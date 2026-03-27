@@ -15,6 +15,7 @@ import { useStrengthState } from "@/hooks/useStrengthState";
 import { orderStrengthItems } from "@/components/strength/utils";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { MyPlanTab } from "@/components/strength/MyPlanTab";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -660,8 +661,9 @@ export default function Strength() {
           />
 
           <Tabs defaultValue="start" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="start">S'entraîner</TabsTrigger>
+              <TabsTrigger value="planning">Mon plan</TabsTrigger>
               <TabsTrigger value="history">Historique</TabsTrigger>
             </TabsList>
 
@@ -696,6 +698,32 @@ export default function Strength() {
                 />
               )}
 
+              {screenMode === "reader" && activeSession && exercises && (
+                <SessionDetailPreview
+                  session={activeSession}
+                  assignment={activeAssignment}
+                  cycleType={cycleType}
+                  cycleOptions={cycleOptions}
+                  exercises={exercises}
+                  oneRMs={oneRMs || []}
+                  saveState={saveState}
+                  onBack={() => setScreenMode("list")}
+                  onLaunch={handleLaunchFocus}
+                  substitutions={substitutions}
+                  onSubstitute={handleSubstitute}
+                  originalItemCount={originalItemCount}
+                  onAddExercise={handleAddExercise}
+                />
+              )}
+            </TabsContent>
+
+            <TabsContent value="planning" className="space-y-4 pt-4">
+              {screenMode === "list" && userId && (
+                <MyPlanTab
+                  athleteId={userId}
+                  onSelectSession={startCatalogSession}
+                />
+              )}
               {screenMode === "reader" && activeSession && exercises && (
                 <SessionDetailPreview
                   session={activeSession}
