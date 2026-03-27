@@ -362,9 +362,7 @@ export default function StrengthCatalog() {
 
   const { data: sessionFolders = [] } = useQuery({
     queryKey: ["strength_folders", "session", selectedAthleteId],
-    queryFn: () => api.getStrengthFolders("session",
-      selectedAthleteId !== null ? { athleteId: selectedAthleteId } : undefined
-    ),
+    queryFn: () => api.getStrengthFolders("session", { athleteId: selectedAthleteId }),
   });
 
   const { data: exerciseFolders } = useQuery({

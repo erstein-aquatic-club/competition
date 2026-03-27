@@ -1258,9 +1258,9 @@ export async function duplicateFolder(
     .select("id")
     .eq("folder_id", folderId);
   if (sessErr) throw new Error(sessErr.message);
-  for (const s of sessions ?? []) {
-    await duplicateStrengthSession(safeInt(s.id), copy.id);
-  }
+  await Promise.all(
+    (sessions ?? []).map((s: any) => duplicateStrengthSession(safeInt(s.id), copy.id)),
+  );
 
   // Copy sub-folders recursively
   const { data: subFolders, error: subErr } = await supabase
@@ -1286,7 +1286,8 @@ export async function duplicateAthletePlan(
     .from("strength_folders")
     .select("id")
     .eq("athlete_id", sourceAthleteId)
-    .eq("type", "session");
+    .eq("type", "session")
+    .is("parent_id", null);
   if (error) throw new Error(error.message);
 
   for (const r of roots ?? []) {

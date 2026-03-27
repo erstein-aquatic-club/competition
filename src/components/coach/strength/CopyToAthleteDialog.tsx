@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,10 @@ export function CopyToAthleteDialog({
   loading,
 }: CopyToAthleteDialogProps) {
   const [targetAthleteId, setTargetAthleteId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open) setTargetAthleteId(null);
+  }, [open]);
 
   const title =
     mode === "plan"
