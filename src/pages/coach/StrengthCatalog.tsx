@@ -290,6 +290,7 @@ export default function StrengthCatalog() {
   const [searchQuery, setSearchQuery] = useState("");
   const [catalogTab, setCatalogTab] = useState<"sessions" | "exercises">("sessions");
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
+  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
 
   const handleGifUpload = async (file: File, setter: (url: string) => void) => {
     const maxSize = 10 * 1024 * 1024;
@@ -348,9 +349,16 @@ export default function StrengthCatalog() {
     queryFn: () => api.getStrengthSessions()
   });
 
-  const { data: sessionFolders } = useQuery({
-    queryKey: ["strength_folders", "session"],
-    queryFn: () => api.getStrengthFolders("session"),
+  const { data: athletes = [] } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => api.getAthletes(),
+  });
+
+  const { data: sessionFolders = [] } = useQuery({
+    queryKey: ["strength_folders", "session", selectedAthleteId],
+    queryFn: () => api.getStrengthFolders("session",
+      selectedAthleteId !== null ? { athleteId: selectedAthleteId } : undefined
+    ),
   });
 
   const { data: exerciseFolders } = useQuery({
@@ -391,6 +399,23 @@ export default function StrengthCatalog() {
     }
     return map;
   }, [filteredSessions]);
+
+  // Hierarchy: root folders vs sub-folders (cycles)
+  const rootFolders = useMemo(
+    () => sessionFolders.filter((f) => !f.parent_id),
+    [sessionFolders],
+  );
+  const subFoldersMap = useMemo(() => {
+    const map = new Map<number, StrengthFolder[]>();
+    for (const f of sessionFolders) {
+      if (f.parent_id) {
+        const arr = map.get(f.parent_id) ?? [];
+        arr.push(f);
+        map.set(f.parent_id, arr);
+      }
+    }
+    return map;
+  }, [sessionFolders]);
 
   const unfiledExercises = useMemo(() =>
     (exercises ?? []).filter((ex) => !ex.folder_id),
@@ -474,8 +499,11 @@ export default function StrengthCatalog() {
   });
 
   const createFolder = useMutation({
-    mutationFn: ({ name, type }: { name: string; type: 'session' | 'exercise' }) =>
-      api.createStrengthFolder(name, type),
+    mutationFn: (args: { name: string; type: 'session' | 'exercise'; parentId?: number; athleteId?: number }) =>
+      api.createStrengthFolder(args.name, args.type, {
+        parentId: args.parentId ?? null,
+        athleteId: args.athleteId ?? null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast({ title: "Dossier créé" });
@@ -1119,76 +1147,229 @@ export default function StrengthCatalog() {
 
           {/* === SESSIONS TAB === */}
           <TabsContent value="sessions" className="space-y-4 mt-4">
-            {/* Search */}
-            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <input
-                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="Rechercher une séance"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            {/* Athlete filter + Search */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Select
+                value={selectedAthleteId === null ? "__common__" : String(selectedAthleteId)}
+                onValueChange={(v) => setSelectedAthleteId(v === "__common__" ? null : Number(v))}
+              >
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <SelectValue placeholder="Bibliothèque commune" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__common__">Bibliothèque commune</SelectItem>
+                  {athletes.map((a) => (
+                    <SelectItem key={a.id ?? a.display_name} value={String(a.id)}>
+                      {a.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex flex-1 items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <input
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  placeholder="Rechercher une séance"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="space-y-3">
-              {/* Unfiled sessions */}
-              <SessionListView
-                sessions={unfiledSessions}
-                isLoading={isLoadingSessions}
-                error={sessionsError}
-                renderTitle={(session) => session.title ?? "Sans titre"}
-                renderMetrics={renderSessionMetrics}
-                renderExtraActions={(session) => (
-                  <MoveToFolderPopover
-                    folders={sessionFolders ?? []}
-                    currentFolderId={session.folder_id}
-                    onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                  />
-                )}
-                onPreview={(session) => startEditSession(session)}
-                onEdit={(session) => startEditSession(session)}
-                onDelete={(session) => setPendingDeleteSession(session)}
-                canDelete={() => true}
-                isDeleting={deleteSession.isPending}
-              />
-
-              {/* Session folders */}
-              {sessionFolders?.map((folder) => {
-                const folderSessions = sessionsByFolder.get(folder.id) ?? [];
-                return (
-                  <FolderSection
-                    key={folder.id}
-                    name={folder.name}
-                    count={folderSessions.length}
-                    onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
-                    onDelete={() => deleteFolderMut.mutate(folder.id)}
+              {/* "Créer un plan" when athlete selected but no folders yet */}
+              {selectedAthleteId !== null && rootFolders.length === 0 && (
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">Aucun plan pour ce nageur</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const athlete = athletes.find((a) => a.id === selectedAthleteId);
+                      createFolder.mutate({
+                        name: athlete?.display_name ?? "Plan",
+                        type: "session",
+                        athleteId: selectedAthleteId,
+                      });
+                    }}
                   >
-                    {folderSessions.length > 0 ? (
-                      <SessionListView
-                        sessions={folderSessions}
-                        renderTitle={(session) => session.title ?? "Sans titre"}
-                        renderMetrics={renderSessionMetrics}
-                        renderExtraActions={(session) => (
-                          <MoveToFolderPopover
-                            folders={sessionFolders ?? []}
-                            currentFolderId={session.folder_id}
-                            onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                    <Plus className="h-4 w-4 mr-2" /> Créer un plan
+                  </Button>
+                </div>
+              )}
+
+              {selectedAthleteId === null ? (
+                <>
+                  {/* Flat folder list — "Bibliothèque commune" mode */}
+                  <SessionListView
+                    sessions={unfiledSessions}
+                    isLoading={isLoadingSessions}
+                    error={sessionsError}
+                    renderTitle={(session) => session.title ?? "Sans titre"}
+                    renderMetrics={renderSessionMetrics}
+                    renderExtraActions={(session) => (
+                      <MoveToFolderPopover
+                        folders={sessionFolders}
+                        currentFolderId={session.folder_id}
+                        onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                      />
+                    )}
+                    onPreview={(session) => startEditSession(session)}
+                    onEdit={(session) => startEditSession(session)}
+                    onDelete={(session) => setPendingDeleteSession(session)}
+                    canDelete={() => true}
+                    isDeleting={deleteSession.isPending}
+                  />
+
+                  {sessionFolders.map((folder) => {
+                    const folderSessions = sessionsByFolder.get(folder.id) ?? [];
+                    return (
+                      <FolderSection
+                        key={folder.id}
+                        name={folder.name}
+                        count={folderSessions.length}
+                        onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
+                        onDelete={() => deleteFolderMut.mutate(folder.id)}
+                      >
+                        {folderSessions.length > 0 ? (
+                          <SessionListView
+                            sessions={folderSessions}
+                            renderTitle={(session) => session.title ?? "Sans titre"}
+                            renderMetrics={renderSessionMetrics}
+                            renderExtraActions={(session) => (
+                              <MoveToFolderPopover
+                                folders={sessionFolders}
+                                currentFolderId={session.folder_id}
+                                onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                              />
+                            )}
+                            onPreview={(session) => startEditSession(session)}
+                            onEdit={(session) => startEditSession(session)}
+                            onDelete={(session) => setPendingDeleteSession(session)}
+                            canDelete={() => true}
+                            isDeleting={deleteSession.isPending}
+                          />
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            Dossier vide
+                          </div>
+                        )}
+                      </FolderSection>
+                    );
+                  })}
+                </>
+              ) : (
+                <>
+                  {/* 2-level hierarchy — athlete mode */}
+                  {/* Unfiled sessions for this athlete context */}
+                  <SessionListView
+                    sessions={unfiledSessions}
+                    isLoading={isLoadingSessions}
+                    error={sessionsError}
+                    renderTitle={(session) => session.title ?? "Sans titre"}
+                    renderMetrics={renderSessionMetrics}
+                    renderExtraActions={(session) => (
+                      <MoveToFolderPopover
+                        folders={sessionFolders}
+                        currentFolderId={session.folder_id}
+                        onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                      />
+                    )}
+                    onPreview={(session) => startEditSession(session)}
+                    onEdit={(session) => startEditSession(session)}
+                    onDelete={(session) => setPendingDeleteSession(session)}
+                    canDelete={() => true}
+                    isDeleting={deleteSession.isPending}
+                  />
+
+                  {rootFolders.map((root) => {
+                    const cycles = subFoldersMap.get(root.id) ?? [];
+                    const rootSessions = sessionsByFolder.get(root.id) ?? [];
+                    const totalCount = cycles.reduce(
+                      (sum, c) => sum + (sessionsByFolder.get(c.id)?.length ?? 0),
+                      rootSessions.length,
+                    );
+                    return (
+                      <FolderSection
+                        key={root.id}
+                        name={root.name}
+                        count={totalCount}
+                        defaultOpen
+                        onRename={(newName) => renameFolder.mutate({ id: root.id, name: newName })}
+                        onDelete={() => deleteFolderMut.mutate(root.id)}
+                      >
+                        {/* Sessions directly in root */}
+                        {rootSessions.length > 0 && (
+                          <SessionListView
+                            sessions={rootSessions}
+                            renderTitle={(session) => session.title ?? "Sans titre"}
+                            renderMetrics={renderSessionMetrics}
+                            renderExtraActions={(session) => (
+                              <MoveToFolderPopover
+                                folders={sessionFolders}
+                                currentFolderId={session.folder_id}
+                                onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                              />
+                            )}
+                            onPreview={(session) => startEditSession(session)}
+                            onEdit={(session) => startEditSession(session)}
+                            onDelete={(session) => setPendingDeleteSession(session)}
+                            canDelete={() => true}
+                            isDeleting={deleteSession.isPending}
                           />
                         )}
-                        onPreview={(session) => startEditSession(session)}
-                        onEdit={(session) => startEditSession(session)}
-                        onDelete={(session) => setPendingDeleteSession(session)}
-                        canDelete={() => true}
-                        isDeleting={deleteSession.isPending}
-                      />
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                        Dossier vide
-                      </div>
-                    )}
-                  </FolderSection>
-                );
-              })}
+
+                        {/* Sub-folders (cycles) */}
+                        {cycles.map((cycle) => {
+                          const cycleSessions = sessionsByFolder.get(cycle.id) ?? [];
+                          return (
+                            <FolderSection
+                              key={cycle.id}
+                              name={cycle.name}
+                              count={cycleSessions.length}
+                              onRename={(newName) => renameFolder.mutate({ id: cycle.id, name: newName })}
+                              onDelete={() => deleteFolderMut.mutate(cycle.id)}
+                            >
+                              {cycleSessions.length > 0 ? (
+                                <SessionListView
+                                  sessions={cycleSessions}
+                                  renderTitle={(session) => session.title ?? "Sans titre"}
+                                  renderMetrics={renderSessionMetrics}
+                                  renderExtraActions={(session) => (
+                                    <MoveToFolderPopover
+                                      folders={sessionFolders}
+                                      currentFolderId={session.folder_id}
+                                      onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                                    />
+                                  )}
+                                  onPreview={(session) => startEditSession(session)}
+                                  onEdit={(session) => startEditSession(session)}
+                                  onDelete={(session) => setPendingDeleteSession(session)}
+                                  canDelete={() => true}
+                                  isDeleting={deleteSession.isPending}
+                                />
+                              ) : (
+                                <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                                  Dossier vide
+                                </div>
+                              )}
+                            </FolderSection>
+                          );
+                        })}
+
+                        {/* Add cycle button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-1 text-xs"
+                          onClick={() => createFolder.mutate({ name: "Nouveau cycle", type: "session", parentId: root.id })}
+                        >
+                          <Plus className="h-4 w-4 mr-2" /> Ajouter un cycle
+                        </Button>
+                      </FolderSection>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </TabsContent>
 
