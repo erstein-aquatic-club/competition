@@ -7016,6 +7016,32 @@ Le coach peut maintenant organiser des séances de musculation par nageur avec d
 - Phase 2 prévue : vue nageur "Mon plan muscu" (consultation côté nageur)
 
 ### Limites / dette
-- Pas de vue côté nageur "Mon plan muscu" (phase 2)
 - Les charges ne sont pas copiées lors de la duplication inter-nageurs
 - Pas de drag & drop pour réorganiser les dossiers
+
+---
+
+### Phase 2 — Onglet "Mon plan" côté nageur
+
+**Date** : 2026-03-27
+
+#### Contexte
+
+Le coach organise des cycles et séances dans des dossiers par nageur (phase 1). Le nageur n'avait aucun moyen de consulter ce plan depuis son interface musculation. Phase 2 ajoute un onglet "Mon plan" dans la page Strength du nageur.
+
+#### Changements réalisés
+
+1. **Composant `MyPlanTab`** — Vue lecture seule des cycles et séances planifiées par le coach pour le nageur connecté
+2. **Intégration dans `Strength.tsx`** — Ajout d'un 3e onglet "Mon plan" (S'entraîner | Mon plan | Historique)
+3. **Lancement séance** — Réutilise le flow `startCatalogSession` existant pour démarrer un workout depuis le plan
+
+#### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/strength/MyPlanTab.tsx` | Créé (~158 lignes) — onglet Mon plan nageur |
+| `src/pages/Strength.tsx` | Modifié — ajout 3e onglet Mon plan |
+
+#### Tests
+- `npx tsc --noEmit` : pas d'erreurs nouvelles
+- `npm run build` : succès

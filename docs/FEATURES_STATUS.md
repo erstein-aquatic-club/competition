@@ -97,6 +97,7 @@ Tous les feature flags sont activés.
 | Dossiers exercices | ✅ | `StrengthCatalog.tsx`, `FolderSection.tsx`, `MoveToFolderPopover.tsx` | Même système que séances, types séparés (§32) |
 | Assignation | ✅ | `CoachAssignScreen.tsx` | Via écran d'assignation partagé |
 | Dossiers par nageur (hiérarchiques) | ✅ | `StrengthCatalog.tsx`, `FolderSection.tsx`, `CopyToAthleteDialog.tsx` | Filtre nageur, dossiers 2 niveaux (cycle → séances), copie inter-nageurs, assignation rapide (§90) |
+| Vue nageur Mon plan muscu | ✅ | `MyPlanTab.tsx`, `Strength.tsx` | Onglet "Mon plan" lecture cycles + lancement séance (§90 phase 2) |
 | Dashboard coach | ✅ | `Coach.tsx` | Mobile first, KPI unifié, grille 2x2 avec compteurs, cards nageurs (§35) |
 | Calendrier coach | ✅ | `CoachCalendar.tsx`, `useCoachCalendarState.ts` | Vue mensuelle assignations, filtre groupe/nageur, 3 slots éditables inline (Nage Matin, Nage Soir, Muscu), indicateur musculation DayCell (§53, §54) |
 

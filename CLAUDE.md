@@ -110,6 +110,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/competition/TimelineTab.tsx` | Onglet Jour J (fusion chronologique courses + routines) | ~235 lignes |
 | `src/components/competition/ChecklistTab.tsx` | Onglet checklist (templates, progress bar, toggle) | ~415 lignes |
 | `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) | |
+| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur (lecture cycles + lancement séance) | ~158 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/coach/strength/FolderSection.tsx` | Dossiers hiérarchiques 2 niveaux bibliothèque muscu (§90) | |
 
