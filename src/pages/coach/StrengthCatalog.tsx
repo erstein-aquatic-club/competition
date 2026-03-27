@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
+import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus, Copy, CalendarPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -570,6 +570,27 @@ export default function StrengthCatalog() {
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Copie échouée";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async (sessionId: number) => {
+      if (!selectedAthleteId) throw new Error("Aucun nageur sélectionné");
+      const today = new Date().toISOString().slice(0, 10);
+      return api.assignments_create({
+        assignment_type: "strength",
+        session_id: sessionId,
+        target_user_id: selectedAthleteId,
+        scheduled_date: today,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
+      toast({ title: "Séance assignée pour aujourd'hui" });
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : "Erreur d'assignation";
       toast({ title: "Erreur", description: message, variant: "destructive" });
     },
   });
@@ -1345,6 +1366,16 @@ export default function StrengthCatalog() {
                         >
                           <Copy className="h-4 w-4" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => assignMutation.mutate(session.id)}
+                          disabled={assignMutation.isPending}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted text-green-600"
+                          aria-label="Assigner pour aujourd'hui"
+                          title="Assigner pour aujourd'hui"
+                        >
+                          <CalendarPlus className="h-4 w-4" />
+                        </button>
                       </>
                     )}
                     onPreview={(session) => startEditSession(session)}
@@ -1392,6 +1423,16 @@ export default function StrengthCatalog() {
                                 >
                                   <Copy className="h-4 w-4" />
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => assignMutation.mutate(session.id)}
+                                  disabled={assignMutation.isPending}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted text-green-600"
+                                  aria-label="Assigner pour aujourd'hui"
+                                  title="Assigner pour aujourd'hui"
+                                >
+                                  <CalendarPlus className="h-4 w-4" />
+                                </button>
                               </>
                             )}
                             onPreview={(session) => startEditSession(session)}
@@ -1433,6 +1474,16 @@ export default function StrengthCatalog() {
                                         aria-label="Copier vers un nageur"
                                       >
                                         <Copy className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => assignMutation.mutate(session.id)}
+                                        disabled={assignMutation.isPending}
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted text-green-600"
+                                        aria-label="Assigner pour aujourd'hui"
+                                        title="Assigner pour aujourd'hui"
+                                      >
+                                        <CalendarPlus className="h-4 w-4" />
                                       </button>
                                     </>
                                   )}
