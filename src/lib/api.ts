@@ -325,6 +325,9 @@ import {
   renameStrengthFolder as _renameStrengthFolder,
   deleteStrengthFolder as _deleteStrengthFolder,
   moveToFolder as _moveToFolder,
+  duplicateStrengthSession as _duplicateStrengthSession,
+  duplicateFolder as _duplicateFolder,
+  duplicateAthletePlan as _duplicateAthletePlan,
 } from "./api/strength";
 
 // --- API Service ---
@@ -595,6 +598,9 @@ export const api = {
   async renameStrengthFolder(id: number, name: string) { return _renameStrengthFolder(id, name); },
   async deleteStrengthFolder(id: number) { return _deleteStrengthFolder(id); },
   async moveToFolder(itemId: number, folderId: number | null, table: 'strength_sessions' | 'dim_exercices') { return _moveToFolder(itemId, folderId, table); },
+  async duplicateStrengthSession(sessionId: number, targetFolderId: number | null) { return _duplicateStrengthSession(sessionId, targetFolderId); },
+  async duplicateFolder(folderId: number, targetAthleteId: number | null, targetParentId: number | null) { return _duplicateFolder(folderId, targetAthleteId, targetParentId); },
+  async duplicateAthletePlan(sourceAthleteId: number, targetAthleteId: number) { return _duplicateAthletePlan(sourceAthleteId, targetAthleteId); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Swim Exercise Logs

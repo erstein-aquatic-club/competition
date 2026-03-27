@@ -1167,3 +1167,129 @@ export async function moveToFolder(
   const { error } = await supabase.from(table).update({ folder_id: folderId }).eq("id", itemId);
   if (error) throw new Error(error.message);
 }
+
+// --- Duplication helpers ---
+
+export async function duplicateStrengthSession(
+  sessionId: number,
+  targetFolderId: number | null,
+): Promise<number> {
+  if (!canUseSupabase()) throw new Error("Supabase requis");
+
+  // Read source session
+  const { data: src, error: srcErr } = await supabase
+    .from("strength_sessions")
+    .select("name, description")
+    .eq("id", sessionId)
+    .single();
+  if (srcErr || !src) throw new Error(srcErr?.message ?? "Session introuvable");
+
+  // Read source items
+  const { data: items, error: itemsErr } = await supabase
+    .from("strength_session_items")
+    .select("ordre, exercise_id, block, cycle_type, sets, reps, pct_1rm, rest_series_s, rest_exercise_s, notes, raw_payload")
+    .eq("session_id", sessionId)
+    .order("ordre");
+  if (itemsErr) throw new Error(itemsErr.message);
+
+  // Insert copy session
+  const { data: created, error: createErr } = await supabase
+    .from("strength_sessions")
+    .insert({
+      name: src.name,
+      description: src.description,
+      folder_id: targetFolderId,
+    })
+    .select("id")
+    .single();
+  if (createErr || !created) throw new Error(createErr?.message ?? "Échec création session");
+
+  const newId = safeInt(created.id);
+
+  // Insert copy items
+  if (items && items.length > 0) {
+    const copyItems = items.map((it: any) => ({
+      session_id: newId,
+      ordre: it.ordre,
+      exercise_id: it.exercise_id,
+      block: it.block,
+      cycle_type: it.cycle_type,
+      sets: it.sets,
+      reps: it.reps,
+      pct_1rm: it.pct_1rm,
+      rest_series_s: it.rest_series_s,
+      rest_exercise_s: it.rest_exercise_s,
+      notes: it.notes,
+      raw_payload: it.raw_payload,
+    }));
+    const { error: insErr } = await supabase
+      .from("strength_session_items")
+      .insert(copyItems);
+    if (insErr) throw new Error(insErr.message);
+  }
+
+  return newId;
+}
+
+export async function duplicateFolder(
+  folderId: number,
+  targetAthleteId: number | null,
+  targetParentId: number | null,
+): Promise<number> {
+  if (!canUseSupabase()) throw new Error("Supabase requis");
+
+  // Read source folder
+  const { data: src, error: srcErr } = await supabase
+    .from("strength_folders")
+    .select("name, type")
+    .eq("id", folderId)
+    .single();
+  if (srcErr || !src) throw new Error(srcErr?.message ?? "Dossier introuvable");
+
+  // Create copy folder
+  const copy = await createStrengthFolder(src.name, src.type, {
+    parentId: targetParentId,
+    athleteId: targetAthleteId,
+  });
+
+  // Copy all sessions in this folder
+  const { data: sessions, error: sessErr } = await supabase
+    .from("strength_sessions")
+    .select("id")
+    .eq("folder_id", folderId);
+  if (sessErr) throw new Error(sessErr.message);
+  for (const s of sessions ?? []) {
+    await duplicateStrengthSession(safeInt(s.id), copy.id);
+  }
+
+  // Copy sub-folders recursively
+  const { data: subFolders, error: subErr } = await supabase
+    .from("strength_folders")
+    .select("id")
+    .eq("parent_id", folderId);
+  if (subErr) throw new Error(subErr.message);
+  for (const sf of subFolders ?? []) {
+    await duplicateFolder(safeInt(sf.id), null, copy.id);
+  }
+
+  return copy.id;
+}
+
+export async function duplicateAthletePlan(
+  sourceAthleteId: number,
+  targetAthleteId: number,
+): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase requis");
+
+  // Find all root folders for source athlete
+  const { data: roots, error } = await supabase
+    .from("strength_folders")
+    .select("id")
+    .eq("athlete_id", sourceAthleteId)
+    .eq("type", "session");
+  if (error) throw new Error(error.message);
+
+  for (const r of roots ?? []) {
+    await duplicateFolder(safeInt(r.id), targetAthleteId, null);
+  }
+}

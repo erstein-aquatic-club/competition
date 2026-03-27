@@ -319,4 +319,7 @@ export {
   renameStrengthFolder,
   deleteStrengthFolder,
   moveToFolder,
+  duplicateStrengthSession,
+  duplicateFolder,
+  duplicateAthletePlan,
 } from './strength';
