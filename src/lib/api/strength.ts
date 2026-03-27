@@ -1061,33 +1061,89 @@ export async function updateExerciseNote(params: {
 
 // --- Strength Folders ---
 
-export async function getStrengthFolders(type: 'session' | 'exercise'): Promise<StrengthFolder[]> {
+function mapFolder(row: any): StrengthFolder {
+  return {
+    id: safeInt(row.id),
+    name: String(row.name || ""),
+    type: row.type as 'session' | 'exercise',
+    sort_order: safeInt(row.sort_order),
+    parent_id: row.parent_id != null ? safeInt(row.parent_id) : null,
+    athlete_id: row.athlete_id != null ? safeInt(row.athlete_id) : null,
+  };
+}
+
+export async function getStrengthFolders(
+  type: 'session' | 'exercise',
+  opts?: { athleteId?: number | null; parentId?: number | null },
+): Promise<StrengthFolder[]> {
   if (canUseSupabase()) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("strength_folders")
       .select("*")
-      .eq("type", type)
-      .order("sort_order", { ascending: true });
+      .eq("type", type);
+
+    if (opts?.athleteId !== undefined) {
+      if (opts.athleteId === null) {
+        // Global/common folders: no athlete, no parent (root level)
+        query = query.is("athlete_id", null).is("parent_id", null);
+      } else {
+        // Athlete-specific: fetch root folders for this athlete, then children
+        const { data: roots, error: rootErr } = await query
+          .eq("athlete_id", opts.athleteId)
+          .is("parent_id", null)
+          .order("sort_order", { ascending: true });
+        if (rootErr) throw new Error(rootErr.message);
+        const rootFolders = (roots ?? []).map(mapFolder);
+        if (rootFolders.length === 0) return [];
+        const rootIds = rootFolders.map((f) => f.id);
+        const { data: children, error: childErr } = await supabase
+          .from("strength_folders")
+          .select("*")
+          .eq("type", type)
+          .in("parent_id", rootIds)
+          .order("sort_order", { ascending: true });
+        if (childErr) throw new Error(childErr.message);
+        const allFolders = [...rootFolders, ...(children ?? []).map(mapFolder)];
+        if (opts.parentId !== undefined && opts.parentId !== null) {
+          return allFolders.filter((f) => f.parent_id === opts.parentId);
+        }
+        return allFolders;
+      }
+    }
+
+    if (opts?.parentId !== undefined) {
+      if (opts.parentId === null) {
+        query = query.is("parent_id", null);
+      } else {
+        query = query.eq("parent_id", opts.parentId);
+      }
+    }
+
+    const { data, error } = await query.order("sort_order", { ascending: true });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((row: any) => ({
-      id: safeInt(row.id),
-      name: String(row.name || ""),
-      type: row.type as 'session' | 'exercise',
-      sort_order: safeInt(row.sort_order),
-    }));
+    return (data ?? []).map(mapFolder);
   }
   return [];
 }
 
-export async function createStrengthFolder(name: string, type: 'session' | 'exercise'): Promise<StrengthFolder> {
+export async function createStrengthFolder(
+  name: string,
+  type: 'session' | 'exercise',
+  opts?: { parentId?: number | null; athleteId?: number | null },
+): Promise<StrengthFolder> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
   const { data, error } = await supabase
     .from("strength_folders")
-    .insert({ name, type })
+    .insert({
+      name,
+      type,
+      parent_id: opts?.parentId ?? null,
+      athlete_id: opts?.athleteId ?? null,
+    })
     .select("*")
     .single();
   if (error) throw new Error(error.message);
-  return { id: safeInt(data.id), name: String(data.name), type: data.type, sort_order: safeInt(data.sort_order) };
+  return mapFolder(data);
 }
 
 export async function renameStrengthFolder(id: number, name: string): Promise<void> {
