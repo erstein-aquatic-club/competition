@@ -86,6 +86,8 @@ export interface StrengthFolder {
   name: string;
   type: 'session' | 'exercise';
   sort_order: number;
+  parent_id?: number | null;
+  athlete_id?: number | null;
 }
 
 export interface SwimSessionTemplate {
