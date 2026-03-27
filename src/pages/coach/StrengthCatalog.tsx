@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus } from "lucide-react";
+import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +28,7 @@ import { StrengthSessionBuilder } from "@/components/coach/strength/StrengthSess
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { FolderSection } from "@/components/coach/strength/FolderSection";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
+import { CopyToAthleteDialog } from "@/components/coach/strength/CopyToAthleteDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -291,6 +292,11 @@ export default function StrengthCatalog() {
   const [catalogTab, setCatalogTab] = useState<"sessions" | "exercises">("sessions");
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
+  const [copyDialog, setCopyDialog] = useState<{
+    mode: "session" | "folder" | "plan";
+    sourceId: number;
+    sourceLabel: string;
+  } | null>(null);
 
   const handleGifUpload = async (file: File, setter: (url: string) => void) => {
     const maxSize = 10 * 1024 * 1024;
@@ -536,6 +542,35 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast({ title: "Déplacé" });
+    },
+  });
+
+  const copyMutation = useMutation({
+    mutationFn: async ({ mode, sourceId, targetAthleteId }: { mode: string; sourceId: number; targetAthleteId: number }) => {
+      if (mode === "session") {
+        const targetFolders = await api.getStrengthFolders("session", { athleteId: targetAthleteId });
+        const rootFolder = targetFolders.find((f) => f.athlete_id === targetAthleteId && !f.parent_id);
+        let targetFolderId: number | null = null;
+        if (rootFolder) {
+          const subs = targetFolders.filter((f) => f.parent_id === rootFolder.id);
+          targetFolderId = subs[0]?.id ?? rootFolder.id;
+        }
+        await api.duplicateStrengthSession(sourceId, targetFolderId);
+      } else if (mode === "folder") {
+        await api.duplicateFolder(sourceId, targetAthleteId, null);
+      } else if (mode === "plan") {
+        await api.duplicateAthletePlan(sourceId, targetAthleteId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      toast({ title: "Copie effectuée" });
+      setCopyDialog(null);
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : "Copie échouée";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
     },
   });
 
@@ -1079,6 +1114,24 @@ export default function StrengthCatalog() {
       {deleteSessionDialog}
       {deleteExerciseDialog}
 
+      {copyDialog && (
+        <CopyToAthleteDialog
+          open={!!copyDialog}
+          onOpenChange={(open) => !open && setCopyDialog(null)}
+          athletes={athletes}
+          mode={copyDialog.mode}
+          sourceLabel={copyDialog.sourceLabel}
+          loading={copyMutation.isPending}
+          onConfirm={(targetAthleteId) =>
+            copyMutation.mutate({
+              mode: copyDialog.mode,
+              sourceId: copyDialog.sourceId,
+              targetAthleteId,
+            })
+          }
+        />
+      )}
+
       {/* GIF enlarge overlay */}
       {enlargedGif && (
         <div
@@ -1207,11 +1260,21 @@ export default function StrengthCatalog() {
                     renderTitle={(session) => session.title ?? "Sans titre"}
                     renderMetrics={renderSessionMetrics}
                     renderExtraActions={(session) => (
-                      <MoveToFolderPopover
-                        folders={sessionFolders}
-                        currentFolderId={session.folder_id}
-                        onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                      />
+                      <>
+                        <MoveToFolderPopover
+                          folders={sessionFolders}
+                          currentFolderId={session.folder_id}
+                          onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                          aria-label="Copier vers un nageur"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </>
                     )}
                     onPreview={(session) => startEditSession(session)}
                     onEdit={(session) => startEditSession(session)}
@@ -1268,11 +1331,21 @@ export default function StrengthCatalog() {
                     renderTitle={(session) => session.title ?? "Sans titre"}
                     renderMetrics={renderSessionMetrics}
                     renderExtraActions={(session) => (
-                      <MoveToFolderPopover
-                        folders={sessionFolders}
-                        currentFolderId={session.folder_id}
-                        onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                      />
+                      <>
+                        <MoveToFolderPopover
+                          folders={sessionFolders}
+                          currentFolderId={session.folder_id}
+                          onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                          aria-label="Copier vers un nageur"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </>
                     )}
                     onPreview={(session) => startEditSession(session)}
                     onEdit={(session) => startEditSession(session)}
@@ -1296,6 +1369,7 @@ export default function StrengthCatalog() {
                         defaultOpen
                         onRename={(newName) => renameFolder.mutate({ id: root.id, name: newName })}
                         onDelete={() => deleteFolderMut.mutate(root.id)}
+                        onCopy={() => setCopyDialog({ mode: "plan", sourceId: selectedAthleteId!, sourceLabel: root.name + " (plan complet)" })}
                       >
                         {/* Sessions directly in root */}
                         {rootSessions.length > 0 && (
@@ -1304,11 +1378,21 @@ export default function StrengthCatalog() {
                             renderTitle={(session) => session.title ?? "Sans titre"}
                             renderMetrics={renderSessionMetrics}
                             renderExtraActions={(session) => (
-                              <MoveToFolderPopover
-                                folders={sessionFolders}
-                                currentFolderId={session.folder_id}
-                                onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                              />
+                              <>
+                                <MoveToFolderPopover
+                                  folders={sessionFolders}
+                                  currentFolderId={session.folder_id}
+                                  onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                                  aria-label="Copier vers un nageur"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                              </>
                             )}
                             onPreview={(session) => startEditSession(session)}
                             onEdit={(session) => startEditSession(session)}
@@ -1328,6 +1412,7 @@ export default function StrengthCatalog() {
                               count={cycleSessions.length}
                               onRename={(newName) => renameFolder.mutate({ id: cycle.id, name: newName })}
                               onDelete={() => deleteFolderMut.mutate(cycle.id)}
+                              onCopy={() => setCopyDialog({ mode: "folder", sourceId: cycle.id, sourceLabel: cycle.name })}
                             >
                               {cycleSessions.length > 0 ? (
                                 <SessionListView
@@ -1335,11 +1420,21 @@ export default function StrengthCatalog() {
                                   renderTitle={(session) => session.title ?? "Sans titre"}
                                   renderMetrics={renderSessionMetrics}
                                   renderExtraActions={(session) => (
-                                    <MoveToFolderPopover
-                                      folders={sessionFolders}
-                                      currentFolderId={session.folder_id}
-                                      onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                                    />
+                                    <>
+                                      <MoveToFolderPopover
+                                        folders={sessionFolders}
+                                        currentFolderId={session.folder_id}
+                                        onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                                        aria-label="Copier vers un nageur"
+                                      >
+                                        <Copy className="h-4 w-4" />
+                                      </button>
+                                    </>
                                   )}
                                   onPreview={(session) => startEditSession(session)}
                                   onEdit={(session) => startEditSession(session)}

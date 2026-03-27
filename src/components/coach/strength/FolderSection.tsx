@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, Copy, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ interface FolderSectionProps {
   children: React.ReactNode;
   onRename: (newName: string) => void;
   onDelete: () => void;
+  onCopy?: () => void;
   defaultOpen?: boolean;
 }
 
@@ -19,6 +20,7 @@ export function FolderSection({
   children,
   onRename,
   onDelete,
+  onCopy,
   defaultOpen = false,
 }: FolderSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -120,6 +122,18 @@ export function FolderSection({
               <Pencil className="h-4 w-4" />
               Rename
             </button>
+            {onCopy && (
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onCopy();
+                }}
+              >
+                <Copy className="h-4 w-4" />
+                Copier vers...
+              </button>
+            )}
             <button
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-muted"
               onClick={() => {
