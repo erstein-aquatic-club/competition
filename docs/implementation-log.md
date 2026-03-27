@@ -60,6 +60,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 | §87 Notes techniques enrichies (épreuve, bassin, équipement) | ✅ Fait | 2026-03-01 |
 | §87 Préparation compétition nageur (courses, routines, timeline, checklist) | ✅ Fait | 2026-03-01 |
 | §89 Strength UX Overhaul (audit + refonte mobile-first) | ✅ Fait | 2026-03-09 |
+| §90 Planification muscu par nageur (dossiers hiérarchiques) | ✅ Fait | 2026-03-27 |
 | §45 Audit UI/UX — header Strength + login mobile + fixes | ✅ Fait | 2026-02-16 |
 | §46 Harmonisation headers + Login mobile thème clair | ✅ Fait | 2026-02-16 |
 | §6 Fix timers PWA iOS | ✅ Fait | 2026-02-09 |
@@ -6971,3 +6972,50 @@ Plan d'exécution : `docs/plans/2026-03-09-strength-ux-overhaul-plan.md`
 - Les GIFs d'exercice restent côté client (pas de CDN dédié)
 - Le composant ExercisePicker ne supporte pas encore le filtrage par groupe musculaire
 - Pas d'export des notes par épreuve
+
+---
+
+## 2026-03-27 — §90 Planification muscu par nageur (dossiers hiérarchiques)
+
+**Branche** : `main`
+**Chantier ROADMAP** : §90 — Planification muscu par nageur (dossiers hiérarchiques)
+
+### Contexte — Pourquoi ce patch
+
+Le coach peut maintenant organiser des séances de musculation par nageur avec des dossiers hiérarchiques (nageur → cycles → séances). La bibliothèque coach StrengthCatalog supporte un filtre par nageur, des dossiers liés à un athlète sur 2 niveaux, la copie inter-nageurs et l'assignation rapide depuis un dossier nageur.
+
+### Changements réalisés
+
+1. **Migration DB** — Ajout de `parent_id` et `athlete_id` sur `strength_folders` pour supporter la hiérarchie et le lien nageur
+2. **API strength** — `getStrengthFolders` avec filtre `athlete_id`, `createStrengthFolder` avec `parent_id`/`athlete_id`, 3 fonctions de duplication (`duplicateFolderToAthlete`, `duplicateSessionToAthlete`, `duplicateSessionToFolder`)
+3. **Types** — Extension de `StrengthFolder` avec `parent_id`, `athlete_id` ; nouveaux types pour la duplication
+4. **UI Coach StrengthCatalog** — Filtre nageur dans la bibliothèque, dossiers hiérarchiques 2 niveaux (cycle → séances), dialog copie vers nageur, assignation rapide depuis dossier nageur
+5. **Composants** — `CopyToAthleteDialog` (sélecteur nageur + dossier cible), `FolderSection` (dossiers hiérarchiques avec expand/collapse)
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00058_strength_folder_hierarchy.sql` | Créé (migration parent_id + athlete_id) |
+| `src/lib/api/strength.ts` | Modifié (filtre athlete, parent_id, 3 fonctions duplication) |
+| `src/lib/api/types.ts` | Modifié (parent_id, athlete_id sur StrengthFolder) |
+| `src/lib/api/index.ts` | Modifié (re-exports nouvelles fonctions) |
+| `src/lib/api.ts` | Modifié (façade nouvelles fonctions) |
+| `src/pages/coach/StrengthCatalog.tsx` | Modifié (filtre nageur, dossiers hiérarchiques, assignation rapide) |
+| `src/components/coach/strength/CopyToAthleteDialog.tsx` | Créé (dialog copie vers nageur) |
+| `src/components/coach/strength/FolderSection.tsx` | Créé (dossiers hiérarchiques 2 niveaux) |
+
+### Tests
+- `npx tsc --noEmit` : pas d'erreurs nouvelles
+- `npm run build` : succès
+
+### Décisions prises
+- Approche B retenue : dossiers liés à un nageur via `athlete_id` (plutôt que tags ou dossiers virtuels)
+- Hiérarchie limitée à 2 niveaux (nageur → cycle → séances) pour garder la navigation simple
+- Charges manuelles : pas de copie automatique des charges d'un nageur à l'autre
+- Phase 2 prévue : vue nageur "Mon plan muscu" (consultation côté nageur)
+
+### Limites / dette
+- Pas de vue côté nageur "Mon plan muscu" (phase 2)
+- Les charges ne sont pas copiées lors de la duplication inter-nageurs
+- Pas de drag & drop pour réorganiser les dossiers

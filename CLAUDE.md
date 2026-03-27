@@ -110,6 +110,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/competition/TimelineTab.tsx` | Onglet Jour J (fusion chronologique courses + routines) | ~235 lignes |
 | `src/components/competition/ChecklistTab.tsx` | Onglet checklist (templates, progress bar, toggle) | ~415 lignes |
 | `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) | |
+| `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
+| `src/components/coach/strength/FolderSection.tsx` | Dossiers hiérarchiques 2 niveaux bibliothèque muscu (§90) | |
 
 ## Edge Functions Supabase
 
@@ -184,6 +186,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 50 | Préparation compétition nageur (courses, routines, timeline, checklist) | Moyenne | Fait (§87) |
 | 51 | Notes techniques enrichies (épreuve, bassin, équipement) | Moyenne | Fait (§88) |
 | 52 | Strength UX Overhaul — refonte parcours musculation nageur | Haute | Fait (§89) |
+| 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Fait (§90) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
