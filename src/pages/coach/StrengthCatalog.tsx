@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, Exercise, StrengthCycleType, StrengthSessionItem, StrengthSessionTemplate, StrengthFolder } from "@/lib/api";
+import { api, Exercise, StrengthCycleType, StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api";
 import type { StrengthSessionInput } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus, Copy, CalendarPlus } from "lucide-react";
+import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,8 +29,7 @@ import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { FolderSection } from "@/components/coach/strength/FolderSection";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
 import { CopyToAthleteDialog } from "@/components/coach/strength/CopyToAthleteDialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { AthletePlansTab } from "@/components/coach/strength/AthletePlansTab";
 
 type ExerciseDraft = Omit<Exercise, "id"> & {
   id?: number;
@@ -289,9 +288,8 @@ export default function StrengthCatalog() {
   const [editWarmupMode, setEditWarmupMode] = useState<"reps" | "duration">("reps");
   const [gifUploading, setGifUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [catalogTab, setCatalogTab] = useState<"sessions" | "exercises">("sessions");
+  const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises">("sessions");
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
-  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
   const [copyDialog, setCopyDialog] = useState<{
     mode: "session" | "folder" | "plan";
     sourceId: number;
@@ -361,8 +359,8 @@ export default function StrengthCatalog() {
   });
 
   const { data: sessionFolders = [] } = useQuery({
-    queryKey: ["strength_folders", "session", selectedAthleteId],
-    queryFn: () => api.getStrengthFolders("session", { athleteId: selectedAthleteId }),
+    queryKey: ["strength_folders", "session", null],
+    queryFn: () => api.getStrengthFolders("session", { athleteId: null }),
   });
 
   const { data: exerciseFolders } = useQuery({
@@ -403,23 +401,6 @@ export default function StrengthCatalog() {
     }
     return map;
   }, [filteredSessions]);
-
-  // Hierarchy: root folders vs sub-folders (cycles)
-  const rootFolders = useMemo(
-    () => sessionFolders.filter((f) => !f.parent_id),
-    [sessionFolders],
-  );
-  const subFoldersMap = useMemo(() => {
-    const map = new Map<number, StrengthFolder[]>();
-    for (const f of sessionFolders) {
-      if (f.parent_id) {
-        const arr = map.get(f.parent_id) ?? [];
-        arr.push(f);
-        map.set(f.parent_id, arr);
-      }
-    }
-    return map;
-  }, [sessionFolders]);
 
   const unfiledExercises = useMemo(() =>
     (exercises ?? []).filter((ex) => !ex.folder_id),
@@ -568,27 +549,6 @@ export default function StrengthCatalog() {
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Copie échouée";
-      toast({ title: "Erreur", description: message, variant: "destructive" });
-    },
-  });
-
-  const assignMutation = useMutation({
-    mutationFn: async (sessionId: number) => {
-      if (!selectedAthleteId) throw new Error("Aucun nageur sélectionné");
-      const today = new Date().toISOString().slice(0, 10);
-      return api.assignments_create({
-        assignment_type: "strength",
-        session_id: sessionId,
-        target_user_id: selectedAthleteId,
-        scheduled_date: today,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      toast({ title: "Séance assignée pour aujourd'hui" });
-    },
-    onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : "Erreur d'assignation";
       toast({ title: "Erreur", description: message, variant: "destructive" });
     },
   });
@@ -1175,16 +1135,18 @@ export default function StrengthCatalog() {
           <div className="text-xs text-muted-foreground">Catalogue</div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              const name = prompt("Nom du dossier");
-              if (name?.trim()) createFolder.mutate({ name: name.trim(), type: catalogTab === "sessions" ? "session" : "exercise" });
-            }}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
-          >
-            <FolderPlus className="h-4 w-4" /> Dossier
-          </button>
+          {catalogTab !== "plans" && (
+            <button
+              type="button"
+              onClick={() => {
+                const name = prompt("Nom du dossier");
+                if (name?.trim()) createFolder.mutate({ name: name.trim(), type: catalogTab === "sessions" ? "session" : "exercise" });
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
+            >
+              <FolderPlus className="h-4 w-4" /> Dossier
+            </button>
+          )}
           {catalogTab === "sessions" ? (
             <button
               type="button"
@@ -1197,7 +1159,7 @@ export default function StrengthCatalog() {
             >
               <Plus className="h-4 w-4" /> Nouvelle
             </button>
-          ) : (
+          ) : catalogTab === "exercises" ? (
             <button
               type="button"
               onClick={() => setExerciseDialogOpen(true)}
@@ -1205,316 +1167,116 @@ export default function StrengthCatalog() {
             >
               <Plus className="h-4 w-4" /> Ajouter
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
       <div className="p-4 space-y-4">
         {/* Tabs */}
-        <Tabs value={catalogTab} onValueChange={(v) => setCatalogTab(v as "sessions" | "exercises")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="sessions">Séances</TabsTrigger>
+        <Tabs value={catalogTab} onValueChange={(v) => setCatalogTab(v as "sessions" | "plans" | "exercises")}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="sessions">S&eacute;ances</TabsTrigger>
+            <TabsTrigger value="plans">Plans nageurs</TabsTrigger>
             <TabsTrigger value="exercises">Exercices ({exercises?.length ?? 0})</TabsTrigger>
           </TabsList>
 
-          {/* === SESSIONS TAB === */}
+          {/* === SESSIONS TAB (common library only) === */}
           <TabsContent value="sessions" className="space-y-4 mt-4">
-            {/* Athlete filter + Search */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Select
-                value={selectedAthleteId === null ? "__common__" : String(selectedAthleteId)}
-                onValueChange={(v) => setSelectedAthleteId(v === "__common__" ? null : Number(v))}
-              >
-                <SelectTrigger className="w-full sm:w-[220px]">
-                  <SelectValue placeholder="Bibliothèque commune" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__common__">Bibliothèque commune</SelectItem>
-                  {athletes.map((a) => (
-                    <SelectItem key={a.id ?? a.display_name} value={String(a.id)}>
-                      {a.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex flex-1 items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <input
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  placeholder="Rechercher une séance"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+            {/* Search */}
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder="Rechercher une s&eacute;ance"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
 
             <div className="space-y-3">
-              {/* "Créer un plan" when athlete selected but no folders yet */}
-              {selectedAthleteId !== null && rootFolders.length === 0 && (
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-4 py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Aucun plan pour ce nageur</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const athlete = athletes.find((a) => a.id === selectedAthleteId);
-                      createFolder.mutate({
-                        name: athlete?.display_name ?? "Plan",
-                        type: "session",
-                        athleteId: selectedAthleteId,
-                      });
-                    }}
+              {/* Unfiled sessions */}
+              <SessionListView
+                sessions={unfiledSessions}
+                isLoading={isLoadingSessions}
+                error={sessionsError}
+                renderTitle={(session) => session.title ?? "Sans titre"}
+                renderMetrics={renderSessionMetrics}
+                renderExtraActions={(session) => (
+                  <>
+                    <MoveToFolderPopover
+                      folders={sessionFolders}
+                      currentFolderId={session.folder_id}
+                      onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                      aria-label="Copier vers un nageur"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+                onPreview={(session) => startEditSession(session)}
+                onEdit={(session) => startEditSession(session)}
+                onDelete={(session) => setPendingDeleteSession(session)}
+                canDelete={() => true}
+                isDeleting={deleteSession.isPending}
+              />
+
+              {/* Folders */}
+              {sessionFolders.map((folder) => {
+                const folderSessions = sessionsByFolder.get(folder.id) ?? [];
+                return (
+                  <FolderSection
+                    key={folder.id}
+                    name={folder.name}
+                    count={folderSessions.length}
+                    onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
+                    onDelete={() => deleteFolderMut.mutate(folder.id)}
                   >
-                    <Plus className="h-4 w-4 mr-2" /> Créer un plan
-                  </Button>
-                </div>
-              )}
-
-              {selectedAthleteId === null ? (
-                <>
-                  {/* Flat folder list — "Bibliothèque commune" mode */}
-                  <SessionListView
-                    sessions={unfiledSessions}
-                    isLoading={isLoadingSessions}
-                    error={sessionsError}
-                    renderTitle={(session) => session.title ?? "Sans titre"}
-                    renderMetrics={renderSessionMetrics}
-                    renderExtraActions={(session) => (
-                      <>
-                        <MoveToFolderPopover
-                          folders={sessionFolders}
-                          currentFolderId={session.folder_id}
-                          onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
-                          aria-label="Copier vers un nageur"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                    onPreview={(session) => startEditSession(session)}
-                    onEdit={(session) => startEditSession(session)}
-                    onDelete={(session) => setPendingDeleteSession(session)}
-                    canDelete={() => true}
-                    isDeleting={deleteSession.isPending}
-                  />
-
-                  {sessionFolders.map((folder) => {
-                    const folderSessions = sessionsByFolder.get(folder.id) ?? [];
-                    return (
-                      <FolderSection
-                        key={folder.id}
-                        name={folder.name}
-                        count={folderSessions.length}
-                        onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
-                        onDelete={() => deleteFolderMut.mutate(folder.id)}
-                      >
-                        {folderSessions.length > 0 ? (
-                          <SessionListView
-                            sessions={folderSessions}
-                            renderTitle={(session) => session.title ?? "Sans titre"}
-                            renderMetrics={renderSessionMetrics}
-                            renderExtraActions={(session) => (
-                              <MoveToFolderPopover
-                                folders={sessionFolders}
-                                currentFolderId={session.folder_id}
-                                onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                              />
-                            )}
-                            onPreview={(session) => startEditSession(session)}
-                            onEdit={(session) => startEditSession(session)}
-                            onDelete={(session) => setPendingDeleteSession(session)}
-                            canDelete={() => true}
-                            isDeleting={deleteSession.isPending}
-                          />
-                        ) : (
-                          <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                            Dossier vide
-                          </div>
-                        )}
-                      </FolderSection>
-                    );
-                  })}
-                </>
-              ) : (
-                <>
-                  {/* 2-level hierarchy — athlete mode */}
-                  {/* Unfiled sessions for this athlete context */}
-                  <SessionListView
-                    sessions={unfiledSessions}
-                    isLoading={isLoadingSessions}
-                    error={sessionsError}
-                    renderTitle={(session) => session.title ?? "Sans titre"}
-                    renderMetrics={renderSessionMetrics}
-                    renderExtraActions={(session) => (
-                      <>
-                        <MoveToFolderPopover
-                          folders={sessionFolders}
-                          currentFolderId={session.folder_id}
-                          onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
-                          aria-label="Copier vers un nageur"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => assignMutation.mutate(session.id)}
-                          disabled={assignMutation.isPending}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted text-green-600"
-                          aria-label="Assigner pour aujourd'hui"
-                          title="Assigner pour aujourd'hui"
-                        >
-                          <CalendarPlus className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                    onPreview={(session) => startEditSession(session)}
-                    onEdit={(session) => startEditSession(session)}
-                    onDelete={(session) => setPendingDeleteSession(session)}
-                    canDelete={() => true}
-                    isDeleting={deleteSession.isPending}
-                  />
-
-                  {rootFolders.map((root) => {
-                    const cycles = subFoldersMap.get(root.id) ?? [];
-                    const rootSessions = sessionsByFolder.get(root.id) ?? [];
-                    const totalCount = cycles.reduce(
-                      (sum, c) => sum + (sessionsByFolder.get(c.id)?.length ?? 0),
-                      rootSessions.length,
-                    );
-                    return (
-                      <FolderSection
-                        key={root.id}
-                        name={root.name}
-                        count={totalCount}
-                        defaultOpen
-                        onRename={(newName) => renameFolder.mutate({ id: root.id, name: newName })}
-                        onDelete={() => deleteFolderMut.mutate(root.id)}
-                        onCopy={() => setCopyDialog({ mode: "plan", sourceId: selectedAthleteId!, sourceLabel: root.name + " (plan complet)" })}
-                      >
-                        {/* Sessions directly in root */}
-                        {rootSessions.length > 0 && (
-                          <SessionListView
-                            sessions={rootSessions}
-                            renderTitle={(session) => session.title ?? "Sans titre"}
-                            renderMetrics={renderSessionMetrics}
-                            renderExtraActions={(session) => (
-                              <>
-                                <MoveToFolderPopover
-                                  folders={sessionFolders}
-                                  currentFolderId={session.folder_id}
-                                  onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
-                                  aria-label="Copier vers un nageur"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => assignMutation.mutate(session.id)}
-                                  disabled={assignMutation.isPending}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted text-green-600"
-                                  aria-label="Assigner pour aujourd'hui"
-                                  title="Assigner pour aujourd'hui"
-                                >
-                                  <CalendarPlus className="h-4 w-4" />
-                                </button>
-                              </>
-                            )}
-                            onPreview={(session) => startEditSession(session)}
-                            onEdit={(session) => startEditSession(session)}
-                            onDelete={(session) => setPendingDeleteSession(session)}
-                            canDelete={() => true}
-                            isDeleting={deleteSession.isPending}
+                    {folderSessions.length > 0 ? (
+                      <SessionListView
+                        sessions={folderSessions}
+                        renderTitle={(session) => session.title ?? "Sans titre"}
+                        renderMetrics={renderSessionMetrics}
+                        renderExtraActions={(session) => (
+                          <MoveToFolderPopover
+                            folders={sessionFolders}
+                            currentFolderId={session.folder_id}
+                            onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
                           />
                         )}
-
-                        {/* Sub-folders (cycles) */}
-                        {cycles.map((cycle) => {
-                          const cycleSessions = sessionsByFolder.get(cycle.id) ?? [];
-                          return (
-                            <FolderSection
-                              key={cycle.id}
-                              name={cycle.name}
-                              count={cycleSessions.length}
-                              onRename={(newName) => renameFolder.mutate({ id: cycle.id, name: newName })}
-                              onDelete={() => deleteFolderMut.mutate(cycle.id)}
-                              onCopy={() => setCopyDialog({ mode: "folder", sourceId: cycle.id, sourceLabel: cycle.name })}
-                            >
-                              {cycleSessions.length > 0 ? (
-                                <SessionListView
-                                  sessions={cycleSessions}
-                                  renderTitle={(session) => session.title ?? "Sans titre"}
-                                  renderMetrics={renderSessionMetrics}
-                                  renderExtraActions={(session) => (
-                                    <>
-                                      <MoveToFolderPopover
-                                        folders={sessionFolders}
-                                        currentFolderId={session.folder_id}
-                                        onMove={(folderId) => moveItem.mutate({ itemId: session.id, folderId, table: "strength_sessions" })}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setCopyDialog({ mode: "session", sourceId: session.id, sourceLabel: session.title ?? "Sans titre" })}
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
-                                        aria-label="Copier vers un nageur"
-                                      >
-                                        <Copy className="h-4 w-4" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => assignMutation.mutate(session.id)}
-                                        disabled={assignMutation.isPending}
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted text-green-600"
-                                        aria-label="Assigner pour aujourd'hui"
-                                        title="Assigner pour aujourd'hui"
-                                      >
-                                        <CalendarPlus className="h-4 w-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                  onPreview={(session) => startEditSession(session)}
-                                  onEdit={(session) => startEditSession(session)}
-                                  onDelete={(session) => setPendingDeleteSession(session)}
-                                  canDelete={() => true}
-                                  isDeleting={deleteSession.isPending}
-                                />
-                              ) : (
-                                <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                                  Dossier vide
-                                </div>
-                              )}
-                            </FolderSection>
-                          );
-                        })}
-
-                        {/* Add cycle button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-1 text-xs"
-                          onClick={() => createFolder.mutate({ name: "Nouveau cycle", type: "session", parentId: root.id })}
-                        >
-                          <Plus className="h-4 w-4 mr-2" /> Ajouter un cycle
-                        </Button>
-                      </FolderSection>
-                    );
-                  })}
-                </>
-              )}
+                        onPreview={(session) => startEditSession(session)}
+                        onEdit={(session) => startEditSession(session)}
+                        onDelete={(session) => setPendingDeleteSession(session)}
+                        canDelete={() => true}
+                        isDeleting={deleteSession.isPending}
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                        Dossier vide
+                      </div>
+                    )}
+                  </FolderSection>
+                );
+              })}
             </div>
+          </TabsContent>
+
+          {/* === PLANS NAGEURS TAB === */}
+          <TabsContent value="plans" className="mt-4">
+            <AthletePlansTab
+              athletes={athletes}
+              onStartCreateSession={(folderId) => {
+                setEditingSessionId(null);
+                setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
+                setIsCreating(true);
+              }}
+              onStartEditSession={startEditSession}
+              onDeleteSession={(session) => setPendingDeleteSession(session)}
+            />
           </TabsContent>
 
           {/* === EXERCISES TAB === */}
