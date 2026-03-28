@@ -49,54 +49,54 @@ export function StrengthExerciseCard({
     <>
       <Card
         className={cn(
-          "rounded-2xl border-border transition-all",
-          expanded && "ring-1 ring-primary/20"
+          "rounded-xl border-border transition-all",
+          expanded && "ring-1 ring-primary/10 border-primary/40"
         )}
       >
         {/* Collapsed header — always visible */}
         <button
           type="button"
-          className="flex w-full items-center gap-3 p-3 text-left"
+          className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left"
           onClick={() => setExpanded(!expanded)}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-            {index + 1}
-          </span>
+          {/* GIF thumbnail or number fallback */}
+          {gifUrl ? (
+            <div className="relative h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-muted/30 border border-border/50">
+              <img
+                src={gifUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+              <span className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-tl-md bg-muted text-[9px] font-bold text-muted-foreground">
+                {index + 1}
+              </span>
+            </div>
+          ) : (
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+              <span className="text-sm font-bold text-muted-foreground">{index + 1}</span>
+            </div>
+          )}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold">{exerciseName}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-[13px] font-semibold leading-tight">{exerciseName}</span>
               {isWarmup && (
-                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                <span className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-px text-[9px] font-bold">
                   Échauf.
                 </span>
               )}
             </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
               {exercise.sets}&times;{exercise.reps}
-              {exercise.percent_1rm ? ` @ ${exercise.percent_1rm}% 1RM` : ""}
-              {exercise.rest_seconds ? ` · ${exercise.rest_seconds}s repos` : ""}
-            </div>
+              {exercise.percent_1rm ? <><span className="text-muted-foreground/40"> · </span>{exercise.percent_1rm}% 1RM</> : ""}
+              {exercise.rest_seconds ? <><span className="text-muted-foreground/40"> · </span>repos {exercise.rest_seconds}s</> : ""}
+            </p>
           </div>
-          {gifUrl && (
-            <button
-              type="button"
-              className="shrink-0 rounded-lg overflow-hidden border border-border bg-muted"
-              onClick={(e) => {
-                e.stopPropagation();
-                setGifDialogOpen(true);
-              }}
-            >
-              <img
-                src={gifUrl}
-                alt={exerciseName}
-                className="h-9 w-9 object-cover"
-              />
-            </button>
-          )}
           <ChevronDown
             className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180"
+              "h-4 w-4 shrink-0 text-muted-foreground/40 transition-transform duration-200",
+              expanded && "rotate-180 text-primary"
             )}
           />
         </button>
