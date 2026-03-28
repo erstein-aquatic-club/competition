@@ -20,7 +20,7 @@ function detectPhase(name: string): string {
   if (n.includes("force")) return "force";
   if (n.includes("puissance")) return "puissance";
   if (n.includes("taper")) return "taper";
-  if (n.includes("compét") || n.includes("compet") || n.includes("s9")) return "compétition";
+  if (n.includes("compét") || n.includes("compet")) return "compétition";
   return "force";
 }
 
@@ -148,10 +148,10 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
               if (sessions.length === 0) return null;
               const phase = detectPhase(cycle.name);
               const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-              // Extract short label (e.g. "S1" or "S4-S6")
-              const shortLabel = cycle.name.match(/^(S\d[\d-]*)/)?.[1] ?? "";
+              // Extract short label (e.g. "S13" or "S15-S16")
+              const shortLabel = cycle.name.match(/^(S\d+(?:-S\d+)?)/)?.[1] ?? "";
               // Extract phase name (after —)
-              const phaseName = cycle.name.replace(/^S[\d-]+\s*[—–\-]\s*/, "").replace(/\s*\(.*\)$/, "").trim();
+              const phaseName = cycle.name.replace(/^S\d+(?:-S\d+)?\s*[—–\-]\s*/, "").replace(/\s*\(.*\)$/, "").trim();
 
               return (
                 <div key={cycle.id} className="relative pl-8">
