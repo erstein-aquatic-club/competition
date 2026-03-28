@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import CoachSectionHeader from "./CoachSectionHeader";
 
 type CoachMessagesScreenProps = {
-  onBack: () => void;
+  onBack?: () => void;
   athletes: Array<{ id: number | null; display_name: string; email?: string | null; group_id?: number | null; group_label?: string | null }>;
   groups: Array<{ id: number; name: string }>;
   athletesLoading: boolean;

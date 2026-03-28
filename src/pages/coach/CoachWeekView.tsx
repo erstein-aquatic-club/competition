@@ -107,13 +107,11 @@ export default function CoachWeekView({
       <Suspense fallback={<PageSkeleton />}>
         {mode === "week" ? (
           <CoachTrainingSlotsScreen
-            onBack={() => {}}
             groups={groups}
             onOpenLibrary={handleOpenLibrary}
           />
         ) : (
           <CoachCalendar
-            onBack={() => {}}
             athletes={athletes}
             groups={groups}
             swimSessions={swimSessions}

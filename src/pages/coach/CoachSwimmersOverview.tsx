@@ -132,7 +132,7 @@ function LastSeenLabel({ dateStr }: { dateStr: string | null }) {
 interface Props {
   athletes: AthleteSummary[];
   athletesLoading: boolean;
-  onBack: () => void;
+  onBack?: () => void;
   onOpenAthlete: (athlete: AthleteSummary) => void;
 }
 

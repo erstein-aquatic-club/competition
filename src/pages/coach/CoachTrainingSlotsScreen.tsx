@@ -180,7 +180,7 @@ function buildSwimLibraryContext(
 // ── Types ────────────────────────────────────────────────────────
 
 type CoachTrainingSlotsScreenProps = {
-  onBack: () => void;
+  onBack?: () => void;
   groups: Array<{ id: number | string; name: string }>;
   onOpenLibrary?: (context?: SwimLibraryEntryContext) => void;
 };
@@ -1615,9 +1615,11 @@ const CoachTrainingSlotsScreen = ({
       <div className="sm:hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 -ml-2" onClick={onBack}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+            {onBack && (
+              <Button variant="ghost" size="icon" className="h-10 w-10 -ml-2" onClick={onBack}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
             <div>
               <h2 className="text-lg font-display font-semibold uppercase italic text-primary leading-tight">
                 Créneaux

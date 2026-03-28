@@ -8,6 +8,7 @@ import {
   BellRing,
   CalendarDays,
   ChevronRight,
+  ShieldCheck,
   Trophy,
   Users,
   UsersRound,
@@ -35,6 +36,7 @@ type CoachAthleteOption = {
 type CoachHomeProps = {
   onNavigate: (section: CoachSection) => void;
   onOpenRecordsClub: () => void;
+  onOpenRecordsAdmin: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
@@ -81,6 +83,7 @@ function formatDateIso(d: Date): string {
 const CoachHome = ({
   onNavigate,
   onOpenRecordsClub,
+  onOpenRecordsAdmin,
   onOpenAthlete,
   athletes,
   athletesLoading,
@@ -153,8 +156,9 @@ const CoachHome = ({
       { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
       { label: "Comms", icon: BellRing, action: () => onNavigate("comms"), color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30" },
       { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-900/30" },
+      { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
-    [onNavigate, onOpenRecordsClub],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -269,22 +273,22 @@ const CoachHome = ({
         </section>
       )}
 
-      {/* ── Section D: Accès rapides (2x2 grid) ── */}
+      {/* ── Section D: Accès rapides ── */}
       <section className="space-y-2.5">
         <SectionLabel>Accès rapides</SectionLabel>
 
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           {quickAccess.map((item) => (
             <button
               key={item.label}
               type="button"
               onClick={item.action}
-              className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-4 text-left transition-colors active:bg-muted"
+              className="flex flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-3.5 text-center transition-colors active:bg-muted"
             >
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.bg}`}>
                 <item.icon className={`h-5 w-5 ${item.color}`} />
               </div>
-              <span className="text-sm font-semibold">{item.label}</span>
+              <span className="text-[11px] font-semibold leading-tight">{item.label}</span>
             </button>
           ))}
         </div>
@@ -585,6 +589,7 @@ export default function Coach() {
         <CoachHome
           onNavigate={setActiveSection}
           onOpenRecordsClub={() => navigate("/records-club")}
+          onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenAthlete={handleOpenAthlete}
           athletes={athletes}
           athletesLoading={athletesLoading}
@@ -615,7 +620,6 @@ export default function Coach() {
           <CoachSwimmersOverview
             athletes={athletes}
             athletesLoading={athletesLoading}
-            onBack={() => setActiveSection("home")}
             onOpenAthlete={handleOpenAthlete}
           />
         </Suspense>

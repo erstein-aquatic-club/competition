@@ -62,14 +62,12 @@ export default function CoachComms({
       <Suspense fallback={<PageSkeleton />}>
         {tab === "notifications" ? (
           <CoachMessagesScreen
-            onBack={() => {}}
             athletes={athletes}
             groups={groups}
             athletesLoading={athletesLoading}
           />
         ) : (
           <CoachSmsScreen
-            onBack={() => {}}
             athletes={athletes}
             groups={groups}
             athletesLoading={athletesLoading}

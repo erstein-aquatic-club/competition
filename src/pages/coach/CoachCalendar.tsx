@@ -16,7 +16,7 @@ import { InlineBanner } from "@/components/shared/InlineBanner";
 type FilterMode = "group" | "user";
 
 interface CoachCalendarProps {
-  onBack: () => void;
+  onBack?: () => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null }>;
   groups: Array<{ id: number | string; name: string }>;
   swimSessions?: Array<{ id: number; name: string }>;

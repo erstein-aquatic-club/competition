@@ -706,7 +706,7 @@ const EventsTimeline = ({
 // ── Main Component ──────────────────────────────────────────────
 
 type CoachCompetitionsScreenProps = {
-  onBack: () => void;
+  onBack?: () => void;
 };
 
 const CoachCompetitionsScreen = ({ onBack }: CoachCompetitionsScreenProps) => {

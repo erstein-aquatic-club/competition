@@ -51,7 +51,7 @@ import type {
 } from "@/lib/api/types";
 
 type CoachGroupsScreenProps = {
-  onBack: () => void;
+  onBack?: () => void;
   athletes: Array<{
     id: number | null;
     display_name: string;

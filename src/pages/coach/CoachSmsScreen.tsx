@@ -15,7 +15,7 @@ import CoachSectionHeader from "./CoachSectionHeader";
 import { buildSmsUri, canOpenSmsApp } from "@/lib/smsUtils";
 
 type CoachSmsScreenProps = {
-  onBack: () => void;
+  onBack?: () => void;
   athletes: Array<{ id: number | null; display_name: string; email?: string | null; group_id?: number | null; group_label?: string | null }>;
   groups: Array<{ id: number; name: string }>;
   athletesLoading: boolean;
