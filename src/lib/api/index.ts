@@ -315,6 +315,7 @@ export {
   update1RM,
   updateExerciseNote,
   getStrengthFolders,
+  getTeamAthletePlans,
   createStrengthFolder,
   renameStrengthFolder,
   deleteStrengthFolder,

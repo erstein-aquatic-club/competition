@@ -36,6 +36,7 @@ export type {
   SwimExerciseLog,
   SwimExerciseLogInput,
   StrengthFolder,
+  TeamAthletePlan,
   CoachAssignment,
   Competition,
   CompetitionInput,
@@ -328,6 +329,7 @@ import {
   duplicateStrengthSession as _duplicateStrengthSession,
   duplicateFolder as _duplicateFolder,
   duplicateAthletePlan as _duplicateAthletePlan,
+  getTeamAthletePlans as _getTeamAthletePlans,
 } from "./api/strength";
 
 // --- API Service ---
@@ -601,6 +603,7 @@ export const api = {
   async duplicateStrengthSession(sessionId: number, targetFolderId: number | null) { return _duplicateStrengthSession(sessionId, targetFolderId); },
   async duplicateFolder(folderId: number, targetAthleteId: number | null, targetParentId: number | null) { return _duplicateFolder(folderId, targetAthleteId, targetParentId); },
   async duplicateAthletePlan(sourceAthleteId: number, targetAthleteId: number) { return _duplicateAthletePlan(sourceAthleteId, targetAthleteId); },
+  async getTeamAthletePlans(excludeAthleteId: number) { return _getTeamAthletePlans(excludeAthleteId); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Swim Exercise Logs

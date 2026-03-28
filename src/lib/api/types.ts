@@ -90,6 +90,12 @@ export interface StrengthFolder {
   athlete_id?: number | null;
 }
 
+export interface TeamAthletePlan {
+  athleteId: number;
+  athleteName: string;
+  folders: StrengthFolder[];
+}
+
 export interface SwimSessionTemplate {
   id: number;
   name: string;

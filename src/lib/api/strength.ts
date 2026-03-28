@@ -24,6 +24,7 @@ import type {
   StrengthSessionItem,
   StrengthCycleType,
   StrengthFolder,
+  TeamAthletePlan,
 } from './types';
 import { normalizeExercise } from './helpers';
 import type {
@@ -1124,6 +1125,58 @@ export async function getStrengthFolders(
     return (data ?? []).map(mapFolder);
   }
   return [];
+}
+
+export async function getTeamAthletePlans(
+  excludeAthleteId: number,
+): Promise<TeamAthletePlan[]> {
+  if (!canUseSupabase()) return [];
+
+  // Fetch all athlete-specific root folders (with user name)
+  const { data: roots, error: rootErr } = await supabase
+    .from("strength_folders")
+    .select("*, users!inner(display_name)")
+    .eq("type", "session")
+    .not("athlete_id", "is", null)
+    .neq("athlete_id", excludeAthleteId)
+    .is("parent_id", null)
+    .order("sort_order", { ascending: true });
+  if (rootErr) throw new Error(rootErr.message);
+  if (!roots?.length) return [];
+
+  // Fetch children of those roots
+  const rootIds = roots.map((r: any) => r.id);
+  const { data: children, error: childErr } = await supabase
+    .from("strength_folders")
+    .select("*")
+    .eq("type", "session")
+    .in("parent_id", rootIds)
+    .order("sort_order", { ascending: true });
+  if (childErr) throw new Error(childErr.message);
+
+  // Group by athlete
+  const athleteMap = new Map<number, { name: string; folders: StrengthFolder[] }>();
+  for (const row of roots) {
+    const aid = safeInt(row.athlete_id);
+    const name = (row.users as any)?.display_name ?? "Nageur";
+    if (!athleteMap.has(aid)) athleteMap.set(aid, { name, folders: [] });
+    athleteMap.get(aid)!.folders.push(mapFolder(row));
+  }
+  for (const row of (children ?? [])) {
+    const parentRoot = roots.find((r: any) => r.id === row.parent_id);
+    if (!parentRoot) continue;
+    const aid = safeInt(parentRoot.athlete_id);
+    athleteMap.get(aid)?.folders.push(mapFolder(row));
+  }
+
+  // Sort alphabetically by athlete name
+  return Array.from(athleteMap.entries())
+    .map(([athleteId, { name, folders }]) => ({
+      athleteId,
+      athleteName: name,
+      folders,
+    }))
+    .sort((a, b) => a.athleteName.localeCompare(b.athleteName));
 }
 
 export async function createStrengthFolder(
