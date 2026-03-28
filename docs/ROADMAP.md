@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-03-28 (§92 Refonte UX Coach)*
+*Dernière mise à jour : 2026-03-28 (§93 Restructuration bibliothèque musculation nageur)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -62,6 +62,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 52 | Strength UX Overhaul — refonte parcours musculation nageur | Haute | Haute | Fait (§89) |
 | 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Moyenne | Fait (§90) |
 | 54 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Moyenne | Fait (§92) |
+| 56 | Restructuration bibliothèque musculation nageur | Moyenne | Moyenne | Fait (§93) |
 
 ---
 

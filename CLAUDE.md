@@ -115,6 +115,9 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur (lecture cycles + lancement séance) | ~158 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/coach/strength/FolderSection.tsx` | Dossiers hiérarchiques 2 niveaux bibliothèque muscu (§90) | |
+| `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |
+| `src/components/strength/CommonFolderList.tsx` | Accordéons dossiers globaux muscu (§93) | |
+| `src/components/strength/TeamPlansSection.tsx` | Plans d'équipe visibles entre nageurs (§93) | |
 | `src/lib/gifEncoder.ts` | Conversion vidéo → GIF (Canvas + gifenc, 240px, ≤200KB) (§91) | ~90 lignes |
 | `src/components/coach/strength/VideoTrimmer.tsx` | Trimmer vidéo dual-slider (max 5s) (§91) | ~130 lignes |
 | `src/components/coach/strength/MediaSourceSheet.tsx` | Bottom sheet filmer/importer illustration (§91) | ~100 lignes |
@@ -195,6 +198,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Fait (§90) |
 | 54 | Vidéo → GIF pour illustration exercices musculation | Moyenne | Fait (§91) |
 | 55 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Fait (§92) |
+| 56 | Restructuration bibliothèque musculation nageur | Moyenne | Fait (§93) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

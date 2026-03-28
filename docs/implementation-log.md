@@ -7115,3 +7115,37 @@ Les exercices de musculation ont un champ `illustration_gif` pour afficher un GI
 - Mini-grille semaine dans Home dépend des APIs de créneaux existantes
 - Onglet Comms de la fiche nageur redirige vers la section Comms globale (pas d'envoi inline)
 - Les `onBack` des composants wrappés reçoivent un no-op
+
+---
+
+## §93 — Restructuration bibliothèque musculation nageur (2026-03-28)
+
+**Contexte** : L'onglet "S'entraîner" de la page Musculation nageur affichait toutes les séances à plat, sans organisation. Restructuration avec dossiers et visibilité inter-nageurs.
+
+**Changements** :
+- Nouveau `SessionBrowser.tsx` remplace `SessionList` dans l'onglet "S'entraîner"
+- Extraction `CycleSelector.tsx` et `InProgressCard.tsx` depuis SessionList (réutilisables)
+- Nouveau `UnfiledSessionList.tsx` — séances sans dossier (liste plate)
+- Nouveau `CommonFolderList.tsx` — dossiers globaux coach en accordéons Collapsible
+- Nouveau `TeamPlansSection.tsx` — plans d'autres nageurs, réutilise `MyPlanTab`
+- Nouvelle API `getTeamAthletePlans()` — fetch plans d'autres nageurs avec join users
+- 3 sections ordonnées : séances non classées → bibliothèque commune → plans d'équipe
+
+**Fichiers créés** :
+- `src/components/strength/SessionBrowser.tsx`
+- `src/components/strength/CycleSelector.tsx`
+- `src/components/strength/InProgressCard.tsx`
+- `src/components/strength/UnfiledSessionList.tsx`
+- `src/components/strength/CommonFolderList.tsx`
+- `src/components/strength/TeamPlansSection.tsx`
+
+**Fichiers modifiés** :
+- `src/components/strength/SessionList.tsx` (extraction CycleSelector + InProgressCard)
+- `src/lib/api/strength.ts` (ajout getTeamAthletePlans)
+- `src/lib/api/types.ts` (ajout TeamAthletePlan)
+- `src/lib/api/index.ts`, `src/lib/api.ts` (re-exports)
+- `src/pages/Strength.tsx` (branche SessionBrowser)
+
+**Tests** : TypeScript compile + build production OK
+**Décisions** : Réutilisation de `MyPlanTab` pour les plans d'équipe (cohérence visuelle garantie)
+**Limites** : La recherche filtre uniquement les séances non classées (pas les dossiers/plans)
