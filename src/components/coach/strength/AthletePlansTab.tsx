@@ -21,6 +21,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CopyToAthleteDialog } from "./CopyToAthleteDialog";
+import { AddSessionSheet } from "./AddSessionSheet";
 import { cn } from "@/lib/utils";
 
 /* ---------- colour palette for cycle left borders ---------- */
@@ -288,6 +289,11 @@ function AthletePlanDetail({
     },
   });
 
+  const [addSessionTarget, setAddSessionTarget] = useState<{
+    folderId: number;
+    cycleName: string;
+  } | null>(null);
+
   const [copyDialog, setCopyDialog] = useState<{
     mode: "session" | "folder" | "plan";
     sourceId: number;
@@ -487,7 +493,7 @@ function AthletePlanDetail({
                       sourceLabel: cycle.name,
                     })
                   }
-                  onAddSession={() => onStartCreateSession(cycle.id, { athleteName, cycleName: cycle.name })}
+                  onAddSession={() => setAddSessionTarget({ folderId: cycle.id, cycleName: cycle.name })}
                   onEditSession={onStartEditSession}
                   onDeleteSession={onDeleteSession}
                   onCopySession={(s) =>
@@ -550,6 +556,24 @@ function AthletePlanDetail({
           </div>
         );
       })}
+
+      {/* Add session picker sheet */}
+      {addSessionTarget && (
+        <AddSessionSheet
+          open={!!addSessionTarget}
+          onOpenChange={(open) => !open && setAddSessionTarget(null)}
+          targetFolderId={addSessionTarget.folderId}
+          cycleName={addSessionTarget.cycleName}
+          athleteName={athleteName}
+          onCreateNew={() => {
+            onStartCreateSession(addSessionTarget.folderId, {
+              athleteName,
+              cycleName: addSessionTarget.cycleName,
+            });
+            setAddSessionTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }
