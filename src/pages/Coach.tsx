@@ -21,26 +21,16 @@ import {
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { Input } from "@/components/ui/input";
-import CoachSectionHeader from "./coach/CoachSectionHeader";
-import type { SwimLibraryEntryContext } from "./coach/swimLibraryEntryContext";
 const CoachSwimmersOverview = lazy(() => import("./coach/CoachSwimmersOverview"));
-const CoachMessagesScreen = lazy(() => import("./coach/CoachMessagesScreen"));
-const CoachSmsScreen = lazy(() => import("./coach/CoachSmsScreen"));
-const CoachCalendar = lazy(() => import("./coach/CoachCalendar"));
 const CoachGroupsScreen = lazy(() => import("./coach/CoachGroupsScreen"));
 const CoachCompetitionsScreen = lazy(() => import("./coach/CoachCompetitionsScreen"));
-const CoachObjectivesScreen = lazy(() => import("./coach/CoachObjectivesScreen"));
-const CoachTrainingSlotsScreen = lazy(() => import("./coach/CoachTrainingSlotsScreen"));
 const CoachSwimmerDetail = lazy(() => import("./coach/CoachSwimmerDetail"));
-import ComingSoon from "./ComingSoon";
-import { FEATURES } from "@/lib/features";
+const CoachWeekView = lazy(() => import("./coach/CoachWeekView"));
+const CoachLibrary = lazy(() => import("./coach/CoachLibrary"));
+const CoachComms = lazy(() => import("./coach/CoachComms"));
 import type { LocalStrengthRun } from "@/lib/types";
 
-// Lazy load heavy catalog components
-const StrengthCatalog = lazy(() => import("./coach/StrengthCatalog"));
-const SwimCatalog = lazy(() => import("./coach/SwimCatalog"));
-
-type CoachSection = "home" | "swim" | "swim-library" | "strength" | "swimmers" | "messaging" | "sms" | "calendar" | "groups" | "competitions" | "objectives" | "training-slots" | "athlete";
+type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -51,7 +41,6 @@ type CoachAthleteOption = {
 
 type CoachHomeProps = {
   onNavigate: (section: CoachSection) => void;
-  onOpenRecordsAdmin: () => void;
   onOpenRecordsClub: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; ffn_iuf?: string | null; avatar_url?: string | null }>;
@@ -93,7 +82,6 @@ function FormeDots({ score }: { score: number | null }) {
 // ── CoachHome ──────────────────────────────────────────────────────────────
 const CoachHome = ({
   onNavigate,
-  onOpenRecordsAdmin,
   onOpenRecordsClub,
   onOpenAthlete,
   athletes,
@@ -131,18 +119,17 @@ const CoachHome = ({
   const primaryAction = {
     label: "Créer une séance",
     detail: "Natation · Explorer la bibliothèque",
-    action: () => onNavigate("swim"),
+    action: () => onNavigate("week"),
   };
 
   const tools = [
-    { label: "Natation", icon: Waves, action: () => onNavigate("swim"), color: "text-cyan-500" },
-    { label: "Muscu", icon: Dumbbell, action: () => onNavigate("strength"), color: "text-violet-500" },
+    { label: "Natation", icon: Waves, action: () => onNavigate("week"), color: "text-cyan-500" },
+    { label: "Muscu", icon: Dumbbell, action: () => onNavigate("library"), color: "text-violet-500" },
     { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500" },
     { label: "Échéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500" },
-    { label: "Créneaux", icon: Clock, action: () => onNavigate("training-slots"), color: "text-blue-500" },
-    { label: "SMS", icon: BellRing, action: () => onNavigate("sms"), color: "text-rose-500" },
+    { label: "Créneaux", icon: Clock, action: () => onNavigate("week"), color: "text-blue-500" },
+    { label: "SMS", icon: BellRing, action: () => onNavigate("comms"), color: "text-rose-500" },
     { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-orange-500" },
-    { label: "Admin rec.", icon: Trophy, action: onOpenRecordsAdmin, color: "text-slate-500" },
   ];
 
   return (
@@ -180,7 +167,7 @@ const CoachHome = ({
               className="h-10 rounded-full pl-9"
             />
           </div>
-          <Button size="sm" className="shrink-0 rounded-full" onClick={() => onNavigate("messaging")}>
+          <Button size="sm" className="shrink-0 rounded-full" onClick={() => onNavigate("comms")}>
             Message
           </Button>
         </div>
@@ -223,35 +210,20 @@ const CoachHome = ({
           </div>
         </button>
 
-        {/* Secondary quick actions */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigate("objectives")}
-            className="flex items-center gap-2.5 rounded-2xl border bg-card px-4 py-3.5 text-left transition-colors active:bg-muted"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
-              <Trophy className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">Objectifs</p>
-              <p className="text-[11px] text-muted-foreground">Temps cibles</p>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate("messaging")}
-            className="flex items-center gap-2.5 rounded-2xl border bg-card px-4 py-3.5 text-left transition-colors active:bg-muted"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-              <BellRing className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">Message</p>
-              <p className="text-[11px] text-muted-foreground">Notifier un groupe</p>
-            </div>
-          </button>
-        </div>
+        {/* Secondary quick action */}
+        <button
+          type="button"
+          onClick={() => onNavigate("comms")}
+          className="flex w-full items-center gap-2.5 rounded-2xl border bg-card px-4 py-3.5 text-left transition-colors active:bg-muted"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
+            <BellRing className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Message</p>
+            <p className="text-[11px] text-muted-foreground">Notifier un groupe</p>
+          </div>
+        </button>
       </section>
 
       {/* ── SECTION 2 : TOUR DE CONTRÔLE ── */}
@@ -468,7 +440,7 @@ const CoachHome = ({
           {/* Session assignment row */}
           <button
             type="button"
-            onClick={() => onNavigate("calendar")}
+            onClick={() => onNavigate("week")}
             className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 px-4 py-3.5 text-left transition-colors active:bg-muted"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
@@ -550,10 +522,6 @@ export default function Coach() {
   });
   const kpiPeriod: KpiLookbackPeriod = 7;
   const [selectedCoachAthlete, setSelectedCoachAthlete] = useState<CoachAthleteOption | null>(null);
-  const [swimLibraryContext, setSwimLibraryContext] =
-    useState<SwimLibraryEntryContext | null>(null);
-  const [swimLibraryReturnSection, setSwimLibraryReturnSection] =
-    useState<"swim" | "training-slots">("swim");
 
   // Sync activeSection → URL (replaceState to avoid extra history entries)
   useEffect(() => {
@@ -589,23 +557,18 @@ export default function Coach() {
   }, []);
 
   const coachAccess = role === "coach" || role === "admin";
-  const shouldLoadCatalogs = activeSection === "home" || activeSection === "calendar";
+  const shouldLoadCatalogs = activeSection === "home" || activeSection === "week";
   const shouldLoadAthletes =
     activeSection === "home" ||
-    activeSection === "messaging" ||
-    activeSection === "sms" ||
+    activeSection === "comms" ||
     activeSection === "swimmers" ||
     activeSection === "athlete" ||
-    activeSection === "calendar" ||
-    activeSection === "groups" ||
-    activeSection === "objectives";
+    activeSection === "week" ||
+    activeSection === "groups";
   const shouldLoadGroups =
-    activeSection === "swim" ||
-    activeSection === "messaging" ||
-    activeSection === "sms" ||
-    activeSection === "calendar" ||
-    activeSection === "groups" ||
-    activeSection === "training-slots";
+    activeSection === "week" ||
+    activeSection === "comms" ||
+    activeSection === "groups";
 
   // Queries
   const { data: swimSessions } = useQuery({
@@ -761,7 +724,6 @@ export default function Coach() {
       {activeSection === "home" ? (
         <CoachHome
           onNavigate={setActiveSection}
-          onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenRecordsClub={() => navigate("/records-club")}
           onOpenAthlete={handleOpenAthlete}
           athletes={athletes}
@@ -775,63 +737,21 @@ export default function Coach() {
         />
       ) : null}
 
-      {activeSection === "swim" ? (
+      {activeSection === "week" ? (
         <Suspense fallback={<PageSkeleton />}>
-          <CoachTrainingSlotsScreen
-            onBack={() => setActiveSection("home")}
-            onOpenLibrary={(context) => {
-              setSwimLibraryReturnSection("swim");
-              setSwimLibraryContext(context ?? null);
-              setActiveSection("swim-library");
-            }}
+          <CoachWeekView
             groups={groups}
+            athletes={athletes}
+            swimSessions={swimSessions}
+            strengthSessions={strengthSessions}
           />
         </Suspense>
       ) : null}
 
-      {activeSection === "swim-library" ? (
-        <div className="space-y-6">
-          <CoachSectionHeader
-            title="Bibliothèque natation"
-            description="Templates de séances."
-            onBack={() => {
-              setSwimLibraryContext(null);
-              setActiveSection(swimLibraryReturnSection);
-            }}
-          />
-          <Suspense fallback={<PageSkeleton />}>
-            <SwimCatalog
-              entryContext={swimLibraryContext}
-              onEntryContextConsumed={() => setSwimLibraryContext(null)}
-            />
-          </Suspense>
-        </div>
-      ) : null}
-
-      {activeSection === "strength" ? (
-        <div className="space-y-6">
-          <CoachSectionHeader
-            title="Bibliothèque musculation"
-            description="Consultez et créez des séances musculation."
-            onBack={() => setActiveSection("home")}
-            actions={
-              <Button variant="outline" size="sm" onClick={() => setActiveSection("calendar")}>
-                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                Assigner
-              </Button>
-            }
-          />
-          {FEATURES.coachStrength ? (
-            <Suspense fallback={<PageSkeleton />}>
-              <StrengthCatalog />
-            </Suspense>
-          ) : (
-            <ComingSoon
-              title="Musculation coach"
-              description="Le builder musculation est en cours de finalisation."
-            />
-          )}
-        </div>
+      {activeSection === "library" ? (
+        <Suspense fallback={<PageSkeleton />}>
+          <CoachLibrary />
+        </Suspense>
       ) : null}
 
       {activeSection === "swimmers" ? (
@@ -855,40 +775,6 @@ export default function Coach() {
         </Suspense>
       ) : null}
 
-      {activeSection === "messaging" ? (
-        <Suspense fallback={<PageSkeleton />}>
-          <CoachMessagesScreen
-            onBack={() => setActiveSection("home")}
-            athletes={athletes}
-            groups={groups}
-            athletesLoading={athletesLoading}
-          />
-        </Suspense>
-      ) : null}
-
-      {activeSection === "sms" ? (
-        <Suspense fallback={<PageSkeleton />}>
-          <CoachSmsScreen
-            onBack={() => setActiveSection("home")}
-            athletes={athletes}
-            groups={groups}
-            athletesLoading={athletesLoading}
-          />
-        </Suspense>
-      ) : null}
-
-      {activeSection === "calendar" ? (
-        <Suspense fallback={<PageSkeleton />}>
-          <CoachCalendar
-            onBack={() => setActiveSection("home")}
-            athletes={athletes}
-            groups={groups}
-            swimSessions={swimSessions}
-            strengthSessions={strengthSessions}
-          />
-        </Suspense>
-      ) : null}
-
       {activeSection === "groups" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachGroupsScreen
@@ -908,26 +794,12 @@ export default function Coach() {
         </Suspense>
       ) : null}
 
-      {activeSection === "objectives" ? (
+      {activeSection === "comms" ? (
         <Suspense fallback={<PageSkeleton />}>
-          <CoachObjectivesScreen
-            onBack={() => setActiveSection("home")}
+          <CoachComms
             athletes={athletes}
-            athletesLoading={athletesLoading}
-          />
-        </Suspense>
-      ) : null}
-
-      {activeSection === "training-slots" ? (
-        <Suspense fallback={<PageSkeleton />}>
-          <CoachTrainingSlotsScreen
-            onBack={() => setActiveSection("home")}
             groups={groups}
-            onOpenLibrary={(context) => {
-              setSwimLibraryReturnSection("training-slots");
-              setSwimLibraryContext(context ?? null);
-              setActiveSection("swim-library");
-            }}
+            athletesLoading={athletesLoading}
           />
         </Suspense>
       ) : null}
