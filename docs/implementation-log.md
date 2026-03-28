@@ -7086,3 +7086,32 @@ Les exercices de musculation ont un champ `illustration_gif` pour afficher un GI
 - gifenc (~15 KB gzipped) choisi pour sa légèreté vs gif.js
 - 2 fps et 240px de large pour rester sous 200 KB
 - Bucket existant `exercise-gifs` réutilisé, pas de nouveau bucket
+
+---
+
+## §92 — Refonte UX Coach
+
+**Date :** 2026-03-28
+**Contexte :** L'interface coach avait 13 sections, une navigation incohérente, et des écrans redondants.
+
+**Changements :**
+1. `navItems.ts` : 5 items → 4 (Semaine/Nageurs/Biblio/Home)
+2. `AppLayout.tsx` : ajout header coach (titre section, avatar, notification bell)
+3. `Coach.tsx` : CoachSection simplifié (13 → 8 types), CoachHome réécrit ("Ma semaine")
+4. `CoachSwimmerDetail.tsx` : 4 onglets consolidés (Résumé/Planning/Échanges/Comms)
+5. `CoachObjectivesScreen.tsx` : supprimé (objectifs dans fiche nageur)
+6. Nouveaux fichiers : `CoachWeekView.tsx`, `CoachLibrary.tsx`, `CoachComms.tsx`
+
+**Fichiers modifiés :** navItems.ts, AppLayout.tsx, Coach.tsx, CoachSwimmerDetail.tsx
+**Fichiers créés :** CoachWeekView.tsx, CoachLibrary.tsx, CoachComms.tsx
+**Fichiers supprimés :** CoachObjectivesScreen.tsx
+
+**Décisions :**
+- Wrappers composent les écrans existants (pas de réécriture)
+- Préférences UI persistées en localStorage (mode semaine/mois, tab biblio)
+- Nageurs récents persistés en localStorage (max 3)
+
+**Limites :**
+- Mini-grille semaine dans Home dépend des APIs de créneaux existantes
+- Onglet Comms de la fiche nageur redirige vers la section Comms globale (pas d'envoi inline)
+- Les `onBack` des composants wrappés reçoivent un no-op

@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-03-27 (§90 Planification muscu par nageur)*
+*Dernière mise à jour : 2026-03-28 (§92 Refonte UX Coach)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -61,6 +61,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 50 | Préparation compétition nageur (courses, routines, timeline, checklist) | Moyenne | Haute | Fait (§87) |
 | 52 | Strength UX Overhaul — refonte parcours musculation nageur | Haute | Haute | Fait (§89) |
 | 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Moyenne | Fait (§90) |
+| 54 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Moyenne | Fait (§92) |
 
 ---
 
@@ -915,3 +916,22 @@ Haute — refonte complète du flow musculation + 3 hotfixes.
 ### Statut
 
 Fait — 2026-03-09
+
+---
+
+## 54. Refonte UX Coach (navigation, home, fiche nageur, fusions)
+
+### §92 — Refonte UX Coach (navigation, home, fiche nageur, fusions)
+
+**Objectif :** Simplifier l'interface coach pour un profil non-tech.
+
+**Changements :**
+- Bottom nav : 5 items → 4 piliers (Semaine/Nageurs/Biblio/Home)
+- Header coach : titre section + avatar profil + cloche notifications
+- Dashboard Home : "Ma semaine" actionnable (grille 7j, alertes, accès rapides, nageurs récents)
+- Fiche nageur : 4 onglets consolidés (Résumé/Planning/Échanges/Comms)
+- 3 wrappers : CoachWeekView (semaine/mois), CoachLibrary (nage/muscu), CoachComms (notifs/SMS)
+- Suppression : CoachObjectivesScreen (objectifs dans fiche nageur)
+- Sections Coach.tsx : 13 → 8
+
+**Statut : Fait**

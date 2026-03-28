@@ -63,12 +63,14 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/coach/CoachCalendar.tsx` | Calendrier coach (vue mensuelle assignations) | ~266 lignes |
 | `src/hooks/useCoachCalendarState.ts` | Hook état calendrier coach (grille, query, slots) | ~187 lignes |
 | `src/pages/coach/CoachSwimmersOverview.tsx` | Dashboard synthétique nageurs (grille cards, KPIs) | ~310 lignes |
-| `src/pages/coach/CoachSwimmerDetail.tsx` | Page fiche nageur (onglets ressentis/objectifs/planif/entretiens) | ~120 lignes |
+| `src/pages/coach/CoachSwimmerDetail.tsx` | Page fiche nageur (4 onglets consolidés: Résumé/Planning/Échanges/Comms) (§92) | ~120 lignes |
 | `src/pages/coach/SwimmerFeedbackTab.tsx` | Onglet ressentis (liste chronologique sessions) | ~120 lignes |
 | `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) | ~390 lignes |
 | `src/pages/coach/CoachGroupsScreen.tsx` | UI gestion groupes temporaires (stages) | ~580 lignes |
 | `src/pages/coach/CoachCompetitionsScreen.tsx` | UI compétitions coach + assignations + SMS | ~470 lignes |
-| `src/pages/coach/CoachObjectivesScreen.tsx` | UI gestion objectifs par nageur | ~710 lignes |
+| `src/pages/coach/CoachWeekView.tsx` | Wrapper toggle semaine/mois (calendrier unifié) (§92) | ~80 lignes |
+| `src/pages/coach/CoachLibrary.tsx` | Wrapper tabs bibliothèque nage/muscu (§92) | ~60 lignes |
+| `src/pages/coach/CoachComms.tsx` | Wrapper tabs notifications/SMS (§92) | ~60 lignes |
 | `src/lib/api/planning.ts` | CRUD macro-cycles + semaines | ~200 lignes |
 | `src/lib/api/interviews.ts` | CRUD entretiens + transitions multi-phases | ~200 lignes |
 | `src/pages/coach/SwimmerPlanningTab.tsx` | Onglet planification fiche nageur (timeline cycles) | ~440 lignes |
@@ -192,6 +194,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 52 | Strength UX Overhaul — refonte parcours musculation nageur | Haute | Fait (§89) |
 | 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Fait (§90) |
 | 54 | Vidéo → GIF pour illustration exercices musculation | Moyenne | Fait (§91) |
+| 55 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Fait (§92) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
