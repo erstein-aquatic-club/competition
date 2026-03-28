@@ -278,6 +278,10 @@ export default function StrengthCatalog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
+  const [planCreationContext, setPlanCreationContext] = useState<{
+    athleteName: string;
+    cycleName: string;
+  } | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [exerciseEditOpen, setExerciseEditOpen] = useState(false);
@@ -556,6 +560,7 @@ export default function StrengthCatalog() {
   const resetSessionForm = () => {
     setIsCreating(false);
     setEditingSessionId(null);
+    setPlanCreationContext(null);
     setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
   };
 
@@ -971,11 +976,27 @@ export default function StrengthCatalog() {
         {exerciseEditDialog}
         {deleteSessionDialog}
         {deleteExerciseDialog}
+        {planCreationContext && (
+          <div className="px-4 pt-4 pb-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <button
+                onClick={resetSessionForm}
+                className="hover:text-foreground transition-colors"
+              >
+                &larr; Plans
+              </button>
+              <span>/</span>
+              <span className="font-medium text-foreground">{planCreationContext.athleteName}</span>
+              <span>/</span>
+              <span className="font-medium text-foreground">{planCreationContext.cycleName}</span>
+            </div>
+          </div>
+        )}
         <StrengthSessionBuilder
           session={newSession}
           exercises={exercises ?? []}
           editingSessionId={editingSessionId}
-          folders={sessionFolders}
+          folders={planCreationContext ? undefined : sessionFolders}
           onSessionChange={setNewSession}
           onCycleChange={(cycle) => {
             const items = newSession.items.map((item, i) => {
@@ -1175,9 +1196,9 @@ export default function StrengthCatalog() {
         {/* Tabs */}
         <Tabs value={catalogTab} onValueChange={(v) => setCatalogTab(v as "sessions" | "plans" | "exercises")}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="sessions">S&eacute;ances</TabsTrigger>
-            <TabsTrigger value="plans">Plans nageurs</TabsTrigger>
-            <TabsTrigger value="exercises">Exercices ({exercises?.length ?? 0})</TabsTrigger>
+            <TabsTrigger value="sessions" className="text-xs sm:text-sm px-1">S&eacute;ances</TabsTrigger>
+            <TabsTrigger value="plans" className="text-xs sm:text-sm px-1">Plans</TabsTrigger>
+            <TabsTrigger value="exercises" className="text-xs sm:text-sm px-1">Exercices</TabsTrigger>
           </TabsList>
 
           {/* === SESSIONS TAB (common library only) === */}
@@ -1269,9 +1290,10 @@ export default function StrengthCatalog() {
           <TabsContent value="plans" className="mt-4">
             <AthletePlansTab
               athletes={athletes}
-              onStartCreateSession={(folderId) => {
+              onStartCreateSession={(folderId, context) => {
                 setEditingSessionId(null);
                 setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
+                setPlanCreationContext(context ?? null);
                 setIsCreating(true);
               }}
               onStartEditSession={startEditSession}

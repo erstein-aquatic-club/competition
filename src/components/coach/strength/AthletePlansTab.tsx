@@ -66,7 +66,7 @@ function nameToColor(name: string) {
    ================================================================ */
 interface AthletePlansTabProps {
   athletes: AthleteSummary[];
-  onStartCreateSession: (folderId: number | null) => void;
+  onStartCreateSession: (folderId: number | null, context?: { athleteName: string; cycleName: string }) => void;
   onStartEditSession: (session: StrengthSessionTemplate) => void;
   onDeleteSession: (session: StrengthSessionTemplate) => void;
 }
@@ -200,7 +200,7 @@ interface AthletePlanDetailProps {
   athleteName: string;
   athletes: AthleteSummary[];
   onBack: () => void;
-  onStartCreateSession: (folderId: number | null) => void;
+  onStartCreateSession: (folderId: number | null, context?: { athleteName: string; cycleName: string }) => void;
   onStartEditSession: (session: StrengthSessionTemplate) => void;
   onDeleteSession: (session: StrengthSessionTemplate) => void;
 }
@@ -487,7 +487,7 @@ function AthletePlanDetail({
                       sourceLabel: cycle.name,
                     })
                   }
-                  onAddSession={() => onStartCreateSession(cycle.id)}
+                  onAddSession={() => onStartCreateSession(cycle.id, { athleteName, cycleName: cycle.name })}
                   onEditSession={onStartEditSession}
                   onDeleteSession={onDeleteSession}
                   onCopySession={(s) =>
