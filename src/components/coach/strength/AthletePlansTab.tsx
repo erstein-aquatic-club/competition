@@ -770,7 +770,7 @@ function CycleCard({
                 {day.label}
               </span>
               {session ? (
-                <div className="flex items-center gap-2 flex-1 min-w-0 group">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <button
                     type="button"
                     onClick={() => onEditSession(session)}
@@ -781,41 +781,23 @@ function CycleCard({
                   <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
                     {session.items?.length ?? 0} ex.
                   </span>
-                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => onEditSession(session)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted"
-                      aria-label="Modifier"
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onAssignSession(session)}
-                      disabled={assignPending}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted text-green-600"
-                      aria-label="Assigner"
-                    >
-                      {assignPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CalendarPlus className="h-3 w-3" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onCopySession(session)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted"
-                      aria-label="Copier"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteSession(session)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
-                      aria-label="Supprimer"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onAssignSession(session)}
+                    disabled={assignPending}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-green-600 shrink-0"
+                    aria-label="Assigner"
+                  >
+                    {assignPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CalendarPlus className="h-3 w-3" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteSession(session)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 shrink-0"
+                    aria-label="Supprimer"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
                 </div>
               ) : (
                 <button
