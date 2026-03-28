@@ -67,18 +67,27 @@ function nameToColor(name: string) {
    ================================================================ */
 interface AthletePlansTabProps {
   athletes: AthleteSummary[];
+  selectedAthleteId?: number | null;
+  onSelectedAthleteChange?: (id: number | null) => void;
   onStartCreateSession: (folderId: number | null, context?: { athleteName: string; cycleName: string }) => void;
-  onStartEditSession: (session: StrengthSessionTemplate) => void;
+  onStartEditSession: (session: StrengthSessionTemplate, context?: { athleteName: string; cycleName: string }) => void;
   onDeleteSession: (session: StrengthSessionTemplate) => void;
 }
 
 export function AthletePlansTab({
   athletes,
+  selectedAthleteId: controlledAthleteId,
+  onSelectedAthleteChange,
   onStartCreateSession,
   onStartEditSession,
   onDeleteSession,
 }: AthletePlansTabProps) {
-  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
+  const [internalAthleteId, setInternalAthleteId] = useState<number | null>(null);
+  const selectedAthleteId = controlledAthleteId !== undefined ? controlledAthleteId : internalAthleteId;
+  const setSelectedAthleteId = (id: number | null) => {
+    setInternalAthleteId(id);
+    onSelectedAthleteChange?.(id);
+  };
   const [athleteSearch, setAthleteSearch] = useState("");
 
   /* Count sessions per athlete across all their folders */
@@ -211,7 +220,7 @@ interface AthletePlanDetailProps {
   athletes: AthleteSummary[];
   onBack: () => void;
   onStartCreateSession: (folderId: number | null, context?: { athleteName: string; cycleName: string }) => void;
-  onStartEditSession: (session: StrengthSessionTemplate) => void;
+  onStartEditSession: (session: StrengthSessionTemplate, context?: { athleteName: string; cycleName: string }) => void;
   onDeleteSession: (session: StrengthSessionTemplate) => void;
 }
 
@@ -504,7 +513,7 @@ function AthletePlanDetail({
                     })
                   }
                   onAddSession={(dayPrefix) => setAddSessionTarget({ folderId: cycle.id, cycleName: cycle.name, dayPrefix })}
-                  onEditSession={onStartEditSession}
+                  onEditSession={(s) => onStartEditSession(s, { athleteName, cycleName: cycle.name })}
                   onDeleteSession={onDeleteSession}
                   onCopySession={(s) =>
                     setCopyDialog({
@@ -534,7 +543,7 @@ function AthletePlanDetail({
                     <SessionRow
                       key={s.id}
                       session={s}
-                      onEdit={() => onStartEditSession(s)}
+                      onEdit={() => onStartEditSession(s, { athleteName, cycleName: "Non classé" })}
                       onDelete={() => onDeleteSession(s)}
                       onCopy={() =>
                         setCopyDialog({

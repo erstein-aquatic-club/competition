@@ -293,6 +293,7 @@ export default function StrengthCatalog() {
   const [gifUploading, setGifUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises">("sessions");
+  const [planSelectedAthleteId, setPlanSelectedAthleteId] = useState<number | null>(null);
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
   const [copyDialog, setCopyDialog] = useState<{
     mode: "session" | "folder" | "plan";
@@ -1290,13 +1291,18 @@ export default function StrengthCatalog() {
           <TabsContent value="plans" className="mt-4">
             <AthletePlansTab
               athletes={athletes}
+              selectedAthleteId={planSelectedAthleteId}
+              onSelectedAthleteChange={setPlanSelectedAthleteId}
               onStartCreateSession={(folderId, context) => {
                 setEditingSessionId(null);
                 setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
                 setPlanCreationContext(context ?? null);
                 setIsCreating(true);
               }}
-              onStartEditSession={startEditSession}
+              onStartEditSession={(session, context) => {
+                startEditSession(session);
+                setPlanCreationContext(context ?? null);
+              }}
               onDeleteSession={(session) => setPendingDeleteSession(session)}
             />
           </TabsContent>
