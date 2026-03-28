@@ -47,7 +47,7 @@ export function AddSessionSheet({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "S\u00e9ance ajout\u00e9e" });
+      toast({ title: "Séance ajoutée" });
       onOpenChange(false);
     },
     onError: (err: unknown) => {
@@ -67,9 +67,9 @@ export function AddSessionSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[85vh] flex flex-col rounded-t-2xl">
         <SheetHeader className="text-left">
-          <SheetTitle className="text-base">Ajouter une s&eacute;ance</SheetTitle>
+          <SheetTitle className="text-base">Ajouter une séance</SheetTitle>
           <SheetDescription className="text-xs">
-            {cycleName} &mdash; {athleteName}
+            {cycleName} — {athleteName}
           </SheetDescription>
         </SheetHeader>
 
@@ -79,7 +79,7 @@ export function AddSessionSheet({
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              placeholder="Rechercher une s\u00e9ance..."
+              placeholder="Rechercher une séance..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -94,7 +94,7 @@ export function AddSessionSheet({
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <Dumbbell className="h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">
-                {search.trim() ? "Aucune s\u00e9ance trouv\u00e9e" : "Aucune s\u00e9ance dans la biblioth\u00e8que"}
+                {search.trim() ? "Aucune séance trouvée" : "Aucune séance dans la bibliothèque"}
               </p>
             </div>
           ) : (
@@ -149,7 +149,7 @@ export function AddSessionSheet({
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Cr&eacute;er une s&eacute;ance vide
+              Créer une séance vide
             </Button>
           </div>
         </div>

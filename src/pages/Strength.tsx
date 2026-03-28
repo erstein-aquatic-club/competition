@@ -448,6 +448,8 @@ export default function Strength() {
     setOriginalItemCount(items.length);
   };
 
+  const [isPlanMode, setIsPlanMode] = useState(false);
+
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
     const filteredItems = sessionItems.filter((item) => item.cycle_type === cycleType);
@@ -463,6 +465,31 @@ export default function Strength() {
       });
       return;
     }
+    setIsPlanMode(false);
+    setActiveSession({ ...session, cycle, items });
+    setActiveAssignment(null);
+    setActiveRunId(null);
+    setActiveRunLogs(null);
+    setActiveRunnerStep(0);
+    setScreenMode("reader");
+    setSubstitutions(new Map());
+    setOriginalItemCount(items.length);
+  };
+
+  /** Launch from "Mon plan" — uses the session's own cycle, no cycle selector */
+  const startPlanSession = (session: StrengthSessionTemplate) => {
+    const sessionItems = session.items ?? [];
+    const cycle = normalizeStrengthCycle(session.cycle ?? sessionItems.find((item) => item.cycle_type)?.cycle_type);
+    const items = resolveStrengthItems(sessionItems, cycle, exerciseLookup);
+    if (items.length === 0) {
+      toast({
+        title: "Séance vide",
+        description: "Aucun exercice n'est disponible pour cette séance.",
+      });
+      return;
+    }
+    setIsPlanMode(true);
+    setCycleType(cycle);
     setActiveSession({ ...session, cycle, items });
     setActiveAssignment(null);
     setActiveRunId(null);
@@ -721,7 +748,7 @@ export default function Strength() {
               {screenMode === "list" && userId && (
                 <MyPlanTab
                   athleteId={userId}
-                  onSelectSession={startCatalogSession}
+                  onSelectSession={startPlanSession}
                 />
               )}
               {screenMode === "reader" && activeSession && exercises && (
@@ -729,11 +756,11 @@ export default function Strength() {
                   session={activeSession}
                   assignment={activeAssignment}
                   cycleType={cycleType}
-                  cycleOptions={cycleOptions}
+                  cycleOptions={isPlanMode ? [] : cycleOptions}
                   exercises={exercises}
                   oneRMs={oneRMs || []}
                   saveState={saveState}
-                  onBack={() => setScreenMode("list")}
+                  onBack={() => { setScreenMode("list"); setIsPlanMode(false); }}
                   onLaunch={handleLaunchFocus}
                   substitutions={substitutions}
                   onSubstitute={handleSubstitute}

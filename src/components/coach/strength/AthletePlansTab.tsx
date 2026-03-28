@@ -88,12 +88,19 @@ export function AthletePlansTab({
   });
 
   const athleteFolderIds = useMemo(() => {
+    // Build root-to-athlete mapping
+    const rootToAthlete = new Map<number, number>();
+    for (const f of allFolders) {
+      if (f.athlete_id) rootToAthlete.set(f.id, f.athlete_id);
+    }
+    // Collect ALL folder ids per athlete (root + sub-folders via parent_id)
     const map = new Map<number, number[]>();
     for (const f of allFolders) {
-      if (f.athlete_id) {
-        const arr = map.get(f.athlete_id) ?? [];
+      const athleteId = f.athlete_id ?? (f.parent_id ? rootToAthlete.get(f.parent_id) : null);
+      if (athleteId) {
+        const arr = map.get(athleteId) ?? [];
         arr.push(f.id);
-        map.set(f.athlete_id, arr);
+        map.set(athleteId, arr);
       }
     }
     return map;
@@ -154,7 +161,7 @@ export function AthletePlansTab({
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <Users className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">Aucun nageur trouv&eacute;</p>
+          <p className="text-sm text-muted-foreground">Aucun nageur trouvé</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -179,8 +186,10 @@ export function AthletePlansTab({
                 <p className="text-sm font-medium truncate w-full">{athlete.display_name}</p>
                 {count > 0 ? (
                   <span className="text-xs text-muted-foreground">
-                    {count} s&eacute;ance{count > 1 ? "s" : ""}
+                    {count} séance{count > 1 ? "s" : ""}
                   </span>
+                ) : athleteFolderIds.has(athlete.id!) ? (
+                  <span className="text-xs text-muted-foreground/60">Plan vide</span>
                 ) : (
                   <span className="text-xs text-muted-foreground/60">Aucun plan</span>
                 )}
@@ -267,7 +276,7 @@ function AthletePlanDetail({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Cycle cr\u00e9\u00e9" });
+      toast({ title: "Cycle créé" });
     },
   });
 
@@ -276,7 +285,7 @@ function AthletePlanDetail({
       api.renameStrengthFolder(id, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Renomm\u00e9" });
+      toast({ title: "Renommé" });
     },
   });
 
@@ -285,7 +294,7 @@ function AthletePlanDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
-      toast({ title: "Cycle supprim\u00e9" });
+      toast({ title: "Cycle supprimé" });
     },
   });
 
@@ -332,11 +341,11 @@ function AthletePlanDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
-      toast({ title: "Copie effectu\u00e9e" });
+      toast({ title: "Copie effectuée" });
       setCopyDialog(null);
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : "Copie \u00e9chou\u00e9e";
+      const message = err instanceof Error ? err.message : "Copie échouée";
       toast({ title: "Erreur", description: message, variant: "destructive" });
     },
   });
@@ -353,7 +362,7 @@ function AthletePlanDetail({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      toast({ title: "S\u00e9ance assign\u00e9e pour aujourd\u2019hui" });
+      toast({ title: "Séance assignée pour aujourd’hui" });
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Erreur";
@@ -450,7 +459,7 @@ function AthletePlanDetail({
             }
           >
             <Plus className="h-4 w-4 mr-2" />
-            Cr&eacute;er un plan
+            Créer un plan
           </Button>
         </div>
       )}
@@ -470,7 +479,7 @@ function AthletePlanDetail({
             {rootFolders.length > 1 && (
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <span>{root.name}</span>
-                <span className="text-xs text-muted-foreground">({totalCount} s&eacute;ances)</span>
+                <span className="text-xs text-muted-foreground">({totalCount} séances)</span>
               </div>
             )}
 
@@ -514,9 +523,9 @@ function AthletePlanDetail({
               <div className="rounded-xl border border-border overflow-hidden">
                 <div className="flex items-center gap-3 bg-muted/30 px-4 py-3">
                   <div className="w-1 h-6 rounded-full bg-gray-400" />
-                  <span className="text-sm font-semibold flex-1">Non class&eacute;</span>
+                  <span className="text-sm font-semibold flex-1">Non classé</span>
                   <span className="text-xs text-muted-foreground">
-                    {rootSessions.length} s&eacute;ance{rootSessions.length > 1 ? "s" : ""}
+                    {rootSessions.length} séance{rootSessions.length > 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="divide-y divide-border">
@@ -657,7 +666,7 @@ function CycleCard({
         )}
         {!editing && (
           <span className="text-xs text-muted-foreground">
-            {sessions.length} s&eacute;ance{sessions.length !== 1 ? "s" : ""}
+            {sessions.length} séance{sessions.length !== 1 ? "s" : ""}
           </span>
         )}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -719,7 +728,7 @@ function CycleCard({
         </div>
       ) : (
         <div className="border-t border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-          Aucune s&eacute;ance &mdash; ajoutez-en une ci-dessous
+          Aucune séance — ajoutez-en une ci-dessous
         </div>
       )}
 
@@ -729,10 +738,30 @@ function CycleCard({
         className="w-full border-t border-border py-2.5 text-xs text-muted-foreground hover:bg-muted/20 transition-colors flex items-center justify-center gap-1.5"
       >
         <Plus className="h-3.5 w-3.5" />
-        Ajouter une s&eacute;ance
+        Ajouter une séance
       </button>
     </div>
   );
+}
+
+/* ---------- day-of-week badge extraction ---------- */
+const DAY_PATTERNS: [RegExp, string, string][] = [
+  [/^lun/i, "Lun", "bg-blue-500/15 text-blue-700"],
+  [/^mar/i, "Mar", "bg-green-500/15 text-green-700"],
+  [/^mer/i, "Mer", "bg-amber-500/15 text-amber-700"],
+  [/^jeu/i, "Jeu", "bg-violet-500/15 text-violet-700"],
+  [/^ven/i, "Ven", "bg-orange-500/15 text-orange-700"],
+  [/^sam/i, "Sam", "bg-red-500/15 text-red-700"],
+  [/^dim/i, "Dim", "bg-gray-500/15 text-gray-700"],
+];
+
+function extractDayBadge(title: string | undefined | null): { label: string; color: string } | null {
+  if (!title) return null;
+  const trimmed = title.trim();
+  for (const [pattern, label, color] of DAY_PATTERNS) {
+    if (pattern.test(trimmed)) return { label, color };
+  }
+  return null;
 }
 
 /* ================================================================
@@ -749,10 +778,17 @@ interface SessionRowProps {
 
 function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending }: SessionRowProps) {
   const itemCount = session.items?.length ?? 0;
+  const dayBadge = extractDayBadge(session.title);
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 group">
-      <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {dayBadge ? (
+        <span className={cn("inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold shrink-0 w-8", dayBadge.color)}>
+          {dayBadge.label}
+        </span>
+      ) : (
+        <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      )}
       <button
         type="button"
         onClick={onEdit}

@@ -58,8 +58,8 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
         <FolderOpen className="h-10 w-10 mb-3 opacity-40" />
-        <p className="text-sm">Aucun plan personnalise.</p>
-        <p className="text-xs mt-1">Ton coach peut creer un plan depuis le catalogue.</p>
+        <p className="text-sm">Aucun plan personnalisé.</p>
+        <p className="text-xs mt-1">Ton coach peut créer un plan depuis le catalogue.</p>
       </div>
     );
   }
@@ -115,13 +115,13 @@ function CycleSection({
         />
         <span className="text-sm font-semibold">{name}</span>
         <span className="text-xs text-muted-foreground ml-auto">
-          {sessions.length} seance{sessions.length > 1 ? "s" : ""}
+          {sessions.length} séance{sessions.length > 1 ? "s" : ""}
         </span>
       </button>
       {open && (
         <div className="ml-6 space-y-1">
           {sessions.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">Aucune seance dans ce cycle.</p>
+            <p className="text-xs text-muted-foreground py-2">Aucune séance dans ce cycle.</p>
           ) : (
             sessions.map((s) => <SessionRow key={s.id} session={s} onSelect={onSelectSession} />)
           )}
