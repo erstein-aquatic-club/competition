@@ -1,4 +1,4 @@
-import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, Library, Home, type LucideIcon } from "lucide-react";
 import { FEATURES } from "@/lib/features";
 
 type NavItem = {
@@ -24,11 +24,10 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
   }
   if (normalizedRole === "coach") {
     return [
-      { href: "/coach?section=swim", icon: Waves, label: "Natation" },
-      { href: "/coach?section=calendar", icon: CalendarDays, label: "Calendrier" },
+      { href: "/coach?section=week", icon: CalendarDays, label: "Semaine" },
       { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
-      { href: "/coach", icon: LayoutGrid, label: "Plus" },
-      { href: "/profile", icon: User, label: "Profil" },
+      { href: "/coach?section=library", icon: Library, label: "Biblio" },
+      { href: "/coach", icon: Home, label: "Home" },
     ];
   }
   const athleteItems: NavItem[] = [
