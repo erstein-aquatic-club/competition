@@ -13,7 +13,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronRight, Dumbbell, Search, X, Flame, Zap, Weight } from "lucide-react";
+import { ChevronRight, Dumbbell, Search, X } from "lucide-react";
+import { CycleSelector } from "@/components/strength/CycleSelector";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -66,26 +67,6 @@ type DisplaySession = {
   exerciseCount: number;
 };
 
-const cycleConfig = [
-  {
-    value: "endurance" as StrengthCycleType,
-    label: "Endurance",
-    subtitle: "Léger",
-    icon: Flame,
-  },
-  {
-    value: "hypertrophie" as StrengthCycleType,
-    label: "Hypertrophie",
-    subtitle: "Modéré",
-    icon: Zap,
-  },
-  {
-    value: "force" as StrengthCycleType,
-    label: "Force",
-    subtitle: "Lourd",
-    icon: Weight,
-  },
-] as const;
 
 const cardVariant = {
   hidden: { opacity: 0, x: -10 },
@@ -322,28 +303,7 @@ export function SessionList({
   return (
     <div className="space-y-3 animate-in fade-in motion-reduce:animate-none">
       {/* ── Cycle selector ── */}
-      <div className="grid grid-cols-3 gap-1.5">
-        {cycleConfig.map((option) => {
-          const active = cycleType === option.value;
-          const Icon = option.icon;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onCycleChange(normalizeStrengthCycle(option.value))}
-              className={cn(
-                "relative flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 transition-all active:scale-[0.96]",
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                  : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
-              )}
-            >
-              <Icon className={cn("h-3.5 w-3.5", active ? "text-primary-foreground" : "text-muted-foreground/50")} />
-              <span className="text-[12px] font-bold leading-tight">{option.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <CycleSelector cycleType={cycleType} onCycleChange={onCycleChange} />
 
       {/* ── In-progress session ── */}
       {inProgressRun && (
