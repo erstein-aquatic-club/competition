@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Edit2, Search, Dumbbell, Upload, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
+import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,6 +30,7 @@ import { FolderSection } from "@/components/coach/strength/FolderSection";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
 import { CopyToAthleteDialog } from "@/components/coach/strength/CopyToAthleteDialog";
 import { AthletePlansTab } from "@/components/coach/strength/AthletePlansTab";
+import { MediaSourceSheet } from "@/components/coach/strength/MediaSourceSheet";
 
 type ExerciseDraft = Omit<Exercise, "id"> & {
   id?: number;
@@ -295,27 +296,28 @@ export default function StrengthCatalog() {
   const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises">("sessions");
   const [planSelectedAthleteId, setPlanSelectedAthleteId] = useState<number | null>(null);
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
+  const [mediaSheetTarget, setMediaSheetTarget] = useState<"edit" | "create" | null>(null);
   const [copyDialog, setCopyDialog] = useState<{
     mode: "session" | "folder" | "plan";
     sourceId: number;
     sourceLabel: string;
   } | null>(null);
 
-  const handleGifUpload = async (file: File, setter: (url: string) => void) => {
+  const handleGifUpload = async (media: File | Blob, isGif: boolean, setter: (url: string) => void) => {
     const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
+    if (media.size > maxSize) {
       toast({ title: "Fichier trop volumineux", description: "La taille maximale est de 10 Mo.", variant: "destructive" });
       return;
     }
     setGifUploading(true);
     try {
-      const ext = file.name.split(".").pop() ?? "gif";
+      const ext = isGif ? "gif" : (media instanceof File ? (media.name.split(".").pop() ?? "gif") : "gif");
       const path = `exercises/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("exercise-gifs").upload(path, file, { upsert: false });
+      const { error: uploadError } = await supabase.storage.from("exercise-gifs").upload(path, media, { upsert: false });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("exercise-gifs").getPublicUrl(path);
       setter(urlData.publicUrl);
-      toast({ title: "Image uploadée" });
+      toast({ title: "Illustration uploadée" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Réessayez.";
       toast({ title: "Erreur d'upload", description: message, variant: "destructive" });
@@ -707,7 +709,7 @@ export default function StrengthCatalog() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Illustration (GIF)</Label>
+              <Label>Illustration</Label>
               <div className="flex gap-2">
                 <Input
                   value={editingExercise.illustration_gif ?? ""}
@@ -725,19 +727,10 @@ export default function StrengthCatalog() {
                   variant="outline"
                   size="icon"
                   disabled={gifUploading}
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = "image/*,.gif";
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) handleGifUpload(file, (url) => setEditingExercise((prev) => prev ? { ...prev, illustration_gif: url } : prev));
-                    };
-                    input.click();
-                  }}
-                  aria-label="Uploader une image"
+                  onClick={() => setMediaSheetTarget("edit")}
+                  aria-label="Ajouter une illustration"
                 >
-                  {gifUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {gifUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
                 </Button>
               </div>
               {editingExercise.illustration_gif && (
@@ -832,7 +825,7 @@ export default function StrengthCatalog() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Illustration (GIF)</Label>
+            <Label>Illustration</Label>
             <div className="flex gap-2">
               <Input
                 value={newExercise.illustration_gif ?? ""}
@@ -850,19 +843,10 @@ export default function StrengthCatalog() {
                 variant="outline"
                 size="icon"
                 disabled={gifUploading}
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/*,.gif";
-                  input.onchange = (e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (file) handleGifUpload(file, (url) => setNewExercise((prev) => ({ ...prev, illustration_gif: url })));
-                  };
-                  input.click();
-                }}
-                aria-label="Uploader une image"
+                onClick={() => setMediaSheetTarget("create")}
+                aria-label="Ajouter une illustration"
               >
-                {gifUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {gifUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               </Button>
             </div>
             {newExercise.illustration_gif && (
@@ -1340,6 +1324,23 @@ export default function StrengthCatalog() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <MediaSourceSheet
+        open={mediaSheetTarget !== null}
+        onOpenChange={(v) => { if (!v) setMediaSheetTarget(null); }}
+        onMediaReady={(media, isGif) => {
+          if (mediaSheetTarget === "edit") {
+            handleGifUpload(media, isGif, (url) =>
+              setEditingExercise((prev) => prev ? { ...prev, illustration_gif: url } : prev)
+            );
+          } else if (mediaSheetTarget === "create") {
+            handleGifUpload(media, isGif, (url) =>
+              setNewExercise((prev) => ({ ...prev, illustration_gif: url }))
+            );
+          }
+          setMediaSheetTarget(null);
+        }}
+      />
     </div>
   );
 }
