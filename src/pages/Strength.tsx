@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dumbbell, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
-import { SessionList } from "@/components/strength/SessionList";
+import { SessionBrowser } from "@/components/strength/SessionBrowser";
 import { SessionDetailPreview } from "@/components/strength/SessionDetailPreview";
 import { HistoryTable } from "@/components/strength/HistoryTable";
 import { useStrengthState } from "@/hooks/useStrengthState";
@@ -696,7 +696,7 @@ export default function Strength() {
 
             <TabsContent value="start" className="space-y-5 pt-4">
               {screenMode === "list" && (
-                <SessionList
+                <SessionBrowser
                   user={user}
                   userId={userId}
                   athleteName={historyAthleteName}
@@ -710,10 +710,11 @@ export default function Strength() {
                   onSearchChange={setSearchQuery}
                   onStartAssignment={(assignment) => {
                     if (assignment.session_type === "strength") {
-                      startAssignment(assignment as StrengthAssignment);
+                      startAssignment(assignment as any);
                     }
                   }}
                   onStartCatalog={startCatalogSession}
+                  onStartPlanSession={startPlanSession}
                   onResumeInProgress={({ assignment, session, runId, logs, progressPct }) => {
                     setActiveAssignment(assignment);
                     setActiveSession(session);
