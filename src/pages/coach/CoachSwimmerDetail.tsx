@@ -6,7 +6,8 @@ import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CalendarClock, CalendarRange, ChevronRight, Clock, MessageSquare, Target } from "lucide-react";
+import { ArrowLeft, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, MessageSquare, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import SwimmerFeedbackTab from "./SwimmerFeedbackTab";
 import SwimmerObjectivesTab from "./SwimmerObjectivesTab";
@@ -40,7 +41,7 @@ type CoachSwimmerDetailProps = {
   onBack?: () => void;
 };
 
-type CoachSwimmerTab = "resume" | "suivi" | "echanges" | "planif";
+type CoachSwimmerTab = "resume" | "planning" | "echanges" | "comms";
 
 export default function CoachSwimmerDetail({
   athleteId: athleteIdProp,
@@ -176,18 +177,18 @@ export default function CoachSwimmerDetail({
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CoachSwimmerTab)}>
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
-          <TabsTrigger value="resume" className="rounded-xl border bg-card px-3 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
+        <TabsList className="grid h-auto w-full grid-cols-4 gap-1.5 bg-transparent p-0">
+          <TabsTrigger value="resume" className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
             Résumé
           </TabsTrigger>
-          <TabsTrigger value="suivi" className="rounded-xl border bg-card px-3 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
-            Suivi
+          <TabsTrigger value="planning" className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
+            Planning
           </TabsTrigger>
-          <TabsTrigger value="echanges" className="rounded-xl border bg-card px-3 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
+          <TabsTrigger value="echanges" className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
             Échanges
           </TabsTrigger>
-          <TabsTrigger value="planif" className="rounded-xl border bg-card px-3 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
-            Planif
+          <TabsTrigger value="comms" className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-primary/5">
+            Comms
           </TabsTrigger>
         </TabsList>
 
@@ -201,7 +202,7 @@ export default function CoachSwimmerDetail({
               {/* Suivi tile */}
               <button
                 type="button"
-                onClick={() => setActiveTab("suivi")}
+                onClick={() => setActiveTab("echanges")}
                 className="rounded-xl border px-3 py-3 text-left active:bg-muted"
               >
                 <div className="flex items-center gap-2">
@@ -253,7 +254,7 @@ export default function CoachSwimmerDetail({
               {/* Planif tile */}
               <button
                 type="button"
-                onClick={() => setActiveTab("planif")}
+                onClick={() => setActiveTab("planning")}
                 className="rounded-xl border px-3 py-3 text-left active:bg-muted"
               >
                 <div className="flex items-center gap-2">
@@ -279,7 +280,7 @@ export default function CoachSwimmerDetail({
               {/* Objectifs tile */}
               <button
                 type="button"
-                onClick={() => setActiveTab("suivi")}
+                onClick={() => setActiveTab("planning")}
                 className="rounded-xl border px-3 py-3 text-left active:bg-muted"
               >
                 <div className="flex items-center gap-2">
@@ -301,37 +302,24 @@ export default function CoachSwimmerDetail({
           </div>
         </TabsContent>
 
-        <TabsContent value="suivi" className="mt-4 space-y-4">
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Objectifs</h2>
-            </div>
-            <SwimmerObjectivesTab athleteId={athleteId} athleteName={displayName} />
-          </section>
-
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Ressentis</h2>
-            </div>
-            <SwimmerFeedbackTab athleteId={athleteId} athleteName={displayName} showProgressAction={false} />
-          </section>
-        </TabsContent>
-
-        <TabsContent value="echanges" className="mt-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Entretiens</h2>
-          </div>
-          <SwimmerInterviewsTab athleteId={athleteId} athleteName={displayName} />
-        </TabsContent>
-
-        <TabsContent value="planif" className="mt-4 space-y-4">
+        <TabsContent value="planning" className="mt-4 space-y-4">
           <Collapsible defaultOpen>
             <CollapsibleTrigger asChild>
               <button type="button" className="w-full flex items-center gap-2 group">
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                <Target className="h-4 w-4 text-amber-500" />
+                <h2 className="text-sm font-semibold">Objectifs</h2>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <SwimmerObjectivesTab athleteId={athleteId} athleteName={displayName} />
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger asChild>
+              <button type="button" className="w-full flex items-center gap-2 group">
+                <CalendarClock className="h-4 w-4 text-blue-500" />
                 <h2 className="text-sm font-semibold">Créneaux</h2>
                 <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
               </button>
@@ -345,13 +333,66 @@ export default function CoachSwimmerDetail({
             </CollapsibleContent>
           </Collapsible>
 
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger asChild>
+              <button type="button" className="w-full flex items-center gap-2 group">
+                <CalendarRange className="h-4 w-4 text-emerald-500" />
+                <h2 className="text-sm font-semibold">Macro-cycles</h2>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <SwimmerPlanningTab athleteId={athleteId} />
+            </CollapsibleContent>
+          </Collapsible>
+        </TabsContent>
+
+        <TabsContent value="echanges" className="mt-4 space-y-4">
           <section className="space-y-2">
             <div className="flex items-center gap-2">
-              <CalendarRange className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Cycle</h2>
+              <MessageSquare className="h-4 w-4 text-violet-500" />
+              <h2 className="text-sm font-semibold">Entretiens</h2>
             </div>
-            <SwimmerPlanningTab athleteId={athleteId} />
+            <SwimmerInterviewsTab athleteId={athleteId} athleteName={displayName} />
           </section>
+
+          <section className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-blue-500" />
+              <h2 className="text-sm font-semibold">Ressentis séances</h2>
+            </div>
+            <SwimmerFeedbackTab athleteId={athleteId} athleteName={displayName} showProgressAction={false} />
+          </section>
+        </TabsContent>
+
+        <TabsContent value="comms" className="mt-4 space-y-3">
+          <div className="rounded-2xl border bg-card p-4 space-y-3">
+            <p className="text-sm font-semibold">Contacter {displayName}</p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  window.location.hash = "#/coach?section=comms";
+                }}
+              >
+                <Bell className="mr-1.5 h-3.5 w-3.5" />
+                Notification
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  window.location.hash = "#/coach?section=comms";
+                }}
+              >
+                <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                SMS
+              </Button>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
