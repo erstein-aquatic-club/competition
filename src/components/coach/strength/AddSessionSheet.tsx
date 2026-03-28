@@ -18,6 +18,7 @@ interface AddSessionSheetProps {
   targetFolderId: number;
   cycleName: string;
   athleteName: string;
+  dayPrefix?: string;
   onCreateNew: () => void;
 }
 
@@ -27,6 +28,7 @@ export function AddSessionSheet({
   targetFolderId,
   cycleName,
   athleteName,
+  dayPrefix,
   onCreateNew,
 }: AddSessionSheetProps) {
   const { toast } = useToast();
@@ -69,7 +71,7 @@ export function AddSessionSheet({
         <SheetHeader className="text-left">
           <SheetTitle className="text-base">Ajouter une séance</SheetTitle>
           <SheetDescription className="text-xs">
-            {cycleName} — {athleteName}
+            {dayPrefix ? `${dayPrefix} · ` : ""}{cycleName} — {athleteName}
           </SheetDescription>
         </SheetHeader>
 

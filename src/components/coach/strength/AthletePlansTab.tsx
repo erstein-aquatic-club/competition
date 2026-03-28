@@ -301,6 +301,7 @@ function AthletePlanDetail({
   const [addSessionTarget, setAddSessionTarget] = useState<{
     folderId: number;
     cycleName: string;
+    dayPrefix?: string;
   } | null>(null);
 
   const [copyDialog, setCopyDialog] = useState<{
@@ -502,7 +503,7 @@ function AthletePlanDetail({
                       sourceLabel: cycle.name,
                     })
                   }
-                  onAddSession={() => setAddSessionTarget({ folderId: cycle.id, cycleName: cycle.name })}
+                  onAddSession={(dayPrefix) => setAddSessionTarget({ folderId: cycle.id, cycleName: cycle.name, dayPrefix })}
                   onEditSession={onStartEditSession}
                   onDeleteSession={onDeleteSession}
                   onCopySession={(s) =>
@@ -574,6 +575,7 @@ function AthletePlanDetail({
           targetFolderId={addSessionTarget.folderId}
           cycleName={addSessionTarget.cycleName}
           athleteName={athleteName}
+          dayPrefix={addSessionTarget.dayPrefix}
           onCreateNew={() => {
             onStartCreateSession(addSessionTarget.folderId, {
               athleteName,
@@ -587,8 +589,31 @@ function AthletePlanDetail({
   );
 }
 
+/* ── Day slot definitions ── */
+const WEEK_DAYS: { key: string; label: string; full: string; color: string }[] = [
+  { key: "lun", label: "Lun", full: "Lundi", color: "bg-sky-500/15 text-sky-700" },
+  { key: "mar", label: "Mar", full: "Mardi", color: "bg-emerald-500/15 text-emerald-700" },
+  { key: "mer", label: "Mer", full: "Mercredi", color: "bg-amber-500/15 text-amber-700" },
+  { key: "jeu", label: "Jeu", full: "Jeudi", color: "bg-violet-500/15 text-violet-700" },
+  { key: "ven", label: "Ven", full: "Vendredi", color: "bg-orange-500/15 text-orange-700" },
+  { key: "sam", label: "Sam", full: "Samedi", color: "bg-rose-500/15 text-rose-700" },
+];
+
+function matchDay(title: string | undefined | null): string | null {
+  if (!title) return null;
+  const t = title.trim().toLowerCase();
+  for (const d of WEEK_DAYS) {
+    if (t.startsWith(d.key)) return d.key;
+  }
+  return null;
+}
+
+function stripDayPrefix(title: string): string {
+  return title.replace(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*[—–\-:]\s*/i, "").trim();
+}
+
 /* ================================================================
-   CycleCard — a visually distinct card for each cycle
+   CycleCard — day-slot based schedule view
    ================================================================ */
 interface CycleCardProps {
   cycle: StrengthFolder;
@@ -597,7 +622,7 @@ interface CycleCardProps {
   onRename: (name: string) => void;
   onDelete: () => void;
   onCopy: () => void;
-  onAddSession: () => void;
+  onAddSession: (dayPrefix?: string) => void;
   onEditSession: (s: StrengthSessionTemplate) => void;
   onDeleteSession: (s: StrengthSessionTemplate) => void;
   onCopySession: (s: StrengthSessionTemplate) => void;
@@ -640,6 +665,18 @@ function CycleCard({
     }
     setEditing(false);
   };
+
+  // Map sessions to day slots
+  const sessionsByDay = new Map<string, StrengthSessionTemplate>();
+  const unslotted: StrengthSessionTemplate[] = [];
+  for (const s of sessions) {
+    const day = matchDay(s.title ?? s.name);
+    if (day) {
+      sessionsByDay.set(day, s);
+    } else {
+      unslotted.push(s);
+    }
+  }
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">
@@ -711,10 +748,85 @@ function CycleCard({
         </Popover>
       </div>
 
-      {/* Sessions list */}
-      {sessions.length > 0 ? (
-        <div className="divide-y divide-border">
-          {sessions.map((s) => (
+      {/* Day slots */}
+      <div className="divide-y divide-border/50">
+        {WEEK_DAYS.map((day) => {
+          const session = sessionsByDay.get(day.key);
+          return (
+            <div key={day.key} className="flex items-center gap-2.5 px-3 py-2 min-h-[44px]">
+              <span className={cn(
+                "inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-bold shrink-0 w-[32px]",
+                day.color,
+              )}>
+                {day.label}
+              </span>
+              {session ? (
+                <div className="flex items-center gap-2 flex-1 min-w-0 group">
+                  <button
+                    type="button"
+                    onClick={() => onEditSession(session)}
+                    className="text-[13px] font-medium flex-1 truncate text-left hover:underline"
+                  >
+                    {stripDayPrefix(session.title ?? session.name ?? "Sans titre")}
+                  </button>
+                  <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                    {session.items?.length ?? 0} ex.
+                  </span>
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => onEditSession(session)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted"
+                      aria-label="Modifier"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAssignSession(session)}
+                      disabled={assignPending}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted text-green-600"
+                      aria-label="Assigner"
+                    >
+                      {assignPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CalendarPlus className="h-3 w-3" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onCopySession(session)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted"
+                      aria-label="Copier"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteSession(session)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
+                      aria-label="Supprimer"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onAddSession(day.full)}
+                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Ajouter</span>
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Unslotted sessions (no day prefix) */}
+      {unslotted.length > 0 && (
+        <div className="border-t border-border divide-y divide-border/50">
+          {unslotted.map((s) => (
             <SessionRow
               key={s.id}
               session={s}
@@ -726,20 +838,7 @@ function CycleCard({
             />
           ))}
         </div>
-      ) : (
-        <div className="border-t border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-          Aucune séance — ajoutez-en une ci-dessous
-        </div>
       )}
-
-      {/* Add session button */}
-      <button
-        onClick={onAddSession}
-        className="w-full border-t border-border py-2.5 text-xs text-muted-foreground hover:bg-muted/20 transition-colors flex items-center justify-center gap-1.5"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Ajouter une séance
-      </button>
     </div>
   );
 }
