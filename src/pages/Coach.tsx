@@ -1,26 +1,18 @@
-import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   BellRing,
   CalendarDays,
   ChevronRight,
-  Clock,
-  Dumbbell,
-  HeartPulse,
-  Search,
   Trophy,
   Users,
   UsersRound,
-  Waves,
-  Zap,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
-import { Input } from "@/components/ui/input";
 const CoachSwimmersOverview = lazy(() => import("./coach/CoachSwimmersOverview"));
 const CoachGroupsScreen = lazy(() => import("./coach/CoachGroupsScreen"));
 const CoachCompetitionsScreen = lazy(() => import("./coach/CoachCompetitionsScreen"));
@@ -37,20 +29,17 @@ type CoachAthleteOption = {
   id: number | null;
   display_name: string;
   group_label?: string | null;
+  avatar_url?: string | null;
 };
 
 type CoachHomeProps = {
   onNavigate: (section: CoachSection) => void;
   onOpenRecordsClub: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
-  athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; ffn_iuf?: string | null; avatar_url?: string | null }>;
+  athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
   kpiLoading: boolean;
   fatigueAlerts: Array<{ athleteName: string; rating: number }>;
-  mostLoadedAthlete?: { athleteName: string; loadScore: number } | null;
-  formeScores: Map<number, number | null>;
-  swimSessionCount?: number;
-  strengthSessionCount?: number;
 };
 
 // ── Minimal section divider label ──────────────────────────────────────────
@@ -65,21 +54,30 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** 5-dot forme indicator — score is 1–5, dots fill from left */
-function FormeDots({ score }: { score: number | null }) {
-  if (score == null) return null;
-  const filled = Math.round(score);
-  const dotColor = score >= 3.5 ? "bg-emerald-500" : score >= 2.5 ? "bg-amber-500" : "bg-red-500";
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className={`h-1.5 w-1.5 rounded-full ${i < filled ? dotColor : "bg-muted"}`} />
-      ))}
-    </div>
-  );
+const RECENT_ATHLETES_KEY = "eac-recent-coach-athletes";
+const DAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"] as const;
+
+/** Get Monday of the current week (ISO week, Monday = first day) */
+function getMondayOfWeek(d: Date): Date {
+  const copy = new Date(d);
+  const day = copy.getDay(); // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  copy.setDate(copy.getDate() + diff);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
 }
 
-// ── CoachHome ──────────────────────────────────────────────────────────────
+function getSundayOfWeek(monday: Date): Date {
+  const sun = new Date(monday);
+  sun.setDate(sun.getDate() + 6);
+  return sun;
+}
+
+function formatDateIso(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+// ── CoachHome — "Ma semaine" dashboard ────────────────────────────────────
 const CoachHome = ({
   onNavigate,
   onOpenRecordsClub,
@@ -88,164 +86,169 @@ const CoachHome = ({
   athletesLoading,
   kpiLoading,
   fatigueAlerts,
-  mostLoadedAthlete,
-  formeScores,
-  swimSessionCount,
-  strengthSessionCount,
 }: CoachHomeProps) => {
-  const today = new Date().toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
+  const userName = useAuth((s) => s.user);
+  const firstName = userName?.split(" ")[0] ?? "Coach";
+
+  const now = useMemo(() => new Date(), []);
+  const monday = useMemo(() => getMondayOfWeek(now), [now]);
+  const sunday = useMemo(() => getSundayOfWeek(monday), [monday]);
+  const mondayLabel = monday.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+
+  // ── Section B: Slot data ────────────────────────────────────
+  const { data: slots = [] } = useQuery({
+    queryKey: ["training-slots"],
+    queryFn: () => api.getTrainingSlots(),
+    staleTime: 5 * 60 * 1000,
   });
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search.trim().toLocaleLowerCase("fr-FR"));
 
-  const visibleAthletes = useMemo(() => {
-    if (!deferredSearch) {
-      return athletes.slice(0, 5);
+  const { data: slotAssignments = [] } = useQuery({
+    queryKey: ["slot-assignments-week", formatDateIso(monday), formatDateIso(sunday)],
+    queryFn: () => api.getSlotAssignments({ from: formatDateIso(monday), to: formatDateIso(sunday) }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build per-day info: which days have slots, which have sessions
+  const weekDays = useMemo(() => {
+    // Set of day_of_week values that have at least one slot
+    const daysWithSlots = new Set(slots.map((s) => s.day_of_week));
+    // Set of day_of_week values that have at least one session assignment this week
+    const daysWithSessions = new Set<number>();
+    for (const a of slotAssignments) {
+      if (a.training_slot_id) {
+        // Find the slot to get its day_of_week
+        const slot = slots.find((s) => s.id === a.training_slot_id);
+        if (slot != null) {
+          daysWithSessions.add(slot.day_of_week);
+        }
+      } else if (a.scheduled_date) {
+        // Fallback: derive day_of_week from scheduled_date
+        const d = new Date(a.scheduled_date + "T00:00:00");
+        const jsDay = d.getDay(); // 0=Sun
+        const dow = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon
+        daysWithSessions.add(dow);
+      }
     }
-    return athletes
-      .filter((athlete) => {
-        const name = athlete.display_name.toLocaleLowerCase("fr-FR");
-        const group = athlete.group_label?.toLocaleLowerCase("fr-FR") ?? "";
-        return name.includes(deferredSearch) || group.includes(deferredSearch);
-      })
-      .slice(0, 6);
-  }, [athletes, deferredSearch]);
 
-  const hasAlerts = fatigueAlerts.length > 0;
+    const totalSlots = slots.length;
+    const slotsWithSession = slots.filter((s) => daysWithSessions.has(s.day_of_week)).length;
+    const emptySlotsCount = totalSlots - slotsWithSession;
 
-  const primaryAction = {
-    label: "Créer une séance",
-    detail: "Natation · Explorer la bibliothèque",
-    action: () => onNavigate("week"),
-  };
+    return {
+      daysWithSlots,
+      daysWithSessions,
+      totalSlots,
+      slotsWithSession,
+      emptySlotsCount,
+    };
+  }, [slots, slotAssignments]);
 
-  const tools = [
-    { label: "Natation", icon: Waves, action: () => onNavigate("week"), color: "text-cyan-500" },
-    { label: "Muscu", icon: Dumbbell, action: () => onNavigate("library"), color: "text-violet-500" },
-    { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500" },
-    { label: "Échéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500" },
-    { label: "Créneaux", icon: Clock, action: () => onNavigate("week"), color: "text-blue-500" },
-    { label: "SMS", icon: BellRing, action: () => onNavigate("comms"), color: "text-rose-500" },
-    { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-orange-500" },
-  ];
+  // ── Section C: Fatigue alerts (max 3) ──────────────────────
+  const topAlerts = useMemo(() => fatigueAlerts.slice(0, 3), [fatigueAlerts]);
+
+  // ── Section D: Quick access ────────────────────────────────
+  const quickAccess = useMemo(
+    () => [
+      { label: "Echéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
+      { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+      { label: "Comms", icon: BellRing, action: () => onNavigate("comms"), color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30" },
+      { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    ],
+    [onNavigate, onOpenRecordsClub],
+  );
+
+  // ── Section E: Recent athletes ─────────────────────────────
+  const recentAthletes = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_ATHLETES_KEY);
+      if (!raw) return [];
+      const ids: number[] = JSON.parse(raw);
+      return ids
+        .map((id) => athletes.find((a) => a.id === id))
+        .filter(Boolean) as typeof athletes;
+    } catch {
+      return [];
+    }
+  }, [athletes]);
 
   return (
     <div className="space-y-5 pb-24">
-      {/* CSS keyframes for glow animations */}
-      <style>{`
-        @keyframes cta-breathe {
-          0%, 100% { opacity: 0.55; transform: scale(1); }
-          50%       { opacity: 0.85; transform: scale(1.06); }
-        }
-        @keyframes shimmer-slide {
-          0%   { transform: translateX(-100%) skewX(-12deg); }
-          100% { transform: translateX(300%) skewX(-12deg); }
-        }
-        .cta-glow     { animation: cta-breathe 3.5s ease-in-out infinite; }
-        .cta-shimmer  { animation: shimmer-slide 2.8s ease-in-out infinite 0.8s; }
-      `}</style>
-
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigate("home")}
-            className="shrink-0 rounded-full border px-3 py-2 text-sm font-semibold active:bg-muted"
-          >
-            Aujourd'hui
-          </button>
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un nageur"
-              className="h-10 rounded-full pl-9"
-            />
-          </div>
-          <Button size="sm" className="shrink-0 rounded-full" onClick={() => onNavigate("comms")}>
-            Message
-          </Button>
-        </div>
-        <p className="mt-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground capitalize">
-          {today}
+      {/* ── Section A: Header ── */}
+      <section className="pt-2">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Bonjour {firstName}
+        </h1>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          Semaine du {mondayLabel}
         </p>
-      </div>
+      </section>
 
-      {/* ── SECTION 1 : LE QUOTIDIEN ── */}
+      {/* ── Section B: Ma semaine (mini-grille 7 jours) ── */}
       <section className="space-y-2.5">
-        <SectionLabel>Le Quotidien</SectionLabel>
+        <SectionLabel>Ma semaine</SectionLabel>
 
-        {/* ── PRIMARY CTA — giant animated button ── */}
         <button
           type="button"
-          onClick={primaryAction.action}
-          className="relative w-full overflow-hidden rounded-3xl text-white transition-all duration-200 active:scale-[0.97] bg-gradient-to-br from-primary via-primary/80 to-primary/60"
+          onClick={() => onNavigate("week")}
+          className="w-full rounded-2xl border bg-card p-4 text-left transition-colors active:bg-muted"
         >
-          {/* Radial background glow */}
-          <div
-            className="cta-glow absolute inset-0"
-            style={{
-              background: "radial-gradient(ellipse at 20% 60%, rgba(255,255,255,0.2) 0%, transparent 65%)",
-            }}
-          />
-          {/* Diagonal shimmer stripe */}
-          <div
-            className="cta-shimmer absolute top-0 bottom-0 left-0 w-1/3 pointer-events-none"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
-          />
-
-          <div className="relative flex items-center gap-4 px-6 py-7">
-            <div className="min-w-0 flex-1">
-              <p className="text-[1.6rem] font-bold leading-tight tracking-tight">{primaryAction.label}</p>
-              <p className="mt-1.5 text-sm opacity-75">{primaryAction.detail}</p>
-            </div>
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20">
-              <Waves className="h-7 w-7" />
-            </div>
+          {/* 7-column day grid */}
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {DAY_LABELS.map((label, i) => {
+              const hasSlot = weekDays.daysWithSlots.has(i);
+              const hasSession = weekDays.daysWithSessions.has(i);
+              return (
+                <div key={i} className="flex flex-col items-center gap-1.5">
+                  <span className="text-[9px] font-bold uppercase text-muted-foreground">
+                    {label}
+                  </span>
+                  <span
+                    className={[
+                      "flex h-8 w-8 items-center justify-center rounded-xl text-sm font-semibold transition-colors",
+                      hasSession
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                        : hasSlot
+                          ? "bg-muted text-muted-foreground"
+                          : "text-muted-foreground/30",
+                    ].join(" ")}
+                  >
+                    {hasSession ? "\u2713" : hasSlot ? "\u25CB" : "\u00B7"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        </button>
 
-        {/* Secondary quick action */}
-        <button
-          type="button"
-          onClick={() => onNavigate("comms")}
-          className="flex w-full items-center gap-2.5 rounded-2xl border bg-card px-4 py-3.5 text-left transition-colors active:bg-muted"
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-            <BellRing className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Message</p>
-            <p className="text-[11px] text-muted-foreground">Notifier un groupe</p>
+          {/* Summary label */}
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-[11px] text-muted-foreground">
+              {weekDays.slotsWithSession}/{weekDays.totalSlots} créneaux planifiés
+            </p>
+            {weekDays.emptySlotsCount > 0 && (
+              <span className="text-[11px] font-semibold text-primary">
+                {weekDays.emptySlotsCount} sans séance
+              </span>
+            )}
           </div>
         </button>
       </section>
 
-      {/* ── SECTION 2 : TOUR DE CONTRÔLE ── */}
-      <section className="space-y-2.5">
-        <SectionLabel>Tour de Contrôle</SectionLabel>
+      {/* ── Section C: Alertes (conditional) ── */}
+      {topAlerts.length > 0 && !kpiLoading && (
+        <section className="space-y-2.5">
+          <SectionLabel>Alertes</SectionLabel>
 
-        <div
-          className={[
-            "rounded-3xl border p-4 space-y-3 transition-colors",
-            hasAlerts
-              ? "border-red-200 bg-red-50/70 dark:border-red-900/50 dark:bg-red-950/25"
-              : "bg-card border-border",
-          ].join(" ")}
-        >
-          {/* Fatigue alert list — front and center */}
-          {hasAlerts && !kpiLoading && (
-            <div className="space-y-1.5">
-              {fatigueAlerts.map((alert) => (
+          <div className="space-y-1.5 rounded-2xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/50 dark:bg-red-950/25">
+            {topAlerts.map((alert) => {
+              const athlete = athletes.find((a) => a.display_name === alert.athleteName);
+              return (
                 <button
                   key={alert.athleteName}
                   type="button"
-                  onClick={() => onNavigate("swimmers")}
+                  onClick={() => {
+                    if (athlete) onOpenAthlete(athlete);
+                    else onNavigate("swimmers");
+                  }}
                   className="flex w-full items-center gap-3 rounded-2xl bg-white/70 dark:bg-black/20 px-3.5 py-2.5 text-left transition-colors active:bg-white/90"
                 >
                   <span className="relative flex h-3 w-3 shrink-0">
@@ -260,238 +263,89 @@ const CoachHome = ({
                   </span>
                   <ChevronRight className="h-3.5 w-3.5 text-red-400" />
                 </button>
-              ))}
-            </div>
-          )}
-
-          {/* KPI pair */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div
-              className={[
-                "rounded-2xl p-3.5",
-                hasAlerts ? "bg-white/50 dark:bg-black/20" : "bg-muted/40",
-              ].join(" ")}
-            >
-              <div className="mb-2 flex items-center gap-1.5">
-                <HeartPulse
-                  className={`h-3.5 w-3.5 ${fatigueAlerts.length > 0 ? "text-red-500" : "text-muted-foreground"}`}
-                />
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                  Alertes
-                </span>
-              </div>
-              <p
-                className={`text-4xl font-black tabular-nums leading-none ${fatigueAlerts.length > 0 ? "text-red-600 dark:text-red-400" : "text-foreground"
-                  }`}
-              >
-                {kpiLoading ? "–" : fatigueAlerts.length}
-              </p>
-              <p className="mt-1.5 text-[11px] text-muted-foreground truncate">
-                {kpiLoading
-                  ? "Calcul…"
-                  : fatigueAlerts.length > 0
-                    ? fatigueAlerts.slice(0, 2).map((a) => a.athleteName.split(" ")[0]).join(", ")
-                    : "Aucune alerte"}
-              </p>
-            </div>
-
-            <div
-              className={[
-                "rounded-2xl p-3.5",
-                hasAlerts ? "bg-white/50 dark:bg-black/20" : "bg-muted/40",
-              ].join(" ")}
-            >
-              <div className="mb-2 flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                  Plus chargé
-                </span>
-              </div>
-              <p className="text-2xl font-black truncate leading-none">
-                {kpiLoading ? "–" : mostLoadedAthlete?.athleteName?.split(" ")[0] ?? "–"}
-              </p>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                {kpiLoading
-                  ? "Calcul…"
-                  : mostLoadedAthlete
-                    ? `Charge ${Math.round(mostLoadedAthlete.loadScore)}`
-                    : "Pas de données"}
-              </p>
-            </div>
+              );
+            })}
           </div>
+        </section>
+      )}
+
+      {/* ── Section D: Accès rapides (2x2 grid) ── */}
+      <section className="space-y-2.5">
+        <SectionLabel>Accès rapides</SectionLabel>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          {quickAccess.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-4 text-left transition-colors active:bg-muted"
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.bg}`}>
+                <item.icon className={`h-5 w-5 ${item.color}`} />
+              </div>
+              <span className="text-sm font-semibold">{item.label}</span>
+            </button>
+          ))}
         </div>
       </section>
 
-      {/* ── SECTION 3 : NAGEURS ── */}
+      {/* ── Section E: Nageurs récents ── */}
       <section className="space-y-2.5">
-        <div className="flex items-center gap-3 pb-0.5">
-          <span className="text-[9px] font-black uppercase tracking-[0.28em] text-muted-foreground/70">
-            Nageurs
-          </span>
-          <div className="flex-1 h-px bg-border/50" />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="text-[10px] font-bold text-primary"
-            >
-              Effacer
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onNavigate("swimmers")}
-              className="flex items-center gap-0.5 text-[10px] font-bold text-primary"
-            >
-              Tous <ChevronRight className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+        <SectionLabel>Nageurs récents</SectionLabel>
 
-        <div className="overflow-hidden rounded-3xl border bg-card shadow-sm">
-          {athletesLoading ? (
-            <div className="divide-y divide-border/60">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                  <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
-                    <div className="h-3 w-18 animate-pulse rounded bg-muted" />
-                  </div>
+        {athletesLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-3">
+                <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-18 animate-pulse rounded bg-muted" />
                 </div>
-              ))}
-            </div>
-          ) : visibleAthletes.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Aucun nageur trouvé.
-            </p>
-          ) : (
+              </div>
+            ))}
+          </div>
+        ) : recentAthletes.length === 0 ? (
+          <p className="rounded-2xl border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
+            Aucun nageur consulté récemment
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border bg-card">
             <div className="divide-y divide-border/60">
-              {visibleAthletes.map((athlete) => {
-                const isFatigueAlert = fatigueAlerts.some(
-                  (a) => a.athleteName === athlete.display_name,
-                );
+              {recentAthletes.slice(0, 3).map((athlete) => {
                 const initials = athlete.display_name.charAt(0).toUpperCase();
-                const formeScore = athlete.id != null ? (formeScores.get(athlete.id) ?? null) : null;
-
                 return (
                   <button
                     key={athlete.id ?? athlete.display_name}
                     type="button"
                     onClick={() => onOpenAthlete(athlete)}
-                    className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-muted"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-muted"
                   >
-                    {/* Avatar with alert ring */}
                     {athlete.avatar_url ? (
                       <img
                         src={athlete.avatar_url}
                         alt=""
-                        className={[
-                          "h-9 w-9 shrink-0 rounded-full object-cover border",
-                          isFatigueAlert
-                            ? "border-red-400/60 ring-2 ring-red-400/60 ring-offset-1"
-                            : "border-border",
-                        ].join(" ")}
+                        className="h-9 w-9 shrink-0 rounded-full object-cover border border-border"
                       />
                     ) : (
-                      <div
-                        className={[
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all",
-                          isFatigueAlert
-                            ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 ring-2 ring-red-400/60 ring-offset-1"
-                            : "bg-primary/10 text-primary",
-                        ].join(" ")}
-                      >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                         {initials}
                       </div>
                     )}
-
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{athlete.display_name}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {athlete.group_label || "Sans groupe"}
-                        </p>
-                        {formeScore != null && <FormeDots score={formeScore} />}
-                      </div>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {athlete.group_label || "Sans groupe"}
+                      </p>
                     </div>
-
-                    {isFatigueAlert ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                        Alerte
-                      </span>
-                    ) : (
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    )}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </button>
                 );
               })}
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── SECTION 4 : ARSENAL ── */}
-      <section className="space-y-2.5">
-        <SectionLabel>Arsenal</SectionLabel>
-
-        <div className="space-y-2 rounded-3xl border bg-card p-3 shadow-sm">
-          {/* Session assignment row */}
-          <button
-            type="button"
-            onClick={() => onNavigate("week")}
-            className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 px-4 py-3.5 text-left transition-colors active:bg-muted"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
-              <CalendarDays className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Calendrier · Assigner</p>
-              <p className="text-[11px] text-muted-foreground">
-                {swimSessionCount ?? 0} séances nat · {strengthSessionCount ?? 0} muscu
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </button>
-
-          {/* Tools grid 4-col */}
-          <div className="grid grid-cols-4 gap-1.5">
-            {tools.map((tool) => (
-              <button
-                key={tool.label}
-                type="button"
-                onClick={tool.action}
-                className="flex flex-col items-center gap-1.5 rounded-2xl border bg-card px-1.5 py-3 text-center transition-colors active:bg-muted"
-              >
-                <tool.icon className={`h-4.5 w-4.5 ${tool.color}`} />
-                <span className="text-[9px] font-semibold leading-tight text-muted-foreground">
-                  {tool.label}
-                </span>
-              </button>
-            ))}
           </div>
-
-          {/* All swimmers link */}
-          <button
-            type="button"
-            onClick={() => onNavigate("swimmers")}
-            className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 px-4 py-3.5 text-left transition-colors active:bg-muted"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-              <Users className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Voir tous les nageurs</p>
-              <p className="text-[11px] text-muted-foreground">
-                {athletesLoading
-                  ? "Chargement…"
-                  : `${athletes.length} nageur${athletes.length > 1 ? "s" : ""}`}
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </button>
-        </div>
+        )}
       </section>
     </div>
   );
@@ -694,6 +548,12 @@ export default function Coach() {
       navigate("/progress");
       return;
     }
+    // Persist recent athletes for "Nageurs récents" section
+    try {
+      const recent: number[] = JSON.parse(localStorage.getItem(RECENT_ATHLETES_KEY) || "[]");
+      const updated = [athlete.id, ...recent.filter((id) => id !== athlete.id)].slice(0, 3);
+      localStorage.setItem(RECENT_ATHLETES_KEY, JSON.stringify(updated));
+    } catch { /* ignore storage errors */ }
     setSelectedCoachAthlete(athlete);
     setActiveSection("athlete");
   };
@@ -730,10 +590,6 @@ export default function Coach() {
           athletesLoading={athletesLoading}
           kpiLoading={coachKpisQuery.isLoading}
           fatigueAlerts={coachKpisQuery.data?.fatigueAlerts ?? []}
-          mostLoadedAthlete={coachKpisQuery.data?.mostLoadedAthlete ?? null}
-          formeScores={coachKpisQuery.data?.formeScores ?? new Map()}
-          swimSessionCount={swimSessions?.length}
-          strengthSessionCount={strengthSessions?.length}
         />
       ) : null}
 
