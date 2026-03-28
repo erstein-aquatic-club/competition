@@ -7045,3 +7045,44 @@ Le coach organise des cycles et séances dans des dossiers par nageur (phase 1).
 #### Tests
 - `npx tsc --noEmit` : pas d'erreurs nouvelles
 - `npm run build` : succès
+
+---
+
+### §91 — Vidéo → GIF pour exercices de musculation
+
+**Date** : 2026-03-28
+
+#### Contexte
+
+Les exercices de musculation ont un champ `illustration_gif` pour afficher un GIF démonstratif. Jusqu'ici le coach ne pouvait qu'uploader un GIF déjà prêt ou coller une URL. Ce patch ajoute un pipeline complet : filmer (caméra) ou importer une vidéo, la raccourcir (max 5s), et la convertir en GIF compressé côté client.
+
+#### Changements réalisés
+
+1. **`gifEncoder.ts`** — Utilitaire de conversion vidéo → GIF côté client (Canvas API + gifenc). Extraction de frames à 2 fps, redimensionnement à 240px de large, palette 256 couleurs, cible ≤200 KB.
+2. **`VideoTrimmer.tsx`** — Composant de découpage vidéo avec deux curseurs (début/fin), limite 5 secondes, preview vidéo, bouton "Créer le GIF" avec spinner.
+3. **`MediaSourceSheet.tsx`** — Bottom sheet avec deux options : "Filmer" (caméra device) et "Importer" (galerie). Les images/GIF statiques passent en upload direct, les vidéos ouvrent le trimmer.
+4. **`StrengthCatalog.tsx`** — Remplacement des deux boutons d'upload (formulaire création + édition) par le nouveau flow MediaSourceSheet. `handleGifUpload` accepte maintenant `File | Blob`.
+5. **`gifenc.d.ts`** — Déclarations TypeScript pour le module gifenc (pas de types inclus).
+
+#### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/gifEncoder.ts` | Créé (~90 lignes) — conversion vidéo → GIF |
+| `src/lib/__tests__/gifEncoder.test.ts` | Créé — 5 tests unitaires clampTrimRange |
+| `src/components/coach/strength/VideoTrimmer.tsx` | Créé (~130 lignes) — trimmer vidéo |
+| `src/components/coach/strength/MediaSourceSheet.tsx` | Créé (~100 lignes) — bottom sheet filmer/importer |
+| `src/pages/coach/StrengthCatalog.tsx` | Modifié — intégration MediaSourceSheet |
+| `src/gifenc.d.ts` | Créé — types gifenc |
+| `package.json` | Modifié — ajout gifenc@1.0.3 |
+
+#### Tests
+- `npx vitest run src/lib/__tests__/gifEncoder.test.ts` : 5/5 passent
+- `npx tsc --noEmit` : pas d'erreurs nouvelles
+- `npm run build` : succès
+
+#### Décisions
+- Conversion 100% côté client (Canvas + gifenc) plutôt que FFmpeg WASM (25 MB) ou Edge Function
+- gifenc (~15 KB gzipped) choisi pour sa légèreté vs gif.js
+- 2 fps et 240px de large pour rester sous 200 KB
+- Bucket existant `exercise-gifs` réutilisé, pas de nouveau bucket

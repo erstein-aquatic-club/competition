@@ -113,6 +113,9 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur (lecture cycles + lancement séance) | ~158 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/coach/strength/FolderSection.tsx` | Dossiers hiérarchiques 2 niveaux bibliothèque muscu (§90) | |
+| `src/lib/gifEncoder.ts` | Conversion vidéo → GIF (Canvas + gifenc, 240px, ≤200KB) (§91) | ~90 lignes |
+| `src/components/coach/strength/VideoTrimmer.tsx` | Trimmer vidéo dual-slider (max 5s) (§91) | ~130 lignes |
+| `src/components/coach/strength/MediaSourceSheet.tsx` | Bottom sheet filmer/importer illustration (§91) | ~100 lignes |
 
 ## Edge Functions Supabase
 
@@ -188,6 +191,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 51 | Notes techniques enrichies (épreuve, bassin, équipement) | Moyenne | Fait (§88) |
 | 52 | Strength UX Overhaul — refonte parcours musculation nageur | Haute | Fait (§89) |
 | 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Fait (§90) |
+| 54 | Vidéo → GIF pour illustration exercices musculation | Moyenne | Fait (§91) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
