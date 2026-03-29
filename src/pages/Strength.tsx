@@ -9,6 +9,7 @@ import { Dumbbell, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
 import { SessionBrowser } from "@/components/strength/SessionBrowser";
+import { SessionSummary } from "@/components/strength/SessionSummary";
 import { SessionDetailPreview } from "@/components/strength/SessionDetailPreview";
 import { HistoryTable } from "@/components/strength/HistoryTable";
 import { useStrengthState } from "@/hooks/useStrengthState";
@@ -222,6 +223,8 @@ export default function Strength() {
     enabled: !!user,
   });
 
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+
   // Task 11: Exercise substitution state
   const [substitutions, setSubstitutions] = useState<Map<number, { originalIndex: number; exercise: Exercise }>>(new Map());
   const [originalItemCount, setOriginalItemCount] = useState(0);
@@ -378,11 +381,7 @@ export default function Strength() {
       queryClient.invalidateQueries({ queryKey: ["assignments", user, "strength"] });
       queryClient.invalidateQueries({ queryKey: ["1rm", user, userId] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      setActiveAssignment(null);
-      setActiveRunId(null);
-      setActiveSession(null);
-      setActiveRunLogs(null);
-      setScreenMode("list");
+      setScreenMode("summary");
       toast({ title: "Séance sauvegardée", description: "Bravo pour l'effort !" });
     },
     onError: (_error, variables) => {
@@ -564,6 +563,7 @@ export default function Strength() {
       items: activeFilteredItems,
     });
     setActiveRunnerStep(1);
+    setSessionStartTime(Date.now());
     setScreenMode("focus");
   };
 
@@ -699,6 +699,26 @@ export default function Strength() {
             </div>
           </div>
         )
+      ) : screenMode === "summary" && activeSession ? (
+        <SessionSummary
+          sessionTitle={activeSession.title ?? "Séance"}
+          logs={activeRunLogs ?? []}
+          durationMinutes={sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 60000) : null}
+          exerciseNames={new Map(
+            (activeSession.items ?? []).map((item) => [
+              item.exercise_id,
+              item.exercise_name ?? exerciseLookup.get(item.exercise_id)?.nom_exercice ?? `Ex #${item.exercise_id}`,
+            ]),
+          )}
+          onClose={() => {
+            setScreenMode("list");
+            setActiveSession(null);
+            setActiveAssignment(null);
+            setActiveRunId(null);
+            setActiveRunLogs(null);
+            setSessionStartTime(null);
+          }}
+        />
       ) : (
         <>
           <PageHeader
