@@ -531,6 +531,11 @@ export function FeedbackDrawer({
                     }
                   }
 
+                  // Filter out unexpected empty slots (no assignment, no log)
+                  const visibleUnexpected = unexpectedSessions.filter(
+                    (s) => !s.isEmpty || Boolean(logsBySessionId[s.id]),
+                  );
+
                   const renderSessionCard = (s: PlannedSession) => {
                     const st = getSessionStatus(s, selectedDate);
                     const hasLog = Boolean(logsBySessionId[s.id]);
@@ -538,6 +543,42 @@ export function FeedbackDrawer({
                     const isNotExpected = st.status === "not_expected";
                     const isAbsentLike = isAbsentOverride || isNotExpected;
                     const needsAction = st.expected && !hasLog && !isAbsentOverride;
+
+                    // Expected slot with no assignment: show dashed placeholder
+                    if (s.isEmpty && st.expected && !hasLog && !isAbsentOverride) {
+                      const SlotIcon = SLOTS.find((x) => x.key === s.slotKey)?.Icon || Circle;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => onOpenSession(s.id)}
+                          className="w-full rounded-3xl border border-dashed border-border px-3 py-3 text-left transition hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-10 w-10 rounded-2xl border border-dashed border-border bg-muted/50 flex items-center justify-center">
+                                <SlotIcon className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium text-muted-foreground">Créneau prévu</div>
+                                <div className="mt-0.5 text-xs text-muted-foreground/70">Aucune séance assignée</div>
+                              </div>
+                            </div>
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMarkAbsent(s.id);
+                              }}
+                              label="Absent"
+                              tone="sky"
+                              disabled={isPending}
+                            >
+                              <UserX className="h-5 w-5" />
+                            </IconButton>
+                          </div>
+                        </button>
+                      );
+                    }
 
                     const bg = hasLog
                       ? "bg-status-success-bg border-status-success/30"
@@ -638,7 +679,7 @@ export function FeedbackDrawer({
                         {expectedSessions.map(renderSessionCard)}
                       </div>
 
-                      {unexpectedSessions.length > 0 && (
+                      {visibleUnexpected.length > 0 && (
                         <div className="mt-3">
                           <button
                             type="button"
@@ -646,7 +687,7 @@ export function FeedbackDrawer({
                             className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
                           >
                             <ChevronDown className={cn("h-4 w-4 transition-transform", unexpectedExpanded && "rotate-180")} />
-                            Autres séances ({unexpectedSessions.length})
+                            Autres séances ({visibleUnexpected.length})
                           </button>
                           <AnimatePresence>
                             {unexpectedExpanded && (
@@ -658,7 +699,7 @@ export function FeedbackDrawer({
                                 className="overflow-hidden"
                               >
                                 <div className="mt-1 grid gap-2">
-                                  {unexpectedSessions.map(renderSessionCard)}
+                                  {visibleUnexpected.map(renderSessionCard)}
                                 </div>
                               </motion.div>
                             )}
