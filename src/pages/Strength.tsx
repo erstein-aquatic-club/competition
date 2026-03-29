@@ -515,6 +515,7 @@ export default function Strength() {
 
   const handleLaunchFocus = async () => {
     if (!activeSession) return;
+    const lockedCycle = activeSession.cycle ?? cycleType;
     if (activeFilteredItems.length === 0) {
       toast({
         title: "Séance vide",
@@ -540,13 +541,18 @@ export default function Strength() {
           athleteName: user ?? undefined,
           progress_pct: 0,
           session_id: sessionId,
-          cycle_type: cycleType,
+          cycle_type: lockedCycle,
         });
         if (res?.run_id) {
           setActiveRunId(res.run_id);
           setActiveRunLogs((prev) => prev ?? []);
         }
       } catch {
+        toast({
+          title: "Erreur de démarrage",
+          description: "Impossible de démarrer la séance. Vérifiez votre connexion.",
+          variant: "destructive",
+        });
         return;
       }
     }
@@ -554,7 +560,7 @@ export default function Strength() {
     // Update session with resolved items and enter focus — batched to avoid double-render
     setActiveSession({
       ...activeSession,
-      cycle: cycleType,
+      cycle: lockedCycle,
       items: activeFilteredItems,
     });
     setActiveRunnerStep(1);
