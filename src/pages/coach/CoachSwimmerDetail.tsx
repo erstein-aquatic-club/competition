@@ -87,7 +87,7 @@ export default function CoachSwimmerDetail({
     staleTime,
   });
 
-  const { data: athleteAuthId } = useQuery({
+  const { data: athleteAuthId, error: authUidError } = useQuery({
     queryKey: ["auth-uid", athleteId],
     queryFn: () => fetchAuthUid(athleteId!),
     enabled: !!athleteId,
@@ -312,7 +312,7 @@ export default function CoachSwimmerDetail({
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
-              <SwimmerObjectivesTab athleteId={athleteId} athleteName={displayName} />
+              <SwimmerObjectivesTab athleteId={athleteId} athleteName={displayName} authUidError={!!authUidError} />
             </CollapsibleContent>
           </Collapsible>
 
