@@ -9,6 +9,7 @@ import { SlotTemplatePicker } from "./SlotTemplatePicker";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { bulkCreateSlotAssignments, deriveScheduledSlot } from "@/lib/api/assignments";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Props ──────────────────────────────────────────────────
 
@@ -258,6 +259,7 @@ export default function CoachSlotCalendar({
 
   const { userId } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // ── Sheet state ────────────────────────────────────────
   const [selectedInstance, setSelectedInstance] = useState<SlotInstance | null>(null);
@@ -291,7 +293,7 @@ export default function CoachSlotCalendar({
   const assignTemplateMutation = useMutation({
     mutationFn: async ({ catalogId, inst }: { catalogId: number; inst: SlotInstance }) => {
       const groupIds = inst.groups.map((g) => g.group_id);
-      if (groupIds.length === 0 || !userId) return;
+      if (groupIds.length === 0 || !userId) throw new Error("Aucun groupe sélectionné");
       await bulkCreateSlotAssignments({
         swimCatalogId: catalogId,
         trainingSlotId: inst.slot.id,
@@ -306,6 +308,10 @@ export default function CoachSlotCalendar({
       queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
       setTemplatePickerOpen(false);
       setTemplateTargetInstance(null);
+      toast({ title: "Séance assignée au créneau" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
     },
   });
 
