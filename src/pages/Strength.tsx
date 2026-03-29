@@ -17,6 +17,7 @@ import { orderStrengthItems } from "@/components/strength/utils";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
+import { OneRmGate } from "@/components/strength/OneRmGate";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -461,6 +462,18 @@ export default function Strength() {
   };
 
   const [isPlanMode, setIsPlanMode] = useState(false);
+  const [showOneRmGate, setShowOneRmGate] = useState(false);
+  const [skipPercent1rm, setSkipPercent1rm] = useState(false);
+
+  const missing1RmExercises = useMemo(() => {
+    return activeFilteredItems
+      .filter((item) => (item.percent_1rm ?? 0) > 0)
+      .filter((item) => !oneRMs?.some((rm: OneRmEntry) => rm.exercise_id === item.exercise_id && Number(rm.weight) > 0))
+      .map((item) => ({
+        exerciseId: item.exercise_id,
+        exerciseName: item.exercise_name ?? `Ex #${item.exercise_id}`,
+      }));
+  }, [activeFilteredItems, oneRMs]);
 
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
@@ -522,6 +535,13 @@ export default function Strength() {
       });
       return;
     }
+
+    // Check for missing 1RMs before entering focus mode
+    if (missing1RmExercises.length > 0 && !skipPercent1rm) {
+      setShowOneRmGate(true);
+      return;
+    }
+
     // Auto-start the run so WorkoutRunner skips step 0
     if (!activeRunId) {
       const sessionId = activeAssignment?.session_id ?? activeSession?.id ?? null;
@@ -823,6 +843,25 @@ export default function Strength() {
           </Tabs>
         </>
       )}
+
+      <OneRmGate
+        open={showOneRmGate}
+        onOpenChange={setShowOneRmGate}
+        missingExercises={missing1RmExercises}
+        athleteId={userId}
+        onSaveAndContinue={() => {
+          setShowOneRmGate(false);
+          queryClient.invalidateQueries({ queryKey: ["1rm"] });
+          // Re-trigger launch after 1RM saved
+          handleLaunchFocus();
+        }}
+        onSkipToFreeWeight={() => {
+          setShowOneRmGate(false);
+          setSkipPercent1rm(true);
+          // Re-trigger launch with skip flag
+          setTimeout(() => handleLaunchFocus(), 0);
+        }}
+      />
     </div>
   );
 }
