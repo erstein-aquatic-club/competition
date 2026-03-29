@@ -23,6 +23,7 @@ export interface Session {
   distance: number;
   duration: number;
   comments: string;
+  coach_notes?: string | null;
   stroke_distances?: StrokeDistances | null;
   created_at: string;
 }

@@ -499,6 +499,15 @@ export const api = {
     return { status: "deleted" };
   },
 
+  async updateSessionCoachNotes(sessionId: number, notes: string | null): Promise<void> {
+    if (!canUseSupabase()) return;
+    const { error } = await supabase
+      .from("dim_sessions")
+      .update({ coach_notes: notes })
+      .eq("id", sessionId);
+    if (error) throw new Error(error.message);
+  },
+
   // ── Demo Seed (kept in api.ts) ──
   async seedDemoData() {
     const exercises = [

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { BarChart3, ChevronDown } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { BarChart3, ChevronDown, StickyNote, X } from "lucide-react";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -31,6 +33,86 @@ interface Props {
   athleteName: string;
   onOpenProgression?: () => void;
   showProgressAction?: boolean;
+}
+
+function CoachNotePopover({
+  sessionId,
+  athleteId,
+  athleteName,
+  existingNotes,
+}: {
+  sessionId: number;
+  athleteId: number;
+  athleteName: string;
+  existingNotes: string | null | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState(existingNotes ?? "");
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (newNotes: string | null) =>
+      api.updateSessionCoachNotes(sessionId, newNotes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions", athleteId] });
+      setOpen(false);
+    },
+  });
+
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v) setNotes(existingNotes ?? ""); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "h-6 w-6 rounded-lg flex items-center justify-center transition-colors",
+            existingNotes
+              ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+              : "bg-muted text-muted-foreground hover:bg-muted/80",
+          )}
+          title="Note du coach"
+        >
+          <StickyNote className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-64 p-3 space-y-2"
+        onClick={(e) => e.stopPropagation()}
+        align="end"
+      >
+        <p className="text-xs font-semibold">Note du coach</p>
+        <Textarea
+          className="text-xs min-h-[60px]"
+          placeholder="Ajouter une note..."
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className="flex-1 text-xs h-7"
+            onClick={() => mutation.mutate(notes.trim() || null)}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? "..." : "Enregistrer"}
+          </Button>
+          {existingNotes && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-xs h-7 text-destructive"
+              onClick={() => mutation.mutate(null)}
+              disabled={mutation.isPending}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function SwimmerFeedbackTab({
@@ -114,6 +196,12 @@ export default function SwimmerFeedbackTab({
                 <span className="text-xs text-muted-foreground ml-1.5">{session.slot}</span>
               </div>
               <div className="flex items-center gap-1">
+                <CoachNotePopover
+                  sessionId={session.id}
+                  athleteId={athleteId}
+                  athleteName={athleteName}
+                  existingNotes={session.coach_notes}
+                />
                 {INDICATORS.map((ind) => {
                   const value = session[ind.key] as number | null | undefined;
                   const tooltipId = `${session.id}-${ind.key}`;
@@ -155,14 +243,22 @@ export default function SwimmerFeedbackTab({
               <span className="text-xs text-muted-foreground">
                 {session.distance > 0 ? `${session.distance}m` : "—"}
               </span>
-              {session.comments && (
+              {(session.comments || session.coach_notes) && (
                 <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isExpanded && "rotate-180")} />
               )}
             </div>
 
-            {isExpanded && session.comments && (
-              <div className="mt-2 pt-2 border-t border-border">
-                <p className="text-xs text-foreground whitespace-pre-wrap">{session.comments}</p>
+            {isExpanded && (
+              <div className="mt-2 pt-2 border-t border-border space-y-2">
+                {session.comments && (
+                  <p className="text-xs text-foreground whitespace-pre-wrap">{session.comments}</p>
+                )}
+                {session.coach_notes && (
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-400 p-2">
+                    <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
+                    <p className="text-xs text-blue-800 dark:text-blue-300">{session.coach_notes}</p>
+                  </div>
+                )}
               </div>
             )}
           </button>
