@@ -227,6 +227,7 @@ export default function Strength() {
   const [originalItemCount, setOriginalItemCount] = useState(0);
 
   const handleSubstitute = (itemIndex: number, newExercise: Exercise) => {
+    const params = resolveExerciseParams(newExercise, cycleType);
     setSubstitutions((prev) => {
       const next = new Map(prev);
       next.set(itemIndex, { originalIndex: itemIndex, exercise: newExercise });
@@ -235,8 +236,20 @@ export default function Strength() {
     setActiveSession((prev) => {
       if (!prev?.items) return prev;
       const items = [...prev.items];
-      items[itemIndex] = { ...items[itemIndex], exercise_id: newExercise.id, exercise_name: newExercise.nom_exercice };
+      items[itemIndex] = {
+        ...items[itemIndex],
+        exercise_id: newExercise.id,
+        exercise_name: newExercise.nom_exercice,
+        sets: params.sets ?? items[itemIndex].sets,
+        reps: params.reps ?? items[itemIndex].reps,
+        rest_seconds: params.restSeries ?? items[itemIndex].rest_seconds,
+        percent_1rm: params.percent1rm ?? items[itemIndex].percent_1rm,
+      };
       return { ...prev, items };
+    });
+    toast({
+      title: "Exercice remplacé",
+      description: `${newExercise.nom_exercice} — paramètres mis à jour.`,
     });
   };
 
