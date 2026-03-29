@@ -32,8 +32,9 @@ function generatePassword(length = 12): string {
 
 // Actions that each role is allowed to perform
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  admin: ["create_coach", "update_role", "update_password", "disable_user"],
-  coach: ["create_coach", "update_password"],
+  admin: ["create_coach", "update_role", "update_password", "disable_user", "approve_user", "reject_user"],
+  coach: ["create_coach", "update_password", "approve_user", "reject_user"],
+  comite: ["approve_user", "reject_user"],
 };
 
 // --- Auth check: verify caller JWT and extract role ---
@@ -282,6 +283,42 @@ async function handleDisableUser(body: {
   return jsonResponse({ status: "disabled" });
 }
 
+async function handleApproveUser(body: { user_id: number }, callerId: number): Promise<Response> {
+  const { user_id } = body;
+  if (!user_id) return errorResponse("Missing user_id");
+
+  const { error } = await supabase
+    .from("user_profiles")
+    .update({ is_approved: true, approved_by: callerId, approved_at: new Date().toISOString() })
+    .eq("user_id", user_id);
+
+  if (error) return errorResponse(`Failed to approve: ${error.message}`, 500);
+  return jsonResponse({ status: "approved" });
+}
+
+async function handleRejectUser(body: { user_id: number }): Promise<Response> {
+  const { user_id } = body;
+  if (!user_id) return errorResponse("Missing user_id");
+
+  // Find auth user email
+  const { data: pubUser } = await supabase.from("users").select("email").eq("id", user_id).maybeSingle();
+  if (!pubUser?.email) return errorResponse("User not found", 404);
+
+  // Delete from users table (cascade will handle profiles, group_members)
+  const { error: delError } = await supabase.from("users").delete().eq("id", user_id);
+  if (delError) return errorResponse(`Failed to delete: ${delError.message}`, 500);
+
+  // Also delete auth user
+  try {
+    const { data: authUid } = await supabase.rpc("get_auth_user_id_by_email", { p_email: pubUser.email });
+    if (authUid) {
+      await supabase.auth.admin.deleteUser(authUid as string);
+    }
+  } catch { /* best effort */ }
+
+  return jsonResponse({ status: "rejected" });
+}
+
 // --- Main handler ---
 
 Deno.serve(async (req) => {
@@ -319,19 +356,50 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Helper to log audit trail (best-effort, never blocks the response)
+    const logAudit = async (targetUserId: number | null, details: Record<string, unknown> = {}) => {
+      try {
+        await supabase.from("admin_audit_log").insert({
+          actor_id: callerResult.userId,
+          action,
+          target_user_id: targetUserId,
+          details,
+        });
+      } catch (e) {
+        console.error("audit log error:", e);
+      }
+    };
+
     // Route to the appropriate handler
+    let response: Response;
     switch (action) {
       case "create_coach":
-        return await handleCreateCoach(body);
+        response = await handleCreateCoach(body);
+        if (response.status === 200) await logAudit(null, { email: body.email, display_name: body.display_name });
+        return response;
       case "update_role":
-        return await handleUpdateRole(body);
+        response = await handleUpdateRole(body);
+        if (response.status === 200) await logAudit(body.user_id, { new_role: body.role });
+        return response;
       case "update_password":
-        return await handleUpdatePassword(body);
+        response = await handleUpdatePassword(body);
+        if (response.status === 200) await logAudit(body.user_id);
+        return response;
       case "disable_user":
-        return await handleDisableUser(body);
+        response = await handleDisableUser(body);
+        if (response.status === 200) await logAudit(body.user_id);
+        return response;
+      case "approve_user":
+        response = await handleApproveUser(body, callerResult.userId);
+        if (response.status === 200) await logAudit(body.user_id);
+        return response;
+      case "reject_user":
+        response = await handleRejectUser(body);
+        if (response.status === 200) await logAudit(body.user_id);
+        return response;
       default:
         return errorResponse(
-          `Unknown action: ${action}. Valid actions: create_coach, update_role, update_password, disable_user`,
+          `Unknown action: ${action}. Valid actions: create_coach, update_role, update_password, disable_user, approve_user, reject_user`,
         );
     }
   } catch (err) {

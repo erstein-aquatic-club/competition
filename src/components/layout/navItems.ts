@@ -1,4 +1,4 @@
-import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, Library, Home, type LucideIcon } from "lucide-react";
+import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, Library, Home, Trophy, type LucideIcon } from "lucide-react";
 import { FEATURES } from "@/lib/features";
 
 type NavItem = {
@@ -13,6 +13,7 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
     return [
       { href: "/profile", icon: User, label: "Profil" },
       { href: "/admin", icon: Settings, label: "Gestion des comptes" },
+      { href: "/records-admin", icon: Trophy, label: "Records" },
     ];
   }
   if (normalizedRole === "comite") {

@@ -1,12 +1,12 @@
 import * as React from "react";
 import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ShieldCheck, UserMinus, UserPlus, Search, CheckCircle, XCircle, Clock, Pen, Save } from "lucide-react";
+import { AlertCircle, ShieldCheck, UserMinus, UserPlus, Search, CheckCircle, XCircle, Clock, Pen, Save, History } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
-import { api, summarizeApiError, type UserSummary } from "@/lib/api";
+import { api, summarizeApiError, type UserSummary, getAuditLog, type AuditEntry } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -216,6 +216,12 @@ export default function Admin() {
   const { data: groups = [] } = useQuery({
     queryKey: ["admin-groups"],
     queryFn: () => api.getGroups(),
+    enabled: isAdmin,
+  });
+
+  const { data: auditLog = [] } = useQuery({
+    queryKey: ["admin-audit-log"],
+    queryFn: () => getAuditLog(50, 0),
     enabled: isAdmin,
   });
 
@@ -689,6 +695,54 @@ export default function Admin() {
           )}
         </CardContent>
       </Card>
+
+      {/* Audit log */}
+      {auditLog.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-muted-foreground" />
+              Historique des actions
+            </CardTitle>
+            <CardDescription>Actions récentes effectuées via l'administration.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {auditLog.map((entry) => {
+                const actionLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+                  create_coach: { label: "Création coach", variant: "default" },
+                  update_role: { label: "Changement rôle", variant: "secondary" },
+                  update_password: { label: "Mot de passe", variant: "outline" },
+                  disable_user: { label: "Désactivation", variant: "destructive" },
+                  approve_user: { label: "Approbation", variant: "default" },
+                  reject_user: { label: "Rejet", variant: "destructive" },
+                };
+                const actionInfo = actionLabels[entry.action] ?? { label: entry.action, variant: "outline" as const };
+                const date = new Date(entry.created_at);
+                const formattedDate = date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+                const formattedTime = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                return (
+                  <div key={entry.id} className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+                    <Badge variant={actionInfo.variant} className="text-[10px] shrink-0">{actionInfo.label}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium">{entry.actor_name}</span>
+                      {entry.target_user_id && (
+                        <span className="text-muted-foreground"> &rarr; {entry.target_name}</span>
+                      )}
+                      {entry.details && Object.keys(entry.details).length > 0 && (
+                        <span className="text-muted-foreground text-xs ml-1">
+                          ({Object.entries(entry.details).map(([k, v]) => `${k}: ${v}`).join(", ")})
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">{formattedDate} {formattedTime}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Profile edit bottom sheet */}
       <Sheet open={isProfileEditOpen} onOpenChange={setIsProfileEditOpen}>

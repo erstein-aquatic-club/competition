@@ -295,6 +295,11 @@ export {
 } from './competition-prep';
 
 export {
+  getAuditLog,
+  type AuditEntry,
+} from './audit';
+
+export {
   getExercises,
   createExercise,
   updateExercise,

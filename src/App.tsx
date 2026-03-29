@@ -65,6 +65,7 @@ const CoachSwimmerDetail = lazyWithRetry(() => import("@/pages/coach/CoachSwimme
 const CompetitionDetail = lazyWithRetry(() => import("@/pages/CompetitionDetail"));
 const SwimNotes = lazyWithRetry(() => import("@/pages/SwimNotes"));
 const ComingSoon = lazyWithRetry(() => import("@/pages/ComingSoon"));
+const AwaitingApproval = lazyWithRetry(() => import("@/pages/AwaitingApproval"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Loading fallback for lazy components (kept for backward compatibility)
@@ -218,20 +219,11 @@ function AppRouter() {
 
   if (user && isApproved === false) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center space-y-4">
-            <div className="text-4xl">&#9203;</div>
-            <h2 className="text-xl font-semibold">En attente de validation</h2>
-            <p className="text-sm text-muted-foreground">
-              Votre compte a été créé mais doit être validé par un coach ou un administrateur.
-            </p>
-            <Button variant="outline" onClick={() => useAuth.getState().logout()}>
-              Se déconnecter
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <ErrorBoundary>
+        <Suspense fallback={<PageSkeleton />}>
+          <AwaitingApproval />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 

@@ -100,6 +100,9 @@ import {
 // Re-export error utilities for backward compatibility
 export { parseApiError, summarizeApiError } from "./api/client";
 
+// Re-export audit module
+export { getAuditLog, type AuditEntry } from "./api/audit";
+
 // --- Delegated module imports ---
 import {
   getProfile as _getProfile,

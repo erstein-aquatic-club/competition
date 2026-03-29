@@ -15,6 +15,7 @@ import {
   getShiftDurationMinutes,
   type TimesheetShift,
 } from "@/pages/timesheetHelpers";
+import { PendingApprovals } from "@/components/shared/PendingApprovals";
 
 const formatTime = (value?: string | null) => {
   if (!value) return "—";
@@ -90,6 +91,8 @@ export default function Comite() {
         <h1 className="text-3xl font-display font-bold uppercase italic text-primary">Comité</h1>
         <div className="text-sm text-muted-foreground">Tableau de bord shifts</div>
       </div>
+
+      <PendingApprovals />
 
       {capabilityMessage ? (
         <Card className="border-dashed">

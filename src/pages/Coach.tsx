@@ -14,6 +14,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import { PendingApprovals } from "@/components/shared/PendingApprovals";
 const CoachSwimmersOverview = lazy(() => import("./coach/CoachSwimmersOverview"));
 const CoachGroupsScreen = lazy(() => import("./coach/CoachGroupsScreen"));
 const CoachCompetitionsScreen = lazy(() => import("./coach/CoachCompetitionsScreen"));
@@ -186,6 +187,9 @@ const CoachHome = ({
           Semaine du {mondayLabel}
         </p>
       </section>
+
+      {/* ── Pending approvals banner ── */}
+      <PendingApprovals compact />
 
       {/* ── Section B: Ma semaine (mini-grille 7 jours) ── */}
       <section className="space-y-2.5">
