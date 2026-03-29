@@ -644,7 +644,10 @@ export default function Strength() {
               initialStep={activeRunnerStep}
               isFinishing={isFinishing}
               onStepChange={(step) => setActiveRunnerStep(step)}
-              onExitFocus={() => setScreenMode("reader")}
+              onExitFocus={() => {
+                setScreenMode("list");
+                // Don't clear run state — keep activeRunId so InProgressCard shows
+              }}
               onAddExercise={handleAddExercise}
               onSubstitute={handleSubstitute}
               onLogSets={async (blockLogs) => {

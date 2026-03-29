@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  ArrowLeft,
   Check,
   CheckCircle2,
   Dumbbell,
@@ -676,6 +677,25 @@ export function WorkoutRunner({
 
   return (
     <div className="space-y-6 pb-44">
+      {/* Exit bar */}
+      {onExitFocus && (
+        <div className="sticky top-0 z-10 flex items-center gap-2 bg-background/95 backdrop-blur px-4 py-2 border-b">
+          <button
+            type="button"
+            onClick={() => {
+              if (logs.length > 0) {
+                setExitConfirmOpen(true);
+              } else {
+                onExitFocus();
+              }
+            }}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quitter
+          </button>
+        </div>
+      )}
       <div className="space-y-3">
         {/* Ligne 1 : GIF + titre + note + exit */}
         <div className="flex items-center gap-3">
