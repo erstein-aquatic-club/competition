@@ -46,6 +46,7 @@ export async function getProfile(options: {
     ffn_iuf: data.ffn_iuf ?? null,
     phone: data.phone ?? null,
     neurotype_result: data.neurotype_result ?? null,
+    body_weight: data.body_weight != null ? Number(data.body_weight) : null,
   };
 }
 
@@ -62,6 +63,7 @@ export async function updateProfile(payload: {
     ffn_iuf?: string | null;
     phone?: string | null;
     neurotype_result?: NeurotypResult | null;
+    body_weight?: number | null;
   };
 }) {
   if (!canUseSupabase()) return { status: "skipped" };

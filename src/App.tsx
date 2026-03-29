@@ -64,6 +64,7 @@ const SharedSwimSession = lazyWithRetry(() => import("@/pages/SharedSwimSession"
 const CoachSwimmerDetail = lazyWithRetry(() => import("@/pages/coach/CoachSwimmerDetail"));
 const CompetitionDetail = lazyWithRetry(() => import("@/pages/CompetitionDetail"));
 const SwimNotes = lazyWithRetry(() => import("@/pages/SwimNotes"));
+const MonthlyReport = lazyWithRetry(() => import("@/pages/MonthlyReport"));
 const ComingSoon = lazyWithRetry(() => import("@/pages/ComingSoon"));
 const AwaitingApproval = lazyWithRetry(() => import("@/pages/AwaitingApproval"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
@@ -249,6 +250,7 @@ function AppRouter() {
             <Route path="/swim-session" component={SwimSessionView} />
             <Route path="/swim-notes" component={SwimNotes} />
             <Route path="/s/:token" component={SharedSwimSession} />
+            <Route path="/report/:userId/:month" component={MonthlyReport} />
             <Route path="/suivi" component={Suivi} />
             <Route path="/profile" component={Profile} />
             <Route path="/coming-soon" component={ComingSoon} />

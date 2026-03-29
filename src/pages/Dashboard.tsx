@@ -23,7 +23,13 @@ import {
   Trophy,
   FileText,
   ChevronRight,
+  X,
 } from "lucide-react";
+import { WellnessBanner } from "@/components/wellness/WellnessBanner";
+import { WellnessForm } from "@/components/wellness/WellnessForm";
+import { ChallengeProgressBar } from "@/components/shared/ChallengeProgressBar";
+import { getActiveChallenges } from "@/lib/api/challenges";
+import { fetchUserGroupIds } from "@/lib/api/client";
 import type { SaveState } from "@/components/shared/BottomActionBar";
 
 /**
@@ -134,6 +140,7 @@ export default function Dashboard() {
 
   const [, navigate] = useLocation();
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
+  const [wellnessOpen, setWellnessOpen] = React.useState(false);
 
   // Get Supabase auth UUID for swim exercise logs
   const [authUuid, setAuthUuid] = React.useState<string | null>(null);
@@ -179,6 +186,21 @@ export default function Dashboard() {
   const absenceDates = useMemo(() => {
     return new Set(myAbsences.map((a) => a.date));
   }, [myAbsences]);
+
+  // ── Active challenges ──────────────────────────────────────
+  const { data: userGroupIds } = useQuery({
+    queryKey: ["user-group-ids", userId],
+    queryFn: () => fetchUserGroupIds(userId),
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: activeChallenges = [] } = useQuery({
+    queryKey: ["active-challenges", userGroupIds],
+    queryFn: () => getActiveChallenges(userGroupIds?.[0] ?? null),
+    enabled: userGroupIds !== undefined,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const isLoading = sessionsLoading || assignmentsLoading;
   const error = sessionsError || assignmentsError;
@@ -740,6 +762,20 @@ export default function Dashboard() {
           className="mt-2"
         />
 
+        {/* Wellness banner */}
+        {userId && (
+          <WellnessBanner userId={userId} onOpen={() => setWellnessOpen(true)} />
+        )}
+
+        {/* Active challenges */}
+        {activeChallenges.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {activeChallenges.map((ch) => (
+              <ChallengeProgressBar key={ch.id} challenge={ch} />
+            ))}
+          </div>
+        )}
+
         {/* Error banner */}
         {error && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-center gap-3 mt-2">
@@ -930,6 +966,42 @@ export default function Dashboard() {
           onMarkDayAbsent={(reason) => absenceMutation.mutate({ date: selectedISO, reason })}
           onRemoveDayAbsence={() => removeAbsenceMutation.mutate(selectedISO)}
         />
+
+        {/* Wellness Drawer */}
+        {wellnessOpen && userId && (
+          <>
+            <div
+              className="fixed inset-0 z-overlay bg-black/30"
+              onClick={() => setWellnessOpen(false)}
+            />
+            <div className="fixed inset-x-0 bottom-0 z-modal max-h-[85vh] overflow-y-auto rounded-t-2xl bg-background border-t border-border shadow-xl px-4 pt-4 pb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-display font-bold uppercase italic tracking-tight text-primary">
+                  Wellness du jour
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setWellnessOpen(false)}
+                  className="h-8 w-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80"
+                  aria-label="Fermer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <WellnessForm
+                userId={userId}
+                date={(() => {
+                  const d = new Date();
+                  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                })()}
+                onSaved={() => {
+                  setWellnessOpen(false);
+                  queryClient.invalidateQueries({ queryKey: ["wellness"] });
+                }}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

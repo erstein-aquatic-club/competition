@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AthleteSummary } from "@/lib/api/types";
+import type { WellnessCheck } from "@/lib/api/types";
+import { getGroupWellnessForDate, getWellnessRange, computeReadinessScore } from "@/lib/api/wellness";
+import { ReadinessBadge } from "@/components/coach/WellnessTrend";
+import WellnessTrend from "@/components/coach/WellnessTrend";
+import TrainingLoadIndicators from "@/components/coach/TrainingLoadIndicators";
 import CoachSectionHeader from "./CoachSectionHeader";
 
 // --- Types ---
 
-type SortKey = "name" | "forme" | "assiduity";
+type SortKey = "name" | "forme" | "assiduity" | "readiness" | "charge";
 
 interface AthleteKPIs {
   forme: number | null;
@@ -143,6 +148,17 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [athletesShown, setAthletesShown] = useState(30);
 
+  // ACWR values reported by TrainingLoadIndicators children (for sorting)
+  const acwrMapRef = useRef(new Map<number, number | null>());
+  const [acwrMapVersion, setAcwrMapVersion] = useState(0);
+  const handleAcwrReady = useCallback((userId: number, acwr: number | null) => {
+    const prev = acwrMapRef.current.get(userId);
+    if (prev !== acwr) {
+      acwrMapRef.current.set(userId, acwr);
+      setAcwrMapVersion((v) => v + 1);
+    }
+  }, []);
+
   const { data: recentSessions = [] } = useQuery({
     queryKey: ["recent-sessions-all", 30],
     queryFn: () => api.getRecentSessionsAllAthletes(30),
@@ -156,6 +172,75 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
     enabled: athletes.length > 0,
     staleTime: 5 * 60 * 1000,
   });
+
+  // ── Wellness data ───────────────────────────────────────
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const { data: todayWellness = [] } = useQuery({
+    queryKey: ["group-wellness-today", todayISO],
+    queryFn: () => getGroupWellnessForDate(todayISO),
+    enabled: athletes.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build a map userId -> today's readiness score
+  const wellnessByUser = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const w of todayWellness) {
+      map.set(w.user_id, w.readiness_score ?? computeReadinessScore(w));
+    }
+    return map;
+  }, [todayWellness]);
+
+  // Fetch last 3 days of wellness for all swimmers to detect declining trends
+  const threeDaysAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 2);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const { data: recentWellnessAll = [] } = useQuery({
+    queryKey: ["group-wellness-recent-3d", threeDaysAgo, todayISO],
+    queryFn: async () => {
+      // Fetch all wellness for last 3 days
+      const results: WellnessCheck[] = [];
+      for (let i = 0; i < 3; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        const dayData = await getGroupWellnessForDate(dateStr);
+        results.push(...dayData);
+      }
+      return results;
+    },
+    enabled: athletes.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Detect declining trends: 3 consecutive days of decreasing readiness
+  const decliningUsers = useMemo(() => {
+    const byUser = new Map<number, Map<string, number>>();
+    for (const w of recentWellnessAll) {
+      if (!byUser.has(w.user_id)) byUser.set(w.user_id, new Map());
+      byUser.get(w.user_id)!.set(w.date, w.readiness_score ?? computeReadinessScore(w));
+    }
+    const declining = new Set<number>();
+    for (const [userId, dateMap] of byUser) {
+      const dates: string[] = [];
+      for (let i = 2; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().slice(0, 10));
+      }
+      const scores = dates.map((d) => dateMap.get(d));
+      if (scores[0] != null && scores[1] != null && scores[2] != null) {
+        if (scores[1] < scores[0] && scores[2] < scores[1]) {
+          declining.add(userId);
+        }
+      }
+    }
+    return declining;
+  }, [recentWellnessAll]);
 
   const groups = useMemo(() => {
     const map = new Map<number, string>();
@@ -222,11 +307,35 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
           return sa - sb;
         });
         break;
+      case "readiness":
+        list.sort((a, b) => {
+          const ra = a.id != null ? (wellnessByUser.get(a.id) ?? 999) : 999;
+          const rb = b.id != null ? (wellnessByUser.get(b.id) ?? 999) : 999;
+          return ra - rb; // lowest readiness first
+        });
+        break;
+      case "charge":
+        // Sort by ACWR descending — danger (highest/lowest extremes) first
+        // ACWR far from 1.0 is more dangerous, so sort by distance from 1.0 descending
+        list.sort((a, b) => {
+          const aa = a.id != null ? acwrMapRef.current.get(a.id) : undefined;
+          const ab = b.id != null ? acwrMapRef.current.get(b.id) : undefined;
+          // null/undefined ACWR goes last
+          if (aa == null && ab == null) return 0;
+          if (aa == null) return 1;
+          if (ab == null) return -1;
+          // Danger first: sort by distance from optimal center (1.05)
+          const distA = Math.abs(aa - 1.05);
+          const distB = Math.abs(ab - 1.05);
+          return distB - distA; // higher distance = more danger = first
+        });
+        break;
       default:
         list.sort((a, b) => a.display_name.localeCompare(b.display_name, "fr"));
     }
     return list;
-  }, [athletes, groupFilter, sortKey, athleteKPIs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [athletes, groupFilter, sortKey, athleteKPIs, wellnessByUser, acwrMapVersion]);
 
   // Reset pagination when filters change
   useEffect(() => { setAthletesShown(30); }, [groupFilter, sortKey]);
@@ -280,7 +389,9 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
         {([
           { key: "name" as const, label: "Nom" },
           { key: "forme" as const, label: "Forme" },
+          { key: "readiness" as const, label: "Bien-être" },
           { key: "assiduity" as const, label: "Activité" },
+          { key: "charge" as const, label: "Charge \u2191" },
         ]).map((opt) => (
           <button
             key={opt.key}
@@ -330,6 +441,8 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
               const hasLowActivity = sessionsCount === 0;
               const formScore = kpis?.forme ?? null;
               const isLowForme = formScore !== null && formScore < 2.5;
+              const readiness = athlete.id != null ? wellnessByUser.get(athlete.id) ?? null : null;
+              const isDeclining = athlete.id != null && decliningUsers.has(athlete.id);
 
               return (
                 <button
@@ -390,6 +503,31 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
                         Forme
                       </span>
                       <FormeDots score={kpis?.forme ?? null} />
+                    </div>
+
+                    {/* Readiness (wellness) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Bien-être
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {athlete.id != null && (
+                          <WellnessTrend userId={athlete.id} days={7} mode="compact" />
+                        )}
+                        <ReadinessBadge score={readiness} declining={isDeclining} />
+                      </div>
+                    </div>
+
+                    {/* Charge (ACWR + load mini chart) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Charge
+                      </span>
+                      {athlete.id != null ? (
+                        <TrainingLoadIndicators userId={athlete.id} onAcwrReady={handleAcwrReady} />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">&mdash;</span>
+                      )}
                     </div>
 
                     {/* Assiduité sparkline */}

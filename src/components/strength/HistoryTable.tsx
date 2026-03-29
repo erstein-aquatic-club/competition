@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -7,8 +7,9 @@ import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { staggerChildren, listItem } from "@/lib/animations";
 import { cn } from "@/lib/utils";
-import { Dumbbell, ChevronDown, Clock, Flame } from "lucide-react";
+import { Dumbbell, ChevronDown, Clock, Flame, TrendingUp } from "lucide-react";
 import type { LocalStrengthRun } from "@/lib/types";
+import { ExerciseProgressChart } from "./ExerciseProgressChart";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Tous" },
@@ -31,6 +32,7 @@ interface HistoryTableProps {
 
 export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTableProps) {
   const [historyStatus, setHistoryStatus] = useState("all");
+  const [progressExercise, setProgressExercise] = useState<{ id: number; name: string } | null>(null);
 
   const strengthHistoryQuery = useInfiniteQuery({
     queryKey: ["strength_history", athleteKey, historyStatus],
@@ -51,6 +53,36 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
   });
 
   const historyRuns = strengthHistoryQuery.data?.pages.flatMap((page) => page.runs) ?? [];
+
+  // Fetch exercises to get exercise names for the progression section
+  const { data: exercises } = useQuery({
+    queryKey: ["exercises"],
+    queryFn: () => api.getExercises(),
+  });
+
+  // Build unique exercise list from history runs (set_logs)
+  const exerciseList = useMemo(() => {
+    const map = new Map<number, { id: number; name: string; count: number }>();
+    for (const run of historyRuns) {
+      const logs = (run.strength_set_logs ?? run.logs ?? []) as Array<{ exercise_id: number }>;
+      for (const log of logs) {
+        const eid = Number(log.exercise_id);
+        if (!eid) continue;
+        const existing = map.get(eid);
+        if (existing) {
+          existing.count++;
+        } else {
+          const ex = exercises?.find((e) => e.id === eid);
+          map.set(eid, {
+            id: eid,
+            name: ex?.nom_exercice ?? `Exercice #${eid}`,
+            count: 1,
+          });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [historyRuns, exercises]);
 
   return (
     <div className="space-y-3 pt-2">
@@ -162,6 +194,55 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
           <ChevronDown className="h-3.5 w-3.5" />
           {strengthHistoryQuery.isFetchingNextPage ? "Chargement…" : "Charger plus"}
         </button>
+      )}
+
+      {/* ── Exercise progression section ── */}
+      {exerciseList.length > 0 && athleteId && (
+        <div className="pt-3 space-y-2">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Progression par exercice
+          </h3>
+          <motion.div
+            className="space-y-1.5"
+            variants={staggerChildren}
+            initial="hidden"
+            animate="visible"
+          >
+            {exerciseList.map((ex) => (
+              <motion.button
+                key={ex.id}
+                type="button"
+                variants={listItem}
+                onClick={() => setProgressExercise(ex)}
+                className="w-full flex items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 transition-all hover:border-primary/30 active:scale-[0.98] text-left"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Dumbbell className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-semibold truncate">{ex.name}</p>
+                  <p className="text-[10px] text-muted-foreground tabular-nums">
+                    {ex.count} {ex.count > 1 ? "series" : "serie"}
+                  </p>
+                </div>
+                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              </motion.button>
+            ))}
+          </motion.div>
+        </div>
+      )}
+
+      {/* ── Exercise progress chart sheet ── */}
+      {progressExercise && athleteId && (
+        <ExerciseProgressChart
+          exerciseId={progressExercise.id}
+          userId={athleteId}
+          exerciseName={progressExercise.name}
+          open={!!progressExercise}
+          onOpenChange={(open) => {
+            if (!open) setProgressExercise(null);
+          }}
+        />
       )}
     </div>
   );

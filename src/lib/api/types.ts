@@ -170,6 +170,7 @@ export interface UserProfile {
   ffn_iuf?: string | null;
   phone?: string | null;
   neurotype_result?: NeurotypResult | null;
+  body_weight?: number | null;
 }
 
 export interface AthleteSummary {
@@ -341,6 +342,7 @@ export interface StrengthSetPayload {
   reps: number;
   weight: number;
   notes?: string | null;
+  difficulty?: number | null;
   athleteId?: number | string | null;
   athleteName?: string | null;
 }
@@ -788,4 +790,56 @@ export interface CompetitionChecklistCheck {
   checklist_item_id: string;
   checked: boolean;
   checked_at?: string | null;
+}
+
+// ── Achievements / Badges ─────────────────────────────────
+
+export interface Achievement {
+  id: string;
+  user_id: number;
+  type: string;
+  key: string;
+  unlocked_at: string;
+  metadata: Record<string, unknown>;
+}
+
+// ── Challenges ────────────────────────────────────────────
+
+export interface Challenge {
+  id: string;
+  coach_id: number;
+  group_id: number | null;
+  title: string;
+  type: 'attendance' | 'wellness' | 'custom';
+  target: number;
+  current_value: number;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
+// ── Wellness Checks ────────────────────────────────────────
+
+export interface WellnessCheck {
+  id: string;
+  user_id: number;
+  date: string;
+  sleep_quality: number;
+  sleep_hours: number;
+  fatigue: number;
+  soreness: number;
+  mood: number;
+  stress: number;
+  readiness_score: number;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface PainReport {
+  id: string;
+  user_id: number;
+  date: string;
+  body_zone: string;
+  intensity: number; // 1-3
+  created_at: string;
 }

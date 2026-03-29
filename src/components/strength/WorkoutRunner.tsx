@@ -22,6 +22,7 @@ import {
   Dumbbell,
   RotateCcw,
   StickyNote,
+  Trophy,
   X,
 } from "lucide-react";
 import { BottomActionBar } from "@/components/shared/BottomActionBar";
@@ -33,6 +34,8 @@ import { colors } from "@/lib/design-tokens";
 import type { Exercise, StrengthSessionTemplate } from "@/lib/api";
 import { BODYWEIGHT_SENTINEL, isBodyweight } from "@/lib/api/client";
 import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from "@/lib/types";
+import { detectPR, estimateOneRM } from "@/lib/prDetection";
+import type { PrDetection } from "@/lib/prDetection";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -189,6 +192,8 @@ export function WorkoutRunner({
   const [shouldReplace, setShouldReplace] = useState(false);
   const [isGifOpen, setIsGifOpen] = useState(false);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  // Track which set keys triggered a PR for trophy display
+  const [prSets, setPrSets] = useState<Set<string>>(new Set());
 
   // Inline note state (refs only - effects defined after currentBlock)
   const [localNote, setLocalNote] = useState("");
@@ -473,11 +478,13 @@ export function WorkoutRunner({
       }
       return;
     }
+    const setDifficulty = currentSetInputs[currentSetIndex - 1]?.difficulty ?? null;
     const newLog = {
       exercise_id: currentBlock.exercise_id,
       set_number: currentSetIndex,
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
       weight: currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight,
+      difficulty: setDifficulty,
     };
     setLogs((prev) => [...prev, newLog]);
     isLoggingRef.current = true;
@@ -488,6 +495,24 @@ export function WorkoutRunner({
     } finally {
       isLoggingRef.current = false;
     }
+
+    // --- Live PR detection ---
+    const logWeight = Number(newLog.weight);
+    const logReps = Number(newLog.reps);
+    if (logWeight > 0 && logReps > 0 && !isBodyweight(logWeight)) {
+      const currentBest1rm = oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight || 0;
+      const exName = currentExerciseDef?.nom_exercice ?? "Exercice";
+      const pr = detectPR({ weight: logWeight, reps: logReps }, currentBest1rm, exName);
+      if (pr) {
+        const setKey = `${currentBlock.exercise_id}-${currentSetIndex}`;
+        setPrSets((prev) => new Set(prev).add(setKey));
+        toast({
+          title: "\uD83C\uDFC6 Nouveau record !",
+          description: `1RM estim\u00e9 : ${pr.newValue}kg (+${pr.improvement}%)`,
+        });
+      }
+    }
+
     const isLastSet = currentSetIndex >= currentBlock.sets;
     if (isLastSet) {
       // Last set of exercise: advance first, then optionally show inter-exercise timer
@@ -800,8 +825,11 @@ export function WorkoutRunner({
 
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold">
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
             Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {formatStrengthValue(currentBlock?.reps)} reps
+            {currentSetKey && prSets.has(currentSetKey) && (
+              <Trophy className="h-4 w-4 text-amber-500" aria-label="Record personnel" />
+            )}
           </div>
           {restDuration > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -842,6 +870,45 @@ export function WorkoutRunner({
               <span className="text-sm font-medium text-muted-foreground">reps</span>
             </div>
           </button>
+        </div>
+        {/* Optional difficulty selector (1-5) */}
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Difficulté</span>
+          <div className="flex gap-1.5">
+            {([1, 2, 3, 4, 5] as const).map((level) => {
+              const selected = currentSetInputs[currentSetIndex - 1]?.difficulty === level;
+              const colorClass = level <= 2
+                ? "bg-emerald-500 text-white border-emerald-500"
+                : level === 3
+                  ? "bg-amber-400 text-white border-amber-400"
+                  : level === 4
+                    ? "bg-orange-500 text-white border-orange-500"
+                    : "bg-red-500 text-white border-red-500";
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold transition-all",
+                    selected
+                      ? colorClass
+                      : "border-muted-foreground/25 bg-muted/30 text-muted-foreground/60",
+                  )}
+                  onClick={() =>
+                    setCurrentSetInputs((prev: Record<number, SetInputValues>) => ({
+                      ...prev,
+                      [currentSetIndex - 1]: {
+                        ...prev[currentSetIndex - 1],
+                        difficulty: selected ? null : level,
+                      },
+                    }))
+                  }
+                >
+                  {level}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Card>
 
@@ -1046,6 +1113,11 @@ export function WorkoutRunner({
                       {formatStrengthValue(item.sets)}×{formatStrengthValue(item.reps)}
                     </p>
                   </div>
+                  {Array.from({ length: item.sets }).some((_, si) =>
+                    prSets.has(`${item.exercise_id}-${si + 1}`)
+                  ) && (
+                    <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  )}
                   <span className="text-xs font-mono font-semibold text-muted-foreground shrink-0">
                     {loggedSets}/{formatStrengthValue(item.sets)}
                   </span>

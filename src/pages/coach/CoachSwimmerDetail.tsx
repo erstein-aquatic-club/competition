@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, MessageSquare, Target } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import SwimmerFeedbackTab from "./SwimmerFeedbackTab";
@@ -15,6 +15,12 @@ import SwimmerPlanningTab from "./SwimmerPlanningTab";
 import SwimmerInterviewsTab from "./SwimmerInterviewsTab";
 import SwimmerSlotsTab from "@/components/coach/SwimmerSlotsTab";
 import PlanningWizard from "@/components/coach/PlanningWizard";
+import WellnessTrend from "@/components/coach/WellnessTrend";
+import TrainingLoadChart from "@/components/coach/TrainingLoadChart";
+import SwimVolumeCharts from "@/components/coach/SwimVolumeCharts";
+import { useSwimAnalytics } from "@/hooks/useSwimAnalytics";
+import AttendancePerformanceChart from "@/components/coach/AttendancePerformanceChart";
+import PainHistoryMap from "@/components/coach/PainHistoryMap";
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
@@ -54,6 +60,7 @@ export default function CoachSwimmerDetail({
   const { selectedAthleteId, selectedAthleteName } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<CoachSwimmerTab>("resume");
+  const [swimWeeks, setSwimWeeks] = useState(8);
 
   const athleteId =
     athleteIdProp ?? (params?.id ? Number(params.id) : selectedAthleteId);
@@ -107,6 +114,11 @@ export default function CoachSwimmerDetail({
     queryKey: ["competitions"],
     queryFn: () => api.getCompetitions(),
     staleTime,
+  });
+
+  const swimAnalytics = useSwimAnalytics({
+    userId: athleteId ?? undefined,
+    weeks: swimWeeks,
   });
 
   // ── Derived KPIs ─────────────────────────────────────────
@@ -307,6 +319,86 @@ export default function CoachSwimmerDetail({
                 </p>
               </button>
             </div>
+          </div>
+
+          {/* Rapport mensuel */}
+          <Button
+            variant="outline"
+            className="w-full gap-2 rounded-2xl"
+            onClick={() => {
+              const now = new Date();
+              const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+              navigate(`/report/${athleteId}/${m}`);
+            }}
+          >
+            <FileText className="h-4 w-4" />
+            Rapport mensuel
+          </Button>
+
+          {/* Bien-être section */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Heart className="h-4 w-4 text-rose-500" />
+              <p className="text-sm font-semibold">Bien-être</p>
+            </div>
+            <WellnessTrend userId={athleteId} days={28} mode="full" />
+          </div>
+
+          {/* Douleurs section */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="h-4 w-4 text-red-500" />
+              <p className="text-sm font-semibold">Douleurs</p>
+            </div>
+            <PainHistoryMap userId={athleteId} days={28} />
+          </div>
+
+          {/* Charge d'entraînement section */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="h-4 w-4 text-blue-500" />
+              <p className="text-sm font-semibold">Charge d'entraînement</p>
+            </div>
+            <TrainingLoadChart userId={athleteId} />
+          </div>
+
+          {/* Analytics natation section */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-4 w-4 text-cyan-500" />
+              <p className="text-sm font-semibold">Volume natation</p>
+              {swimAnalytics.totalMeters > 0 && (
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                  {(swimAnalytics.totalMeters / 1000).toFixed(1)} km total
+                </span>
+              )}
+            </div>
+            {swimAnalytics.isLoading ? (
+              <p className="text-xs text-muted-foreground text-center py-6">Chargement...</p>
+            ) : swimAnalytics.weeklyVolumes.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">
+                Aucune donnée de volume sur cette période.
+              </p>
+            ) : (
+              <SwimVolumeCharts
+                weeklyVolumes={swimAnalytics.weeklyVolumes}
+                mode="full"
+                selectedWeeks={swimWeeks}
+                onWeeksChange={setSwimWeeks}
+              />
+            )}
+          </div>
+
+          {/* Corrélation présence / performance */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-violet-500" />
+              <p className="text-sm font-semibold">Présence vs Performance</p>
+            </div>
+            <AttendancePerformanceChart
+              groupId={profile?.group_id ?? undefined}
+              highlightUserId={athleteId}
+            />
           </div>
         </TabsContent>
 

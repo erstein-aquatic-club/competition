@@ -305,6 +305,33 @@ export {
 } from './audit';
 
 export {
+  computeReadinessScore,
+  getWellnessForDate,
+  getWellnessRange,
+  getGroupWellnessForDate,
+  upsertWellness,
+} from './wellness';
+
+export {
+  getUserAchievements,
+  unlockAchievement,
+} from './achievements';
+
+export {
+  getActiveChallenges,
+  getAllChallenges,
+  createChallenge,
+  updateChallengeProgress,
+  deleteChallenge,
+} from './challenges';
+
+export {
+  getPainReportsForDate,
+  getPainReportsRange,
+  upsertPainReports,
+} from './painReports';
+
+export {
   getExercises,
   createExercise,
   updateExercise,
@@ -333,4 +360,6 @@ export {
   duplicateStrengthSession,
   duplicateFolder,
   duplicateAthletePlan,
+  getAllOneRmRecords,
+  getPopularExercises,
 } from './strength';
