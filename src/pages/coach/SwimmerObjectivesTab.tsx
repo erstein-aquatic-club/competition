@@ -47,6 +47,7 @@ import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard"
 interface Props {
   athleteId: number;    // public.users.id (integer)
   athleteName: string;
+  authUidError?: boolean;
 }
 
 type ObjectiveType = "chrono" | "texte" | "both";
@@ -415,7 +416,7 @@ const ObjectiveFormSheet = ({
 
 // ── Main Component ──────────────────────────────────────────────
 
-const SwimmerObjectivesTab = ({ athleteId, athleteName }: Props) => {
+const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) => {
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
 
@@ -472,6 +473,13 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName }: Props) => {
 
   return (
     <div className="space-y-4">
+      {authUidError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-center">
+          <p className="text-xs text-destructive">
+            Impossible de charger les objectifs. Vérifiez que le nageur a un compte actif.
+          </p>
+        </div>
+      )}
       {/* Add button */}
       <div className="flex justify-end">
         <Button

@@ -785,6 +785,10 @@ const CoachInterviewCard = ({
           )}
         </button>
 
+        <div className="px-4 pb-2">
+          <InterviewStatusBar status={status} />
+        </div>
+
         {expanded && (
           <div className="px-4 pb-4 space-y-5">
             {status === "draft_athlete" && (
@@ -1004,6 +1008,45 @@ const CoachInterviewCard = ({
     </>
   );
 };
+
+// ── Interview Status Timeline ───────────────────────────────────
+
+const INTERVIEW_PHASES: { key: InterviewStatus; label: string; icon: typeof Clock }[] = [
+  { key: "draft_athlete", label: "Nageur", icon: User },
+  { key: "draft_coach", label: "Coach", icon: GraduationCap },
+  { key: "sent", label: "Envoyé", icon: Send },
+  { key: "signed", label: "Signé", icon: Trophy },
+];
+
+function InterviewStatusBar({ status }: { status: InterviewStatus }) {
+  const currentIndex = INTERVIEW_PHASES.findIndex((p) => p.key === status);
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {INTERVIEW_PHASES.map((phase, i) => {
+        const Icon = phase.icon;
+        const isDone = i < currentIndex;
+        const isCurrent = i === currentIndex;
+        return (
+          <div key={phase.key} className="flex items-center gap-1">
+            {i > 0 && (
+              <div className={`h-0.5 w-3 rounded ${isDone ? "bg-emerald-500" : "bg-muted"}`} />
+            )}
+            <div className={`flex h-6 items-center gap-1 rounded-full px-2 text-[10px] font-medium ${
+              isCurrent
+                ? "bg-primary/10 text-primary"
+                : isDone
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                  : "bg-muted text-muted-foreground"
+            }`}>
+              <Icon className="h-3 w-3" />
+              {phase.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ── Main Component ──────────────────────────────────────────────
 
