@@ -32,3 +32,6 @@ supabase/config.toml
 *.sln
 *.sw?
 supabase/.temp/
+
+# Worktrees
+.worktrees/
