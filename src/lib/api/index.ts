@@ -136,6 +136,11 @@ export {
 } from './notifications';
 
 export {
+  getNotificationLog,
+  type NotificationLogEntry,
+} from './notificationLog';
+
+export {
   getAssignmentsForCoach,
   getAssignments,
   getCoachAssignments,

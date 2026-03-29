@@ -150,6 +150,7 @@ export const mapFromDbSession = (raw: Record<string, unknown>): Session | null =
     distance: safeInt(raw.distance, 0),
     duration: safeInt(raw.duration, 0),
     comments: (raw.comments || '') as string,
+    coach_notes: (raw.coach_notes as string | null) ?? null,
     stroke_distances: (raw.stroke_distances as Session['stroke_distances']) ?? null,
     created_at: (raw.created_at || raw.updated_at || new Date().toISOString()) as string,
   };

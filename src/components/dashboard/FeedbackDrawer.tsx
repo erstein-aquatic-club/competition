@@ -782,6 +782,14 @@ export function FeedbackDrawer({
                               )}
                             </AnimatePresence>
 
+                            {/* Coach notes */}
+                            {logsBySessionId[activeSession.id]?.coach_notes && (
+                              <div className="mx-3 mb-3 rounded-2xl bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-400 p-3">
+                                <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
+                                <p className="text-xs text-blue-800 dark:text-blue-300 mt-0.5">{logsBySessionId[activeSession.id].coach_notes}</p>
+                              </div>
+                            )}
+
                             {/* Ressenti + distance */}
                             <div className="px-4 pb-4">
                               {!canRate && (
