@@ -143,6 +143,8 @@ import {
   notifications_mark_read as _notifications_mark_read,
 } from "./api/notifications";
 
+import { getNotificationLog as _getNotificationLog } from "./api/notificationLog";
+
 import {
   getAssignmentsForCoach as _getAssignmentsForCoach,
   getAssignments as _getAssignments,
@@ -651,6 +653,7 @@ export const api = {
   async markNotificationRead(id: number) { return _markNotificationRead(id); },
   async notifications_list(options: Parameters<typeof _notifications_list>[0]) { return _notifications_list(options); },
   async notifications_mark_read(payload: Parameters<typeof _notifications_mark_read>[0]) { return _notifications_mark_read(payload); },
+  async getNotificationLog(limit?: number, offset?: number) { return _getNotificationLog(limit, offset); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Timesheet

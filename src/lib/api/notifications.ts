@@ -54,6 +54,37 @@ export async function notifications_send(payload: {
       if (targetError) throw new Error(targetError.message);
       // Push delivery handled by pg_net trigger (00044)
     }
+
+    // Log the notification for history
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: senderRow } = await supabase
+          .from("users")
+          .select("id")
+          .eq("auth_uid", user.id)
+          .single();
+        if (senderRow) {
+          const targetUserIds = payload.targets
+            .map((t) => t.target_user_id)
+            .filter((id): id is number => id != null);
+          const targetGroupIds = payload.targets
+            .map((t) => t.target_group_id)
+            .filter((id): id is number => id != null);
+          const targetType = targetGroupIds.length > 0 ? "group" : targetUserIds.length > 0 ? "user" : "all";
+          const targetIds = targetType === "group" ? targetGroupIds : targetUserIds;
+          await supabase.from("notification_log").insert({
+            sender_id: senderRow.id,
+            title: payload.title,
+            body: payload.body ?? null,
+            target_type: targetType,
+            target_ids: targetIds,
+            recipient_count: payload.targets.length,
+          });
+        }
+      }
+    } catch { /* non-blocking */ }
+
     return { status: "sent" };
   }
   const notifs = (localStorageGet(STORAGE_KEYS.NOTIFICATIONS) || []) as any[];
