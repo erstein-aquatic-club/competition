@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Search, Dumbbell, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, stripAccents } from "@/lib/utils";
 import type { Exercise } from "@/lib/api";
 
 interface ExercisePickerProps {
@@ -25,11 +25,11 @@ export function ExercisePicker({
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = stripAccents(search.trim().toLowerCase());
     let list = exercises.filter((e) => e.exercise_type === "strength");
     if (q) {
       list = list.filter((e) =>
-        (e.nom_exercice ?? "").toLowerCase().includes(q)
+        stripAccents((e.nom_exercice ?? "").toLowerCase()).includes(q)
       );
     }
     if (preferredType) {

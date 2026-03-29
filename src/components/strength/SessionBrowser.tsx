@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, StrengthCycleType, StrengthSessionTemplate, Assignment } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Dumbbell, Search, X } from "lucide-react";
+import { stripAccents } from "@/lib/utils";
 import { CycleSelector } from "@/components/strength/CycleSelector";
 import { InProgressCard } from "@/components/strength/InProgressCard";
 import { UnfiledSessionList, DisplaySession } from "@/components/strength/UnfiledSessionList";
@@ -188,13 +189,13 @@ export function SessionBrowser({
   }, [assignedDisplaySessions, unfiledCatalogSessions]);
 
   // ── Search filter ────────────────────────────────────────────────────
-  const searchValue = searchQuery.trim().toLowerCase();
+  const searchValue = stripAccents(searchQuery.trim().toLowerCase());
   const isSearching = searchValue.length > 0;
 
   const filteredUnfiledSessions = useMemo(() => {
     if (!isSearching) return unfiledSessions;
     return unfiledSessions.filter((s) =>
-      `${s.title} ${s.description ?? ""}`.toLowerCase().includes(searchValue),
+      stripAccents(`${s.title} ${s.description ?? ""}`.toLowerCase()).includes(searchValue),
     );
   }, [unfiledSessions, isSearching, searchValue]);
 

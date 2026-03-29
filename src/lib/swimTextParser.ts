@@ -1,6 +1,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 // swimTextParser.ts — Deterministic text → SwimBlock[] parser
 // ────────────────────────────────────────────────────────────────────────────
+import { stripAccents } from "@/lib/utils";
 
 // ── Shared normalizers (extracted from SwimCatalog / SwimExerciseForm / SwimSessionBuilder) ──
 
@@ -168,10 +169,6 @@ export function parseRestToken(tokens: string[]): RestResult | null {
 
 // ── Exercise token parsing ──
 
-/** Normalize accented characters to ASCII for regex matching */
-function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
 
 // Stroke keywords (order matters: longer patterns first)
 // All patterns use ASCII — input is stripped of accents before matching

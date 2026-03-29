@@ -7,7 +7,7 @@ import { CycleSelector } from "@/components/strength/CycleSelector";
 import { InProgressCard } from "@/components/strength/InProgressCard";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, stripAccents } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { staggerChildren } from "@/lib/animations";
 import { SaveState } from "@/components/shared/BottomActionBar";
@@ -182,11 +182,11 @@ export function SessionList({
   }, [strengthCatalog, cycleType]);
 
   const filteredDisplaySessions = useMemo(() => {
-    const searchValue = searchQuery.trim().toLowerCase();
+    const searchValue = stripAccents(searchQuery.trim().toLowerCase());
     const allSessions = [...assignedDisplaySessions, ...catalogDisplaySessions];
     if (!searchValue) return allSessions;
     return allSessions.filter((session) =>
-      `${session.title} ${session.description}`.toLowerCase().includes(searchValue)
+      stripAccents(`${session.title} ${session.description}`.toLowerCase()).includes(searchValue)
     );
   }, [assignedDisplaySessions, catalogDisplaySessions, searchQuery]);
 
