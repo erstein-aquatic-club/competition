@@ -222,6 +222,17 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
           </div>
         );
       })}
+
+      {!foldersLoading && folders.length > 0 && Array.from(sessionsByFolder.values()).every(arr => arr.length === 0) && (
+        <div className="rounded-xl border border-dashed p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            Les séances de ce plan n'ont pas encore d'exercices configurés.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Demande à ton coach de compléter ta planification.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
