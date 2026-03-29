@@ -409,6 +409,7 @@ const InlinePlanning = ({
     onSuccess: () => {
       setEditingWeekKey(null);
       void queryClient.invalidateQueries({ queryKey: ["training-weeks"] });
+      toast({ title: "Semaine planifiée" });
     },
     onError: (err: Error) => {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -692,6 +693,7 @@ const CoachInterviewCard = ({
     mutationFn: (input: InterviewCoachInput) => api.updateInterviewCoachSections(interview.id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
+      toast({ title: "Sections coach enregistrées" });
     },
     onError: (err: Error) => {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });

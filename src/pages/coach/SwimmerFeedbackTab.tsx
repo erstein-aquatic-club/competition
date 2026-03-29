@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -49,6 +50,7 @@ function CoachNotePopover({
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState(existingNotes ?? "");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const mutation = useMutation({
     mutationFn: (newNotes: string | null) =>
@@ -56,6 +58,10 @@ function CoachNotePopover({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions", athleteId] });
       setOpen(false);
+      toast({ title: "Note sauvegardée" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de sauvegarder la note.", variant: "destructive" });
     },
   });
 
