@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Brain, Clock, Bell, BellOff, BellRing, ChevronRight, type LucideIcon } from "lucide-react";
+import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Brain, Clock, Bell, BellOff, BellRing, ChevronRight, FileText, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import { compressImage, isAcceptedImageType } from "@/lib/imageUtils";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -23,6 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { fadeIn } from "@/lib/animations";
+import BadgesGrid from "@/components/profile/BadgesGrid";
 import SwimmerMessagesView from "@/components/profile/SwimmerMessagesView";
 import { NeurotypQuiz } from "@/components/neurotype/NeurotypQuiz";
 import NeurotypResultView from "@/components/neurotype/NeurotypResult";
@@ -705,6 +706,16 @@ export default function Profile() {
                 onClick={() => navigate("/hall-of-fame")}
               />
               <ProfileActionTile
+                icon={FileText}
+                title="Rapport mensuel"
+                meta="Bilan du mois"
+                onClick={() => {
+                  const now = new Date();
+                  const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+                  navigate(`/report/${userId}/${m}`);
+                }}
+              />
+              <ProfileActionTile
                 icon={Brain}
                 title="Neurotype"
                 meta={profile?.neurotype_result ? getNeurotypName(profile.neurotype_result.dominant) : "Découvrir"}
@@ -720,6 +731,8 @@ export default function Profile() {
             </CardContent>
           </Card>
         ) : null}
+
+        {userId ? <BadgesGrid userId={userId} /> : null}
 
         <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
           <CardHeader className="pb-3">

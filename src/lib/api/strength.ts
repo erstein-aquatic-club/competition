@@ -354,6 +354,7 @@ export async function logStrengthSet(payload: {
   notes?: string | null;
   pct_1rm_suggested?: number | null;
   rest_seconds?: number | null;
+  difficulty?: number | null;
   athlete_id?: number | string | null;
   athleteId?: number | string | null;
   athlete_name?: string | null;
@@ -1055,6 +1056,55 @@ export async function updateExerciseNote(params: {
   }
   localStorageSave(STORAGE_KEYS.ONE_RM, records);
   return { status: "ok" };
+}
+
+// --- Leaderboard (all athletes 1RM) ---
+
+export async function getAllOneRmRecords(): Promise<
+  Array<{
+    athlete_id: number;
+    exercise_id: number;
+    one_rm: number;
+  }>
+> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase
+    .from("one_rm_records")
+    .select("athlete_id, exercise_id, one_rm")
+    .gt("one_rm", 0);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: any) => ({
+    athlete_id: safeInt(r.athlete_id),
+    exercise_id: safeInt(r.exercise_id),
+    one_rm: Number(r.one_rm ?? 0),
+  }));
+}
+
+export async function getPopularExercises(limit = 10): Promise<
+  Array<{ exercise_id: number; athlete_count: number }>
+> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase
+    .from("one_rm_records")
+    .select("exercise_id, athlete_id")
+    .gt("one_rm", 0);
+  if (error) throw new Error(error.message);
+
+  const countMap = new Map<number, Set<number>>();
+  (data ?? []).forEach((r: any) => {
+    const eid = safeInt(r.exercise_id);
+    const aid = safeInt(r.athlete_id);
+    if (!countMap.has(eid)) countMap.set(eid, new Set());
+    countMap.get(eid)!.add(aid);
+  });
+
+  return Array.from(countMap.entries())
+    .map(([exercise_id, athletes]) => ({
+      exercise_id,
+      athlete_count: athletes.size,
+    }))
+    .sort((a, b) => b.athlete_count - a.athlete_count)
+    .slice(0, limit);
 }
 
 // --- Strength Folders ---

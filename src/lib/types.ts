@@ -158,6 +158,7 @@ export interface SetLogEntry {
   notes?: string | null;
   pct_1rm_suggested?: number | null;
   rest_seconds?: number | null;
+  difficulty?: number | null;
   completed_at?: string | null;
 }
 
@@ -455,6 +456,7 @@ export interface RawClubRecordSwimmerRow {
 export interface SetInputValues {
   reps?: number;
   weight?: number;
+  difficulty?: number | null;
 }
 
 export interface WorkoutFinishData {

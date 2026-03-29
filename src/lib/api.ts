@@ -335,6 +335,8 @@ import {
   duplicateFolder as _duplicateFolder,
   duplicateAthletePlan as _duplicateAthletePlan,
   getTeamAthletePlans as _getTeamAthletePlans,
+  getAllOneRmRecords as _getAllOneRmRecords,
+  getPopularExercises as _getPopularExercises,
 } from "./api/strength";
 
 // --- API Service ---
@@ -618,6 +620,8 @@ export const api = {
   async duplicateFolder(folderId: number, targetAthleteId: number | null, targetParentId: number | null) { return _duplicateFolder(folderId, targetAthleteId, targetParentId); },
   async duplicateAthletePlan(sourceAthleteId: number, targetAthleteId: number) { return _duplicateAthletePlan(sourceAthleteId, targetAthleteId); },
   async getTeamAthletePlans(excludeAthleteId: number) { return _getTeamAthletePlans(excludeAthleteId); },
+  async getAllOneRmRecords() { return _getAllOneRmRecords(); },
+  async getPopularExercises(limit?: number) { return _getPopularExercises(limit); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Swim Exercise Logs

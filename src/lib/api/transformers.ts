@@ -129,6 +129,7 @@ export const createSetLogDbPayload = (payload: {
   notes?: string | null;
   pct_1rm_suggested?: number | null;
   rest_seconds?: number | null;
+  difficulty?: number | null;
 }) => ({
   run_id: payload.run_id,
   exercise_id: payload.exercise_id,
@@ -138,6 +139,7 @@ export const createSetLogDbPayload = (payload: {
   pct_1rm_suggested: payload.pct_1rm_suggested ?? null,
   rest_seconds: payload.rest_seconds ?? null,
   rpe: payload.rpe ?? null,
+  difficulty: payload.difficulty ?? null,
   notes: payload.notes ?? null,
   completed_at: new Date().toISOString(),
 });
@@ -157,6 +159,7 @@ export const mapLogsForDbInsert = (
     reps: log.reps ?? null,
     weight: log.weight ?? null,
     rpe: log.rpe ?? null,
+    difficulty: log.difficulty ?? null,
     notes: log.notes ?? null,
     completed_at: new Date().toISOString(),
   }));

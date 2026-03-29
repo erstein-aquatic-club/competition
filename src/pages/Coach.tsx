@@ -22,6 +22,7 @@ const CoachSwimmerDetail = lazy(() => import("./coach/CoachSwimmerDetail"));
 const CoachWeekView = lazy(() => import("./coach/CoachWeekView"));
 const CoachLibrary = lazy(() => import("./coach/CoachLibrary"));
 const CoachComms = lazy(() => import("./coach/CoachComms"));
+import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
 
 type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms";
@@ -43,6 +44,7 @@ type CoachHomeProps = {
   athletesLoading: boolean;
   kpiLoading: boolean;
   fatigueAlerts: Array<{ athleteName: string; rating: number }>;
+  groups: Array<{ id: number; name: string; member_count?: number | null; is_temporary?: boolean; is_active?: boolean; parent_group_id?: number | null }>;
 };
 
 // ── Minimal section divider label ──────────────────────────────────────────
@@ -90,6 +92,7 @@ const CoachHome = ({
   athletesLoading,
   kpiLoading,
   fatigueAlerts,
+  groups,
 }: CoachHomeProps) => {
   const userName = useAuth((s) => s.user);
   const firstName = userName?.split(" ")[0] ?? "Coach";
@@ -298,7 +301,15 @@ const CoachHome = ({
         </div>
       </section>
 
-      {/* ── Section E: Nageurs récents ── */}
+      {/* ── Section E: Challenges d'équipe ── */}
+      <section className="space-y-2.5">
+        <SectionLabel>Challenges</SectionLabel>
+        <div className="rounded-2xl border bg-card p-4">
+          <CoachChallengesSection groups={groups} />
+        </div>
+      </section>
+
+      {/* ── Section F: Nageurs récents ── */}
       <section className="space-y-2.5">
         <SectionLabel>Nageurs récents</SectionLabel>
 
@@ -428,6 +439,7 @@ export default function Coach() {
     activeSection === "week" ||
     activeSection === "groups";
   const shouldLoadGroups =
+    activeSection === "home" ||
     activeSection === "week" ||
     activeSection === "comms" ||
     activeSection === "groups";
@@ -599,6 +611,7 @@ export default function Coach() {
           athletesLoading={athletesLoading}
           kpiLoading={coachKpisQuery.isLoading}
           fatigueAlerts={coachKpisQuery.data?.fatigueAlerts ?? []}
+          groups={groups}
         />
       ) : null}
 
