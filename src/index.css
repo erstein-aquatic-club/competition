@@ -109,7 +109,7 @@
   --primary: 356 95% 45%; /* EAC Red */
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 90%; /* Light Grey */
+  --secondary: 0 0% 80%; /* Light Grey – WCAG AA ≥ 4.5:1 */
   --secondary-foreground: 0 0% 10%;
 
   --muted: 0 0% 94%;

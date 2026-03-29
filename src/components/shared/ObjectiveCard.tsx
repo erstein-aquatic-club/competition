@@ -33,15 +33,15 @@ const STROKE_BORDER_TOP: Record<string, string> = {
 // ── Progress-based ring colors (same palette as progress bar) ───
 
 function progressRingColor(pct: number | null): string {
-  if (pct == null) return "#a1a1aa"; // zinc-400
-  if (pct >= 100) return "#10b981"; // emerald-500
-  if (pct >= 75) return "#22c55e";  // green-500
-  if (pct >= 50) return "#eab308";  // yellow-500
-  if (pct >= 25) return "#f97316";  // orange-500
-  return "#ef4444";                  // red-500
+  if (pct == null) return "hsl(var(--muted-foreground))";
+  if (pct >= 100) return "hsl(var(--status-success))";
+  if (pct >= 75) return "hsl(var(--intensity-1))";
+  if (pct >= 50) return "hsl(var(--status-warning))";
+  if (pct >= 25) return "hsl(var(--intensity-4))";
+  return "hsl(var(--status-error))";
 }
 
-const RING_DEFAULT = "#a1a1aa";
+const RING_DEFAULT = "hsl(var(--muted-foreground))";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
