@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,7 @@ import SwimmerObjectivesTab from "./SwimmerObjectivesTab";
 import SwimmerPlanningTab from "./SwimmerPlanningTab";
 import SwimmerInterviewsTab from "./SwimmerInterviewsTab";
 import SwimmerSlotsTab from "@/components/coach/SwimmerSlotsTab";
+import PlanningWizard from "@/components/coach/PlanningWizard";
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
@@ -51,6 +52,7 @@ export default function CoachSwimmerDetail({
   const [, params] = useRoute("/coach/swimmer/:id");
   const [, navigate] = useLocation();
   const { selectedAthleteId, selectedAthleteName } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<CoachSwimmerTab>("resume");
 
   const athleteId =
@@ -98,6 +100,12 @@ export default function CoachSwimmerDetail({
     queryKey: ["objectives", athleteAuthId],
     queryFn: () => api.getObjectives(athleteAuthId!),
     enabled: !!athleteAuthId,
+    staleTime,
+  });
+
+  const { data: competitions } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: () => api.getCompetitions(),
     staleTime,
   });
 
@@ -303,48 +311,64 @@ export default function CoachSwimmerDetail({
         </TabsContent>
 
         <TabsContent value="planning" className="mt-4 space-y-4">
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center gap-2 group">
-                <Target className="h-4 w-4 text-amber-500" />
-                <h2 className="text-sm font-semibold">Objectifs</h2>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <SwimmerObjectivesTab athleteId={athleteId} athleteName={displayName} authUidError={!!authUidError} />
-            </CollapsibleContent>
-          </Collapsible>
+          {!cycles?.length && !objectives?.length ? (
+            <PlanningWizard
+              athleteId={athleteId}
+              athleteAuthId={athleteAuthId ?? null}
+              athleteName={displayName}
+              groupId={profile?.group_id ?? 0}
+              competitions={competitions ?? []}
+              onComplete={() => {
+                queryClient.invalidateQueries({ queryKey: ["training-cycles", athleteId] });
+                queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
+              }}
+            />
+          ) : (
+            <>
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="w-full flex items-center gap-2 group">
+                    <Target className="h-4 w-4 text-amber-500" />
+                    <h2 className="text-sm font-semibold">Objectifs</h2>
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <SwimmerObjectivesTab athleteId={athleteId} athleteName={displayName} authUidError={!!authUidError} />
+                </CollapsibleContent>
+              </Collapsible>
 
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center gap-2 group">
-                <CalendarClock className="h-4 w-4 text-blue-500" />
-                <h2 className="text-sm font-semibold">Créneaux</h2>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <SwimmerSlotsTab
-                athleteId={athleteId}
-                athleteName={displayName}
-                groupId={profile?.group_id ?? 0}
-              />
-            </CollapsibleContent>
-          </Collapsible>
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="w-full flex items-center gap-2 group">
+                    <CalendarClock className="h-4 w-4 text-blue-500" />
+                    <h2 className="text-sm font-semibold">Créneaux</h2>
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <SwimmerSlotsTab
+                    athleteId={athleteId}
+                    athleteName={displayName}
+                    groupId={profile?.group_id ?? 0}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
 
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center gap-2 group">
-                <CalendarRange className="h-4 w-4 text-emerald-500" />
-                <h2 className="text-sm font-semibold">Macro-cycles</h2>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <SwimmerPlanningTab athleteId={athleteId} />
-            </CollapsibleContent>
-          </Collapsible>
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="w-full flex items-center gap-2 group">
+                    <CalendarRange className="h-4 w-4 text-emerald-500" />
+                    <h2 className="text-sm font-semibold">Macro-cycles</h2>
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <SwimmerPlanningTab athleteId={athleteId} />
+                </CollapsibleContent>
+              </Collapsible>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="echanges" className="mt-4 space-y-4">
