@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
 import { api, summarizeApiError, type UserSummary, getAuditLog, type AuditEntry } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -173,10 +174,22 @@ export default function Admin() {
   });
 
   const approveUser = useMutation({
-    mutationFn: (userId: number) => api.approveUser(userId),
+    mutationFn: async (userId: number) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action: "approve_user", user_id: userId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-audit-log"] });
       toast({ title: "Inscription validée" });
     },
     onError: (error: unknown) => {
@@ -188,10 +201,22 @@ export default function Admin() {
   });
 
   const rejectUser = useMutation({
-    mutationFn: (userId: number) => api.rejectUser(userId),
+    mutationFn: async (userId: number) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action: "reject_user", user_id: userId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-audit-log"] });
       toast({ title: "Inscription rejetée" });
     },
     onError: (error: unknown) => {
