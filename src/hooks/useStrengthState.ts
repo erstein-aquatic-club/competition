@@ -27,7 +27,7 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
   const [activeRunLogs, setActiveRunLogs] = useState<SetLogEntry[] | null>(null);
   const [activeRunnerStep, setActiveRunnerStep] = useState(0);
-  const [screenMode, setScreenMode] = useState<"list" | "reader" | "focus" | "settings">("list");
+  const [screenMode, setScreenMode] = useState<"list" | "reader" | "focus" | "settings" | "summary">("list");
   const [isFinishing, setIsFinishing] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 

@@ -379,10 +379,7 @@ export async function logStrengthSet(payload: {
     );
     const current = existingByExercise.get(payload.exercise_id) ?? 0;
     if (estimate <= current) return null;
-    if (
-      canUseSupabase() &&
-      (athleteId === null || athleteId === undefined || athleteId === "")
-    ) {
+    if (canUseSupabase() && !athleteId && !athleteName) {
       return null;
     }
     await update1RM({

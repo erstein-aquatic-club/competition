@@ -9,6 +9,7 @@ import { Dumbbell, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
 import { SessionBrowser } from "@/components/strength/SessionBrowser";
+import { SessionSummary } from "@/components/strength/SessionSummary";
 import { SessionDetailPreview } from "@/components/strength/SessionDetailPreview";
 import { HistoryTable } from "@/components/strength/HistoryTable";
 import { useStrengthState } from "@/hooks/useStrengthState";
@@ -222,11 +223,14 @@ export default function Strength() {
     enabled: !!user,
   });
 
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+
   // Task 11: Exercise substitution state
   const [substitutions, setSubstitutions] = useState<Map<number, { originalIndex: number; exercise: Exercise }>>(new Map());
   const [originalItemCount, setOriginalItemCount] = useState(0);
 
   const handleSubstitute = (itemIndex: number, newExercise: Exercise) => {
+    const params = resolveExerciseParams(newExercise, cycleType);
     setSubstitutions((prev) => {
       const next = new Map(prev);
       next.set(itemIndex, { originalIndex: itemIndex, exercise: newExercise });
@@ -235,8 +239,20 @@ export default function Strength() {
     setActiveSession((prev) => {
       if (!prev?.items) return prev;
       const items = [...prev.items];
-      items[itemIndex] = { ...items[itemIndex], exercise_id: newExercise.id, exercise_name: newExercise.nom_exercice };
+      items[itemIndex] = {
+        ...items[itemIndex],
+        exercise_id: newExercise.id,
+        exercise_name: newExercise.nom_exercice,
+        sets: params.sets ?? items[itemIndex].sets,
+        reps: params.reps ?? items[itemIndex].reps,
+        rest_seconds: params.restSeries ?? items[itemIndex].rest_seconds,
+        percent_1rm: params.percent1rm ?? items[itemIndex].percent_1rm,
+      };
       return { ...prev, items };
+    });
+    toast({
+      title: "Exercice remplacé",
+      description: `${newExercise.nom_exercice} — paramètres mis à jour.`,
     });
   };
 
@@ -365,11 +381,7 @@ export default function Strength() {
       queryClient.invalidateQueries({ queryKey: ["assignments", user, "strength"] });
       queryClient.invalidateQueries({ queryKey: ["1rm", user, userId] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      setActiveAssignment(null);
-      setActiveRunId(null);
-      setActiveSession(null);
-      setActiveRunLogs(null);
-      setScreenMode("list");
+      setScreenMode("summary");
       toast({ title: "Séance sauvegardée", description: "Bravo pour l'effort !" });
     },
     onError: (_error, variables) => {
@@ -502,6 +514,7 @@ export default function Strength() {
 
   const handleLaunchFocus = async () => {
     if (!activeSession) return;
+    const lockedCycle = activeSession.cycle ?? cycleType;
     if (activeFilteredItems.length === 0) {
       toast({
         title: "Séance vide",
@@ -527,13 +540,18 @@ export default function Strength() {
           athleteName: user ?? undefined,
           progress_pct: 0,
           session_id: sessionId,
-          cycle_type: cycleType,
+          cycle_type: lockedCycle,
         });
         if (res?.run_id) {
           setActiveRunId(res.run_id);
           setActiveRunLogs((prev) => prev ?? []);
         }
       } catch {
+        toast({
+          title: "Erreur de démarrage",
+          description: "Impossible de démarrer la séance. Vérifiez votre connexion.",
+          variant: "destructive",
+        });
         return;
       }
     }
@@ -541,10 +559,11 @@ export default function Strength() {
     // Update session with resolved items and enter focus — batched to avoid double-render
     setActiveSession({
       ...activeSession,
-      cycle: cycleType,
+      cycle: lockedCycle,
       items: activeFilteredItems,
     });
     setActiveRunnerStep(1);
+    setSessionStartTime(Date.now());
     setScreenMode("focus");
   };
 
@@ -680,6 +699,26 @@ export default function Strength() {
             </div>
           </div>
         )
+      ) : screenMode === "summary" && activeSession ? (
+        <SessionSummary
+          sessionTitle={activeSession.title ?? "Séance"}
+          logs={activeRunLogs ?? []}
+          durationMinutes={sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 60000) : null}
+          exerciseNames={new Map(
+            (activeSession.items ?? []).map((item) => [
+              item.exercise_id,
+              item.exercise_name ?? exerciseLookup.get(item.exercise_id)?.nom_exercice ?? `Ex #${item.exercise_id}`,
+            ]),
+          )}
+          onClose={() => {
+            setScreenMode("list");
+            setActiveSession(null);
+            setActiveAssignment(null);
+            setActiveRunId(null);
+            setActiveRunLogs(null);
+            setSessionStartTime(null);
+          }}
+        />
       ) : (
         <>
           <PageHeader
