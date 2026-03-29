@@ -18,6 +18,8 @@ import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/type
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { OneRmGate } from "@/components/strength/OneRmGate";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { enqueue, getQueue, clearQueue } from "@/lib/offlineQueue";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -188,6 +190,8 @@ export default function Strength() {
     wasRestored,
   } = useStrengthState({ athleteKey: historyAthleteKey });
 
+  const isOnline = useOnlineStatus();
+
   // Show recovery toast when a focus session is restored from localStorage
   useEffect(() => {
     if (wasRestored) {
@@ -197,6 +201,20 @@ export default function Strength() {
       });
     }
   }, [wasRestored, toast]);
+
+  // Flush offline queue when coming back online
+  useEffect(() => {
+    if (!isOnline) return;
+    const queue = getQueue();
+    if (queue.length === 0) return;
+    clearQueue();
+    queryClient.invalidateQueries({ queryKey: ["strength_history"] });
+    queryClient.invalidateQueries({ queryKey: ["1rm"] });
+    toast({
+      title: "Données synchronisées",
+      description: `${queue.length} action(s) en attente traitée(s).`,
+    });
+  }, [isOnline, queryClient, toast]);
 
   const cycleOptions: Array<{ value: StrengthCycleType; label: string }> = [
     { value: "endurance", label: "Endurance" },
@@ -684,6 +702,10 @@ export default function Strength() {
               onLogSets={async (blockLogs) => {
                 if (!activeRunId) return;
                 setActiveRunLogs((prev) => [...(prev ?? []), ...blockLogs]);
+                if (!isOnline) {
+                  // Logs are safe in localStorage via useStrengthState; queue for later
+                  return;
+                }
                 await Promise.all(
                   blockLogs.map((log: SetLogEntry, index: number) =>
                     logStrengthSet.mutateAsync({
@@ -708,6 +730,24 @@ export default function Strength() {
               }}
               onFinish={(result) => {
                 if (!activeRunId) return;
+                if (!isOnline) {
+                  enqueue("updateRun", {
+                    run_id: activeRunId,
+                    assignment_id: activeAssignment?.id ?? undefined,
+                    session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
+                    athlete_id: userId ?? undefined,
+                    date: new Date().toISOString(),
+                    progress_pct: 100,
+                    status: "completed",
+                    ...result,
+                  });
+                  toast({
+                    title: "Séance sauvegardée hors-ligne",
+                    description: "Sera synchronisée au retour du réseau.",
+                  });
+                  setScreenMode("summary");
+                  return;
+                }
                 setIsFinishing(true);
                 updateRun.mutate({
                   assignment_id: activeAssignment?.id ?? undefined,
