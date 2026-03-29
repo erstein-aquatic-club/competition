@@ -28,20 +28,22 @@ function computeFormeScore(sessions: Array<{
   fatigue: number | null;
 }>): number | null {
   if (sessions.length === 0) return null;
-  const last = sessions[0];
-  const effort = last.effort;
-  const fatigue = last.fatigue;
-  const perf = last.performance;
-  const engagement = last.engagement;
-  // Values are stored on a 1-10 scale in DB (expandScaleToTen on write)
-  // Invert effort and fatigue (high = bad), normalize to 1-5
-  const values: number[] = [];
-  if (effort != null) values.push((11 - effort) / 2);
-  if (fatigue != null) values.push((11 - fatigue) / 2);
-  if (perf != null) values.push(perf / 2);
-  if (engagement != null) values.push(engagement / 2);
-  if (values.length === 0) return null;
-  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+  const recent = sessions.slice(0, 7);
+  const sessionScores: number[] = [];
+
+  for (const s of recent) {
+    const values: number[] = [];
+    if (s.effort != null) values.push((11 - s.effort) / 2);
+    if (s.fatigue != null) values.push((11 - s.fatigue) / 2);
+    if (s.performance != null) values.push(s.performance / 2);
+    if (s.engagement != null) values.push(s.engagement / 2);
+    if (values.length > 0) {
+      sessionScores.push(values.reduce((a, b) => a + b, 0) / values.length);
+    }
+  }
+
+  if (sessionScores.length === 0) return null;
+  return Math.round((sessionScores.reduce((a, b) => a + b, 0) / sessionScores.length) * 10) / 10;
 }
 
 function formeBadge(score: number | null): { label: string; className: string } {
