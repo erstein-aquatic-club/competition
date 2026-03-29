@@ -398,6 +398,19 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
                   ? "Enregistrer"
                   : "Créer"}
             </Button>
+
+            {editingObj && (
+              <Button
+                variant="ghost"
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  setShowForm(false);
+                  setDeleteTarget(editingObj);
+                }}
+              >
+                Supprimer cet objectif
+              </Button>
+            )}
           </div>
         </SheetContent>
       </Sheet>
