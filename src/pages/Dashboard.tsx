@@ -740,6 +740,18 @@ export default function Dashboard() {
           className="mt-2"
         />
 
+        {/* Error banner */}
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-center gap-3 mt-2">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-destructive">Erreur de chargement</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Impossible de récupérer vos données. Vérifiez votre connexion.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={refetch}>Réessayer</Button>
+          </div>
+        )}
+
         {/* Calendar */}
         <div className="mt-3 rounded-3xl border border-border bg-card overflow-hidden">
           <CalendarHeader
