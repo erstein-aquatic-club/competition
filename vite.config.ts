@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'supabase-api',
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
             },
           },
           {
@@ -59,7 +59,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'supabase-auth',
               expiration: { maxEntries: 5, maxAgeSeconds: 60 * 5 },
               cacheableResponse: { statuses: [0, 200] },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
             },
           },
         ],

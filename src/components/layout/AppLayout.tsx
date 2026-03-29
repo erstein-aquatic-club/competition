@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 const eacLogo = `${import.meta.env.BASE_URL}logo-eac.webp`;
 import { getNavItemsForRole } from "@/components/layout/navItems";
 import { OfflineDetector } from "@/components/shared/OfflineDetector";
+import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
 import { Bell, User } from "lucide-react";
 
@@ -97,6 +98,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background pb-20 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 md:pt-16">
+      <OfflineBanner />
       <OfflineDetector />
       <InstallPrompt />
       {/* Desktop Top Nav */}

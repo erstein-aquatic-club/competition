@@ -78,6 +78,9 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     return;
   }, [screenMode]);
 
+  // Track whether a session was restored from localStorage
+  const [wasRestored, setWasRestored] = useState(false);
+
   // Restore focus state from localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -102,6 +105,7 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
         setCycleType(normalizeStrengthCycle(parsed.cycleType));
       }
       setScreenMode(parsedMode);
+      setWasRestored(true);
     } catch {
       return;
     }
@@ -188,5 +192,6 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     setCycleType,
     // Helpers
     clearActiveRunState,
+    wasRestored,
   };
 }
