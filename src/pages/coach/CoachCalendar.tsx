@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { CalendarHeader } from "@/components/dashboard/CalendarHeader";
 import { CalendarGrid } from "@/components/dashboard/CalendarGrid";
 import { useCoachCalendarState } from "@/hooks/useCoachCalendarState";
@@ -64,6 +65,7 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
   } = useCoachCalendarState({ groupId, userId, enabled: true });
 
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const assignMutation = useMutation({
     mutationFn: (params: {
@@ -76,6 +78,10 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
     }) => api.assignments_create(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coach-calendar-assignments"] });
+      toast({ title: "Séance assignée" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible d'assigner la séance.", variant: "destructive" });
     },
   });
 
@@ -83,6 +89,10 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
     mutationFn: (assignmentId: number) => api.assignments_delete(assignmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coach-calendar-assignments"] });
+      toast({ title: "Assignation supprimée" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer l'assignation.", variant: "destructive" });
     },
   });
 

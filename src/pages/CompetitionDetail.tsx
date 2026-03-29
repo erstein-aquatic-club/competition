@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -93,7 +93,17 @@ export default function CompetitionDetail() {
 
   /* ── Schedule push notifications for first routine step ── */
 
-  const scheduledRef = useRef<Set<string>>(new Set());
+  const getScheduledNotifs = (): Set<string> => {
+    try {
+      const stored = sessionStorage.getItem("eac-comp-notif-scheduled");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  };
+  const addScheduledNotif = (key: string) => {
+    const set = getScheduledNotifs();
+    set.add(key);
+    sessionStorage.setItem("eac-comp-notif-scheduled", JSON.stringify([...set]));
+  };
 
   useEffect(() => {
     if (!competition || races.length === 0) return;
@@ -131,8 +141,8 @@ export default function CompetitionDetail() {
 
       // Deduplicate — don't re-schedule if already done for this race
       const key = `${race.id}-${firstStep.offset_minutes}`;
-      if (scheduledRef.current.has(key)) continue;
-      scheduledRef.current.add(key);
+      if (getScheduledNotifs().has(key)) continue;
+      addScheduledNotif(key);
 
       const suffix = race.race_type === "finale"
         ? race.final_letter ? ` — Finale ${race.final_letter}` : " — Finale"

@@ -39,6 +39,13 @@ const CoachSmsScreen = ({ onBack, athletes, groups, athletesLoading }: CoachSmsS
     },
   });
 
+  const missingPhoneAthletes = useMemo(() => {
+    if (!athletePhones) return [];
+    return athletes
+      .filter((a) => a.id != null && selectedUsers.has(a.id) && !athletePhones.has(a.id!))
+      .map((a) => a.display_name);
+  }, [athletes, selectedUsers, athletePhones]);
+
   const athleteOptions = useMemo(
     () =>
       athletes
@@ -301,6 +308,17 @@ const CoachSmsScreen = ({ onBack, athletes, groups, athletesLoading }: CoachSmsS
           />
         </CardContent>
       </Card>
+
+      {missingPhoneAthletes.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3">
+          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+            {missingPhoneAthletes.length} nageur(s) sans numéro de téléphone :
+          </p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+            {missingPhoneAthletes.join(", ")}
+          </p>
+        </div>
+      )}
 
       <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 p-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:p-0">
         <Button
