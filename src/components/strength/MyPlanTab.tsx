@@ -1,9 +1,15 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import type { StrengthSessionTemplate, StrengthFolder } from "@/lib/api/types";
-import { ChevronRight, Dumbbell, FolderOpen } from "lucide-react";
+import { Check, ChevronRight, Dumbbell, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  getISOWeekKey,
+  getCheckedSessionIds,
+  toggleSessionCheck,
+} from "@/lib/planCheckHelpers";
 
 /* ── Phase colours ── */
 const PHASE_STYLES: Record<string, { border: string; bg: string; text: string; dot: string }> = {
@@ -61,6 +67,63 @@ function sortByDay(sessions: StrengthSessionTemplate[]): StrengthSessionTemplate
   });
 }
 
+/* ── Check circle ── */
+function SessionCheck({ checked, onToggle }: { checked: boolean; onToggle: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="relative flex items-center justify-center shrink-0 h-6 w-6 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={checked ? "Marquer non fait" : "Marquer fait"}
+    >
+      <AnimatePresence mode="wait">
+        {checked ? (
+          <motion.span
+            key="checked"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+            className="flex items-center justify-center h-6 w-6 rounded-full bg-emerald-500 dark:bg-emerald-600"
+          >
+            <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+          </motion.span>
+        ) : (
+          <motion.span
+            key="unchecked"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="h-6 w-6 rounded-full border-2 border-muted-foreground/25"
+          />
+        )}
+      </AnimatePresence>
+    </button>
+  );
+}
+
+/* ── Cycle progress ── */
+function CycleProgress({ done, total }: { done: number; total: number }) {
+  if (total === 0) return null;
+  const pct = Math.round((done / total) * 100);
+  return (
+    <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+        <motion.div
+          className={cn("h-full rounded-full", pct >= 100 ? "bg-emerald-500" : "bg-primary/60")}
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(pct, 100)}%` }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        />
+      </div>
+      <span className="text-[10px] font-bold tabular-nums text-muted-foreground shrink-0">
+        {done}/{total}
+      </span>
+    </div>
+  );
+}
+
 /* ── Component ── */
 interface MyPlanTabProps {
   athleteId: number;
@@ -68,6 +131,55 @@ interface MyPlanTabProps {
 }
 
 export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
+  const weekKey = useMemo(() => getISOWeekKey(), []);
+  const [checkedVersion, setCheckedVersion] = useState(0);
+
+  // Checked sessions from localStorage (re-read on checkedVersion change)
+  const checkedIds = useMemo(
+    () => getCheckedSessionIds(athleteId, weekKey),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [athleteId, weekKey, checkedVersion],
+  );
+
+  // Auto-check: fetch completed runs for this week
+  const weekStart = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay() || 7; // Mon=1..Sun=7
+    d.setDate(d.getDate() - day + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, []);
+
+  const { data: completedRunSessionIds } = useQuery({
+    queryKey: ["strength-completed-runs-week", athleteId, weekKey],
+    queryFn: async () => {
+      const { data } = await (await import("@/lib/supabase")).supabase
+        .from("strength_session_runs")
+        .select("session_id")
+        .eq("athlete_id", athleteId)
+        .eq("status", "completed")
+        .gte("started_at", weekStart);
+      return new Set((data ?? []).map((r: any) => String(r.session_id)).filter(Boolean));
+    },
+    staleTime: 60_000,
+  });
+
+  const isChecked = useCallback(
+    (sessionId: number) => {
+      const sid = String(sessionId);
+      return checkedIds.has(sid) || (completedRunSessionIds?.has(sid) ?? false);
+    },
+    [checkedIds, completedRunSessionIds],
+  );
+
+  const handleToggle = useCallback(
+    (e: React.MouseEvent, sessionId: number) => {
+      e.stopPropagation();
+      toggleSessionCheck(athleteId, sessionId, weekKey);
+      setCheckedVersion((v) => v + 1);
+    },
+    [athleteId, weekKey],
+  );
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
     queryFn: () => api.getStrengthFolders("session", { athleteId }),
@@ -153,6 +265,8 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
               // Extract phase name (after —)
               const phaseName = cycle.name.replace(/^S\d+(?:-S\d+)?\s*[—–\-]\s*/, "").replace(/\s*\(.*\)$/, "").trim();
 
+              const doneCount = sessions.filter((s) => isChecked(s.id)).length;
+
               return (
                 <div key={cycle.id} className="relative pl-8">
                   {/* Timeline dot */}
@@ -174,6 +288,7 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
                         {cycle.name.match(/\((.+)\)/)?.[1]}
                       </p>
                     )}
+                    <CycleProgress done={doneCount} total={sessions.length} />
                   </div>
 
                   {/* Sessions */}
@@ -182,31 +297,44 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
                       const dayInfo = getDayInfo(s.title ?? s.name);
                       const cleanTitle = stripDayPrefix(s.title ?? s.name ?? "Sans titre");
                       const itemCount = s.items?.length ?? 0;
+                      const done = isChecked(s.id);
 
                       return (
-                        <button
+                        <div
                           key={s.id}
-                          onClick={() => onSelectSession(s)}
-                          className="flex items-center gap-3 w-full text-left px-3.5 py-3 bg-card hover:bg-accent/50 transition-colors"
-                        >
-                          {dayInfo ? (
-                            <span className={cn(
-                              "inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-bold shrink-0 min-w-[32px]",
-                              dayInfo.color,
-                            )}>
-                              {dayInfo.label}
-                            </span>
-                          ) : (
-                            <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          className={cn(
+                            "flex items-center gap-2 w-full text-left px-3 py-2.5 bg-card transition-all",
+                            done && "opacity-55",
                           )}
+                        >
+                          <SessionCheck
+                            checked={done}
+                            onToggle={(e) => handleToggle(e, s.id)}
+                          />
 
-                          <span className="text-[13px] font-medium flex-1 truncate">{cleanTitle}</span>
+                          <button
+                            onClick={() => onSelectSession(s)}
+                            className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-accent/50 rounded-lg -mx-1 px-1 py-0.5 transition-colors"
+                          >
+                            {dayInfo ? (
+                              <span className={cn(
+                                "inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-bold shrink-0 min-w-[32px]",
+                                dayInfo.color,
+                              )}>
+                                {dayInfo.label}
+                              </span>
+                            ) : (
+                              <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            )}
 
-                          <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                            {itemCount} ex.
-                          </span>
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                        </button>
+                            <span className="text-[13px] font-medium flex-1 truncate">{cleanTitle}</span>
+
+                            <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                              {itemCount} ex.
+                            </span>
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
