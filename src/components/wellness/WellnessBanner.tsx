@@ -40,9 +40,12 @@ export function WellnessBanner({ userId, onOpen }: WellnessBannerProps) {
       <InlineBanner
         variant="emerald"
         icon={<Heart />}
-        label="Wellness"
+        label="Bien-être"
         badge={
-          <ReadinessGauge score={wellness.readiness_score} size={28} showLabel={false} />
+          <span className="flex items-center gap-1.5">
+            <ReadinessGauge score={wellness.readiness_score} size={22} showLabel={false} />
+            <span className="text-sm font-bold tabular-nums">{wellness.readiness_score}%</span>
+          </span>
         }
         visible
         onClick={onOpen}

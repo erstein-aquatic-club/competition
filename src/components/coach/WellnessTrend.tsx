@@ -212,7 +212,7 @@ function WellnessTooltip({ active, payload }: { active?: boolean; payload?: Arra
   if (p.readiness == null) return null;
 
   const items = [
-    { label: "Readiness", value: p.readiness },
+    { label: "Forme", value: p.readiness },
     { label: "Sommeil", value: p.sleep },
     { label: "Fatigue", value: p.fatigue },
     { label: "Humeur", value: p.mood },
@@ -232,7 +232,7 @@ function WellnessTooltip({ active, payload }: { active?: boolean; payload?: Arra
                 className="font-medium tabular-nums"
                 style={{
                   color:
-                    it.label === "Readiness"
+                    it.label === "Forme"
                       ? `hsl(${readinessColor(it.value)})`
                       : undefined,
                 }}

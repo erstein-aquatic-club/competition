@@ -21,9 +21,9 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
   { key: 'pr_5', type: 'pr', label: 'PR Hunter', description: '5 records muscu battus', icon: '\u{1F3C6}', palier: 5 },
   { key: 'pr_15', type: 'pr', label: 'PR Master', description: '15 records muscu battus', icon: '\u{1F3C6}', palier: 15 },
   // Wellness badges
-  { key: 'wellness_7', type: 'wellness', label: 'Wellness 7j', description: '7 jours consecutifs de wellness', icon: '\u{1F49A}', palier: 7 },
-  { key: 'wellness_14', type: 'wellness', label: 'Wellness 14j', description: '14 jours consecutifs', icon: '\u{1F49A}', palier: 14 },
-  { key: 'wellness_30', type: 'wellness', label: 'Wellness 30j', description: '30 jours consecutifs', icon: '\u{1F49A}', palier: 30 },
+  { key: 'wellness_7', type: 'wellness', label: 'Bien-être 7j', description: '7 jours consécutifs de bien-être', icon: '\u{1F49A}', palier: 7 },
+  { key: 'wellness_14', type: 'wellness', label: 'Bien-être 14j', description: '14 jours consécutifs', icon: '\u{1F49A}', palier: 14 },
+  { key: 'wellness_30', type: 'wellness', label: 'Bien-être 30j', description: '30 jours consécutifs', icon: '\u{1F49A}', palier: 30 },
   // Attendance (strength sessions) badges
   { key: 'iron_10', type: 'attendance', label: 'Iron Will', description: '10 seances muscu completees', icon: '\u{1F4AA}', palier: 10 },
   { key: 'iron_25', type: 'attendance', label: 'Iron Will II', description: '25 seances muscu', icon: '\u{1F4AA}', palier: 25 },

@@ -35,7 +35,7 @@ export function ReadinessGauge({ score, size = 80, showLabel = true }: Readiness
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         className="shrink-0"
-        aria-label={`Readiness ${pct}%`}
+        aria-label={`Forme ${pct}%`}
       >
         {/* Background ring */}
         <circle
@@ -77,7 +77,7 @@ export function ReadinessGauge({ score, size = 80, showLabel = true }: Readiness
       </svg>
       {showLabel && (
         <span className="text-[10px] font-medium text-muted-foreground">
-          Readiness
+          Forme
         </span>
       )}
     </div>

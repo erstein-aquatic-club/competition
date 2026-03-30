@@ -391,7 +391,7 @@ export default function MonthlyReport() {
         <ReportCard icon={Heart} iconColor="text-rose-500" title="Bien-etre">
           {report.avgReadiness != null ? (
             <>
-              <BigKPI value={report.avgReadiness} label="readiness moyen" unit="%" />
+              <BigKPI value={report.avgReadiness} label="forme moyenne" unit="%" />
               <Sparkline values={report.readinessTrend} />
               <p className="text-xs text-muted-foreground text-center">
                 {report.daysInRedZone > 0
