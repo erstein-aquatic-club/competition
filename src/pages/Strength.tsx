@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, Trophy } from "lucide-react";
+import { Dumbbell, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
 import { SessionBrowser } from "@/components/strength/SessionBrowser";
@@ -17,7 +17,6 @@ import { orderStrengthItems } from "@/components/strength/utils";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
-import { StrengthLeaderboard } from "@/components/strength/StrengthLeaderboard";
 import { OneRmGate } from "@/components/strength/OneRmGate";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, getQueue, clearQueue } from "@/lib/offlineQueue";
@@ -803,14 +802,10 @@ export default function Strength() {
           />
 
           <Tabs defaultValue="start" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="start">S'entraîner</TabsTrigger>
               <TabsTrigger value="planning">Mon plan</TabsTrigger>
               <TabsTrigger value="history">Historique</TabsTrigger>
-              <TabsTrigger value="leaderboard" className="gap-1">
-                <Trophy className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Classement</span>
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="start" className="space-y-5 pt-4">
@@ -898,9 +893,6 @@ export default function Strength() {
               />
             </TabsContent>
 
-            <TabsContent value="leaderboard" className="space-y-4 pt-4">
-              {userId && <StrengthLeaderboard userId={userId} />}
-            </TabsContent>
           </Tabs>
         </>
       )}
