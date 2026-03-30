@@ -4,12 +4,14 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { staggerChildren, listItem } from "@/lib/animations";
 import { cn } from "@/lib/utils";
-import { Dumbbell, ChevronDown, Clock, Flame, TrendingUp } from "lucide-react";
+import { Dumbbell, ChevronDown, Clock, Flame, TrendingUp, Zap } from "lucide-react";
 import type { LocalStrengthRun } from "@/lib/types";
 import { ExerciseProgressChart } from "./ExerciseProgressChart";
+import { RunDetailSheet } from "./RunDetailSheet";
+import { computeRunTonnage, computeRunSRPE, groupLogsByExercise } from "@/lib/strengthHistoryUtils";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Tous" },
@@ -33,6 +35,8 @@ interface HistoryTableProps {
 export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTableProps) {
   const [historyStatus, setHistoryStatus] = useState("all");
   const [progressExercise, setProgressExercise] = useState<{ id: number; name: string } | null>(null);
+  const [expandedRunId, setExpandedRunId] = useState<number | null>(null);
+  const [selectedRun, setSelectedRun] = useState<LocalStrengthRun | null>(null);
 
   const strengthHistoryQuery = useInfiniteQuery({
     queryKey: ["strength_history", athleteKey, historyStatus],
@@ -59,6 +63,16 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
     queryKey: ["exercises"],
     queryFn: () => api.getExercises(),
   });
+
+  const exerciseNames = useMemo(() => {
+    const map = new Map<number, string>();
+    if (exercises) {
+      for (const ex of exercises) {
+        map.set(ex.id, ex.nom_exercice ?? `Exercice #${ex.id}`);
+      }
+    }
+    return map;
+  }, [exercises]);
 
   // Build unique exercise list from history runs (set_logs)
   const exerciseList = useMemo(() => {
@@ -123,53 +137,110 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
             const progressPct = run.progress_pct ?? 0;
 
             return (
-              <motion.div
-                key={run.id}
-                variants={listItem}
-                className="flex items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 transition-all hover:border-primary/30"
-              >
-                {/* Date block */}
-                <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/40">
-                  <span className="text-[15px] font-bold leading-none">
-                    {dateStr ? format(new Date(dateStr), "dd") : "—"}
-                  </span>
-                  <span className="text-[9px] font-semibold uppercase text-muted-foreground leading-tight mt-0.5">
-                    {dateStr ? format(new Date(dateStr), "MMM", { locale: fr }) : ""}
-                  </span>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", style.dot)} />
-                    <span className={cn("text-[11px] font-semibold capitalize", style.text)}>
-                      {status === "completed" ? "Terminée" : status === "in_progress" ? "En cours" : "Abandonnée"}
+              <div key={run.id}>
+                <motion.div
+                  variants={listItem}
+                  onClick={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
+                  role="button"
+                  className="flex items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 transition-all hover:border-primary/30 cursor-pointer"
+                >
+                  {/* Date block */}
+                  <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/40">
+                    <span className="text-[15px] font-bold leading-none">
+                      {dateStr ? format(new Date(dateStr), "dd") : "—"}
                     </span>
-                    {status === "in_progress" && progressPct > 0 && (
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        ({Math.round(progressPct)}%)
-                      </span>
-                    )}
+                    <span className="text-[9px] font-semibold uppercase text-muted-foreground leading-tight mt-0.5">
+                      {dateStr ? format(new Date(dateStr), "MMM", { locale: fr }) : ""}
+                    </span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
-                    {setCount > 0 && (
-                      <><span className="font-medium text-foreground">{setCount}</span> séries</>
-                    )}
-                    {duration > 0 && (
-                      <>
-                        {setCount > 0 && <span className="text-muted-foreground/40"> · </span>}
-                        <Clock className="inline h-3 w-3 -mt-px mr-0.5" />{duration} min
-                      </>
-                    )}
-                    {feeling > 0 && (
-                      <>
-                        <span className="text-muted-foreground/40"> · </span>
-                        <Flame className="inline h-3 w-3 -mt-px mr-0.5" />{feeling}/5
-                      </>
-                    )}
-                  </p>
-                </div>
-              </motion.div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", style.dot)} />
+                      <span className={cn("text-[11px] font-semibold capitalize", style.text)}>
+                        {status === "completed" ? "Terminée" : status === "in_progress" ? "En cours" : "Abandonnée"}
+                      </span>
+                      {status === "in_progress" && progressPct > 0 && (
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          ({Math.round(progressPct)}%)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
+                      {setCount > 0 && (
+                        <><span className="font-medium text-foreground">{setCount}</span> séries</>
+                      )}
+                      {duration > 0 && (
+                        <>
+                          {setCount > 0 && <span className="text-muted-foreground/40"> · </span>}
+                          <Clock className="inline h-3 w-3 -mt-px mr-0.5" />{duration} min
+                        </>
+                      )}
+                      {feeling > 0 && (
+                        <>
+                          <span className="text-muted-foreground/40"> · </span>
+                          <Flame className="inline h-3 w-3 -mt-px mr-0.5" />{feeling}/5
+                        </>
+                      )}
+                    </p>
+                  </div>
+
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200", expandedRunId === run.id && "rotate-180")} />
+                </motion.div>
+
+                <AnimatePresence>
+                  {expandedRunId === run.id && (() => {
+                    const logs = run.logs ?? run.strength_set_logs ?? [];
+                    const groups = groupLogsByExercise(logs, exerciseNames);
+                    const tonnage = computeRunTonnage(logs);
+                    const srpe = computeRunSRPE(run.rpe ?? run.feeling ?? null, run.duration ?? null);
+                    return (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-2.5 pb-2.5 pt-1 space-y-2">
+                          {/* Exercise pills */}
+                          {groups.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {groups.map((g) => (
+                                <span key={g.exerciseId} className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  {g.exerciseName}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Stats row */}
+                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                            {srpe > 0 && (
+                              <span className="flex items-center gap-0.5">
+                                <Zap className="h-3 w-3 text-amber-500" />sRPE {srpe}
+                              </span>
+                            )}
+                            {tonnage > 0 && (
+                              <span className="flex items-center gap-0.5">
+                                <Dumbbell className="h-3 w-3 text-primary" />{tonnage.toLocaleString("fr-FR")} kg
+                              </span>
+                            )}
+                          </div>
+                          {/* Detail button */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSelectedRun(run); }}
+                            className="text-[11px] font-semibold text-primary hover:underline"
+                          >
+                            Voir détails →
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })()}
+                </AnimatePresence>
+              </div>
             );
           })}
         </motion.div>
@@ -242,6 +313,15 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
           onOpenChange={(open) => {
             if (!open) setProgressExercise(null);
           }}
+        />
+      )}
+
+      {selectedRun && (
+        <RunDetailSheet
+          run={selectedRun}
+          exerciseNames={exerciseNames}
+          open={!!selectedRun}
+          onOpenChange={(open) => { if (!open) setSelectedRun(null); }}
         />
       )}
     </div>

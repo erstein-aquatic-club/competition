@@ -61,6 +61,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 | §87 Préparation compétition nageur (courses, routines, timeline, checklist) | ✅ Fait | 2026-03-01 |
 | §89 Strength UX Overhaul (audit + refonte mobile-first) | ✅ Fait | 2026-03-09 |
 | §90 Planification muscu par nageur (dossiers hiérarchiques) | ✅ Fait | 2026-03-27 |
+| §94 Historique musculation détaillé (expand + sheet) | ✅ Fait | 2026-03-30 |
 | §45 Audit UI/UX — header Strength + login mobile + fixes | ✅ Fait | 2026-02-16 |
 | §46 Harmonisation headers + Login mobile thème clair | ✅ Fait | 2026-02-16 |
 | §6 Fix timers PWA iOS | ✅ Fait | 2026-02-09 |
@@ -7149,3 +7150,41 @@ Les exercices de musculation ont un champ `illustration_gif` pour afficher un GI
 **Tests** : TypeScript compile + build production OK
 **Décisions** : Réutilisation de `MyPlanTab` pour les plans d'équipe (cohérence visuelle garantie)
 **Limites** : La recherche filtre uniquement les séances non classées (pas les dossiers/plans)
+
+---
+
+## 2026-03-30 — Détail historique séances musculation (expand + sheet)
+**Branche** : `main`
+**Chantier ROADMAP** : §94 — Historique musculation détaillé
+
+### Contexte — Pourquoi ce patch
+L'historique des séances musculation était une liste plate (date, statut, séries, durée, ressenti). Les données détaillées (poids, reps, difficulté, RPE par set) étaient déjà chargées mais non exploitées côté UI. L'athlète ne pouvait pas consulter le détail d'une séance passée.
+
+### Changements réalisés
+1. **Helpers purs** (`strengthHistoryUtils.ts`) : fonctions de calcul tonnage, totalReps, sRPE, groupByExercise, avgDifficulty — 14 tests unitaires
+2. **Expand inline** dans `HistoryTable` : chaque carte séance est cliquable, se déplie pour montrer les exercices (pills), sRPE, tonnage, et un bouton "Voir détails"
+3. **Bottom sheet détail** (`RunDetailSheet`) : KPI cards (tonnage, séries, reps, sRPE), liste exercices avec sets détaillés (poids × reps + difficulté en dots colorées), section ressenti (mini-gauges SVG pour RPE/fatigue/forme/difficulté), notes
+
+### Fichiers créés
+- `src/lib/strengthHistoryUtils.ts` — Helpers calcul historique
+- `src/components/strength/RunDetailSheet.tsx` — Bottom sheet détail séance
+- `src/__tests__/strengthHistoryUtils.test.ts` — 14 tests unitaires
+- `docs/plans/2026-03-30-strength-history-detail-design.md` — Design doc
+- `docs/plans/2026-03-30-strength-history-detail-plan.md` — Plan implémentation
+
+### Fichiers modifiés
+- `src/components/strength/HistoryTable.tsx` — Ajout expand/collapse + intégration RunDetailSheet
+
+### Tests
+- [x] `npx vitest run src/__tests__/strengthHistoryUtils.test.ts` — 14/14 PASS
+- [x] `npx tsc --noEmit` — pas de nouvelles erreurs (3 pré-existantes)
+- [ ] Test manuel : navigation historique → expand → sheet
+
+### Décisions prises
+- Approche client-side uniquement : les logs sont déjà dans la réponse `getStrengthHistory()`, zéro appel API supplémentaire
+- sRPE calculé avec RPE global × durée (pas avg RPE des sets) pour cohérence avec l'affichage existant
+- Difficulté par set affichée en 5 dots colorées (vert→rouge) plutôt qu'en chiffre
+
+### Limites / dette
+- Pas de comparaison avec séances précédentes (choix utilisateur)
+- Les icônes Flame et Heart importées dans RunDetailSheet ne sont pas utilisées (à nettoyer)
