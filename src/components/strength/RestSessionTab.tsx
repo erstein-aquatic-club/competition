@@ -45,73 +45,89 @@ export function RestSessionTab({
   const totalSteps = items.length;
 
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto pb-4">
+    <div className="flex flex-col gap-4 overflow-y-auto pb-6">
       {/* Progress bar */}
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-muted-foreground">
-          {currentStep} / {totalSteps} exercices
-        </span>
-        <div className="h-2 w-full rounded-full bg-muted">
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Progression</span>
+          <span className="text-sm font-bold tabular-nums">{currentStep} <span className="text-muted-foreground font-normal">/ {totalSteps}</span></span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
           <div
-            className="h-2 rounded-full bg-primary transition-all"
+            className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
             style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
           />
         </div>
       </div>
 
-      {/* Last set summary */}
-      {lastLog && (
-        <div className="rounded-xl border bg-card p-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <Dumbbell className="h-3 w-3" />
-            <span>Dernière série</span>
+      {/* Stats row: last set + volume */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Last set summary */}
+        {lastLog ? (
+          <div className="rounded-2xl border border-border/50 bg-card p-3 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Dumbbell className="h-3 w-3 text-muted-foreground/60" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Dernière série</span>
+            </div>
+            <p className="font-semibold text-sm truncate">{lastExerciseName}</p>
+            <p className="text-lg font-bold tabular-nums mt-0.5">
+              {isBodyweight(lastLog.weight)
+                ? `${lastLog.reps ?? "—"} reps`
+                : `${lastLog.weight ?? "—"} × ${lastLog.reps ?? "—"}`}
+            </p>
           </div>
-          <p className="font-medium text-sm">{lastExerciseName}</p>
-          <p className="text-sm text-muted-foreground">
-            {isBodyweight(lastLog.weight)
-              ? `Corps × ${lastLog.reps ?? "—"}`
-              : `${lastLog.weight ?? "—"} kg × ${lastLog.reps ?? "—"}`}
-          </p>
-        </div>
-      )}
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/50 bg-muted/20 p-3 flex items-center justify-center">
+            <span className="text-xs text-muted-foreground/40">—</span>
+          </div>
+        )}
 
-      {/* Total volume */}
-      <div className="rounded-xl border bg-card p-3 text-center">
-        <p className="text-xs text-muted-foreground mb-1">Volume total</p>
-        <p className="text-2xl font-bold tabular-nums">{formatVolume(totalVolume)} kg</p>
+        {/* Total volume */}
+        <div className="rounded-2xl border border-border/50 bg-card p-3 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Volume total</p>
+          <p className="text-lg font-bold tabular-nums">{formatVolume(totalVolume)}</p>
+          <p className="text-xs text-muted-foreground">kg soulevés</p>
+        </div>
       </div>
 
       {/* Exercise list */}
-      <div className="flex flex-col gap-1">
-        {items.map((item, idx) => {
-          const isCompleted = idx < currentStep;
-          const exName =
-            exerciseMap.get(item.exercise_id)?.nom_exercice ??
-            item.exercise_name ??
-            `Exercice ${item.exercise_id}`;
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Exercices</p>
+        <div className="flex flex-col gap-0.5">
+          {items.map((item, idx) => {
+            const isCompleted = idx < currentStep;
+            const isCurrent = idx === currentStep - 1;
+            const exName =
+              exerciseMap.get(item.exercise_id)?.nom_exercice ??
+              item.exercise_name ??
+              `Exercice ${item.exercise_id}`;
 
-          return (
-            <div
-              key={`${item.exercise_id}-${idx}`}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
-                isCompleted && "opacity-40",
-              )}
-            >
-              {isCompleted ? (
-                <Check className="h-4 w-4 shrink-0 text-primary" />
-              ) : (
-                <span className="w-4 shrink-0 text-center text-xs font-mono text-muted-foreground">
-                  {idx + 1}
+            return (
+              <div
+                key={`${item.exercise_id}-${idx}`}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors",
+                  isCompleted && "opacity-35",
+                  isCurrent && "bg-primary/5",
+                )}
+              >
+                {isCompleted ? (
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                    <Check className="h-3 w-3 text-primary" />
+                  </div>
+                ) : (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
+                    {idx + 1}
+                  </span>
+                )}
+                <span className={cn("truncate flex-1", isCompleted && "line-through")}>{exName}</span>
+                <span className="text-xs text-muted-foreground/60 tabular-nums">
+                  {item.sets}×{item.reps}
                 </span>
-              )}
-              <span className={cn(isCompleted && "line-through")}>{exName}</span>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {item.sets}×{item.reps}
-              </span>
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

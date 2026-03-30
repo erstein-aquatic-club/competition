@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-03-28 (§93 Restructuration bibliothèque musculation nageur)*
+*Dernière mise à jour : 2026-03-30 (§94 Rest Timer enrichi — tabs swipables)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -63,6 +63,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 53 | Planification muscu par nageur (dossiers hiérarchiques) | Moyenne | Moyenne | Fait (§90) |
 | 54 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Moyenne | Fait (§92) |
 | 56 | Restructuration bibliothèque musculation nageur | Moyenne | Moyenne | Fait (§93) |
+| 57 | Rest Timer enrichi — tabs swipables | Moyenne | Moyenne | Fait (§94) |
 
 ---
 
