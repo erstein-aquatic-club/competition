@@ -7188,3 +7188,52 @@ L'historique des séances musculation était une liste plate (date, statut, sér
 ### Limites / dette
 - Pas de comparaison avec séances précédentes (choix utilisateur)
 - Les icônes Flame et Heart importées dans RunDetailSheet ne sont pas utilisées (à nettoyer)
+
+---
+
+## 2026-03-30 — Rest Timer enrichi avec tabs swipables (§94)
+**Branche** : `main`
+**Chantier ROADMAP** : §94 — Rest Timer enrichi — tabs swipables
+
+### Contexte — Pourquoi ce patch
+L'écran de repos entre les séries de musculation n'affichait qu'un timer circulaire et une petite card exercice. Pendant les 2-3 minutes de pause, l'utilisateur n'avait rien d'utile à consulter.
+
+### Changements réalisés
+- Extraction de l'overlay de repos du WorkoutRunner (~95 lignes inline) dans un composant `RestScreen`
+- 3 tabs swipables sous le timer circulaire (framer-motion + useSwipeNavigation) :
+  - **Tab Exercice** (défaut) : GIF grande taille, nom, prescription en pills, muscles, notes coach
+  - **Tab Séance** : barre de progression, dernière série + volume total (grid 2 cols), liste exercices
+  - **Tab Perfs** : 1RM + charge cible (cards côte à côte), barre d'intensité, meilleure série
+- Dots de pagination avec labels aria nommés
+- Timer glow rouge + countdown destructive quand < 10s
+- Animation spring pour les transitions de tabs
+- Aucun appel API supplémentaire — toutes les données viennent des props/state existants
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/strength/RestScreen.tsx` | **Créé** — Container timer + tabs swipables |
+| `src/components/strength/RestExerciseTab.tsx` | **Créé** — Tab exercice (GIF, notes, muscles) |
+| `src/components/strength/RestSessionTab.tsx` | **Créé** — Tab progression séance |
+| `src/components/strength/RestPerfsTab.tsx` | **Créé** — Tab performances |
+| `src/components/strength/__tests__/RestScreen.test.tsx` | **Créé** — 7 tests |
+| `src/components/strength/__tests__/RestExerciseTab.test.tsx` | **Créé** — 5 tests |
+| `src/components/strength/__tests__/RestSessionTab.test.tsx` | **Créé** — 5 tests |
+| `src/components/strength/__tests__/RestPerfsTab.test.tsx` | **Créé** — 5 tests |
+| `src/components/strength/WorkoutRunner.tsx` | **Modifié** — Remplacement overlay inline par `<RestScreen />` |
+
+### Tests
+- [x] `npx tsc --noEmit` — 0 nouvelles erreurs
+- [x] 25/25 tests passent (22 nouveaux + 3 existants WorkoutRunner)
+- [x] Test manuel : timer, swipe, dots, données correctes
+
+### Décisions prises
+- **Pas de fetch API** : toutes les données (logs, oneRMs, exercises, exerciseNotes) sont déjà dans le state du WorkoutRunner
+- **Spring animation** au lieu de tween pour les transitions de tabs (plus naturel sur mobile)
+- **Grid 2 cols** pour dernière série + volume (meilleure utilisation de l'espace)
+- **1RM + charge cible côte à côte** quand les deux sont présents
+
+### Limites / dette
+- Pas d'historique des séances passées (nécessiterait un fetch — prévu pour V2)
+- Le swipe horizontal peut confluer avec le scroll vertical sur contenus longs

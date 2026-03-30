@@ -123,6 +123,10 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/lib/gifEncoder.ts` | Conversion vidéo → GIF (Canvas + gifenc, 240px, ≤200KB) (§91) | ~90 lignes |
 | `src/components/coach/strength/VideoTrimmer.tsx` | Trimmer vidéo dual-slider (max 5s) (§91) | ~130 lignes |
 | `src/components/coach/strength/MediaSourceSheet.tsx` | Bottom sheet filmer/importer illustration (§91) | ~100 lignes |
+| `src/components/strength/RestScreen.tsx` | Container repos enrichi (timer + 3 tabs swipables) (§94) | ~200 lignes |
+| `src/components/strength/RestExerciseTab.tsx` | Tab exercice (GIF, prescription, muscles, notes) (§94) | ~95 lignes |
+| `src/components/strength/RestSessionTab.tsx` | Tab progression séance (barre, volume, liste) (§94) | ~130 lignes |
+| `src/components/strength/RestPerfsTab.tsx` | Tab performances (1RM, cible, intensité) (§94) | ~140 lignes |
 
 ## Edge Functions Supabase
 
@@ -201,6 +205,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 54 | Vidéo → GIF pour illustration exercices musculation | Moyenne | Fait (§91) |
 | 55 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Fait (§92) |
 | 56 | Restructuration bibliothèque musculation nageur | Moyenne | Fait (§93) |
+| 57 | Rest Timer enrichi — tabs swipables | Moyenne | Fait (§94) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
