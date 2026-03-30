@@ -24,9 +24,9 @@ export function PendingApprovals({ compact = false }: Props) {
         .eq("is_approved", false);
       return (data ?? []).map((row: any) => ({
         userId: row.user_id as number,
-        name: (row.users as any)?.display_name ?? "\u2014",
-        email: (row.users as any)?.email ?? "\u2014",
-        role: (row.users as any)?.role ?? "\u2014",
+        name: (row.users as any)?.display_name ?? "—",
+        email: (row.users as any)?.email ?? "—",
+        role: (row.users as any)?.role ?? "—",
       }));
     },
     enabled: role === "admin" || role === "coach" || role === "comite",
@@ -47,7 +47,7 @@ export function PendingApprovals({ compact = false }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
-      toast({ title: "Utilisateur approuv\u00e9" });
+      toast({ title: "Utilisateur approuvé" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible d'approuver.", variant: "destructive" });
@@ -69,7 +69,7 @@ export function PendingApprovals({ compact = false }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
-      toast({ title: "Inscription rejet\u00e9e" });
+      toast({ title: "Inscription rejetée" });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de rejeter.", variant: "destructive" });

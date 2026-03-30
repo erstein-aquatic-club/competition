@@ -44,11 +44,11 @@ interface WellnessItem {
 }
 
 const ITEMS: WellnessItem[] = [
-  { key: "sleep_quality", label: "Sommeil (qualit\u00e9)", emoji: ["\ud83d\ude34", "\ud83d\ude0a"] },
-  { key: "fatigue", label: "Fatigue", emoji: ["\ud83d\udcaa", "\ud83e\udd75"] },
-  { key: "soreness", label: "Courbatures", emoji: ["\u2728", "\ud83d\udd25"] },
-  { key: "mood", label: "Humeur", emoji: ["\ud83d\ude14", "\ud83d\ude04"] },
-  { key: "stress", label: "Stress", emoji: ["\ud83e\uddd8", "\ud83d\ude30"] },
+  { key: "sleep_quality", label: "Sommeil (qualité)", emoji: ["😴", "😊"] },
+  { key: "fatigue", label: "Fatigue", emoji: ["💪", "🥵"] },
+  { key: "soreness", label: "Courbatures", emoji: ["✨", "🔥"] },
+  { key: "mood", label: "Humeur", emoji: ["😔", "😄"] },
+  { key: "stress", label: "Stress", emoji: ["🧘", "😰"] },
 ];
 
 // ── Component ──────────────────────────────────────────────────
@@ -174,7 +174,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
         <ReadinessGauge score={savedScore} size={100} />
         <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
           <Check className="h-4 w-4" />
-          Enregistr\u00e9
+          Enregistré
         </div>
       </motion.div>
     );
@@ -222,7 +222,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
       {/* Sleep hours stepper */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-base leading-none">\ud83d\udca4</span>
+          <span className="text-base leading-none">💤</span>
           <span className="text-xs font-semibold text-foreground">Heures de sommeil</span>
         </div>
         <div className="flex items-center justify-center gap-3">
@@ -279,7 +279,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
               : "border-border bg-muted text-muted-foreground hover:bg-muted/70",
           ].join(" ")}
         >
-          <span className="text-base leading-none">{hasPain ? "\u{1FA79}" : "\u2764\uFE0F"}</span>
+          <span className="text-base leading-none">{hasPain ? "🩹" : "❤️"}</span>
           <span>{hasPain ? "Douleurs signalées" : "As-tu des douleurs ?"}</span>
           {hasPain && Object.keys(painZones).length > 0 && (
             <span className="ml-auto text-xs bg-red-500/20 px-1.5 py-0.5 rounded-full">
@@ -323,12 +323,12 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
             : "bg-muted text-muted-foreground cursor-not-allowed",
         ].join(" ")}
       >
-        {mutation.isPending ? "Enregistrement\u2026" : "Enregistrer"}
+        {mutation.isPending ? "Enregistrement…" : "Enregistrer"}
       </button>
 
       {mutation.isError && (
         <p className="text-xs text-destructive text-center">
-          Erreur : {(mutation.error as Error)?.message ?? "Veuillez r\u00e9essayer."}
+          Erreur : {(mutation.error as Error)?.message ?? "Veuillez réessayer."}
         </p>
       )}
     </motion.div>

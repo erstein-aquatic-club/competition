@@ -22,10 +22,10 @@ export async function getAuditLog(limit = 50, offset = 0): Promise<AuditEntry[]>
   return (data ?? []).map((row: any) => ({
     id: row.id,
     actor_id: row.actor_id,
-    actor_name: row.actor?.display_name ?? "\u2014",
+    actor_name: row.actor?.display_name ?? "—",
     action: row.action,
     target_user_id: row.target_user_id,
-    target_name: row.target?.display_name ?? "\u2014",
+    target_name: row.target?.display_name ?? "—",
     details: row.details ?? {},
     created_at: row.created_at,
   }));

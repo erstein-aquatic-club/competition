@@ -54,8 +54,8 @@ function acwrLabel(acwr: number | null): { text: string; className: string } {
 
 function acwrIcon(acwr: number | null): string {
   if (acwr === null) return "";
-  if (acwr > 1.5 || acwr < 0.6) return "\u26a0\ufe0f ";
-  if (acwr >= 0.8 && acwr <= 1.3) return "\u2705 ";
+  if (acwr > 1.5 || acwr < 0.6) return "⚠️ ";
+  if (acwr >= 0.8 && acwr <= 1.3) return "✅ ";
   return "";
 }
 

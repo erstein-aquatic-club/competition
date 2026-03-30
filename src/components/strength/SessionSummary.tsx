@@ -55,14 +55,14 @@ export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNa
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
           <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
         </div>
-        <h2 className="text-xl font-display font-bold uppercase italic">Seance terminee</h2>
+        <h2 className="text-xl font-display font-bold uppercase italic">Séance terminée</h2>
         <p className="text-sm text-muted-foreground">{sessionTitle}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={<Dumbbell className="h-4 w-4" />} label="Tonnage" value={stats.totalTonnage > 0 ? `${Math.round(stats.totalTonnage)} kg` : "\u2014"} />
-        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Series" value={`${stats.totalSets}`} />
-        <StatCard icon={<Timer className="h-4 w-4" />} label="Duree" value={durationMinutes ? `${durationMinutes} min` : "\u2014"} />
+        <StatCard icon={<Dumbbell className="h-4 w-4" />} label="Tonnage" value={stats.totalTonnage > 0 ? `${Math.round(stats.totalTonnage)} kg` : "—"} />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Séries" value={`${stats.totalSets}`} />
+        <StatCard icon={<Timer className="h-4 w-4" />} label="Durée" value={durationMinutes ? `${durationMinutes} min` : "—"} />
         <StatCard icon={<Dumbbell className="h-4 w-4" />} label="Exercices" value={`${stats.exerciseCount}`} />
       </div>
 

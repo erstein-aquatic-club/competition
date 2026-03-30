@@ -28,6 +28,7 @@ import {
 import { BottomActionBar } from "@/components/shared/BottomActionBar";
 import { ScaleSelector5 } from "@/components/shared/ScaleSelector5";
 import { ExercisePicker } from "@/components/strength/ExercisePicker";
+import { RestScreen } from "./RestScreen";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { colors } from "@/lib/design-tokens";
@@ -507,8 +508,8 @@ export function WorkoutRunner({
         const setKey = `${currentBlock.exercise_id}-${currentSetIndex}`;
         setPrSets((prev) => new Set(prev).add(setKey));
         toast({
-          title: "\uD83C\uDFC6 Nouveau record !",
-          description: `1RM estim\u00e9 : ${pr.newValue}kg (+${pr.improvement}%)`,
+          title: "🏆 Nouveau record !",
+          description: `1RM estimé : ${pr.newValue}kg (+${pr.improvement}%)`,
         });
       }
     }
@@ -947,102 +948,38 @@ export function WorkoutRunner({
       ) : null}
 
       {isResting && (
-        <div className="fixed inset-0 z-modal flex flex-col bg-background pb-[env(safe-area-inset-bottom)]">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-            <div className="text-sm font-semibold text-muted-foreground">
-              {restType === "exercise" ? "Transition" : "Repos"}
-            </div>
-            <button
-              type="button"
-              className="rounded-full p-2 text-muted-foreground hover:bg-muted active:scale-95 transition-all"
-              onClick={() => { setIsResting(false); setIsRestPaused(false); }}
-              aria-label="Fermer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* Circular timer — tap to skip */}
-          <button
-            type="button"
-            className="flex-1 flex flex-col items-center justify-center gap-2 px-6 active:opacity-80 transition-opacity"
-            onClick={() => {
-              restEndRef.current = 0;
-              setIsResting(false);
-              setRestTimer(0);
-              setIsRestPaused(false);
-            }}
-            aria-label="Passer le repos"
-          >
-            <div className="relative">
-              <svg className="h-52 w-52 -rotate-90" viewBox="0 0 200 200">
-                <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" className="text-muted/30" strokeWidth="8" />
-                <circle
-                  cx="100" cy="100" r="90" fill="none" stroke="currentColor"
-                  className="text-primary transition-all duration-1000"
-                  strokeWidth="8" strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 90}
-                  strokeDashoffset={restDuration ? 2 * Math.PI * 90 * (1 - restTimer / restDuration) : 0}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-5xl font-bold tabular-nums tracking-tight">
-                  {Math.floor(restTimer / 60)}:{String(restTimer % 60).padStart(2, "0")}
-                </span>
-                <span className="text-xs text-muted-foreground mt-1">tap pour passer</span>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full px-5 mt-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                restEndRef.current += 30 * 1000;
-                setRestTimer((prev) => prev + 30);
-              }}
-            >
-              +30s
-            </Button>
-          </button>
-
-          {/* Next exercise card */}
-          {(() => {
-            const nextEx = restType === "exercise" ? nextExerciseDef : currentExerciseDef;
-            const nextItem = restType === "exercise" ? nextBlock : currentBlock;
-            if (!nextEx || !nextItem) return null;
-            const noteText = exerciseNotes?.[nextEx.id];
-            return (
-              <div className="mx-5 mb-6 rounded-2xl border bg-card p-4 shadow-sm">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                  {restType === "exercise" ? "Prochain exercice" : "Exercice en cours"}
-                </div>
-                <div className="flex items-center gap-3">
-                  {nextEx.illustration_gif ? (
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border bg-muted/20">
-                      <img src={nextEx.illustration_gif} alt="" className="h-full w-full object-cover" loading="eager" decoding="async" />
-                    </div>
-                  ) : (
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border bg-muted/20">
-                      <Dumbbell className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{nextEx.nom_exercice}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatStrengthValue(nextItem.sets)}×{formatStrengthValue(nextItem.reps)}
-                      {nextItem.percent_1rm ? ` · ${formatStrengthValue(nextItem.percent_1rm)}% 1RM` : ""}
-                    </p>
-                    {noteText && (
-                      <p className="text-xs italic text-muted-foreground/70 truncate mt-0.5">{noteText}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+        <RestScreen
+          restTimer={restTimer}
+          restDuration={restDuration}
+          restType={restType}
+          exercise={currentExerciseDef ?? null}
+          block={currentBlock}
+          nextExercise={nextExerciseDef ?? null}
+          nextBlock={nextBlock}
+          targetWeight={targetWeight}
+          muscleTags={muscleTags}
+          note={exerciseNotes?.[
+            (restType === "exercise" ? nextBlock?.exercise_id : currentBlock?.exercise_id) ?? -1
+          ] ?? null}
+          items={workoutPlan}
+          logs={logs}
+          exercises={exercises}
+          currentStep={currentStep}
+          progressPct={progressPct}
+          oneRmWeight={rm}
+          percentOneRm={hasPercent ? percentValue : 0}
+          onClose={() => { setIsResting(false); setIsRestPaused(false); }}
+          onSkip={() => {
+            restEndRef.current = 0;
+            setIsResting(false);
+            setRestTimer(0);
+            setIsRestPaused(false);
+          }}
+          onAdd30s={() => {
+            restEndRef.current += 30 * 1000;
+            setRestTimer((prev) => prev + 30);
+          }}
+        />
       )}
 
       {isGifOpen && currentExerciseDef?.illustration_gif && (

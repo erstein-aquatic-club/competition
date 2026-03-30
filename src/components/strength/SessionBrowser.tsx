@@ -250,11 +250,11 @@ export function SessionBrowser({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
           <Input
-            placeholder="Rechercher\u2026"
+            placeholder="Rechercher…"
             className="h-9 rounded-xl bg-muted/30 pl-8 pr-8 border-0 text-[13px] focus-visible:ring-2 focus-visible:ring-primary/30"
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            aria-label="Rechercher une s\u00e9ance"
+            aria-label="Rechercher une séance"
           />
           {searchQuery && (
             <button
@@ -297,7 +297,7 @@ export function SessionBrowser({
       {isSearching && totalUnfiled === 0 && (
         <div className="flex flex-col items-center justify-center py-14 text-center">
           <Dumbbell className="h-8 w-8 mb-3 text-muted-foreground/25" />
-          <p className="text-sm font-medium text-muted-foreground">Aucune s\u00e9ance trouv\u00e9e</p>
+          <p className="text-sm font-medium text-muted-foreground">Aucune séance trouvée</p>
           <p className="text-[11px] text-muted-foreground/50 mt-1 max-w-[220px]">
             Changez de cycle ou modifiez votre recherche.
           </p>

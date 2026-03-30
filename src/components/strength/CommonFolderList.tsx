@@ -42,7 +42,7 @@ export function CommonFolderList({ folders, allSessions, onStartCatalog }: Commo
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2 pt-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Biblioth\u00e8que</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Bibliothèque</span>
         <div className="flex-1 h-px bg-border/40" />
       </div>
 

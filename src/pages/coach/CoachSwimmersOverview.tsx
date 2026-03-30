@@ -391,7 +391,7 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
           { key: "forme" as const, label: "Forme" },
           { key: "readiness" as const, label: "Bien-être" },
           { key: "assiduity" as const, label: "Activité" },
-          { key: "charge" as const, label: "Charge \u2191" },
+          { key: "charge" as const, label: "Charge ↑" },
         ]).map((opt) => (
           <button
             key={opt.key}

@@ -1193,7 +1193,7 @@ export default function StrengthCatalog() {
               <Search className="h-4 w-4 text-muted-foreground" />
               <input
                 className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="Rechercher une s&eacute;ance"
+                placeholder="Rechercher une séance"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
