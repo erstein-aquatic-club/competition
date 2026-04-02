@@ -77,9 +77,11 @@ export function RestScreen({
     onSwipeRight: () => goTo(activeTab - 1),
   });
 
-  // Determine which exercise/block to display in the exercise tab
-  const displayExercise = restType === "exercise" ? nextExercise : exercise;
-  const displayBlock = restType === "exercise" ? nextBlock : block;
+  // When restType="exercise", advanceExercise() has already incremented currentStep,
+  // so `exercise`/`block` (derived from currentStep) already point to the NEXT exercise.
+  // We use current (not next) to avoid showing the exercise after next (+2).
+  const displayExercise = exercise;
+  const displayBlock = block;
 
   // Today's logs for the displayed exercise (for perfs tab)
   const displayExerciseId = displayExercise?.id ?? -1;

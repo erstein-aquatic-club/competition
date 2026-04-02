@@ -958,9 +958,7 @@ export function WorkoutRunner({
           nextBlock={nextBlock}
           targetWeight={targetWeight}
           muscleTags={muscleTags}
-          note={exerciseNotes?.[
-            (restType === "exercise" ? nextBlock?.exercise_id : currentBlock?.exercise_id) ?? -1
-          ] ?? null}
+          note={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? null}
           items={workoutPlan}
           logs={logs}
           exercises={exercises}
