@@ -41,13 +41,14 @@ interface WellnessItem {
   key: string;
   label: string;
   emoji: [string, string]; // [low, high]
+  positive?: boolean; // true = higher is better (colors reversed: 5=green, 1=red)
 }
 
 const ITEMS: WellnessItem[] = [
-  { key: "sleep_quality", label: "Sommeil (qualité)", emoji: ["😴", "😊"] },
+  { key: "sleep_quality", label: "Sommeil (qualité)", emoji: ["😴", "😊"], positive: true },
   { key: "fatigue", label: "Fatigue", emoji: ["💪", "🥵"] },
   { key: "soreness", label: "Courbatures", emoji: ["✨", "🔥"] },
-  { key: "mood", label: "Humeur", emoji: ["😔", "😄"] },
+  { key: "mood", label: "Humeur", emoji: ["😔", "😄"], positive: true },
   { key: "stress", label: "Stress", emoji: ["🧘", "😰"] },
 ];
 
@@ -199,21 +200,25 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
               <span className="text-base leading-none ml-auto">{item.emoji[1]}</span>
             </div>
             <div className="flex gap-1.5">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setValue(n)}
-                  className={[
-                    "flex-1 h-10 rounded-xl border text-sm font-bold transition-all active:scale-95",
-                    value === n
-                      ? INTENSITY_CLASSES[n]
-                      : "bg-muted border-border text-muted-foreground hover:bg-muted/70",
-                  ].join(" ")}
-                >
-                  {n}
-                </button>
-              ))}
+              {[1, 2, 3, 4, 5].map((n) => {
+                // For positive items (higher=better), reverse color: 5→intensity-1 (green), 1→intensity-5 (red)
+                const colorIndex = item.positive ? 6 - n : n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setValue(n)}
+                    className={[
+                      "flex-1 h-10 rounded-xl border text-sm font-bold transition-all active:scale-95",
+                      value === n
+                        ? INTENSITY_CLASSES[colorIndex]
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted/70",
+                    ].join(" ")}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
             </div>
           </div>
         );
