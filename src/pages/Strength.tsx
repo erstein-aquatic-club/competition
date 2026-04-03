@@ -102,10 +102,10 @@ const resolveStrengthItems = (
     const params = resolveExerciseParams(exerciseLookup.get(item.exercise_id), cycle);
     return {
       ...item,
-      sets: params.sets ?? item.sets ?? 0,
-      reps: params.reps ?? item.reps ?? 0,
-      rest_seconds: params.restSeries ?? item.rest_seconds ?? 0,
-      percent_1rm: params.percent1rm ?? item.percent_1rm ?? 0,
+      sets: item.sets ?? params.sets ?? 0,
+      reps: item.reps ?? params.reps ?? 0,
+      rest_seconds: item.rest_seconds ?? params.restSeries ?? 0,
+      percent_1rm: item.percent_1rm ?? params.percent1rm ?? 0,
     };
   });
 
