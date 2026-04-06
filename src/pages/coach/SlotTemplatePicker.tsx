@@ -89,7 +89,8 @@ export function SlotTemplatePicker({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex h-[80vh] flex-col rounded-t-2xl px-4 pb-4 pt-5"
+        className="flex flex-col overflow-hidden rounded-t-2xl px-4 pb-4 pt-5"
+        style={{ maxHeight: "80dvh" }}
       >
         {/* Header */}
         <SheetHeader className="shrink-0 space-y-1">
@@ -113,7 +114,7 @@ export function SlotTemplatePicker({
         </div>
 
         {/* Scrollable list */}
-        <div className="mt-3 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mt-3 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (

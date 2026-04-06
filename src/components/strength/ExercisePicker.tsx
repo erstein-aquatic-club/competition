@@ -44,15 +44,21 @@ export function ExercisePicker({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setSearch(""); }}>
-      <SheetContent side="bottom" className="max-h-[85vh] rounded-t-3xl">
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
+      <SheetContent
+        side="bottom"
+        className="flex flex-col overflow-hidden rounded-t-3xl px-4 pb-4 pt-5"
+        style={{ maxHeight: "80dvh" }}
+      >
+        <SheetHeader className="shrink-0">
+          <SheetTitle className="text-base font-semibold">{title}</SheetTitle>
         </SheetHeader>
-        <div className="mt-3 relative">
+
+        {/* Sticky search */}
+        <div className="relative mt-3 shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
           <Input
             placeholder="Rechercher..."
-            className="h-10 rounded-xl bg-muted/30 pl-10 pr-4 border-0 text-sm"
+            className="h-10 rounded-xl bg-muted/30 pl-10 pr-10 border-0 text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -67,43 +73,44 @@ export function ExercisePicker({
             </button>
           )}
         </div>
-        <div
-          className="mt-3 space-y-1 overflow-y-auto overscroll-contain pb-8"
-          style={{ maxHeight: "calc(85vh - 8rem)", WebkitOverflowScrolling: "touch" }}
-        >
+
+        {/* Scrollable list — flex-1 + min-h-0 ensures it shrinks within the sheet */}
+        <div className="mt-3 flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-4 px-4 pb-[env(safe-area-inset-bottom)]">
           {filtered.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">Aucun exercice trouvé</p>
           )}
-          {filtered.map((exercise) => (
-            <button
-              key={exercise.id}
-              type="button"
-              className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:scale-[0.98]"
-              onClick={() => { onSelect(exercise); onOpenChange(false); setSearch(""); }}
-            >
-              {exercise.illustration_gif ? (
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted/20">
-                  <img
-                    src={exercise.illustration_gif}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/20">
-                  <Dumbbell className="h-4 w-4 text-muted-foreground" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{exercise.nom_exercice}</p>
-                {exercise.description && (
-                  <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
+          <div className="space-y-1">
+            {filtered.map((exercise) => (
+              <button
+                key={exercise.id}
+                type="button"
+                className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:scale-[0.98]"
+                onClick={() => { onSelect(exercise); onOpenChange(false); setSearch(""); }}
+              >
+                {exercise.illustration_gif ? (
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted/20">
+                    <img
+                      src={exercise.illustration_gif}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/20">
+                    <Dumbbell className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 )}
-              </div>
-            </button>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{exercise.nom_exercice}</p>
+                  {exercise.description && (
+                    <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
