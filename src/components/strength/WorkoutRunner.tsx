@@ -471,6 +471,7 @@ export function WorkoutRunner({
 
   const handleValidateSet = async () => {
     if (!currentBlock) return;
+    if (isLoggingRef.current) return;
     if (currentLoggedSet) {
       if (currentSetIndex >= currentBlock.sets) {
         await advanceExercise();
@@ -488,16 +489,8 @@ export function WorkoutRunner({
       difficulty: setDifficulty,
     };
     setLogs((prev) => [...prev, newLog]);
-    isLoggingRef.current = true;
-    try {
-      await onLogSets?.([newLog]);
-    } catch (err) {
-      toast({ title: "Erreur de sauvegarde", description: "Réessayez", variant: "destructive" });
-    } finally {
-      isLoggingRef.current = false;
-    }
 
-    // --- Live PR detection ---
+    // --- Live PR detection (before async save so toast shows immediately) ---
     const logWeight = Number(newLog.weight);
     const logReps = Number(newLog.reps);
     if (logWeight > 0 && logReps > 0 && !isBodyweight(logWeight)) {
@@ -514,20 +507,29 @@ export function WorkoutRunner({
       }
     }
 
+    // --- Advance UI state BEFORE async save to avoid intermediate "Série suivante" flash ---
     const isLastSet = currentSetIndex >= currentBlock.sets;
     if (isLastSet) {
-      // Last set of exercise: advance first, then optionally show inter-exercise timer
       await advanceExercise();
       if (autoRest && currentBlock.rest_seconds > 0) {
         startRestTimer(currentBlock.rest_seconds, "exercise");
       }
-      return;
+    } else {
+      if (autoRest && currentBlock.rest_seconds > 0) {
+        startRestTimer(currentBlock.rest_seconds, "set");
+      }
+      setCurrentSetIndex((prev) => Math.min(currentBlock.sets, prev + 1));
     }
-    // Not the last set: show inter-set rest timer, then move to next set
-    if (autoRest && currentBlock.rest_seconds > 0) {
-      startRestTimer(currentBlock.rest_seconds, "set");
+
+    // --- Persist to server (UI already transitioned) ---
+    isLoggingRef.current = true;
+    try {
+      await onLogSets?.([newLog]);
+    } catch (err) {
+      toast({ title: "Erreur de sauvegarde", description: "Réessayez", variant: "destructive" });
+    } finally {
+      isLoggingRef.current = false;
     }
-    setCurrentSetIndex((prev) => Math.min(currentBlock.sets, prev + 1));
   };
 
   const openInputSheet = (type: "weight" | "reps") => {
