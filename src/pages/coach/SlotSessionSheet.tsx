@@ -57,7 +57,7 @@ export interface SlotSessionSheetProps {
   onOpenChange: (open: boolean) => void;
   onCreateNew: (slotInstance: SlotInstance) => void;
   onEditSession: (sessionId: number) => void;
-  onPickTemplate: (slotInstance: SlotInstance) => void;
+  onPickTemplate: (slotInstance: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => void;
   onEditSlot?: (slotInstance: SlotInstance) => void;
   onManageOverride?: (slotInstance: SlotInstance) => void;
 }
@@ -496,7 +496,7 @@ function EmptyBody({
   onToggleGroup: (groupId: number) => void;
   onVisibleFromChange: (date: string) => void;
   onCreateNew: (inst: SlotInstance) => void;
-  onPickTemplate: (inst: SlotInstance) => void;
+  onPickTemplate: (inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => void;
   onClose: () => void;
 }) {
   const handleCreateNew = () => {
@@ -506,7 +506,7 @@ function EmptyBody({
 
   const handlePickTemplate = () => {
     onClose();
-    onPickTemplate(instance);
+    onPickTemplate(instance, selectedGroups, visibleFrom);
   };
 
   return (

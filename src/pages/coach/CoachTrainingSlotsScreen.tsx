@@ -1297,6 +1297,8 @@ const CoachTrainingSlotsScreen = ({
   const [showSessionSheet, setShowSessionSheet] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [templateTargetInstance, setTemplateTargetInstance] = useState<SlotInstance | null>(null);
+  const [templateSelectedGroups, setTemplateSelectedGroups] = useState<number[]>([]);
+  const [templateVisibleFrom, setTemplateVisibleFrom] = useState<string>("");
 
   // Week navigation state
   const [weekMonday, setWeekMonday] = useState(() => getMonday(new Date()));
@@ -1552,8 +1554,10 @@ const CoachTrainingSlotsScreen = ({
     onOpenLibrary(buildSwimLibraryContext(selectedInstance, "edit", sessionId));
   };
 
-  const handlePickTemplate = (instance: SlotInstance) => {
+  const handlePickTemplate = (instance: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => {
     setTemplateTargetInstance(instance);
+    setTemplateSelectedGroups(selectedGroupIds);
+    setTemplateVisibleFrom(visibleFrom);
     setShowSessionSheet(false);
     setTemplatePickerOpen(true);
   };
@@ -1562,12 +1566,16 @@ const CoachTrainingSlotsScreen = ({
     mutationFn: async ({
       catalogId,
       instance,
+      groupIds,
+      visibleFrom,
     }: {
       catalogId: number;
       instance: SlotInstance;
+      groupIds: number[];
+      visibleFrom: string;
     }) => {
-      const groupIds = instance.groups.map((group) => group.group_id);
-      if (!userId || groupIds.length === 0) return;
+      if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
+      if (!userId) throw new Error("Utilisateur non connecté");
 
       await api.bulkCreateSlotAssignments({
         swimCatalogId: catalogId,
@@ -1575,7 +1583,7 @@ const CoachTrainingSlotsScreen = ({
         scheduledDate: instance.date,
         groupIds,
         scheduledSlot: deriveScheduledSlot(instance.slot.start_time),
-        visibleFrom: instance.date,
+        visibleFrom,
         assignedBy: userId,
       });
     },
@@ -1583,6 +1591,7 @@ const CoachTrainingSlotsScreen = ({
       void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
       setTemplatePickerOpen(false);
       setTemplateTargetInstance(null);
+      toast({ title: "Séance assignée au créneau" });
     },
     onError: (err: Error) => {
       toast({
@@ -1595,7 +1604,12 @@ const CoachTrainingSlotsScreen = ({
 
   const handleTemplateSelect = (catalogId: number) => {
     if (!templateTargetInstance) return;
-    assignTemplateMutation.mutate({ catalogId, instance: templateTargetInstance });
+    assignTemplateMutation.mutate({
+      catalogId,
+      instance: templateTargetInstance,
+      groupIds: templateSelectedGroups,
+      visibleFrom: templateVisibleFrom,
+    });
   };
 
   const coachesForForm = coaches.map((c) => ({

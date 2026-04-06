@@ -267,6 +267,8 @@ export default function CoachSlotCalendar({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   // Store the instance context for template selection
   const [templateTargetInstance, setTemplateTargetInstance] = useState<SlotInstance | null>(null);
+  const [templateSelectedGroups, setTemplateSelectedGroups] = useState<number[]>([]);
+  const [templateVisibleFrom, setTemplateVisibleFrom] = useState<string>("");
 
   const handleOpenSlot = useCallback((instance: SlotInstance) => {
     setSelectedInstance(instance);
@@ -283,24 +285,26 @@ export default function CoachSlotCalendar({
     onOpenLibrary();
   }, [onOpenLibrary]);
 
-  const handlePickTemplate = useCallback((inst: SlotInstance) => {
+  const handlePickTemplate = useCallback((inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => {
     setTemplateTargetInstance(inst);
+    setTemplateSelectedGroups(selectedGroupIds);
+    setTemplateVisibleFrom(visibleFrom);
     setSheetOpen(false);
     setTemplatePickerOpen(true);
   }, []);
 
   // Mutation: assign a template to a slot
   const assignTemplateMutation = useMutation({
-    mutationFn: async ({ catalogId, inst }: { catalogId: number; inst: SlotInstance }) => {
-      const groupIds = inst.groups.map((g) => g.group_id);
-      if (groupIds.length === 0 || !userId) throw new Error("Aucun groupe sélectionné");
+    mutationFn: async ({ catalogId, inst, groupIds, visibleFrom }: { catalogId: number; inst: SlotInstance; groupIds: number[]; visibleFrom: string }) => {
+      if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
+      if (!userId) throw new Error("Utilisateur non connecté");
       await bulkCreateSlotAssignments({
         swimCatalogId: catalogId,
         trainingSlotId: inst.slot.id,
         scheduledDate: inst.date,
         groupIds,
         scheduledSlot: deriveScheduledSlot(inst.slot.start_time),
-        visibleFrom: inst.date, // Default: visible on slot date
+        visibleFrom,
         assignedBy: userId,
       });
     },
@@ -317,8 +321,13 @@ export default function CoachSlotCalendar({
 
   const handleTemplateSelect = useCallback((catalogId: number, _sessionName: string) => {
     if (!templateTargetInstance) return;
-    assignTemplateMutation.mutate({ catalogId, inst: templateTargetInstance });
-  }, [templateTargetInstance, assignTemplateMutation]);
+    assignTemplateMutation.mutate({
+      catalogId,
+      inst: templateTargetInstance,
+      groupIds: templateSelectedGroups,
+      visibleFrom: templateVisibleFrom,
+    });
+  }, [templateTargetInstance, templateSelectedGroups, templateVisibleFrom, assignTemplateMutation]);
 
   const today = useMemo(() => todayIso(), []);
   const weekLabel = useMemo(

@@ -334,7 +334,7 @@ export async function bulkCreateSlotAssignments(params: {
   visibleFrom: string | null;
   assignedBy: number;
 }): Promise<{ created: number }> {
-  if (!canUseSupabase()) return { created: 0 };
+  if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
   const rows = params.groupIds.map((groupId) => ({
     assignment_type: "swim" as const,
@@ -412,7 +412,7 @@ export async function updateSlotVisibility(params: {
   scheduledDate: string;
   visibleFrom: string | null;
 }): Promise<void> {
-  if (!canUseSupabase()) return;
+  if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
   const { error } = await supabase
     .from("session_assignments")
@@ -428,7 +428,7 @@ export async function deleteSlotAssignments(params: {
   trainingSlotId: string;
   scheduledDate: string;
 }): Promise<void> {
-  if (!canUseSupabase()) return;
+  if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
   const { error } = await supabase
     .from("session_assignments")

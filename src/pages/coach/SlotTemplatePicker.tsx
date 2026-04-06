@@ -12,7 +12,28 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, SwatchBook, Waves } from "lucide-react";
+import { Clock, Search, SwatchBook, Waves } from "lucide-react";
+
+/* ─── Helpers ────────────────────────────────────────────── */
+
+function formatRelativeDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Aujourd'hui";
+  if (diffDays === 1) return "Hier";
+  if (diffDays < 7) return `Il y a ${diffDays} j`;
+  if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} sem.`;
+  return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+function isRecent(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  return diffMs < 7 * 24 * 60 * 60 * 1000;
+}
 
 /* ─── Props ───────────────────────────────────────────────── */
 
@@ -39,7 +60,7 @@ export function SlotTemplatePicker({
     enabled: open,
   });
 
-  /* Filter out archived, apply search, sort alphabetically */
+  /* Filter out archived, apply search, keep newest-first order from API */
   const filtered = useMemo(() => {
     if (!sessions) return [];
     const q = search.trim().toLowerCase();
@@ -50,8 +71,7 @@ export function SlotTemplatePicker({
           !q ||
           s.name.toLowerCase().includes(q) ||
           (s.folder ?? "").toLowerCase().includes(q),
-      )
-      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+      );
   }, [sessions, search]);
 
   /* ── handlers ────────────────────────────────────────── */
@@ -109,23 +129,38 @@ export function SlotTemplatePicker({
                 const totalDistance = calculateSwimTotalDistance(
                   session.items ?? [],
                 );
+                const relDate = formatRelativeDate(session.created_at);
+                const recent = isRecent(session.created_at);
                 return (
                   <button
                     key={session.id}
                     type="button"
                     onClick={() => handleSelect(session)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-transform active:scale-[0.98]"
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-transform active:scale-[0.98] ${
+                      recent
+                        ? "border-blue-500/30 bg-blue-500/5"
+                        : "border-border bg-card"
+                    }`}
                   >
                     {/* Icon */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                      recent ? "bg-blue-500/15 text-blue-500" : "bg-blue-500/10 text-blue-400"
+                    }`}>
                       <SwatchBook className="h-5 w-5" />
                     </div>
 
                     {/* Text */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {session.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {session.name}
+                        </p>
+                        {recent && (
+                          <span className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                            Récent
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                         {totalDistance > 0 && (
                           <span>{totalDistance.toLocaleString("fr-FR")} m</span>
@@ -135,6 +170,15 @@ export function SlotTemplatePicker({
                         )}
                         {session.folder && (
                           <span className="truncate">{session.folder}</span>
+                        )}
+                        {(totalDistance > 0 || session.folder) && relDate && (
+                          <span aria-hidden="true">·</span>
+                        )}
+                        {relDate && (
+                          <span className="inline-flex items-center gap-0.5 shrink-0">
+                            <Clock className="h-2.5 w-2.5 opacity-60" />
+                            {relDate}
+                          </span>
                         )}
                       </div>
                     </div>

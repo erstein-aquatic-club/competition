@@ -7237,3 +7237,49 @@ L'écran de repos entre les séries de musculation n'affichait qu'un timer circu
 ### Limites / dette
 - Pas d'historique des séances passées (nécessiterait un fetch — prévu pour V2)
 - Le swipe horizontal peut confluer avec le scroll vertical sur contenus longs
+
+## 2026-04-06 — Fix critique parcours assignation séances coach (§95)
+**Branche** : `main`
+**Chantier ROADMAP** : §95 — Fix parcours métier principal coach
+
+### Contexte — Pourquoi ce patch
+Le parcours métier principal du coach (création d'une séance natation puis assignation à un créneau depuis la vue semaine) était totalement cassé : l'assignation échouait silencieusement sans aucun feedback. La pastille "À faire" ne changeait jamais de statut.
+
+### Changements
+
+**Bug critique — Échec silencieux de l'assignation (`CoachTrainingSlotsScreen.tsx`)**
+- **Cause racine** : La `mutationFn` de `assignTemplateMutation` (ligne 1570) faisait `return` au lieu de `throw` quand `userId` est null ou quand `groupIds` est vide → la mutation terminait "avec succès" sans insérer aucune ligne en base
+- **Fix** : Remplacé `return` par `throw new Error(...)` avec messages explicites ("Aucun groupe sélectionné", "Utilisateur non connecté")
+- **Ajout toast de succès** manquant dans `onSuccess` : `"Séance assignée au créneau"`
+
+**Fonctions API d'écriture silencieuses (`assignments.ts`)**
+- `bulkCreateSlotAssignments` : `canUseSupabase() → return { created: 0 }` → remplacé par `throw`
+- `updateSlotVisibility` : `canUseSupabase() → return` → remplacé par `throw`
+- `deleteSlotAssignments` : `canUseSupabase() → return` → remplacé par `throw`
+- Toutes les fonctions d'écriture lèvent maintenant `"Connexion indisponible"` hors-ligne
+
+**Groupes et visibilité ignorés dans la mutation**
+- Les checkboxes de sélection de groupes et le date picker de visibilité dans `EmptyBody` (SlotSessionSheet) étaient purement décoratifs — la mutation utilisait toujours tous les groupes du créneau et la date du créneau
+- Modifié `onPickTemplate` pour transporter `selectedGroupIds` et `visibleFrom` du sheet vers le parent
+- Les deux parents (`CoachSlotCalendar`, `CoachTrainingSlotsScreen`) stockent et passent ces valeurs à la mutation
+
+**Ordre de la bibliothèque dans le picker**
+- `SlotTemplatePicker` triait les séances alphabétiquement (A→Z) — la séance fraîchement créée se retrouvait perdue dans la liste
+- Supprimé le `.sort()` alphabétique pour conserver l'ordre API `created_at DESC` (les plus récentes en premier)
+- Ajouté un badge "Récent" (bleu) pour les séances créées dans les 7 derniers jours
+- Ajouté la date de création relative ("Aujourd'hui", "Hier", "Il y a 3 j") dans chaque carte
+
+### Fichiers modifiés
+- `src/pages/coach/CoachTrainingSlotsScreen.tsx` — Fix mutation silencieuse, wiring groupes/visibilité
+- `src/pages/coach/CoachSlotCalendar.tsx` — Wiring groupes/visibilité depuis le sheet
+- `src/pages/coach/SlotSessionSheet.tsx` — Signature `onPickTemplate` enrichie (groupIds, visibleFrom)
+- `src/pages/coach/SlotTemplatePicker.tsx` — Ordre inversé, badge "Récent", date relative
+- `src/lib/api/assignments.ts` — Fonctions d'écriture lèvent des erreurs au lieu de retourner silencieusement
+
+### Tests
+- `npx tsc --noEmit` : ✅ aucune nouvelle erreur
+- `npm test` : ✅ aucune régression (échecs pré-existants : gifEncoder, coach nav labels, StrengthCatalog)
+
+### Décisions
+- Les fonctions API de **lecture** (`getSlotAssignments`, etc.) retournent toujours `[]` hors-ligne (affichage vide) — seules les fonctions d'**écriture** lèvent une erreur
+- L'ordre "plus récent d'abord" dans le picker est le plus adapté au workflow principal (créer une séance → l'assigner immédiatement)
