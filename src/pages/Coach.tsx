@@ -102,6 +102,12 @@ const CoachHome = ({
   const sunday = useMemo(() => getSundayOfWeek(monday), [monday]);
   const mondayLabel = monday.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 
+  // Today's index in ISO week (0=Mon..6=Sun)
+  const todayIndex = useMemo(() => {
+    const jsDay = now.getDay(); // 0=Sun
+    return jsDay === 0 ? 6 : jsDay - 1;
+  }, [now]);
+
   // ── Section B: Slot data ────────────────────────────────────
   const { data: slots = [] } = useQuery({
     queryKey: ["training-slots"],
@@ -208,14 +214,28 @@ const CoachHome = ({
             {DAY_LABELS.map((label, i) => {
               const hasSlot = weekDays.daysWithSlots.has(i);
               const hasSession = weekDays.daysWithSessions.has(i);
+              const isToday = i === todayIndex;
+              const dayDate = new Date(monday);
+              dayDate.setDate(monday.getDate() + i);
+              const dayNum = dayDate.getDate();
               return (
-                <div key={i} className="flex flex-col items-center gap-1.5">
-                  <span className="text-[9px] font-bold uppercase text-muted-foreground">
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <span className={[
+                    "text-[9px] font-bold uppercase",
+                    isToday ? "text-primary" : "text-muted-foreground",
+                  ].join(" ")}>
                     {label}
+                  </span>
+                  <span className={[
+                    "text-[10px]",
+                    isToday ? "font-bold text-primary" : "text-muted-foreground/60",
+                  ].join(" ")}>
+                    {dayNum}
                   </span>
                   <span
                     className={[
                       "flex h-8 w-8 items-center justify-center rounded-xl text-sm font-semibold transition-colors",
+                      isToday ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : "",
                       hasSession
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
                         : hasSlot
