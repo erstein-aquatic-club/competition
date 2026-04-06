@@ -24,6 +24,9 @@ import { z } from "zod";
 import { motion } from "framer-motion";
 import { fadeIn } from "@/lib/animations";
 import BadgesGrid from "@/components/profile/BadgesGrid";
+import { useAchievementChecker } from "@/hooks/useAchievementChecker";
+import AchievementToast from "@/components/shared/AchievementToast";
+import type { BadgeDefinition } from "@/lib/achievementRules";
 import SwimmerMessagesView from "@/components/profile/SwimmerMessagesView";
 import { NeurotypQuiz } from "@/components/neurotype/NeurotypQuiz";
 import NeurotypResultView from "@/components/neurotype/NeurotypResult";
@@ -232,6 +235,19 @@ export default function Profile() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [dismissedTargetIds, setDismissedTargetIds] = useState<number[]>([]);
+
+  // Badge achievement checker — evaluates rules and unlocks new badges
+  const isSwimmer = role === "athlete";
+  useAchievementChecker({
+    userId: isSwimmer && userId ? userId : 0,
+    onBadgeUnlocked: (badge: BadgeDefinition) => {
+      toast({
+        title: "Badge débloqué !",
+        description: <AchievementToast badge={badge} />,
+        duration: 5000,
+      });
+    },
+  });
 
   // Reset view state when dock icon is tapped while already on this page
   useEffect(() => {
