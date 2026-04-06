@@ -1583,7 +1583,7 @@ const CoachTrainingSlotsScreen = ({
         scheduledDate: instance.date,
         groupIds,
         scheduledSlot: deriveScheduledSlot(instance.slot.start_time),
-        visibleFrom,
+        visibleFrom: visibleFrom || instance.date,
         assignedBy: userId,
       });
     },
@@ -1958,8 +1958,16 @@ const CoachTrainingSlotsScreen = ({
 
       <SlotTemplatePicker
         open={templatePickerOpen}
-        onOpenChange={setTemplatePickerOpen}
+        onOpenChange={(open) => {
+          setTemplatePickerOpen(open);
+          if (!open) {
+            setTemplateTargetInstance(null);
+            setTemplateSelectedGroups([]);
+            setTemplateVisibleFrom("");
+          }
+        }}
         onSelect={(catalogId, _sessionName) => handleTemplateSelect(catalogId)}
+        isAssigning={assignTemplateMutation.isPending}
       />
     </div>
   );

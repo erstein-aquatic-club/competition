@@ -304,7 +304,7 @@ export default function CoachSlotCalendar({
         scheduledDate: inst.date,
         groupIds,
         scheduledSlot: deriveScheduledSlot(inst.slot.start_time),
-        visibleFrom,
+        visibleFrom: visibleFrom || inst.date,
         assignedBy: userId,
       });
     },
@@ -455,8 +455,16 @@ export default function CoachSlotCalendar({
 
     <SlotTemplatePicker
       open={templatePickerOpen}
-      onOpenChange={setTemplatePickerOpen}
+      onOpenChange={(open) => {
+        setTemplatePickerOpen(open);
+        if (!open) {
+          setTemplateTargetInstance(null);
+          setTemplateSelectedGroups([]);
+          setTemplateVisibleFrom("");
+        }
+      }}
       onSelect={handleTemplateSelect}
+      isAssigning={assignTemplateMutation.isPending}
     />
     </>
   );

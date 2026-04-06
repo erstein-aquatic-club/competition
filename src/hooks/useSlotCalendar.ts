@@ -110,9 +110,8 @@ export function getSlotScheduleBucket(
 ): SlotScheduleBucket | null {
   const hour = parseInt(startTime.split(":")[0] ?? "", 10);
   if (!Number.isFinite(hour)) return null;
-  if (hour < 12) return "morning";
-  if (hour >= 13) return "evening";
-  return null;
+  if (hour < 13) return "morning";
+  return "evening";
 }
 
 export function resolveSlotAssignment(

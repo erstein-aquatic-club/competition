@@ -363,6 +363,13 @@ export default function SwimCatalog({
         title: variables?.id ? "Séance natation mise à jour" : "Séance natation créée",
       });
     },
+    onError: (err: Error) => {
+      toast({
+        title: "Erreur",
+        description: err.message || "Impossible d'enregistrer la séance.",
+        variant: "destructive",
+      });
+    },
   });
 
   const deleteSession = useMutation({

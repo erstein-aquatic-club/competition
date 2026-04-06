@@ -7283,3 +7283,51 @@ Le parcours métier principal du coach (création d'une séance natation puis as
 ### Décisions
 - Les fonctions API de **lecture** (`getSlotAssignments`, etc.) retournent toujours `[]` hors-ligne (affichage vide) — seules les fonctions d'**écriture** lèvent une erreur
 - L'ordre "plus récent d'abord" dans le picker est le plus adapté au workflow principal (créer une séance → l'assigner immédiatement)
+
+## 2026-04-06 — Hardening parcours assignation (§95b)
+**Branche** : `main`
+**Chantier ROADMAP** : §95 — Audit robustesse parcours métier coach
+
+### Contexte — Pourquoi ce patch
+Audit exhaustif du parcours métier critique (création séance → assignation créneau) pour éliminer toutes les failles résiduelles après le fix initial du §95.
+
+### Changements
+
+**1. Reset état template quand le picker est fermé sans sélection (CRITIQUE)**
+- Si le coach ouvrait le picker pour le créneau A, le fermait, puis ouvrait celui du créneau B et sélectionnait → la séance partait sur le créneau A (état stale)
+- `CoachSlotCalendar` + `CoachTrainingSlotsScreen` : reset de `templateTargetInstance`, `templateSelectedGroups` et `templateVisibleFrom` dans `onOpenChange` quand `open=false`
+
+**2. Harmonisation bucket midi entre `deriveScheduledSlot` et `getSlotScheduleBucket` (CRITIQUE)**
+- `deriveScheduledSlot("12:00")` retournait `"morning"` mais `getSlotScheduleBucket("12:00")` retournait `null`
+- Les créneaux de midi n'étaient jamais résolus en fallback dans `resolveSlotAssignment`
+- Aligné `getSlotScheduleBucket` : `hour < 13 → morning`, sinon `evening`
+
+**3. Protection double-tap sur SlotTemplatePicker (HIGH)**
+- Aucun état loading/disabled sur les boutons de sélection → double-tap créait des doublons en base
+- Ajouté prop `isAssigning` propagée depuis `assignTemplateMutation.isPending`
+- Boutons `disabled` + handler bloqué quand mutation en cours
+
+**4. Toast d'erreur sur création de séance (HIGH)**
+- `SwimCatalog.tsx` : `createSession` mutation n'avait aucun `onError` → échec de sauvegarde totalement silencieux
+- Ajouté `onError` avec toast destructive
+
+**5. Warning quand créneau sans groupes assignés (HIGH)**
+- `EmptyBody` dans `SlotSessionSheet` : si `groups.length === 0`, aucun checkbox affiché mais le bouton "Depuis la bibliothèque" restait actif → mutation échouait avec "Aucun groupe sélectionné"
+- Ajouté banner orange d'avertissement + bouton "Depuis la bibliothèque" désactivé quand `selectedGroups.length === 0`
+- Texte dynamique : "Sélectionnez au moins un groupe" si tout est décoché
+
+**6. Normalisation `visibleFrom` vide (HIGH)**
+- Si le coach ne touchait pas le date picker, `visibleFrom` pouvait être `""` (string vide) → inséré tel quel en base au lieu de `null` ou date du créneau
+- Ajouté fallback `visibleFrom || inst.date` dans les deux mutations
+
+### Fichiers modifiés
+- `src/pages/coach/CoachSlotCalendar.tsx` — Reset template state on picker close, visibleFrom fallback
+- `src/pages/coach/CoachTrainingSlotsScreen.tsx` — Idem
+- `src/pages/coach/SlotSessionSheet.tsx` — Warning groups vides, disabled bouton, import AlertTriangle
+- `src/pages/coach/SlotTemplatePicker.tsx` — Prop `isAssigning`, disabled buttons, guard double-tap
+- `src/pages/coach/SwimCatalog.tsx` — onError sur createSession mutation
+- `src/hooks/useSlotCalendar.ts` — Fix getSlotScheduleBucket pour midi
+
+### Tests
+- `npx tsc --noEmit` : ✅ aucune nouvelle erreur
+- `npm test` : ✅ aucune régression

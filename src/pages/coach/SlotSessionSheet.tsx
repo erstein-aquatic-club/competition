@@ -42,6 +42,7 @@ import {
   CalendarDays,
   Loader2,
   Ban,
+  AlertTriangle,
 } from "lucide-react";
 import {
   updateSlotVisibility,
@@ -516,7 +517,7 @@ function EmptyBody({
         description="Choisissez comment renseigner la séance liée à ce créneau."
       />
 
-      {groups.length > 0 && (
+      {groups.length > 0 ? (
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Groupes concernés
@@ -537,6 +538,18 @@ function EmptyBody({
                 </span>
               </label>
             ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2.5 rounded-xl border border-orange-500/30 bg-orange-500/5 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+          <div>
+            <p className="text-sm font-medium text-orange-700 dark:text-orange-400">
+              Aucun groupe assigné
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Configurez les groupes de ce créneau avant d'assigner une séance.
+            </p>
           </div>
         </div>
       )}
@@ -569,8 +582,9 @@ function EmptyBody({
         <ActionButton
           icon={<BookOpen className="h-4 w-4" />}
           label="Depuis la bibliothèque"
-          description="Réutiliser une séance existante"
+          description={selectedGroups.length === 0 ? "Sélectionnez au moins un groupe" : "Réutiliser une séance existante"}
           onClick={handlePickTemplate}
+          disabled={selectedGroups.length === 0}
         />
       </div>
     </div>

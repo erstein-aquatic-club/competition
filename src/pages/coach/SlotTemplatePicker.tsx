@@ -41,6 +41,7 @@ interface SlotTemplatePickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (catalogId: number, sessionName: string) => void;
+  isAssigning?: boolean;
 }
 
 /* ─── Component ───────────────────────────────────────────── */
@@ -49,6 +50,7 @@ export function SlotTemplatePicker({
   open,
   onOpenChange,
   onSelect,
+  isAssigning = false,
 }: SlotTemplatePickerProps) {
   const [search, setSearch] = useState("");
 
@@ -77,8 +79,8 @@ export function SlotTemplatePicker({
   /* ── handlers ────────────────────────────────────────── */
 
   const handleSelect = (session: SwimSessionTemplate) => {
+    if (isAssigning) return;
     onSelect(session.id, session.name);
-    onOpenChange(false);
   };
 
   /* ── render ──────────────────────────────────────────── */
@@ -135,8 +137,9 @@ export function SlotTemplatePicker({
                   <button
                     key={session.id}
                     type="button"
+                    disabled={isAssigning}
                     onClick={() => handleSelect(session)}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-transform active:scale-[0.98] ${
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none ${
                       recent
                         ? "border-blue-500/30 bg-blue-500/5"
                         : "border-border bg-card"
