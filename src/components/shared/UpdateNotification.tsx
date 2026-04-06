@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Auto-reload delay: if user doesn't click, reload after 10 seconds
+const AUTO_RELOAD_DELAY_MS = 10_000;
+
 export function UpdateNotification() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
+  const [countdown, setCountdown] = useState(Math.ceil(AUTO_RELOAD_DELAY_MS / 1000));
 
   useEffect(() => {
     const handler = () => setUpdateAvailable(true);
@@ -12,21 +16,30 @@ export function UpdateNotification() {
     return () => window.removeEventListener("pwa-update-available", handler);
   }, []);
 
+  // Auto-reload countdown when update is available
+  useEffect(() => {
+    if (!updateAvailable) return;
+    const tick = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(tick);
+          handleReload();
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [updateAvailable]);
+
   const handleReload = async () => {
     setIsReloading(true);
-    try {
-      const updateSW = (window as any).__pwaUpdateSW;
-      if (typeof updateSW === "function") {
-        await updateSW(true);
-      }
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-    } catch {
-      // best-effort
+    const applyUpdate = (window as any).__pwaApplyUpdate;
+    if (typeof applyUpdate === 'function') {
+      await applyUpdate();
+    } else {
+      window.location.reload();
     }
-    window.location.reload();
   };
 
   return (
@@ -49,7 +62,7 @@ export function UpdateNotification() {
               disabled={isReloading}
               className="rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-[11px] font-bold transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-50"
             >
-              {isReloading ? "..." : "Recharger"}
+              {isReloading ? "..." : `Recharger (${countdown}s)`}
             </button>
           </motion.div>
         </div>

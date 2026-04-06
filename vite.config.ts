@@ -1,25 +1,44 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from 'vite-plugin-pwa';
 import path from "path";
+import fs from "fs";
 import { componentTagger } from "lovable-tagger";
 import { visualizer } from "rollup-plugin-visualizer";
+
+const BUILD_TIMESTAMP = new Date().toISOString();
+
+// Emit version.json so the app can detect stale PWA installs independently of SW
+function versionJsonPlugin(): Plugin {
+  return {
+    name: 'version-json',
+    writeBundle(options) {
+      const dir = options.dir ?? path.resolve('dist');
+      fs.writeFileSync(
+        path.join(dir, 'version.json'),
+        JSON.stringify({ build: BUILD_TIMESTAMP }) + '\n',
+      );
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => ({
   base: mode === "production" ? "/competition/" : "/",
   envDir: path.resolve(import.meta.dirname),
   define: {
-    __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+    __BUILD_TIMESTAMP__: JSON.stringify(BUILD_TIMESTAMP),
   },
   plugins: [
     react(),
     tailwindcss(),
+    versionJsonPlugin(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       workbox: {
         importScripts: ['push-handler.js'],
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+        globIgnores: ['**/version.json'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,

@@ -7,17 +7,49 @@ declare const __BUILD_TIMESTAMP__: string;
 console.log(`[EAC] Build: ${__BUILD_TIMESTAMP__}`);
 (window as any).__eacBuildTimestamp = __BUILD_TIMESTAMP__;
 
-// vite-plugin-pwa: prompt mode – show notification when new SW is waiting
+// vite-plugin-pwa: autoUpdate mode – SW activates immediately (skipWaiting + clientsClaim)
+// Extra safety: periodic check every hour + check on visibility change
+const UPDATE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
 const updateSW = registerSW({
   immediate: true,
   onRegistered(r) {
-    if (r) (window as any).__pwaRegistration = r;
+    if (r) {
+      (window as any).__pwaRegistration = r;
+
+      // Periodic update check every hour
+      setInterval(() => {
+        r.update().catch(() => {});
+      }, UPDATE_INTERVAL_MS);
+
+      // Check for updates when app regains focus (PWA returning from background)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          r.update().catch(() => {});
+        }
+      });
+    }
   },
   onNeedRefresh() {
+    // In autoUpdate mode the new SW is already active.
+    // Notify the UI so we can reload with a brief countdown.
     window.dispatchEvent(new CustomEvent('pwa-update-available'));
   },
 });
+
+async function applyUpdate() {
+  try {
+    // Clear all caches to avoid stale resources from previous SW
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch { /* best-effort */ }
+  window.location.reload();
+}
+
 (window as any).__pwaUpdateSW = updateSW;
+(window as any).__pwaApplyUpdate = applyUpdate;
 
 // Lock orientation to portrait on mobile (Android PWA / fullscreen)
 // Falls back silently — iOS Safari doesn't support this API, CSS overlay handles it

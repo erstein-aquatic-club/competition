@@ -43,6 +43,51 @@ function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any
 // Clear the reload flag on successful app load
 sessionStorage.removeItem('chunk_reload');
 
+// Fallback version check — bypasses SW entirely for stuck PWA installs.
+// Fetches a tiny version file (cache-busted) and reloads if build differs.
+const VERSION_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+function useVersionCheck() {
+  useEffect(() => {
+    const currentBuild = (window as any).__eacBuildTimestamp as string | undefined;
+    if (!currentBuild) return;
+
+    const checkVersion = async () => {
+      try {
+        // Fetch version.json with cache-busting query to bypass SW + HTTP cache
+        const res = await fetch(`${import.meta.env.BASE_URL}version.json?_=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const { build } = await res.json();
+        if (build && build !== currentBuild) {
+          console.log(`[EAC] Version mismatch: running ${currentBuild}, server has ${build}. Reloading…`);
+          // Clear all caches then reload
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          }
+          window.location.reload();
+        }
+      } catch { /* offline or fetch error — ignore */ }
+    };
+
+    // Check on mount + periodically + on visibility change
+    const timeout = setTimeout(checkVersion, 5_000); // 5s after app load
+    const interval = setInterval(checkVersion, VERSION_CHECK_INTERVAL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') checkVersion();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+}
+
 // Lazy load all pages for code splitting (with retry for stale chunks)
 const Login = lazyWithRetry(() => import("@/pages/Login"));
 const LoginDebug = lazyWithRetry(() => import("@/pages/LoginDebug"));
@@ -264,6 +309,7 @@ function AppRouter() {
 
 function App() {
   const { loadUser } = useAuth();
+  useVersionCheck();
 
   React.useEffect(() => {
     void loadUser();
