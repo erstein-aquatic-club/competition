@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getSwimCatalog } from "@/lib/api/swim";
+import { getAssignedSwimCatalogIds } from "@/lib/api/assignments";
 import type { SwimSessionTemplate } from "@/lib/api/types";
 import { calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
 import {
@@ -12,7 +13,14 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Search, SwatchBook, Waves } from "lucide-react";
+import {
+  CalendarCheck,
+  Clock,
+  FolderOpen,
+  Search,
+  SwatchBook,
+  Waves,
+} from "lucide-react";
 
 /* ─── Helpers ────────────────────────────────────────────── */
 
@@ -56,13 +64,21 @@ export function SlotTemplatePicker({
 
   /* ── data ─────────────────────────────────────────────── */
 
-  const { data: sessions, isLoading } = useQuery({
+  const { data: sessions, isLoading: catalogLoading } = useQuery({
     queryKey: ["swim_catalog"],
     queryFn: () => getSwimCatalog(),
     enabled: open,
   });
 
-  /* Filter out archived, apply search, keep newest-first order from API */
+  const { data: assignedIds, isLoading: assignedLoading } = useQuery({
+    queryKey: ["assigned_swim_catalog_ids"],
+    queryFn: () => getAssignedSwimCatalogIds(),
+    enabled: open,
+  });
+
+  const isLoading = catalogLoading || assignedLoading;
+
+  /* Filter out archived, apply search */
   const filtered = useMemo(() => {
     if (!sessions) return [];
     const q = search.trim().toLowerCase();
@@ -75,6 +91,18 @@ export function SlotTemplatePicker({
           (s.folder ?? "").toLowerCase().includes(q),
       );
   }, [sessions, search]);
+
+  /* Split into assigned / unassigned */
+  const { assigned, unassigned } = useMemo(() => {
+    const ids = assignedIds ?? new Set<number>();
+    const a: SwimSessionTemplate[] = [];
+    const u: SwimSessionTemplate[] = [];
+    for (const s of filtered) {
+      if (ids.has(s.id)) a.push(s);
+      else u.push(s);
+    }
+    return { assigned: a, unassigned: u };
+  }, [filtered, assignedIds]);
 
   /* ── handlers ────────────────────────────────────────── */
 
@@ -127,72 +155,175 @@ export function SlotTemplatePicker({
               <p className="text-sm">Aucune séance dans la bibliothèque</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filtered.map((session) => {
-                const totalDistance = calculateSwimTotalDistance(
-                  session.items ?? [],
-                );
-                const relDate = formatRelativeDate(session.created_at);
-                const recent = isRecent(session.created_at);
-                return (
-                  <button
-                    key={session.id}
-                    type="button"
-                    disabled={isAssigning}
-                    onClick={() => handleSelect(session)}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none ${
-                      recent
-                        ? "border-blue-500/30 bg-blue-500/5"
-                        : "border-border bg-card"
-                    }`}
-                  >
-                    {/* Icon */}
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                      recent ? "bg-blue-500/15 text-blue-500" : "bg-blue-500/10 text-blue-400"
-                    }`}>
-                      <SwatchBook className="h-5 w-5" />
-                    </div>
+            <div className="space-y-4">
+              {/* ── Assigned section ── */}
+              {assigned.length > 0 && (
+                <SessionGroup
+                  label="Assignées"
+                  icon={<CalendarCheck className="h-3.5 w-3.5" />}
+                  badgeCount={assigned.length}
+                  accentClass="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                  sessions={assigned}
+                  assignedIds={assignedIds}
+                  isAssigning={isAssigning}
+                  onSelect={handleSelect}
+                />
+              )}
 
-                    {/* Text */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {session.name}
-                        </p>
-                        {recent && (
-                          <span className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                            Récent
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        {totalDistance > 0 && (
-                          <span>{totalDistance.toLocaleString("fr-FR")} m</span>
-                        )}
-                        {totalDistance > 0 && session.folder && (
-                          <span aria-hidden="true">·</span>
-                        )}
-                        {session.folder && (
-                          <span className="truncate">{session.folder}</span>
-                        )}
-                        {(totalDistance > 0 || session.folder) && relDate && (
-                          <span aria-hidden="true">·</span>
-                        )}
-                        {relDate && (
-                          <span className="inline-flex items-center gap-0.5 shrink-0">
-                            <Clock className="h-2.5 w-2.5 opacity-60" />
-                            {relDate}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+              {/* ── Unassigned section ── */}
+              {unassigned.length > 0 && (
+                <SessionGroup
+                  label="Non assignées"
+                  icon={<FolderOpen className="h-3.5 w-3.5" />}
+                  badgeCount={unassigned.length}
+                  accentClass="text-muted-foreground bg-muted/60"
+                  sessions={unassigned}
+                  assignedIds={assignedIds}
+                  isAssigning={isAssigning}
+                  onSelect={handleSelect}
+                />
+              )}
             </div>
           )}
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/* ─── SessionGroup ───────────────────────────────────────── */
+
+function SessionGroup({
+  label,
+  icon,
+  badgeCount,
+  accentClass,
+  sessions,
+  assignedIds,
+  isAssigning,
+  onSelect,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  badgeCount: number;
+  accentClass: string;
+  sessions: SwimSessionTemplate[];
+  assignedIds?: Set<number>;
+  isAssigning: boolean;
+  onSelect: (s: SwimSessionTemplate) => void;
+}) {
+  return (
+    <div>
+      {/* Section header */}
+      <div className="mb-2 flex items-center gap-2">
+        <div
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${accentClass}`}
+        >
+          {icon}
+          {label}
+        </div>
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {badgeCount}
+        </span>
+        <div className="flex-1 border-t border-border/40" />
+      </div>
+
+      {/* Session cards */}
+      <div className="space-y-2">
+        {sessions.map((session) => (
+          <SessionCard
+            key={session.id}
+            session={session}
+            isAssigned={assignedIds?.has(session.id) ?? false}
+            isAssigning={isAssigning}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── SessionCard ────────────────────────────────────────── */
+
+function SessionCard({
+  session,
+  isAssigned,
+  isAssigning,
+  onSelect,
+}: {
+  session: SwimSessionTemplate;
+  isAssigned: boolean;
+  isAssigning: boolean;
+  onSelect: (s: SwimSessionTemplate) => void;
+}) {
+  const totalDistance = calculateSwimTotalDistance(session.items ?? []);
+  const relDate = formatRelativeDate(session.created_at);
+  const recent = isRecent(session.created_at);
+
+  return (
+    <button
+      type="button"
+      disabled={isAssigning}
+      onClick={() => onSelect(session)}
+      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none ${
+        isAssigned
+          ? "border-emerald-500/25 bg-emerald-500/5"
+          : recent
+            ? "border-blue-500/30 bg-blue-500/5"
+            : "border-border bg-card"
+      }`}
+    >
+      {/* Icon */}
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+          isAssigned
+            ? "bg-emerald-500/15 text-emerald-500"
+            : recent
+              ? "bg-blue-500/15 text-blue-500"
+              : "bg-blue-500/10 text-blue-400"
+        }`}
+      >
+        {isAssigned ? (
+          <CalendarCheck className="h-5 w-5" />
+        ) : (
+          <SwatchBook className="h-5 w-5" />
+        )}
+      </div>
+
+      {/* Text */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-foreground">
+            {session.name}
+          </p>
+          {recent && !isAssigned && (
+            <span className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+              Récent
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+          {totalDistance > 0 && (
+            <span>{totalDistance.toLocaleString("fr-FR")} m</span>
+          )}
+          {totalDistance > 0 && session.folder && (
+            <span aria-hidden="true">·</span>
+          )}
+          {session.folder && (
+            <span className="truncate">{session.folder}</span>
+          )}
+          {(totalDistance > 0 || session.folder) && relDate && (
+            <span aria-hidden="true">·</span>
+          )}
+          {relDate && (
+            <span className="inline-flex items-center gap-0.5 shrink-0">
+              <Clock className="h-2.5 w-2.5 opacity-60" />
+              {relDate}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
   );
 }

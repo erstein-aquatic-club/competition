@@ -438,3 +438,25 @@ export async function deleteSlotAssignments(params: {
 
   if (error) throw new Error(error.message);
 }
+
+/** Get distinct swim_catalog_ids that have upcoming (today+) slot assignments */
+export async function getAssignedSwimCatalogIds(): Promise<Set<number>> {
+  if (!canUseSupabase()) return new Set();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("session_assignments")
+    .select("swim_catalog_id")
+    .eq("assignment_type", "swim")
+    .gte("scheduled_date", today)
+    .neq("status", "completed")
+    .not("swim_catalog_id", "is", null);
+
+  if (error) throw new Error(error.message);
+
+  const ids = new Set<number>();
+  for (const row of data ?? []) {
+    if (row.swim_catalog_id != null) ids.add(row.swim_catalog_id);
+  }
+  return ids;
+}
