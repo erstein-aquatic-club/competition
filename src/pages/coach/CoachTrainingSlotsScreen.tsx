@@ -185,12 +185,7 @@ type CoachTrainingSlotsScreenProps = {
   onOpenLibrary?: (context?: SwimLibraryEntryContext) => void;
 };
 
-type AssignmentRow = {
-  key: number;
-  group_id: string;
-  coach_id: string;
-  lane_count: string;
-};
+// (AssignmentRow removed — groups and coaches are now independent multi-select lists)
 
 type SlotCompletionState = "empty" | "draft" | "published" | "cancelled";
 
@@ -219,8 +214,9 @@ const SlotFormSheet = ({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
-  const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
-  const [nextKey, setNextKey] = useState(1);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
+  const [selectedCoachIds, setSelectedCoachIds] = useState<number[]>([]);
+  const [laneCount, setLaneCount] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
@@ -230,43 +226,28 @@ const SlotFormSheet = ({
       setStartTime(formatTime(slot.start_time));
       setEndTime(formatTime(slot.end_time));
       setLocation(slot.location);
-      const rows = slot.assignments.map((a, i) => ({
-        key: i,
-        group_id: String(a.group_id),
-        coach_id: String(a.coach_id),
-        lane_count: a.lane_count != null ? String(a.lane_count) : "",
-      }));
-      setAssignments(rows);
-      setNextKey(rows.length);
+      setSelectedGroupIds(slot.assignments.map((a) => a.group_id));
+      setSelectedCoachIds((slot.coaches ?? []).map((c) => c.coach_id));
+      setLaneCount(slot.lane_count != null ? String(slot.lane_count) : "");
     } else {
       setDayOfWeek("1");
       setStartTime("");
       setEndTime("");
       setLocation("");
-      setAssignments([]);
-      setNextKey(1);
+      setSelectedGroupIds([]);
+      setSelectedCoachIds([]);
+      setLaneCount("");
     }
   }, [open, slot]);
 
-  const addAssignment = () => {
-    setAssignments((prev) => [
-      ...prev,
-      { key: nextKey, group_id: "", coach_id: "", lane_count: "" },
-    ]);
-    setNextKey((k) => k + 1);
+  const toggleGroup = (id: number) => {
+    setSelectedGroupIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   };
-
-  const removeAssignment = (key: number) => {
-    setAssignments((prev) => prev.filter((a) => a.key !== key));
-  };
-
-  const updateAssignment = (
-    key: number,
-    field: keyof Omit<AssignmentRow, "key">,
-    value: string,
-  ) => {
-    setAssignments((prev) =>
-      prev.map((a) => (a.key === key ? { ...a, [field]: value } : a)),
+  const toggleCoach = (id: number) => {
+    setSelectedCoachIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -292,13 +273,9 @@ const SlotFormSheet = ({
       start_time: startTime,
       end_time: endTime,
       location: location.trim(),
-      assignments: assignments
-        .filter((a) => a.group_id && a.coach_id)
-        .map((a) => ({
-          group_id: Number(a.group_id),
-          coach_id: Number(a.coach_id),
-          lane_count: a.lane_count ? Number(a.lane_count) : null,
-        })),
+      lane_count: laneCount ? Number(laneCount) : null,
+      group_ids: selectedGroupIds,
+      coach_ids: selectedCoachIds,
     };
   };
 
@@ -439,93 +416,94 @@ const SlotFormSheet = ({
 
             <Separator />
 
-            {/* Assignments */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Groupes & Coachs</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addAssignment}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Ajouter
-                </Button>
+            {/* Groups multi-select */}
+            <div className="space-y-2">
+              <Label>Groupes</Label>
+              <div className="flex flex-wrap gap-2">
+                {groups.map((g) => {
+                  const selected = selectedGroupIds.includes(Number(g.id));
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => toggleGroup(Number(g.id))}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                        selected
+                          ? "border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                          : "border-muted bg-muted/40 text-muted-foreground"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                          selected
+                            ? "border-blue-500 bg-blue-500 text-white"
+                            : "border-muted-foreground/40"
+                        }`}
+                      >
+                        {selected && <Check className="h-2.5 w-2.5" />}
+                      </span>
+                      {g.name}
+                    </button>
+                  );
+                })}
               </div>
-
-              {assignments.length === 0 && (
+              {groups.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-2">
-                  Aucun groupe assigne.
+                  Aucun groupe disponible.
                 </p>
               )}
+            </div>
 
-              {assignments.map((row) => (
-                <div
-                  key={row.key}
-                  className="rounded-lg border p-3 space-y-2"
-                >
-                  <div className="space-y-1.5">
-                    <Select
-                      value={row.group_id}
-                      onValueChange={(v) =>
-                        updateAssignment(row.key, "group_id", v)
-                      }
+            {/* Lane count */}
+            <div className="space-y-2">
+              <Label htmlFor="slot-lanes">Lignes d'eau</Label>
+              <Input
+                id="slot-lanes"
+                type="number"
+                min={0}
+                placeholder="Ex : 6"
+                value={laneCount}
+                onChange={(e) => setLaneCount(e.target.value)}
+                className="w-32"
+              />
+            </div>
+
+            {/* Coaches multi-select */}
+            <div className="space-y-2">
+              <Label>Coachs</Label>
+              <div className="flex flex-wrap gap-2">
+                {coaches.map((c) => {
+                  const selected = selectedCoachIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleCoach(c.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                        selected
+                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                          : "border-muted bg-muted/40 text-muted-foreground"
+                      }`}
                     >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Groupe..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {groups.map((g) => (
-                          <SelectItem key={g.id} value={String(g.id)}>
-                            {g.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select
-                      value={row.coach_id}
-                      onValueChange={(v) =>
-                        updateAssignment(row.key, "coach_id", v)
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Coach..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {coaches.map((c) => (
-                          <SelectItem key={c.id} value={String(c.id)}>
-                            {c.display_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder="Lignes d'eau"
-                        value={row.lane_count}
-                        onChange={(e) =>
-                          updateAssignment(row.key, "lane_count", e.target.value)
-                        }
-                        className="h-8 text-xs flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => removeAssignment(row.key)}
+                      <span
+                        className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                          selected
+                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            : "border-muted-foreground/40"
+                        }`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                        {selected && <Check className="h-2.5 w-2.5" />}
+                      </span>
+                      {c.display_name}
+                    </button>
+                  );
+                })}
+              </div>
+              {coaches.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Aucun coach disponible.
+                </p>
+              )}
             </div>
 
             {/* Actions */}
@@ -930,9 +908,9 @@ const TimelineSlot = ({
         )}
 
         {/* Coach names for taller slots */}
-        {!isShort && height >= 70 && slot.assignments.length > 0 && (
+        {!isShort && height >= 70 && (slot.coaches?.length ?? 0) > 0 && (
           <span className="text-[9px] text-muted-foreground truncate">
-            {[...new Set(slot.assignments.map((a) => a.coach_name))].join(", ")}
+            {(slot.coaches ?? []).map((c) => c.coach_name).join(", ")}
           </span>
         )}
 
@@ -1229,8 +1207,8 @@ const MobileView = ({
                         </div>
                       )}
 
-                      {/* Group badges */}
-                      {slot.assignments.length > 0 && (
+                      {/* Group badges + coach/lane info */}
+                      {(slot.assignments.length > 0 || (slot.coaches?.length ?? 0) > 0 || slot.lane_count) && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {slot.assignments.map((a) => (
                             <span
@@ -1238,10 +1216,18 @@ const MobileView = ({
                               className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground"
                             >
                               {a.group_name}
-                              {a.coach_name ? ` · ${a.coach_name.split(" ")[0]}` : ""}
-                              {a.lane_count ? ` · ${a.lane_count}L` : ""}
                             </span>
                           ))}
+                          {(slot.coaches ?? []).length > 0 && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                              {(slot.coaches ?? []).map((c) => c.coach_name.split(" ")[0]).join(", ")}
+                            </span>
+                          )}
+                          {slot.lane_count != null && slot.lane_count > 0 && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+                              {slot.lane_count}L
+                            </span>
+                          )}
                         </div>
                       )}
 
@@ -1390,6 +1376,8 @@ const CoachTrainingSlotsScreen = ({
       created_by: s.created_by,
       created_at: s.created_at,
       assignments: [],
+      lane_count: null,
+      coaches: [],
     }));
   }, [swimmerSlots]);
 
@@ -1405,7 +1393,7 @@ const CoachTrainingSlotsScreen = ({
     if (filterValue.startsWith("coach:")) {
       const cid = Number(filterValue.split(":")[1]);
       return slots.filter((s) =>
-        s.assignments.some((a) => a.coach_id === cid),
+        (s.coaches ?? []).some((c) => c.coach_id === cid),
       );
     }
     if (filterValue.startsWith("swimmer:")) {
