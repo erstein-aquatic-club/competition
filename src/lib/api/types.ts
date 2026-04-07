@@ -628,7 +628,9 @@ export interface TrainingSlot {
   is_active: boolean;
   created_by: number | null;
   created_at: string;
+  lane_count: number | null;
   assignments: TrainingSlotAssignment[];
+  coaches: TrainingSlotCoach[];
 }
 
 export interface TrainingSlotAssignment {
@@ -636,9 +638,13 @@ export interface TrainingSlotAssignment {
   slot_id: string;
   group_id: number;
   group_name: string;
+}
+
+export interface TrainingSlotCoach {
+  id: string;
+  slot_id: string;
   coach_id: number;
   coach_name: string;
-  lane_count: number | null;
 }
 
 export interface TrainingSlotOverride {
@@ -659,11 +665,9 @@ export interface TrainingSlotInput {
   start_time: string;
   end_time: string;
   location: string;
-  assignments: Array<{
-    group_id: number;
-    coach_id: number;
-    lane_count: number | null;
-  }>;
+  lane_count: number | null;
+  group_ids: number[];
+  coach_ids: number[];
 }
 
 export interface TrainingSlotOverrideInput {
