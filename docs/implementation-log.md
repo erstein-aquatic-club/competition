@@ -7331,3 +7331,42 @@ Audit exhaustif du parcours métier critique (création séance → assignation 
 ### Tests
 - `npx tsc --noEmit` : ✅ aucune nouvelle erreur
 - `npm test` : ✅ aucune régression
+
+## 2026-04-07 — Créneaux multi-groupes / multi-coachs (§96)
+**Branche** : `main`
+**Chantier ROADMAP** : §96 — Refonte gestion créneaux horaires
+
+### Contexte — Pourquoi ce patch
+Le formulaire de gestion des créneaux utilisait un modèle en lignes (1 ligne = 1 groupe + 1 coach + lignes d'eau) laborieux à remplir. En réalité, les groupes et coachs sont des listes indépendantes et les lignes d'eau sont un nombre global au créneau.
+
+### Changements
+
+**Migration DB (`00069_slot_multi_coaches.sql`)**
+- Ajout colonne `lane_count SMALLINT` sur `training_slots`
+- Création table `training_slot_coaches` (slot_id, coach_id) avec UNIQUE + RLS
+- Migration des données existantes (lane_count MAX par slot, coach_id DISTINCT)
+- Suppression des colonnes `coach_id` et `lane_count` de `training_slot_assignments`
+
+**Types TypeScript (`types.ts`)**
+- `TrainingSlot` : ajout `lane_count`, `coaches: TrainingSlotCoach[]`
+- `TrainingSlotAssignment` : simplifié à `(id, slot_id, group_id, group_name)`
+- Nouveau type `TrainingSlotCoach` : `(id, slot_id, coach_id, coach_name)`
+- `TrainingSlotInput` : `assignments[]` remplacé par `group_ids[]`, `coach_ids[]`, `lane_count`
+
+**API (`training-slots.ts`)**
+- `getTrainingSlots` : fetch séparé slots + groups + coaches avec lookup maps
+- `createTrainingSlot` / `updateTrainingSlot` : insèrent dans 2 tables séparées
+
+**UI (`CoachTrainingSlotsScreen.tsx`)**
+- Formulaire : multi-select chips toggleables groupes (bleu) + coachs (vert émeraude) + lignes d'eau global
+- Timeline/liste : coachs depuis `slot.coaches`, filtre coach adapté
+
+### Fichiers modifiés
+- `supabase/migrations/00069_slot_multi_coaches.sql`
+- `src/lib/api/types.ts`
+- `src/lib/api/training-slots.ts`
+- `src/pages/coach/CoachTrainingSlotsScreen.tsx`
+
+### Tests
+- `npx tsc --noEmit` : ✅ aucune nouvelle erreur
+- `npm test` : ✅ aucune régression
