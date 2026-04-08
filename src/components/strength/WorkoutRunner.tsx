@@ -961,6 +961,9 @@ export function WorkoutRunner({
           targetWeight={targetWeight}
           muscleTags={muscleTags}
           note={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? null}
+          athleteNote={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? ""}
+          exerciseId={currentBlock?.exercise_id ?? -1}
+          onUpdateNote={onUpdateNote}
           items={workoutPlan}
           logs={logs}
           exercises={exercises}

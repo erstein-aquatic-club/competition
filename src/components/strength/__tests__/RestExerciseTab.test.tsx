@@ -32,6 +32,8 @@ test("renders exercise name and prescription values", () => {
       muscleTags={[]}
       note={null}
       isTransition={false}
+      athleteNote=""
+      exerciseId={1}
     />,
   );
 
@@ -51,6 +53,8 @@ test("renders muscle tags", () => {
       muscleTags={["Pectoraux", "Triceps", "Épaules"]}
       note={null}
       isTransition={false}
+      athleteNote=""
+      exerciseId={1}
     />,
   );
 
@@ -68,6 +72,8 @@ test("renders coach notes", () => {
       muscleTags={[]}
       note="Contrôler la descente sur 3 secondes"
       isTransition={false}
+      athleteNote=""
+      exerciseId={1}
     />,
   );
 
@@ -86,6 +92,8 @@ test("shows 'Exercice en cours' when isTransition=false", () => {
       muscleTags={[]}
       note={null}
       isTransition={false}
+      athleteNote=""
+      exerciseId={1}
     />,
   );
 
@@ -108,6 +116,8 @@ test("shows 'Prochain exercice' when isTransition=true", () => {
       muscleTags={[]}
       note={null}
       isTransition={true}
+      athleteNote=""
+      exerciseId={1}
     />,
   );
 

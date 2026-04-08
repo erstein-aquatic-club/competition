@@ -1,5 +1,5 @@
-import React from "react";
-import { Dumbbell, StickyNote } from "lucide-react";
+import React, { useState, useRef, useCallback } from "react";
+import { Dumbbell, StickyNote, Pencil } from "lucide-react";
 import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 
 export interface RestExerciseTabProps {
@@ -9,6 +9,9 @@ export interface RestExerciseTabProps {
   muscleTags: string[];
   note: string | null | undefined;
   isTransition: boolean;
+  athleteNote: string;
+  exerciseId: number;
+  onUpdateNote?: (exerciseId: number, note: string | null) => void;
 }
 
 const formatVal = (v?: number | null) => {
@@ -23,8 +26,29 @@ export function RestExerciseTab({
   muscleTags,
   note,
   isTransition,
+  athleteNote,
+  exerciseId,
+  onUpdateNote,
 }: RestExerciseTabProps) {
   const label = isTransition ? "Prochain exercice" : "Exercice en cours";
+
+  const [localAthleteNote, setLocalAthleteNote] = useState(athleteNote);
+  const noteTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  React.useEffect(() => {
+    setLocalAthleteNote(athleteNote);
+  }, [athleteNote, exerciseId]);
+
+  const handleAthleteNoteChange = useCallback(
+    (value: string) => {
+      setLocalAthleteNote(value);
+      clearTimeout(noteTimerRef.current);
+      noteTimerRef.current = setTimeout(() => {
+        onUpdateNote?.(exerciseId, value || null);
+      }, 800);
+    },
+    [exerciseId, onUpdateNote],
+  );
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto pb-6">
@@ -36,17 +60,17 @@ export function RestExerciseTab({
       {/* GIF illustration */}
       <div className="flex justify-center">
         {exercise?.illustration_gif ? (
-          <div className="h-[170px] w-full max-w-[260px] overflow-hidden rounded-2xl border border-border/50 shadow-sm">
+          <div className="max-h-[220px] w-full max-w-[300px] overflow-hidden rounded-2xl border border-border/50 bg-muted/20 shadow-sm">
             <img
               src={exercise.illustration_gif}
               alt={exercise.nom_exercice}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain max-h-[220px]"
               loading="eager"
               decoding="async"
             />
           </div>
         ) : (
-          <div className="flex h-[170px] w-full max-w-[260px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/30">
+          <div className="flex h-[170px] w-full max-w-[300px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/30">
             <Dumbbell className="h-10 w-10 text-muted-foreground/40" />
           </div>
         )}
@@ -100,6 +124,26 @@ export function RestExerciseTab({
           </div>
         </div>
       ) : null}
+
+      {/* Athlete note — editable */}
+      {onUpdateNote && exerciseId > 0 && (
+        <div className="rounded-2xl border border-dashed border-border/50 bg-card/50 p-3.5 flex gap-2.5 items-start">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Ma note</p>
+            <textarea
+              value={localAthleteNote}
+              onChange={(e) => handleAthleteNoteChange(e.target.value)}
+              placeholder="Ajouter une note..."
+              rows={1}
+              className="w-full resize-none bg-transparent text-sm text-foreground/80 leading-relaxed placeholder:text-muted-foreground/40 focus:outline-none"
+              style={{ maxHeight: "4.5em", overflow: "auto" }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
