@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-03-30 (§94 Rest Timer enrichi — tabs swipables)*
+*Dernière mise à jour : 2026-04-08 (§95 Rest Screen Improvements)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -64,6 +64,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 54 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Moyenne | Fait (§92) |
 | 56 | Restructuration bibliothèque musculation nageur | Moyenne | Moyenne | Fait (§93) |
 | 57 | Rest Timer enrichi — tabs swipables | Moyenne | Moyenne | Fait (§94) |
+| 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Moyenne | Fait (§95) |
 
 ---
 

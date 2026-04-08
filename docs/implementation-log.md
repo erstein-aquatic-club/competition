@@ -7370,3 +7370,55 @@ Le formulaire de gestion des créneaux utilisait un modèle en lignes (1 ligne =
 ### Tests
 - `npx tsc --noEmit` : ✅ aucune nouvelle erreur
 - `npm test` : ✅ aucune régression
+
+---
+
+## §95 — Rest Screen Improvements (2026-04-08)
+
+### Contexte
+5 améliorations UX de l'écran de récupération en mode focus musculation, identifiées par retour utilisateur.
+
+### Changements
+
+**1. GIF full ratio (`RestExerciseTab.tsx`)**
+- `object-cover` → `object-contain`, conteneur adaptatif `max-h-[220px] max-w-[300px]`, fond `bg-muted/20`
+
+**2. Fix conflit swipe/scroll (`useSwipeNavigation.ts`, `RestScreen.tsx`)**
+- Remplacement du drag framer-motion par détection directionnelle tactile (touchstart/touchmove/touchend)
+- Lock directionnel après 10px de mouvement : horizontal → swipe tabs, vertical → scroll natif
+- `{...swipeProps}` déplacé du `motion.div` interne vers le wrapper externe
+
+**3. Notes perso éditables (`RestExerciseTab.tsx`)**
+- Bloc "Ma note" avec textarea auto-resize sous la note coach
+- Debounce 800ms, même pattern que WorkoutRunner
+- Props threadées : `athleteNote`, `exerciseId`, `onUpdateNote`
+
+**4. Pastilles série + estimation temps (`RestSessionTab.tsx`)**
+- Indicateurs visuels ●●●○○ pour la série en cours (filled/current ring/empty)
+- Label "Série X/Y" à droite des pastilles
+- Estimation "~N min restantes" basée sur séries et exercices restants × temps de repos
+
+**5. Sparkline 1RM + détail (`RestPerfsTab.tsx`)**
+- Mini AreaChart recharts (60px) affichant l'évolution 1RM sur 3 mois
+- Delta "+X.X kg" en badge
+- Tap → ouvre `ExerciseProgressChart` (bottom sheet existant complet)
+- Réutilise `useExerciseHistory` avec cache React Query (staleTime 60s)
+
+### Fichiers modifiés
+- `src/hooks/useSwipeNavigation.ts` — réécriture complète (framer-motion → touch events)
+- `src/components/strength/RestScreen.tsx` — nouvelles props, swipe wrapper
+- `src/components/strength/RestExerciseTab.tsx` — GIF contain + notes éditables
+- `src/components/strength/RestSessionTab.tsx` — pastilles série + temps restant
+- `src/components/strength/RestPerfsTab.tsx` — sparkline 1RM + chart
+- `src/components/strength/WorkoutRunner.tsx` — passage nouvelles props
+- `src/pages/Strength.tsx` — passage userId
+- `src/components/strength/ExerciseProgressChart.tsx` — ajout import React (SSR)
+
+### Décisions
+- Touch events natifs plutôt que framer-motion drag : meilleure cohabitation scroll/swipe sur mobile
+- Estimation temps approximative (utilise rest_seconds de l'exercice courant pour tous) — acceptable car pas de rest_seconds distinct inter-exercice dans le schéma
+- Gradient sparkline avec ID `restSparkGrad` distinct pour éviter conflit avec `ExerciseProgressChart`
+
+### Tests
+- `npx tsc --noEmit` : ✅ aucune nouvelle erreur
+- `npm test` : ✅ aucune régression (RestPerfsTab tests corrigés avec QueryClientProvider)

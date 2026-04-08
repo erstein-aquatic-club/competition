@@ -206,6 +206,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 55 | Refonte UX Coach (nav, home, fiche nageur) | Haute | Fait (§92) |
 | 56 | Restructuration bibliothèque musculation nageur | Moyenne | Fait (§93) |
 | 57 | Rest Timer enrichi — tabs swipables | Moyenne | Fait (§94) |
+| 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Fait (§95) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
