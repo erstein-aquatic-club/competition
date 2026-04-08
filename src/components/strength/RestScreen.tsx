@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
@@ -43,12 +43,6 @@ export interface RestScreenProps {
 
 const TAB_LABELS = ["Exercice", "Séance", "Perfs"] as const;
 
-const slideVariants = {
-  enter: (d: number) => ({ x: d > 0 ? "80%" : "-80%", opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (d: number) => ({ x: d > 0 ? "-80%" : "80%", opacity: 0 }),
-};
-
 export function RestScreen({
   restTimer,
   restDuration,
@@ -80,11 +74,9 @@ export function RestScreen({
   onAdd30s,
 }: RestScreenProps) {
   const [activeTab, setActiveTab] = useState(0);
-  const [direction, setDirection] = useState(0);
 
   const goTo = (next: number) => {
     if (next < 0 || next >= TAB_LABELS.length || next === activeTab) return;
-    setDirection(next > activeTab ? 1 : -1);
     setActiveTab(next);
   };
 
@@ -202,58 +194,51 @@ export function RestScreen({
         ))}
       </div>
 
-      {/* Swipable tabs area */}
+      {/* Swipable tabs area — all 3 tabs pre-rendered, translate on swipe */}
       <div className="flex-1 overflow-hidden relative" {...swipeProps}>
-        <AnimatePresence initial={false} custom={direction} mode="popLayout">
-          <motion.div
-            key={activeTab}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: "spring", stiffness: 350, damping: 30, mass: 0.8 }}
-            className="absolute inset-0 overflow-y-auto px-5 pt-1"
-          >
-            {activeTab === 0 && (
-              <RestExerciseTab
-                exercise={displayExercise}
-                block={displayBlock}
-                targetWeight={targetWeight}
-                muscleTags={muscleTags}
-                note={note}
-                isTransition={restType === "exercise"}
-                athleteNote={athleteNote}
-                exerciseId={exerciseId}
-                onUpdateNote={onUpdateNote}
-              />
-            )}
-            {activeTab === 1 && (
-              <RestSessionTab
-                items={items}
-                logs={logs}
-                exercises={exercises}
-                currentStep={currentStep}
-                progressPct={progressPct}
-                currentSetIndex={currentSetIndex}
-                totalSets={totalSets}
-                restSecondsPerSet={restSecondsPerSet}
-                restSecondsPerExercise={restSecondsPerExercise}
-              />
-            )}
-            {activeTab === 2 && (
-              <RestPerfsTab
-                exerciseName={displayExercise?.nom_exercice ?? "—"}
-                oneRmWeight={oneRmWeight}
-                targetWeight={targetWeight}
-                percentOneRm={percentOneRm}
-                todayLogs={todayLogs}
-                exerciseId={displayExerciseId}
-                userId={userId}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          className="absolute inset-0 flex will-change-transform"
+          animate={{ x: `${-activeTab * 100}%` }}
+          transition={{ type: "tween", duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          <div className="w-full shrink-0 overflow-y-auto px-5 pt-1">
+            <RestExerciseTab
+              exercise={displayExercise}
+              block={displayBlock}
+              targetWeight={targetWeight}
+              muscleTags={muscleTags}
+              note={note}
+              isTransition={restType === "exercise"}
+              athleteNote={athleteNote}
+              exerciseId={exerciseId}
+              onUpdateNote={onUpdateNote}
+            />
+          </div>
+          <div className="w-full shrink-0 overflow-y-auto px-5 pt-1">
+            <RestSessionTab
+              items={items}
+              logs={logs}
+              exercises={exercises}
+              currentStep={currentStep}
+              progressPct={progressPct}
+              currentSetIndex={currentSetIndex}
+              totalSets={totalSets}
+              restSecondsPerSet={restSecondsPerSet}
+              restSecondsPerExercise={restSecondsPerExercise}
+            />
+          </div>
+          <div className="w-full shrink-0 overflow-y-auto px-5 pt-1">
+            <RestPerfsTab
+              exerciseName={displayExercise?.nom_exercice ?? "—"}
+              oneRmWeight={oneRmWeight}
+              targetWeight={targetWeight}
+              percentOneRm={percentOneRm}
+              todayLogs={todayLogs}
+              exerciseId={displayExerciseId}
+              userId={userId}
+            />
+          </div>
+        </motion.div>
       </div>
     </div>
   );

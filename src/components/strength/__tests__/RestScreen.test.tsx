@@ -2,9 +2,14 @@ import React from "react";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RestScreen } from "@/components/strength/RestScreen";
 import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 import type { SetLogEntry } from "@/lib/types";
+
+const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const wrap = (ui: React.ReactNode) =>
+  renderToStaticMarkup(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 
 const exercise: Exercise = {
   id: 1,
@@ -57,42 +62,42 @@ const defaultProps = {
 };
 
 test("renders timer text correctly (1:25 for restTimer=85)", () => {
-  const markup = renderToStaticMarkup(<RestScreen {...defaultProps} />);
+  const markup = wrap(<RestScreen {...defaultProps} />);
   // 85s = 1 min 25s → "1:25"
   assert.ok(markup.includes("1:25"), `expected '1:25' in markup`);
 });
 
 test("renders 3 pagination dot buttons with aria-labels", () => {
-  const markup = renderToStaticMarkup(<RestScreen {...defaultProps} />);
+  const markup = wrap(<RestScreen {...defaultProps} />);
   assert.ok(markup.includes("Exercice"), "should have dot for Exercice tab");
   assert.ok(markup.includes("Séance"), "should have dot for Séance tab");
   assert.ok(markup.includes("Perfs"), "should have dot for Perfs tab");
 });
 
 test("renders RestExerciseTab content by default (exercise name visible)", () => {
-  const markup = renderToStaticMarkup(<RestScreen {...defaultProps} />);
+  const markup = wrap(<RestScreen {...defaultProps} />);
   assert.ok(markup.includes("Développé couché"), "exercise name should be visible on first tab");
 });
 
 test("shows 'Repos' label for restType=set", () => {
-  const markup = renderToStaticMarkup(<RestScreen {...defaultProps} restType="set" />);
+  const markup = wrap(<RestScreen {...defaultProps} restType="set" />);
   assert.ok(markup.includes("Repos"), "should show 'Repos' for set rest");
 });
 
 test("shows 'Transition' label for restType=exercise", () => {
-  const markup = renderToStaticMarkup(
+  const markup = wrap(
     <RestScreen {...defaultProps} restType="exercise" />,
   );
   assert.ok(markup.includes("Transition"), "should show 'Transition' for exercise rest");
 });
 
 test("renders tap pour passer and +30s button", () => {
-  const markup = renderToStaticMarkup(<RestScreen {...defaultProps} />);
+  const markup = wrap(<RestScreen {...defaultProps} />);
   assert.ok(markup.includes("tap pour passer"), "should show skip hint");
   assert.ok(markup.includes("+30s"), "should show +30s button");
 });
 
 test("renders timer as 0:00 when restTimer=0", () => {
-  const markup = renderToStaticMarkup(<RestScreen {...defaultProps} restTimer={0} />);
+  const markup = wrap(<RestScreen {...defaultProps} restTimer={0} />);
   assert.ok(markup.includes("0:00"), "should show 0:00 when restTimer is 0");
 });
