@@ -31,6 +31,11 @@ export interface RestScreenProps {
   athleteNote: string;
   exerciseId: number;
   onUpdateNote?: (exerciseId: number, note: string | null) => void;
+  currentSetIndex: number;
+  totalSets: number;
+  restSecondsPerSet: number;
+  restSecondsPerExercise: number;
+  userId: number;
   onClose: () => void;
   onSkip: () => void;
   onAdd30s: () => void;
@@ -65,6 +70,11 @@ export function RestScreen({
   athleteNote,
   exerciseId,
   onUpdateNote,
+  currentSetIndex,
+  totalSets,
+  restSecondsPerSet,
+  restSecondsPerExercise,
+  userId,
   onClose,
   onSkip,
   onAdd30s,
@@ -225,6 +235,10 @@ export function RestScreen({
                 exercises={exercises}
                 currentStep={currentStep}
                 progressPct={progressPct}
+                currentSetIndex={currentSetIndex}
+                totalSets={totalSets}
+                restSecondsPerSet={restSecondsPerSet}
+                restSecondsPerExercise={restSecondsPerExercise}
               />
             )}
             {activeTab === 2 && (
@@ -234,6 +248,8 @@ export function RestScreen({
                 targetWeight={targetWeight}
                 percentOneRm={percentOneRm}
                 todayLogs={todayLogs}
+                exerciseId={displayExerciseId}
+                userId={userId}
               />
             )}
           </motion.div>

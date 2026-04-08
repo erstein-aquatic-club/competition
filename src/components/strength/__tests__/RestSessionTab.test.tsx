@@ -30,6 +30,10 @@ test("renders progress count", () => {
       exercises={exercises}
       currentStep={1}
       progressPct={33}
+      currentSetIndex={1}
+      totalSets={4}
+      restSecondsPerSet={120}
+      restSecondsPerExercise={120}
     />,
   );
 
@@ -51,6 +55,10 @@ test("renders total volume", () => {
       exercises={exercises}
       currentStep={2}
       progressPct={66}
+      currentSetIndex={1}
+      totalSets={3}
+      restSecondsPerSet={90}
+      restSecondsPerExercise={90}
     />,
   );
 
@@ -68,6 +76,10 @@ test("renders remaining exercise names", () => {
       exercises={exercises}
       currentStep={1}
       progressPct={33}
+      currentSetIndex={1}
+      totalSets={4}
+      restSecondsPerSet={120}
+      restSecondsPerExercise={120}
     />,
   );
 
@@ -83,6 +95,10 @@ test("renders last set summary with weight and reps", () => {
       exercises={exercises}
       currentStep={1}
       progressPct={33}
+      currentSetIndex={1}
+      totalSets={4}
+      restSecondsPerSet={120}
+      restSecondsPerExercise={120}
     />,
   );
 
@@ -106,6 +122,10 @@ test("excludes bodyweight exercises from volume", () => {
       exercises={exercises}
       currentStep={2}
       progressPct={66}
+      currentSetIndex={1}
+      totalSets={3}
+      restSecondsPerSet={90}
+      restSecondsPerExercise={90}
     />,
   );
 

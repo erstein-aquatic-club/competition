@@ -137,6 +137,7 @@ export function WorkoutRunner({
   onUpdateNote,
   onAddExercise,
   onSubstitute,
+  userId,
 }: {
   session: StrengthSessionTemplate;
   exercises: Exercise[];
@@ -155,6 +156,7 @@ export function WorkoutRunner({
   onUpdateNote?: (exerciseId: number, note: string | null) => void;
   onAddExercise?: (exercise: Exercise) => void;
   onSubstitute?: (itemIndex: number, exercise: Exercise) => void;
+  userId: number;
 }) {
   const { toast } = useToast();
   const isLoggingRef = useRef(false);
@@ -971,6 +973,12 @@ export function WorkoutRunner({
           progressPct={progressPct}
           oneRmWeight={rm}
           percentOneRm={hasPercent ? percentValue : 0}
+          currentSetIndex={currentSetIndex}
+          totalSets={currentBlock?.sets ?? 0}
+          restSecondsPerSet={currentBlock?.rest_seconds ?? 0}
+          restSecondsPerExercise={currentBlock?.rest_seconds ?? 0}
+          exerciseId={currentBlock?.exercise_id ?? -1}
+          userId={userId}
           onClose={() => { setIsResting(false); setIsRestPaused(false); }}
           onSkip={() => {
             restEndRef.current = 0;

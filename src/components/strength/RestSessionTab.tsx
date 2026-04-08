@@ -11,6 +11,10 @@ export interface RestSessionTabProps {
   exercises: Exercise[];
   currentStep: number;
   progressPct: number;
+  currentSetIndex: number;
+  totalSets: number;
+  restSecondsPerSet: number;
+  restSecondsPerExercise: number;
 }
 
 const formatVolume = (v: number) =>
@@ -24,6 +28,10 @@ export function RestSessionTab({
   exercises,
   currentStep,
   progressPct,
+  currentSetIndex,
+  totalSets,
+  restSecondsPerSet,
+  restSecondsPerExercise,
 }: RestSessionTabProps) {
   // Exercise lookup map
   const exerciseMap = new Map<number, Exercise>(exercises.map((e) => [e.id, e]));
@@ -59,6 +67,48 @@ export function RestSessionTab({
           />
         </div>
       </div>
+
+      {/* Current exercise set progress */}
+      {totalSets > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: totalSets }).map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-2 w-2 rounded-full transition-colors",
+                  i < currentSetIndex
+                    ? "bg-primary"
+                    : i === currentSetIndex
+                      ? "bg-primary/40 ring-2 ring-primary/30"
+                      : "bg-muted-foreground/20",
+                )}
+              />
+            ))}
+          </div>
+          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+            Série {currentSetIndex}/{totalSets}
+          </span>
+        </div>
+      )}
+
+      {/* Estimated remaining time */}
+      {(() => {
+        const setsLeft = Math.max(0, totalSets - currentSetIndex);
+        const exercisesAfter = items.slice(currentStep);
+        const futureSets = exercisesAfter.reduce((acc, item) => acc + item.sets, 0);
+        const totalSecsLeft =
+          setsLeft * restSecondsPerSet +
+          futureSets * restSecondsPerSet +
+          exercisesAfter.length * restSecondsPerExercise;
+        if (totalSecsLeft <= 0) return null;
+        const mins = Math.ceil(totalSecsLeft / 60);
+        return (
+          <p className="text-xs text-muted-foreground/60 text-center">
+            ~{mins} min restante{mins > 1 ? "s" : ""}
+          </p>
+        );
+      })()}
 
       {/* Stats row: last set + volume */}
       <div className="grid grid-cols-2 gap-3">

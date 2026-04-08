@@ -1,5 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Trophy, Target, TrendingUp } from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import { cn } from "@/lib/utils";
+import { useExerciseHistory } from "@/hooks/useExerciseHistory";
+import { ExerciseProgressChart } from "./ExerciseProgressChart";
 import type { SetLogEntry } from "@/lib/types";
 import { isBodyweight } from "@/lib/api/client";
 
@@ -9,6 +13,8 @@ export interface RestPerfsTabProps {
   targetWeight: number;
   percentOneRm: number;
   todayLogs: SetLogEntry[];
+  exerciseId: number;
+  userId: number;
 }
 
 export function RestPerfsTab({
@@ -17,7 +23,15 @@ export function RestPerfsTab({
   targetWeight,
   percentOneRm,
   todayLogs,
+  exerciseId,
+  userId,
 }: RestPerfsTabProps) {
+  const { sessions, delta1rm } = useExerciseHistory({
+    exerciseId,
+    userId,
+    months: 3,
+  });
+  const [chartOpen, setChartOpen] = useState(false);
   // Filter out bodyweight logs for weight-based computations
   const weightedLogs = todayLogs.filter(
     (l) => !isBodyweight(l.weight) && typeof l.weight === "number" && (l.weight ?? 0) > 0,
@@ -126,6 +140,63 @@ export function RestPerfsTab({
             {bestSet.reps} <span className="text-sm font-normal text-muted-foreground">reps</span>
           </p>
         </div>
+      )}
+
+      {/* 1RM sparkline */}
+      {sessions.length >= 2 && (
+        <button
+          type="button"
+          className="w-full max-w-xs rounded-2xl border border-border/50 bg-card p-4 shadow-sm active:scale-[0.98] transition-transform"
+          onClick={() => setChartOpen(true)}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+              Évolution 1RM
+            </span>
+            {delta1rm !== 0 && (
+              <span
+                className={cn(
+                  "text-xs font-semibold tabular-nums",
+                  delta1rm >= 0 ? "text-emerald-600" : "text-red-500",
+                )}
+              >
+                {delta1rm >= 0 ? "+" : ""}{delta1rm.toFixed(1)} kg
+              </span>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={60}>
+            <AreaChart data={sessions} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+              <defs>
+                <linearGradient id="restSparkGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="estimated1rm"
+                stroke="hsl(var(--primary))"
+                strokeWidth={1.5}
+                fill="url(#restSparkGrad)"
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+          <p className="text-[10px] text-muted-foreground/50 text-center mt-1">
+            Tap pour voir le détail
+          </p>
+        </button>
+      )}
+
+      {/* Full chart sheet */}
+      {exerciseId > 0 && userId > 0 && (
+        <ExerciseProgressChart
+          exerciseId={exerciseId}
+          userId={userId}
+          exerciseName={exerciseName}
+          open={chartOpen}
+          onOpenChange={setChartOpen}
+        />
       )}
     </div>
   );
