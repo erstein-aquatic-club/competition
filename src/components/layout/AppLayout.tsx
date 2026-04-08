@@ -64,8 +64,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const alreadyActive = isNavActive(hash, href);
 
     if (alreadyActive) {
-      // Already on this page — reset to home state
-      window.dispatchEvent(new CustomEvent(NAV_RESET_EVENT));
+      // Already on this page — reset internal state (but not section)
+      // Only dispatch reset for items without a section query param;
+      // section items just scroll to top to avoid losing the current page.
+      if (!hrefQuery || !new URLSearchParams(hrefQuery).has("section")) {
+        window.dispatchEvent(new CustomEvent(NAV_RESET_EVENT));
+      }
       window.scrollTo(0, 0);
     } else if (hrefQuery && location === hrefPath) {
       // Same base route (e.g. /coach) but different section — update hash
