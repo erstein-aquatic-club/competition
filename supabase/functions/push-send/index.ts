@@ -41,6 +41,10 @@ function resolveNotificationUrl(payload: {
     return "#/profile?section=objectives";
   }
 
+  if (type === "wellness") {
+    return "#/?wellness=open";
+  }
+
   return "#/profile?section=messages";
 }
 
