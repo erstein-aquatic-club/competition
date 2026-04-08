@@ -2,15 +2,20 @@
 -- Sends a push to athletes who haven't filled their wellness_checks for today.
 -- Runs daily at 04:00 UTC (06:00 CEST).
 
+-- Extend notifications type CHECK to allow 'wellness'
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+  CHECK (type IN ('message', 'assignment', 'birthday', 'wellness'));
+
 CREATE OR REPLACE FUNCTION public.send_wellness_morning_push()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_athlete_ids uuid[];
+  v_athlete_ids integer[];
   v_notif_id   integer;
-  v_uid        uuid;
+  v_uid        integer;
 BEGIN
   -- Find athletes with active push subscriptions who haven't filled wellness today
   SELECT array_agg(DISTINCT u.id)
