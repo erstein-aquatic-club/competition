@@ -24,6 +24,9 @@ import {
   FileText,
   ChevronRight,
   X,
+  Sun,
+  Moon,
+  Clock,
 } from "lucide-react";
 import { WellnessBanner } from "@/components/wellness/WellnessBanner";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
@@ -42,6 +45,7 @@ import type { SaveState } from "@/components/shared/BottomActionBar";
  */
 
 const WEEKDAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const WEEKDAYS_SHORT = ["L", "M", "M", "J", "V", "S", "D"];
 
 const SLOTS = [
   { key: "AM" as const, label: "Matin" },
@@ -849,89 +853,120 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Settings Dialog */}
+        {/* Settings Dialog — compact weekly grid */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <DialogContent className="max-w-sm rounded-2xl">
-            <DialogHeader>
-              <DialogTitle>Présence hebdo</DialogTitle>
+          <DialogContent className="max-w-[340px] rounded-2xl p-5">
+            <DialogHeader className="pb-1">
+              <DialogTitle className="text-base font-bold tracking-tight">Ma semaine type</DialogTitle>
+              <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                Coche les créneaux où tu t'entraînes habituellement.
+              </p>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground">
-                Définis les créneaux attendus chaque semaine. Tu peux ensuite ajuster un jour précis dans le calendrier.
+
+            {/* Weekly grid matrix */}
+            <div className="mt-3 rounded-xl border border-border bg-card overflow-hidden">
+              {/* Day headers */}
+              <div className="grid grid-cols-[auto_repeat(7,1fr)] border-b border-border/60">
+                <div className="w-16" />
+                {WEEKDAYS_SHORT.map((d, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-center py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
+                  >
+                    {d}
+                  </div>
+                ))}
               </div>
 
-              <div className="space-y-2">
-                {WEEKDAYS_FR.map((wd, idx) => {
-                  const activeCount = SLOTS.filter((slot) => Boolean(presenceDefaults?.[idx]?.[slot.key])).length;
-                  return (
-                    <div key={wd} className="rounded-2xl border border-border bg-card px-3 py-3">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">{wd}</div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {activeCount === 0
-                              ? "Aucun créneau prévu"
-                              : `${activeCount} créneau${activeCount > 1 ? "x" : ""} attendu${activeCount > 1 ? "s" : ""}`}
-                          </div>
-                        </div>
-                      </div>
+              {/* Slot rows */}
+              {SLOTS.map((slot, slotIdx) => (
+                <div
+                  key={slot.key}
+                  className={cn(
+                    "grid grid-cols-[auto_repeat(7,1fr)]",
+                    slotIdx < SLOTS.length - 1 && "border-b border-border/40",
+                  )}
+                >
+                  {/* Row label */}
+                  <div className="flex w-16 items-center gap-1.5 pl-3 py-3">
+                    {slot.key === "AM" ? (
+                      <Sun className="h-3.5 w-3.5 text-amber-500" />
+                    ) : (
+                      <Moon className="h-3.5 w-3.5 text-indigo-400" />
+                    )}
+                    <span className="text-[11px] font-semibold text-foreground">{slot.label}</span>
+                  </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        {SLOTS.map((s) => {
-                          const on = Boolean(presenceDefaults?.[idx]?.[s.key]);
-                          return (
-                            <button
-                              key={s.key}
-                              type="button"
-                              onClick={() => toggleDefaultPresence(idx, s.key)}
-                              className={cn(
-                                "rounded-2xl border px-3 py-3 text-left transition",
-                                on
-                                  ? "border-foreground bg-foreground text-background"
-                                  : "border-border bg-card text-foreground hover:bg-muted",
-                              )}
-                              aria-label={`${wd} ${s.label}`}
-                            >
-                              <div className="text-sm font-semibold">{s.label}</div>
-                              <div
-                                className={cn(
-                                  "mt-1 text-[11px]",
-                                  on ? "text-background/80" : "text-muted-foreground",
-                                )}
-                              >
-                                {on ? "Prévu" : "Non prévu"}
-                              </div>
-                            </button>
-                          );
-                        })}
+                  {/* Toggle cells */}
+                  {WEEKDAYS_SHORT.map((_, dayIdx) => {
+                    const on = Boolean(presenceDefaults?.[dayIdx]?.[slot.key]);
+                    return (
+                      <div key={dayIdx} className="flex items-center justify-center py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleDefaultPresence(dayIdx, slot.key)}
+                          aria-label={`${WEEKDAYS_FR[dayIdx]} ${slot.label}`}
+                          aria-pressed={on}
+                          className={cn(
+                            "h-8 w-8 rounded-full border-2 transition-all duration-150 active:scale-90",
+                            on
+                              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                              : "border-border bg-background text-transparent hover:border-primary/40",
+                          )}
+                        >
+                          {on && (
+                            <svg viewBox="0 0 16 16" className="h-4 w-4 mx-auto" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3.5 8.5L6.5 11.5L12.5 5" />
+                            </svg>
+                          )}
+                        </button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Stable duration (backend requirement) */}
-              <div className="rounded-2xl border border-border bg-muted px-3 py-2">
-                <div className="text-xs font-semibold text-foreground">Durée (valeur par défaut)</div>
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="h-9 w-9 rounded-2xl border border-border bg-card hover:bg-muted flex items-center justify-center"
-                    onClick={() => setStableDurationMin((v) => Math.max(30, v - 15))}
-                    aria-label="Diminuer la durée"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <div className="text-sm font-semibold text-foreground">{stableDurationMin} min</div>
-                  <button
-                    type="button"
-                    className="h-9 w-9 rounded-2xl border border-border bg-card hover:bg-muted flex items-center justify-center"
-                    onClick={() => setStableDurationMin((v) => Math.min(240, v + 15))}
-                    aria-label="Augmenter la durée"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                    );
+                  })}
                 </div>
+              ))}
+            </div>
+
+            {/* Summary */}
+            {(() => {
+              const total = WEEKDAYS_FR.reduce(
+                (sum, _, idx) => sum + SLOTS.filter((s) => Boolean(presenceDefaults?.[idx]?.[s.key])).length,
+                0,
+              );
+              return (
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground mt-1">
+                  <span className="font-bold text-foreground tabular-nums">{total}</span>
+                  <span>créneau{total !== 1 ? "x" : ""} / semaine</span>
+                </div>
+              );
+            })()}
+
+            {/* Duration stepper */}
+            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3 py-2.5 mt-1">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-foreground">Durée par défaut</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-card hover:bg-muted transition active:scale-95"
+                  onClick={() => setStableDurationMin((v) => Math.max(30, v - 15))}
+                  aria-label="Diminuer la durée"
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+                <span className="w-12 text-center text-xs font-bold tabular-nums text-foreground">
+                  {stableDurationMin} min
+                </span>
+                <button
+                  type="button"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-card hover:bg-muted transition active:scale-95"
+                  onClick={() => setStableDurationMin((v) => Math.min(240, v + 15))}
+                  aria-label="Augmenter la durée"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
               </div>
             </div>
           </DialogContent>
