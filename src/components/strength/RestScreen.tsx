@@ -187,7 +187,7 @@ export function RestScreen({
       </div>
 
       {/* Swipable tabs area */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative" {...swipeProps}>
         <AnimatePresence initial={false} custom={direction} mode="popLayout">
           <motion.div
             key={activeTab}
@@ -198,7 +198,6 @@ export function RestScreen({
             exit="exit"
             transition={{ type: "spring", stiffness: 350, damping: 30, mass: 0.8 }}
             className="absolute inset-0 overflow-y-auto px-5 pt-1"
-            {...swipeProps}
           >
             {activeTab === 0 && (
               <RestExerciseTab
