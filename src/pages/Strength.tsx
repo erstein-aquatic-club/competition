@@ -699,6 +699,7 @@ export default function Strength() {
               }}
               onAddExercise={handleAddExercise}
               onSubstitute={handleSubstitute}
+              userId={userId ?? 0}
               onLogSets={async (blockLogs) => {
                 if (!activeRunId) return;
                 setActiveRunLogs((prev) => [...(prev ?? []), ...blockLogs]);

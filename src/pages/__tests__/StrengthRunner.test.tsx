@@ -40,6 +40,7 @@ test("WorkoutRunner renders execution state", () => {
       oneRMs={[]}
       onFinish={() => undefined}
       initialStep={1}
+      userId={1}
     />,
   );
 
@@ -56,6 +57,7 @@ test("WorkoutRunner renders finish state", () => {
       oneRMs={[]}
       onFinish={() => undefined}
       initialStep={2}
+      userId={1}
     />,
   );
 
@@ -71,6 +73,7 @@ test("WorkoutRunner renders input modal when open", () => {
       oneRMs={[]}
       onFinish={() => undefined}
       initialStep={1}
+      userId={1}
       initialInputOpen
     />,
   );

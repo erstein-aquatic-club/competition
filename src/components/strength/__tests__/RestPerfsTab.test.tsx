@@ -21,6 +21,8 @@ test("renders 1RM value and target weight when provided", () => {
       targetWeight={80}
       percentOneRm={80}
       todayLogs={[]}
+      exerciseId={1}
+      userId={1}
     />,
   );
 
@@ -39,6 +41,8 @@ test("renders percentage of 1RM in progress bar section", () => {
       targetWeight={75}
       percentOneRm={75}
       todayLogs={logs}
+      exerciseId={1}
+      userId={1}
     />,
   );
 
@@ -58,6 +62,8 @@ test("renders without 1RM — shows logged weight data instead", () => {
       targetWeight={0}
       percentOneRm={0}
       todayLogs={logs}
+      exerciseId={1}
+      userId={1}
     />,
   );
 
@@ -76,6 +82,8 @@ test("renders fallback message when no data at all", () => {
       targetWeight={0}
       percentOneRm={0}
       todayLogs={[]}
+      exerciseId={1}
+      userId={1}
     />,
   );
 
@@ -100,6 +108,8 @@ test("excludes bodyweight logs from weight computations", () => {
       targetWeight={0}
       percentOneRm={0}
       todayLogs={logs}
+      exerciseId={1}
+      userId={1}
     />,
   );
 
