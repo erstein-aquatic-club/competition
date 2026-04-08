@@ -117,7 +117,7 @@ export function ExerciseProgressChart({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[92vh] overflow-y-auto rounded-t-2xl px-4 pb-8 pt-4">
+      <SheetContent side="bottom" className="h-[92vh] overflow-y-auto rounded-t-2xl px-4 pb-8 pt-4 z-[70]">
         <SheetHeader className="pb-2">
           <SheetTitle className="flex items-center gap-2 text-base">
             <Dumbbell className="h-4 w-4 text-primary" />
