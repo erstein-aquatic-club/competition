@@ -115,9 +115,9 @@ export function RestSessionTab({
                   key={i}
                   className={cn(
                     "rounded-[3px] transition-all duration-300",
-                    i < currentSetIndex
+                    i < currentSetIndex - 1
                       ? "h-1.5 w-3 bg-primary"
-                      : i === currentSetIndex
+                      : i === currentSetIndex - 1
                         ? "h-1.5 w-3 bg-primary/40 ring-1 ring-primary/30"
                         : "h-1.5 w-1.5 bg-muted-foreground/20",
                   )}
@@ -161,18 +161,21 @@ export function RestSessionTab({
               <div key={`${item.exercise_id}-${idx}`} className="relative">
                 {/* Timeline node */}
                 <div className={cn(
-                  "absolute -left-5 flex items-center justify-center rounded-full border-2 transition-all duration-300",
+                  "absolute -left-5 rounded-full transition-all duration-300",
                   isCompleted
-                    ? "top-2 h-5 w-5 bg-primary border-primary"
+                    ? "top-2 h-5 w-5 bg-primary"
                     : isCurrent
-                      ? "top-2.5 h-6 w-6 -ml-0.5 bg-primary/15 border-primary shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                      : "top-2.5 h-4 w-4 ml-0.5 bg-background border-muted-foreground/20",
+                      ? "top-2.5 h-6 w-6 -ml-0.5 bg-primary/15 border-2 border-primary shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                      : "top-2.5 h-4 w-4 ml-0.5 bg-background border-2 border-muted-foreground/20",
                 )}>
                   {isCompleted && (
-                    <Check className="h-2.5 w-2.5 text-primary-foreground" strokeWidth={3} />
+                    <Check
+                      className="absolute inset-0 m-auto h-2.5 w-2.5 text-primary-foreground"
+                      strokeWidth={3}
+                    />
                   )}
                   {isCurrent && (
-                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <div className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-primary animate-pulse" />
                   )}
                 </div>
 
@@ -194,7 +197,7 @@ export function RestSessionTab({
                       {Array.from({ length: item.sets }).map((_, si) => {
                         const setLog = logLookup.get(`${item.exercise_id}-${si + 1}`);
                         const isDone = !!setLog;
-                        const isActive = si === currentSetIndex;
+                        const isActive = si === currentSetIndex - 1;
                         return (
                           <div
                             key={si}
