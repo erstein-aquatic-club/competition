@@ -45,9 +45,9 @@ export function useSwipeNavigation({
       const dt = (Date.now() - startTime.current) / 1000;
       const velocity = dt > 0 ? Math.abs(dx) / dt : 0;
 
-      if (dx < -threshold || velocity > velocityThreshold) {
+      if (dx < -threshold || (dx < 0 && velocity > velocityThreshold)) {
         onSwipeLeft?.();
-      } else if (dx > threshold || velocity > velocityThreshold) {
+      } else if (dx > threshold || (dx > 0 && velocity > velocityThreshold)) {
         onSwipeRight?.();
       }
     },
