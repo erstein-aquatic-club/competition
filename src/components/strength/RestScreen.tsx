@@ -28,6 +28,9 @@ export interface RestScreenProps {
   progressPct: number;
   oneRmWeight: number;
   percentOneRm: number;
+  athleteNote: string;
+  exerciseId: number;
+  onUpdateNote?: (exerciseId: number, note: string | null) => void;
   onClose: () => void;
   onSkip: () => void;
   onAdd30s: () => void;
@@ -59,6 +62,9 @@ export function RestScreen({
   progressPct,
   oneRmWeight,
   percentOneRm,
+  athleteNote,
+  exerciseId,
+  onUpdateNote,
   onClose,
   onSkip,
   onAdd30s,
@@ -207,6 +213,9 @@ export function RestScreen({
                 muscleTags={muscleTags}
                 note={note}
                 isTransition={restType === "exercise"}
+                athleteNote={athleteNote}
+                exerciseId={exerciseId}
+                onUpdateNote={onUpdateNote}
               />
             )}
             {activeTab === 1 && (

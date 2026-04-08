@@ -44,6 +44,8 @@ const defaultProps = {
   progressPct: 50,
   oneRmWeight: 100,
   percentOneRm: 75,
+  athleteNote: "",
+  exerciseId: 1,
   onClose: () => undefined,
   onSkip: () => undefined,
   onAdd30s: () => undefined,
