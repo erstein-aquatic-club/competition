@@ -142,6 +142,17 @@ export default function Dashboard() {
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [wellnessOpen, setWellnessOpen] = React.useState(false);
 
+  // Auto-open wellness drawer from push notification deep link (?wellness=open)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    if (params.get('wellness') === 'open') {
+      setWellnessOpen(true);
+      // Clean up URL param
+      const hashBase = window.location.hash.split('?')[0];
+      window.history.replaceState(null, '', window.location.pathname + hashBase);
+    }
+  }, []);
+
   // Get Supabase auth UUID for swim exercise logs
   const [authUuid, setAuthUuid] = React.useState<string | null>(null);
   React.useEffect(() => {
