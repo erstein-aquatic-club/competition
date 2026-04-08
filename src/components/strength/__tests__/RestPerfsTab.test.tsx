@@ -2,8 +2,13 @@ import React from "react";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RestPerfsTab } from "@/components/strength/RestPerfsTab";
 import type { SetLogEntry } from "@/lib/types";
+
+const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const wrap = (ui: React.ReactNode) =>
+  renderToStaticMarkup(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 
 const makeLogs = (entries: Array<{ weight: number; reps: number }>): SetLogEntry[] =>
   entries.map((e, i) => ({
@@ -14,7 +19,7 @@ const makeLogs = (entries: Array<{ weight: number; reps: number }>): SetLogEntry
   }));
 
 test("renders 1RM value and target weight when provided", () => {
-  const markup = renderToStaticMarkup(
+  const markup = wrap(
     <RestPerfsTab
       exerciseName="Développé couché"
       oneRmWeight={100}
@@ -34,7 +39,7 @@ test("renders 1RM value and target weight when provided", () => {
 
 test("renders percentage of 1RM in progress bar section", () => {
   const logs = makeLogs([{ weight: 75, reps: 5 }]);
-  const markup = renderToStaticMarkup(
+  const markup = wrap(
     <RestPerfsTab
       exerciseName="Squat"
       oneRmWeight={100}
@@ -55,7 +60,7 @@ test("renders without 1RM — shows logged weight data instead", () => {
     { weight: 60, reps: 8 },
     { weight: 70, reps: 5 },
   ]);
-  const markup = renderToStaticMarkup(
+  const markup = wrap(
     <RestPerfsTab
       exerciseName="Soulevé de terre"
       oneRmWeight={0}
@@ -75,7 +80,7 @@ test("renders without 1RM — shows logged weight data instead", () => {
 });
 
 test("renders fallback message when no data at all", () => {
-  const markup = renderToStaticMarkup(
+  const markup = wrap(
     <RestPerfsTab
       exerciseName="Pompes"
       oneRmWeight={0}
@@ -101,7 +106,7 @@ test("excludes bodyweight logs from weight computations", () => {
     { exercise_id: 1, set_index: 0, weight: -1, reps: 10 },
     { exercise_id: 1, set_index: 1, weight: -1, reps: 12 },
   ];
-  const markup = renderToStaticMarkup(
+  const markup = wrap(
     <RestPerfsTab
       exerciseName="Tractions"
       oneRmWeight={0}

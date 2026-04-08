@@ -977,7 +977,6 @@ export function WorkoutRunner({
           totalSets={currentBlock?.sets ?? 0}
           restSecondsPerSet={currentBlock?.rest_seconds ?? 0}
           restSecondsPerExercise={currentBlock?.rest_seconds ?? 0}
-          exerciseId={currentBlock?.exercise_id ?? -1}
           userId={userId}
           onClose={() => { setIsResting(false); setIsRestPaused(false); }}
           onSkip={() => {
