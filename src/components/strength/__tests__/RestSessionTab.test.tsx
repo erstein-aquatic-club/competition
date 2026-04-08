@@ -22,7 +22,7 @@ const logs: SetLogEntry[] = [
   { exercise_id: 1, set_index: 0, reps: 8, weight: 80 },
 ];
 
-test("renders progress count", () => {
+test("renders progress count in ring", () => {
   const markup = renderToStaticMarkup(
     <RestSessionTab
       items={items}
@@ -38,8 +38,8 @@ test("renders progress count", () => {
   );
 
   assert.ok(markup.includes("1"), "should include current step");
-  assert.ok(markup.includes("3"), "should include total steps");
-  assert.ok(markup.includes("Progression"), "should include 'Progression' label");
+  assert.ok(markup.includes("/3"), "should include total steps");
+  assert.ok(markup.includes("kg"), "should include volume unit");
 });
 
 test("renders total volume", () => {
@@ -87,7 +87,7 @@ test("renders remaining exercise names", () => {
   assert.ok(markup.includes("Tirage vertical"), "should include remaining exercise Tirage vertical");
 });
 
-test("renders last set summary with weight and reps", () => {
+test("renders current exercise with set chips showing logged data", () => {
   const markup = renderToStaticMarkup(
     <RestSessionTab
       items={items}
@@ -102,10 +102,9 @@ test("renders last set summary with weight and reps", () => {
     />,
   );
 
-  assert.ok(markup.includes("Développé couché"), "should include last exercise name");
-  assert.ok(markup.includes("80"), "should include weight from last log");
-  assert.ok(markup.includes("8"), "should include reps from last log");
-  assert.ok(markup.includes("Dernière série"), "should show last set label");
+  assert.ok(markup.includes("Développé couché"), "should include current exercise name");
+  assert.ok(markup.includes("En cours"), "should show 'En cours' label");
+  assert.ok(markup.includes("1/4"), "should show set progress");
 });
 
 test("excludes bodyweight exercises from volume", () => {

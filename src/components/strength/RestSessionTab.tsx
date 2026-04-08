@@ -1,5 +1,5 @@
-import React from "react";
-import { Check, Dumbbell } from "lucide-react";
+import React, { useMemo } from "react";
+import { Check, Flame, Timer } from "lucide-react";
 import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 import type { SetLogEntry } from "@/lib/types";
 import { isBodyweight } from "@/lib/api/client";
@@ -33,147 +33,215 @@ export function RestSessionTab({
   restSecondsPerSet,
   restSecondsPerExercise,
 }: RestSessionTabProps) {
-  // Exercise lookup map
   const exerciseMap = new Map<number, Exercise>(exercises.map((e) => [e.id, e]));
 
-  // Total volume — exclude bodyweight exercises
   const totalVolume = logs.reduce((sum, log) => {
     if (isBodyweight(log.weight)) return sum;
     return sum + (log.weight ?? 0) * (log.reps ?? 0);
   }, 0);
 
-  // Last logged set
-  const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
-  const lastExercise = lastLog ? exerciseMap.get(lastLog.exercise_id) : null;
-  const lastExerciseName =
-    lastExercise?.nom_exercice ??
-    items.find((i) => i.exercise_id === lastLog?.exercise_id)?.exercise_name ??
-    "—";
+  // Build a log lookup: "exerciseId-setNumber" → SetLogEntry
+  const logLookup = useMemo(() => {
+    const map = new Map<string, SetLogEntry>();
+    logs.forEach((log, index) => {
+      const key = `${log.exercise_id}-${log.set_number ?? log.set_index ?? index + 1}`;
+      map.set(key, log);
+    });
+    return map;
+  }, [logs]);
 
   const totalSteps = items.length;
 
+  // Time estimate
+  const estimatedMins = useMemo(() => {
+    const setsLeft = Math.max(0, totalSets - currentSetIndex);
+    const exercisesAfter = items.slice(currentStep);
+    const futureSets = exercisesAfter.reduce((acc, item) => acc + item.sets, 0);
+    const totalSecsLeft =
+      setsLeft * restSecondsPerSet +
+      futureSets * restSecondsPerSet +
+      exercisesAfter.length * restSecondsPerExercise;
+    return totalSecsLeft > 0 ? Math.ceil(totalSecsLeft / 60) : 0;
+  }, [totalSets, currentSetIndex, items, currentStep, restSecondsPerSet, restSecondsPerExercise]);
+
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto pb-6">
-      {/* Progress bar */}
-      <div>
-        <div className="flex items-baseline justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Progression</span>
-          <span className="text-sm font-bold tabular-nums">{currentStep} <span className="text-muted-foreground font-normal">/ {totalSteps}</span></span>
+    <div className="flex flex-col gap-3 pb-6">
+      {/* ── Hero stats row ── */}
+      <div className="flex items-center gap-2.5">
+        {/* Big progress ring */}
+        <div className="relative shrink-0">
+          <svg className="h-[52px] w-[52px] -rotate-90" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="currentColor" className="text-muted/30" strokeWidth="3.5" />
+            <circle
+              cx="26" cy="26" r="22"
+              fill="none" stroke="currentColor"
+              className="text-primary transition-all duration-700 ease-out"
+              strokeWidth="3.5" strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 22}
+              strokeDashoffset={2 * Math.PI * 22 * (1 - progressPct / 100)}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[11px] font-bold tabular-nums leading-none">
+              {currentStep}<span className="text-muted-foreground/50 font-normal">/{totalSteps}</span>
+            </span>
+          </div>
         </div>
-        <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-            style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
-          />
-        </div>
-      </div>
 
-      {/* Current exercise set progress */}
-      {totalSets > 0 && (
-        <div className="flex items-center justify-between">
+        {/* Volume + Time chips */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
-            {Array.from({ length: totalSets }).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-2 w-2 rounded-full transition-colors",
-                  i < currentSetIndex
-                    ? "bg-primary"
-                    : i === currentSetIndex
-                      ? "bg-primary/40 ring-2 ring-primary/30"
-                      : "bg-muted-foreground/20",
-                )}
-              />
-            ))}
+            <Flame className="h-3 w-3 text-orange-400 shrink-0" />
+            <span className="text-sm font-bold tabular-nums">{formatVolume(totalVolume)}</span>
+            <span className="text-[10px] text-muted-foreground">kg</span>
           </div>
-          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
-            Série {currentSetIndex}/{totalSets}
-          </span>
-        </div>
-      )}
-
-      {/* Estimated remaining time */}
-      {(() => {
-        const setsLeft = Math.max(0, totalSets - currentSetIndex);
-        const exercisesAfter = items.slice(currentStep);
-        const futureSets = exercisesAfter.reduce((acc, item) => acc + item.sets, 0);
-        const totalSecsLeft =
-          setsLeft * restSecondsPerSet +
-          futureSets * restSecondsPerSet +
-          exercisesAfter.length * restSecondsPerExercise;
-        if (totalSecsLeft <= 0) return null;
-        const mins = Math.ceil(totalSecsLeft / 60);
-        return (
-          <p className="text-xs text-muted-foreground/60 text-center">
-            ~{mins} min restante{mins > 1 ? "s" : ""}
-          </p>
-        );
-      })()}
-
-      {/* Stats row: last set + volume */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Last set summary */}
-        {lastLog ? (
-          <div className="rounded-2xl border border-border/50 bg-card p-3 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Dumbbell className="h-3 w-3 text-muted-foreground/60" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Dernière série</span>
+          {estimatedMins > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Timer className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+              <span className="text-xs text-muted-foreground">
+                ~{estimatedMins} min restante{estimatedMins > 1 ? "s" : ""}
+              </span>
             </div>
-            <p className="font-semibold text-sm truncate">{lastExerciseName}</p>
-            <p className="text-lg font-bold tabular-nums mt-0.5">
-              {isBodyweight(lastLog.weight)
-                ? `${lastLog.reps ?? "—"} reps`
-                : `${lastLog.weight ?? "—"} × ${lastLog.reps ?? "—"}`}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border/50 bg-muted/20 p-3 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground/40">—</span>
+          )}
+        </div>
+
+        {/* Set dots — current exercise */}
+        {totalSets > 0 && (
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Série</span>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalSets }).map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "rounded-[3px] transition-all duration-300",
+                    i < currentSetIndex
+                      ? "h-1.5 w-3 bg-primary"
+                      : i === currentSetIndex
+                        ? "h-1.5 w-3 bg-primary/40 ring-1 ring-primary/30"
+                        : "h-1.5 w-1.5 bg-muted-foreground/20",
+                  )}
+                />
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Total volume */}
-        <div className="rounded-2xl border border-border/50 bg-card p-3 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Volume total</p>
-          <p className="text-lg font-bold tabular-nums">{formatVolume(totalVolume)}</p>
-          <p className="text-xs text-muted-foreground">kg soulevés</p>
-        </div>
       </div>
 
-      {/* Exercise list */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Exercices</p>
-        <div className="flex flex-col gap-0.5">
+      {/* ── Connected timeline ── */}
+      <div className="relative pl-5 pt-1">
+        {/* Vertical rail */}
+        <div className="absolute left-[9px] top-0 bottom-0 w-[2px] bg-muted/40 rounded-full" />
+        {/* Filled portion of rail */}
+        <div
+          className="absolute left-[9px] top-0 w-[2px] bg-primary rounded-full transition-all duration-500 ease-out"
+          style={{
+            height: totalSteps > 1
+              ? `${Math.min(100, ((currentStep - 1) / (totalSteps - 1)) * 100)}%`
+              : "0%",
+          }}
+        />
+
+        <div className="flex flex-col">
           {items.map((item, idx) => {
             const isCompleted = idx < currentStep;
             const isCurrent = idx === currentStep - 1;
+            const isUpcoming = idx >= currentStep;
             const exName =
               exerciseMap.get(item.exercise_id)?.nom_exercice ??
               item.exercise_name ??
               `Exercice ${item.exercise_id}`;
 
+            // Compute logged sets for this exercise
+            const loggedSets = Array.from({ length: item.sets }).filter((_, si) =>
+              logLookup.get(`${item.exercise_id}-${si + 1}`),
+            ).length;
+
             return (
-              <div
-                key={`${item.exercise_id}-${idx}`}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors",
-                  isCompleted && "opacity-35",
-                  isCurrent && "bg-primary/5",
-                )}
-              >
-                {isCompleted ? (
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15">
-                    <Check className="h-3 w-3 text-primary" />
+              <div key={`${item.exercise_id}-${idx}`} className="relative">
+                {/* Timeline node */}
+                <div className={cn(
+                  "absolute -left-5 flex items-center justify-center rounded-full border-2 transition-all duration-300",
+                  isCompleted
+                    ? "top-2 h-5 w-5 bg-primary border-primary"
+                    : isCurrent
+                      ? "top-2.5 h-6 w-6 -ml-0.5 bg-primary/15 border-primary shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                      : "top-2.5 h-4 w-4 ml-0.5 bg-background border-muted-foreground/20",
+                )}>
+                  {isCompleted && (
+                    <Check className="h-2.5 w-2.5 text-primary-foreground" strokeWidth={3} />
+                  )}
+                  {isCurrent && (
+                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                  )}
+                </div>
+
+                {/* Content */}
+                {isCurrent ? (
+                  /* ── Expanded current exercise card ── */
+                  <div className="mb-3 rounded-2xl border border-primary/20 bg-primary/[0.04] p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">En cours</p>
+                        <p className="text-sm font-bold truncate">{exName}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary tabular-nums">
+                        {currentSetIndex}/{item.sets}
+                      </span>
+                    </div>
+                    {/* Inline set chips */}
+                    <div className="flex items-center gap-1 mt-2">
+                      {Array.from({ length: item.sets }).map((_, si) => {
+                        const setLog = logLookup.get(`${item.exercise_id}-${si + 1}`);
+                        const isDone = !!setLog;
+                        const isActive = si === currentSetIndex;
+                        return (
+                          <div
+                            key={si}
+                            className={cn(
+                              "flex items-center justify-center rounded-lg text-[10px] font-bold tabular-nums transition-all",
+                              isDone
+                                ? "h-6 flex-1 bg-primary/15 text-primary"
+                                : isActive
+                                  ? "h-6 flex-1 border border-dashed border-primary/30 text-primary/60"
+                                  : "h-6 flex-1 bg-muted/40 text-muted-foreground/40",
+                            )}
+                          >
+                            {isDone
+                              ? isBodyweight(setLog.weight)
+                                ? `${setLog.reps}r`
+                                : `${setLog.weight}×${setLog.reps}`
+                              : `S${si + 1}`}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
-                    {idx + 1}
-                  </span>
+                  /* ── Compact completed / upcoming row ── */
+                  <div className={cn(
+                    "flex items-center gap-2 py-2 transition-opacity",
+                    isCompleted ? "opacity-40" : "opacity-70",
+                  )}>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        "text-[13px] truncate",
+                        isCompleted ? "line-through text-muted-foreground" : "text-foreground/80",
+                      )}>
+                        {exName}
+                      </p>
+                    </div>
+                    {isCompleted ? (
+                      <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+                        {loggedSets}/{item.sets}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] text-muted-foreground/50 tabular-nums">
+                        {item.sets}×{item.reps}
+                      </span>
+                    )}
+                  </div>
                 )}
-                <span className={cn("truncate flex-1", isCompleted && "line-through")}>{exName}</span>
-                <span className="text-xs text-muted-foreground/60 tabular-nums">
-                  {item.sets}×{item.reps}
-                </span>
               </div>
             );
           })}
