@@ -7422,3 +7422,25 @@ Le formulaire de gestion des créneaux utilisait un modèle en lignes (1 ligne =
 ### Tests
 - `npx tsc --noEmit` : ✅ aucune nouvelle erreur
 - `npm test` : ✅ aucune régression (RestPerfsTab tests corrigés avec QueryClientProvider)
+
+
+---
+
+## §96 — Notification matinale bien-être (2026-04-08)
+
+### Contexte
+Les nageurs oublient souvent de saisir leur bien-être quotidien. Ajout d'une notification push automatique à 6h00 chaque matin pour les inciter à remplir le formulaire.
+
+### Changements
+- `supabase/migrations/00070_wellness_morning_cron.sql` — Cron job pg_cron `0 4 * * *` (6h00 CEST). Fonction `send_wellness_morning_push()` qui identifie les nageurs (rôle athlete) avec push actif sans wellness du jour, crée une notification et des targets individuels. Ajout de `'wellness'` au CHECK constraint de `notifications.type`.
+- `src/pages/Dashboard.tsx` — Lecture du query param `?wellness=open` au montage pour ouvrir automatiquement le drawer WellnessForm. Nettoyage de l'URL après ouverture.
+- `supabase/functions/push-send/index.ts` — Ajout routage type `wellness` → `#/?wellness=open` dans `resolveNotificationUrl()`.
+
+### Décisions
+- Utilise le pipeline notifications existant (INSERT notification_targets → trigger → push-send) plutôt qu'un appel HTTP direct, pour la cohérence et la traçabilité.
+- Heure fixe UTC (04:00 = 06:00 CEST). En hiver CET, notification à 05:00 local.
+- Notification unique partagée avec targets individuels pour éviter les doublons en base.
+
+### Tests
+- `npm run build` : ✅ aucune erreur
+- Validation syntaxique SQL : ✅

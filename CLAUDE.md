@@ -207,6 +207,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 56 | Restructuration bibliothèque musculation nageur | Moyenne | Fait (§93) |
 | 57 | Rest Timer enrichi — tabs swipables | Moyenne | Fait (§94) |
 | 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Fait (§95) |
+| 59 | Notification matinale bien-être (push 6h00) | Moyenne | Fait (§96) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
