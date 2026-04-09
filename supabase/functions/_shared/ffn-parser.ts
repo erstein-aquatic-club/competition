@@ -86,7 +86,18 @@ export async function fetchAllPerformances(iuf: string): Promise<RecFull[]> {
     const parsed = parseHtmlFull(html, poolSize);
     results.push(...parsed);
   }
-  return results;
+  // Deduplicate: FFN HTML repeats "Bassin" headers per event, causing the
+  // split-based parser to emit the same row twice when a performance sits at
+  // a section boundary.  PostgreSQL rejects an entire upsert batch if two
+  // rows share the same conflict key, so duplicates here silently drop the
+  // whole chunk (including unrelated new performances).
+  const seen = new Set<string>();
+  return results.filter((r) => {
+    const key = `${r.event_name}|${r.pool_length}|${r.record_date}|${r.time_seconds}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function parseHtmlBests(html: string): Rec[] {

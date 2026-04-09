@@ -502,13 +502,16 @@ Deno.serve(async (req) => {
         let imported = 0;
         for (let i = 0; i < rows.length; i += 100) {
           const chunk = rows.slice(i, i + 100);
-          const { data } = await supabaseAdmin
+          const { data, error: upsertErr } = await supabaseAdmin
             .from("swimmer_performances")
             .upsert(chunk, {
               onConflict:
                 "swimmer_iuf,event_code,pool_length,competition_date,time_seconds",
             })
             .select("id");
+          if (upsertErr) {
+            console.error(`[import-club-records] upsert error for ${iuf} chunk ${i}: ${upsertErr.message}`);
+          }
           imported += data?.length ?? 0;
         }
 
