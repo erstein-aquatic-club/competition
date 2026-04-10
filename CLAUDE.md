@@ -134,6 +134,9 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/chrono/ChronoRace.tsx` | Phase course chrono (GO, splits, chrono live) | ~340 lignes |
 | `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono (splits, export) | ~245 lignes |
 | `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage | ~135 lignes |
+| `src/lib/api/coach-assignments.ts` | CRUD attributions coach ↔ nageur (§98) | ~110 lignes |
+| `src/hooks/useMySwimmerIds.ts` | Hook filtrage nageurs par coach + helper filterByAssignment (§98) | ~45 lignes |
+| `src/pages/coach/CoachMySwimmersScreen.tsx` | Écran gestion attribution nageurs coach/admin (§98) | ~555 lignes |
 
 ## Edge Functions Supabase
 
@@ -216,6 +219,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Fait (§95) |
 | 59 | Notification matinale bien-être (push 6h00) | Moyenne | Fait (§96) |
 | 60 | Chrono Coach (split timer poolside tablette) | Haute | Fait (§97) |
+| 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Fait (§98) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
@@ -232,6 +236,15 @@ Chaque session de développement doit suivre ce protocole (détail complet dans 
    - `CLAUDE.md` — si fichiers clés ajoutés/supprimés ou chantier terminé
 
 > **Règle d'or : aucun patch sans entrée dans `implementation-log.md`.**
+
+## Migrations Supabase
+
+**IMPORTANT : Toujours appliquer les migrations via le MCP Supabase (`mcp__plugin_supabase_supabase__apply_migration`), jamais via `supabase db push` ou le dashboard.**
+
+- Le projet ID est `fscnobivsgornxdwqwlk` (EAC Databases, région eu-west-1)
+- Les policies RLS utilisent les helpers `app_user_role()` et `app_user_id()` — ne PAS utiliser `auth.uid()` directement dans les subqueries
+- Toujours créer le fichier SQL dans `supabase/migrations/` ET l'appliquer via MCP dans la même session
+- Convention de nommage : `00XXX_<nom_descriptif>.sql` (incrémenter le numéro)
 
 ## Déploiement
 

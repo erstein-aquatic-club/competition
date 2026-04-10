@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-10 (§97 Chrono Coach)*
+*Dernière mise à jour : 2026-04-10 (§98 Attribution Coach ↔ Nageur)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -66,6 +66,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 57 | Rest Timer enrichi — tabs swipables | Moyenne | Moyenne | Fait (§94) |
 | 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Moyenne | Fait (§95) |
 | 60 | Chrono Coach (split timer poolside tablette) | Haute | Moyenne | Fait (§97) |
+| 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Moyenne | Fait (§98) |
 
 ---
 

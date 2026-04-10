@@ -7471,3 +7471,51 @@ Les nageurs oublient souvent de saisir leur bien-être quotidien. Ajout d'une no
 - localStorage backup sérialisé (Map → array) pour la reprise après crash
 - createStandaloneSwimLog() pour l'export (standalone, pas lié à une session)
 - Mobile guard CSS (hidden md:block) plutôt que JS pour éviter le flash
+
+## §98 — Attribution Coach ↔ Nageur (2026-04-10)
+
+### Contexte
+Les coachs voyaient tous les nageurs du club. Besoin d'un système d'attribution 1 coach principal par nageur, avec filtrage des vues personnelles.
+
+### Changements
+
+**Base de données :**
+- Migration `00072_coach_swimmer_assignments.sql` : table `coach_swimmer_assignments` (UNIQUE swimmer_id), table `coach_swimmer_history`, trigger automatique de log sur suppression/modification, RLS coach/admin
+
+**API :**
+- Nouveau module `src/lib/api/coach-assignments.ts` : 6 fonctions (getMySwimmers, getAllAssignments, assignSwimmer, unassignSwimmer, reassignSwimmer, getSwimmerCoachHistory)
+- Delegation stubs ajoutés dans `src/lib/api.ts`
+- Re-exports dans `src/lib/api/index.ts`
+- Types `CoachSwimmerAssignment` et `CoachSwimmerHistory` dans `types.ts`
+
+**Hook partagé :**
+- `src/hooks/useMySwimmerIds.ts` : hook React Query + helper `filterByAssignment()`, retourne null pour admin (pas de filtre)
+
+**Écran "Gérer mes nageurs" :**
+- `src/pages/coach/CoachMySwimmersScreen.tsx` : vue coach (mes nageurs + disponibles) et vue admin (groupés par coach + réattribution Select)
+- Confirmation AlertDialog avant retrait
+- Navigation via quick access "Mes nageurs" dans CoachHome
+
+**Filtrage des vues :**
+- `Coach.tsx` : `myAthletes` (filtré) passé aux vues personnelles (home, swimmers, comms), `athletes` (complet) aux vues partagées (chrono, groups, my-swimmers)
+- `CoachSwimmerDetail.tsx` : protection d'accès — affiche "Ce nageur ne fait pas partie de vos nageurs" si non attribué
+- `ChronoSetup.tsx` : toggle "Tout le club" (Switch) pour élargir la sélection au-delà des nageurs du coach
+
+### Fichiers modifiés
+- `supabase/migrations/00072_coach_swimmer_assignments.sql` (créé)
+- `src/lib/api/coach-assignments.ts` (créé)
+- `src/lib/api/types.ts` (modifié)
+- `src/lib/api/index.ts` (modifié)
+- `src/lib/api.ts` (modifié)
+- `src/hooks/useMySwimmerIds.ts` (créé)
+- `src/pages/coach/CoachMySwimmersScreen.tsx` (créé)
+- `src/pages/Coach.tsx` (modifié)
+- `src/pages/coach/CoachSwimmerDetail.tsx` (modifié)
+- `src/pages/coach/CoachChronoScreen.tsx` (modifié)
+- `src/components/chrono/ChronoSetup.tsx` (modifié)
+
+### Décisions techniques
+- UNIQUE(swimmer_id) plutôt qu'une relation many-to-many — 1 coach principal par nageur, design le plus simple
+- Trigger SECURITY DEFINER pour la table d'historique — log automatique sans action côté frontend
+- filterByAssignment retourne null pour admin → pas de filtre, le code appelant n'a pas besoin de brancher sur le rôle
+- Toggle chrono conditionnel : affiché seulement si allAthletes.length > athletes.length (masqué si le coach a déjà tous les nageurs)

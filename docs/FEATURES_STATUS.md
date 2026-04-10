@@ -75,6 +75,7 @@ Tous les feature flags sont activés.
 | Picker templates | ✅ | `SlotTemplatePicker.tsx` | Sélection séance bibliothèque, recherche par nom (§85) |
 | Notifications rappel ressenti | ✅ | `00054_slot_centric_sessions.sql` | pg_cron 15min, push 30min avant fin créneau (§85) |
 | Chrono split timer (tablette/desktop) | ✅ | Coach peut chronométrer les splits par ligne/vague et exporter vers profils nageurs |
+| Attribution coach ↔ nageur | ✅ | `coach-assignments.ts`, `CoachMySwimmersScreen.tsx`, `useMySwimmerIds.ts` | 1 coach principal par nageur, écran gestion, filtrage vues, historique (§98) |
 
 ### Musculation — Nageur
 
