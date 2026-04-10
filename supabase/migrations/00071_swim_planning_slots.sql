@@ -11,26 +11,25 @@ CREATE TABLE IF NOT EXISTS swim_planning_slots (
   UNIQUE(group_id, week_start, day_of_week, time_slot)
 );
 
+-- RLS
 ALTER TABLE swim_planning_slots ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Coaches can manage swim planning slots"
-  ON swim_planning_slots FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM users u
-      WHERE u.auth_id = auth.uid()
-      AND u.role IN ('coach', 'admin')
-    )
-  );
+CREATE POLICY "swim_planning_slots_select" ON swim_planning_slots
+  FOR SELECT TO authenticated
+  USING (true);
 
-CREATE POLICY "Athletes can view swim planning slots"
-  ON swim_planning_slots FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM users u
-      WHERE u.auth_id = auth.uid()
-    )
-  );
+CREATE POLICY "swim_planning_slots_insert" ON swim_planning_slots
+  FOR INSERT TO authenticated
+  WITH CHECK (app_user_role() IN ('coach', 'admin'));
 
+CREATE POLICY "swim_planning_slots_update" ON swim_planning_slots
+  FOR UPDATE TO authenticated
+  USING (app_user_role() IN ('coach', 'admin'));
+
+CREATE POLICY "swim_planning_slots_delete" ON swim_planning_slots
+  FOR DELETE TO authenticated
+  USING (app_user_role() IN ('coach', 'admin'));
+
+-- Index for query pattern: fetch all slots for a group in a date range
 CREATE INDEX idx_swim_planning_slots_group_week
   ON swim_planning_slots(group_id, week_start);
