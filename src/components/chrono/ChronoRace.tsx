@@ -25,6 +25,16 @@ interface ChronoRaceProps {
   getTimestamp: () => number;
 }
 
+/* ── Vivid wave accent colors for scoreboard contrast ──────────── */
+const WAVE_ACCENTS = [
+  { bg: "bg-cyan-500",    bgMuted: "bg-cyan-950",    border: "border-cyan-400",    text: "text-cyan-300",    glow: "shadow-cyan-500/40" },
+  { bg: "bg-orange-500",  bgMuted: "bg-orange-950",  border: "border-orange-400",  text: "text-orange-300",  glow: "shadow-orange-500/40" },
+  { bg: "bg-emerald-500", bgMuted: "bg-emerald-950", border: "border-emerald-400", text: "text-emerald-300", glow: "shadow-emerald-500/40" },
+  { bg: "bg-pink-500",    bgMuted: "bg-pink-950",    border: "border-pink-400",    text: "text-pink-300",    glow: "shadow-pink-500/40" },
+  { bg: "bg-yellow-500",  bgMuted: "bg-yellow-950",  border: "border-yellow-400",  text: "text-yellow-300",  glow: "shadow-yellow-500/40" },
+  { bg: "bg-purple-500",  bgMuted: "bg-purple-950",  border: "border-purple-400",  text: "text-purple-300",  glow: "shadow-purple-500/40" },
+] as const;
+
 // ── Wave Bar ────────────────────────────────────────────────────────
 
 function WaveBar({
@@ -39,11 +49,12 @@ function WaveBar({
   getTimestamp: () => number;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto px-3 py-2">
+    <div className="flex gap-3 px-4 py-3">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
-          const color = WAVE_COLORS[w.wave - 1] ?? WAVE_COLORS[0];
+          const wc = WAVE_COLORS[w.wave - 1] ?? WAVE_COLORS[0];
+          const accent = WAVE_ACCENTS[(w.wave - 1) % WAVE_ACCENTS.length];
           const launched = w.startedAt !== null;
 
           if (!launched) {
@@ -57,13 +68,13 @@ function WaveBar({
                     timestamp: getTimestamp(),
                   })
                 }
-                className={`flex flex-col items-center justify-center rounded-xl border-2 ${color.border} ${color.bg} min-w-[100px] h-16 animate-pulse active:scale-95 transition-transform`}
+                className={`flex flex-col items-center justify-center rounded-2xl ${accent.bg} min-w-[120px] h-[72px] shadow-lg ${accent.glow} animate-pulse active:scale-95 transition-transform cursor-pointer`}
               >
-                <span className={`text-xs font-medium ${color.text}`}>
-                  {color.label}
+                <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+                  {wc.label}
                 </span>
-                <span className="flex items-center gap-1 text-lg font-bold text-white">
-                  <Play className="h-4 w-4 fill-current" /> GO
+                <span className="flex items-center gap-1.5 text-xl font-black text-white drop-shadow-md">
+                  <Play className="h-5 w-5 fill-current" /> GO
                 </span>
               </button>
             );
@@ -73,12 +84,12 @@ function WaveBar({
           return (
             <div
               key={w.wave}
-              className={`flex flex-col items-center justify-center rounded-xl border-2 ${color.border} ${color.bg} min-w-[100px] h-16 px-3`}
+              className={`flex flex-col items-center justify-center rounded-2xl border-2 ${accent.border} ${accent.bgMuted} min-w-[120px] h-[72px] px-4`}
             >
-              <span className={`text-[10px] font-medium ${color.text}`}>
-                {color.label} — En course
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.text}`}>
+                {wc.label} — En course
               </span>
-              <span className="font-mono tabular-nums text-lg font-bold text-white">
+              <span className="font-mono tabular-nums text-2xl font-black text-white tracking-tight">
                 {formatTime(elapsed)}
               </span>
             </div>
@@ -111,7 +122,8 @@ function SwimmerCard({
 }) {
   const lastTapRef = useRef(0);
   const flashRef = useRef<HTMLDivElement>(null);
-  const color = WAVE_COLORS[wave - 1] ?? WAVE_COLORS[0];
+  const wc = WAVE_COLORS[wave - 1] ?? WAVE_COLORS[0];
+  const accent = WAVE_ACCENTS[(wave - 1) % WAVE_ACCENTS.length];
   const launched = waveStartedAt !== null;
 
   const handleTap = useCallback(() => {
@@ -122,25 +134,22 @@ function SwimmerCard({
     lastTapRef.current = tapTime;
 
     if (gap < 300 && gap > 0) {
-      // Double-tap → undo
       dispatch({ type: "UNDO_SPLIT", athleteId });
       toast("Split annulé", { duration: 1500 });
-      lastTapRef.current = 0; // reset to avoid triple-tap undo
+      lastTapRef.current = 0;
       return;
     }
 
-    // Single tap → record split
     dispatch({ type: "RECORD_SPLIT", athleteId, timestamp: getTimestamp() });
     navigator.vibrate?.(50);
 
-    // Flash feedback
     const el = flashRef.current;
     if (el) {
-      el.style.opacity = "0.3";
+      el.style.opacity = "0.35";
       requestAnimationFrame(() => {
         setTimeout(() => {
           el.style.opacity = "0";
-        }, 80);
+        }, 100);
       });
     }
   }, [launched, dispatch, athleteId, getTimestamp]);
@@ -153,10 +162,10 @@ function SwimmerCard({
       type="button"
       disabled={!launched}
       onClick={handleTap}
-      className={`relative flex flex-col items-start rounded-xl border-l-4 ${color.border} p-3 text-left transition-transform select-none min-h-[100px] ${
+      className={`relative flex flex-col rounded-xl border-l-[5px] ${accent.border} text-left transition-all select-none min-h-[120px] ${
         launched
-          ? `${color.bg} active:scale-95 cursor-pointer`
-          : "bg-muted/30 opacity-40 pointer-events-none"
+          ? "bg-zinc-900 active:scale-[0.97] cursor-pointer shadow-md hover:bg-zinc-800/90"
+          : "bg-zinc-900/30 opacity-30 pointer-events-none border-l-zinc-700"
       }`}
     >
       {/* Flash overlay */}
@@ -166,43 +175,49 @@ function SwimmerCard({
       />
 
       {/* Header: name + wave chip */}
-      <div className="flex w-full items-center gap-2">
-        <span className="truncate text-sm font-medium text-white">
+      <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
+        <span className="truncate text-sm font-semibold text-zinc-100">
           {displayName}
         </span>
         <span
-          className={`ml-auto flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${color.bg} ${color.text}`}
+          className={`ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${accent.bgMuted} ${accent.text} border ${accent.border}`}
         >
-          <span className={`inline-block h-1.5 w-1.5 rounded-full ${color.dot}`} />
-          {color.label}
+          <span className={`inline-block h-2 w-2 rounded-full ${accent.bg}`} />
+          {wc.label}
         </span>
       </div>
 
-      {/* Running chrono */}
-      <span className="mt-1 font-mono tabular-nums text-2xl font-bold text-white">
-        {launched ? formatTime(elapsed) : "--:--.--"}
-      </span>
+      {/* Running chrono — THE MAIN ELEMENT */}
+      <div className="flex-1 flex items-center px-3">
+        <span className="font-mono tabular-nums text-[2rem] font-black text-white tracking-tight leading-none drop-shadow-sm">
+          {launched ? formatTime(elapsed) : "--:--.--"}
+        </span>
+      </div>
 
       {/* Split info */}
-      {launched && lastSplit ? (
-        <div className="mt-auto flex w-full items-baseline gap-2 text-xs text-muted-foreground">
-          <span className="font-medium">Split {splits.length}</span>
-          <span className="font-mono tabular-nums">
-            {formatTime(lastSplit.cumulativeMs)}
+      <div className="px-3 pb-2.5 pt-1">
+        {launched && lastSplit ? (
+          <div className="flex w-full items-baseline gap-2">
+            <span className={`text-xs font-bold ${accent.text}`}>
+              Split {splits.length}
+            </span>
+            <span className="font-mono tabular-nums text-sm font-semibold text-zinc-300">
+              {formatTime(lastSplit.cumulativeMs)}
+            </span>
+            <span className="font-mono tabular-nums text-xs text-zinc-500">
+              ({formatLap(lastSplit.lapMs)})
+            </span>
+          </div>
+        ) : launched ? (
+          <span className="text-xs font-medium text-zinc-500">
+            Tap pour split
           </span>
-          <span className="font-mono tabular-nums text-[10px] opacity-70">
-            ({formatLap(lastSplit.lapMs)})
+        ) : (
+          <span className="text-xs text-zinc-600">
+            En attente
           </span>
-        </div>
-      ) : launched ? (
-        <span className="mt-auto text-xs text-muted-foreground/60">
-          Tap pour split
-        </span>
-      ) : (
-        <span className="mt-auto text-xs text-muted-foreground/40">
-          En attente
-        </span>
-      )}
+        )}
+      </div>
     </button>
   );
 }
@@ -231,10 +246,14 @@ function LaneSection({
 
   return (
     <div className="space-y-2">
-      <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Ligne {lane}
-      </h3>
-      <div className="grid grid-cols-2 gap-2 px-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      <div className="flex items-center gap-2 px-4">
+        <div className="h-px flex-1 bg-zinc-800" />
+        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+          Ligne {lane}
+        </h3>
+        <div className="h-px flex-1 bg-zinc-800" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5 px-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
           const race = raceData.get(s.athleteId);
@@ -268,9 +287,9 @@ export default function ChronoRace({
   const lanes = Array.from({ length: state.laneCount }, (_, i) => i + 1);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-black">
       {/* Sticky top bar: waves + stop button */}
-      <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-20 border-b border-zinc-800 bg-black/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <div className="flex-1 overflow-hidden">
             <WaveBar
@@ -282,15 +301,15 @@ export default function ChronoRace({
           </div>
 
           {/* Stop button */}
-          <div className="pr-3">
+          <div className="pr-4">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   variant="destructive"
                   size="sm"
-                  className="gap-1.5 whitespace-nowrap"
+                  className="gap-1.5 whitespace-nowrap font-bold shadow-lg shadow-red-900/30"
                 >
-                  <Square className="h-4 w-4" />
+                  <Square className="h-4 w-4 fill-current" />
                   Terminer
                 </Button>
               </AlertDialogTrigger>
@@ -321,7 +340,7 @@ export default function ChronoRace({
       </div>
 
       {/* Lane grid */}
-      <div className="flex-1 space-y-4 py-4">
+      <div className="flex-1 space-y-5 py-5">
         {lanes.map((lane) => (
           <LaneSection
             key={lane}
