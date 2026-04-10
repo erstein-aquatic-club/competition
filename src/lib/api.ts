@@ -345,6 +345,15 @@ import {
   getPopularExercises as _getPopularExercises,
 } from "./api/strength";
 
+import {
+  getMySwimmers as _getMySwimmers,
+  getAllAssignments as _getAllAssignments,
+  assignSwimmer as _assignSwimmer,
+  unassignSwimmer as _unassignSwimmer,
+  reassignSwimmer as _reassignSwimmer,
+  getSwimmerCoachHistory as _getSwimmerCoachHistory,
+} from "./api/coach-assignments";
+
 // --- API Service ---
 
 export const api = {
@@ -830,4 +839,14 @@ export const api = {
   async getSwimPlanningSlots(opts: Parameters<typeof _getSwimPlanningSlots>[0]) { return _getSwimPlanningSlots(opts); },
   async upsertSwimPlanningSlot(input: Parameters<typeof _upsertSwimPlanningSlot>[0]) { return _upsertSwimPlanningSlot(input); },
   async deleteSwimPlanningSlot(id: string) { return _deleteSwimPlanningSlot(id); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — Coach Swimmer Assignments
+  // ══════════════════════════════════════════════════════════════════
+  async getMySwimmers() { return _getMySwimmers(); },
+  async getAllAssignments() { return _getAllAssignments(); },
+  async assignSwimmer(swimmerId: number, coachId: number, assignedBy: number) { return _assignSwimmer(swimmerId, coachId, assignedBy); },
+  async unassignSwimmer(swimmerId: number) { return _unassignSwimmer(swimmerId); },
+  async reassignSwimmer(swimmerId: number, newCoachId: number, assignedBy: number) { return _reassignSwimmer(swimmerId, newCoachId, assignedBy); },
+  async getSwimmerCoachHistory(swimmerId: number) { return _getSwimmerCoachHistory(swimmerId); },
 };
