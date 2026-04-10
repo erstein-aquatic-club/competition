@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Trophy,
+  UserCheck,
   Users,
   UsersRound,
   Waves,
@@ -24,10 +25,12 @@ const CoachWeekView = lazy(() => import("./coach/CoachWeekView"));
 const CoachLibrary = lazy(() => import("./coach/CoachLibrary"));
 const CoachComms = lazy(() => import("./coach/CoachComms"));
 const CoachChronoScreen = lazy(() => import("./coach/CoachChronoScreen"));
+const CoachMySwimmersScreen = lazy(() => import("./coach/CoachMySwimmersScreen"));
+const CoachCommentsScreen = lazy(() => import("./coach/CoachCommentsScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
 
-type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms" | "chrono";
+type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms" | "chrono" | "my-swimmers" | "comments";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -169,6 +172,7 @@ const CoachHome = ({
       { label: "Planif. Nage", icon: Waves, action: onOpenSwimPlanning, color: "text-cyan-500", bg: "bg-cyan-100 dark:bg-cyan-900/30" },
       { label: "Echéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
       { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+      { label: "Mes nageurs", icon: UserCheck, action: () => onNavigate("my-swimmers"), color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
       { label: "Comms", icon: BellRing, action: () => onNavigate("comms"), color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30" },
       { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
@@ -463,7 +467,8 @@ export default function Coach() {
     activeSection === "athlete" ||
     activeSection === "week" ||
     activeSection === "groups" ||
-    activeSection === "chrono";
+    activeSection === "chrono" ||
+    activeSection === "my-swimmers";
   const shouldLoadGroups =
     activeSection === "home" ||
     activeSection === "week" ||
@@ -711,6 +716,16 @@ export default function Coach() {
       {activeSection === "chrono" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachChronoScreen athletes={athletes} />
+        </Suspense>
+      ) : null}
+
+      {activeSection === "my-swimmers" ? (
+        <Suspense fallback={<PageSkeleton />}>
+          <CoachMySwimmersScreen
+            athletes={athletes}
+            athletesLoading={athletesLoading}
+            onBack={() => setActiveSection("home")}
+          />
         </Suspense>
       ) : null}
 
