@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-import type { SwimPlanningSlot, SwimPlanningSlotInput, GroupSummary } from "@/lib/api/types";
+import type { SwimPlanningSlot, SwimPlanningSlotInput, GroupSummary, SwimSessionTemplate } from "@/lib/api/types";
 import { FILIERES, FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import { cn } from "@/lib/utils";
@@ -35,9 +35,12 @@ import {
   CalendarRange,
   Check,
   ChevronDown,
+  Link2,
   Pencil,
   Plus,
+  Search,
   Trash2,
+  Unlink,
   Waves,
   X,
 } from "lucide-react";
@@ -311,6 +314,61 @@ export default function SwimPlanningDemo() {
     },
   });
 
+  // ── Swim catalog (for session linking) ──
+  const { data: swimCatalog = [] } = useQuery({
+    queryKey: ["swim-catalog"],
+    queryFn: () => api.getSwimCatalog(),
+    staleTime: 5 * 60_000,
+  });
+
+  // Sessions grouped by date (most recent first), already sorted by API
+  const catalogByDate = useMemo(() => {
+    const groups: { label: string; sessions: SwimSessionTemplate[] }[] = [];
+    const map = new Map<string, SwimSessionTemplate[]>();
+    for (const s of swimCatalog) {
+      if (s.is_archived) continue;
+      const dateKey = s.created_at?.split("T")[0] ?? "unknown";
+      const arr = map.get(dateKey) ?? [];
+      arr.push(s);
+      map.set(dateKey, arr);
+    }
+    for (const [dateKey, sessions] of map) {
+      const d = new Date(dateKey + "T00:00:00");
+      const label = d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+      groups.push({ label, sessions });
+    }
+    return groups;
+  }, [swimCatalog]);
+
+  // Session picker state
+  const [sessionPickerSlot, setSessionPickerSlot] = useState<{
+    weekKey: string;
+    dayIndex: number;
+    timeSlot: "morning" | "evening";
+    currentSessionId?: string | null;
+  } | null>(null);
+  const [sessionSearch, setSessionSearch] = useState("");
+
+  const filteredCatalog = useMemo(() => {
+    if (!sessionSearch.trim()) return catalogByDate;
+    const q = sessionSearch.toLowerCase();
+    return catalogByDate
+      .map((g) => ({
+        ...g,
+        sessions: g.sessions.filter((s) => s.name.toLowerCase().includes(q)),
+      }))
+      .filter((g) => g.sessions.length > 0);
+  }, [catalogByDate, sessionSearch]);
+
+  // Map session IDs to names for display
+  const sessionNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of swimCatalog) {
+      map.set(String(s.id), s.name);
+    }
+    return map;
+  }, [swimCatalog]);
+
   const handleSelectFiliere = (filiereId: string) => {
     if (!filiereSheet || !selectedGroupId) return;
     upsertMutation.mutate({
@@ -319,12 +377,44 @@ export default function SwimPlanningDemo() {
       day_of_week: filiereSheet.dayIndex,
       time_slot: filiereSheet.timeSlot,
       filiere: filiereId,
+      session_id: filiereSheet.existingSlot?.session_id ?? null,
     });
   };
 
   const handleDeleteSlot = () => {
     if (!filiereSheet?.existingSlot) return;
     deleteMutation.mutate(filiereSheet.existingSlot.id);
+  };
+
+  const handleLinkSession = (sessionId: number) => {
+    if (!sessionPickerSlot || !selectedGroupId) return;
+    // Find the existing slot to get the filiere
+    const existing = findSlot(sessionPickerSlot.weekKey, sessionPickerSlot.dayIndex, sessionPickerSlot.timeSlot);
+    if (!existing) return;
+    upsertMutation.mutate({
+      group_id: selectedGroupId,
+      week_start: sessionPickerSlot.weekKey,
+      day_of_week: sessionPickerSlot.dayIndex,
+      time_slot: sessionPickerSlot.timeSlot,
+      filiere: existing.filiere,
+      session_id: String(sessionId),
+    });
+    setSessionPickerSlot(null);
+  };
+
+  const handleUnlinkSession = () => {
+    if (!sessionPickerSlot || !selectedGroupId) return;
+    const existing = findSlot(sessionPickerSlot.weekKey, sessionPickerSlot.dayIndex, sessionPickerSlot.timeSlot);
+    if (!existing) return;
+    upsertMutation.mutate({
+      group_id: selectedGroupId,
+      week_start: sessionPickerSlot.weekKey,
+      day_of_week: sessionPickerSlot.dayIndex,
+      time_slot: sessionPickerSlot.timeSlot,
+      filiere: existing.filiere,
+      session_id: null,
+    });
+    setSessionPickerSlot(null);
   };
 
   // ── Find slot for a given cell ──
@@ -433,6 +523,7 @@ export default function SwimPlanningDemo() {
                 isEditing={editing}
                 meta={meta}
                 filledCount={filledCount}
+                weekSlots={weekSlots}
                 editWeekType={editWeekType}
                 setEditWeekType={setEditWeekType}
                 editWeekNotes={editWeekNotes}
@@ -524,10 +615,30 @@ export default function SwimPlanningDemo() {
               );
             })}
 
-            {/* Delete option */}
+            {/* Link session + Delete options */}
             {filiereSheet?.existingSlot && (
               <>
                 <div className="h-px bg-border my-2" />
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-primary hover:bg-primary/10 active:scale-[0.98]"
+                  onClick={() => {
+                    const slot = filiereSheet.existingSlot!;
+                    setSessionPickerSlot({
+                      weekKey: filiereSheet.weekKey,
+                      dayIndex: filiereSheet.dayIndex,
+                      timeSlot: filiereSheet.timeSlot,
+                      currentSessionId: slot.session_id,
+                    });
+                    setSessionSearch("");
+                    setFiliereSheet(null);
+                  }}
+                >
+                  <Link2 className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">
+                    {filiereSheet.existingSlot.session_id ? "Modifier la séance liée" : "Lier une séance"}
+                  </span>
+                </button>
                 <button
                   type="button"
                   className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98]"
@@ -538,6 +649,96 @@ export default function SwimPlanningDemo() {
                   <span className="text-sm font-medium">Supprimer</span>
                 </button>
               </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Session picker bottom sheet ── */}
+      <Sheet
+        open={!!sessionPickerSlot}
+        onOpenChange={(open) => !open && setSessionPickerSlot(null)}
+      >
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">
+          <SheetHeader className="pb-2 shrink-0">
+            <SheetTitle className="text-base">Lier une séance</SheetTitle>
+            <SheetDescription className="text-xs text-muted-foreground">
+              Catalogue de séances natation
+            </SheetDescription>
+          </SheetHeader>
+
+          {/* Search bar */}
+          <div className="relative shrink-0 mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+            <Input
+              className="pl-9 h-9 text-sm"
+              placeholder="Rechercher une séance..."
+              value={sessionSearch}
+              onChange={(e) => setSessionSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Session list */}
+          <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-4">
+            {/* Unlink option */}
+            {sessionPickerSlot?.currentSessionId && (
+              <button
+                type="button"
+                className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98] border border-dashed border-destructive/30"
+                onClick={handleUnlinkSession}
+              >
+                <Unlink className="h-4 w-4 shrink-0" />
+                <span className="text-sm font-medium">Délier la séance</span>
+              </button>
+            )}
+
+            {filteredCatalog.length === 0 ? (
+              <div className="text-center py-8">
+                <Waves className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Aucune séance trouvée</p>
+              </div>
+            ) : (
+              filteredCatalog.map((group) => (
+                <div key={group.label}>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
+                    {group.label}
+                  </p>
+                  <div className="space-y-1">
+                    {group.sessions.map((s) => {
+                      const isLinked = sessionPickerSlot?.currentSessionId === String(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className={cn(
+                            "w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] active:scale-[0.98]",
+                            isLinked
+                              ? "bg-primary/10 ring-2 ring-primary/30"
+                              : "hover:bg-muted/50",
+                          )}
+                          onClick={() => handleLinkSession(s.id)}
+                          disabled={upsertMutation.isPending}
+                        >
+                          <Waves className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium block truncate">
+                              {s.name}
+                            </span>
+                            {s.description && (
+                              <span className="text-[11px] text-muted-foreground line-clamp-1">
+                                {s.description}
+                              </span>
+                            )}
+                          </div>
+                          {isLinked && (
+                            <Check className="h-4 w-4 text-primary shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </SheetContent>
@@ -614,6 +815,7 @@ interface WeekCardProps {
   isEditing: boolean;
   meta: { weekType?: string; notes?: string };
   filledCount: number;
+  weekSlots: SwimPlanningSlot[];
   editWeekType: string;
   setEditWeekType: (v: string) => void;
   editWeekNotes: string;
@@ -638,6 +840,7 @@ function WeekCard({
   isEditing,
   meta,
   filledCount,
+  weekSlots,
   editWeekType,
   setEditWeekType,
   editWeekNotes,
@@ -748,8 +951,24 @@ function WeekCard({
                     </Badge>
                   )}
                   {filledCount > 0 && (
-                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-                      {filledCount} fil.
+                    <span className="inline-flex items-center gap-[3px] shrink-0">
+                      {/* Mini-dots: ordered Lun matin, Lun soir, Mar matin... */}
+                      {DAY_ROWS.flatMap((day) =>
+                        (["morning", "evening"] as const).map((ts) => {
+                          const slot = weekSlots.find(
+                            (s) => s.day_of_week === day.index && s.time_slot === ts,
+                          );
+                          if (!slot) return null;
+                          const f = FILIERE_MAP.get(slot.filiere);
+                          const style = FILIERE_STYLES[f?.color ?? "sky"] ?? FILIERE_STYLES.sky;
+                          return (
+                            <span
+                              key={`${day.index}-${ts}`}
+                              className={cn("h-[6px] w-[6px] rounded-full shrink-0", style.dot)}
+                            />
+                          );
+                        }),
+                      )}
                     </span>
                   )}
                 </div>
@@ -887,12 +1106,13 @@ function SlotCell({
   const filiere = FILIERE_MAP.get(slot.filiere);
   const color = filiere?.color ?? "sky";
   const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
+  const hasSession = !!slot.session_id;
 
   return (
     <button
       type="button"
       className={cn(
-        "h-9 w-full rounded-lg flex items-center justify-center px-1.5 transition-all active:scale-95",
+        "relative h-9 w-full rounded-lg flex items-center justify-center px-1.5 transition-all active:scale-95",
         style.bg,
       )}
       onClick={onTap}
@@ -901,6 +1121,11 @@ function SlotCell({
       <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
         {filiere?.short ?? slot.filiere}
       </span>
+      {hasSession && (
+        <Link2
+          className={cn("absolute top-0.5 right-0.5 h-[10px] w-[10px]", style.text, "opacity-60")}
+        />
+      )}
     </button>
   );
 }
