@@ -182,6 +182,33 @@ export function chronoReducer(
         ...raceState,
         stoppedAt: action.timestamp,
       });
+
+      // Check if all swimmers in this wave are now stopped → auto NEXT_REP
+      const waveNum = raceState.swimmer.wave;
+      const waveSwimmers = Array.from(newRaceData.values()).filter(
+        (rs) => rs.swimmer.wave === waveNum,
+      );
+      const allStopped = waveSwimmers.every((rs) => rs.stoppedAt !== null);
+
+      if (allStopped) {
+        // Auto-reset wave for next rep
+        const waves = state.waves.map((w) =>
+          w.wave === waveNum
+            ? { ...w, startedAt: null, currentRep: w.currentRep + 1 }
+            : w,
+        );
+        for (const [id, rs] of newRaceData) {
+          if (rs.swimmer.wave === waveNum) {
+            newRaceData.set(id, {
+              ...rs,
+              splitsByRep: [...rs.splitsByRep, []],
+              stoppedAt: null,
+            });
+          }
+        }
+        return { ...state, waves, raceData: newRaceData };
+      }
+
       return { ...state, raceData: newRaceData };
     }
 
