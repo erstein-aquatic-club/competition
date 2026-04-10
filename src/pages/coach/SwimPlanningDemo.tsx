@@ -545,6 +545,17 @@ export default function SwimPlanningDemo() {
                     existingSlot: existing,
                   });
                 }}
+                onLinkTap={(dayIndex, timeSlot) => {
+                  const existing = findSlot(week.weekKey, dayIndex, timeSlot);
+                  if (!existing) return;
+                  setSessionPickerSlot({
+                    weekKey: week.weekKey,
+                    dayIndex,
+                    timeSlot,
+                    currentSessionId: existing.session_id,
+                  });
+                  setSessionSearch("");
+                }}
               />
             );
           })
@@ -831,6 +842,7 @@ interface WeekCardProps {
     timeSlot: "morning" | "evening",
   ) => SwimPlanningSlot | undefined;
   onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
+  onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
 }
 
 function WeekCard({
@@ -852,6 +864,7 @@ function WeekCard({
   onCancelEditMeta,
   findSlot,
   onCellTap,
+  onLinkTap,
 }: WeekCardProps) {
   const datalistId = `wt-${week.weekKey}`;
 
@@ -1013,6 +1026,7 @@ function WeekCard({
                     weekKey={week.weekKey}
                     findSlot={findSlot}
                     onCellTap={onCellTap}
+                    onLinkTap={onLinkTap}
                   />
                 </motion.div>
               )}
@@ -1032,6 +1046,7 @@ function MicroGrid({
   weekKey,
   findSlot,
   onCellTap,
+  onLinkTap,
 }: {
   weekKey: string;
   findSlot: (
@@ -1040,6 +1055,7 @@ function MicroGrid({
     timeSlot: "morning" | "evening",
   ) => SwimPlanningSlot | undefined;
   onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
+  onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
 }) {
   return (
     <div className="border-t bg-muted/20">
@@ -1067,10 +1083,12 @@ function MicroGrid({
             <SlotCell
               slot={findSlot(weekKey, day.index, "morning")}
               onTap={() => onCellTap(day.index, "morning")}
+              onLinkTap={() => onLinkTap(day.index, "morning")}
             />
             <SlotCell
               slot={findSlot(weekKey, day.index, "evening")}
               onTap={() => onCellTap(day.index, "evening")}
+              onLinkTap={() => onLinkTap(day.index, "evening")}
             />
           </div>
         ))}
@@ -1086,9 +1104,11 @@ function MicroGrid({
 function SlotCell({
   slot,
   onTap,
+  onLinkTap,
 }: {
   slot: SwimPlanningSlot | undefined;
   onTap: () => void;
+  onLinkTap: () => void;
 }) {
   if (!slot) {
     return (
@@ -1109,23 +1129,46 @@ function SlotCell({
   const hasSession = !!slot.session_id;
 
   return (
-    <button
-      type="button"
-      className={cn(
-        "relative h-9 w-full rounded-lg flex items-center justify-center px-1.5 transition-all active:scale-95",
-        style.bg,
-      )}
-      onClick={onTap}
-      aria-label={`Modifier: ${filiere?.short ?? slot.filiere}`}
-    >
-      <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
-        {filiere?.short ?? slot.filiere}
-      </span>
-      {hasSession && (
+    <div className="flex items-center gap-0.5 h-9 w-full">
+      {/* Filière chip — tap to change filière */}
+      <button
+        type="button"
+        className={cn(
+          "h-full flex-1 min-w-0 rounded-l-lg flex items-center justify-center px-1.5 transition-all active:scale-[0.97]",
+          style.bg,
+        )}
+        onClick={onTap}
+        aria-label={`Modifier: ${filiere?.short ?? slot.filiere}`}
+      >
+        <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
+          {filiere?.short ?? slot.filiere}
+        </span>
+      </button>
+
+      {/* Link session button */}
+      <button
+        type="button"
+        className={cn(
+          "h-full w-7 shrink-0 rounded-r-lg flex items-center justify-center transition-all active:scale-[0.93]",
+          hasSession
+            ? cn(style.bg, "border-l border-white/20 dark:border-black/10")
+            : "bg-muted/40 border border-dashed border-muted-foreground/15 hover:border-muted-foreground/30",
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onLinkTap();
+        }}
+        aria-label={hasSession ? "Modifier la séance liée" : "Lier une séance"}
+      >
         <Link2
-          className={cn("absolute top-0.5 right-0.5 h-[10px] w-[10px]", style.text, "opacity-60")}
+          className={cn(
+            "h-3 w-3",
+            hasSession
+              ? cn(style.text, "opacity-80")
+              : "text-muted-foreground/35",
+          )}
         />
-      )}
-    </button>
+      </button>
+    </div>
   );
 }
