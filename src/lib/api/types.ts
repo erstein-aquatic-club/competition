@@ -183,6 +183,23 @@ export interface AthleteSummary {
   avatar_url?: string | null;
 }
 
+export interface CoachSwimmerAssignment {
+  id: number;
+  coach_id: number;
+  swimmer_id: number;
+  assigned_at: string;
+  assigned_by: number;
+}
+
+export interface CoachSwimmerHistory {
+  id: number;
+  coach_id: number;
+  swimmer_id: number;
+  assigned_at: string;
+  removed_at: string;
+  removed_by: number | null;
+}
+
 export interface GroupSummary {
   id: number;
   name: string;

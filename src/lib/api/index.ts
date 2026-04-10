@@ -338,6 +338,16 @@ export {
   deleteSwimPlanningSlot,
 } from './swim-planning';
 
+// Coach assignments
+export {
+  getMySwimmers,
+  getAllAssignments,
+  assignSwimmer,
+  unassignSwimmer,
+  reassignSwimmer,
+  getSwimmerCoachHistory,
+} from './coach-assignments';
+
 export {
   getExercises,
   createExercise,
