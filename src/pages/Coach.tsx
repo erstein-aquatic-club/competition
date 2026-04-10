@@ -12,6 +12,7 @@ import {
   Trophy,
   Users,
   UsersRound,
+  Waves,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
@@ -39,6 +40,7 @@ type CoachHomeProps = {
   onNavigate: (section: CoachSection) => void;
   onOpenRecordsClub: () => void;
   onOpenRecordsAdmin: () => void;
+  onOpenSwimPlanning: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
@@ -87,6 +89,7 @@ const CoachHome = ({
   onNavigate,
   onOpenRecordsClub,
   onOpenRecordsAdmin,
+  onOpenSwimPlanning,
   onOpenAthlete,
   athletes,
   athletesLoading,
@@ -162,13 +165,14 @@ const CoachHome = ({
   // ── Section D: Quick access ────────────────────────────────
   const quickAccess = useMemo(
     () => [
+      { label: "Planif. Nage", icon: Waves, action: onOpenSwimPlanning, color: "text-cyan-500", bg: "bg-cyan-100 dark:bg-cyan-900/30" },
       { label: "Echéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
       { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
       { label: "Comms", icon: BellRing, action: () => onNavigate("comms"), color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30" },
       { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
-    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -626,6 +630,7 @@ export default function Coach() {
           onNavigate={setActiveSection}
           onOpenRecordsClub={() => navigate("/records-club")}
           onOpenRecordsAdmin={() => navigate("/records-admin")}
+          onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
           onOpenAthlete={handleOpenAthlete}
           athletes={athletes}
           athletesLoading={athletesLoading}

@@ -331,6 +331,13 @@ export {
   upsertPainReports,
 } from './painReports';
 
+// Swim planning
+export {
+  getSwimPlanningSlots,
+  upsertSwimPlanningSlot,
+  deleteSwimPlanningSlot,
+} from './swim-planning';
+
 export {
   getExercises,
   createExercise,

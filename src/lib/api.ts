@@ -260,6 +260,12 @@ import {
 } from './api/absences';
 
 import {
+  getSwimPlanningSlots as _getSwimPlanningSlots,
+  upsertSwimPlanningSlot as _upsertSwimPlanningSlot,
+  deleteSwimPlanningSlot as _deleteSwimPlanningSlot,
+} from "./api/swim-planning";
+
+import {
   getTrainingCycles as _getTrainingCycles,
   createTrainingCycle as _createTrainingCycle,
   updateTrainingCycle as _updateTrainingCycle,
@@ -817,4 +823,11 @@ export const api = {
   async deleteSwimmerSlot(slotId: string) { return _deleteSwimmerSlot(slotId); },
   async resetSwimmerSlots(userId: number, groupId: number, createdBy: number) { return _resetSwimmerSlots(userId, groupId, createdBy); },
   async getSwimmersAffectedBySlot(assignmentId: string) { return _getSwimmersAffectedBySlot(assignmentId); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — Swim Planning
+  // ══════════════════════════════════════════════════════════════════
+  async getSwimPlanningSlots(opts: Parameters<typeof _getSwimPlanningSlots>[0]) { return _getSwimPlanningSlots(opts); },
+  async upsertSwimPlanningSlot(input: Parameters<typeof _upsertSwimPlanningSlot>[0]) { return _upsertSwimPlanningSlot(input); },
+  async deleteSwimPlanningSlot(id: string) { return _deleteSwimPlanningSlot(id); },
 };

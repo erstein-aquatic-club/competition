@@ -847,3 +847,25 @@ export interface PainReport {
   intensity: number; // 1-3
   created_at: string;
 }
+
+// ── Swim Planning Slots ──
+
+export interface SwimPlanningSlot {
+  id: string;
+  group_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  filiere: string;
+  session_id?: string | null;
+  created_at?: string;
+}
+
+export interface SwimPlanningSlotInput {
+  group_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  filiere: string;
+  session_id?: string | null;
+}
