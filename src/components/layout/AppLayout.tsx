@@ -72,13 +72,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         window.dispatchEvent(new CustomEvent(NAV_RESET_EVENT));
       }
       window.scrollTo(0, 0);
-    } else if (hrefQuery && location === hrefPath) {
+    } else if (location === hrefPath) {
       // Same base route (e.g. /coach) but different section — update hash
       // and notify Coach.tsx via custom event
-      const section = new URLSearchParams(hrefQuery).get("section");
-      window.location.hash = `#${href}`;
-      if (section) {
-        window.dispatchEvent(new CustomEvent(NAV_SECTION_EVENT, { detail: section }));
+      if (hrefQuery) {
+        const section = new URLSearchParams(hrefQuery).get("section");
+        window.location.hash = `#${href}`;
+        if (section) {
+          window.dispatchEvent(new CustomEvent(NAV_SECTION_EVENT, { detail: section }));
+        }
+      } else {
+        // No query param (e.g. Home button) — reset to base section
+        window.location.hash = `#${hrefPath}`;
+        window.dispatchEvent(new CustomEvent(NAV_RESET_EVENT));
       }
       window.scrollTo(0, 0);
     } else {
