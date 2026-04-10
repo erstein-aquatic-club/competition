@@ -7519,3 +7519,14 @@ Les coachs voyaient tous les nageurs du club. Besoin d'un système d'attribution
 - Trigger SECURITY DEFINER pour la table d'historique — log automatique sans action côté frontend
 - filterByAssignment retourne null pour admin → pas de filtre, le code appelant n'a pas besoin de brancher sur le rôle
 - Toggle chrono conditionnel : affiché seulement si allAthletes.length > athletes.length (masqué si le coach a déjà tous les nageurs)
+
+### Complément §98 — Notifications push scoped (2026-04-10)
+
+**Problème :** Le trigger `auto_notify_swimmer_comment()` (migration 00072) envoyait les notifications de commentaire nageur à **tous les coachs** du club.
+
+**Correction :** Migration `00073_coach_comment_notify_assigned_only.sql` — `CREATE OR REPLACE FUNCTION` qui :
+1. Cherche le `coach_id` dans `coach_swimmer_assignments` pour le `athlete_id` de la session
+2. Si trouvé → notifie uniquement ce coach
+3. Si non trouvé (nageur non attribué) → fallback vers tous les coachs (backward compatible)
+
+**Fichier :** `supabase/migrations/00073_coach_comment_notify_assigned_only.sql`
