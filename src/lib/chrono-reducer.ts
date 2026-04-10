@@ -181,11 +181,22 @@ export function chronoReducer(
     case "STOP_SWIMMER": {
       const raceState = state.raceData.get(action.athleteId);
       if (!raceState || raceState.stoppedAt) return state;
+
+      // Auto-record a final split at stop time
+      const swimmerWave = state.waves.find((w) => w.wave === raceState.swimmer.wave);
+      let updatedRaceState = { ...raceState, stoppedAt: action.timestamp };
+      if (swimmerWave?.startedAt) {
+        const cumulativeMs = action.timestamp - swimmerWave.startedAt;
+        const currentSplits = raceState.splitsByRep[raceState.splitsByRep.length - 1];
+        const prevSplit = currentSplits[currentSplits.length - 1];
+        const lapMs = prevSplit ? cumulativeMs - prevSplit.cumulativeMs : cumulativeMs;
+        const newSplitsByRep = [...raceState.splitsByRep];
+        newSplitsByRep[newSplitsByRep.length - 1] = [...currentSplits, { cumulativeMs, lapMs }];
+        updatedRaceState = { ...updatedRaceState, splitsByRep: newSplitsByRep };
+      }
+
       const newRaceData = new Map(state.raceData);
-      newRaceData.set(action.athleteId, {
-        ...raceState,
-        stoppedAt: action.timestamp,
-      });
+      newRaceData.set(action.athleteId, updatedRaceState);
 
       // Check if all swimmers in this wave are now stopped → auto NEXT_REP
       const waveNum = raceState.swimmer.wave;
@@ -239,10 +250,25 @@ export function chronoReducer(
 
     case "STOP_RACE": {
       const waves = state.waves.map((w) => ({ ...w, stopped: true }));
+      // Auto-record final split for all active swimmers
+      const newRaceData = new Map(state.raceData);
+      for (const [id, rs] of newRaceData) {
+        if (rs.stoppedAt) continue; // already stopped
+        const swimmerWave = state.waves.find((w) => w.wave === rs.swimmer.wave);
+        if (!swimmerWave?.startedAt) continue;
+        const cumulativeMs = action.timestamp - swimmerWave.startedAt;
+        const currentSplits = rs.splitsByRep[rs.splitsByRep.length - 1];
+        const prevSplit = currentSplits[currentSplits.length - 1];
+        const lapMs = prevSplit ? cumulativeMs - prevSplit.cumulativeMs : cumulativeMs;
+        const newSplitsByRep = [...rs.splitsByRep];
+        newSplitsByRep[newSplitsByRep.length - 1] = [...currentSplits, { cumulativeMs, lapMs }];
+        newRaceData.set(id, { ...rs, splitsByRep: newSplitsByRep, stoppedAt: action.timestamp });
+      }
       return {
         ...state,
         phase: "results",
         waves,
+        raceData: newRaceData,
         stoppedAt: action.timestamp,
       };
     }

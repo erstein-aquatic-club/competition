@@ -40,7 +40,7 @@ function WaveBar({
 }) {
 
   return (
-    <div className="flex gap-3 px-4 py-3 overflow-x-auto">
+    <div className="grid grid-cols-2 gap-3 px-4 py-3 lg:grid-cols-3 xl:grid-cols-4">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
