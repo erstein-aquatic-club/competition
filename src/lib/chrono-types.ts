@@ -15,15 +15,18 @@ export interface SplitRecord {
 
 export interface SwimmerRaceState {
   swimmer: ChronoSwimmer;
-  splits: SplitRecord[];
+  /** Splits grouped by rep: splitsByRep[0] = first rep, etc. */
+  splitsByRep: SplitRecord[][];
   /** Timestamp (Date.now()) when swimmer was individually stopped, null if still racing */
   stoppedAt: number | null;
 }
 
 export interface WaveState {
   wave: number;
-  startedAt: number | null; // performance.now() timestamp
+  startedAt: number | null; // Date.now() timestamp
   stopped: boolean;
+  /** Current rep index (0-based) */
+  currentRep: number;
 }
 
 export type ChronoPhase = "setup" | "racing" | "results";
@@ -35,6 +38,8 @@ export interface ChronoState {
   waves: WaveState[];
   raceData: Map<number, SwimmerRaceState>; // keyed by athleteId
   stoppedAt: number | null;
+  /** Departure interval in seconds (0 = no countdown) */
+  departureIntervalSec: number;
 }
 
 export const WAVE_COLORS = [

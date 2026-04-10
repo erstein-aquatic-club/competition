@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { ChronoState } from "../../lib/chrono-types";
+import type { ChronoState, SplitRecord } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap } from "../../hooks/useChronoTimer";
 import { WAVE_COLORS } from "../../lib/chrono-types";
@@ -17,11 +17,26 @@ interface ChronoResultsProps {
 
 type ExportStatus = "pending" | "sent" | "error";
 
+/** Flatten all reps into a single split_times array for export */
+function flattenSplits(splitsByRep: SplitRecord[][]): { rep: number; time_seconds: number }[] {
+  const result: { rep: number; time_seconds: number }[] = [];
+  let idx = 1;
+  for (const rep of splitsByRep) {
+    for (const s of rep) {
+      result.push({ rep: idx++, time_seconds: s.cumulativeMs / 1000 });
+    }
+  }
+  return result;
+}
+
+function totalSplitCount(splitsByRep: SplitRecord[][]): number {
+  return splitsByRep.reduce((sum, rep) => sum + rep.length, 0);
+}
+
 export default function ChronoResults({ state, dispatch, onExportComplete }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
 
-  // Group race data by lane
   const raceEntries = Array.from(state.raceData.values());
   const byLane = new Map<number, typeof raceEntries>();
   for (const entry of raceEntries) {
@@ -31,10 +46,11 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
     byLane.set(lane, list);
   }
   const sortedLanes = Array.from(byLane.keys()).sort((a, b) => a - b);
+  const hasMultipleReps = raceEntries.some((e) => e.splitsByRep.length > 1);
 
   const handleExportAll = useCallback(async () => {
     setExporting(true);
-    const swimmers = raceEntries.filter((e) => e.splits.length > 0);
+    const swimmers = raceEntries.filter((e) => totalSplitCount(e.splitsByRep) > 0);
 
     if (swimmers.length === 0) {
       toast.error("Aucun split à exporter");
@@ -44,14 +60,12 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
 
     const results = await Promise.allSettled(
       swimmers.map(async (raceState) => {
-        const { swimmer, splits } = raceState;
+        const { swimmer, splitsByRep } = raceState;
+        const repCount = splitsByRep.length;
         const log: SwimExerciseLogInput = {
           exercise_label: "Chrono coach",
-          split_times: splits.map((s, i) => ({
-            rep: i + 1,
-            time_seconds: s.cumulativeMs / 1000,
-          })),
-          notes: `Série chrono — Ligne ${swimmer.lane}`,
+          split_times: flattenSplits(splitsByRep),
+          notes: `Série chrono — Ligne ${swimmer.lane}${repCount > 1 ? ` — ${repCount} reps` : ""}`,
         };
 
         await createStandaloneSwimLog(String(swimmer.athleteId), log);
@@ -123,21 +137,10 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
             Ligne {lane}
           </h3>
           {byLane.get(lane)!.map((raceState) => {
-            const { swimmer, splits } = raceState;
+            const { swimmer, splitsByRep } = raceState;
             const waveColor = WAVE_COLORS[(swimmer.wave - 1) % WAVE_COLORS.length];
             const status = exportStatuses.get(swimmer.athleteId);
-
-            // Find best lap
-            let bestLapIndex = -1;
-            let bestLapMs = Infinity;
-            for (let i = 0; i < splits.length; i++) {
-              if (splits[i].lapMs < bestLapMs) {
-                bestLapMs = splits[i].lapMs;
-                bestLapIndex = i;
-              }
-            }
-
-            const lastSplit = splits[splits.length - 1];
+            const total = totalSplitCount(splitsByRep);
 
             return (
               <div
@@ -151,62 +154,86 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
                       {swimmer.displayName}
                     </span>
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${waveColor.bg} ${waveColor.text}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${waveColor.dot}`}
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${waveColor.dot}`} />
                       {waveColor.label}
                     </span>
                   </div>
                   <ExportStatusBadge status={status} />
                 </div>
 
-                {/* Splits */}
-                {splits.length === 0 ? (
+                {/* Splits by rep */}
+                {total === 0 ? (
                   <p className="text-sm text-muted-foreground italic">
                     Aucun split enregistré
                   </p>
                 ) : (
-                  <>
-                    <div className="flex flex-col gap-0.5 mb-2">
-                      {splits.map((split, i) => {
-                        const isBest = i === bestLapIndex;
-                        return (
-                          <div
-                            key={i}
-                            className={`flex items-center gap-3 font-mono tabular-nums text-sm ${
-                              isBest ? "text-green-400" : "text-foreground"
-                            }`}
-                          >
-                            <span className="w-6 text-right text-muted-foreground">
-                              #{i + 1}
+                  <div className="flex flex-col gap-3">
+                    {splitsByRep.map((splits, repIdx) => {
+                      if (splits.length === 0) return null;
+
+                      let bestLapIdx = -1;
+                      let bestLapMs = Infinity;
+                      for (let i = 0; i < splits.length; i++) {
+                        if (splits[i].lapMs < bestLapMs) {
+                          bestLapMs = splits[i].lapMs;
+                          bestLapIdx = i;
+                        }
+                      }
+                      const lastSplit = splits[splits.length - 1];
+
+                      return (
+                        <div key={repIdx}>
+                          {/* Rep header — only show if multiple reps */}
+                          {hasMultipleReps && (
+                            <div className="text-xs font-semibold text-muted-foreground mb-1">
+                              Rep {repIdx + 1}
+                            </div>
+                          )}
+
+                          <div className="flex flex-col gap-0.5 mb-1.5">
+                            {splits.map((split, i) => {
+                              const isBest = i === bestLapIdx;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex items-center gap-3 font-mono tabular-nums text-sm ${
+                                    isBest ? "text-green-600 dark:text-green-400" : "text-foreground"
+                                  }`}
+                                >
+                                  <span className="w-6 text-right text-muted-foreground">
+                                    #{i + 1}
+                                  </span>
+                                  <span className="w-20">
+                                    {formatTime(split.cumulativeMs)}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    ({formatLap(split.lapMs)})
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Rep summary */}
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 border-t pt-1.5 text-xs text-muted-foreground">
+                            <span>
+                              Total :{" "}
+                              <span className="font-mono tabular-nums text-foreground">
+                                {formatTime(lastSplit.cumulativeMs)}
+                              </span>
                             </span>
-                            <span className="w-20">
-                              {formatTime(split.cumulativeMs)}
-                            </span>
-                            <span className="text-muted-foreground">
-                              ({formatLap(split.lapMs)})
+                            <span>
+                              Meilleur :{" "}
+                              <span className="font-mono tabular-nums text-green-600 dark:text-green-400">
+                                {formatLap(bestLapMs)} (#{bestLapIdx + 1})
+                              </span>
                             </span>
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Summary */}
-                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 border-t pt-1.5 text-xs text-muted-foreground">
-                      <span>
-                        Temps total :{" "}
-                        <span className="font-mono tabular-nums text-foreground">
-                          {formatTime(lastSplit.cumulativeMs)}
-                        </span>
-                      </span>
-                      <span>
-                        Meilleur partiel :{" "}
-                        <span className="font-mono tabular-nums text-green-400">
-                          {formatLap(bestLapMs)} (#{bestLapIndex + 1})
-                        </span>
-                      </span>
-                    </div>
-                  </>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             );
@@ -228,14 +255,14 @@ function ExportStatusBadge({ status }: { status?: ExportStatus }) {
   }
   if (status === "sent") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-green-400">
+      <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
         <Check className="h-3.5 w-3.5" />
         Envoyé
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-red-400">
+    <span className="inline-flex items-center gap-1 text-xs text-destructive">
       <AlertCircle className="h-3.5 w-3.5" />
       Erreur
     </span>

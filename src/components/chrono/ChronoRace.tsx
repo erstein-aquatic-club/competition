@@ -32,12 +32,16 @@ function WaveBar({
   now,
   dispatch,
   getTimestamp,
+  departureIntervalSec,
 }: {
   waves: ChronoState["waves"];
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
+  departureIntervalSec: number;
 }) {
+  const intervalMs = departureIntervalSec * 1000;
+
   return (
     <div className="flex gap-3 px-4 py-3 overflow-x-auto">
       {[...waves]
@@ -60,7 +64,7 @@ function WaveBar({
                 className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
               >
                 <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-                  {wc.label}
+                  {wc.label}{w.currentRep > 0 ? ` R${w.currentRep + 1}` : ""}
                 </span>
                 <span className="flex items-center gap-1.5 text-lg font-black text-white">
                   <Play className="h-4 w-4 fill-current" /> GO
@@ -70,17 +74,45 @@ function WaveBar({
           }
 
           const elapsed = now - (w.startedAt as number);
+          const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
+          const urgent = remainingMs >= 0 && remainingMs <= 15000;
+
           return (
             <div
               key={w.wave}
-              className={`flex flex-col items-center justify-center rounded-xl border-2 ${wc.border} bg-card min-w-[110px] h-16 px-3`}
+              className={`flex flex-col items-center justify-center rounded-xl border-2 ${wc.border} bg-card min-w-[130px] px-3 py-1.5 gap-0.5`}
             >
-              <span className={`text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}>
-                {wc.label} — En course
+              {/* Countdown */}
+              {intervalMs > 0 && (
+                <span className={`font-mono tabular-nums text-xs font-bold ${
+                  remainingMs <= 0
+                    ? "text-destructive"
+                    : urgent
+                      ? "text-destructive animate-pulse"
+                      : "text-muted-foreground"
+                }`}>
+                  {remainingMs <= 0 ? `+${formatTime(-remainingMs)}` : `-${formatTime(remainingMs)}`}
+                </span>
+              )}
+              {/* Wave label + rep */}
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {wc.label} — Rep {w.currentRep + 1}
               </span>
+              {/* Main chrono */}
               <span className="font-mono tabular-nums text-xl font-black text-foreground tracking-tight">
                 {formatTime(elapsed)}
               </span>
+              {/* Next rep button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch({ type: "NEXT_REP", wave: w.wave });
+                }}
+                className={`mt-0.5 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase border ${wc.border} text-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation`}
+              >
+                Rep suivante
+              </button>
             </div>
           );
         })}
@@ -95,8 +127,9 @@ function SwimmerCard({
   displayName,
   wave,
   waveStartedAt,
-  splits,
+  currentSplits,
   swimmerStoppedAt,
+  totalReps,
   now,
   dispatch,
   getTimestamp,
@@ -105,8 +138,9 @@ function SwimmerCard({
   displayName: string;
   wave: number;
   waveStartedAt: number | null;
-  splits: { cumulativeMs: number; lapMs: number }[];
+  currentSplits: { cumulativeMs: number; lapMs: number }[];
   swimmerStoppedAt: number | null;
+  totalReps: number;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -156,7 +190,7 @@ function SwimmerCard({
   const elapsed = launched
     ? (stopped ? swimmerStoppedAt : now) - waveStartedAt
     : 0;
-  const lastSplit = splits.length > 0 ? splits[splits.length - 1] : null;
+  const lastSplit = currentSplits.length > 0 ? currentSplits[currentSplits.length - 1] : null;
 
   return (
     <div
@@ -215,7 +249,7 @@ function SwimmerCard({
         {launched && lastSplit ? (
           <div className="flex items-baseline gap-2">
             <span className={`text-xs font-bold text-white rounded px-1 py-0.5 ${wc.dot}`}>
-              #{splits.length}
+              #{currentSplits.length}
             </span>
             <span className="font-mono tabular-nums text-sm font-semibold text-foreground">
               {formatTime(lastSplit.cumulativeMs)}
@@ -276,8 +310,9 @@ function LaneSection({
               displayName={s.displayName}
               wave={s.wave}
               waveStartedAt={waveState?.startedAt ?? null}
-              splits={race?.splits ?? []}
+              currentSplits={race ? race.splitsByRep[race.splitsByRep.length - 1] : []}
               swimmerStoppedAt={race?.stoppedAt ?? null}
+              totalReps={race?.splitsByRep.length ?? 1}
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
@@ -310,6 +345,7 @@ export default function ChronoRace({
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
+              departureIntervalSec={state.departureIntervalSec}
             />
           </div>
           <div className="pr-4 shrink-0">

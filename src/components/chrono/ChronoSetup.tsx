@@ -152,6 +152,28 @@ export default function ChronoSetup({
         )}
       </div>
 
+      {/* ── Departure interval ─────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">Départ toutes les :</span>
+        <Input
+          type="number"
+          min={0}
+          step={5}
+          value={state.departureIntervalSec || ""}
+          onChange={(e) =>
+            dispatch({ type: "SET_DEPARTURE_INTERVAL", seconds: Number(e.target.value) || 0 })
+          }
+          placeholder="0"
+          className="w-20 text-center font-mono"
+        />
+        <span className="text-sm text-muted-foreground">sec</span>
+        {state.departureIntervalSec > 0 && (
+          <span className="text-xs text-muted-foreground">
+            ({Math.floor(state.departureIntervalSec / 60)}:{String(state.departureIntervalSec % 60).padStart(2, "0")})
+          </span>
+        )}
+      </div>
+
       {/* ── Lane sections ──────────────────────────────── */}
       <div className="flex flex-col gap-3">
         {Array.from({ length: state.laneCount }, (_, i) => i + 1).map(
