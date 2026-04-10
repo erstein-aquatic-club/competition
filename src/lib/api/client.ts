@@ -44,6 +44,7 @@ export const STORAGE_KEYS = {
   SWIM_RECORDS: "suivi_natation_swim_records",
   TIMESHEET_SHIFTS: "suivi_natation_timesheet_shifts",
   TIMESHEET_LOCATIONS: "suivi_natation_timesheet_locations",
+  CHRONO_BACKUP: "eac-chrono-backup",
 } as const;
 
 // --- Safe type conversions ---

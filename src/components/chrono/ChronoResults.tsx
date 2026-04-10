@@ -12,11 +12,12 @@ import type { SwimExerciseLogInput } from "../../lib/api/types";
 interface ChronoResultsProps {
   state: ChronoState;
   dispatch: React.Dispatch<ChronoAction>;
+  onExportComplete?: () => void;
 }
 
 type ExportStatus = "pending" | "sent" | "error";
 
-export default function ChronoResults({ state, dispatch }: ChronoResultsProps) {
+export default function ChronoResults({ state, dispatch, onExportComplete }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
 
@@ -79,10 +80,11 @@ export default function ChronoResults({ state, dispatch }: ChronoResultsProps) {
 
     if (errorCount === 0) {
       toast.success(`${successCount} résultat${successCount > 1 ? "s" : ""} envoyé${successCount > 1 ? "s" : ""}`);
+      onExportComplete?.();
     } else {
       toast.error(`${errorCount} erreur${errorCount > 1 ? "s" : ""} sur ${swimmers.length} envoi${swimmers.length > 1 ? "s" : ""}`);
     }
-  }, [raceEntries, exportStatuses]);
+  }, [raceEntries, exportStatuses, onExportComplete]);
 
   const handleNewSeries = useCallback(() => {
     dispatch({ type: "RESET_FOR_NEW_SERIES" });
