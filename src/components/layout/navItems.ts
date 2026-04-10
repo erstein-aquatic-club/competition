@@ -1,4 +1,4 @@
-import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, Library, Home, Trophy, type LucideIcon } from "lucide-react";
+import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, Library, Home, Trophy, Timer, type LucideIcon } from "lucide-react";
 import { FEATURES } from "@/lib/features";
 
 type NavItem = {
@@ -29,6 +29,7 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
       { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
       { href: "/coach?section=library", icon: Library, label: "Biblio" },
       { href: "/coach", icon: Home, label: "Home" },
+      { href: "/coach?section=chrono", icon: Timer, label: "Chrono" },
     ];
   }
   const athleteItems: NavItem[] = [

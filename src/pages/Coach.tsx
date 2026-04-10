@@ -23,10 +23,11 @@ const CoachSwimmerDetail = lazy(() => import("./coach/CoachSwimmerDetail"));
 const CoachWeekView = lazy(() => import("./coach/CoachWeekView"));
 const CoachLibrary = lazy(() => import("./coach/CoachLibrary"));
 const CoachComms = lazy(() => import("./coach/CoachComms"));
+const CoachChronoScreen = lazy(() => import("./coach/CoachChronoScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
 
-type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms";
+type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms" | "chrono";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -703,6 +704,12 @@ export default function Coach() {
             groups={groups}
             athletesLoading={athletesLoading}
           />
+        </Suspense>
+      ) : null}
+
+      {activeSection === "chrono" ? (
+        <Suspense fallback={<PageSkeleton />}>
+          <CoachChronoScreen athletes={athletes} />
         </Suspense>
       ) : null}
 
