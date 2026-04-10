@@ -76,6 +76,7 @@ Tous les feature flags sont activés.
 | Notifications rappel ressenti | ✅ | `00054_slot_centric_sessions.sql` | pg_cron 15min, push 30min avant fin créneau (§85) |
 | Chrono split timer (tablette/desktop) | ✅ | Coach peut chronométrer les splits par ligne/vague et exporter vers profils nageurs |
 | Attribution coach ↔ nageur | ✅ | `coach-assignments.ts`, `CoachMySwimmersScreen.tsx`, `useMySwimmerIds.ts` | 1 coach principal par nageur, écran gestion, filtrage vues, historique (§98) |
+| Commentaires nageurs → push coach | ✅ | `coach-comments.ts`, `CoachCommentsScreen.tsx`, `Coach.tsx` | Push immédiat au coach, badge home 48h, inbox dédié, lu/non-lu (§99) |
 
 ### Musculation — Nageur
 

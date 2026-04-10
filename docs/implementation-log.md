@@ -7530,3 +7530,37 @@ Les coachs voyaient tous les nageurs du club. Besoin d'un système d'attribution
 3. Si non trouvé (nageur non attribué) → fallback vers tous les coachs (backward compatible)
 
 **Fichier :** `supabase/migrations/00073_coach_comment_notify_assigned_only.sql`
+
+## §99 — Commentaires nageurs sur home coach + push notification (2026-04-10)
+
+### Contexte
+Les nageurs peuvent laisser un commentaire textuel dans leur ressenti de séance, mais les coachs n'en sont informés que s'ils consultent manuellement la fiche du nageur. On veut rendre ces commentaires visibles et proactifs.
+
+### Changements réalisés
+
+**Base de données :**
+- Migration `00074_coach_comment_notifications.sql` : table `coach_comment_reads` (suivi lu/non-lu par coach) + trigger `auto_notify_swimmer_comment()` sur `dim_sessions` INSERT/UPDATE qui envoie une notification push à tous les coachs quand un nageur écrit un commentaire
+- Le trigger ne se déclenche que si `comments` est non-vide et a changé (pas de re-notification sur édition d'autres champs)
+
+**API :**
+- Module `src/lib/api/coach-comments.ts` avec 3 fonctions : `getSwimmerComments()`, `markCommentsRead()`, `countUnreadComments48h()`
+- Intégré dans `api/index.ts` (re-exports) et `api.ts` (facade)
+
+**UI Coach :**
+- Section violette "Commentaires nageurs" sur la page d'accueil coach — affiche les 3 derniers commentaires des 48h avec badge compteur non-lus
+- Écran dédié `CoachCommentsScreen` (inbox complet) accessible via `section=comments` : cartes avec avatar, indicateurs colorés, texte complet, pastille non-lu violette, bord gauche coloré (rouge si fatigue/difficulté élevée)
+- Auto-marquage lu à l'ouverture de l'écran commentaires
+
+### Fichiers modifiés
+- `supabase/migrations/00074_coach_comment_notifications.sql` (créé)
+- `src/lib/api/coach-comments.ts` (créé)
+- `src/lib/api/index.ts` (modifié)
+- `src/lib/api.ts` (modifié)
+- `src/pages/coach/CoachCommentsScreen.tsx` (créé)
+- `src/pages/Coach.tsx` (modifié — section commentaires home + routing)
+
+### Décisions techniques
+- Couleur violette pour la thématique commentaires (non utilisée ailleurs dans les accès rapides)
+- Fenêtre 48h pour le badge home (commentaires plus anciens accessibles via la liste complète)
+- Réutilisation du pipeline push existant (notifications → notification_targets → webhook → push-send)
+- Pas de `since` dans l'API — filtrage client-side pour les 48h (volume faible, max 20 items)

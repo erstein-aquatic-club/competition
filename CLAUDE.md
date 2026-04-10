@@ -137,6 +137,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/lib/api/coach-assignments.ts` | CRUD attributions coach ↔ nageur (§98) | ~110 lignes |
 | `src/hooks/useMySwimmerIds.ts` | Hook filtrage nageurs par coach + helper filterByAssignment (§98) | ~45 lignes |
 | `src/pages/coach/CoachMySwimmersScreen.tsx` | Écran gestion attribution nageurs coach/admin (§98) | ~555 lignes |
+| `src/lib/api/coach-comments.ts` | API commentaires nageurs (fetch, mark read, count) (§99) | ~130 lignes |
+| `src/pages/coach/CoachCommentsScreen.tsx` | Écran inbox commentaires coach (§99) | ~240 lignes |
 
 ## Edge Functions Supabase
 
@@ -220,6 +222,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 59 | Notification matinale bien-être (push 6h00) | Moyenne | Fait (§96) |
 | 60 | Chrono Coach (split timer poolside tablette) | Haute | Fait (§97) |
 | 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Fait (§98) |
+| 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Fait (§99) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
