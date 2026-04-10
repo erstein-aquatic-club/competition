@@ -21,6 +21,7 @@ import SwimVolumeCharts from "@/components/coach/SwimVolumeCharts";
 import { useSwimAnalytics } from "@/hooks/useSwimAnalytics";
 import AttendancePerformanceChart from "@/components/coach/AttendancePerformanceChart";
 import PainHistoryMap from "@/components/coach/PainHistoryMap";
+import { useMySwimmerIds } from "@/hooks/useMySwimmerIds";
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
@@ -65,6 +66,9 @@ export default function CoachSwimmerDetail({
   const athleteId =
     athleteIdProp ?? (params?.id ? Number(params.id) : selectedAthleteId);
   const athleteName = athleteNameProp ?? selectedAthleteName;
+
+  const { swimmerIds } = useMySwimmerIds();
+  const hasAccess = swimmerIds === null || (athleteId != null && swimmerIds.has(athleteId));
 
   const { data: profile } = useQuery({
     queryKey: ["profile", athleteId],
@@ -154,12 +158,12 @@ export default function CoachSwimmerDetail({
   const groupLabel = profile?.group_label ?? null;
   const handleBack = onBack ?? (() => navigate("/coach?section=swimmers"));
 
-  if (!athleteId) {
+  if (!athleteId || !hasAccess) {
     return (
       <div className="p-4 text-center text-muted-foreground">
-        <p>Aucun nageur sélectionné.</p>
+        <p>{!athleteId ? "Aucun nageur sélectionné." : "Ce nageur ne fait pas partie de vos nageurs."}</p>
         <button type="button" onClick={handleBack} className="mt-2 text-primary underline">
-          Retour au dashboard
+          Retour
         </button>
       </div>
     );
