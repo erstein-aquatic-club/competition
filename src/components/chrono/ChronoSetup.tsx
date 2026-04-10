@@ -152,27 +152,51 @@ export default function ChronoSetup({
         )}
       </div>
 
-      {/* ── Departure interval ─────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Départ toutes les :</span>
-        <Input
-          type="number"
-          min={0}
-          step={5}
-          value={state.departureIntervalSec || ""}
-          onChange={(e) =>
-            dispatch({ type: "SET_DEPARTURE_INTERVAL", seconds: Number(e.target.value) || 0 })
-          }
-          placeholder="0"
-          className="w-20 text-center font-mono"
-        />
-        <span className="text-sm text-muted-foreground">sec</span>
-        {state.departureIntervalSec > 0 && (
-          <span className="text-xs text-muted-foreground">
-            ({Math.floor(state.departureIntervalSec / 60)}:{String(state.departureIntervalSec % 60).padStart(2, "0")})
-          </span>
-        )}
-      </div>
+      {/* ── Departure intervals per wave ──────────────── */}
+      {activeWaves.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-muted-foreground">Départ toutes les :</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {activeWaves.map((w) => {
+              const c = WAVE_COLORS[w - 1];
+              const waveState = state.waves.find((ws) => ws.wave === w);
+              const sec = waveState?.departureIntervalSec ?? 0;
+              const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+              const ss = String(sec % 60).padStart(2, "0");
+              return (
+                <div key={w} className="flex items-center gap-1.5">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${c.dot}`}>
+                    {c.label}
+                  </span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={sec > 0 ? `${mm}:${ss}` : ""}
+                    placeholder="mm:ss"
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9:]/g, "");
+                      let totalSec = 0;
+                      if (raw.includes(":")) {
+                        const [m, s] = raw.split(":");
+                        totalSec = (parseInt(m) || 0) * 60 + (parseInt(s) || 0);
+                      } else {
+                        const num = parseInt(raw) || 0;
+                        if (num > 59) {
+                          totalSec = Math.floor(num / 100) * 60 + (num % 100);
+                        } else {
+                          totalSec = num;
+                        }
+                      }
+                      dispatch({ type: "SET_WAVE_INTERVAL", wave: w, seconds: totalSec });
+                    }}
+                    className="w-[4.5rem] text-center font-mono text-sm"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Lane sections ──────────────────────────────── */}
       <div className="flex flex-col gap-3">

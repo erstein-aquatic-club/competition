@@ -27,6 +27,8 @@ export interface WaveState {
   stopped: boolean;
   /** Current rep index (0-based) */
   currentRep: number;
+  /** Departure interval in seconds for this wave (0 = no countdown) */
+  departureIntervalSec: number;
 }
 
 export type ChronoPhase = "setup" | "racing" | "results";
@@ -38,8 +40,6 @@ export interface ChronoState {
   waves: WaveState[];
   raceData: Map<number, SwimmerRaceState>; // keyed by athleteId
   stoppedAt: number | null;
-  /** Departure interval in seconds (0 = no countdown) */
-  departureIntervalSec: number;
 }
 
 export const WAVE_COLORS = [

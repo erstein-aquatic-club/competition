@@ -10,7 +10,7 @@ import type {
 
 type ChronoAction =
   | { type: "SET_LANE_COUNT"; count: number }
-  | { type: "SET_DEPARTURE_INTERVAL"; seconds: number }
+  | { type: "SET_WAVE_INTERVAL"; wave: number; seconds: number }
   | { type: "ADD_SWIMMER"; swimmer: ChronoSwimmer }
   | { type: "REMOVE_SWIMMER"; athleteId: number }
   | { type: "MOVE_SWIMMER"; athleteId: number; lane: number }
@@ -39,7 +39,7 @@ export function computeWaves(
 
   return sorted.map((wave) => {
     const existing = existingMap.get(wave);
-    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0 };
+    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 0 };
   });
 }
 
@@ -52,7 +52,6 @@ export const initialChronoState: ChronoState = {
   waves: [],
   raceData: new Map(),
   stoppedAt: null,
-  departureIntervalSec: 0,
 };
 
 // ── Reducer ──────────────────────────────────────────────────────────
@@ -67,8 +66,13 @@ export function chronoReducer(
       return { ...state, laneCount };
     }
 
-    case "SET_DEPARTURE_INTERVAL": {
-      return { ...state, departureIntervalSec: Math.max(0, action.seconds) };
+    case "SET_WAVE_INTERVAL": {
+      const waves = state.waves.map((w) =>
+        w.wave === action.wave
+          ? { ...w, departureIntervalSec: Math.max(0, action.seconds) }
+          : w,
+      );
+      return { ...state, waves };
     }
 
     case "ADD_SWIMMER": {

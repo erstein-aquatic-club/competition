@@ -32,15 +32,12 @@ function WaveBar({
   now,
   dispatch,
   getTimestamp,
-  departureIntervalSec,
 }: {
   waves: ChronoState["waves"];
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
-  departureIntervalSec: number;
 }) {
-  const intervalMs = departureIntervalSec * 1000;
 
   return (
     <div className="flex gap-3 px-4 py-3 overflow-x-auto">
@@ -74,6 +71,7 @@ function WaveBar({
           }
 
           const elapsed = now - (w.startedAt as number);
+          const intervalMs = w.departureIntervalSec * 1000;
           const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
           const urgent = remainingMs >= 0 && remainingMs <= 15000;
 
@@ -345,7 +343,6 @@ export default function ChronoRace({
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
-              departureIntervalSec={state.departureIntervalSec}
             />
           </div>
           <div className="pr-4 shrink-0">
