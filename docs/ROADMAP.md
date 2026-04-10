@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-08 (§95 Rest Screen Improvements)*
+*Dernière mise à jour : 2026-04-10 (§97 Chrono Coach)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -65,6 +65,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 56 | Restructuration bibliothèque musculation nageur | Moyenne | Moyenne | Fait (§93) |
 | 57 | Rest Timer enrichi — tabs swipables | Moyenne | Moyenne | Fait (§94) |
 | 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Moyenne | Fait (§95) |
+| 60 | Chrono Coach (split timer poolside tablette) | Haute | Moyenne | Fait (§97) |
 
 ---
 

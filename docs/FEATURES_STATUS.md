@@ -74,6 +74,7 @@ Tous les feature flags sont activés.
 | Assignation par créneau | ✅ | `SlotSessionSheet.tsx`, `assignments.ts` | Auto-assignation groupes, visible_from, bulk create, delete, visibilité (§85) |
 | Picker templates | ✅ | `SlotTemplatePicker.tsx` | Sélection séance bibliothèque, recherche par nom (§85) |
 | Notifications rappel ressenti | ✅ | `00054_slot_centric_sessions.sql` | pg_cron 15min, push 30min avant fin créneau (§85) |
+| Chrono split timer (tablette/desktop) | ✅ | Coach peut chronométrer les splits par ligne/vague et exporter vers profils nageurs |
 
 ### Musculation — Nageur
 

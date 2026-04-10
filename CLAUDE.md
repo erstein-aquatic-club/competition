@@ -127,6 +127,13 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/strength/RestExerciseTab.tsx` | Tab exercice (GIF, prescription, muscles, notes) (§94) | ~95 lignes |
 | `src/components/strength/RestSessionTab.tsx` | Tab progression séance (barre, volume, liste) (§94) | ~130 lignes |
 | `src/components/strength/RestPerfsTab.tsx` | Tab performances (1RM, cible, intensité) (§94) | ~140 lignes |
+| `src/lib/chrono-types.ts` | Types et constantes chrono (ChronoSwimmer, WAVE_COLORS) | ~45 lignes |
+| `src/lib/chrono-reducer.ts` | State machine reducer chrono (12 actions) | ~190 lignes |
+| `src/hooks/useChronoTimer.ts` | Hook RAF chrono 60fps + formatters | ~45 lignes |
+| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono (lignes, nageurs, vagues) | ~295 lignes |
+| `src/components/chrono/ChronoRace.tsx` | Phase course chrono (GO, splits, chrono live) | ~340 lignes |
+| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono (splits, export) | ~245 lignes |
+| `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage | ~135 lignes |
 
 ## Edge Functions Supabase
 
@@ -208,6 +215,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 57 | Rest Timer enrichi — tabs swipables | Moyenne | Fait (§94) |
 | 58 | Rest Screen Improvements (GIF, notes, dots, sparkline, swipe) | Moyenne | Fait (§95) |
 | 59 | Notification matinale bien-être (push 6h00) | Moyenne | Fait (§96) |
+| 60 | Chrono Coach (split timer poolside tablette) | Haute | Fait (§97) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

@@ -7444,3 +7444,30 @@ Les nageurs oublient souvent de saisir leur bien-être quotidien. Ajout d'une no
 ### Tests
 - `npm run build` : ✅ aucune erreur
 - Validation syntaxique SQL : ✅
+
+## §97 — Chrono Coach (Split Timer Poolside)
+
+**Date** : 2026-04-10
+**Contexte** : Page "Chrono" réservée tablette/desktop permettant au coach de chronométrer les splits de nageurs par ligne d'eau et par vague de départ, puis d'exporter les résultats vers chaque profil nageur.
+
+**Changements** :
+- Créé `src/lib/chrono-types.ts` — types (ChronoSwimmer, SplitRecord, WaveState, ChronoState, WAVE_COLORS)
+- Créé `src/lib/chrono-reducer.ts` — state machine reducer (12 actions : setup → racing → results → reset)
+- Créé `src/hooks/useChronoTimer.ts` — hook RAF 60fps + formatTime/formatLap helpers
+- Créé `src/components/chrono/ChronoSetup.tsx` — phase préparation (lignes, picker nageurs, vagues)
+- Créé `src/components/chrono/ChronoRace.tsx` — phase course (GO par vague, split buttons tactiles, chrono live)
+- Créé `src/components/chrono/ChronoResults.tsx` — phase résultats (tableau splits, export vers profils, meilleur partiel)
+- Créé `src/pages/coach/CoachChronoScreen.tsx` — orchestrateur 3 phases + localStorage backup/restore
+- Modifié `src/pages/Coach.tsx` — ajout section "chrono" + lazy loading
+- Modifié `src/components/layout/navItems.ts` — ajout nav item Timer
+- Modifié `src/components/layout/AppLayout.tsx` — ajout label section
+- Modifié `src/lib/api/client.ts` — ajout STORAGE_KEYS.CHRONO_BACKUP
+
+**Fichiers modifiés** : 11 fichiers (7 créés, 4 modifiés)
+**Tests** : Compilation TypeScript OK (npx tsc --noEmit)
+**Décisions** :
+- performance.now() pour la précision sub-ms du chrono
+- Map<number, SwimmerRaceState> pour l'accès O(1) aux données par nageur
+- localStorage backup sérialisé (Map → array) pour la reprise après crash
+- createStandaloneSwimLog() pour l'export (standalone, pas lié à une session)
+- Mobile guard CSS (hidden md:block) plutôt que JS pour éviter le flash
