@@ -105,38 +105,45 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
         </p>
       </div>
 
-      <div className="hidden md:block max-w-6xl mx-auto p-4">
-      {showRestore && (
-        <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-950/60 p-4 flex items-center justify-between gap-4 shadow-lg shadow-amber-900/20">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
-              <Timer className="h-4 w-4 text-amber-400" />
-            </div>
-            <p className="text-sm font-medium text-amber-100">
-              Une série en cours a été retrouvée. Reprendre ?
-            </p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button variant="ghost" size="sm" className="text-amber-300/70 hover:text-amber-100 hover:bg-amber-900/40" onClick={handleDismissRestore}>
-              Ignorer
-            </Button>
-            <Button size="sm" className="bg-amber-500 text-amber-950 font-semibold hover:bg-amber-400" onClick={handleRestore}>
-              Reprendre
-            </Button>
-          </div>
+      {/* Race phase uses full width — no container */}
+      {state.phase === "racing" && (
+        <div className="hidden md:block">
+          <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
         </div>
       )}
 
-      {state.phase === "setup" && (
-        <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} />
+      {/* Setup & results use a centered container */}
+      {state.phase !== "racing" && (
+        <div className="hidden md:block max-w-6xl mx-auto p-4">
+          {showRestore && (
+            <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-950/60 p-4 flex items-center justify-between gap-4 shadow-lg shadow-amber-900/20">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+                  <Timer className="h-4 w-4 text-amber-400" />
+                </div>
+                <p className="text-sm font-medium text-amber-100">
+                  Une série en cours a été retrouvée. Reprendre ?
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button variant="ghost" size="sm" className="text-amber-300/70 hover:text-amber-100 hover:bg-amber-900/40" onClick={handleDismissRestore}>
+                  Ignorer
+                </Button>
+                <Button size="sm" className="bg-amber-500 text-amber-950 font-semibold hover:bg-amber-400" onClick={handleRestore}>
+                  Reprendre
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {state.phase === "setup" && (
+            <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} />
+          )}
+          {state.phase === "results" && (
+            <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} />
+          )}
+        </div>
       )}
-      {state.phase === "racing" && (
-        <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
-      )}
-      {state.phase === "results" && (
-        <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} />
-      )}
-      </div>
     </>
   );
 }

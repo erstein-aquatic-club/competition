@@ -25,16 +25,6 @@ interface ChronoRaceProps {
   getTimestamp: () => number;
 }
 
-/* ── Vivid wave accent colors for scoreboard contrast ──────────── */
-const WAVE_ACCENTS = [
-  { bg: "bg-cyan-500",    bgMuted: "bg-cyan-950",    border: "border-cyan-400",    text: "text-cyan-300",    glow: "shadow-cyan-500/40" },
-  { bg: "bg-orange-500",  bgMuted: "bg-orange-950",  border: "border-orange-400",  text: "text-orange-300",  glow: "shadow-orange-500/40" },
-  { bg: "bg-emerald-500", bgMuted: "bg-emerald-950", border: "border-emerald-400", text: "text-emerald-300", glow: "shadow-emerald-500/40" },
-  { bg: "bg-pink-500",    bgMuted: "bg-pink-950",    border: "border-pink-400",    text: "text-pink-300",    glow: "shadow-pink-500/40" },
-  { bg: "bg-yellow-500",  bgMuted: "bg-yellow-950",  border: "border-yellow-400",  text: "text-yellow-300",  glow: "shadow-yellow-500/40" },
-  { bg: "bg-purple-500",  bgMuted: "bg-purple-950",  border: "border-purple-400",  text: "text-purple-300",  glow: "shadow-purple-500/40" },
-] as const;
-
 // ── Wave Bar ────────────────────────────────────────────────────────
 
 function WaveBar({
@@ -49,12 +39,11 @@ function WaveBar({
   getTimestamp: () => number;
 }) {
   return (
-    <div className="flex gap-3 px-4 py-3">
+    <div className="flex gap-3 px-4 py-3 overflow-x-auto">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
           const wc = WAVE_COLORS[w.wave - 1] ?? WAVE_COLORS[0];
-          const accent = WAVE_ACCENTS[(w.wave - 1) % WAVE_ACCENTS.length];
           const launched = w.startedAt !== null;
 
           if (!launched) {
@@ -68,13 +57,13 @@ function WaveBar({
                     timestamp: getTimestamp(),
                   })
                 }
-                className={`flex flex-col items-center justify-center rounded-2xl ${accent.bg} min-w-[120px] h-[72px] shadow-lg ${accent.glow} animate-pulse active:scale-95 transition-transform cursor-pointer`}
+                className={`flex flex-col items-center justify-center rounded-xl ${wc.bg} border-2 ${wc.border} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation`}
               >
                 <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
                   {wc.label}
                 </span>
-                <span className="flex items-center gap-1.5 text-xl font-black text-white drop-shadow-md">
-                  <Play className="h-5 w-5 fill-current" /> GO
+                <span className="flex items-center gap-1.5 text-lg font-black text-white">
+                  <Play className="h-4 w-4 fill-current" /> GO
                 </span>
               </button>
             );
@@ -84,12 +73,12 @@ function WaveBar({
           return (
             <div
               key={w.wave}
-              className={`flex flex-col items-center justify-center rounded-2xl border-2 ${accent.border} ${accent.bgMuted} min-w-[120px] h-[72px] px-4`}
+              className={`flex flex-col items-center justify-center rounded-xl border-2 ${wc.border} ${wc.bg} min-w-[110px] h-16 px-3`}
             >
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.text}`}>
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${wc.text}`}>
                 {wc.label} — En course
               </span>
-              <span className="font-mono tabular-nums text-2xl font-black text-white tracking-tight">
+              <span className="font-mono tabular-nums text-xl font-black text-white tracking-tight">
                 {formatTime(elapsed)}
               </span>
             </div>
@@ -125,7 +114,6 @@ function SwimmerCard({
   const lastTapRef = useRef(0);
   const flashRef = useRef<HTMLDivElement>(null);
   const wc = WAVE_COLORS[wave - 1] ?? WAVE_COLORS[0];
-  const accent = WAVE_ACCENTS[(wave - 1) % WAVE_ACCENTS.length];
   const launched = waveStartedAt !== null;
   const stopped = swimmerStoppedAt !== null;
   const active = launched && !stopped;
@@ -149,7 +137,7 @@ function SwimmerCard({
 
     const el = flashRef.current;
     if (el) {
-      el.style.opacity = "0.35";
+      el.style.opacity = "0.3";
       requestAnimationFrame(() => {
         setTimeout(() => {
           el.style.opacity = "0";
@@ -165,7 +153,6 @@ function SwimmerCard({
     toast(`${displayName} — Stoppé`, { duration: 2000 });
   }, [dispatch, athleteId, getTimestamp, displayName]);
 
-  // Compute elapsed — frozen if swimmer stopped
   const elapsed = launched
     ? (stopped ? swimmerStoppedAt : now) - waveStartedAt
     : 0;
@@ -176,78 +163,71 @@ function SwimmerCard({
       role="button"
       tabIndex={active ? 0 : -1}
       onClick={handleTap}
-      className={`relative flex flex-col rounded-xl border-l-[5px] text-left select-none overflow-hidden min-h-[120px] touch-manipulation ${
+      className={`relative rounded-xl border-l-4 ${wc.border} overflow-hidden touch-manipulation ${
         stopped
-          ? `${accent.border} bg-zinc-900/60 opacity-70`
+          ? "bg-card/50 opacity-60"
           : active
-            ? `${accent.border} bg-zinc-900 active:scale-[0.97] cursor-pointer shadow-md transition-transform`
-            : "border-l-zinc-700 bg-zinc-900/30 opacity-30 pointer-events-none"
+            ? "bg-card active:scale-[0.97] cursor-pointer shadow-sm transition-transform"
+            : "bg-card/20 opacity-25 pointer-events-none"
       }`}
     >
       {/* Flash overlay */}
       <div
         ref={flashRef}
-        className="pointer-events-none absolute inset-0 bg-white opacity-0 transition-opacity duration-150"
+        className="pointer-events-none absolute inset-0 bg-white opacity-0 transition-opacity duration-100"
       />
 
-      {/* Header: name + stop button + wave chip */}
-      <div className="flex w-full items-center gap-1.5 px-3 pt-2.5 pb-1 min-w-0">
-        <span className={`truncate text-sm font-semibold min-w-0 flex-1 ${stopped ? "text-zinc-400" : "text-zinc-100"}`}>
+      {/* ── Row 1: Name + controls ── */}
+      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+        <span className={`text-sm font-semibold leading-tight ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
           {displayName}
         </span>
-        {/* Individual stop button — visible when active */}
-        {active && (
-          <button
-            type="button"
-            onClick={handleStop}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all"
-            title="Stopper ce nageur"
-          >
-            <CircleStop className="h-4 w-4" />
-          </button>
-        )}
-        {stopped && (
-          <span className="shrink-0 rounded bg-red-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
-            Stop
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {active && (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive/15 text-destructive hover:bg-destructive/30 active:scale-90 transition-all"
+            >
+              <CircleStop className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {stopped && (
+            <span className="rounded bg-destructive px-1.5 py-0.5 text-[9px] font-bold uppercase text-destructive-foreground">
+              Stop
+            </span>
+          )}
+          <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${wc.border} ${wc.text} ${wc.bg}`}>
+            {wc.label}
           </span>
-        )}
-        <span
-          className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${accent.bgMuted} ${accent.text} border ${accent.border}`}
-        >
-          <span className={`inline-block h-2 w-2 rounded-full ${accent.bg}`} />
-          {wc.label}
-        </span>
+        </div>
       </div>
 
-      {/* Running chrono — THE MAIN ELEMENT */}
-      <div className="flex-1 flex items-center px-3 overflow-hidden">
-        <span className={`font-mono tabular-nums text-[1.75rem] lg:text-[2rem] font-black tracking-tight leading-none drop-shadow-sm ${stopped ? "text-zinc-400" : "text-white"}`}>
+      {/* ── Row 2: Chrono ── */}
+      <div className="px-3 py-1">
+        <span className={`font-mono tabular-nums text-2xl font-black leading-none tracking-tight ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
           {launched ? formatTime(elapsed) : "--:--.--"}
         </span>
       </div>
 
-      {/* Split info */}
-      <div className="px-3 pb-2 pt-1 overflow-hidden">
+      {/* ── Row 3: Split info ── */}
+      <div className="px-3 pb-2.5 pt-0.5">
         {launched && lastSplit ? (
-          <div className="flex w-full items-baseline gap-2 min-w-0">
-            <span className={`text-xs font-bold shrink-0 ${accent.text}`}>
-              Split {splits.length}
+          <div className="flex items-baseline gap-1.5">
+            <span className={`text-xs font-bold ${wc.text}`}>
+              #{splits.length}
             </span>
-            <span className="font-mono tabular-nums text-sm font-semibold text-zinc-300 truncate">
+            <span className="font-mono tabular-nums text-xs font-medium text-foreground">
               {formatTime(lastSplit.cumulativeMs)}
             </span>
-            <span className="font-mono tabular-nums text-xs text-zinc-500 shrink-0">
+            <span className="font-mono tabular-nums text-[11px] text-muted-foreground">
               ({formatLap(lastSplit.lapMs)})
             </span>
           </div>
-        ) : launched && !stopped ? (
-          <span className="text-xs font-medium text-zinc-500">
-            Tap pour split
-          </span>
+        ) : active ? (
+          <span className="text-xs text-muted-foreground">Tap pour split</span>
         ) : !launched ? (
-          <span className="text-xs text-zinc-600">
-            En attente
-          </span>
+          <span className="text-xs text-muted-foreground/50">En attente</span>
         ) : null}
       </div>
     </div>
@@ -278,14 +258,14 @@ function LaneSection({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 px-4">
-        <div className="h-px flex-1 bg-zinc-800" />
-        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+      <div className="flex items-center gap-3 px-4">
+        <div className="h-px flex-1 bg-border" />
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Ligne {lane}
         </h3>
-        <div className="h-px flex-1 bg-zinc-800" />
+        <div className="h-px flex-1 bg-border" />
       </div>
-      <div className="grid grid-cols-2 gap-2.5 px-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 px-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
           const race = raceData.get(s.athleteId);
@@ -320,9 +300,9 @@ export default function ChronoRace({
   const lanes = Array.from({ length: state.laneCount }, (_, i) => i + 1);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-black">
+    <div className="flex min-h-dvh flex-col bg-background">
       {/* Sticky top bar: waves + stop button */}
-      <div className="sticky top-0 z-20 border-b border-zinc-800 bg-black/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <div className="flex-1 overflow-hidden">
             <WaveBar
@@ -332,15 +312,13 @@ export default function ChronoRace({
               getTimestamp={getTimestamp}
             />
           </div>
-
-          {/* Stop button */}
-          <div className="pr-4">
+          <div className="pr-4 shrink-0">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   variant="destructive"
                   size="sm"
-                  className="gap-1.5 whitespace-nowrap font-bold shadow-lg shadow-red-900/30"
+                  className="gap-1.5 whitespace-nowrap font-semibold"
                 >
                   <Square className="h-4 w-4 fill-current" />
                   Terminer
@@ -372,8 +350,8 @@ export default function ChronoRace({
         </div>
       </div>
 
-      {/* Lane grid */}
-      <div className="flex-1 space-y-5 py-5">
+      {/* Lane grid — full width */}
+      <div className="flex-1 space-y-4 py-4">
         {lanes.map((lane) => (
           <LaneSection
             key={lane}
