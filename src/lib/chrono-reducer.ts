@@ -48,7 +48,7 @@ export function computeWaves(
 
 export const initialChronoState: ChronoState = {
   phase: "setup",
-  laneCount: 4,
+  laneCount: 3,
   swimmers: [],
   waves: [],
   raceData: new Map(),

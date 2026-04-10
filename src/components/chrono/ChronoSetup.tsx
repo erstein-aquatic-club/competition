@@ -1,0 +1,295 @@
+import { useState, useMemo, useCallback } from "react";
+import { Play, Plus, Minus, X, Search } from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../ui/sheet";
+import { WAVE_COLORS } from "../../lib/chrono-types";
+import type { ChronoState } from "../../lib/chrono-types";
+import type { ChronoAction } from "../../lib/chrono-reducer";
+import type { AthleteSummary } from "../../lib/api/types";
+
+interface ChronoSetupProps {
+  state: ChronoState;
+  dispatch: React.Dispatch<ChronoAction>;
+  athletes: AthleteSummary[];
+}
+
+export default function ChronoSetup({
+  state,
+  dispatch,
+  athletes,
+}: ChronoSetupProps) {
+  const [addLane, setAddLane] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+
+  const assignedIds = useMemo(
+    () => new Set(state.swimmers.map((s) => s.athleteId)),
+    [state.swimmers],
+  );
+
+  const activeWaves = useMemo(() => {
+    const waves = new Set(state.swimmers.map((s) => s.wave));
+    return Array.from(waves).sort((a, b) => a - b);
+  }, [state.swimmers]);
+
+  const swimmersByLane = useCallback(
+    (lane: number) => state.swimmers.filter((s) => s.lane === lane),
+    [state.swimmers],
+  );
+
+  // Group athletes by group_label for the picker
+  const groupedAthletes = useMemo(() => {
+    const lowerSearch = search.toLowerCase();
+    const filtered = athletes.filter(
+      (a) =>
+        a.id != null &&
+        a.display_name.toLowerCase().includes(lowerSearch),
+    );
+    const groups = new Map<string, AthleteSummary[]>();
+    for (const a of filtered) {
+      const label = a.group_label ?? "Sans groupe";
+      const list = groups.get(label);
+      if (list) list.push(a);
+      else groups.set(label, [a]);
+    }
+    return groups;
+  }, [athletes, search]);
+
+  const handleAddSwimmer = (a: AthleteSummary) => {
+    if (a.id == null || addLane == null) return;
+    dispatch({
+      type: "ADD_SWIMMER",
+      swimmer: {
+        athleteId: a.id,
+        displayName: a.display_name,
+        avatarUrl: a.avatar_url ?? null,
+        wave: 1,
+        lane: addLane,
+      },
+    });
+    setAddLane(null);
+    setSearch("");
+  };
+
+  const cycleWave = (athleteId: number, currentWave: number) => {
+    dispatch({
+      type: "SET_WAVE",
+      athleteId,
+      wave: (currentWave % 6) + 1,
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-5 p-4">
+      {/* ── Header ─────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Préparation</h2>
+        <Button
+          size="sm"
+          disabled={state.swimmers.length === 0}
+          onClick={() => dispatch({ type: "START_RACE" })}
+          className="gap-1.5"
+        >
+          <Play className="h-4 w-4" />
+          Lancer
+        </Button>
+      </div>
+
+      {/* ── Lane count controls + wave dots ─────────────── */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">Lignes :</span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() =>
+            dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })
+          }
+          disabled={state.laneCount <= 1}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <span className="min-w-[1.5rem] text-center font-medium">
+          {state.laneCount}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() =>
+            dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })
+          }
+          disabled={state.laneCount >= 8}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+
+        {activeWaves.length > 0 && (
+          <div className="ml-auto flex items-center gap-1.5">
+            {activeWaves.map((w) => {
+              const c = WAVE_COLORS[w - 1];
+              return (
+                <span
+                  key={w}
+                  className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium ${c.bg} ${c.text}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+                  {c.label}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Lane sections ──────────────────────────────── */}
+      <div className="flex flex-col gap-3">
+        {Array.from({ length: state.laneCount }, (_, i) => i + 1).map(
+          (lane) => {
+            const swimmers = swimmersByLane(lane);
+            return (
+              <div
+                key={lane}
+                className="rounded-lg border border-border bg-card p-3"
+              >
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  Ligne {lane}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {swimmers.map((s) => {
+                    const c = WAVE_COLORS[s.wave - 1];
+                    return (
+                      <div
+                        key={s.athleteId}
+                        className="relative flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1.5 text-sm"
+                      >
+                        <span className="max-w-[7rem] truncate">
+                          {s.displayName}
+                        </span>
+                        {/* Wave chip — tap to cycle */}
+                        <button
+                          type="button"
+                          onClick={() => cycleWave(s.athleteId, s.wave)}
+                          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${c.dot}`}
+                          />
+                          {c.label}
+                        </button>
+                        {/* Remove button */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            dispatch({
+                              type: "REMOVE_SWIMMER",
+                              athleteId: s.athleteId,
+                            })
+                          }
+                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add swimmer button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddLane(lane);
+                      setSearch("");
+                    }}
+                    className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            );
+          },
+        )}
+      </div>
+
+      {/* ── Add swimmer sheet ──────────────────────────── */}
+      <Sheet
+        open={addLane !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddLane(null);
+            setSearch("");
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-80 sm:w-96">
+          <SheetHeader>
+            <SheetTitle>Ajouter un nageur — Ligne {addLane}</SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-4 flex flex-col gap-4">
+            {/* Search input */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Grouped athlete list */}
+            <div className="flex flex-col gap-4 overflow-y-auto">
+              {Array.from(groupedAthletes.entries()).map(
+                ([group, members]) => (
+                  <div key={group}>
+                    <div className="mb-1 text-xs font-medium text-muted-foreground">
+                      {group}
+                    </div>
+                    <div className="flex flex-col">
+                      {members.map((a) => {
+                        const isAssigned =
+                          a.id != null && assignedIds.has(a.id);
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            disabled={isAssigned}
+                            onClick={() => handleAddSwimmer(a)}
+                            className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                              isAssigned
+                                ? "cursor-not-allowed text-muted-foreground/50"
+                                : "hover:bg-muted"
+                            }`}
+                          >
+                            {a.display_name}
+                            {isAssigned && (
+                              <span className="ml-auto text-[10px] text-muted-foreground">
+                                déjà assigné
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ),
+              )}
+              {groupedAthletes.size === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Aucun nageur trouvé
+                </p>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
