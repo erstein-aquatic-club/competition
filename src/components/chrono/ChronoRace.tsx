@@ -57,7 +57,7 @@ function WaveBar({
                     timestamp: getTimestamp(),
                   })
                 }
-                className={`flex flex-col items-center justify-center rounded-xl ${wc.bg} border-2 ${wc.border} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation`}
+                className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
               >
                 <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
                   {wc.label}
@@ -73,12 +73,12 @@ function WaveBar({
           return (
             <div
               key={w.wave}
-              className={`flex flex-col items-center justify-center rounded-xl border-2 ${wc.border} ${wc.bg} min-w-[110px] h-16 px-3`}
+              className={`flex flex-col items-center justify-center rounded-xl border-2 ${wc.border} bg-card min-w-[110px] h-16 px-3`}
             >
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${wc.text}`}>
+              <span className={`text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}>
                 {wc.label} — En course
               </span>
-              <span className="font-mono tabular-nums text-xl font-black text-white tracking-tight">
+              <span className="font-mono tabular-nums text-xl font-black text-foreground tracking-tight">
                 {formatTime(elapsed)}
               </span>
             </div>
@@ -163,23 +163,23 @@ function SwimmerCard({
       role="button"
       tabIndex={active ? 0 : -1}
       onClick={handleTap}
-      className={`relative rounded-xl border-l-4 ${wc.border} overflow-hidden touch-manipulation ${
+      className={`relative rounded-xl border-l-4 ${wc.border} border border-border overflow-hidden touch-manipulation ${
         stopped
-          ? "bg-card/50 opacity-60"
+          ? "bg-muted opacity-60"
           : active
-            ? "bg-card active:scale-[0.97] cursor-pointer shadow-sm transition-transform"
-            : "bg-card/20 opacity-25 pointer-events-none"
+            ? "bg-card active:scale-[0.97] cursor-pointer shadow transition-transform"
+            : "bg-muted/50 opacity-25 pointer-events-none"
       }`}
     >
       {/* Flash overlay */}
       <div
         ref={flashRef}
-        className="pointer-events-none absolute inset-0 bg-white opacity-0 transition-opacity duration-100"
+        className="pointer-events-none absolute inset-0 bg-primary opacity-0 transition-opacity duration-100"
       />
 
-      {/* ── Row 1: Name + controls ── */}
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
-        <span className={`text-sm font-semibold leading-tight ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
+      {/* ── Row 1: Name ── */}
+      <div className="flex items-center gap-2 px-3 pt-3 pb-0.5">
+        <span className={`text-base font-bold leading-snug min-w-0 truncate ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
           {displayName}
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -197,35 +197,35 @@ function SwimmerCard({
               Stop
             </span>
           )}
-          <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${wc.border} ${wc.text} ${wc.bg}`}>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
             {wc.label}
           </span>
         </div>
       </div>
 
       {/* ── Row 2: Chrono ── */}
-      <div className="px-3 py-1">
-        <span className={`font-mono tabular-nums text-2xl font-black leading-none tracking-tight ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
+      <div className="px-3 py-1.5">
+        <span className={`font-mono tabular-nums text-3xl font-black leading-none tracking-tight ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
           {launched ? formatTime(elapsed) : "--:--.--"}
         </span>
       </div>
 
       {/* ── Row 3: Split info ── */}
-      <div className="px-3 pb-2.5 pt-0.5">
+      <div className="px-3 pb-3 pt-0.5">
         {launched && lastSplit ? (
-          <div className="flex items-baseline gap-1.5">
-            <span className={`text-xs font-bold ${wc.text}`}>
+          <div className="flex items-baseline gap-2">
+            <span className={`text-xs font-bold text-white rounded px-1 py-0.5 ${wc.dot}`}>
               #{splits.length}
             </span>
-            <span className="font-mono tabular-nums text-xs font-medium text-foreground">
+            <span className="font-mono tabular-nums text-sm font-semibold text-foreground">
               {formatTime(lastSplit.cumulativeMs)}
             </span>
-            <span className="font-mono tabular-nums text-[11px] text-muted-foreground">
+            <span className="font-mono tabular-nums text-xs text-muted-foreground">
               ({formatLap(lastSplit.lapMs)})
             </span>
           </div>
         ) : active ? (
-          <span className="text-xs text-muted-foreground">Tap pour split</span>
+          <span className="text-sm text-muted-foreground">Tap pour split</span>
         ) : !launched ? (
           <span className="text-xs text-muted-foreground/50">En attente</span>
         ) : null}
@@ -265,7 +265,7 @@ function LaneSection({
         </h3>
         <div className="h-px flex-1 bg-border" />
       </div>
-      <div className="grid grid-cols-2 gap-2 px-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 px-4 lg:grid-cols-3 xl:grid-cols-4">
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
           const race = raceData.get(s.athleteId);
