@@ -78,39 +78,47 @@ function WaveBar({
           return (
             <div
               key={w.wave}
-              className={`flex flex-col items-center justify-center rounded-xl border-2 ${wc.border} bg-card min-w-[130px] px-3 py-1.5 gap-0.5`}
+              className={`flex items-center gap-3 rounded-xl border-2 ${wc.border} bg-card min-w-[160px] px-4 py-2`}
             >
-              {/* Countdown */}
-              {intervalMs > 0 && (
-                <span className={`font-mono tabular-nums text-xs font-bold ${
-                  remainingMs <= 0
-                    ? "text-destructive"
-                    : urgent
-                      ? "text-destructive animate-pulse"
-                      : "text-muted-foreground"
-                }`}>
-                  {remainingMs <= 0 ? `+${formatTime(-remainingMs)}` : `-${formatTime(remainingMs)}`}
+              {/* Left: wave info */}
+              <div className="flex flex-col items-center gap-0.5 shrink-0">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
+                  {wc.label}
                 </span>
-              )}
-              {/* Wave label + rep */}
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {wc.label} — Rep {w.currentRep + 1}
-              </span>
-              {/* Main chrono */}
-              <span className="font-mono tabular-nums text-xl font-black text-foreground tracking-tight">
-                {formatTime(elapsed)}
-              </span>
-              {/* Next rep button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  dispatch({ type: "NEXT_REP", wave: w.wave });
-                }}
-                className={`mt-0.5 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase border ${wc.border} text-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation`}
-              >
-                Rep suivante
-              </button>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  Rep {w.currentRep + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: "NEXT_REP", wave: w.wave });
+                  }}
+                  className="mt-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
+                >
+                  Suivante
+                </button>
+              </div>
+
+              {/* Right: chrono + countdown */}
+              <div className="flex flex-col items-end">
+                {/* Countdown — large and prominent */}
+                {intervalMs > 0 && (
+                  <span className={`font-mono tabular-nums text-lg font-black leading-tight ${
+                    remainingMs <= 0
+                      ? "text-destructive"
+                      : urgent
+                        ? "text-destructive animate-pulse"
+                        : "text-foreground"
+                  }`}>
+                    {remainingMs <= 0 ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
+                  </span>
+                )}
+                {/* Elapsed chrono */}
+                <span className={`font-mono tabular-nums font-bold tracking-tight text-muted-foreground ${intervalMs > 0 ? "text-sm" : "text-xl text-foreground"}`}>
+                  {formatTime(elapsed)}
+                </span>
+              </div>
             </div>
           );
         })}
