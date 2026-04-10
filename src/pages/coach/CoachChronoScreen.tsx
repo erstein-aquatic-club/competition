@@ -1,6 +1,5 @@
 import { useReducer, useEffect, useState, useCallback } from "react";
 import { chronoReducer, initialChronoState } from "../../lib/chrono-reducer";
-import type { ChronoAction } from "../../lib/chrono-reducer";
 import type { ChronoState } from "../../lib/chrono-types";
 import { useChronoTimer } from "../../hooks/useChronoTimer";
 import ChronoSetup from "../../components/chrono/ChronoSetup";
@@ -8,6 +7,7 @@ import ChronoRace from "../../components/chrono/ChronoRace";
 import ChronoResults from "../../components/chrono/ChronoResults";
 import { STORAGE_KEYS } from "../../lib/api/client";
 import { Button } from "../../components/ui/button";
+import { Timer } from "lucide-react";
 import type { AthleteSummary } from "../../lib/api/types";
 
 const BACKUP_KEY = STORAGE_KEYS.CHRONO_BACKUP;
@@ -94,7 +94,17 @@ export default function CoachChronoScreen({ athletes }: Props) {
   const { now, getTimestamp } = useChronoTimer(isRacing);
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
+    <>
+      {/* Mobile guard — chrono is tablet/desktop only */}
+      <div className="flex flex-col items-center justify-center gap-3 p-8 text-center md:hidden" style={{ minHeight: "50vh" }}>
+        <Timer className="h-10 w-10 text-muted-foreground" />
+        <p className="text-lg font-semibold">Chrono non disponible sur mobile</p>
+        <p className="text-sm text-muted-foreground">
+          Utilisez une tablette ou un ordinateur pour accéder au chronomètre.
+        </p>
+      </div>
+
+      <div className="hidden md:block max-w-6xl mx-auto p-4">
       {showRestore && (
         <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center justify-between gap-4">
           <p className="text-sm text-yellow-200">
@@ -120,6 +130,7 @@ export default function CoachChronoScreen({ athletes }: Props) {
       {state.phase === "results" && (
         <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} />
       )}
-    </div>
+      </div>
+    </>
   );
 }
