@@ -106,15 +106,20 @@ export default function CoachChronoScreen({ athletes }: Props) {
 
       <div className="hidden md:block max-w-6xl mx-auto p-4">
       {showRestore && (
-        <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center justify-between gap-4">
-          <p className="text-sm text-yellow-200">
-            Une série en cours a été retrouvée. Reprendre ?
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleDismissRestore}>
-              Non, ignorer
+        <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-950/60 p-4 flex items-center justify-between gap-4 shadow-lg shadow-amber-900/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+              <Timer className="h-4 w-4 text-amber-400" />
+            </div>
+            <p className="text-sm font-medium text-amber-100">
+              Une série en cours a été retrouvée. Reprendre ?
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="ghost" size="sm" className="text-amber-300/70 hover:text-amber-100 hover:bg-amber-900/40" onClick={handleDismissRestore}>
+              Ignorer
             </Button>
-            <Button size="sm" onClick={handleRestore}>
+            <Button size="sm" className="bg-amber-500 text-amber-950 font-semibold hover:bg-amber-400" onClick={handleRestore}>
               Reprendre
             </Button>
           </div>

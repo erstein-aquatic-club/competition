@@ -462,7 +462,8 @@ export default function Coach() {
     activeSection === "swimmers" ||
     activeSection === "athlete" ||
     activeSection === "week" ||
-    activeSection === "groups";
+    activeSection === "groups" ||
+    activeSection === "chrono";
   const shouldLoadGroups =
     activeSection === "home" ||
     activeSection === "week" ||
