@@ -721,7 +721,7 @@ export default function Coach() {
 
       {activeSection === "chrono" ? (
         <Suspense fallback={<PageSkeleton />}>
-          <CoachChronoScreen athletes={athletes} />
+          <CoachChronoScreen athletes={myAthletes} allAthletes={athletes} />
         </Suspense>
       ) : null}
 

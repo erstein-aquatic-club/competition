@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { Play, Plus, Minus, X, Search } from "lucide-react";
+import { Play, Plus, Minus, X, Search, Users } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Switch } from "../ui/switch";
 import {
   Sheet,
   SheetContent,
@@ -17,15 +18,19 @@ interface ChronoSetupProps {
   state: ChronoState;
   dispatch: React.Dispatch<ChronoAction>;
   athletes: AthleteSummary[];
+  allAthletes?: AthleteSummary[];
 }
 
 export default function ChronoSetup({
   state,
   dispatch,
   athletes,
+  allAthletes,
 }: ChronoSetupProps) {
   const [addLane, setAddLane] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const displayAthletes = showAll && allAthletes ? allAthletes : athletes;
 
   const assignedIds = useMemo(
     () => new Set(state.swimmers.map((s) => s.athleteId)),
@@ -45,7 +50,7 @@ export default function ChronoSetup({
   // Group athletes by group_label for the picker
   const groupedAthletes = useMemo(() => {
     const lowerSearch = search.toLowerCase();
-    const filtered = athletes.filter(
+    const filtered = displayAthletes.filter(
       (a) =>
         a.id != null &&
         a.display_name.toLowerCase().includes(lowerSearch),
@@ -58,7 +63,7 @@ export default function ChronoSetup({
       else groups.set(label, [a]);
     }
     return groups;
-  }, [athletes, search]);
+  }, [displayAthletes, search]);
 
   const handleAddSwimmer = (a: AthleteSummary) => {
     if (a.id == null || addLane == null) return;
@@ -243,6 +248,15 @@ export default function ChronoSetup({
                 className="pl-9"
               />
             </div>
+
+            {/* Club-wide toggle */}
+            {allAthletes && allAthletes.length > athletes.length && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Switch checked={showAll} onCheckedChange={setShowAll} />
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Tout le club</span>
+              </label>
+            )}
 
             {/* Grouped athlete list */}
             <div className="flex flex-col gap-4 overflow-y-auto">

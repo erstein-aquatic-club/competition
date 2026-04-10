@@ -35,9 +35,10 @@ function deserializeState(raw: string): ChronoState | null {
 
 interface Props {
   athletes: AthleteSummary[];
+  allAthletes?: AthleteSummary[];
 }
 
-export default function CoachChronoScreen({ athletes }: Props) {
+export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
   const [state, dispatch] = useReducer(chronoReducer, initialChronoState);
   const [showRestore, setShowRestore] = useState(false);
 
@@ -127,7 +128,7 @@ export default function CoachChronoScreen({ athletes }: Props) {
       )}
 
       {state.phase === "setup" && (
-        <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} />
+        <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} />
       )}
       {state.phase === "racing" && (
         <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
