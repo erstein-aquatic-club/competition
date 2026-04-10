@@ -266,53 +266,67 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
                         )}
                       </div>
 
-                      {/* Day rows — compact list */}
+                      {/* Day rows — grid with Matin/Soir columns */}
                       <div className={cn(
-                        "rounded-xl border-l-[3px] overflow-hidden divide-y divide-border/40",
+                        "rounded-xl border-l-[3px] overflow-hidden bg-card",
                         current ? "border-l-primary" : "border-l-border",
                       )}>
-                        {DAY_ROWS.map((day) => {
-                          const morning = slotMap.get(`${day.index}-morning`);
-                          const evening = slotMap.get(`${day.index}-evening`);
-                          if (!morning && !evening) return null;
+                        {/* Column headers */}
+                        <div className="grid grid-cols-[40px_1fr_1fr] gap-1 px-2.5 pt-2 pb-1">
+                          <div />
+                          <span className="text-[9px] font-semibold text-muted-foreground/50 uppercase tracking-wider text-center">
+                            Matin
+                          </span>
+                          <span className="text-[9px] font-semibold text-muted-foreground/50 uppercase tracking-wider text-center">
+                            Soir
+                          </span>
+                        </div>
 
-                          return (
-                            <div
-                              key={day.index}
-                              className="flex items-center gap-2 px-2.5 py-2 bg-card"
-                            >
-                              {/* Day badge */}
-                              <span className={cn(
-                                "inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-bold shrink-0 min-w-[32px]",
-                                DAY_COLORS[day.index],
-                              )}>
-                                {day.label}
-                              </span>
+                        {/* Day rows */}
+                        <div className="px-2.5 pb-2 space-y-1">
+                          {DAY_ROWS.map((day) => {
+                            const morning = slotMap.get(`${day.index}-morning`);
+                            const evening = slotMap.get(`${day.index}-evening`);
+                            if (!morning && !evening) return null;
 
-                              {/* Filière chips */}
-                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                {morning && (
-                                  <FiliereChip
-                                    slot={morning}
-                                    label="Matin"
-                                    onTap={handleChipTap}
-                                  />
+                            return (
+                              <div
+                                key={day.index}
+                                className="grid grid-cols-[40px_1fr_1fr] gap-1 items-center"
+                              >
+                                {/* Day badge */}
+                                <span className={cn(
+                                  "inline-flex items-center justify-center rounded-md px-1 py-0.5 text-[10px] font-bold",
+                                  DAY_COLORS[day.index],
+                                )}>
+                                  {day.label}
+                                </span>
+
+                                {/* Morning cell */}
+                                {morning ? (
+                                  <FiliereChip slot={morning} onTap={handleChipTap} />
+                                ) : (
+                                  <div className="h-[28px] rounded-lg bg-muted/20 flex items-center justify-center">
+                                    <span className="text-muted-foreground/20 text-[10px]">—</span>
+                                  </div>
                                 )}
-                                {evening && (
-                                  <FiliereChip
-                                    slot={evening}
-                                    label="Soir"
-                                    onTap={handleChipTap}
-                                  />
+
+                                {/* Evening cell */}
+                                {evening ? (
+                                  <FiliereChip slot={evening} onTap={handleChipTap} />
+                                ) : (
+                                  <div className="h-[28px] rounded-lg bg-muted/20 flex items-center justify-center">
+                                    <span className="text-muted-foreground/20 text-[10px]">—</span>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
 
                         {/* Empty week */}
                         {weekSlots.length === 0 && (
-                          <div className="px-3 py-3 bg-card">
+                          <div className="px-3 py-3">
                             <p className="text-[11px] text-muted-foreground/40 italic">
                               Pas de séances planifiées
                             </p>
@@ -436,11 +450,9 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
 
 function FiliereChip({
   slot,
-  label,
   onTap,
 }: {
   slot: SwimPlanningSlot;
-  label: string;
   onTap: (filiereId: string, hasSession: boolean) => void;
 }) {
   const filiere = FILIERE_MAP.get(slot.filiere);
