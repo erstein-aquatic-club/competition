@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 /**
- * Returns a high-resolution timestamp that updates at ~60fps
- * while `running` is true. Uses performance.now() for precision.
+ * Returns a timestamp (Date.now()) that updates at ~60fps
+ * while `running` is true. Uses Date.now() for absolute time
+ * consistency across page reloads and localStorage restore.
  */
 export function useChronoTimer(running: boolean) {
-  const [now, setNow] = useState(() => performance.now());
+  const [now, setNow] = useState(() => Date.now());
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
@@ -14,19 +15,19 @@ export function useChronoTimer(running: boolean) {
       return;
     }
     const tick = () => {
-      setNow(performance.now());
+      setNow(Date.now());
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [running]);
 
-  const getTimestamp = useCallback(() => performance.now(), []);
+  const getTimestamp = useCallback(() => Date.now(), []);
 
   return { now, getTimestamp };
 }
 
-/** Format ms to MM:SS.d (1 decimal) */
+/** Format ms to M:SS.d (1 decimal) */
 export function formatTime(ms: number): string {
   if (ms < 0) return "--:--.--";
   const totalSeconds = ms / 1000;

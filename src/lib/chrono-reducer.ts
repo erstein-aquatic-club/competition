@@ -18,6 +18,7 @@ type ChronoAction =
   | { type: "LAUNCH_WAVE"; wave: number; timestamp: number }
   | { type: "RECORD_SPLIT"; athleteId: number; timestamp: number }
   | { type: "UNDO_SPLIT"; athleteId: number }
+  | { type: "STOP_SWIMMER"; athleteId: number; timestamp: number }
   | { type: "STOP_RACE"; timestamp: number }
   | { type: "RESET_FOR_NEW_SERIES" }
   | { type: "RESTORE_STATE"; state: ChronoState };
@@ -99,7 +100,7 @@ export function chronoReducer(
     case "START_RACE": {
       const raceData = new Map<number, SwimmerRaceState>();
       for (const swimmer of state.swimmers) {
-        raceData.set(swimmer.athleteId, { swimmer, splits: [] });
+        raceData.set(swimmer.athleteId, { swimmer, splits: [], stoppedAt: null });
       }
       return {
         ...state,
@@ -120,7 +121,7 @@ export function chronoReducer(
 
     case "RECORD_SPLIT": {
       const raceState = state.raceData.get(action.athleteId);
-      if (!raceState) return state;
+      if (!raceState || raceState.stoppedAt) return state;
 
       const swimmer = raceState.swimmer;
       const waveState = state.waves.find((w) => w.wave === swimmer.wave);
@@ -152,6 +153,17 @@ export function chronoReducer(
         splits: raceState.splits.slice(0, -1),
       });
 
+      return { ...state, raceData: newRaceData };
+    }
+
+    case "STOP_SWIMMER": {
+      const raceState = state.raceData.get(action.athleteId);
+      if (!raceState || raceState.stoppedAt) return state;
+      const newRaceData = new Map(state.raceData);
+      newRaceData.set(action.athleteId, {
+        ...raceState,
+        stoppedAt: action.timestamp,
+      });
       return { ...state, raceData: newRaceData };
     }
 

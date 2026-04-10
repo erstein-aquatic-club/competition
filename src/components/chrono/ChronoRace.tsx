@@ -107,6 +107,7 @@ function SwimmerCard({
   wave,
   waveStartedAt,
   splits,
+  swimmerStoppedAt,
   now,
   dispatch,
   getTimestamp,
@@ -116,20 +117,24 @@ function SwimmerCard({
   wave: number;
   waveStartedAt: number | null;
   splits: { cumulativeMs: number; lapMs: number }[];
+  swimmerStoppedAt: number | null;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
 }) {
   const lastTapRef = useRef(0);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const wc = WAVE_COLORS[wave - 1] ?? WAVE_COLORS[0];
   const accent = WAVE_ACCENTS[(wave - 1) % WAVE_ACCENTS.length];
   const launched = waveStartedAt !== null;
+  const stopped = swimmerStoppedAt !== null;
+  const active = launched && !stopped;
 
   const handleTap = useCallback(() => {
-    if (!launched) return;
+    if (!active) return;
 
-    const tapTime = performance.now();
+    const tapTime = Date.now();
     const gap = tapTime - lastTapRef.current;
     lastTapRef.current = tapTime;
 
@@ -152,20 +157,46 @@ function SwimmerCard({
         }, 100);
       });
     }
-  }, [launched, dispatch, athleteId, getTimestamp]);
+  }, [active, dispatch, athleteId, getTimestamp]);
 
-  const elapsed = launched ? now - waveStartedAt : 0;
+  // Long-press (600ms) to stop swimmer individually
+  const handlePointerDown = useCallback(() => {
+    if (!active) return;
+    longPressRef.current = setTimeout(() => {
+      dispatch({ type: "STOP_SWIMMER", athleteId, timestamp: getTimestamp() });
+      navigator.vibrate?.([50, 30, 50]);
+      toast(`${displayName} — Stoppé`, { duration: 2000 });
+      lastTapRef.current = 0; // prevent tap from firing
+    }, 600);
+  }, [active, dispatch, athleteId, getTimestamp, displayName]);
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }, []);
+
+  // Compute elapsed — frozen if swimmer stopped
+  const elapsed = launched
+    ? (stopped ? swimmerStoppedAt : now) - waveStartedAt
+    : 0;
   const lastSplit = splits.length > 0 ? splits[splits.length - 1] : null;
 
   return (
     <button
       type="button"
-      disabled={!launched}
+      disabled={!launched || stopped}
       onClick={handleTap}
-      className={`relative flex flex-col rounded-xl border-l-[5px] ${accent.border} text-left transition-all select-none min-h-[120px] ${
-        launched
-          ? "bg-zinc-900 active:scale-[0.97] cursor-pointer shadow-md hover:bg-zinc-800/90"
-          : "bg-zinc-900/30 opacity-30 pointer-events-none border-l-zinc-700"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      className={`relative flex flex-col rounded-xl border-l-[5px] text-left transition-all select-none min-h-[120px] ${
+        stopped
+          ? `${accent.border} bg-zinc-900/60 opacity-70`
+          : active
+            ? `${accent.border} bg-zinc-900 active:scale-[0.97] cursor-pointer shadow-md hover:bg-zinc-800/90`
+            : "border-l-zinc-700 bg-zinc-900/30 opacity-30 pointer-events-none"
       }`}
     >
       {/* Flash overlay */}
@@ -174,9 +205,18 @@ function SwimmerCard({
         className="pointer-events-none absolute inset-0 rounded-xl bg-white opacity-0 transition-opacity duration-150"
       />
 
+      {/* Stopped badge */}
+      {stopped && (
+        <div className="absolute top-2 right-2">
+          <span className="rounded bg-red-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+            Stop
+          </span>
+        </div>
+      )}
+
       {/* Header: name + wave chip */}
       <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
-        <span className="truncate text-sm font-semibold text-zinc-100">
+        <span className={`truncate text-sm font-semibold ${stopped ? "text-zinc-400" : "text-zinc-100"}`}>
           {displayName}
         </span>
         <span
@@ -189,7 +229,7 @@ function SwimmerCard({
 
       {/* Running chrono — THE MAIN ELEMENT */}
       <div className="flex-1 flex items-center px-3">
-        <span className="font-mono tabular-nums text-[2rem] font-black text-white tracking-tight leading-none drop-shadow-sm">
+        <span className={`font-mono tabular-nums text-[2rem] font-black tracking-tight leading-none drop-shadow-sm ${stopped ? "text-zinc-400" : "text-white"}`}>
           {launched ? formatTime(elapsed) : "--:--.--"}
         </span>
       </div>
@@ -208,15 +248,15 @@ function SwimmerCard({
               ({formatLap(lastSplit.lapMs)})
             </span>
           </div>
-        ) : launched ? (
+        ) : launched && !stopped ? (
           <span className="text-xs font-medium text-zinc-500">
             Tap pour split
           </span>
-        ) : (
+        ) : !launched ? (
           <span className="text-xs text-zinc-600">
             En attente
           </span>
-        )}
+        ) : null}
       </div>
     </button>
   );
@@ -265,6 +305,7 @@ function LaneSection({
               wave={s.wave}
               waveStartedAt={waveState?.startedAt ?? null}
               splits={race?.splits ?? []}
+              swimmerStoppedAt={race?.stoppedAt ?? null}
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}

@@ -16,6 +16,8 @@ export interface SplitRecord {
 export interface SwimmerRaceState {
   swimmer: ChronoSwimmer;
   splits: SplitRecord[];
+  /** Timestamp (Date.now()) when swimmer was individually stopped, null if still racing */
+  stoppedAt: number | null;
 }
 
 export interface WaveState {
