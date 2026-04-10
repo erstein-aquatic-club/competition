@@ -380,3 +380,12 @@ export {
   getAllOneRmRecords,
   getPopularExercises,
 } from './strength';
+
+// Coach comments (read/unread tracking)
+export {
+  getSwimmerComments,
+  markCommentsRead,
+  countUnreadComments48h,
+  type SwimmerComment,
+  type GetSwimmerCommentsOptions,
+} from './coach-comments';

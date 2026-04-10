@@ -354,6 +354,12 @@ import {
   getSwimmerCoachHistory as _getSwimmerCoachHistory,
 } from "./api/coach-assignments";
 
+import {
+  getSwimmerComments as _getSwimmerComments,
+  markCommentsRead as _markCommentsRead,
+  countUnreadComments48h as _countUnreadComments48h,
+} from "./api/coach-comments";
+
 // --- API Service ---
 
 export const api = {
@@ -849,4 +855,11 @@ export const api = {
   async unassignSwimmer(swimmerId: number) { return _unassignSwimmer(swimmerId); },
   async reassignSwimmer(swimmerId: number, newCoachId: number, assignedBy: number) { return _reassignSwimmer(swimmerId, newCoachId, assignedBy); },
   async getSwimmerCoachHistory(swimmerId: number) { return _getSwimmerCoachHistory(swimmerId); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — Coach Comments
+  // ══════════════════════════════════════════════════════════════════
+  async getSwimmerComments(coachUserId: number, options?: Parameters<typeof _getSwimmerComments>[1]) { return _getSwimmerComments(coachUserId, options); },
+  async markCommentsRead(coachUserId: number, sessionIds: number[]) { return _markCommentsRead(coachUserId, sessionIds); },
+  async countUnreadComments48h(coachUserId: number) { return _countUnreadComments48h(coachUserId); },
 };
