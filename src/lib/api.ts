@@ -266,6 +266,11 @@ import {
 } from "./api/swim-planning";
 
 import {
+  getSwimFilieres as _getSwimFilieres,
+  updateSwimFiliere as _updateSwimFiliere,
+} from "./api/swim-filieres";
+
+import {
   getTrainingCycles as _getTrainingCycles,
   createTrainingCycle as _createTrainingCycle,
   updateTrainingCycle as _updateTrainingCycle,
@@ -845,6 +850,12 @@ export const api = {
   async getSwimPlanningSlots(opts: Parameters<typeof _getSwimPlanningSlots>[0]) { return _getSwimPlanningSlots(opts); },
   async upsertSwimPlanningSlot(input: Parameters<typeof _upsertSwimPlanningSlot>[0]) { return _upsertSwimPlanningSlot(input); },
   async deleteSwimPlanningSlot(id: string) { return _deleteSwimPlanningSlot(id); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — Swim Filières
+  // ══════════════════════════════════════════════════════════════════
+  async getSwimFilieres() { return _getSwimFilieres(); },
+  async updateSwimFiliere(input: Parameters<typeof _updateSwimFiliere>[0]) { return _updateSwimFiliere(input); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Coach Swimmer Assignments

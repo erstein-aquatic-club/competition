@@ -338,6 +338,12 @@ export {
   deleteSwimPlanningSlot,
 } from './swim-planning';
 
+// Swim filières
+export {
+  getSwimFilieres,
+  updateSwimFiliere,
+} from './swim-filieres';
+
 // Coach assignments
 export {
   getMySwimmers,

@@ -1,19 +1,160 @@
+export interface FiliereTechnicals {
+  heartRate: string;
+  lactate: string;
+  effort: string;
+  duration: string;
+  distance: string;
+  reps: string;
+  intensity: string;
+  recovery: string;
+  workType: string;
+}
+
 export interface Filiere {
   id: string;
   name: string;
   short: string;
   color: string;
+  technicals: FiliereTechnicals;
 }
 
 export const FILIERES: Filiere[] = [
-  { id: "entretien-aerobie",        name: "Entretien aérobie",           short: "Entretien",          color: "sky" },
-  { id: "capacite-aerobie",         name: "Capacité aérobie",            short: "Cap. aéro.",         color: "emerald" },
-  { id: "puissance-aerobie",        name: "Puissance aérobie",           short: "Puiss. aéro.",       color: "orange" },
-  { id: "capacite-anaerobie-lact",  name: "Cap. anaérobie lactique",     short: "Cap. ana. lact.",    color: "red" },
-  { id: "puissance-anaerobie-lact", name: "Puiss. anaérobie lactique",   short: "Puiss. ana. lact.",  color: "violet" },
-  { id: "capacite-anaerobie-alact", name: "Cap. anaérobie alactique",    short: "Cap. ana. alact.",   color: "slate" },
-  { id: "puissance-anaerobie-alact",name: "Puiss. anaérobie alactique",  short: "Puiss. ana. alact.", color: "zinc" },
-  { id: "technique",                name: "Technique",                   short: "Technique",          color: "cyan" },
+  {
+    id: "entretien-aerobie",
+    name: "Entretien aérobie",
+    short: "Entretien",
+    color: "sky",
+    technicals: {
+      heartRate: "120-150",
+      lactate: "2",
+      effort: "8-12",
+      duration: "6-25mn",
+      distance: "300-1500m",
+      reps: "1-4",
+      intensity: "70-85% VMA",
+      recovery: "10-30s passive",
+      workType: "Continu, échauffement, technique, récupération",
+    },
+  },
+  {
+    id: "capacite-aerobie",
+    name: "Capacité aérobie",
+    short: "Cap. aéro.",
+    color: "emerald",
+    technicals: {
+      heartRate: "150-175",
+      lactate: "2-4",
+      effort: "12-15",
+      duration: "20-45mn",
+      distance: "50-3000m",
+      reps: "30/1",
+      intensity: "80-90% VMA",
+      recovery: "10s passive / sans",
+      workType: "Distances continues, fartleck, interval training lent",
+    },
+  },
+  {
+    id: "puissance-aerobie",
+    name: "Puissance aérobie",
+    short: "Puiss. aéro.",
+    color: "orange",
+    technicals: {
+      heartRate: "170-max",
+      lactate: "5-12",
+      effort: "14-20",
+      duration: "6-15mn",
+      distance: "25-500m",
+      reps: "20/1",
+      intensity: "90-110% VMA",
+      recovery: "10-30s passive / sans",
+      workType: "Distances continues, interval training rapide, intermittent",
+    },
+  },
+  {
+    id: "capacite-anaerobie-lact",
+    name: "Cap. anaérobie lactique",
+    short: "Cap. ana. lact.",
+    color: "red",
+    technicals: {
+      heartRate: "max",
+      lactate: "8-max",
+      effort: "16-20",
+      duration: "2min30-6mn",
+      distance: "50-100m",
+      reps: "3x3/3",
+      intensity: "85-95% VMA lact.",
+      recovery: "10s+2mn / 3mn",
+      workType: "Fractionné (passive et/ou active)",
+    },
+  },
+  {
+    id: "puissance-anaerobie-lact",
+    name: "Puiss. anaérobie lactique",
+    short: "Puiss. ana. lact.",
+    color: "violet",
+    technicals: {
+      heartRate: "max",
+      lactate: "12-max",
+      effort: "18-20",
+      duration: "30s-3mn",
+      distance: "50-200m",
+      reps: "4 (10s récup)/1",
+      intensity: "90-100% VMA lact.",
+      recovery: "Complète (5-10mn)",
+      workType: "Fractionné, simulateurs, épreuves 50-100 (active entre répét.)",
+    },
+  },
+  {
+    id: "capacite-anaerobie-alact",
+    name: "Cap. anaérobie alactique",
+    short: "Cap. ana. alact.",
+    color: "slate",
+    technicals: {
+      heartRate: "N/A",
+      lactate: "N/A",
+      effort: "N/A",
+      duration: "15s-5mn",
+      distance: "12.5-25m",
+      reps: "1/4",
+      intensity: "90-100% VMA alact.",
+      recovery: "1mn",
+      workType: "Séries répétées (passive)",
+    },
+  },
+  {
+    id: "puissance-anaerobie-alact",
+    name: "Puiss. anaérobie alactique",
+    short: "Puiss. ana. alact.",
+    color: "zinc",
+    technicals: {
+      heartRate: "N/A",
+      lactate: "N/A",
+      effort: "N/A",
+      duration: "7s-10min",
+      distance: "12.5-12.5m",
+      reps: "1/4",
+      intensity: "90-100% VMA alact.",
+      recovery: "2min30",
+      workType: "Sprints départ, reprises de nages, virages (passive ou active)",
+    },
+  },
+  {
+    id: "technique",
+    name: "Technique",
+    short: "Technique",
+    color: "cyan",
+    technicals: {
+      heartRate: "Variable",
+      lactate: "Variable",
+      effort: "Variable",
+      duration: "Variable",
+      distance: "Variable",
+      reps: "Variable",
+      intensity: "Variable",
+      recovery: "Variable",
+      workType: "Éducatifs, drills, coordination, coulées",
+    },
+  },
 ] as const;
 
 export const FILIERE_MAP = new Map(FILIERES.map((f) => [f.id, f]));

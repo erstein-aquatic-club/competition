@@ -886,3 +886,21 @@ export interface SwimPlanningSlotInput {
   filiere: string;
   session_id?: string | null;
 }
+
+// ── Swim Filières ──
+
+export interface SwimFiliere {
+  id: string;
+  name: string;
+  short_name: string;
+  color: string;
+  description?: string | null;
+  examples?: string | null;
+  sort_order: number;
+}
+
+export interface SwimFiliereInput {
+  id: string;
+  description?: string | null;
+  examples?: string | null;
+}

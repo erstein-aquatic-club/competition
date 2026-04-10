@@ -35,6 +35,7 @@ import {
   CalendarRange,
   Check,
   ChevronDown,
+  Eye,
   Link2,
   Pencil,
   Plus,
@@ -44,6 +45,7 @@ import {
   Waves,
   X,
 } from "lucide-react";
+import SwimPlanningAthleteView from "./SwimPlanningAthleteView";
 
 /* ═══════════════════════════════════════════════════════════════════
    Helpers
@@ -166,6 +168,7 @@ export default function SwimPlanningDemo() {
   );
 
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [showAthleteView, setShowAthleteView] = useState(false);
 
   // Auto-select first group
   useEffect(() => {
@@ -484,6 +487,7 @@ export default function SwimPlanningDemo() {
         groups={permanentGroups}
         selectedGroupId={selectedGroupId}
         onSelectGroup={setSelectedGroupId}
+        onShowAthleteView={() => setShowAthleteView(true)}
       />
 
       {/* ── Timeline ── */}
@@ -754,6 +758,13 @@ export default function SwimPlanningDemo() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Athlete Preview Overlay ── */}
+      <SwimPlanningAthleteView
+        open={showAthleteView}
+        onClose={() => setShowAthleteView(false)}
+        groupId={selectedGroupId!}
+      />
     </div>
   );
 }
@@ -766,10 +777,12 @@ function Header({
   groups,
   selectedGroupId,
   onSelectGroup,
+  onShowAthleteView,
 }: {
   groups: GroupSummary[];
   selectedGroupId: number | null;
   onSelectGroup: (id: number) => void;
+  onShowAthleteView?: () => void;
 }) {
   return (
     <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b">
@@ -784,6 +797,17 @@ function Header({
           >
             Demo
           </Badge>
+          {onShowAthleteView && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs ml-auto"
+              onClick={onShowAthleteView}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Vue nageur
+            </Button>
+          )}
         </div>
 
         {groups.length > 0 && (
