@@ -127,7 +127,7 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
   const weekStarts = useMemo(() => weeks.map((w) => w.weekKey), [weeks]);
 
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
-    queryKey: ["swim-planning-slots-athlete", groupId, weekStarts],
+    queryKey: ["swim-planning-slots", groupId, weekStarts],
     queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts }),
     enabled: open && !!groupId && weekStarts.length > 0,
   });
