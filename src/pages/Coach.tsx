@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
+import { useMySwimmerIds, filterByAssignment } from "@/hooks/useMySwimmerIds";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BellRing,
@@ -491,7 +492,12 @@ export default function Coach() {
     queryFn: () => api.getAthletes(),
     enabled: coachAccess && shouldLoadAthletes,
   });
-  const topAthletes = useMemo(() => athletes.slice(0, 5), [athletes]);
+  const { swimmerIds } = useMySwimmerIds();
+  const myAthletes = useMemo(
+    () => filterByAssignment(athletes, swimmerIds),
+    [athletes, swimmerIds],
+  );
+  const topAthletes = useMemo(() => myAthletes.slice(0, 5), [myAthletes]);
   const { data: groups = [] } = useQuery({
     queryKey: ["groups"],
     queryFn: () => api.getGroups(),
@@ -639,7 +645,7 @@ export default function Coach() {
           onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
           onOpenAthlete={handleOpenAthlete}
-          athletes={athletes}
+          athletes={myAthletes}
           athletesLoading={athletesLoading}
           kpiLoading={coachKpisQuery.isLoading}
           fatigueAlerts={coachKpisQuery.data?.fatigueAlerts ?? []}
@@ -667,7 +673,7 @@ export default function Coach() {
       {activeSection === "swimmers" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachSwimmersOverview
-            athletes={athletes}
+            athletes={myAthletes}
             athletesLoading={athletesLoading}
             onOpenAthlete={handleOpenAthlete}
           />
@@ -706,7 +712,7 @@ export default function Coach() {
       {activeSection === "comms" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachComms
-            athletes={athletes}
+            athletes={myAthletes}
             groups={groups}
             athletesLoading={athletesLoading}
           />
@@ -725,6 +731,15 @@ export default function Coach() {
             athletes={athletes}
             athletesLoading={athletesLoading}
             onBack={() => setActiveSection("home")}
+          />
+        </Suspense>
+      ) : null}
+
+      {activeSection === "comments" ? (
+        <Suspense fallback={<PageSkeleton />}>
+          <CoachCommentsScreen
+            onBack={() => setActiveSection("home")}
+            onOpenAthlete={handleOpenAthlete}
           />
         </Suspense>
       ) : null}
