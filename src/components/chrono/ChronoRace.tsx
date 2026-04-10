@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Square, Play } from "lucide-react";
+import { Square, Play, CircleStop } from "lucide-react";
 import { toast } from "sonner";
 
 interface ChronoRaceProps {
@@ -123,7 +123,6 @@ function SwimmerCard({
   getTimestamp: () => number;
 }) {
   const lastTapRef = useRef(0);
-  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const wc = WAVE_COLORS[wave - 1] ?? WAVE_COLORS[0];
   const accent = WAVE_ACCENTS[(wave - 1) % WAVE_ACCENTS.length];
@@ -159,23 +158,12 @@ function SwimmerCard({
     }
   }, [active, dispatch, athleteId, getTimestamp]);
 
-  // Long-press (600ms) to stop swimmer individually
-  const handlePointerDown = useCallback(() => {
-    if (!active) return;
-    longPressRef.current = setTimeout(() => {
-      dispatch({ type: "STOP_SWIMMER", athleteId, timestamp: getTimestamp() });
-      navigator.vibrate?.([50, 30, 50]);
-      toast(`${displayName} — Stoppé`, { duration: 2000 });
-      lastTapRef.current = 0; // prevent tap from firing
-    }, 600);
-  }, [active, dispatch, athleteId, getTimestamp, displayName]);
-
-  const handlePointerUp = useCallback(() => {
-    if (longPressRef.current) {
-      clearTimeout(longPressRef.current);
-      longPressRef.current = null;
-    }
-  }, []);
+  const handleStop = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    dispatch({ type: "STOP_SWIMMER", athleteId, timestamp: getTimestamp() });
+    navigator.vibrate?.([50, 30, 50]);
+    toast(`${displayName} — Stoppé`, { duration: 2000 });
+  }, [dispatch, athleteId, getTimestamp, displayName]);
 
   // Compute elapsed — frozen if swimmer stopped
   const elapsed = launched
@@ -184,43 +172,47 @@ function SwimmerCard({
   const lastSplit = splits.length > 0 ? splits[splits.length - 1] : null;
 
   return (
-    <button
-      type="button"
-      disabled={!launched || stopped}
+    <div
+      role="button"
+      tabIndex={active ? 0 : -1}
       onClick={handleTap}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      className={`relative flex flex-col rounded-xl border-l-[5px] text-left transition-all select-none min-h-[120px] ${
+      className={`relative flex flex-col rounded-xl border-l-[5px] text-left select-none overflow-hidden min-h-[120px] touch-manipulation ${
         stopped
           ? `${accent.border} bg-zinc-900/60 opacity-70`
           : active
-            ? `${accent.border} bg-zinc-900 active:scale-[0.97] cursor-pointer shadow-md hover:bg-zinc-800/90`
+            ? `${accent.border} bg-zinc-900 active:scale-[0.97] cursor-pointer shadow-md transition-transform`
             : "border-l-zinc-700 bg-zinc-900/30 opacity-30 pointer-events-none"
       }`}
     >
       {/* Flash overlay */}
       <div
         ref={flashRef}
-        className="pointer-events-none absolute inset-0 rounded-xl bg-white opacity-0 transition-opacity duration-150"
+        className="pointer-events-none absolute inset-0 bg-white opacity-0 transition-opacity duration-150"
       />
 
-      {/* Stopped badge */}
-      {stopped && (
-        <div className="absolute top-2 right-2">
-          <span className="rounded bg-red-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
-            Stop
-          </span>
-        </div>
-      )}
-
-      {/* Header: name + wave chip */}
-      <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
-        <span className={`truncate text-sm font-semibold ${stopped ? "text-zinc-400" : "text-zinc-100"}`}>
+      {/* Header: name + stop button + wave chip */}
+      <div className="flex w-full items-center gap-1.5 px-3 pt-2.5 pb-1 min-w-0">
+        <span className={`truncate text-sm font-semibold min-w-0 flex-1 ${stopped ? "text-zinc-400" : "text-zinc-100"}`}>
           {displayName}
         </span>
+        {/* Individual stop button — visible when active */}
+        {active && (
+          <button
+            type="button"
+            onClick={handleStop}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all"
+            title="Stopper ce nageur"
+          >
+            <CircleStop className="h-4 w-4" />
+          </button>
+        )}
+        {stopped && (
+          <span className="shrink-0 rounded bg-red-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+            Stop
+          </span>
+        )}
         <span
-          className={`ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${accent.bgMuted} ${accent.text} border ${accent.border}`}
+          className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${accent.bgMuted} ${accent.text} border ${accent.border}`}
         >
           <span className={`inline-block h-2 w-2 rounded-full ${accent.bg}`} />
           {wc.label}
@@ -228,23 +220,23 @@ function SwimmerCard({
       </div>
 
       {/* Running chrono — THE MAIN ELEMENT */}
-      <div className="flex-1 flex items-center px-3">
-        <span className={`font-mono tabular-nums text-[2rem] font-black tracking-tight leading-none drop-shadow-sm ${stopped ? "text-zinc-400" : "text-white"}`}>
+      <div className="flex-1 flex items-center px-3 overflow-hidden">
+        <span className={`font-mono tabular-nums text-[1.75rem] lg:text-[2rem] font-black tracking-tight leading-none drop-shadow-sm ${stopped ? "text-zinc-400" : "text-white"}`}>
           {launched ? formatTime(elapsed) : "--:--.--"}
         </span>
       </div>
 
       {/* Split info */}
-      <div className="px-3 pb-2.5 pt-1">
+      <div className="px-3 pb-2 pt-1 overflow-hidden">
         {launched && lastSplit ? (
-          <div className="flex w-full items-baseline gap-2">
-            <span className={`text-xs font-bold ${accent.text}`}>
+          <div className="flex w-full items-baseline gap-2 min-w-0">
+            <span className={`text-xs font-bold shrink-0 ${accent.text}`}>
               Split {splits.length}
             </span>
-            <span className="font-mono tabular-nums text-sm font-semibold text-zinc-300">
+            <span className="font-mono tabular-nums text-sm font-semibold text-zinc-300 truncate">
               {formatTime(lastSplit.cumulativeMs)}
             </span>
-            <span className="font-mono tabular-nums text-xs text-zinc-500">
+            <span className="font-mono tabular-nums text-xs text-zinc-500 shrink-0">
               ({formatLap(lastSplit.lapMs)})
             </span>
           </div>
@@ -258,7 +250,7 @@ function SwimmerCard({
           </span>
         ) : null}
       </div>
-    </button>
+    </div>
   );
 }
 
