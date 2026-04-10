@@ -1,0 +1,1 @@
+function a(t){let e=0;for(let h=0;h<t.length;h++)e=t.charCodeAt(h)+((e<<5)-e);return`hsl(${Math.abs(e)%360}, 70%, 85%)`}function l(t){let e=0;for(let h=0;h<t.length;h++)e=t.charCodeAt(h)+((e<<5)-e);return`hsl(${Math.abs(e)%360}, 60%, 30%)`}export{a,l as w};
