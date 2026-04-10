@@ -9,6 +9,7 @@ import {
   BellRing,
   CalendarDays,
   ChevronRight,
+  MessageSquareText,
   ShieldCheck,
   Trophy,
   UserCheck,
@@ -89,6 +90,17 @@ function formatDateIso(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
+function formatRelativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "maintenant";
+  if (mins < 60) return `il y a ${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `il y a ${days}j`;
+}
+
 // ── CoachHome — "Ma semaine" dashboard ────────────────────────────────────
 const CoachHome = ({
   onNavigate,
@@ -103,6 +115,7 @@ const CoachHome = ({
   groups,
 }: CoachHomeProps) => {
   const userName = useAuth((s) => s.user);
+  const coachUserId = useAuth((s) => s.userId);
   const firstName = userName?.split(" ")[0] ?? "Coach";
 
   const now = useMemo(() => new Date(), []);
@@ -166,6 +179,21 @@ const CoachHome = ({
 
   // ── Section C: Fatigue alerts (max 3) ──────────────────────
   const topAlerts = useMemo(() => fatigueAlerts.slice(0, 3), [fatigueAlerts]);
+
+  // ── Section C-bis: Recent swimmer comments (48h) ──────────
+  const { data: recentComments } = useQuery({
+    queryKey: ["coach-comments-recent-48h", coachUserId],
+    queryFn: async () => {
+      if (!coachUserId) return { comments: [] as any[], unreadCount: 0 };
+      const all = await api.getSwimmerComments(coachUserId, { limit: 20 });
+      const since = Date.now() - 48 * 60 * 60 * 1000;
+      const recent = all.filter((c) => new Date(c.created_at).getTime() >= since);
+      const unreadCount = recent.filter((c) => !c.is_read).length;
+      return { comments: recent.slice(0, 3), unreadCount };
+    },
+    enabled: !!coachUserId,
+    staleTime: 2 * 60 * 1000,
+  });
 
   // ── Section D: Quick access ────────────────────────────────
   const quickAccess = useMemo(
@@ -307,6 +335,65 @@ const CoachHome = ({
               );
             })}
           </div>
+        </section>
+      )}
+
+      {/* ── Section C-bis: Commentaires nageurs (48h) ── */}
+      {(recentComments?.comments?.length ?? 0) > 0 && (
+        <section className="space-y-2.5">
+          <SectionLabel>Commentaires</SectionLabel>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("comments")}
+            className="w-full rounded-2xl border border-violet-200 bg-violet-50/70 p-3 text-left transition-colors active:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-950/25"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
+                  <MessageSquareText className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                </div>
+                <span className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+                  Commentaires nageurs
+                </span>
+              </div>
+              {(recentComments?.unreadCount ?? 0) > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-bold text-white">
+                  {recentComments!.unreadCount}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              {recentComments!.comments.map((c: any) => (
+                <div
+                  key={c.session_id}
+                  className="flex items-start gap-2 rounded-xl bg-white/70 dark:bg-black/20 px-3 py-2"
+                >
+                  {!c.is_read && (
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-violet-500" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-foreground truncate">
+                        {c.athlete_name}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {formatRelativeTime(c.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                      {c.comments}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 text-center mt-2">
+              Voir tous les commentaires
+            </p>
+          </button>
         </section>
       )}
 
