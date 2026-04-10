@@ -161,7 +161,7 @@ function AdminSwimmerRow({
           <SelectValue placeholder="Coach..." />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__unassign__">Non attribue</SelectItem>
+          <SelectItem value="__unassign__">Non attribué</SelectItem>
           {coaches.map((c) => (
             <SelectItem key={c.id} value={String(c.id)}>
               {c.display_name}
@@ -328,12 +328,12 @@ export default function CoachMySwimmersScreen({
   return (
     <div className="space-y-5 pb-6">
       <CoachSectionHeader
-        title="Gerer mes nageurs"
+        title="Gérer mes nageurs"
         description={
           isLoading
             ? "Chargement..."
             : isAdmin
-            ? `${athletes.length} nageur${athletes.length !== 1 ? "s" : ""} -- vue admin`
+            ? `${athletes.length} nageur${athletes.length !== 1 ? "s" : ""} — vue admin`
             : `${mySwimmers.length} nageur${mySwimmers.length !== 1 ? "s" : ""} pris en charge`
         }
         onBack={onBack}
@@ -491,7 +491,7 @@ export default function CoachMySwimmersScreen({
               <section className="space-y-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
-                    Non attribues
+                    Non attribués
                   </h3>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     {unassigned.length}
@@ -499,7 +499,7 @@ export default function CoachMySwimmersScreen({
                 </div>
                 {unassigned.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2 text-center">
-                    Tous les nageurs sont attribues.
+                    Tous les nageurs sont attribués.
                   </p>
                 ) : (
                   <div className="space-y-2">
