@@ -160,37 +160,38 @@ export default function ChronoSetup({
             {activeWaves.map((w) => {
               const c = WAVE_COLORS[w - 1];
               const waveState = state.waves.find((ws) => ws.wave === w);
-              const sec = waveState?.departureIntervalSec ?? 0;
-              const mm = String(Math.floor(sec / 60)).padStart(2, "0");
-              const ss = String(sec % 60).padStart(2, "0");
+              const totalSec = waveState?.departureIntervalSec ?? 0;
+              const minutes = Math.floor(totalSec / 60);
+              const seconds = totalSec % 60;
+              const updateInterval = (min: number, sec: number) => {
+                dispatch({ type: "SET_WAVE_INTERVAL", wave: w, seconds: min * 60 + sec });
+              };
               return (
                 <div key={w} className="flex items-center gap-1.5">
                   <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${c.dot}`}>
                     {c.label}
                   </span>
-                  <Input
+                  <input
                     type="text"
                     inputMode="numeric"
-                    value={sec > 0 ? `${mm}:${ss}` : ""}
-                    placeholder="mm:ss"
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/[^0-9:]/g, "");
-                      let totalSec = 0;
-                      if (raw.includes(":")) {
-                        const [m, s] = raw.split(":");
-                        totalSec = (parseInt(m) || 0) * 60 + (parseInt(s) || 0);
-                      } else {
-                        const num = parseInt(raw) || 0;
-                        if (num > 59) {
-                          totalSec = Math.floor(num / 100) * 60 + (num % 100);
-                        } else {
-                          totalSec = num;
-                        }
-                      }
-                      dispatch({ type: "SET_WAVE_INTERVAL", wave: w, seconds: totalSec });
-                    }}
-                    className="w-[4.5rem] text-center font-mono text-sm"
+                    value={minutes || ""}
+                    placeholder="0"
+                    onChange={(e) => updateInterval(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
+                    className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
                   />
+                  <span className="text-xs text-muted-foreground">min</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={seconds || ""}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = Number(e.target.value.replace(/\D/g, "")) || 0;
+                      updateInterval(minutes, Math.min(59, val));
+                    }}
+                    className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+                  />
+                  <span className="text-xs text-muted-foreground">sec</span>
                 </div>
               );
             })}
