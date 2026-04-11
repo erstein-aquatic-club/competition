@@ -218,12 +218,11 @@ export default function ChronoSetup({
               <Minus className="h-3.5 w-3.5" />
             </Button>
             <input
-              type="number"
-              min={0}
-              step={25}
+              type="text"
+              inputMode="numeric"
               value={state.totalDistanceM || ""}
               placeholder="—"
-              onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value) || 0 })}
+              onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
               className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
             />
             <span className="text-xs text-muted-foreground">m</span>
@@ -260,12 +259,11 @@ export default function ChronoSetup({
               <Minus className="h-3.5 w-3.5" />
             </Button>
             <input
-              type="number"
-              min={25}
-              step={25}
+              type="text"
+              inputMode="numeric"
               value={state.splitDistanceM || ""}
               placeholder="50"
-              onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value) || 50 })}
+              onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
               className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
             />
             <span className="text-xs text-muted-foreground">m</span>
