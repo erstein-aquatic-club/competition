@@ -533,11 +533,17 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           };
         });
 
-        cache.set(iso, list);
-        return list;
+        // If resolver produced only empty slots but there ARE assignments for this date,
+        // fall through to legacy AM/PM path so assignments aren't lost
+        const hasAnyResolved = list.some((s) => !s.isEmpty);
+        if (hasAnyResolved || dayAssignments.length === 0) {
+          cache.set(iso, list);
+          return list;
+        }
+        // else: fall through to legacy path below
       }
 
-      // ── LEGACY PATH: no swimmer slots, use AM/PM ──
+      // ── LEGACY PATH: no swimmer slots, or resolver found nothing despite assignments ──
       const list: PlannedSession[] = [
         {
           id: `${iso}__AM`,
