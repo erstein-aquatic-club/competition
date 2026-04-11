@@ -7589,3 +7589,48 @@ Les nageurs peuvent laisser un commentaire textuel dans leur ressenti de séance
 - Splits portent leur distanceM individuellement (pas calculé) pour le recalage
 - Envoi via resolveAuthUid (integer→UUID) + createStandaloneSwimLog
 - Brouillon sauvegardé en DB (pas localStorage) pour la fiabilité
+
+## §100 — Remédiation Audit Complet (sécurité, perf, UX, robustesse)
+
+**Date** : 2026-04-11
+**Contexte** : Audit complet frontend + backend + Supabase ayant identifié 18 recommandations. 17 implémentées (leaked password protection exclue — Pro plan only, quick-add feedback exclu).
+
+### Sécurité Backend (Migration 00079)
+- Vue `swim_records_comp` recréée avec `security_invoker = true` (retire SECURITY DEFINER)
+- `search_path = public` fixé sur 16 fonctions (app_user_id/role, auto_notify_*, generate_swim_share_token, etc.)
+- Policy INSERT `admin_audit_log` restreinte à `service_role` uniquement
+
+### Performance DB (Migrations 00080-00082)
+- 30 index FK manquants ajoutés, 2 index inutilisés supprimés (00080)
+- 3 RPC paginées : `get_athletes_paginated`, `get_swim_catalog_paginated`, `get_strength_catalog_paginated` (00081)
+- 2 RPC d'agrégation : `get_strength_run_summary`, `batch_upsert_1rm` (00082)
+
+### Transaction Atomique (Migration 00083)
+- RPC `save_strength_run_atomic` — remplace 5 étapes séquentielles par une seule transaction (rollback complet si échec)
+
+### CHECK Constraints (Migration 00084)
+- ~20 contraintes de longueur sur colonnes texte exposées (bio ≤500, comments ≤2000, interviews ≤5000, etc.)
+
+### Cron Cleanup (Migration 00085)
+- Fonction `cleanup_expired_notifications()` + cron `pg_cron` hebdomadaire (dimanche 3h UTC)
+- Purge notifications expirées >30j + push subscriptions stales >90j
+
+### Frontend UX
+- Auto-fermeture drawer feedback après save (600ms delay)
+- Indicateur champs manquants (ring destructive + message) quand Save est désactivé
+- Breadcrumbs coach : `CoachBreadcrumb` + `useCoachBreadcrumb` hook (fiche nageur, chrono historique)
+- Dark mode toggle admin (system/light/dark via app_settings)
+- `maxLength` sur 28 inputs/textareas correspondant aux CHECK constraints DB
+
+### Frontend Robustesse
+- `localStorageGetVersioned`/`localStorageSaveVersioned` — wrapper versionné pour détection de conflits offline
+- `OfflineSyncBanner` — notification au retour online
+- Session refresh proactif (timer 55min + TOKEN_REFRESHED + fallback signOut)
+- Pagination infinite scroll (`useInfiniteQuery` + "Charger plus") dans CoachSwimmersOverview, SwimCatalog, StrengthCatalog
+- `saveStrengthRun` → appel RPC atomique unique
+- `RunDetailSheet` → RPC `get_strength_run_summary` avec fallback client-side
+
+**Fichiers modifiés** : ~30 fichiers (3 créés, 27 modifiés, 7 migrations)
+**Tests** : `npx tsc --noEmit` — 3 erreurs préexistantes uniquement, aucune régression
+**Design doc** : `docs/plans/2026-04-11-audit-remediation-design.md`
+**Plan** : `docs/plans/2026-04-11-audit-remediation-plan.md`

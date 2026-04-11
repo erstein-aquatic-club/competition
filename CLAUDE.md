@@ -141,6 +141,9 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/hooks/useMySwimmerIds.ts` | Hook filtrage nageurs par coach + helper filterByAssignment (§98) | ~45 lignes |
 | `src/pages/coach/CoachMySwimmersScreen.tsx` | Écran gestion attribution nageurs coach/admin (§98) | ~555 lignes |
 | `src/lib/api/coach-comments.ts` | API commentaires nageurs (fetch, mark read, count) (§99) | ~130 lignes |
+| `src/components/shared/CoachBreadcrumb.tsx` | Breadcrumbs navigation coach (§100) | ~30 lignes |
+| `src/components/shared/OfflineSyncBanner.tsx` | Banner reconnexion offline (§100) | ~40 lignes |
+| `src/hooks/useCoachBreadcrumb.ts` | Hook breadcrumb segments coach (§100) | ~10 lignes |
 | `src/pages/coach/CoachCommentsScreen.tsx` | Écran inbox commentaires coach (§99) | ~240 lignes |
 
 ## Edge Functions Supabase
@@ -227,6 +230,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Fait (§98) |
 | 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Fait (§99) |
 | 63 | Historique Chronos + Éditeur Splits | Haute | Fait (§98) |
+| 64 | Remédiation audit (sécurité, perf, UX, robustesse) | Haute | Fait (§100) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
