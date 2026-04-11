@@ -6,7 +6,7 @@ test("Coach nav items include expected labels", () => {
   const items = getNavItemsForRole("coach");
   const labels = items.map((item) => item.label);
 
-  assert.equal(labels[0], "Semaine");
+  assert.equal(labels[0], "Home");
   assert.ok(labels.includes("Nageurs"));
   assert.ok(labels.includes("Biblio"));
   assert.ok(labels.includes("Home"));

@@ -11,10 +11,10 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
   const normalizedRole = role ?? "athlete";
   if (normalizedRole === "admin") {
     return [
+      { href: "/coach", icon: Home, label: "Home" },
       { href: "/coach?section=week", icon: CalendarDays, label: "Semaine" },
       { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
       { href: "/coach?section=library", icon: Library, label: "Biblio" },
-      { href: "/coach", icon: Home, label: "Home" },
       { href: "/coach?section=chrono", icon: Timer, label: "Chrono" },
       { href: "/profile", icon: User, label: "Profil" },
     ];
@@ -28,10 +28,10 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
   }
   if (normalizedRole === "coach") {
     return [
+      { href: "/coach", icon: Home, label: "Home" },
       { href: "/coach?section=week", icon: CalendarDays, label: "Semaine" },
       { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
       { href: "/coach?section=library", icon: Library, label: "Biblio" },
-      { href: "/coach", icon: Home, label: "Home" },
       { href: "/coach?section=chrono", icon: Timer, label: "Chrono" },
       { href: "/profile", icon: User, label: "Profil" },
     ];
