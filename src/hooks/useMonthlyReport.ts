@@ -101,7 +101,7 @@ export function useMonthlyReport({ userId, month }: UseMonthlyReportProps): Mont
       if (!canUseSupabase()) return [];
       const { data, error } = await supabase
         .from("dim_sessions")
-        .select("id, session_date, rpe, session_duration_minutes, duration")
+        .select("id, session_date, rpe, session_duration_minutes, duration, distance")
         .eq("athlete_id", userId)
         .gte("session_date", start)
         .lte("session_date", end);
@@ -374,8 +374,13 @@ export function useMonthlyReport({ userId, month }: UseMonthlyReportProps): Mont
     const sessionsCount = sessions.length;
     const attendanceDelta = sessionsCount - prevSessions.length;
 
-    // Swim
-    const swimTotalMeters = swimAnalytics.totalMeters;
+    // Swim — use actual logged distances from dim_sessions as primary source
+    const loggedMeters = sessions.reduce((sum, s) => {
+      const d = Number((s as any).distance ?? 0);
+      return sum + (Number.isFinite(d) ? d : 0);
+    }, 0);
+    // Fall back to catalog-based total only if no logged distances exist
+    const swimTotalMeters = loggedMeters > 0 ? loggedMeters : swimAnalytics.totalMeters;
     const swimByStroke: Record<string, number> = {};
     const swimByType: Record<string, number> = {};
     for (const week of swimAnalytics.weeklyVolumes) {

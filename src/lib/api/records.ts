@@ -409,6 +409,7 @@ export async function upsertSwimRecord(payload: {
       time_seconds: payload.time_seconds ?? null,
       record_date: payload.record_date ?? null,
       notes: payload.notes ?? null,
+      record_type: payload.record_type ?? "training",
     };
     if (payload.id) {
       const { error } = await supabase
