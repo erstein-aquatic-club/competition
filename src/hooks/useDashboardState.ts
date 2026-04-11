@@ -365,7 +365,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     return Array.from(assignmentsByIso.keys());
   }, [hasSwimmerSlots, userId, assignmentsByIso]);
 
-  const { data: resolvedByDate } = useQuery({
+  const { data: resolvedByDate, isLoading: isResolvingAssignments } = useQuery({
     queryKey: ["resolved-assignments-batch", userId, datesNeedingResolution],
     queryFn: async () => {
       const results = new Map<string, ResolvedSlotAssignment[]>();
@@ -491,15 +491,20 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
             };
           }
 
-          // No resolved data yet (query loading) or no assignment — try fallback from dayAssignments
-          if (!resolved && dayAssignments.length > 0) {
-            // Lightweight fallback: match by AM/PM while resolver loads
+          // Fallback ONLY while resolver is actively loading (not when disabled/empty)
+          if (!resolved && isResolvingAssignments && dayAssignments.length > 0) {
+            // Lightweight fallback while resolver loads — prioritize individual over group
             const slotScheduledSlot = hour < 13 ? "morning" : "evening";
+            // Priority 1: individual assignment
             const fallback = dayAssignments.find(
+              (a) => a.target_user_id === userId,
+            ) ?? dayAssignments.find(
+              // Priority 2: group by timing
               (a) =>
-                a.target_user_id === userId ||
-                a.assigned_slot === slotScheduledSlot ||
-                pickAssignmentSlotKey(a as unknown as Record<string, unknown>, 0) === slotKey,
+                !a.target_user_id && (
+                  a.assigned_slot === slotScheduledSlot ||
+                  pickAssignmentSlotKey(a as unknown as Record<string, unknown>, 0) === slotKey
+                ),
             );
             if (fallback) {
               const fRecord = fallback as unknown as Record<string, unknown>;
@@ -593,7 +598,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
       cache.set(iso, list);
       return list;
     },
-    [assignmentsByIso, slotsByDayOfWeek, hasSwimmerSlots, userId, resolvedByDate]
+    [assignmentsByIso, slotsByDayOfWeek, hasSwimmerSlots, userId, resolvedByDate, isResolvingAssignments]
   );
 
   const getSessionStatus = useCallback(

@@ -78,6 +78,7 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
     }) => api.assignments_create(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coach-calendar-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       toast({ title: "Séance assignée" });
     },
     onError: () => {
@@ -89,6 +90,7 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
     mutationFn: (assignmentId: number) => api.assignments_delete(assignmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coach-calendar-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       toast({ title: "Assignation supprimée" });
     },
     onError: () => {

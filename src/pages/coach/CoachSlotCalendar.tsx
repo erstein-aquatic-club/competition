@@ -310,6 +310,7 @@ export default function CoachSlotCalendar({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       setTemplatePickerOpen(false);
       setTemplateTargetInstance(null);
       toast({ title: "Séance assignée au créneau" });

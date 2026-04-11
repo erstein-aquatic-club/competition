@@ -620,9 +620,27 @@ export async function resolveSwimmerAssignments(
   const results: ResolvedSlotAssignment[] = [];
 
   for (const slot of daySlots) {
-    const sourceTrainingSlotId = slot.source_assignment_id
+    let sourceTrainingSlotId = slot.source_assignment_id
       ? slotIdByAssignmentId.get(slot.source_assignment_id) ?? null
       : null;
+
+    // Warn if swimmer slot references a deleted training_slot_assignment
+    if (slot.source_assignment_id && !sourceTrainingSlotId) {
+      console.warn(
+        `[resolveSwimmerAssignments] Swimmer slot ${slot.id} references deleted training_slot_assignment ${slot.source_assignment_id}. Falling back to timing match.`,
+      );
+      // Fallback: try to match by start_time bucket instead of training_slot_id
+      const slotBucket = parseInt(slot.start_time.split(":")[0], 10) < 13 ? "morning" : "evening";
+      for (const row of assignments) {
+        if (row.training_slot_id && !row.target_user_id) {
+          const rowBucket = row.scheduled_slot;
+          if (rowBucket === slotBucket) {
+            sourceTrainingSlotId = String(row.training_slot_id);
+            break;
+          }
+        }
+      }
+    }
 
     const slotTime = `${slot.start_time.slice(0, 5)}-${slot.end_time.slice(0, 5)}`;
 
@@ -648,8 +666,13 @@ export async function resolveSwimmerAssignments(
       );
 
       // Prefer subgroup match first, then plain group
+      // target_subgroup_id is a group ID (sub-groups are groups with parent_group_id)
+      // Match if the swimmer belongs to this sub-group OR any of their groups is a parent
       const subgroupMatch = groupAssignments.find(
-        (row) => row.target_subgroup_id && visibleGroupIds.includes(row.target_subgroup_id),
+        (row) =>
+          row.target_subgroup_id &&
+          (allGroupIds.includes(row.target_subgroup_id) ||
+            visibleGroupIds.includes(row.target_subgroup_id)),
       );
 
       if (subgroupMatch) {

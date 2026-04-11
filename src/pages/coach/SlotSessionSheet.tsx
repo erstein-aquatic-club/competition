@@ -147,6 +147,7 @@ export default function SlotSessionSheet({
   // ── Mutations ────────────────────────────────────────────
   const invalidateSlotAssignments = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+    queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
   }, [queryClient]);
 
   const visibilityMutation = useMutation({
