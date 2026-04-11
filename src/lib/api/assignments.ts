@@ -12,10 +12,11 @@ import {
   fetchUserGroupIdsWithContext,
   STORAGE_KEYS,
 } from './client';
-import type { Assignment, CoachAssignment } from './types';
+import type { Assignment, CoachAssignment, ResolvedSlotAssignment } from './types';
 import { localStorageGet, localStorageSave } from './localStorage';
 import { getSwimCatalog } from './swim';
 import { getStrengthSessions } from './strength';
+import { getSwimmerSlots } from './swimmer-slots';
 
 
 export async function getAssignmentsForCoach(): Promise<Assignment[] | null> {
@@ -471,4 +472,213 @@ export async function getAssignedSwimCatalogIds(): Promise<Set<number>> {
     if (row.swim_catalog_id != null) ids.add(row.swim_catalog_id);
   }
   return ids;
+}
+
+// ── Swimmer-centric resolution ─────────────────────────────────────
+
+/**
+ * Resolve which session assignments a swimmer sees for a given date,
+ * based on their personal training slots and inherited group assignments.
+ *
+ * Priority: individual (target_user_id) > subgroup > group.
+ */
+export async function resolveSwimmerAssignments(
+  userId: number,
+  date: string, // ISO date YYYY-MM-DD
+): Promise<ResolvedSlotAssignment[]> {
+  if (!canUseSupabase()) return [];
+
+  // 1. Determine day_of_week (1=Monday … 7=Sunday, ISO standard)
+  const d = new Date(date + "T00:00:00");
+  const jsDay = d.getUTCDay(); // 0=Sun
+  const dayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+  // 2. Fetch swimmer's personal slots (all days, we filter below)
+  const allSlots = await getSwimmerSlots(userId);
+  const daySlots = allSlots.filter((s) => s.day_of_week === dayOfWeek);
+  if (daySlots.length === 0) return [];
+
+  // 3. Fetch user's group IDs
+  const { permanentGroupIds, temporaryGroupIds, hasActiveTemporary } =
+    await fetchUserGroupIdsWithContext(userId);
+  const visibleGroupIds = hasActiveTemporary ? temporaryGroupIds : permanentGroupIds;
+  const allGroupIds = [...new Set([...permanentGroupIds, ...temporaryGroupIds])];
+
+  // 4. Resolve source_assignment_id → training_slot_id for each swimmer slot
+  const sourceAssignmentIds = daySlots
+    .map((s) => s.source_assignment_id)
+    .filter((id): id is string => id != null);
+
+  let slotIdByAssignmentId = new Map<string, string>();
+  if (sourceAssignmentIds.length > 0) {
+    const { data: tsaRows, error: tsaErr } = await supabase
+      .from("training_slot_assignments")
+      .select("id, slot_id")
+      .in("id", sourceAssignmentIds);
+    if (!tsaErr && tsaRows) {
+      for (const row of tsaRows) {
+        slotIdByAssignmentId.set(String(row.id), String(row.slot_id));
+      }
+    }
+  }
+
+  // 5. Fetch ALL session_assignments for this date relevant to the swimmer
+  const today = new Date().toISOString().slice(0, 10);
+  const orFilters: string[] = [`target_user_id.eq.${userId}`];
+  allGroupIds.forEach((gid) => orFilters.push(`target_group_id.eq.${gid}`));
+
+  const { data: saRows, error: saErr } = await supabase
+    .from("session_assignments")
+    .select(`
+      id, assignment_type, swim_catalog_id, strength_session_id,
+      target_user_id, target_group_id, target_subgroup_id,
+      training_slot_id, scheduled_date, scheduled_slot, status,
+      visible_from,
+      swim_sessions_catalog(name, total_distance)
+    `)
+    .eq("scheduled_date", date)
+    .neq("status", "cancelled")
+    .or(orFilters.join(","));
+
+  if (saErr) throw new Error(saErr.message);
+
+  // Filter by visibility
+  const assignments = (saRows ?? []).filter((row: any) => {
+    if (row.visible_from && row.visible_from > today) return false;
+    return true;
+  });
+
+  // 6. Build a map of training_slot_id → assignments
+  const assignmentsByTrainingSlotId = new Map<string, any[]>();
+  const individualAssignments: any[] = [];
+
+  for (const row of assignments) {
+    if (row.target_user_id === userId) {
+      individualAssignments.push(row);
+    }
+    if (row.training_slot_id) {
+      const key = String(row.training_slot_id);
+      if (!assignmentsByTrainingSlotId.has(key)) {
+        assignmentsByTrainingSlotId.set(key, []);
+      }
+      assignmentsByTrainingSlotId.get(key)!.push(row);
+    }
+  }
+
+  // 7. Fetch strength session titles if needed (for non-swim assignments)
+  const strengthIds = new Set<number>();
+  for (const row of assignments) {
+    if (row.assignment_type === "strength" && row.strength_session_id) {
+      strengthIds.add(row.strength_session_id);
+    }
+  }
+  let strengthById = new Map<number, { title: string; description: string }>();
+  if (strengthIds.size > 0) {
+    const sessions = await getStrengthSessions();
+    strengthById = new Map(sessions.map((s) => [s.id, { title: s.title, description: s.description }]));
+  }
+
+  // Helper to build an Assignment object from a raw DB row
+  const toAssignment = (row: any): Assignment => {
+    const type = row.assignment_type === "strength" ? "strength" : "swim";
+    const sessionId = safeOptionalInt(
+      type === "swim" ? row.swim_catalog_id : row.strength_session_id,
+    ) ?? 0;
+    let title: string;
+    let description = "";
+    if (type === "swim") {
+      title = (row.swim_sessions_catalog as any)?.name ?? "Séance natation";
+    } else {
+      const s = strengthById.get(sessionId);
+      title = s?.title ?? "Séance musculation";
+      description = s?.description ?? "";
+    }
+    return {
+      id: safeInt(row.id, 0),
+      session_id: sessionId,
+      session_type: type,
+      title,
+      description,
+      assigned_date: row.scheduled_date ?? date,
+      status: String(row.status || "assigned"),
+    };
+  };
+
+  const getTotalKm = (row: any): number | null => {
+    if (row.assignment_type === "swim") {
+      const dist = (row.swim_sessions_catalog as any)?.total_distance;
+      return dist != null ? Number(dist) : null;
+    }
+    return null;
+  };
+
+  // 8. Resolve for each swimmer slot
+  const results: ResolvedSlotAssignment[] = [];
+
+  for (const slot of daySlots) {
+    const sourceTrainingSlotId = slot.source_assignment_id
+      ? slotIdByAssignmentId.get(slot.source_assignment_id) ?? null
+      : null;
+
+    const slotTime = `${slot.start_time.slice(0, 5)}-${slot.end_time.slice(0, 5)}`;
+
+    let resolved: any = null;
+    let source: ResolvedSlotAssignment['source'] = 'none';
+    const alternatives: ResolvedSlotAssignment['alternatives'] = [];
+
+    // a. Check individual assignments matching this slot's training_slot_id
+    const individualMatch = individualAssignments.find((row) =>
+      sourceTrainingSlotId && String(row.training_slot_id) === sourceTrainingSlotId
+    );
+
+    if (individualMatch) {
+      resolved = individualMatch;
+      source = 'individual';
+    } else if (sourceTrainingSlotId) {
+      // b. Check group/subgroup assignments on the same training_slot_id
+      const slotAssignments = assignmentsByTrainingSlotId.get(sourceTrainingSlotId) ?? [];
+
+      // Filter to group assignments only (exclude individual ones targeting other users)
+      const groupAssignments = slotAssignments.filter(
+        (row) => row.target_group_id && visibleGroupIds.includes(row.target_group_id),
+      );
+
+      // Prefer subgroup match first, then plain group
+      const subgroupMatch = groupAssignments.find(
+        (row) => row.target_subgroup_id && visibleGroupIds.includes(row.target_subgroup_id),
+      );
+
+      if (subgroupMatch) {
+        resolved = subgroupMatch;
+        source = 'subgroup';
+      } else if (groupAssignments.length > 0) {
+        resolved = groupAssignments[0];
+        source = 'group';
+      }
+
+      // Collect alternatives (other assignments on same slot, different from resolved)
+      for (const row of groupAssignments) {
+        if (resolved && row.id === resolved.id) continue;
+        alternatives.push({
+          assignmentId: safeInt(row.id, 0),
+          title: toAssignment(row).title,
+          km: getTotalKm(row),
+          subgroupName: undefined, // Could be enriched with group name if needed
+        });
+      }
+    }
+
+    results.push({
+      swimmerSlotId: slot.id,
+      slotTime,
+      slotLocation: slot.location,
+      sourceTrainingSlotId,
+      assignment: resolved ? toAssignment(resolved) : null,
+      assignmentId: resolved ? safeInt(resolved.id, 0) : null,
+      source,
+      alternatives,
+    });
+  }
+
+  return results;
 }

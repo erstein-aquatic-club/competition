@@ -876,6 +876,27 @@ export interface PainReport {
   created_at: string;
 }
 
+// ── Resolved Slot Assignment (swimmer daily view) ──
+
+export interface ResolvedSlotAssignment {
+  /** The swimmer's personal slot ID (swimmer_training_slots.id) */
+  swimmerSlotId: string;
+  /** Display time range, e.g. "17:00-18:00" */
+  slotTime: string;
+  /** Location of the slot */
+  slotLocation: string;
+  /** The training_slot_id this personal slot was initialized from (via source_assignment_id) */
+  sourceTrainingSlotId: string | null;
+  /** The resolved session assignment (or null if no session assigned) */
+  assignment: Assignment | null;
+  /** The assignment database ID */
+  assignmentId: number | null;
+  /** How the session was resolved */
+  source: 'individual' | 'subgroup' | 'group' | 'none';
+  /** Other sessions available on this slot (for sub-group switching) */
+  alternatives: Array<{ assignmentId: number; title: string; km: number | null; subgroupName?: string }>;
+}
+
 // ── Swim Planning Slots ──
 
 export interface SwimPlanningSlot {

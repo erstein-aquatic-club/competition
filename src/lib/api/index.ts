@@ -152,6 +152,7 @@ export {
   getSlotAssignments,
   updateSlotVisibility,
   deleteSlotAssignments,
+  resolveSwimmerAssignments,
 } from './assignments';
 
 export {
