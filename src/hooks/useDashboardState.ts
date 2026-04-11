@@ -542,14 +542,30 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           };
         });
 
-        // If resolver produced only empty slots but there ARE assignments for this date,
-        // fall through to legacy AM/PM path so assignments aren't lost
-        const hasAnyResolved = list.some((s) => !s.isEmpty);
-        if (hasAnyResolved || dayAssignments.length === 0) {
-          cache.set(iso, list);
-          return list;
+        // If there are unmatched assignments (group sessions the resolver didn't link to
+        // swimmer slots), inject them as extra PlannedSessions so they're not lost.
+        const matchedAssignmentIds = new Set(
+          list.filter((s) => s.assignmentId).map((s) => s.assignmentId),
+        );
+        const unmatchedAssignments = dayAssignments.filter((a) => !matchedAssignmentIds.has(a.id));
+        for (const a of unmatchedAssignments) {
+          const aRecord = a as unknown as Record<string, unknown>;
+          const aSlotKey: SlotKey = pickAssignmentSlotKey(aRecord, 0);
+          list.push({
+            id: `${iso}__unmatched_${a.id}`,
+            iso,
+            slotKey: aSlotKey,
+            title: String(a.title ?? "Séance coach"),
+            km: assignmentPlannedKm(aRecord),
+            details: safeLinesFromText(a.description),
+            assignmentId: typeof a.id === "number" ? a.id : Number(a.id) || undefined,
+            isEmpty: false,
+            assignmentSource: "group",
+          });
         }
-        // else: fall through to legacy path below
+
+        cache.set(iso, list);
+        return list;
       }
 
       // ── LEGACY PATH: no swimmer slots, or resolver found nothing despite assignments ──
