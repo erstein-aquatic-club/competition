@@ -42,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/competition/assets/index-B22oJzRm.js"></script>
+    <script type="module" crossorigin src="/competition/assets/index-BzXRPs6F.js"></script>
     <link rel="modulepreload" crossorigin href="/competition/assets/vendor-react-BzrpNAyj.js">
     <link rel="modulepreload" crossorigin href="/competition/assets/vendor-query-CrNV21jM.js">
     <link rel="modulepreload" crossorigin href="/competition/assets/vendor-charts-ChxsJau8.js">
@@ -55,6 +55,16 @@
       <span class="rotate-icon">📱</span>
       <p>Tourne ton téléphone en mode portrait</p>
     </div>
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('eac-theme');
+          if (stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>
