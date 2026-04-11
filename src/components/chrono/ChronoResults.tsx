@@ -8,7 +8,8 @@ import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy } from 
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
-import type { SwimExerciseLogInput } from "../../lib/api/types";
+import type { SwimExerciseLogInput, ChronoRecordInput } from "../../lib/api/types";
+import { createChronoRecord } from "../../lib/api/chrono-records";
 
 /** Resolve public.users integer ID → auth.users UUID */
 async function resolveAuthUid(athleteId: number): Promise<string | null> {
@@ -23,6 +24,7 @@ interface ChronoResultsProps {
   state: ChronoState;
   dispatch: React.Dispatch<ChronoAction>;
   onExportComplete?: () => void;
+  onSaveDraft?: () => void;
 }
 
 type ExportStatus = "pending" | "sent" | "error";
@@ -40,6 +42,43 @@ function flattenSplits(splitsByRep: SplitRecord[][]): { rep: number; time_second
 
 function totalSplitCount(splitsByRep: SplitRecord[][]): number {
   return splitsByRep.reduce((sum, rep) => sum + rep.length, 0);
+}
+
+/** Build a label from chrono state config */
+function buildLabel(state: ChronoState): string {
+  const parts: string[] = [];
+  if (state.seriesCount > 0) parts.push(`${state.seriesCount}×`);
+  if (state.totalDistanceM > 0) parts.push(`${state.totalDistanceM}m`);
+  if (parts.length === 0) return "Chrono";
+  return parts.join("");
+}
+
+/** Convert race state to ChronoRecordInput for DB persistence */
+function buildChronoRecordInput(state: ChronoState, status: "draft" | "sent"): ChronoRecordInput {
+  const raceEntries = Array.from(state.raceData.values());
+  return {
+    status,
+    label: buildLabel(state),
+    config: {
+      totalDistanceM: state.totalDistanceM,
+      splitDistanceM: state.splitDistanceM,
+      seriesCount: state.seriesCount,
+      laneCount: state.laneCount,
+    },
+    swimmers: raceEntries.map((rs) => ({
+      athleteId: rs.swimmer.athleteId,
+      displayName: rs.swimmer.displayName,
+      lane: rs.swimmer.lane,
+      wave: rs.swimmer.wave,
+      splitsByRep: rs.splitsByRep.map((rep) =>
+        rep.map((s, i) => ({
+          distanceM: state.splitDistanceM > 0 ? (i + 1) * state.splitDistanceM : 0,
+          cumulativeMs: s.cumulativeMs,
+          lapMs: s.lapMs,
+        })),
+      ),
+    })),
+  };
 }
 
 /** Get total time of a series (last split's cumulative time) */
@@ -62,7 +101,7 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
   return bestIdx;
 }
 
-export default function ChronoResults({ state, dispatch, onExportComplete }: ChronoResultsProps) {
+export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -75,6 +114,16 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
       return next;
     });
   };
+
+  const handleSaveDraft = useCallback(async () => {
+    try {
+      await createChronoRecord(buildChronoRecordInput(state, "draft"));
+      toast.success("Brouillon enregistré");
+      onSaveDraft?.();
+    } catch (err: any) {
+      toast.error(err.message || "Erreur de sauvegarde");
+    }
+  }, [state, onSaveDraft]);
 
   const raceEntries = Array.from(state.raceData.values());
   const byLane = new Map<number, typeof raceEntries>();
@@ -134,13 +183,18 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
     setExportStatuses(newStatuses);
     setExporting(false);
 
+    // Save chrono record as "sent" for history
+    try {
+      await createChronoRecord(buildChronoRecordInput(state, "sent"));
+    } catch { /* non-blocking — history save failure shouldn't block export */ }
+
     if (errorCount === 0) {
       toast.success(`${successCount} résultat${successCount > 1 ? "s" : ""} envoyé${successCount > 1 ? "s" : ""}`);
       onExportComplete?.();
     } else {
       toast.error(`${errorCount} erreur${errorCount > 1 ? "s" : ""} sur ${swimmers.length} envoi${swimmers.length > 1 ? "s" : ""}`);
     }
-  }, [raceEntries, exportStatuses, onExportComplete]);
+  }, [raceEntries, exportStatuses, onExportComplete, state]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -148,6 +202,10 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Résultats</h2>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={exporting}>
+            <Clock className="mr-1.5 h-4 w-4" />
+            Brouillon
+          </Button>
           <Button variant="outline" size="sm" onClick={() => dispatch({ type: "RESET_FOR_NEW_SERIES" })} disabled={exporting}>
             <RotateCcw className="mr-1.5 h-4 w-4" />
             Nouvelle série
