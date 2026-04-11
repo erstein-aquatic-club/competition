@@ -190,9 +190,30 @@ export function materializeSlots(
     overrideMap.set(`${o.slot_id}:${o.override_date}`, o);
   }
 
+  const sundayIso = (() => {
+    const [y, m, d] = mondayIso.split("-").map(Number);
+    const mon = new Date(y, m - 1, d);
+    mon.setDate(mon.getDate() + 6);
+    return toISODate(mon);
+  })();
+
   const instances: SlotInstance[] = [];
 
   for (const slot of slots) {
+    // One-off slots: only include if their scheduled_date falls in this week
+    if (slot.scheduled_date) {
+      if (slot.scheduled_date < mondayIso || slot.scheduled_date > sundayIso) continue;
+      const date = slot.scheduled_date;
+      const override = overrideMap.get(`${slot.id}:${date}`);
+      const assignment = resolveSlotAssignment(slot, date, assignments);
+      const state = override?.status === "cancelled"
+        ? "cancelled" as SlotState
+        : computeSlotState(assignment, todayIso);
+      instances.push({ date, slot, groups: slot.assignments, state, assignment, override });
+      continue;
+    }
+
+    // Recurring slots
     const date = dayOfWeekToDate(slot.day_of_week, mondayIso);
     const overrideKey = `${slot.id}:${date}`;
     const override = overrideMap.get(overrideKey);

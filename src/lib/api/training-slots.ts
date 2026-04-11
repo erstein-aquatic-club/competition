@@ -81,6 +81,7 @@ export async function getTrainingSlots(): Promise<TrainingSlot[]> {
     created_by: s.created_by,
     created_at: s.created_at,
     lane_count: s.lane_count ?? null,
+    scheduled_date: s.scheduled_date ?? null,
     assignments: assignmentsBySlot.get(s.id) ?? [],
     coaches: coachesBySlot.get(s.id) ?? [],
   }));
@@ -106,6 +107,7 @@ export async function createTrainingSlot(input: TrainingSlotInput): Promise<Trai
       end_time: input.end_time,
       location: input.location,
       lane_count: input.lane_count,
+      scheduled_date: input.scheduled_date ?? null,
     })
     .select()
     .single();
@@ -154,6 +156,7 @@ export async function updateTrainingSlot(slotId: string, input: TrainingSlotInpu
       end_time: input.end_time,
       location: input.location,
       lane_count: input.lane_count,
+      scheduled_date: input.scheduled_date ?? null,
     })
     .eq("id", slotId);
   if (slotErr) throw new Error(slotErr.message);

@@ -1477,6 +1477,7 @@ const CoachTrainingSlotsScreen = ({
       created_at: s.created_at,
       assignments: [],
       lane_count: null,
+      scheduled_date: null,
       coaches: [],
     }));
   }, [swimmerSlots]);
