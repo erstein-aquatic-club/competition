@@ -392,7 +392,19 @@ export const api = {
     if (canUseSupabase()) {
       const dbPayload = mapToDbSession(session);
       const { data, error } = await supabase.from("dim_sessions").insert(dbPayload).select("id").single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Handle unique constraint violation — fallback to upsert
+        if (error.code === '23505') {
+          const { data: updated, error: updateErr } = await supabase
+            .from("dim_sessions")
+            .upsert(dbPayload, { onConflict: 'athlete_id,session_date,time_slot' })
+            .select("id")
+            .single();
+          if (updateErr) throw new Error(updateErr.message);
+          return { status: "ok", sessionId: updated.id };
+        }
+        throw new Error(error.message);
+      }
       return { status: "ok", sessionId: data.id };
     }
 

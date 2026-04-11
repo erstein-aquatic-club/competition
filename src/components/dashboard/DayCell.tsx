@@ -112,7 +112,7 @@ export const DayCell = memo(function DayCell({
                   <span
                     key={i}
                     className={cn(
-                      "text-[7px] font-semibold leading-none px-0.5 rounded",
+                      "text-[10px] font-semibold leading-none px-0.5 rounded",
                       slot.completed
                         ? "text-status-success"
                         : slot.absent

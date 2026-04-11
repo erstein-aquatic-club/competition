@@ -149,6 +149,13 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [wellnessOpen, setWellnessOpen] = React.useState(false);
+  // Override when swimmer picks an alternative session for a slot
+  const [alternativeOverride, setAlternativeOverride] = React.useState<{
+    sessionId: string;
+    assignmentId: number;
+    title: string;
+    km: number | null;
+  } | null>(null);
 
   // Auto-open wellness drawer from push notification deep link (?wellness=open)
   React.useEffect(() => {
@@ -279,7 +286,7 @@ export default function Dashboard() {
         setDrawerOpen(false);
         setActiveSessionId(null);
         setDetailsOpen(false);
-      }, 600);
+      }, 1200);
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible d'enregistrer la séance.", variant: "destructive" });
@@ -320,7 +327,7 @@ export default function Dashboard() {
         setDrawerOpen(false);
         setActiveSessionId(null);
         setDetailsOpen(false);
-      }, 600);
+      }, 1200);
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de mettre à jour la séance.", variant: "destructive" });
@@ -612,10 +619,18 @@ export default function Dashboard() {
       athlete_name: user!,
       athlete_id: userId ?? undefined,
       stroke_distances: Object.keys(strokeDistances).length > 0 ? strokeDistances : null,
-      assignment_id: activeSession?.assignmentId ?? null,
+      assignment_id: alternativeOverride?.sessionId === activeSessionId
+        ? alternativeOverride.assignmentId
+        : activeSession?.assignmentId ?? null,
     };
 
     const existing = getLogForSession(activeSessionId);
+
+    // For updates, preserve the original assignment_id from the saved log
+    // (unless swimmer explicitly picked an alternative)
+    if (existing?.id && existing.assignment_id != null && !alternativeOverride) {
+      payload.assignment_id = existing.assignment_id;
+    }
 
     startTransition(() => {
       setAttendanceOverrideBySessionId((prev) => ({ ...prev, [activeSessionId]: "present" }));
@@ -634,7 +649,8 @@ export default function Dashboard() {
 
     setActiveSessionId(null);
     setDetailsOpen(false);
-  }, [activeSessionId, user, userId, draftState, stableDurationMin, sessionsForSelectedDay, getLogForSession, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen]);
+    setAlternativeOverride(null);
+  }, [activeSessionId, user, userId, draftState, stableDurationMin, sessionsForSelectedDay, getLogForSession, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen, alternativeOverride]);
 
   const toggleDefaultPresence = useCallback((weekdayIdx: number, slotKey: SlotKey) => {
     setPresenceDefaults((prev) => ({
@@ -1038,6 +1054,15 @@ export default function Dashboard() {
           absenceReason={myAbsences.find((a) => a.date === selectedISO)?.reason ?? null}
           onMarkDayAbsent={(reason) => absenceMutation.mutate({ date: selectedISO, reason })}
           onRemoveDayAbsence={() => removeAbsenceMutation.mutate(selectedISO)}
+          onSwitchAlternative={(sessionId, assignmentId, title, km) => {
+            setAlternativeOverride({ sessionId, assignmentId, title, km });
+            openSession(sessionId);
+          }}
+          alternativeOverrideTitle={
+            alternativeOverride?.sessionId === activeSessionId
+              ? alternativeOverride.title
+              : null
+          }
         />
 
         {/* Wellness Drawer */}

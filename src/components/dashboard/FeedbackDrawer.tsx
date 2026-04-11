@@ -108,10 +108,12 @@ function Chip({ children }: { children: React.ReactNode }) {
 
 function AlternativesSection({
   alternatives,
+  onSelect,
 }: {
   alternatives: NonNullable<PlannedSession['alternatives']>;
+  onSelect?: (assignmentId: number, title: string, km: number | null) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(alternatives.length <= 3);
   return (
     <div className="mt-1 ml-2">
       <button
@@ -143,9 +145,23 @@ function AlternativesSection({
                       <p className="text-[10px] text-muted-foreground">{alt.subgroupName}</p>
                     )}
                   </div>
-                  {alt.km != null && (
-                    <span className="text-[10px] text-muted-foreground shrink-0">{fmtKm(alt.km)} km</span>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {alt.km != null && (
+                      <span className="text-[10px] text-muted-foreground">{fmtKm(alt.km)} km</span>
+                    )}
+                    {onSelect && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelect(alt.assignmentId, alt.title, alt.km);
+                        }}
+                        className="rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        Choisir
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -409,6 +425,9 @@ interface FeedbackDrawerProps {
   onDeleteFeedback?: (sessionId: string) => void;
   onMarkDayAbsent?: (reason?: string) => void;
   onRemoveDayAbsence?: () => void;
+  onSwitchAlternative?: (sessionId: string, assignmentId: number, title: string, km: number | null) => void;
+  /** When set, shows a banner indicating the swimmer switched to an alternative session */
+  alternativeOverrideTitle?: string | null;
 }
 
 export function FeedbackDrawer({
@@ -440,6 +459,8 @@ export function FeedbackDrawer({
   onDeleteFeedback,
   onMarkDayAbsent,
   onRemoveDayAbsence,
+  onSwitchAlternative,
+  alternativeOverrideTitle,
 }: FeedbackDrawerProps) {
   // Use getLogForSession helper if provided, fallback to direct lookup
   const getLog = getLogForSessionProp ?? ((id: string) => logsBySessionId[id]);
@@ -575,6 +596,9 @@ export function FeedbackDrawer({
                         </button>
                       </div>
                       {absenceReason && <p className="text-xs text-muted-foreground mt-1">{absenceReason}</p>}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Annule ton indisponibilité pour saisir un retour de séance.
+                      </p>
                     </div>
                   ) : (
                     <div className="mt-3">
@@ -768,13 +792,28 @@ export function FeedbackDrawer({
                       return (
                         <div key={s.id}>
                           {card}
-                          <AlternativesSection alternatives={s.alternatives} />
+                          <AlternativesSection
+                            alternatives={s.alternatives}
+                            onSelect={onSwitchAlternative ? (aId, title, km) => onSwitchAlternative(s.id, aId, title, km) : undefined}
+                          />
                         </div>
                       );
                     }
 
                     return card;
                   };
+
+                  const allEmpty = expectedSessions.every((s) => s.isEmpty) && visibleUnexpected.length === 0;
+
+                  if (allEmpty && expectedSessions.length > 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                        <Moon className="h-8 w-8 mb-2 opacity-40" />
+                        <p className="text-sm font-medium">Repos</p>
+                        <p className="text-xs mt-1">Aucune séance prévue aujourd'hui</p>
+                      </div>
+                    );
+                  }
 
                   return (
                     <>
@@ -894,6 +933,15 @@ export function FeedbackDrawer({
                               </button>
                             </div>
 
+                            {/* Banner when swimmer switched to alternative session */}
+                            {alternativeOverrideTitle && (
+                              <div className="mx-3 mt-2 rounded-2xl bg-primary/10 border border-primary/20 px-3 py-2">
+                                <p className="text-xs font-medium text-primary">
+                                  Séance changée — tu saisiras ton retour pour <span className="font-bold">{alternativeOverrideTitle}</span>
+                                </p>
+                              </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2 p-3">
                               <button
                                 type="button"
@@ -982,7 +1030,7 @@ export function FeedbackDrawer({
                                       key={ind.key}
                                       className={cn(
                                         "space-y-2 rounded-2xl p-2 -mx-2 transition",
-                                        isMissing && "ring-2 ring-destructive animate-pulse"
+                                        isMissing && "ring-2 ring-destructive transition-all"
                                       )}
                                       variants={listItem}
                                     >
@@ -1119,7 +1167,7 @@ export function FeedbackDrawer({
                 const st = getSessionStatus(activeSession, selectedDate);
                 const canRate = st.expected && st.status !== "absent";
                 const allFilled = INDICATORS.every((i) => Number.isInteger(draftState[i.key]));
-                const isDisabled = isPending || !canRate || !allFilled;
+                const isDisabled = isPending || saveState === "saving" || !canRate || !allFilled;
                 return (
                   <BottomActionBar saveState={saveState} position="static">
                     <div
@@ -1127,7 +1175,7 @@ export function FeedbackDrawer({
                       onClick={() => {
                         if (isDisabled && canRate && !allFilled) {
                           setShowMissing(true);
-                          setTimeout(() => setShowMissing(false), 2000);
+                          setTimeout(() => setShowMissing(false), 3000);
                         }
                       }}
                     >
@@ -1137,7 +1185,7 @@ export function FeedbackDrawer({
                         disabled={isDisabled}
                         className={cn(
                           "rounded-2xl px-4 py-3 text-sm font-semibold transition w-full",
-                          isPending || !canRate
+                          isPending || saveState === "saving" || !canRate
                             ? "bg-muted text-muted-foreground cursor-not-allowed"
                             : allFilled
                             ? "bg-status-success text-white hover:opacity-90"

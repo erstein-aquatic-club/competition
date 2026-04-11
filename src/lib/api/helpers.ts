@@ -155,6 +155,7 @@ export const mapFromDbSession = (raw: Record<string, unknown>): Session | null =
     comments: (raw.comments || '') as string,
     coach_notes: (raw.coach_notes as string | null) ?? null,
     stroke_distances: (raw.stroke_distances as Session['stroke_distances']) ?? null,
+    assignment_id: raw.assignment_id != null ? safeInt(raw.assignment_id) : null,
     created_at: (raw.created_at || raw.updated_at || new Date().toISOString()) as string,
   };
 };
