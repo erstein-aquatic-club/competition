@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
@@ -932,6 +932,101 @@ const TimelineSlot = ({
   );
 };
 
+/** Inline variant of TimelineSlot that receives pre-computed top/height */
+function TimelineSlotInline({
+  slot,
+  instance,
+  hasOverrides,
+  cancelled = false,
+  onSelect,
+  top,
+  height,
+}: TimelineSlotProps & { top: number; height: number }) {
+  const isShort = height < 50;
+  const swim = isSwimSlot(slot.location);
+  const completionState = getSlotCompletionState(instance);
+  const hasAssignment = !!instance?.assignment;
+  const isDraft = instance?.state === "draft";
+  const isPublished = instance?.state === "published";
+
+  const bgClass = cancelled
+    ? "bg-muted/50 border-muted-foreground/20 opacity-50 line-through"
+    : isPublished
+      ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
+      : isDraft
+        ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
+    : swim
+      ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
+      : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
+
+  const iconClass = isPublished
+    ? "text-emerald-600 dark:text-emerald-400"
+    : isDraft
+      ? "text-amber-600 dark:text-amber-400"
+      : swim
+        ? "text-blue-500"
+        : "text-amber-500";
+
+  return (
+    <button
+      type="button"
+      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${bgClass}`}
+      style={{ top, height, minHeight: 24 }}
+      onClick={() => onSelect(slot)}
+      title={`${formatTime(slot.start_time)}–${formatTime(slot.end_time)} · ${slot.location}${instance?.assignment?.session_name ? ` · ${instance.assignment.session_name}` : ""}`}
+    >
+      <div className={`flex flex-col gap-0.5 ${isShort ? "flex-row items-center" : ""}`}>
+        <div className="flex items-start justify-between gap-1 min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
+            <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+            <span className="text-[10px] font-medium text-foreground truncate">
+              {slot.location}
+            </span>
+            {hasOverrides && !cancelled && (
+              <AlertTriangle className="h-2.5 w-2.5 text-orange-500 shrink-0" />
+            )}
+          </div>
+          <span className="shrink-0">
+            <SlotCompletionBadge state={completionState} compact />
+          </span>
+        </div>
+
+        {!isShort && slot.assignments.length > 0 && (
+          <div className="flex flex-wrap gap-0.5">
+            {slot.assignments.map((a) => (
+              <Badge
+                key={a.id}
+                variant="secondary"
+                className="text-[9px] px-1 py-0 leading-tight"
+              >
+                {a.group_name}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {!isShort && height >= 70 && (slot.coaches?.length ?? 0) > 0 && (
+          <span className="text-[9px] text-muted-foreground truncate">
+            {(slot.coaches ?? []).map((c) => c.coach_name).join(", ")}
+          </span>
+        )}
+
+        {!isShort && hasAssignment && (
+          <span
+            className={`text-[9px] truncate ${
+              isDraft
+                ? "text-amber-700 dark:text-amber-300"
+                : "text-emerald-700 dark:text-emerald-300"
+            }`}
+          >
+            {instance?.assignment?.session_name ?? "Séance"}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 // ── Mobile View: Week Strip + Day Detail ────────────────────────
 
 type MobileViewProps = {
@@ -1503,6 +1598,51 @@ const CoachTrainingSlotsScreen = ({
     return map;
   }, [filteredSlots, slotAssignments, weekDates, weekOverrides]);
 
+  // ── Adaptive timeline range (desktop) ─────────────────────
+  const timelineRange = useMemo(() => {
+    let minH = 22;
+    let maxH = 6;
+    filteredSlots.forEach((s) => {
+      const startH = Math.floor(timeToMinutes(s.start_time) / 60);
+      const endH = Math.ceil(timeToMinutes(s.end_time) / 60);
+      if (startH < minH) minH = startH;
+      if (endH > maxH) maxH = endH;
+    });
+    if (minH >= maxH) return { start: 6, end: 22, hours: 16 };
+    // 1h buffer on each side
+    const start = Math.max(0, minH - 1);
+    const end = Math.min(24, maxH + 1);
+    return { start, end, hours: end - start };
+  }, [filteredSlots]);
+
+  const timelineHourLabels = useMemo(
+    () => Array.from({ length: timelineRange.hours + 1 }, (_, i) => timelineRange.start + i),
+    [timelineRange],
+  );
+
+  // Measure available height for the desktop timeline
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const [timelineContainerH, setTimelineContainerH] = useState(0);
+
+  useEffect(() => {
+    const el = timelineContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setTimelineContainerH(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Dynamic px per hour: fill the container, min 32px/h for readability
+  const dynamicPxPerHour = useMemo(() => {
+    if (timelineContainerH <= 0) return PX_PER_HOUR; // fallback
+    const ideal = timelineContainerH / timelineRange.hours;
+    return Math.max(32, ideal);
+  }, [timelineContainerH, timelineRange.hours]);
+
+  const dynamicTimelineHeight = timelineRange.hours * dynamicPxPerHour;
+
   const handleCreate = () => {
     setEditingSlot(null);
     setShowSlotForm(true);
@@ -1843,13 +1983,18 @@ const CoachTrainingSlotsScreen = ({
             />
           </div>
 
-          {/* ── Desktop timeline ── */}
-          <div className="hidden sm:block overflow-x-auto -mx-4 px-4">
+          {/* ── Desktop timeline (viewport-fitted) ── */}
+          <div
+            ref={timelineContainerRef}
+            className="hidden sm:block overflow-x-auto -mx-4 px-4"
+            style={{ height: "calc(100vh - 220px)", minHeight: "320px" }}
+          >
             <div
-              className="grid"
+              className="grid h-full"
               style={{
                 minWidth: "760px",
-                gridTemplateColumns: "2rem repeat(7, 1fr)",
+                gridTemplateColumns: "2.5rem repeat(7, 1fr)",
+                gridTemplateRows: "auto 1fr",
               }}
             >
               {/* ── Day headers row ── */}
@@ -1870,12 +2015,12 @@ const CoachTrainingSlotsScreen = ({
               })}
 
               {/* ── Time labels column ── */}
-              <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
-                {HOUR_LABELS.map((h) => (
+              <div className="relative" style={{ height: dynamicTimelineHeight }}>
+                {timelineHourLabels.map((h) => (
                   <span
                     key={h}
                     className="absolute right-1 text-[9px] text-muted-foreground/70 leading-none -translate-y-1/2"
-                    style={{ top: (h - TIMELINE_START) * PX_PER_HOUR }}
+                    style={{ top: (h - timelineRange.start) * dynamicPxPerHour }}
                   >
                     {h}h
                   </span>
@@ -1889,30 +2034,34 @@ const CoachTrainingSlotsScreen = ({
                   <div
                     key={day}
                     className="relative border-l border-border/40"
-                    style={{ height: TIMELINE_HEIGHT }}
+                    style={{ height: dynamicTimelineHeight }}
                   >
                     {/* Hour grid lines */}
-                    {HOUR_LABELS.map((h) => (
+                    {timelineHourLabels.map((h) => (
                       <div
                         key={h}
                         className="absolute left-0 right-0 border-t border-border/20"
-                        style={{ top: (h - TIMELINE_START) * PX_PER_HOUR }}
+                        style={{ top: (h - timelineRange.start) * dynamicPxPerHour }}
                       />
                     ))}
 
                     {/* Slot blocks */}
-                    {daySlots.map((slot) => (
-                      <TimelineSlot
-                        key={slot.id}
-                        slot={slot}
-                        instance={slotInstancesById.get(slot.id)}
-                        hasOverrides={
-                          (overridesBySlot.get(slot.id) ?? []).length > 0
-                        }
-                        cancelled={cancelledSlotIds.has(slot.id)}
-                        onSelect={handleSelect}
-                      />
-                    ))}
+                    {daySlots.map((slot) => {
+                      const slotTop = ((timeToMinutes(slot.start_time) - timelineRange.start * 60) / 60) * dynamicPxPerHour;
+                      const slotHeight = ((timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)) / 60) * dynamicPxPerHour;
+                      return (
+                        <TimelineSlotInline
+                          key={slot.id}
+                          slot={slot}
+                          instance={slotInstancesById.get(slot.id)}
+                          hasOverrides={(overridesBySlot.get(slot.id) ?? []).length > 0}
+                          cancelled={cancelledSlotIds.has(slot.id)}
+                          onSelect={handleSelect}
+                          top={slotTop}
+                          height={slotHeight}
+                        />
+                      );
+                    })}
                   </div>
                 );
               })}
