@@ -135,7 +135,7 @@ export const mapFromDbSession = (raw: Record<string, unknown>): Session | null =
   const effort = rpe ?? 3;
   const feeling =
     normalizeScaleToFive(
-      safeOptionalInt(raw.performance ?? raw.engagement ?? raw.fatigue ?? raw.feeling),
+      safeOptionalInt(raw.fatigue ?? raw.feeling),
     ) ?? 3;
 
   return {
