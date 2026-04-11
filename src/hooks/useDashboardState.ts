@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Session, Assignment, SwimExerciseLogInput } from "@/lib/api";
-import { resolveSwimmerAssignments } from "@/lib/api/assignments";
+import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
 import type { ResolvedSlotAssignment, SwimmerTrainingSlot } from "@/lib/api/types";
 
 type SlotKey = "AM" | "PM";
@@ -367,16 +367,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
   const { data: resolvedByDate, isLoading: isResolvingAssignments } = useQuery({
     queryKey: ["resolved-assignments-batch", userId, datesNeedingResolution],
-    queryFn: async () => {
-      const results = new Map<string, ResolvedSlotAssignment[]>();
-      await Promise.all(
-        datesNeedingResolution.map(async (date) => {
-          const resolved = await resolveSwimmerAssignments(userId!, date);
-          results.set(date, resolved);
-        }),
-      );
-      return results;
-    },
+    queryFn: () => resolveSwimmerAssignmentsBatch(userId!, datesNeedingResolution),
     enabled: !!userId && datesNeedingResolution.length > 0,
     staleTime: 2 * 60 * 1000,
   });

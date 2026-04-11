@@ -158,10 +158,10 @@ export default function CompetitionDetail() {
               body: notifBody,
               icon: "/competition/icon-192.png",
               badge: "/competition/favicon.png",
-              vibrate: [200, 100, 200],
               tag: `routine-${race.id}`,
               data: { url: `#/competition/${competition.id}` },
-            });
+              vibrate: [200, 100, 200],
+            } as NotificationOptions & { vibrate?: number[] });
           });
         }
       }, delayMs);

@@ -53,8 +53,8 @@ async function applyUpdate() {
 
 // Lock orientation to portrait on mobile (Android PWA / fullscreen)
 // Falls back silently — iOS Safari doesn't support this API, CSS overlay handles it
-if (screen.orientation?.lock && window.matchMedia('(max-width: 768px)').matches) {
-  screen.orientation.lock('portrait-primary').catch(() => {});
+if ((screen.orientation as any)?.lock && window.matchMedia('(max-width: 768px)').matches) {
+  (screen.orientation as any).lock('portrait-primary').catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

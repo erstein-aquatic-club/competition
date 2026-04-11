@@ -269,6 +269,7 @@ export default function CoachSlotCalendar({
   const [templateTargetInstance, setTemplateTargetInstance] = useState<SlotInstance | null>(null);
   const [templateSelectedGroups, setTemplateSelectedGroups] = useState<number[]>([]);
   const [templateVisibleFrom, setTemplateVisibleFrom] = useState<string>("");
+  const [templateSubgroupId, setTemplateSubgroupId] = useState<number | undefined>(undefined);
 
   const handleOpenSlot = useCallback((instance: SlotInstance) => {
     setSelectedInstance(instance);
@@ -285,17 +286,18 @@ export default function CoachSlotCalendar({
     onOpenLibrary();
   }, [onOpenLibrary]);
 
-  const handlePickTemplate = useCallback((inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => {
+  const handlePickTemplate = useCallback((inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string, targetSubgroupId?: number) => {
     setTemplateTargetInstance(inst);
     setTemplateSelectedGroups(selectedGroupIds);
     setTemplateVisibleFrom(visibleFrom);
+    setTemplateSubgroupId(targetSubgroupId);
     setSheetOpen(false);
     setTemplatePickerOpen(true);
   }, []);
 
   // Mutation: assign a template to a slot
   const assignTemplateMutation = useMutation({
-    mutationFn: async ({ catalogId, inst, groupIds, visibleFrom }: { catalogId: number; inst: SlotInstance; groupIds: number[]; visibleFrom: string }) => {
+    mutationFn: async ({ catalogId, inst, groupIds, visibleFrom, targetSubgroupId }: { catalogId: number; inst: SlotInstance; groupIds: number[]; visibleFrom: string; targetSubgroupId?: number }) => {
       if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
       if (!userId) throw new Error("Utilisateur non connecté");
       await bulkCreateSlotAssignments({
@@ -306,6 +308,7 @@ export default function CoachSlotCalendar({
         scheduledSlot: deriveScheduledSlot(inst.slot.start_time),
         visibleFrom: visibleFrom || inst.date,
         assignedBy: userId,
+        ...(targetSubgroupId ? { targetSubgroupId } : {}),
       });
     },
     onSuccess: () => {
@@ -327,8 +330,9 @@ export default function CoachSlotCalendar({
       inst: templateTargetInstance,
       groupIds: templateSelectedGroups,
       visibleFrom: templateVisibleFrom,
+      targetSubgroupId: templateSubgroupId,
     });
-  }, [templateTargetInstance, templateSelectedGroups, templateVisibleFrom, assignTemplateMutation]);
+  }, [templateTargetInstance, templateSelectedGroups, templateVisibleFrom, templateSubgroupId, assignTemplateMutation]);
 
   const today = useMemo(() => todayIso(), []);
   const weekLabel = useMemo(
@@ -462,6 +466,7 @@ export default function CoachSlotCalendar({
           setTemplateTargetInstance(null);
           setTemplateSelectedGroups([]);
           setTemplateVisibleFrom("");
+          setTemplateSubgroupId(undefined);
         }
       }}
       onSelect={handleTemplateSelect}

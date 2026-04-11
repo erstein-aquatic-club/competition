@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sheet,
@@ -19,6 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -48,6 +55,7 @@ import {
   updateSlotVisibility,
   deleteSlotAssignments,
 } from "@/lib/api/assignments";
+import { supabase, canUseSupabase } from "@/lib/api/client";
 import type { SlotInstance, SlotState } from "@/hooks/useSlotCalendar";
 
 // ── Props ────────────────────────────────────────────────────
@@ -58,7 +66,7 @@ export interface SlotSessionSheetProps {
   onOpenChange: (open: boolean) => void;
   onCreateNew: (slotInstance: SlotInstance) => void;
   onEditSession: (sessionId: number) => void;
-  onPickTemplate: (slotInstance: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => void;
+  onPickTemplate: (slotInstance: SlotInstance, selectedGroupIds: number[], visibleFrom: string, targetSubgroupId?: number) => void;
   onEditSlot?: (slotInstance: SlotInstance) => void;
   onManageOverride?: (slotInstance: SlotInstance) => void;
 }
@@ -128,16 +136,36 @@ export default function SlotSessionSheet({
 
   // ── Local state ──────────────────────────────────────────
   const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
+  const [selectedSubgroupId, setSelectedSubgroupId] = useState<number | undefined>(undefined);
   const [visibleFrom, setVisibleFrom] = useState("");
   const [showVisibilityPicker, setShowVisibilityPicker] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuMode, setMenuMode] = useState<MenuMode>("session");
+
+  // Fetch subgroups (temporary groups that are children of the selected groups)
+  const { data: subgroups = [] } = useQuery({
+    queryKey: ["slot-subgroups", selectedGroups],
+    queryFn: async () => {
+      if (!canUseSupabase() || selectedGroups.length === 0) return [];
+      const { data, error } = await supabase
+        .from("groups")
+        .select("id, name, parent_group_id, is_active")
+        .eq("is_temporary", true)
+        .eq("is_active", true)
+        .in("parent_group_id", selectedGroups);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Array<{ id: number; name: string; parent_group_id: number; is_active: boolean }>;
+    },
+    enabled: selectedGroups.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Reset local state when instance changes
   useEffect(() => {
     if (!instance) return;
 
     setSelectedGroups(instance.groups.map((g) => g.group_id));
+    setSelectedSubgroupId(undefined);
     setVisibleFrom(instance.assignment?.visible_from ?? instance.date);
     setShowVisibilityPicker(false);
     setDeleteConfirmOpen(false);
@@ -278,6 +306,9 @@ export default function SlotSessionSheet({
                   instance={instance}
                   groups={groups}
                   selectedGroups={selectedGroups}
+                  subgroups={subgroups}
+                  selectedSubgroupId={selectedSubgroupId}
+                  onSubgroupChange={setSelectedSubgroupId}
                   visibleFrom={visibleFrom}
                   onToggleGroup={handleToggleGroup}
                   onVisibleFromChange={setVisibleFrom}
@@ -453,6 +484,9 @@ function EmptyBody({
   instance,
   groups,
   selectedGroups,
+  subgroups,
+  selectedSubgroupId,
+  onSubgroupChange,
   visibleFrom,
   onToggleGroup,
   onVisibleFromChange,
@@ -463,11 +497,14 @@ function EmptyBody({
   instance: SlotInstance;
   groups: SlotInstance["groups"];
   selectedGroups: number[];
+  subgroups: Array<{ id: number; name: string; parent_group_id: number; is_active: boolean }>;
+  selectedSubgroupId: number | undefined;
+  onSubgroupChange: (id: number | undefined) => void;
   visibleFrom: string;
   onToggleGroup: (groupId: number) => void;
   onVisibleFromChange: (date: string) => void;
   onCreateNew: (inst: SlotInstance) => void;
-  onPickTemplate: (inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => void;
+  onPickTemplate: (inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string, targetSubgroupId?: number) => void;
   onClose: () => void;
 }) {
   const handleCreateNew = () => {
@@ -477,7 +514,7 @@ function EmptyBody({
 
   const handlePickTemplate = () => {
     onClose();
-    onPickTemplate(instance, selectedGroups, visibleFrom);
+    onPickTemplate(instance, selectedGroups, visibleFrom, selectedSubgroupId);
   };
 
   return (
@@ -519,12 +556,29 @@ function EmptyBody({
         </div>
       )}
 
-      {/* TODO: Phase E — Add optional "Sous-groupe" Select dropdown here.
-          Needs to fetch temporary groups (children of selectedGroups) via useQuery
-          and pass target_subgroup_id to bulkCreateSlotAssignments.
-          Requires: 1) Query temporary_groups filtered by parent group IDs
-          2) Add target_subgroup_id param to bulkCreateSlotAssignments
-          3) Pass selected subgroup ID through onPickTemplate callback */}
+      {subgroups.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Sous-groupe (optionnel)
+          </Label>
+          <Select
+            value={selectedSubgroupId != null ? String(selectedSubgroupId) : "none"}
+            onValueChange={(v) => onSubgroupChange(v === "none" ? undefined : Number(v))}
+          >
+            <SelectTrigger className="w-full rounded-xl border-border bg-muted/30">
+              <SelectValue placeholder="Tous les nageurs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Tous les nageurs</SelectItem>
+              {subgroups.map((sg) => (
+                <SelectItem key={sg.id} value={String(sg.id)}>
+                  {sg.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label
