@@ -62,7 +62,7 @@ export default function CoachWeekView({
         <Suspense fallback={<PageSkeleton />}>
           <SwimCatalog
             entryContext={libraryContext}
-            onEntryContextConsumed={handleBackFromLibrary}
+            onEntryContextConsumed={() => setLibraryContext(null)}
           />
         </Suspense>
       </div>
