@@ -40,10 +40,12 @@ export interface ChronoState {
   waves: WaveState[];
   raceData: Map<number, SwimmerRaceState>; // keyed by athleteId
   stoppedAt: number | null;
-  /** Total distance in meters (0 = not set) */
+  /** Total distance per series in meters (0 = not set) */
   totalDistanceM: number;
   /** Split distance in meters (0 = not set, splits numbered only) */
   splitDistanceM: number;
+  /** Number of series (0 = unlimited) */
+  seriesCount: number;
 }
 
 export const DISTANCE_PRESETS = [25, 50, 100, 200, 400, 800, 1500] as const;

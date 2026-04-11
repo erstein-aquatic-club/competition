@@ -282,10 +282,43 @@ export default function ChronoSetup({
           </div>
         </div>
 
+        {/* Series count */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Séries :</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
+              disabled={state.seriesCount <= 0}
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={state.seriesCount || ""}
+              placeholder="∞"
+              onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+              className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
         {/* Summary */}
-        {state.totalDistanceM > 0 && state.splitDistanceM > 0 && (
+        {state.totalDistanceM > 0 && state.seriesCount > 0 && (
           <span className="text-xs text-muted-foreground">
-            → {Math.ceil(state.totalDistanceM / state.splitDistanceM)} splits par série
+            → {state.seriesCount}×{state.totalDistanceM}m
+            {state.splitDistanceM > 0 && ` (${Math.ceil(state.totalDistanceM / state.splitDistanceM)} splits/série)`}
           </span>
         )}
       </div>

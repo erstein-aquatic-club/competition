@@ -32,11 +32,13 @@ function WaveBar({
   now,
   dispatch,
   getTimestamp,
+  seriesCount,
 }: {
   waves: ChronoState["waves"];
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
+  seriesCount: number;
 }) {
 
   return (
@@ -61,7 +63,7 @@ function WaveBar({
                 className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
               >
                 <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-                  {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}` : ""}
+                  {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
                 </span>
                 <span className="flex items-center gap-1.5 text-lg font-black text-white">
                   <Play className="h-4 w-4 fill-current" /> GO
@@ -86,7 +88,7 @@ function WaveBar({
                   {wc.label}
                 </span>
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  Série {w.currentRep + 1}
+                  Série {w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
                 </span>
                 <button
                   type="button"
@@ -356,6 +358,7 @@ export default function ChronoRace({
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
+              seriesCount={state.seriesCount}
             />
           </div>
           <div className="pr-4 shrink-0">
