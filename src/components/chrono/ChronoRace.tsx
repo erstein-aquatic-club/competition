@@ -42,7 +42,7 @@ function WaveBar({
 }) {
 
   return (
-    <div className="grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-1.5 px-4 py-3 md:grid-cols-2 xl:grid-cols-3">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
@@ -76,50 +76,60 @@ function WaveBar({
           const intervalMs = w.departureIntervalSec * 1000;
           const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
           const urgent = remainingMs >= 0 && remainingMs <= 15000;
+          const overdue = remainingMs <= 0;
 
           return (
-            <div
-              key={w.wave}
-              className={`flex items-center gap-3 rounded-xl border-2 ${wc.border} bg-card overflow-hidden px-4 py-2`}
-            >
-              {/* Left: wave info */}
-              <div className="flex flex-col items-center gap-0.5 shrink-0">
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
-                  {wc.label}
-                </span>
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  Série {w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    dispatch({ type: "NEXT_REP", wave: w.wave });
-                  }}
-                  className="mt-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
-                >
-                  Série suiv.
-                </button>
-              </div>
-
-              {/* Right: chrono + countdown */}
-              <div className="flex flex-col items-end">
-                {/* Countdown — large and prominent */}
-                {intervalMs > 0 && (
-                  <span className={`font-mono tabular-nums text-lg font-black leading-tight ${
-                    remainingMs <= 0
-                      ? "text-destructive"
+            <div key={w.wave} className="flex flex-col gap-0">
+              {/* Recovery countdown — above the card */}
+              {intervalMs > 0 && (
+                <div
+                  className={`flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black transition-colors ${
+                    overdue
+                      ? "bg-destructive text-destructive-foreground"
                       : urgent
-                        ? "text-destructive animate-pulse"
-                        : "text-foreground"
-                  }`}>
-                    {remainingMs <= 0 ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
+                        ? "bg-destructive/90 text-destructive-foreground animate-pulse"
+                        : "bg-muted text-foreground"
+                  }`}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                    Récup
                   </span>
-                )}
-                {/* Elapsed chrono */}
-                <span className={`font-mono tabular-nums font-bold tracking-tight text-muted-foreground ${intervalMs > 0 ? "text-sm" : "text-xl text-foreground"}`}>
-                  {formatTime(elapsed)}
-                </span>
+                  <span className={`text-xl leading-none ${urgent || overdue ? "text-2xl" : ""}`}>
+                    {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
+                  </span>
+                </div>
+              )}
+
+              {/* Wave card */}
+              <div
+                className={`flex items-center gap-3 ${intervalMs > 0 ? "rounded-b-xl" : "rounded-xl"} border-2 ${wc.border} bg-card overflow-hidden px-4 py-2`}
+              >
+                {/* Left: wave info */}
+                <div className="flex flex-col items-center gap-0.5 shrink-0">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
+                    {wc.label}
+                  </span>
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    Série {w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch({ type: "NEXT_REP", wave: w.wave });
+                    }}
+                    className="mt-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
+                  >
+                    Série suiv.
+                  </button>
+                </div>
+
+                {/* Right: elapsed chrono */}
+                <div className="flex flex-col items-end ml-auto">
+                  <span className={`font-mono tabular-nums font-bold tracking-tight ${intervalMs > 0 ? "text-base text-muted-foreground" : "text-xl text-foreground"}`}>
+                    {formatTime(elapsed)}
+                  </span>
+                </div>
               </div>
             </div>
           );
