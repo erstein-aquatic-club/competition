@@ -361,15 +361,7 @@ function MenuModePicker({
   sessionDisabled: boolean;
 }) {
   return (
-    <div className="mb-5 space-y-3">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Étape 1
-        </p>
-        <p className="text-sm font-semibold text-foreground">
-          Choisissez ce que vous voulez gérer
-        </p>
-      </div>
+    <div className="mb-5">
       <div className="grid grid-cols-2 gap-2">
         <ModeCard
           title="Séance"
@@ -456,10 +448,6 @@ function SessionUnavailableBody({
 }) {
   return (
     <div className="space-y-4">
-      <PanelHeader
-        title="Définir une séance"
-        description="Ce sous-menu redevient disponible quand le créneau n'est plus annulé."
-      />
       <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-center">
         <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-muted">
           <Ban className="h-4 w-4 text-muted-foreground" />
@@ -512,11 +500,6 @@ function EmptyBody({
 
   return (
     <div className="space-y-5">
-      <PanelHeader
-        title="Définir une séance"
-        description="Choisissez comment renseigner la séance liée à ce créneau."
-      />
-
       {groups.length > 0 ? (
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -620,11 +603,6 @@ function FilledBody({
 }) {
   return (
     <div className="space-y-5">
-      <PanelHeader
-        title="Définir une séance"
-        description="Travaillez sur la séance déjà liée à ce créneau."
-      />
-
       <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
         <p className="text-sm font-semibold text-foreground leading-snug">
           {assignment.session_name ?? "Séance sans nom"}

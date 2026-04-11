@@ -327,6 +327,7 @@ const ObjectiveFormSheet = ({
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   rows={3}
+                  maxLength={1000}
                 />
               </div>
             )}

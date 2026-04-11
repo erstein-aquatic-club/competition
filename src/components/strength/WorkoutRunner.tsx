@@ -678,6 +678,7 @@ export function WorkoutRunner({
                 value={comments}
                 onChange={(event) => setComments(event.target.value)}
                 rows={3}
+                maxLength={2000}
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
               />
             </div>
@@ -796,6 +797,7 @@ export function WorkoutRunner({
                 handleNoteChange(currentBlock.exercise_id, e.target.value || null);
               }}
               placeholder="Note : réglages machine, repères..."
+              maxLength={500}
               className="w-full bg-transparent text-xs italic text-muted-foreground placeholder:text-muted-foreground/50 border-none outline-none focus:text-foreground"
             />
           </div>

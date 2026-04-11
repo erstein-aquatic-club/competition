@@ -200,6 +200,7 @@ const CoachMessagesScreen = ({ onBack, athletes, groups, athletesLoading }: Coac
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex. Changement d'horaire demain"
+              maxLength={200}
             />
           </div>
           <div className="space-y-2">
@@ -210,6 +211,7 @@ const CoachMessagesScreen = ({ onBack, athletes, groups, athletesLoading }: Coac
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Ajoutez les détails à afficher dans la notification…"
               rows={4}
+              maxLength={2000}
             />
           </div>
         </CardContent>

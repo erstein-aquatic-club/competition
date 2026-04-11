@@ -23,6 +23,40 @@ export const localStorageSave = <T = unknown>(key: string, data: T): void => {
   }
 };
 
+// --- Versioned Storage ---
+
+export interface VersionedEntry<T> {
+  data: T;
+  version: number;
+  updatedAt: string;
+}
+
+export const localStorageGetVersioned = <T = unknown>(key: string): VersionedEntry<T> | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && 'version' in parsed) {
+      return parsed as VersionedEntry<T>;
+    }
+    return { data: parsed as T, version: 0, updatedAt: new Date(0).toISOString() };
+  } catch { return null; }
+};
+
+export const localStorageSaveVersioned = <T = unknown>(key: string, data: T): void => {
+  try {
+    const existing = localStorageGetVersioned<T>(key);
+    const entry: VersionedEntry<T> = {
+      data,
+      version: (existing?.version ?? 0) + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch (error) {
+    console.error('[localStorage] Failed to save:', key, error);
+  }
+};
+
 export const localStorageRemove = (key: string): void => {
   try {
     localStorage.removeItem(key);

@@ -138,6 +138,7 @@ export function RestExerciseTab({
               onChange={(e) => handleAthleteNoteChange(e.target.value)}
               placeholder="Ajouter une note..."
               rows={1}
+              maxLength={500}
               className="w-full resize-none bg-transparent text-sm text-foreground/80 leading-relaxed placeholder:text-muted-foreground/40 focus:outline-none"
               style={{ maxHeight: "4.5em", overflow: "auto" }}
             />

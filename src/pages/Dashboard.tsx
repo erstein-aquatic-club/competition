@@ -271,6 +271,11 @@ export default function Dashboard() {
       toast({ title: "Séance enregistrée", description: "Vos données ont été synchronisées." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
+      setTimeout(() => {
+        setDrawerOpen(false);
+        setActiveSessionId(null);
+        setDetailsOpen(false);
+      }, 600);
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible d'enregistrer la séance.", variant: "destructive" });
@@ -307,6 +312,11 @@ export default function Dashboard() {
       toast({ title: "Séance mise à jour", description: "Votre saisie a été mise à jour." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
+      setTimeout(() => {
+        setDrawerOpen(false);
+        setActiveSessionId(null);
+        setDetailsOpen(false);
+      }, 600);
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de mettre à jour la séance.", variant: "destructive" });

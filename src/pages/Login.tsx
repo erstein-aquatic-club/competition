@@ -414,6 +414,7 @@ export default function Login() {
                           })}
                           placeholder="Votre nom"
                           className="min-h-12"
+                          maxLength={100}
                           autoFocus
                         />
                         {signupForm.formState.errors.name && (
@@ -617,6 +618,7 @@ export default function Login() {
                           id="signup-phone"
                           type="tel"
                           placeholder="06 12 34 56 78"
+                          maxLength={20}
                           {...signupForm.register("phone")}
                           className="min-h-12"
                         />

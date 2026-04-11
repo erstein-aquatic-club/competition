@@ -890,7 +890,7 @@ export default function Profile() {
 
             <div className="grid gap-2">
               <Label>Bio</Label>
-              <Textarea {...profileForm.register("bio")} />
+              <Textarea {...profileForm.register("bio")} maxLength={500} />
               {profileForm.formState.errors.bio && (
                 <p className="text-xs text-destructive" role="alert" aria-live="assertive">{profileForm.formState.errors.bio.message}</p>
               )}
@@ -961,6 +961,7 @@ export default function Profile() {
                 id="edit-phone"
                 type="tel"
                 placeholder="06 12 34 56 78"
+                maxLength={20}
                 {...profileForm.register("phone")}
               />
             </div>

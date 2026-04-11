@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Activity, ArrowLeft, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import CoachBreadcrumb from "@/components/shared/CoachBreadcrumb";
 import SwimmerFeedbackTab from "./SwimmerFeedbackTab";
 import SwimmerObjectivesTab from "./SwimmerObjectivesTab";
 import SwimmerPlanningTab from "./SwimmerPlanningTab";
@@ -169,8 +170,17 @@ export default function CoachSwimmerDetail({
     );
   }
 
+  const breadcrumbSegments = useMemo(
+    () => [
+      { label: 'Nageurs', href: '#/coach?section=swimmers' },
+      { label: displayName },
+    ],
+    [displayName],
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
+      <CoachBreadcrumb segments={breadcrumbSegments} />
       {/* Header */}
       <div className="flex items-center gap-3">
         <button

@@ -92,6 +92,7 @@ function CoachNotePopover({
           className="text-xs min-h-[60px]"
           placeholder="Ajouter une note..."
           rows={3}
+          maxLength={2000}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />

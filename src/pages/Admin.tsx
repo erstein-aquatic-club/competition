@@ -1,12 +1,13 @@
 import * as React from "react";
 import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ShieldCheck, UserMinus, UserPlus, Search, CheckCircle, XCircle, Clock, Pen, Save, History } from "lucide-react";
+import { AlertCircle, ShieldCheck, UserMinus, UserPlus, Search, CheckCircle, XCircle, Clock, Pen, Save, History, Sun } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
 import { api, summarizeApiError, type UserSummary, getAuditLog, type AuditEntry } from "@/lib/api";
+import { getAppSettings, updateAppSettings } from "@/lib/api/records";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,34 @@ export default function Admin() {
     enabled: isAdmin,
   });
 
+  const { data: darkModeSetting } = useQuery({
+    queryKey: ["app-setting", "dark_mode"],
+    queryFn: () => getAppSettings("dark_mode"),
+    staleTime: 5 * 60 * 1000,
+    enabled: isAdmin,
+  });
+
+  const darkModeValue: string = (() => {
+    if (darkModeSetting == null) return "system";
+    if (typeof darkModeSetting === "string") return darkModeSetting;
+    if (typeof darkModeSetting === "object" && "mode" in darkModeSetting) return String(darkModeSetting.mode);
+    return "system";
+  })();
+
+  const updateDarkMode = useMutation({
+    mutationFn: (mode: string) => updateAppSettings("dark_mode", { mode }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["app-setting", "dark_mode"] });
+      toast({ title: "Apparence mise à jour" });
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: "Erreur",
+        description: parseErrorMessage(error, "Impossible de mettre à jour l'apparence."),
+      });
+    },
+  });
+
   const updateProfileMutation = useMutation({
     mutationFn: (data: AdminProfileEditForm) =>
       api.updateProfile({
@@ -456,6 +485,7 @@ export default function Admin() {
                   id="coach-create-name"
                   {...register("display_name")}
                   placeholder="Ex: Coach Martin"
+                  maxLength={100}
                 />
                 {errors.display_name && (
                   <p className="text-sm text-destructive" role="alert" aria-live="assertive">{errors.display_name.message}</p>
@@ -721,6 +751,36 @@ export default function Admin() {
         </CardContent>
       </Card>
 
+      {/* Apparence */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sun className="h-5 w-5 text-muted-foreground" />
+            Apparence
+          </CardTitle>
+          <CardDescription>Thème de couleur de l'application pour tous les utilisateurs.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Label htmlFor="dark-mode-select" className="shrink-0">Mode</Label>
+            <Select
+              value={darkModeValue}
+              onValueChange={(value) => updateDarkMode.mutate(value)}
+              disabled={updateDarkMode.isPending}
+            >
+              <SelectTrigger id="dark-mode-select" className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="system">Système</SelectItem>
+                <SelectItem value="light">Clair</SelectItem>
+                <SelectItem value="dark">Sombre</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Audit log */}
       {auditLog.length > 0 && (
         <Card>
@@ -782,7 +842,7 @@ export default function Admin() {
           >
             <div className="grid gap-2">
               <Label>Nom affiché</Label>
-              <Input {...profileEditForm.register("display_name")} />
+              <Input {...profileEditForm.register("display_name")} maxLength={100} />
               {profileEditForm.formState.errors.display_name && (
                 <p className="text-xs text-destructive">{profileEditForm.formState.errors.display_name.message}</p>
               )}
@@ -817,7 +877,7 @@ export default function Admin() {
               </div>
               <div className="grid gap-2">
                 <Label>Téléphone</Label>
-                <Input type="tel" placeholder="06 12 34 56 78" {...profileEditForm.register("phone")} />
+                <Input type="tel" placeholder="06 12 34 56 78" maxLength={20} {...profileEditForm.register("phone")} />
               </div>
             </div>
 
@@ -831,7 +891,7 @@ export default function Admin() {
 
             <div className="grid gap-2">
               <Label>Bio</Label>
-              <Textarea {...profileEditForm.register("bio")} rows={3} />
+              <Textarea {...profileEditForm.register("bio")} rows={3} maxLength={500} />
             </div>
 
             <div className="flex gap-2">

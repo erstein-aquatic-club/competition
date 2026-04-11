@@ -426,6 +426,7 @@ function InterviewCard({
                       onChange={(e) => setCommitmentReview(e.target.value)}
                       onBlur={handleBlur}
                       rows={3}
+                      maxLength={5000}
                     />
                   </div>
                 </div>
@@ -442,6 +443,7 @@ function InterviewCard({
                   onChange={(e) => setSuccesses(e.target.value)}
                   onBlur={handleBlur}
                   rows={3}
+                  maxLength={5000}
                 />
               </div>
               <div className="space-y-2">
@@ -455,6 +457,7 @@ function InterviewCard({
                   onChange={(e) => setDifficulties(e.target.value)}
                   onBlur={handleBlur}
                   rows={3}
+                  maxLength={5000}
                 />
               </div>
               <div className="space-y-2">
@@ -473,6 +476,7 @@ function InterviewCard({
                   onChange={(e) => setGoals(e.target.value)}
                   onBlur={handleBlur}
                   rows={3}
+                  maxLength={5000}
                 />
               </div>
               <div className="space-y-2">
@@ -486,6 +490,7 @@ function InterviewCard({
                   onChange={(e) => setCommitments(e.target.value)}
                   onBlur={handleBlur}
                   rows={3}
+                  maxLength={5000}
                 />
               </div>
               {isSaving && (

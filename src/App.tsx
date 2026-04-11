@@ -2,7 +2,8 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
 import { Switch, Route, Redirect, Router } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { getAppSettings } from "@/lib/api/records";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, handlePasswordReset } from "@/lib/auth";
@@ -309,6 +310,45 @@ function AppRouter() {
   );
 }
 
+function useDarkMode() {
+  const { data: darkModeSetting } = useQuery({
+    queryKey: ["app-setting", "dark_mode"],
+    queryFn: () => getAppSettings("dark_mode"),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    const mode = typeof darkModeSetting === "string" ? darkModeSetting : darkModeSetting?.mode ?? null;
+    const root = document.documentElement;
+
+    if (mode === "dark") {
+      root.classList.add("dark");
+    } else if (mode === "light") {
+      root.classList.remove("dark");
+    } else {
+      // system or null — respect prefers-color-scheme
+      const mql = window.matchMedia("(prefers-color-scheme: dark)");
+      const apply = (e: MediaQueryList | MediaQueryListEvent) => {
+        if (e.matches) {
+          root.classList.add("dark");
+        } else {
+          root.classList.remove("dark");
+        }
+      };
+      apply(mql);
+      const handler = (e: MediaQueryListEvent) => apply(e);
+      mql.addEventListener("change", handler);
+      return () => mql.removeEventListener("change", handler);
+    }
+  }, [darkModeSetting]);
+}
+
+/** Applies dark_mode setting from app_settings. Must be inside QueryClientProvider. */
+function DarkModeApplier() {
+  useDarkMode();
+  return null;
+}
+
 function App() {
   const { loadUser } = useAuth();
   useVersionCheck();
@@ -345,6 +385,7 @@ function App() {
   return (
     <PWAInstallGate>
       <QueryClientProvider client={queryClient}>
+        <DarkModeApplier />
         <TooltipProvider>
           <UpdateNotification />
           <PushPermissionBanner />

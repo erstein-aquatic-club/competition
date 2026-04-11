@@ -272,12 +272,44 @@ export const handlePasswordReset = async (newPassword: string): Promise<{ error:
 // another tab, etc.) and keep the Zustand store in sync.
 // ---------------------------------------------------------------------------
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  const state = useAuth.getState();
+/** Timestamp of last successful token refresh (used by proactive refresh). */
+let lastRefreshAt = Date.now();
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === "TOKEN_REFRESHED" && session) {
+    lastRefreshAt = Date.now();
+    useAuth.setState({
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+    });
+    return;
+  }
+
+  if (event === "SIGNED_OUT") {
+    setStorageValue(COACH_SELECTED_ATHLETE_ID_KEY, null);
+    setStorageValue(COACH_SELECTED_ATHLETE_NAME_KEY, null);
+    useAuth.setState({
+      user: null,
+      userId: null,
+      role: null,
+      isApproved: null,
+      accessToken: null,
+      refreshToken: null,
+      selectedAthleteId: null,
+      selectedAthleteName: null,
+    });
+    if (typeof window !== "undefined" && window.location.hash !== "#/") {
+      window.location.hash = "#/";
+    }
+    return;
+  }
+
+  // All other events (INITIAL_SESSION, SIGNED_IN, PASSWORD_RECOVERY, etc.)
   if (session) {
+    const state = useAuth.getState();
     state.loginFromSession(session);
+    lastRefreshAt = Date.now();
   } else {
-    // Signed out
     useAuth.setState({
       user: null,
       userId: null,
@@ -288,3 +320,39 @@ supabase.auth.onAuthStateChange((_event, session) => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Proactive session refresh timer
+// Every 60 s, check if the token is older than 55 minutes and refresh it
+// preemptively so the user never hits an expired-token error.
+// ---------------------------------------------------------------------------
+
+const REFRESH_CHECK_INTERVAL_MS = 60_000; // 60 seconds
+const REFRESH_THRESHOLD_MS = 55 * 60 * 1000; // 55 minutes
+
+const proactiveRefreshTimer = setInterval(async () => {
+  // Only attempt refresh when the user is currently authenticated
+  const { accessToken } = useAuth.getState();
+  if (!accessToken) return;
+
+  const elapsed = Date.now() - lastRefreshAt;
+  if (elapsed < REFRESH_THRESHOLD_MS) return;
+
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session) {
+      console.warn("[auth] Proactive refresh failed, signing out", error);
+      await supabase.auth.signOut();
+      // onAuthStateChange SIGNED_OUT handler will clear store + redirect
+    }
+    // On success, onAuthStateChange TOKEN_REFRESHED handler updates store
+  } catch (err) {
+    console.warn("[auth] Proactive refresh error", err);
+    await supabase.auth.signOut();
+  }
+}, REFRESH_CHECK_INTERVAL_MS);
+
+// Prevent the timer from keeping Node / test processes alive
+if (typeof proactiveRefreshTimer === "object" && "unref" in proactiveRefreshTimer) {
+  (proactiveRefreshTimer as ReturnType<typeof setInterval>).unref();
+}

@@ -204,6 +204,7 @@ const CoachSectionEditable = ({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       rows={rows}
+      maxLength={5000}
     />
   </div>
 );
@@ -1028,16 +1029,17 @@ function InterviewStatusBar({ status }: { status: InterviewStatus }) {
         const Icon = phase.icon;
         const isDone = i < currentIndex;
         const isCurrent = i === currentIndex;
+        const isTerminal = isCurrent && i === INTERVIEW_PHASES.length - 1;
         return (
           <div key={phase.key} className="flex items-center gap-1">
             {i > 0 && (
-              <div className={`h-0.5 w-3 rounded ${isDone ? "bg-emerald-500" : "bg-muted"}`} />
+              <div className={`h-0.5 w-3 rounded ${isDone || isTerminal ? "bg-emerald-500" : "bg-muted"}`} />
             )}
             <div className={`flex h-6 items-center gap-1 rounded-full px-2 text-[10px] font-medium ${
-              isCurrent
-                ? "bg-primary/10 text-primary"
-                : isDone
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+              isTerminal || isDone
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                : isCurrent
+                  ? "bg-primary/10 text-primary"
                   : "bg-muted text-muted-foreground"
             }`}>
               <Icon className="h-3 w-3" />

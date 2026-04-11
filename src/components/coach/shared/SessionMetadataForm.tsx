@@ -70,6 +70,7 @@ export function SessionMetadataForm({
                   onChange={(e) => onNameChange(e.target.value)}
                   placeholder="Nom de la séance"
                   className="rounded-2xl"
+                  maxLength={200}
                 />
               </div>
             </div>

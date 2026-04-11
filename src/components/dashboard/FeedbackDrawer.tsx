@@ -384,6 +384,7 @@ export function FeedbackDrawer({
   const [unexpectedExpanded, setUnexpectedExpanded] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [showMissing, setShowMissing] = useState(false);
 
   const activeSession = useMemo(() => {
     if (!activeSessionId) return null;
@@ -847,8 +848,16 @@ export function FeedbackDrawer({
                               >
                                 {INDICATORS.map((ind) => {
                                   const selected = draftState[ind.key];
+                                  const isMissing = showMissing && !Number.isInteger(selected);
                                   return (
-                                    <motion.div key={ind.key} className="space-y-2" variants={listItem}>
+                                    <motion.div
+                                      key={ind.key}
+                                      className={cn(
+                                        "space-y-2 rounded-2xl p-2 -mx-2 transition",
+                                        isMissing && "ring-2 ring-destructive animate-pulse"
+                                      )}
+                                      variants={listItem}
+                                    >
                                       <div className={cn("text-sm font-semibold", !canRate ? "text-muted-foreground" : "text-foreground")}>{ind.label}</div>
                                       <div className="flex items-center gap-1.5">
                                         <span className="text-[10px] text-muted-foreground w-14 text-right shrink-0 leading-tight">
@@ -892,6 +901,7 @@ export function FeedbackDrawer({
                                     onChange={(e) => onDraftStateChange({ ...draftState, comment: e.target.value })}
                                     disabled={!canRate}
                                     rows={3}
+                                    maxLength={2000}
                                     placeholder="Sensations, points techniques…"
                                     className={cn(
                                       "w-full resize-none rounded-3xl border px-4 py-3 text-sm outline-none",
@@ -980,23 +990,40 @@ export function FeedbackDrawer({
               {activeSession && (() => {
                 const st = getSessionStatus(activeSession, selectedDate);
                 const canRate = st.expected && st.status !== "absent";
+                const allFilled = INDICATORS.every((i) => Number.isInteger(draftState[i.key]));
+                const isDisabled = isPending || !canRate || !allFilled;
                 return (
                   <BottomActionBar saveState={saveState} position="static">
-                    <button
-                      type="button"
-                      onClick={onSaveFeedback}
-                      disabled={isPending || !canRate || !INDICATORS.every((i) => Number.isInteger(draftState[i.key]))}
-                      className={cn(
-                        "rounded-2xl px-4 py-3 text-sm font-semibold transition flex-1",
-                        isPending || !canRate
-                          ? "bg-muted text-muted-foreground cursor-not-allowed"
-                          : INDICATORS.every((i) => Number.isInteger(draftState[i.key]))
-                          ? "bg-status-success text-white hover:opacity-90"
-                          : "bg-status-success-bg text-status-success cursor-not-allowed"
-                      )}
+                    <div
+                      className="flex-1 flex flex-col items-stretch"
+                      onClick={() => {
+                        if (isDisabled && canRate && !allFilled) {
+                          setShowMissing(true);
+                          setTimeout(() => setShowMissing(false), 2000);
+                        }
+                      }}
                     >
-                      Valider
-                    </button>
+                      <button
+                        type="button"
+                        onClick={onSaveFeedback}
+                        disabled={isDisabled}
+                        className={cn(
+                          "rounded-2xl px-4 py-3 text-sm font-semibold transition w-full",
+                          isPending || !canRate
+                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                            : allFilled
+                            ? "bg-status-success text-white hover:opacity-90"
+                            : "bg-status-success-bg text-status-success cursor-not-allowed"
+                        )}
+                      >
+                        Valider
+                      </button>
+                      {showMissing && (
+                        <div className="text-destructive text-xs text-center mt-1 font-medium">
+                          Remplis les 4 indicateurs
+                        </div>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">{"→"} km</div>
                   </BottomActionBar>
                 );

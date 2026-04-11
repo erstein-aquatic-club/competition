@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getChronoRecords, deleteChronoRecord, updateChronoRecord } from "../../lib/api/chrono-records";
 import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
@@ -19,6 +19,7 @@ import {
 } from "../../components/ui/alert-dialog";
 import { Trash2, Timer } from "lucide-react";
 import { toast } from "sonner";
+import CoachBreadcrumb from "../../components/shared/CoachBreadcrumb";
 
 interface Props {
   onBack: () => void;
@@ -160,10 +161,19 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
     );
   }
 
+  const breadcrumbSegments = useMemo(
+    () => [
+      { label: 'Chrono', href: '#/coach?section=chrono' },
+      { label: 'Historique' },
+    ],
+    [],
+  );
+
   // --- List view ---
 
   return (
     <div className="flex flex-col gap-4">
+      <CoachBreadcrumb segments={breadcrumbSegments} />
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onBack}>
           ← Retour

@@ -265,6 +265,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Notes (optionnel)"
           rows={2}
+          maxLength={1000}
           className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none"
         />
       </div>

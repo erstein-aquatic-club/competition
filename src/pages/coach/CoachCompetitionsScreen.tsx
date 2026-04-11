@@ -272,6 +272,7 @@ const CompetitionFormSheet = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="text-[15px] font-medium"
+                maxLength={200}
               />
             </div>
 
@@ -329,6 +330,7 @@ const CompetitionFormSheet = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
+                maxLength={2000}
                 className="resize-none"
               />
             </div>

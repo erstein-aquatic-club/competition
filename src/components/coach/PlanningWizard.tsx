@@ -371,6 +371,7 @@ export default function PlanningWizard({
                     className="text-xs min-h-[40px]"
                     placeholder="Ex : Améliorer la coulée de dos"
                     rows={2}
+                    maxLength={1000}
                     value={obj.text}
                     onChange={(e) => updateObjective(idx, { text: e.target.value })}
                   />

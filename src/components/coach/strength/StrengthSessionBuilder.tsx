@@ -164,6 +164,7 @@ export function StrengthSessionBuilder({
                     onChange={(e) => onSessionChange({ ...session, description: e.target.value })}
                     placeholder="Description optionnelle..."
                     className="rounded-2xl min-h-[60px]"
+                    maxLength={2000}
                   />
                 </div>
               </div>
