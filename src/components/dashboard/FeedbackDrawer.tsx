@@ -809,7 +809,9 @@ export function FeedbackDrawer({
                     return card;
                   };
 
-                  const allEmpty = primarySessions.every((s) => s.isEmpty) && visibleUnexpected.length === 0;
+                  // Show rest only if swimmer has NO personal slots for this day (legacy path with all empty)
+                  const hasPersonalSlots = primarySessions.some((s) => s.swimmerSlotId);
+                  const allEmpty = !hasPersonalSlots && primarySessions.every((s) => s.isEmpty) && visibleUnexpected.length === 0;
 
                   if (allEmpty && primarySessions.length > 0) {
                     return (
