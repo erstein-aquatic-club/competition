@@ -194,12 +194,13 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 bg-background"
+          className="fixed inset-0 z-50 bg-background overflow-hidden"
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 28, stiffness: 300 }}
         >
+          <div className="max-w-lg mx-auto md:max-w-3xl lg:max-w-4xl h-full flex flex-col">
           {/* ── Header ── */}
           <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b">
             <div className="px-4 pt-3 pb-3">
@@ -220,7 +221,7 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
           </div>
 
           {/* ── Timeline (same layout as coach view) ── */}
-          <div className="overflow-y-auto h-[calc(100dvh-56px)]">
+          <div className="overflow-y-auto flex-1">
             <div className="relative px-4 pt-3 pb-24">
               {/* Vertical rail */}
               <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
@@ -374,6 +375,8 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
               <div ref={sentinelRef} className="h-4" />
             </div>
           </div>
+
+          </div>{/* close max-w wrapper */}
 
           {/* ── Filiere Detail Sheet ── */}
           <Sheet open={!!selectedFiliere} onOpenChange={(o) => !o && setSelectedFiliere(null)}>
