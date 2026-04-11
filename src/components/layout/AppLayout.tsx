@@ -19,6 +19,7 @@ const COACH_SECTION_LABELS: Record<string, string> = {
   competitions: "Échéances",
   comms: "Communications",
   chrono: "Chrono",
+  "chrono-history": "Historique Chronos",
 };
 
 /** Fired when user taps the nav icon for the page they're already on. */

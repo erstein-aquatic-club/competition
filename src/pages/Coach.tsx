@@ -16,6 +16,7 @@ import {
   UserCheck,
   Users,
   UsersRound,
+  Timer,
   Waves,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
@@ -28,12 +29,13 @@ const CoachWeekView = lazy(() => import("./coach/CoachWeekView"));
 const CoachLibrary = lazy(() => import("./coach/CoachLibrary"));
 const CoachComms = lazy(() => import("./coach/CoachComms"));
 const CoachChronoScreen = lazy(() => import("./coach/CoachChronoScreen"));
+const CoachChronoHistoryScreen = lazy(() => import("./coach/CoachChronoHistoryScreen"));
 const CoachMySwimmersScreen = lazy(() => import("./coach/CoachMySwimmersScreen"));
 const CoachCommentsScreen = lazy(() => import("./coach/CoachCommentsScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
 
-type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms" | "chrono" | "my-swimmers" | "comments";
+type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms" | "chrono" | "chrono-history" | "my-swimmers" | "comments";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -205,6 +207,7 @@ const CoachHome = ({
       { label: "Mes nageurs", icon: UserCheck, action: () => onNavigate("my-swimmers"), color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
       { label: "Comms", icon: BellRing, action: () => onNavigate("comms"), color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900/30" },
       { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-900/30" },
+      { label: "Chronos", icon: Timer, action: () => onNavigate("chrono-history"), color: "text-rose-500", bg: "bg-rose-100 dark:bg-rose-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
     [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning],
@@ -834,6 +837,18 @@ export default function Coach() {
       {activeSection === "chrono" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachChronoScreen athletes={myAthletes} allAthletes={athletes} />
+        </Suspense>
+      ) : null}
+
+      {activeSection === "chrono-history" ? (
+        <Suspense fallback={<PageSkeleton />}>
+          <CoachChronoHistoryScreen
+            onSelect={(record) => {
+              // For now, just log — Task 6 will wire this to the editor
+              console.log("Selected record:", record.id);
+            }}
+            onBack={() => setActiveSection("home")}
+          />
         </Suspense>
       ) : null}
 
