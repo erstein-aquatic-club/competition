@@ -97,6 +97,53 @@ export const getRoleLabel = (role: string | null) => {
 
 const getNeurotypName = (code: string) => NEUROTYPE_PROFILES[code as NeurotypCode]?.name ?? code;
 
+const THEME_OPTIONS = [
+  { value: "light", label: "Clair", icon: Sun },
+  { value: "dark", label: "Sombre", icon: Moon },
+  { value: "system", label: "Système", icon: Monitor },
+] as const;
+
+function ThemeSelector() {
+  const [theme, setTheme] = useState<string>(
+    () => localStorage.getItem("eac-theme") ?? "light"
+  );
+
+  const handleChange = (value: string) => {
+    setTheme(value);
+    localStorage.setItem("eac-theme", value);
+    window.dispatchEvent(new Event("eac-theme-change"));
+  };
+
+  const current = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[0];
+  const CurrentIcon = current.icon;
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+          <CurrentIcon className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Apparence</p>
+          <p className="text-xs text-muted-foreground">{current.label}</p>
+        </div>
+        <Select value={theme} onValueChange={handleChange}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {THEME_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 function ProfileActionRow({
   icon: Icon,
   title,
