@@ -102,6 +102,11 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
     localStorage.removeItem(BACKUP_KEY);
   }, []);
 
+  const handleSaveDraft = useCallback(() => {
+    localStorage.removeItem(BACKUP_KEY);
+    dispatch({ type: "RESET_FOR_NEW_SERIES" });
+  }, []);
+
   const isRacing = state.phase === "racing" && state.waves.some((w) => w.startedAt && !w.stopped);
   const { now, getTimestamp } = useChronoTimer(isRacing);
 
@@ -148,7 +153,7 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
             <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} isMobile={isMobile} />
           )}
           {state.phase === "results" && (
-            <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} />
+            <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} onSaveDraft={handleSaveDraft} />
           )}
         </div>
       )}
