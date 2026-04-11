@@ -65,13 +65,6 @@ export const DayCell = memo(function DayCell({
 
   const amSlot = slots.find((s) => s.slotKey === "AM");
   const pmSlot = slots.find((s) => s.slotKey === "PM");
-  const hasSlotTimes = expectedSlots.some((s) => s.slotTime);
-
-  /** Extract just the start hour (e.g. "17:00-18:00" -> "17h") for compact display */
-  const shortTime = (slotTime: string) => {
-    const h = slotTime.split("-")[0]?.split(":")[0];
-    return h ? `${h}h` : "";
-  };
 
   return (
     <button
@@ -105,44 +98,25 @@ export const DayCell = memo(function DayCell({
         <div className="flex items-center justify-end gap-1">
           {hasCompetition ? null : isRest && !strengthAssigned ? (
             <Moon className="h-3 w-3 text-muted-foreground/40" />
-          ) : hasSlotTimes ? (
-            <>
-              <div className="flex items-center gap-0.5">
-                {expectedSlots.map((slot, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      "text-[10px] font-semibold leading-none px-0.5 rounded",
-                      slot.completed
-                        ? "text-status-success"
-                        : slot.absent
-                        ? "text-muted-foreground/30"
-                        : "text-muted-foreground/60"
-                    )}
-                  >
-                    {slot.slotTime ? shortTime(slot.slotTime) : (slot.slotKey === "AM" ? "AM" : "PM")}
-                  </span>
-                ))}
-              </div>
-              {strengthAssigned ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
-              ) : null}
-            </>
           ) : (
             <>
               <div className="flex items-center gap-1">
-                <span
-                  className={cn(
-                    "inline-flex h-2 w-3 rounded-full",
-                    slotPillTone(amSlot),
-                  )}
-                />
-                <span
-                  className={cn(
-                    "inline-flex h-2 w-3 rounded-full",
-                    slotPillTone(pmSlot),
-                  )}
-                />
+                {expectedSlots.length > 0 ? (
+                  expectedSlots.map((slot, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        "inline-flex h-2 w-3 rounded-full",
+                        slotPillTone(slot),
+                      )}
+                    />
+                  ))
+                ) : (
+                  <>
+                    <span className={cn("inline-flex h-2 w-3 rounded-full", slotPillTone(amSlot))} />
+                    <span className={cn("inline-flex h-2 w-3 rounded-full", slotPillTone(pmSlot))} />
+                  </>
+                )}
               </div>
               {strengthAssigned ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />

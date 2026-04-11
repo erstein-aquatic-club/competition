@@ -505,6 +505,7 @@ export default function Dashboard() {
     setDetailsOpen(false);
     setAutoCloseArmed(false);
     setSelectedDayIndex(null);
+    setAlternativeOverride(null);
   }, [setDrawerOpen, setActiveSessionId, setDetailsOpen, setAutoCloseArmed, setSelectedDayIndex]);
 
   const prevMonth = useCallback(() => {
