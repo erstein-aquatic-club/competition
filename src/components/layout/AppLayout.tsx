@@ -8,7 +8,6 @@ import { getNavItemsForRole } from "@/components/layout/navItems";
 import { OfflineDetector } from "@/components/shared/OfflineDetector";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
-import { Bell, User } from "lucide-react";
 
 const COACH_SECTION_LABELS: Record<string, string> = {
   home: "Accueil",
@@ -148,29 +147,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="container max-w-lg mx-auto p-4 md:max-w-3xl lg:max-w-4xl">
-        {/* Coach Header — section title + avatar + bell */}
-        {role === "coach" && (() => {
+        {/* Coach Header — section title */}
+        {(role === "coach" || role === "admin") && (() => {
           const hashSection = hash.match(/[?&]section=([^&]+)/)?.[1] || "home";
           const sectionLabel = COACH_SECTION_LABELS[hashSection] || hashSection;
           return (
             <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-background/95 backdrop-blur px-4 py-2 border-b border-border/40">
               <span className="text-base font-bold tracking-tight text-foreground">{sectionLabel}</span>
-              <div className="flex items-center gap-1.5">
-                <a
-                  href="#/profile"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label="Profil"
-                >
-                  <User className="h-4 w-4" />
-                </a>
-                <a
-                  href="#/coach?section=comms"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-4 w-4" />
-                </a>
-              </div>
             </div>
           );
         })()}

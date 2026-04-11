@@ -10,7 +10,7 @@ test("Coach nav items include expected labels", () => {
   assert.ok(labels.includes("Nageurs"));
   assert.ok(labels.includes("Biblio"));
   assert.ok(labels.includes("Home"));
-  assert.ok(labels.includes("Chrono"));
+  assert.ok(labels.includes("Profil"));
 });
 
 test("Admin nav items match coach nav items", () => {
