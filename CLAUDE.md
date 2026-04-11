@@ -231,6 +231,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Fait (§99) |
 | 63 | Historique Chronos + Éditeur Splits | Haute | Fait (§98) |
 | 64 | Remédiation audit (sécurité, perf, UX, robustesse) | Haute | Fait (§100) |
+| 65 | Refonte assignation avec héritage créneau perso | Haute | Fait (§101) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

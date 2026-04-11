@@ -7634,3 +7634,37 @@ Les nageurs peuvent laisser un commentaire textuel dans leur ressenti de séance
 **Tests** : `npx tsc --noEmit` — 3 erreurs préexistantes uniquement, aucune régression
 **Design doc** : `docs/plans/2026-04-11-audit-remediation-design.md`
 **Plan** : `docs/plans/2026-04-11-audit-remediation-plan.md`
+
+## §101 — Refonte Système d'Assignation avec Héritage
+
+**Date** : 2026-04-11
+**Contexte** : Le système AM/PM ne supportait pas les créneaux perso, l'héritage de séance, la priorité individuel>groupe, ni le feedback multi-slot.
+
+### Migration DB (00086)
+- `dim_sessions.assignment_id` FK → lie chaque feedback à une assignation spécifique
+- Dedup split : `(athlete_id, session_date, assignment_id)` quand lié, `(athlete_id, session_date, time_slot)` en legacy
+- `session_assignments.target_subgroup_id` pour le ciblage sous-groupe
+- RLS interviews scopé au coach assigné (plus tous les coachs)
+- `save_strength_run_atomic` : check FOUND après UPDATE assignment
+
+### API (Phase A)
+- `resolveSwimmerAssignments(userId, date)` : résout séance par créneau perso avec priorité individuel > sous-groupe > groupe
+- Type `ResolvedSlotAssignment` : slotTime, source, alternatives
+
+### Dashboard (Phases B-C)
+- `PlannedSession` enrichi : slotTime, slotLocation, assignmentSource, alternatives, swimmerSlotId
+- `getSessionsForISO` : branche swimmer slots → résolution par créneau, fallback AM/PM
+- `getLogForSession` : bridge nouveau format `iso__<uuid>` vers legacy `Matin/Soir`
+- Session ID : `iso__<swimmerSlotId>` (nouveau) ou `iso__AM/PM` (legacy)
+
+### Feedback (Phase D)
+- `assignment_id` passé dans syncSession/updateSession → dim_sessions INSERT/UPDATE
+
+### UI (Phase E)
+- FeedbackDrawer : heure créneau affichée, badge "Séance personnalisée", section alternatives collapsible
+- Calendar DayCell : labels horaires compacts (17h) au lieu de pills AM/PM
+- Coach : `bulkCreateSlotAssignments` accepte `targetSubgroupId`
+
+**Fichiers modifiés** : 12 fichiers (types, assignments, helpers, api, useDashboardState, Dashboard, FeedbackDrawer, DayCell, CalendarGrid, SlotSessionSheet)
+**Tests** : `npx tsc --noEmit` — 3 erreurs préexistantes uniquement
+**Design doc** : `docs/plans/2026-04-11-assignment-inheritance-design.md`
