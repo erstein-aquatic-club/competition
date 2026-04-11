@@ -69,54 +69,57 @@ export default function CoachWeekView({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {/* Toggle bar */}
-      <div className="flex justify-end">
-        <div className="flex gap-1.5 rounded-xl border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => switchMode("week")}
-            className={[
-              "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              mode === "week"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            ].join(" ")}
-          >
-            <CalendarDays className="h-4 w-4" />
-            Semaine
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode("month")}
-            className={[
-              "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              mode === "month"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            ].join(" ")}
-          >
-            <CalendarRange className="h-4 w-4" />
-            Mois
-          </button>
-        </div>
-      </div>
+  const modeToggle = (
+    <div className="flex gap-1 rounded-xl border bg-card p-0.5">
+      <button
+        type="button"
+        onClick={() => switchMode("week")}
+        className={[
+          "flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+          mode === "week"
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        ].join(" ")}
+      >
+        <CalendarDays className="h-3.5 w-3.5" />
+        Semaine
+      </button>
+      <button
+        type="button"
+        onClick={() => switchMode("month")}
+        className={[
+          "flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+          mode === "month"
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        ].join(" ")}
+      >
+        <CalendarRange className="h-3.5 w-3.5" />
+        Mois
+      </button>
+    </div>
+  );
 
+  return (
+    <div className="space-y-2">
       {/* Content */}
       <Suspense fallback={<PageSkeleton />}>
         {mode === "week" ? (
           <CoachTrainingSlotsScreen
             groups={groups}
             onOpenLibrary={handleOpenLibrary}
+            modeToggle={modeToggle}
           />
         ) : (
-          <CoachCalendar
-            athletes={athletes}
-            groups={groups}
-            swimSessions={swimSessions}
-            strengthSessions={strengthSessions}
-          />
+          <>
+            <div className="flex justify-end">{modeToggle}</div>
+            <CoachCalendar
+              athletes={athletes}
+              groups={groups}
+              swimSessions={swimSessions}
+              strengthSessions={strengthSessions}
+            />
+          </>
         )}
       </Suspense>
     </div>

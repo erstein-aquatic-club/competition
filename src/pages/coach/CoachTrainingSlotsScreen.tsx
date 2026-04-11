@@ -12,7 +12,7 @@ import { computeSlotState, resolveSlotAssignment } from "@/hooks/useSlotCalendar
 import { deriveScheduledSlot } from "@/lib/api/assignments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import CoachSectionHeader from "./CoachSectionHeader";
+
 import SlotSessionSheet from "./SlotSessionSheet";
 import { SlotTemplatePicker } from "./SlotTemplatePicker";
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
@@ -183,6 +183,7 @@ type CoachTrainingSlotsScreenProps = {
   onBack?: () => void;
   groups: Array<{ id: number | string; name: string }>;
   onOpenLibrary?: (context?: SwimLibraryEntryContext) => void;
+  modeToggle?: React.ReactNode;
 };
 
 // (AssignmentRow removed — groups and coaches are now independent multi-select lists)
@@ -1367,6 +1368,7 @@ const CoachTrainingSlotsScreen = ({
   onBack,
   groups,
   onOpenLibrary,
+  modeToggle,
 }: CoachTrainingSlotsScreenProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1760,12 +1762,6 @@ const CoachTrainingSlotsScreen = ({
     display_name: c.display_name,
   }));
 
-  const description =
-    slots.length === 0
-      ? "Planning hebdomadaire des entrainements."
-      : `${slots.length} creneau${slots.length > 1 ? "x" : ""}`;
-
-
   return (
     <div className="space-y-4 pb-24">
       {/* ── Mobile header ── */}
@@ -1810,29 +1806,6 @@ const CoachTrainingSlotsScreen = ({
         </div>
       </div>
 
-      {/* ── Desktop header ── */}
-      <div className="hidden sm:block">
-        <CoachSectionHeader
-          title="Creneaux"
-          description={description}
-          onBack={onBack}
-          actions={
-            <div className="flex items-center gap-2">
-              {onOpenLibrary && (
-                <Button variant="ghost" size="sm" onClick={() => onOpenLibrary()}>
-                  <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-                  Bibliothèque
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={handleCreate}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Nouveau
-              </Button>
-            </div>
-          }
-        />
-      </div>
-
       {/* ── Mobile filter ── */}
       {!slotsLoading && slots.length > 0 && (
         <div className="sm:hidden">
@@ -1859,60 +1832,70 @@ const CoachTrainingSlotsScreen = ({
         </div>
       )}
 
-      {/* ── Desktop week navigation + filters ── */}
-      <div className="hidden sm:block space-y-3">
-        {/* Week nav bar */}
-        <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={prevWeek}>
-            <ChevronLeft className="h-4 w-4" />
+      {/* ── Desktop: single compact toolbar ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        {/* Week navigation */}
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={prevWeek}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-sm font-semibold hover:bg-muted/50 transition-colors"
+          onClick={goToday}
+          title="Revenir à cette semaine"
+        >
+          <span className="text-primary">S{weekNumber}</span>
+          <span className="text-muted-foreground text-xs font-normal">
+            {formatDayMonth(weekMonday)} – {formatDayMonth(weekSunday)}
+          </span>
+        </button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={nextWeek}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+
+        {/* Filter */}
+        <Select value={filterValue} onValueChange={setFilterValue}>
+          <SelectTrigger className="w-44 h-8 text-xs">
+            <SelectValue placeholder="Filtrer..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les créneaux</SelectItem>
+            <SelectSeparator />
+            {groups.map((g) => (
+              <SelectItem key={g.id} value={`group:${g.id}`}>
+                {g.name}
+              </SelectItem>
+            ))}
+            {coaches.length > 0 && <SelectSeparator />}
+            {coaches.map((c) => (
+              <SelectItem key={c.id} value={`coach:${c.id}`}>
+                {c.display_name}
+              </SelectItem>
+            ))}
+            {athletes.length > 0 && <SelectSeparator />}
+            {athletes.map((a) => (
+              <SelectItem key={`swimmer:${a.id}`} value={`swimmer:${a.id}`}>
+                {a.display_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Actions + mode toggle */}
+        {onOpenLibrary && (
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
+            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+            Bibliothèque
           </Button>
-
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-sm font-semibold hover:bg-muted/50 transition-colors"
-            onClick={goToday}
-            title="Revenir a cette semaine"
-          >
-            <span className="text-primary">S{weekNumber}</span>
-            <span className="text-muted-foreground text-xs font-normal">
-              {formatDayMonth(weekMonday)} – {formatDayMonth(weekSunday)}
-            </span>
-          </button>
-
-          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={nextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-row items-center gap-3">
-          <Select value={filterValue} onValueChange={setFilterValue}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Filtrer..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les créneaux</SelectItem>
-              <SelectSeparator />
-              {groups.map((g) => (
-                <SelectItem key={g.id} value={`group:${g.id}`}>
-                  {g.name}
-                </SelectItem>
-              ))}
-              {coaches.length > 0 && <SelectSeparator />}
-              {coaches.map((c) => (
-                <SelectItem key={c.id} value={`coach:${c.id}`}>
-                  {c.display_name}
-                </SelectItem>
-              ))}
-              {athletes.length > 0 && <SelectSeparator />}
-              {athletes.map((a) => (
-                <SelectItem key={`swimmer:${a.id}`} value={`swimmer:${a.id}`}>
-                  {a.display_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        )}
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreate}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Nouveau
+        </Button>
+        {modeToggle}
       </div>
 
       {/* ── Content ── */}
