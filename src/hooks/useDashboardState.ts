@@ -533,8 +533,13 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           };
         });
 
-        cache.set(iso, list);
-        return list;
+        // Filter out empty slots (no assignment) — only show slots that have a session
+        // If ALL slots are empty, keep them so the day shows as "rest"
+        const nonEmpty = list.filter((s) => !s.isEmpty);
+        const result = nonEmpty.length > 0 ? nonEmpty : list;
+
+        cache.set(iso, result);
+        return result;
       }
 
       // ── LEGACY PATH: no swimmer slots, use AM/PM ──
