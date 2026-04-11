@@ -432,7 +432,8 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
       return undefined;
     },
-    [logsBySessionId, swimmerSlots],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sessionsCacheRef is invalidated when assignmentsByIso changes
+    [logsBySessionId, swimmerSlots, assignmentsByIso],
   );
 
   const sessionsCacheRef = useRef<Map<string, PlannedSession[]>>(new Map());
