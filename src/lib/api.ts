@@ -500,6 +500,9 @@ export const api = {
         fatigue: expandScaleToTen(session.feeling),
         comments: session.comments,
       };
+      if (session.assignment_id != null) {
+        dbPayload.assignment_id = session.assignment_id;
+      }
       const { error } = await supabase.from("dim_sessions").update(dbPayload).eq("id", session.id);
       if (error) throw new Error(error.message);
       return { status: "updated" };

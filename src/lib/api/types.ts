@@ -25,6 +25,7 @@ export interface Session {
   comments: string;
   coach_notes?: string | null;
   stroke_distances?: StrokeDistances | null;
+  assignment_id?: number | null;
   created_at: string;
 }
 
@@ -355,6 +356,7 @@ export interface SyncSessionInput {
   duration: number;
   comments: string;
   stroke_distances?: StrokeDistances | null;
+  assignment_id?: number | null;
 }
 
 export interface StrengthRunPayload {

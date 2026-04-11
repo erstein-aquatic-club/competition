@@ -612,6 +612,7 @@ export default function Dashboard() {
       athlete_name: user!,
       athlete_id: userId ?? undefined,
       stroke_distances: Object.keys(strokeDistances).length > 0 ? strokeDistances : null,
+      assignment_id: activeSession?.assignmentId ?? null,
     };
 
     const existing = getLogForSession(activeSessionId);

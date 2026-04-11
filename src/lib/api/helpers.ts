@@ -116,6 +116,9 @@ export const mapToDbSession = (session: SyncSessionInputWithId): Record<string, 
   if (session.stroke_distances) {
     payload.stroke_distances = session.stroke_distances;
   }
+  if (session.assignment_id != null) {
+    payload.assignment_id = session.assignment_id;
+  }
   return payload;
 };
 
