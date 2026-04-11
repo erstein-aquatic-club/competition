@@ -1620,26 +1620,37 @@ const CoachTrainingSlotsScreen = ({
     [timelineRange],
   );
 
-  // Measure available height for the desktop timeline
+  // Measure available viewport height below the timeline container
   const timelineContainerRef = useRef<HTMLDivElement>(null);
-  const [timelineContainerH, setTimelineContainerH] = useState(0);
+  const [availableHeight, setAvailableHeight] = useState(0);
 
   useEffect(() => {
     const el = timelineContainerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setTimelineContainerH(entry.contentRect.height);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      // Available = viewport bottom - element top - small bottom padding
+      const h = window.innerHeight - rect.top - 16;
+      setAvailableHeight(Math.max(200, h));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.body);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, []);
 
-  // Dynamic px per hour: fill the container, min 32px/h for readability
+  // Dynamic px per hour: fill available space, min 28px/h for readability
   const dynamicPxPerHour = useMemo(() => {
-    if (timelineContainerH <= 0) return PX_PER_HOUR; // fallback
-    const ideal = timelineContainerH / timelineRange.hours;
-    return Math.max(32, ideal);
-  }, [timelineContainerH, timelineRange.hours]);
+    if (availableHeight <= 0) return PX_PER_HOUR; // fallback
+    // Reserve ~28px for day headers row
+    const usable = availableHeight - 28;
+    const ideal = usable / timelineRange.hours;
+    return Math.max(28, ideal);
+  }, [availableHeight, timelineRange.hours]);
 
   const dynamicTimelineHeight = timelineRange.hours * dynamicPxPerHour;
 
@@ -1987,14 +1998,12 @@ const CoachTrainingSlotsScreen = ({
           <div
             ref={timelineContainerRef}
             className="hidden sm:block overflow-x-auto -mx-4 px-4"
-            style={{ height: "calc(100vh - 220px)", minHeight: "320px" }}
           >
             <div
-              className="grid h-full"
+              className="grid"
               style={{
                 minWidth: "760px",
                 gridTemplateColumns: "2.5rem repeat(7, 1fr)",
-                gridTemplateRows: "auto 1fr",
               }}
             >
               {/* ── Day headers row ── */}
