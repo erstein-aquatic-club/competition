@@ -678,10 +678,14 @@ export async function resolveSwimmerAssignmentsBatch(
         sourceTrainingSlotId && String(row.training_slot_id) === sourceTrainingSlotId
       );
 
+      // Try individual match by training_slot_id first
       if (individualMatch) {
         resolved = individualMatch;
         source = 'individual';
-      } else if (sourceTrainingSlotId) {
+      }
+
+      // Try group match by training_slot_id
+      if (!resolved && sourceTrainingSlotId) {
         const slotAssignments = assignmentsByTrainingSlotId.get(sourceTrainingSlotId) ?? [];
         const groupAssignments = slotAssignments.filter(
           (row) => row.target_group_id && visibleGroupIds.includes(row.target_group_id),
@@ -710,6 +714,47 @@ export async function resolveSwimmerAssignmentsBatch(
             km: getTotalKm(row),
             subgroupName: undefined,
           });
+        }
+      }
+
+      // Fallback: training_slot_id mismatch (swimmer slots may reference old training_slots).
+      // Match by timing bucket (morning/evening) + group membership.
+      if (!resolved) {
+        const hour = parseInt(slot.start_time.split(":")[0], 10);
+        const slotBucket = hour < 13 ? "morning" : "evening";
+
+        // Try individual by timing
+        const indByTiming = individualAssignments.find(
+          (row) => row.scheduled_slot === slotBucket || (!row.scheduled_slot && !row.training_slot_id),
+        );
+        if (indByTiming) {
+          resolved = indByTiming;
+          source = 'individual';
+        } else {
+          // Try group by timing
+          const groupByTiming = assignments.filter(
+            (row) =>
+              !row.target_user_id &&
+              row.target_group_id && visibleGroupIds.includes(row.target_group_id) &&
+              (row.scheduled_slot === slotBucket ||
+                (!row.scheduled_slot && row.training_slot_id &&
+                  (parseInt(slot.start_time.split(":")[0], 10) >= 13) === (row.scheduled_slot !== "morning"))),
+          );
+          // Deduplicate: don't pick an assignment already matched to another swimmer slot
+          const alreadyUsedIds = new Set(dateResults.map((r) => r.assignmentId).filter(Boolean));
+          const availableGroup = groupByTiming.filter((row) => !alreadyUsedIds.has(safeInt(row.id, 0)));
+          if (availableGroup.length > 0) {
+            resolved = availableGroup[0];
+            source = 'group';
+            for (let i = 1; i < availableGroup.length; i++) {
+              alternatives.push({
+                assignmentId: safeInt(availableGroup[i].id, 0),
+                title: toAssignment(availableGroup[i], date).title,
+                km: getTotalKm(availableGroup[i]),
+                subgroupName: undefined,
+              });
+            }
+          }
         }
       }
 
