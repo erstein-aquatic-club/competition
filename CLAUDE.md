@@ -134,6 +134,9 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/chrono/ChronoRace.tsx` | Phase course chrono (GO, splits, chrono live) | ~340 lignes |
 | `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono (splits, export) | ~245 lignes |
 | `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage | ~135 lignes |
+| `src/lib/api/chrono-records.ts` | CRUD chrono records (historique coach) | ~80 lignes |
+| `src/pages/coach/CoachChronoHistoryScreen.tsx` | Historique chronos + éditeur intégré | ~200 lignes |
+| `src/components/chrono/ChronoSplitEditor.tsx` | Éditeur splits (distance recalibrable, tabs) | ~200 lignes |
 | `src/lib/api/coach-assignments.ts` | CRUD attributions coach ↔ nageur (§98) | ~110 lignes |
 | `src/hooks/useMySwimmerIds.ts` | Hook filtrage nageurs par coach + helper filterByAssignment (§98) | ~45 lignes |
 | `src/pages/coach/CoachMySwimmersScreen.tsx` | Écran gestion attribution nageurs coach/admin (§98) | ~555 lignes |
@@ -223,6 +226,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 60 | Chrono Coach (split timer poolside tablette) | Haute | Fait (§97) |
 | 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Fait (§98) |
 | 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Fait (§99) |
+| 63 | Historique Chronos + Éditeur Splits | Haute | Fait (§98) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

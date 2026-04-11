@@ -7564,3 +7564,28 @@ Les nageurs peuvent laisser un commentaire textuel dans leur ressenti de séance
 - Fenêtre 48h pour le badge home (commentaires plus anciens accessibles via la liste complète)
 - Réutilisation du pipeline push existant (notifications → notification_targets → webhook → push-send)
 - Pas de `since` dans l'API — filtrage client-side pour les 48h (volume faible, max 20 items)
+
+## §98 — Historique Chronos + Éditeur Splits
+
+**Date** : 2026-04-11
+**Contexte** : Persistance des séries chrono en DB, historique consultable, éditeur de splits avec recalage des distances avant envoi aux nageurs.
+
+**Changements** :
+- Migration `00078_chrono_records.sql` — table `chrono_records` (UUID, coach_id, status, label, config JSONB, swimmers JSONB, RLS coach)
+- Migration `00077_coach_insert_swim_logs.sql` — RLS coach INSERT/UPDATE/DELETE sur `swim_exercise_logs`
+- Créé `src/lib/api/chrono-records.ts` — CRUD (get, create, update, delete)
+- Types `ChronoRecord`, `ChronoRecordInput`, `ChronoRecordSwimmer`, `ChronoRecordSplit`, `ChronoRecordConfig` dans `types.ts`
+- Modifié `src/components/chrono/ChronoResults.tsx` — bouton "Brouillon" + sauvegarde chrono_record sur envoi
+- Créé `src/pages/coach/CoachChronoHistoryScreen.tsx` — liste historique chronos + vue éditeur intégrée
+- Créé `src/components/chrono/ChronoSplitEditor.tsx` — tableau éditable (distance recalibrable, suppression splits, tabs nageur/série)
+- Modifié `src/pages/Coach.tsx` — section "chrono-history" + raccourci home "Chronos" (Timer rose)
+- Modifié `src/pages/coach/CoachChronoScreen.tsx` — callback onSaveDraft (reset après brouillon)
+- Fix export nageurs : résolution UUID auth via RPC `get_auth_uid_for_user` + RLS coach INSERT
+
+**Fichiers modifiés** : 10+ fichiers (4 créés, 6+ modifiés, 2 migrations)
+**Tests** : Compilation TypeScript OK
+**Décisions** :
+- Table chrono_records avec JSONB pour swimmers/config (flexible, pas de tables de jointure)
+- Splits portent leur distanceM individuellement (pas calculé) pour le recalage
+- Envoi via resolveAuthUid (integer→UUID) + createStandaloneSwimLog
+- Brouillon sauvegardé en DB (pas localStorage) pour la fiabilité

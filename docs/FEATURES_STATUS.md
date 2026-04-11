@@ -77,6 +77,7 @@ Tous les feature flags sont activés.
 | Chrono split timer (tablette/desktop) | ✅ | Coach peut chronométrer les splits par ligne/vague et exporter vers profils nageurs |
 | Attribution coach ↔ nageur | ✅ | `coach-assignments.ts`, `CoachMySwimmersScreen.tsx`, `useMySwimmerIds.ts` | 1 coach principal par nageur, écran gestion, filtrage vues, historique (§98) |
 | Commentaires nageurs → push coach | ✅ | `coach-comments.ts`, `CoachCommentsScreen.tsx`, `Coach.tsx` | Push immédiat au coach, badge home 48h, inbox dédié, lu/non-lu (§99) |
+| Historique chronos + éditeur splits | ✅ | `chrono-records.ts`, `CoachChronoHistoryScreen.tsx`, `ChronoSplitEditor.tsx` | Sauvegarde DB, brouillons, édition distances, envoi depuis historique |
 
 ### Musculation — Nageur
 

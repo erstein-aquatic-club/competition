@@ -68,6 +68,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 60 | Chrono Coach (split timer poolside tablette) | Haute | Moyenne | Fait (§97) |
 | 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Moyenne | Fait (§98) |
 | 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Moyenne | Fait (§99) |
+| 63 | Historique Chronos + Éditeur Splits | Haute | Moyenne | Fait (§98) |
 
 ---
 
