@@ -400,6 +400,7 @@ interface FeedbackDrawerProps {
   open: boolean;
   selectedDate: Date;
   sessionsForSelectedDay: PlannedSession[];
+  otherGroupAssignments?: Array<{ id: number; title: string; description: string; assigned_date: string; assigned_slot?: string | null; km?: number | null }>;
   selectedDayStatus: { completed: number; total: number };
   dayKm: string;
   activeSessionId: string | null;
@@ -434,6 +435,7 @@ export function FeedbackDrawer({
   open,
   selectedDate,
   sessionsForSelectedDay,
+  otherGroupAssignments = [],
   selectedDayStatus,
   dayKm,
   activeSessionId,
@@ -467,6 +469,7 @@ export function FeedbackDrawer({
   const dragControls = useDragControls();
   const [, setLocation] = useLocation();
   const [unexpectedExpanded, setUnexpectedExpanded] = useState(false);
+  const [otherGroupExpanded, setOtherGroupExpanded] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showMissing, setShowMissing] = useState(false);
@@ -853,6 +856,56 @@ export function FeedbackDrawer({
                               >
                                 <div className="mt-1 grid gap-2">
                                   {visibleUnexpected.map(renderSessionCard)}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* Other group sessions not in swimmer's personal schedule */}
+                      {otherGroupAssignments.length > 0 && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setOtherGroupExpanded((v) => !v)}
+                            className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
+                          >
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", otherGroupExpanded && "rotate-180")} />
+                            Autres séances du groupe ({otherGroupAssignments.length})
+                          </button>
+                          <AnimatePresence>
+                            {otherGroupExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-1 grid gap-2">
+                                  {otherGroupAssignments.map((a) => (
+                                    <div
+                                      key={a.id}
+                                      className="rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-medium truncate">{a.title}</p>
+                                          {a.assigned_slot && (
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                                              {a.assigned_slot === "morning" ? "Matin" : "Soir"}
+                                            </p>
+                                          )}
+                                        </div>
+                                        {a.km != null && (
+                                          <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+                                            {typeof a.km === "number" ? `${(a.km / 1000).toFixed(1)} km` : ""}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </motion.div>
                             )}

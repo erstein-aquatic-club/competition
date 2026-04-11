@@ -672,6 +672,18 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
   const sessionsForSelectedDay = useMemo(() => getSessionsForISO(selectedISO), [getSessionsForISO, selectedISO]);
 
+  // Other group assignments for the selected day that are NOT in the swimmer's planned sessions
+  const otherGroupAssignments = useMemo(() => {
+    const dayAssignments = assignmentsByIso.get(selectedISO) ?? [];
+    if (dayAssignments.length === 0) return [];
+    const matchedIds = new Set(
+      sessionsForSelectedDay
+        .filter((s) => s.assignmentId)
+        .map((s) => s.assignmentId),
+    );
+    return dayAssignments.filter((a) => !matchedIds.has(a.id));
+  }, [selectedISO, assignmentsByIso, sessionsForSelectedDay]);
+
   const selectedDayStatus = completionByISO[selectedISO] || { completed: 0, total: 2, slots: [{ slotKey: "AM" as const, expected: true, completed: false, absent: false }, { slotKey: "PM" as const, expected: true, completed: false, absent: false }] };
 
   const globalKm = useMemo(() => {
@@ -834,6 +846,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     completionByISO,
     selectedDate,
     sessionsForSelectedDay,
+    otherGroupAssignments,
     selectedDayStatus,
     globalKm,
     dayKm,

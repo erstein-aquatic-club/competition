@@ -405,6 +405,7 @@ export default function Dashboard() {
     completionByISO,
     selectedDate,
     sessionsForSelectedDay,
+    otherGroupAssignments,
     selectedDayStatus,
     globalKm,
     dayKm,
@@ -1020,6 +1021,7 @@ export default function Dashboard() {
           open={drawerOpen}
           selectedDate={selectedDate}
           sessionsForSelectedDay={sessionsForSelectedDay}
+          otherGroupAssignments={otherGroupAssignments}
           selectedDayStatus={selectedDayStatus}
           dayKm={dayKm}
           activeSessionId={activeSessionId}
