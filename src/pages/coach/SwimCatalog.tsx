@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Assignment, SwimSessionItem, SwimSessionTemplate } from "@/lib/api";
 import type { SwimSessionInput, SwimPayloadFields } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,7 +35,7 @@ import { formatSwimSessionDefaultTitle } from "@/lib/date";
 import { calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
 import { normalizeIntensityValue, normalizeEquipmentValue } from "@/lib/swimTextParser";
 import type { SwimBlock, SwimExercise } from "@/lib/swimTextParser";
-import { generateShareToken, getSwimCatalogFolders, createSwimCatalogFolder, deleteSwimCatalogFolder, renameSwimCatalogFolder } from "@/lib/api/swim";
+import { generateShareToken, getSwimCatalogFolders, createSwimCatalogFolder, deleteSwimCatalogFolder, renameSwimCatalogFolder, getSwimSessionsPaginated } from "@/lib/api/swim";
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
 
 interface SwimSessionDraft {
@@ -204,7 +204,6 @@ export default function SwimCatalog({
   const [pendingDeleteSession, setPendingDeleteSession] = useState<SwimSessionTemplate | null>(null);
   const [pendingArchiveSession, setPendingArchiveSession] = useState<SwimSessionTemplate | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sessionsShown, setSessionsShown] = useState(30);
 
   // Folder navigation
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
@@ -232,10 +231,31 @@ export default function SwimCatalog({
     createEmptySession(entryContext?.mode === "create" ? entryContext : null),
   );
 
-  const { data: sessions, isLoading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useQuery({
-    queryKey: ["swim_catalog"],
-    queryFn: () => api.getSwimCatalog()
+  const SWIM_PAGE_SIZE = 20;
+  const {
+    data: sessionPages,
+    isLoading: sessionsLoading,
+    error: sessionsError,
+    refetch: refetchSessions,
+    fetchNextPage: fetchNextSwimPage,
+    hasNextPage: hasNextSwimPage,
+    isFetchingNextPage: isFetchingNextSwimPage,
+  } = useInfiniteQuery({
+    queryKey: ["swim_catalog_paginated", searchQuery, currentFolder],
+    queryFn: ({ pageParam = 0 }) =>
+      getSwimSessionsPaginated({
+        offset: pageParam,
+        limit: SWIM_PAGE_SIZE,
+        search: searchQuery || undefined,
+        folder: currentFolder ?? undefined,
+      }),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.sessions.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
+    initialPageParam: 0,
   });
+  const sessions = sessionPages?.pages.flatMap((p) => p.sessions) ?? [];
 
   const { data: assignments, isLoading: assignmentsLoading, isError: assignmentsError, error: assignmentsErrorObj, refetch: refetchAssignments } = useQuery({
     queryKey: ["coach-assignments"],
@@ -257,7 +277,7 @@ export default function SwimCatalog({
     mutationFn: (path: string) => deleteSwimCatalogFolder(path),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_folders"] });
-      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       setCurrentFolder(null);
     },
   });
@@ -279,7 +299,7 @@ export default function SwimCatalog({
         api.migrateLocalStorageArchive(ids).then(() => {
           window.localStorage.removeItem(ARCHIVED_SWIM_SESSIONS_KEY);
           window.localStorage.setItem(ARCHIVE_MIGRATED_KEY, "true");
-          queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+          queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
         }).catch(() => {
           // Will retry next load
         });
@@ -352,38 +372,24 @@ export default function SwimCatalog({
     [sessions],
   );
 
-  // Filtered + visible sessions
+  // Filtered sessions — search & folder are already handled by the paginated RPC;
+  // archive filter is still applied client-side.
   const visibleSessions = useMemo(() => {
     let filtered = sessions ?? [];
-    const q = searchQuery.trim().toLowerCase();
 
     if (showArchive) {
       filtered = filtered.filter((s) => s.is_archived);
     } else {
       filtered = filtered.filter((s) => !s.is_archived);
-      filtered = filtered.filter((s) => {
-        if (currentFolder === null) return !s.folder;
-        return s.folder === currentFolder;
-      });
-    }
-
-    if (q) {
-      filtered = filtered.filter((s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.description ?? "").toLowerCase().includes(q)
-      );
     }
 
     return filtered;
-  }, [sessions, searchQuery, currentFolder, showArchive]);
-
-  // Reset pagination when filters change
-  useEffect(() => { setSessionsShown(30); }, [searchQuery, currentFolder, showArchive]);
+  }, [sessions, showArchive]);
 
   const createSession = useMutation({
     mutationFn: (data: SwimSessionInput) => api.createSwimSession(data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       setIsCreating(false);
       setNewSession(createEmptySession());
       toast({
@@ -402,7 +408,7 @@ export default function SwimCatalog({
   const deleteSession = useMutation({
     mutationFn: (sessionId: number) => api.deleteSwimSession(sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       setPendingDeleteSession(null);
       toast({ title: "Séance supprimée" });
     },
@@ -419,7 +425,7 @@ export default function SwimCatalog({
     mutationFn: ({ sessionId, archived }: { sessionId: number; archived: boolean }) =>
       api.archiveSwimSession(sessionId, archived),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       setPendingArchiveSession(null);
       toast({
         title: variables.archived ? "Séance archivée" : "Séance restaurée",
@@ -431,7 +437,7 @@ export default function SwimCatalog({
     mutationFn: ({ sessionId, folder }: { sessionId: number; folder: string | null }) =>
       api.moveSwimSession(sessionId, folder),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       setPendingMoveSession(null);
       toast({ title: "Séance déplacée" });
     },
@@ -800,7 +806,7 @@ export default function SwimCatalog({
 
         <div className="mt-4">
           <SessionListView
-            sessions={visibleSessions.slice(0, sessionsShown)}
+            sessions={visibleSessions}
             isLoading={sessionsLoading}
             error={sessionsError}
             renderTitle={renderTitle}
@@ -815,15 +821,15 @@ export default function SwimCatalog({
             onShare={showArchive ? undefined : handleShare}
             archiveMode={showArchive ? "restore" : "archive"}
           />
-          {visibleSessions.length > sessionsShown && (
-            <div className="flex flex-col items-center gap-2 py-4">
-              <p className="text-xs text-muted-foreground">
-                {sessionsShown} sur {visibleSessions.length} séances
-              </p>
-              <Button variant="outline" size="sm" onClick={() => setSessionsShown((s) => s + 30)}>
-                Voir plus
-              </Button>
-            </div>
+          {hasNextSwimPage && (
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => fetchNextSwimPage()}
+              disabled={isFetchingNextSwimPage}
+            >
+              {isFetchingNextSwimPage ? "Chargement..." : "Charger plus"}
+            </Button>
           )}
         </div>
 

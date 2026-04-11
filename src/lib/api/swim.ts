@@ -271,6 +271,52 @@ export async function getSharedSession(
   };
 }
 
+export async function getSwimSessionsPaginated(opts: {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  folder?: string;
+} = {}): Promise<{ sessions: SwimSessionTemplate[]; total: number }> {
+  if (!canUseSupabase()) {
+    const all = await getSwimCatalog();
+    return { sessions: all, total: all.length };
+  }
+  const { data, error } = await supabase.rpc('get_swim_catalog_paginated', {
+    p_offset: opts.offset ?? 0,
+    p_limit: opts.limit ?? 20,
+    p_search: opts.search ?? null,
+    p_folder: opts.folder ?? null,
+  });
+  if (error) throw new Error(error.message);
+  const rawSessions = data?.sessions ?? [];
+  const sessions: SwimSessionTemplate[] = rawSessions.map((catalog: any) => ({
+    id: safeInt(catalog.id, Date.now()),
+    name: String(catalog.name || ""),
+    description: catalog.description ?? null,
+    created_by: safeOptionalInt(catalog.created_by) ?? null,
+    created_at: catalog.created_at ?? null,
+    updated_at: catalog.updated_at ?? null,
+    folder: catalog.folder ?? null,
+    is_archived: catalog.is_archived ?? false,
+    items: Array.isArray(catalog.items)
+      ? catalog.items
+          .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
+          .map((item: any, index: number) => ({
+            id: safeOptionalInt(item.id) ?? undefined,
+            catalog_id: safeOptionalInt(item.catalog_id) ?? undefined,
+            ordre: safeOptionalInt(item.ordre) ?? index,
+            label: item.label ?? null,
+            distance: safeOptionalInt(item.distance) ?? null,
+            duration: safeOptionalInt(item.duration) ?? null,
+            intensity: item.intensity ?? null,
+            notes: item.notes ?? null,
+            raw_payload: parseRawPayload(item.raw_payload),
+          }))
+      : [],
+  }));
+  return { sessions, total: data?.total ?? 0 };
+}
+
 // ---------------------------------------------------------------------------
 // Swim catalog folders
 // ---------------------------------------------------------------------------

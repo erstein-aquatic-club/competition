@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Exercise, StrengthCycleType, StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api";
 import type { StrengthSessionInput } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getStrengthSessionsPaginated } from "@/lib/api/strength";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -355,10 +356,30 @@ export default function StrengthCatalog() {
     queryFn: () => api.getExercises()
   });
 
-  const { data: sessions, isLoading: isLoadingSessions, error: sessionsError, refetch: refetchSessions } = useQuery({
-    queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions()
+  const STRENGTH_PAGE_SIZE = 20;
+  const {
+    data: sessionPages,
+    isLoading: isLoadingSessions,
+    error: sessionsError,
+    refetch: refetchSessions,
+    fetchNextPage: fetchNextStrengthPage,
+    hasNextPage: hasNextStrengthPage,
+    isFetchingNextPage: isFetchingNextStrengthPage,
+  } = useInfiniteQuery({
+    queryKey: ["strength_catalog_paginated", searchQuery],
+    queryFn: ({ pageParam = 0 }) =>
+      getStrengthSessionsPaginated({
+        offset: pageParam,
+        limit: STRENGTH_PAGE_SIZE,
+        search: searchQuery || undefined,
+      }),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.sessions.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
+    initialPageParam: 0,
   });
+  const sessions = sessionPages?.pages.flatMap((p) => p.sessions) ?? [];
 
   const { data: athletes = [] } = useQuery({
     queryKey: ["athletes"],
@@ -388,12 +409,8 @@ export default function StrengthCatalog() {
     );
   };
 
-  const filteredSessions = useMemo(() => {
-    if (!sessions) return [];
-    if (!searchQuery.trim()) return sessions;
-    const q = searchQuery.toLowerCase();
-    return sessions.filter((s) => s.title?.toLowerCase().includes(q));
-  }, [sessions, searchQuery]);
+  // Search filtering is now handled server-side by the paginated RPC
+  const filteredSessions = sessions;
 
   const unfiledSessions = filteredSessions.filter((s) => !s.folder_id);
 
@@ -438,7 +455,7 @@ export default function StrengthCatalog() {
   const createSession = useMutation({
     mutationFn: (data: StrengthSessionInput) => api.createStrengthSession(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       setIsCreating(false);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
       toast({ title: "Séance créée avec succès" });
@@ -449,7 +466,7 @@ export default function StrengthCatalog() {
     mutationFn: (data: Exercise) => api.updateExercise(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       setExerciseEditOpen(false);
       setEditingExercise(null);
       toast({ title: "Exercice mis à jour" });
@@ -460,7 +477,7 @@ export default function StrengthCatalog() {
     mutationFn: (exerciseId: number) => api.deleteExercise(exerciseId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       setPendingDeleteExercise(null);
       toast({ title: "Exercice supprimé" });
     },
@@ -469,7 +486,7 @@ export default function StrengthCatalog() {
   const deleteSession = useMutation({
     mutationFn: (sessionId: number) => api.deleteStrengthSession(sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       setPendingDeleteSession(null);
       toast({ title: "Séance supprimée" });
     },
@@ -478,7 +495,7 @@ export default function StrengthCatalog() {
   const updateSession = useMutation({
     mutationFn: (data: StrengthSessionInput) => api.updateStrengthSession(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       setIsCreating(false);
       setEditingSessionId(null);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
@@ -515,7 +532,7 @@ export default function StrengthCatalog() {
     mutationFn: (id: number) => api.deleteStrengthFolder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast({ title: "Dossier supprimé" });
     },
@@ -525,7 +542,7 @@ export default function StrengthCatalog() {
     mutationFn: ({ itemId, folderId, table }: { itemId: number; folderId: number | null; table: 'strength_sessions' | 'dim_exercices' }) =>
       api.moveToFolder(itemId, folderId, table),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast({ title: "Déplacé" });
     },
@@ -550,7 +567,7 @@ export default function StrengthCatalog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       toast({ title: "Copie effectuée" });
       setCopyDialog(null);
     },
@@ -1268,6 +1285,17 @@ export default function StrengthCatalog() {
                   </FolderSection>
                 );
               })}
+
+              {hasNextStrengthPage && (
+                <Button
+                  variant="outline"
+                  className="w-full mt-4"
+                  onClick={() => fetchNextStrengthPage()}
+                  disabled={isFetchingNextStrengthPage}
+                >
+                  {isFetchingNextStrengthPage ? "Chargement..." : "Charger plus"}
+                </Button>
+              )}
             </div>
           </TabsContent>
 

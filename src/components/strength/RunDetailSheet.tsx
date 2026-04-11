@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -20,6 +21,8 @@ import {
   groupLogsByExercise,
   computeAvgDifficulty,
 } from "@/lib/strengthHistoryUtils";
+import { supabase } from "@/lib/supabase";
+import { canUseSupabase } from "@/lib/api/client";
 
 const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
   completed: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", label: "Terminée" },
@@ -77,17 +80,64 @@ interface RunDetailSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface RunSummaryRpc {
+  tonnage: number;
+  total_reps: number;
+  total_sets: number;
+  avg_difficulty: number;
+  exercises: Array<{
+    exercise_id: number;
+    exercise_name: string;
+    sets: number;
+    total_reps: number;
+    tonnage: number;
+    avg_difficulty: number;
+  }>;
+}
+
 export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDetailSheetProps) {
   const logs = run.logs ?? run.strength_set_logs ?? [];
   const status = run.status ?? "completed";
   const style = statusStyle[status] ?? statusStyle.completed;
   const dateStr = run.started_at || run.date || run.created_at;
 
-  const tonnage = useMemo(() => computeRunTonnage(logs), [logs]);
-  const totalReps = useMemo(() => computeRunTotalReps(logs), [logs]);
+  // Server-side summary (preferred when online)
+  const { data: summary } = useQuery<RunSummaryRpc>({
+    queryKey: ['strength-run-summary', run.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_strength_run_summary', { p_run_id: run.id });
+      if (error) throw new Error(error.message);
+      return data as RunSummaryRpc;
+    },
+    enabled: !!run.id && canUseSupabase() && open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Client-side fallback computations
+  const localTonnage = useMemo(() => computeRunTonnage(logs), [logs]);
+  const localTotalReps = useMemo(() => computeRunTotalReps(logs), [logs]);
   const srpe = useMemo(() => computeRunSRPE(run.rpe ?? run.feeling ?? null, run.duration ?? null), [run]);
-  const exerciseGroups = useMemo(() => groupLogsByExercise(logs, exerciseNames), [logs, exerciseNames]);
-  const avgDifficulty = useMemo(() => computeAvgDifficulty(logs), [logs]);
+  const localExerciseGroups = useMemo(() => groupLogsByExercise(logs, exerciseNames), [logs, exerciseNames]);
+  const localAvgDifficulty = useMemo(() => computeAvgDifficulty(logs), [logs]);
+
+  // Use server summary when available, fall back to client-side
+  const tonnage = summary?.tonnage ?? localTonnage;
+  const totalReps = summary?.total_reps ?? localTotalReps;
+  const avgDifficulty = summary?.avg_difficulty != null ? Math.round(summary.avg_difficulty) : localAvgDifficulty;
+  const exerciseGroups = summary?.exercises
+    ? summary.exercises.map((ex) => ({
+        exerciseId: ex.exercise_id,
+        exerciseName: ex.exercise_name || exerciseNames.get(ex.exercise_id) || `Exercice #${ex.exercise_id}`,
+        sets: logs.filter((l) => Number(l.exercise_id) === ex.exercise_id),
+        volume: ex.tonnage,
+        maxWeight: Math.max(
+          0,
+          ...logs
+            .filter((l) => Number(l.exercise_id) === ex.exercise_id)
+            .map((l) => Number(l.weight ?? 0)),
+        ),
+      }))
+    : localExerciseGroups;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

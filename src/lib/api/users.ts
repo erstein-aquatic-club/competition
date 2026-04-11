@@ -395,6 +395,26 @@ export async function deleteAvatar(userId: number): Promise<void> {
   if (profileError) throw new Error(profileError.message);
 }
 
+export async function getAthletesPaginated(opts: {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  groupId?: number;
+} = {}): Promise<{ athletes: AthleteSummary[]; total: number }> {
+  if (!canUseSupabase()) {
+    const all = await getAthletes();
+    return { athletes: all, total: all.length };
+  }
+  const { data, error } = await supabase.rpc('get_athletes_paginated', {
+    p_offset: opts.offset ?? 0,
+    p_limit: opts.limit ?? 20,
+    p_search: opts.search ?? null,
+    p_group_id: opts.groupId ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return { athletes: data?.athletes ?? [], total: data?.total ?? 0 };
+}
+
 export async function getRecentSessionsAllAthletes(days = 30): Promise<
   Array<{
     athlete_id: number | null;

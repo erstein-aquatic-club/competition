@@ -2,8 +2,7 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
 import { Switch, Route, Redirect, Router } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { getAppSettings } from "@/lib/api/records";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, handlePasswordReset } from "@/lib/auth";
@@ -311,22 +310,25 @@ function AppRouter() {
 }
 
 function useDarkMode() {
-  const { data: darkModeSetting } = useQuery({
-    queryKey: ["app-setting", "dark_mode"],
-    queryFn: () => getAppSettings("dark_mode"),
-    staleTime: 5 * 60 * 1000,
-  });
+  const [userPref, setUserPref] = useState<string | null>(() =>
+    localStorage.getItem("eac-theme")
+  );
+
+  // Listen for localStorage changes (from Profile toggle)
+  useEffect(() => {
+    const handler = () => setUserPref(localStorage.getItem("eac-theme"));
+    window.addEventListener("eac-theme-change", handler);
+    return () => window.removeEventListener("eac-theme-change", handler);
+  }, []);
 
   useEffect(() => {
-    const mode = typeof darkModeSetting === "string" ? darkModeSetting : darkModeSetting?.mode ?? null;
+    // User preference takes priority, then default to light
+    const mode = userPref ?? "light";
     const root = document.documentElement;
 
     if (mode === "dark") {
       root.classList.add("dark");
-    } else if (mode === "light") {
-      root.classList.remove("dark");
-    } else {
-      // system or null — respect prefers-color-scheme
+    } else if (mode === "system") {
       const mql = window.matchMedia("(prefers-color-scheme: dark)");
       const apply = (e: MediaQueryList | MediaQueryListEvent) => {
         if (e.matches) {
@@ -339,8 +341,10 @@ function useDarkMode() {
       const handler = (e: MediaQueryListEvent) => apply(e);
       mql.addEventListener("change", handler);
       return () => mql.removeEventListener("change", handler);
+    } else {
+      root.classList.remove("dark");
     }
-  }, [darkModeSetting]);
+  }, [userPref]);
 }
 
 /** Applies dark_mode setting from app_settings. Must be inside QueryClientProvider. */

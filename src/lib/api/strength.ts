@@ -41,7 +41,6 @@ import {
   buildRunUpdatePayload,
   collectEstimated1RMs,
   enrichItemsWithExerciseNames,
-  mapLogsForDbInsert,
 } from './transformers';
 import { localStorageGet, localStorageSave } from './localStorage';
 
@@ -168,6 +167,45 @@ export async function getStrengthSessions(): Promise<StrengthSessionTemplate[]> 
     });
   }
   return (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as StrengthSessionTemplate[];
+}
+
+export async function getStrengthSessionsPaginated(opts: {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  folderId?: number;
+} = {}): Promise<{ sessions: StrengthSessionTemplate[]; total: number }> {
+  if (!canUseSupabase()) {
+    const all = await getStrengthSessions();
+    return { sessions: all, total: all.length };
+  }
+  const { data, error } = await supabase.rpc('get_strength_catalog_paginated', {
+    p_offset: opts.offset ?? 0,
+    p_limit: opts.limit ?? 20,
+    p_search: opts.search ?? null,
+    p_folder_id: opts.folderId ?? null,
+  });
+  if (error) throw new Error(error.message);
+  const rawSessions = data?.sessions ?? [];
+  const sessions: StrengthSessionTemplate[] = rawSessions.map((session: any) => {
+    const rawItems = Array.isArray(session.items) ? session.items : [];
+    const cycle = normalizeCycleType(rawItems[0]?.cycle_type);
+    return {
+      id: safeInt(session.id, Date.now()),
+      title: String(session.name || session.title || ""),
+      description: session.description ?? "",
+      cycle,
+      folder_id: safeOptionalInt(session.folder_id),
+      items: rawItems
+        .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
+        .map((item: any, index: number) => ({
+          ...normalizeStrengthItem(item, index, cycle),
+          exercise_name: item.exercise_name ?? item.dim_exercices?.nom_exercice ?? undefined,
+          category: item.category ?? item.dim_exercices?.exercise_type ?? undefined,
+        })),
+    };
+  });
+  return { sessions, total: data?.total ?? 0 };
 }
 
 export async function createStrengthSession(session: any) {
@@ -527,89 +565,49 @@ export async function deleteStrengthRun(runId: number) {
 
 export async function saveStrengthRun(run: any) {
   if (canUseSupabase()) {
-    let runId = run.run_id;
-    // Step 1: Create run if needed
-    if (!runId) {
-      const { data: newRun, error } = await supabase
-        .from("strength_session_runs")
-        .insert({
-          assignment_id: run.assignment_id ?? null,
-          athlete_id: run.athlete_id ?? null,
-          status: "in_progress",
-          progress_pct: run.progress_pct ?? 0,
-          started_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-      if (error) throw new Error(error.message);
-      runId = newRun.id;
-    }
+    // Build logs array for the atomic RPC
+    const rawLogs = Array.isArray(run.logs) ? run.logs : [];
+    const rpcLogs = rawLogs.map((log: any, index: number) => ({
+      exercise_id: Number(log.exercise_id),
+      set_index: log.set_index ?? log.set_number ?? index,
+      reps: log.reps != null ? Number(log.reps) : null,
+      weight: log.weight != null ? Number(log.weight) : null,
+      rpe: log.rpe != null ? Number(log.rpe) : null,
+      difficulty: log.difficulty != null ? Number(log.difficulty) : null,
+      notes: log.notes ?? null,
+    }));
 
-    // Step 2: Insert all set logs
-    if (runId && Array.isArray(run.logs) && run.logs.length > 0) {
-      const { error: logsError } = await supabase
-        .from("strength_set_logs")
-        .insert(mapLogsForDbInsert(run.logs, runId));
-      if (logsError) throw new Error(logsError.message);
-    }
-
-    // Step 3: Calculate 1RM estimates and upsert records
-    const estimatedRecords = collectEstimated1RMs(
-      Array.isArray(run.logs) ? run.logs : [],
+    // Collect 1RM estimates client-side to pass to the RPC
+    const estimatedRecords = collectEstimated1RMs(rawLogs);
+    const oneRmEstimates = Array.from(estimatedRecords.entries()).map(
+      ([exerciseId, weight]) => ({
+        exercise_id: exerciseId,
+        weight,
+        athlete_id: run.athlete_id ?? null,
+        athlete_name: run.athlete_name ?? null,
+      }),
     );
-    if (estimatedRecords.size > 0) {
-      const athleteId = run.athlete_id ?? null;
-      const athleteName = run.athlete_name ?? null;
-      if (
-        athleteId !== null &&
-        athleteId !== undefined &&
-        athleteId !== ""
-      ) {
-        const existing = await get1RM({ athleteName, athleteId });
-        const existingByExercise = new Map<number, number>(
-          (existing || []).map((record: any) => [
-            record.exercise_id,
-            Number(record.weight ?? 0),
-          ]),
-        );
-        await Promise.all(
-          Array.from(estimatedRecords.entries())
-            .filter(
-              ([exerciseId, estimate]) =>
-                estimate > (existingByExercise.get(exerciseId) ?? 0),
-            )
-            .map(([exerciseId, estimate]) =>
-              update1RM({
-                athlete_id: athleteId ?? undefined,
-                athlete_name: athleteName ?? undefined,
-                exercise_id: exerciseId,
-                one_rm: estimate,
-              }),
-            ),
-        );
-      }
-    }
 
-    // Step 4: Mark run as completed
-    if (runId) {
-      await supabase
-        .from("strength_session_runs")
-        .update({
-          progress_pct: run.progress_pct ?? 100,
-          status: "completed",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", runId);
-    }
+    const { data, error } = await supabase.rpc('save_strength_run_atomic', {
+      p_data: {
+        run_id: run.run_id ?? null,
+        session_id: run.session_id ?? null,
+        athlete_id: run.athlete_id ?? null,
+        assignment_id: run.assignment_id ?? null,
+        started_at: run.started_at ?? new Date().toISOString(),
+        feeling: run.feeling ?? null,
+        rpe: run.rpe ?? null,
+        duration: run.duration ?? null,
+        comments: run.comments ?? null,
+        progress_pct: run.progress_pct ?? 100,
+        logs: rpcLogs,
+        one_rm_estimates: oneRmEstimates,
+      },
+    });
+    if (error) throw new Error(error.message);
 
-    // Step 5: Mark assignment completed if applicable
-    if (run.assignment_id) {
-      await supabase
-        .from("session_assignments")
-        .update({ status: "completed" })
-        .eq("id", run.assignment_id);
-    }
-    return { status: "ok", run_id: runId ?? null };
+    const result = data as { run_id: number; logs_count: number; one_rm_count: number } | null;
+    return { status: "ok", run_id: result?.run_id ?? null };
   }
 
   const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];

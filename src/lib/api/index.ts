@@ -95,6 +95,7 @@ export {
   getProfile,
   updateProfile,
   getAthletes,
+  getAthletesPaginated,
   getGroups,
   getUpcomingBirthdays,
   listUsers,
@@ -155,6 +156,7 @@ export {
 
 export {
   getSwimCatalog,
+  getSwimSessionsPaginated,
   createSwimSession,
   deleteSwimSession,
   archiveSwimSession,
@@ -361,6 +363,7 @@ export {
 export {
   getExercises,
   createExercise,
+  getStrengthSessionsPaginated,
   updateExercise,
   deleteExercise,
   getStrengthSessions,

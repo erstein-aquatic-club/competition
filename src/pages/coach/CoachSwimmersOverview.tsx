@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { getAthletesPaginated } from "@/lib/api/users";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search } from "lucide-react";
 import type { AthleteSummary } from "@/lib/api/types";
 import type { WellnessCheck } from "@/lib/api/types";
 import { getGroupWellnessForDate, getWellnessRange, computeReadinessScore } from "@/lib/api/wellness";
@@ -147,11 +149,42 @@ interface Props {
   allAssignments?: { swimmer_id: number; coach_id: number }[];
 }
 
-export default function CoachSwimmersOverview({ athletes, athletesLoading, onBack, onOpenAthlete, isAdmin, coachesList, allAssignments }: Props) {
+const PAGE_SIZE = 20;
+
+export default function CoachSwimmersOverview({ athletes: propAthletes, athletesLoading: propAthletesLoading, onBack, onOpenAthlete, isAdmin, coachesList, allAssignments }: Props) {
   const [groupFilter, setGroupFilter] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [coachFilter, setCoachFilter] = useState<number | null>(null);
-  const [athletesShown, setAthletesShown] = useState(30);
+  const [searchText, setSearchText] = useState("");
+
+  // Paginated athletes query
+  const {
+    data: paginatedPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: paginatedLoading,
+  } = useInfiniteQuery({
+    queryKey: ['athletes-paginated', searchText, groupFilter],
+    queryFn: ({ pageParam = 0 }) =>
+      getAthletesPaginated({
+        offset: pageParam,
+        limit: PAGE_SIZE,
+        search: searchText || undefined,
+        groupId: groupFilter ?? undefined,
+      }),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.athletes.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
+    initialPageParam: 0,
+  });
+
+  // Use paginated results when available, fall back to props
+  const athletes = paginatedPages
+    ? paginatedPages.pages.flatMap((p) => p.athletes)
+    : propAthletes;
+  const athletesLoading = paginatedPages ? paginatedLoading : propAthletesLoading;
 
   // ACWR values reported by TrainingLoadIndicators children (for sorting)
   const acwrMapRef = useRef(new Map<number, number | null>());
@@ -247,15 +280,17 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
     return declining;
   }, [recentWellnessAll]);
 
+  // Use propAthletes for group extraction (full list, not paginated subset)
   const groups = useMemo(() => {
     const map = new Map<number, string>();
-    athletes.forEach((a) => {
+    const source = propAthletes.length > 0 ? propAthletes : athletes;
+    source.forEach((a) => {
       if (a.group_id && a.group_label) map.set(a.group_id, a.group_label);
     });
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  }, [athletes]);
+  }, [propAthletes, athletes]);
 
   const athleteKPIs = useMemo(() => {
     const kpiMap = new Map<number, AthleteKPIs>();
@@ -348,8 +383,7 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [athletes, groupFilter, sortKey, athleteKPIs, wellnessByUser, acwrMapVersion, coachFilter, allAssignments]);
 
-  // Reset pagination when filters change
-  useEffect(() => { setAthletesShown(30); }, [groupFilter, sortKey, coachFilter]);
+  // (pagination is now handled via useInfiniteQuery)
 
   return (
     <div className="space-y-4 pb-4">
@@ -358,10 +392,21 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
         description={
           athletesLoading
             ? "Chargement…"
-            : `${athletes.length} nageur${athletes.length !== 1 ? "s" : ""}`
+            : `${paginatedPages ? paginatedPages.pages[0]?.total ?? athletes.length : athletes.length} nageur${(paginatedPages ? paginatedPages.pages[0]?.total ?? athletes.length : athletes.length) !== 1 ? "s" : ""}`
         }
         onBack={onBack}
       />
+
+      {/* Search input */}
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <input
+          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder="Rechercher un nageur"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
 
       {/* Group filter chips */}
       {groups.length > 1 && (
@@ -464,7 +509,7 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {sortedAthletes.slice(0, athletesShown).map((athlete) => {
+            {sortedAthletes.map((athlete) => {
               const kpis = athlete.id != null ? athleteKPIs.get(athlete.id) : null;
               const forme = formeBadge(kpis?.forme ?? null);
               const sessionsCount = kpis?.sessionsCount30d ?? 0;
@@ -584,15 +629,15 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
             })}
           </div>
 
-          {sortedAthletes.length > athletesShown && (
-            <div className="flex flex-col items-center gap-2 py-4">
-              <p className="text-xs text-muted-foreground">
-                {athletesShown} sur {sortedAthletes.length} nageurs
-              </p>
-              <Button variant="outline" size="sm" onClick={() => setAthletesShown((s) => s + 30)}>
-                Voir plus
-              </Button>
-            </div>
+          {hasNextPage && (
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? "Chargement..." : "Charger plus"}
+            </Button>
           )}
         </>
       )}

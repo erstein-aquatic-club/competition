@@ -653,6 +653,8 @@ export interface TrainingSlot {
   created_by: number | null;
   created_at: string;
   lane_count: number | null;
+  /** If set, this is a one-off slot for this specific date (not recurring) */
+  scheduled_date: string | null;
   assignments: TrainingSlotAssignment[];
   coaches: TrainingSlotCoach[];
 }
@@ -692,6 +694,8 @@ export interface TrainingSlotInput {
   lane_count: number | null;
   group_ids: number[];
   coach_ids: number[];
+  /** If set, creates a one-off slot for this specific date */
+  scheduled_date?: string | null;
 }
 
 export interface TrainingSlotOverrideInput {
