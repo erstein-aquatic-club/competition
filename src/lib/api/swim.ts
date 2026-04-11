@@ -10,7 +10,7 @@ import {
   parseRawPayload,
   STORAGE_KEYS,
 } from './client';
-import type { SwimSessionTemplate, SwimSessionItem } from './types';
+import type { SwimSessionTemplate, SwimSessionItem, SwimCatalogFolder } from './types';
 import { localStorageGet, localStorageSave } from './localStorage';
 
 export async function getSwimCatalog(): Promise<SwimSessionTemplate[]> {
@@ -269,4 +269,79 @@ export async function getSharedSession(
     description: (data as any).description ?? null,
     items,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Swim catalog folders
+// ---------------------------------------------------------------------------
+
+export async function getSwimCatalogFolders(): Promise<SwimCatalogFolder[]> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase
+    .from("swim_catalog_folders")
+    .select("*")
+    .order("path");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((f: any) => ({
+    id: f.id,
+    path: f.path,
+    created_by: f.created_by,
+    created_at: f.created_at,
+  }));
+}
+
+export async function createSwimCatalogFolder(path: string): Promise<SwimCatalogFolder> {
+  if (!canUseSupabase()) throw new Error("Supabase required");
+  const { data, error } = await supabase
+    .from("swim_catalog_folders")
+    .upsert({ path }, { onConflict: "path" })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return { id: data.id, path: data.path, created_by: data.created_by, created_at: data.created_at };
+}
+
+export async function renameSwimCatalogFolder(oldPath: string, newPath: string): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase required");
+  // Rename the folder itself
+  const { error: folderErr } = await supabase
+    .from("swim_catalog_folders")
+    .update({ path: newPath })
+    .eq("path", oldPath);
+  if (folderErr) throw new Error(folderErr.message);
+
+  // Rename sub-folders
+  const { data: subFolders } = await supabase
+    .from("swim_catalog_folders")
+    .select("id, path")
+    .like("path", `${oldPath}/%`);
+  for (const sf of subFolders ?? []) {
+    const updated = newPath + sf.path.slice(oldPath.length);
+    await supabase.from("swim_catalog_folders").update({ path: updated }).eq("id", sf.id);
+  }
+
+  // Update sessions referencing old path
+  const { data: sessions } = await supabase
+    .from("swim_sessions_catalog")
+    .select("id, folder")
+    .or(`folder.eq.${oldPath},folder.like.${oldPath}/%`);
+  for (const s of sessions ?? []) {
+    const updated = s.folder === oldPath ? newPath : newPath + s.folder.slice(oldPath.length);
+    await supabase.from("swim_sessions_catalog").update({ folder: updated }).eq("id", s.id);
+  }
+}
+
+export async function deleteSwimCatalogFolder(path: string): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase required");
+  // Move sessions in this folder (and sub-folders) to root
+  const { error: moveErr } = await supabase
+    .from("swim_sessions_catalog")
+    .update({ folder: null })
+    .or(`folder.eq.${path},folder.like.${path}/%`);
+  if (moveErr) throw new Error(moveErr.message);
+
+  // Delete sub-folders then the folder itself
+  await supabase.from("swim_catalog_folders").delete().like("path", `${path}/%`);
+  const { error } = await supabase.from("swim_catalog_folders").delete().eq("path", path);
+  if (error) throw new Error(error.message);
 }

@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { SwimSessionBuilder } from "@/components/coach/swim/SwimSessionBuilder";
-import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Plus, Route, Search, Timer } from "lucide-react";
+import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Plus, Route, Search, Timer, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useAuth } from "@/lib/auth";
@@ -35,7 +35,7 @@ import { formatSwimSessionDefaultTitle } from "@/lib/date";
 import { calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
 import { normalizeIntensityValue, normalizeEquipmentValue } from "@/lib/swimTextParser";
 import type { SwimBlock, SwimExercise } from "@/lib/swimTextParser";
-import { generateShareToken } from "@/lib/api/swim";
+import { generateShareToken, getSwimCatalogFolders, createSwimCatalogFolder, deleteSwimCatalogFolder, renameSwimCatalogFolder } from "@/lib/api/swim";
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
 
 interface SwimSessionDraft {
@@ -243,6 +243,25 @@ export default function SwimCatalog({
     enabled: role === "coach" || role === "admin",
   });
 
+  const { data: dbFolders } = useQuery({
+    queryKey: ["swim_catalog_folders"],
+    queryFn: getSwimCatalogFolders,
+  });
+
+  const createFolderMutation = useMutation({
+    mutationFn: (path: string) => createSwimCatalogFolder(path),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["swim_catalog_folders"] }),
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: (path: string) => deleteSwimCatalogFolder(path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog_folders"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      setCurrentFolder(null);
+    },
+  });
+
   // One-time migration: localStorage archived IDs → database is_archived
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -274,9 +293,10 @@ export default function SwimCatalog({
     }
   }, [queryClient]);
 
-  // Derive folder structure from sessions
+  // Derive folder structure from sessions + persisted DB folders
   const allFolders = useMemo(() => {
     const folderSet = new Set<string>();
+    // Folders derived from session paths
     (sessions ?? []).forEach((s) => {
       if (s.folder) {
         const parts = s.folder.split("/");
@@ -285,8 +305,15 @@ export default function SwimCatalog({
         }
       }
     });
+    // Persisted empty folders from DB
+    (dbFolders ?? []).forEach((f) => {
+      const parts = f.path.split("/");
+      for (let i = 1; i <= parts.length; i++) {
+        folderSet.add(parts.slice(0, i).join("/"));
+      }
+    });
     return Array.from(folderSet).sort();
-  }, [sessions]);
+  }, [sessions, dbFolders]);
 
   // Sub-folders of current folder
   const currentSubFolders = useMemo(() => {
@@ -513,7 +540,9 @@ export default function SwimCatalog({
     const trimmed = newFolderName.trim();
     if (!trimmed) return;
     const path = currentFolder ? `${currentFolder}/${trimmed}` : trimmed;
-    setCurrentFolder(path);
+    createFolderMutation.mutate(path, {
+      onSuccess: () => setCurrentFolder(path),
+    });
     setShowCreateFolder(false);
     setNewFolderName("");
   };
@@ -732,6 +761,16 @@ export default function SwimCatalog({
               <FolderPlus className="h-4 w-4" />
               Nouveau dossier
             </button>
+            {currentFolder !== null && visibleSessions.length === 0 && currentSubFolders.length === 0 && (
+              <button
+                type="button"
+                onClick={() => deleteFolderMutation.mutate(currentFolder)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/30 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer ce dossier
+              </button>
+            )}
             {currentFolder === null && archivedCount > 0 && (
               <button
                 type="button"

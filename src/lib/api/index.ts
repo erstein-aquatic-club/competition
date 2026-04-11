@@ -162,6 +162,10 @@ export {
   migrateLocalStorageArchive,
   generateShareToken,
   getSharedSession,
+  getSwimCatalogFolders,
+  createSwimCatalogFolder,
+  renameSwimCatalogFolder,
+  deleteSwimCatalogFolder,
 } from './swim';
 
 export {

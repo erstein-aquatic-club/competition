@@ -109,6 +109,13 @@ export interface SwimSessionTemplate {
   items?: SwimSessionItem[];
 }
 
+export interface SwimCatalogFolder {
+  id: number;
+  path: string;
+  created_by?: number | null;
+  created_at?: string | null;
+}
+
 export interface SwimSessionItem {
   id?: number;
   catalog_id?: number;
