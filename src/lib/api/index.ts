@@ -399,3 +399,11 @@ export {
   type SwimmerComment,
   type GetSwimmerCommentsOptions,
 } from './coach-comments';
+
+// Chrono records
+export {
+  getChronoRecords,
+  createChronoRecord,
+  updateChronoRecord,
+  deleteChronoRecord,
+} from './chrono-records';

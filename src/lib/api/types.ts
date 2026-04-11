@@ -911,3 +911,44 @@ export interface SwimFiliereInput {
   description?: string | null;
   examples?: string | null;
 }
+
+// ── Chrono Records ──────────────────────────────────────────────────
+
+export interface ChronoRecordSplit {
+  distanceM: number;
+  cumulativeMs: number;
+  lapMs: number;
+}
+
+export interface ChronoRecordSwimmer {
+  athleteId: number;
+  displayName: string;
+  lane: number;
+  wave: number;
+  splitsByRep: ChronoRecordSplit[][];
+}
+
+export interface ChronoRecordConfig {
+  totalDistanceM: number;
+  splitDistanceM: number;
+  seriesCount: number;
+  laneCount: number;
+}
+
+export interface ChronoRecord {
+  id: string;
+  coach_id: string;
+  status: "draft" | "sent";
+  label: string | null;
+  config: ChronoRecordConfig;
+  swimmers: ChronoRecordSwimmer[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChronoRecordInput {
+  status: "draft" | "sent";
+  label: string;
+  config: ChronoRecordConfig;
+  swimmers: ChronoRecordSwimmer[];
+}
