@@ -533,13 +533,8 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           };
         });
 
-        // Filter out empty slots (no assignment) — only show slots that have a session
-        // If ALL slots are empty, keep them so the day shows as "rest"
-        const nonEmpty = list.filter((s) => !s.isEmpty);
-        const result = nonEmpty.length > 0 ? nonEmpty : list;
-
-        cache.set(iso, result);
-        return result;
+        cache.set(iso, list);
+        return list;
       }
 
       // ── LEGACY PATH: no swimmer slots, use AM/PM ──
@@ -637,6 +632,9 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
       const slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string }> = [];
 
       for (const s of planned) {
+        // Skip empty slots for calendar pills — they show in the drawer but not on the grid
+        if (s.isEmpty) continue;
+
         const st = getSessionStatus(s, d);
         if (!st.expected) {
           const hasLogAnyway = Boolean(getLogForSession(s.id));

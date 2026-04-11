@@ -609,21 +609,32 @@ export function FeedbackDrawer({
 
                 {/* Liste séances (compacte) */}
                 {!activeSession && (() => {
+                  // Split into: assigned sessions (primary) vs empty slots (other slots)
                   const expectedSessions: PlannedSession[] = [];
-                  const unexpectedSessions: PlannedSession[] = [];
+                  const otherSlots: PlannedSession[] = [];
                   for (const s of sessionsForSelectedDay) {
-                    const st = getSessionStatus(s, selectedDate);
-                    if (st.status === "not_expected") {
-                      unexpectedSessions.push(s);
+                    if (s.isEmpty && !getLog(s.id)) {
+                      // Empty slot with no log → "Autres créneaux du jour"
+                      otherSlots.push(s);
                     } else {
                       expectedSessions.push(s);
                     }
                   }
-
-                  // Filter out unexpected empty slots (no assignment, no log)
-                  const visibleUnexpected = unexpectedSessions.filter(
-                    (s) => !s.isEmpty || Boolean(getLog(s.id)),
+                  // Also include truly unexpected sessions (from presenceDefaults)
+                  // that have a log (swimmer went even though not expected)
+                  const unexpectedSessions: PlannedSession[] = [];
+                  for (const s of expectedSessions) {
+                    const st = getSessionStatus(s, selectedDate);
+                    if (st.status === "not_expected" && !getLog(s.id)) {
+                      // Move to "other" if not expected and no log
+                      otherSlots.push(s);
+                    }
+                  }
+                  // Clean: remove from expected what we moved to other
+                  const primarySessions = expectedSessions.filter(
+                    (s) => !otherSlots.includes(s),
                   );
+                  const visibleUnexpected = otherSlots;
 
                   const renderSessionCard = (s: PlannedSession) => {
                     const st = getSessionStatus(s, selectedDate);
@@ -803,9 +814,9 @@ export function FeedbackDrawer({
                     return card;
                   };
 
-                  const allEmpty = expectedSessions.every((s) => s.isEmpty) && visibleUnexpected.length === 0;
+                  const allEmpty = primarySessions.every((s) => s.isEmpty) && visibleUnexpected.length === 0;
 
-                  if (allEmpty && expectedSessions.length > 0) {
+                  if (allEmpty && primarySessions.length > 0) {
                     return (
                       <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                         <Moon className="h-8 w-8 mb-2 opacity-40" />
@@ -818,7 +829,7 @@ export function FeedbackDrawer({
                   return (
                     <>
                       <div className="mt-4 grid gap-2">
-                        {expectedSessions.map(renderSessionCard)}
+                        {primarySessions.map(renderSessionCard)}
                       </div>
 
                       {visibleUnexpected.length > 0 && (
@@ -829,7 +840,7 @@ export function FeedbackDrawer({
                             className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
                           >
                             <ChevronDown className={cn("h-4 w-4 transition-transform", unexpectedExpanded && "rotate-180")} />
-                            Autres séances ({visibleUnexpected.length})
+                            Autres créneaux du jour ({visibleUnexpected.length})
                           </button>
                           <AnimatePresence>
                             {unexpectedExpanded && (
