@@ -19,6 +19,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { computeACWR, computeAcuteLoad, computeChronicLoad } from "@/lib/trainingLoadHelpers";
+import InfoBubble, { AcwrInfoContent } from "@/components/shared/InfoBubble";
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -202,13 +203,14 @@ export default function TrainingLoadChart({
 
       {/* Alert + period toggle */}
       <div className="flex items-center justify-between gap-2">
-        <p className={`text-xs font-medium ${alert.className}`}>
+        <p className={`text-xs font-medium ${alert.className} inline-flex items-center gap-1`}>
           {icon}{alert.text}
           {acwr !== null && (
-            <span className="ml-1 text-muted-foreground font-normal">
+            <span className="text-muted-foreground font-normal">
               (ACWR : {acwr.toFixed(2)})
             </span>
           )}
+          <InfoBubble size={12}><AcwrInfoContent /></InfoBubble>
         </p>
 
         <div className="flex rounded-lg border bg-muted/50 p-0.5">

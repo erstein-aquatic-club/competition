@@ -26,6 +26,7 @@ import {
   TrendingDown,
   Minus,
 } from "lucide-react";
+import InfoBubble, { AcwrInfoContent } from "@/components/shared/InfoBubble";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -231,7 +232,7 @@ function Sparkline({ values, height = 40 }: { values: number[]; height?: number 
   );
 }
 
-function AcwrBadge({ value }: { value: number }) {
+function ReportAcwrBadge({ value }: { value: number }) {
   let color = "bg-amber-100 text-amber-800";
   let label = "Attention";
   if (value >= 0.8 && value <= 1.3) {
@@ -412,7 +413,10 @@ export default function MonthlyReport() {
             <>
               <div className="flex items-center justify-between">
                 <BigKPI value={report.avgAcwr.toFixed(2)} label="ACWR moyen" />
-                <AcwrBadge value={report.avgAcwr} />
+                <span className="inline-flex items-center gap-1">
+                  <ReportAcwrBadge value={report.avgAcwr} />
+                  <InfoBubble size={12}><AcwrInfoContent /></InfoBubble>
+                </span>
               </div>
               <p className="text-xs text-muted-foreground text-center">
                 {report.daysInOptimalZone} jour{report.daysInOptimalZone > 1 ? "s" : ""} en zone optimale (0.8-1.3)
