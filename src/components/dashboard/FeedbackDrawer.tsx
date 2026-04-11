@@ -612,32 +612,24 @@ export function FeedbackDrawer({
 
                 {/* Liste séances (compacte) */}
                 {!activeSession && (() => {
-                  // Split into: assigned sessions (primary) vs empty slots (other slots)
-                  const expectedSessions: PlannedSession[] = [];
-                  const otherSlots: PlannedSession[] = [];
+                  // Split: swimmer's own slots (primary, always visible even if empty)
+                  // vs unexpected legacy slots (collapsed)
+                  const primarySessions: PlannedSession[] = [];
+                  const visibleUnexpected: PlannedSession[] = [];
                   for (const s of sessionsForSelectedDay) {
-                    if (s.isEmpty && !getLog(s.id)) {
-                      // Empty slot with no log → "Autres créneaux du jour"
-                      otherSlots.push(s);
-                    } else {
-                      expectedSessions.push(s);
+                    // Swimmer's personal slots: always in primary (even if empty)
+                    if (s.swimmerSlotId) {
+                      primarySessions.push(s);
+                      continue;
                     }
-                  }
-                  // Also include truly unexpected sessions (from presenceDefaults)
-                  // that have a log (swimmer went even though not expected)
-                  const unexpectedSessions: PlannedSession[] = [];
-                  for (const s of expectedSessions) {
+                    // Legacy AM/PM slots: check if expected
                     const st = getSessionStatus(s, selectedDate);
-                    if (st.status === "not_expected" && !getLog(s.id)) {
-                      // Move to "other" if not expected and no log
-                      otherSlots.push(s);
+                    if (st.status === "not_expected" && s.isEmpty && !getLog(s.id)) {
+                      visibleUnexpected.push(s);
+                    } else {
+                      primarySessions.push(s);
                     }
                   }
-                  // Clean: remove from expected what we moved to other
-                  const primarySessions = expectedSessions.filter(
-                    (s) => !otherSlots.includes(s),
-                  );
-                  const visibleUnexpected = otherSlots;
 
                   const renderSessionCard = (s: PlannedSession) => {
                     const st = getSessionStatus(s, selectedDate);
