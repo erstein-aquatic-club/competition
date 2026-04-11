@@ -182,6 +182,7 @@ export {
   importSingleSwimmer,
   getSwimRecords,
   upsertSwimRecord,
+  deleteSwimRecord,
   getSwimmerPerformances,
   importSwimmerPerformances,
   recalculateClubRecords,

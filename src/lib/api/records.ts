@@ -444,6 +444,19 @@ export async function upsertSwimRecord(payload: {
   return { status: "created" };
 }
 
+export async function deleteSwimRecord(id: number): Promise<void> {
+  if (canUseSupabase()) {
+    const { error } = await supabase
+      .from("swim_records")
+      .delete()
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const records = (localStorageGet(STORAGE_KEYS.SWIM_RECORDS) || []) as any[];
+  localStorageSave(STORAGE_KEYS.SWIM_RECORDS, records.filter((r: any) => r.id !== id));
+}
+
 export async function getSwimmerPerformances(filters: {
   userId?: number;
   iuf?: string;

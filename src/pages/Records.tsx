@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { shouldShowRecords } from "@/pages/Profile";
-import { Check, ChevronDown, ChevronRight, Dumbbell, Edit2, Download, RefreshCw, StickyNote, Trophy, Waves, X, AlertCircle } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Dumbbell, Edit2, Download, RefreshCw, StickyNote, Trash2, Trophy, Waves, X, AlertCircle } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { motion, useReducedMotion } from "framer-motion";
@@ -440,8 +440,30 @@ export default function Records() {
     },
   });
 
+  const deleteSwimRecordMut = useMutation({
+    mutationFn: (id: number) => api.deleteSwimRecord(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["swim-records"] });
+      setSwimSheetOpen(false);
+      setSwimForm(emptySwimForm);
+      toast({ title: "Record supprimé" });
+    },
+  });
+
   const openAddSwim = () => {
     setSwimForm({ ...emptySwimForm, pool_length: String(histPoolLen) });
+    setSwimSheetOpen(true);
+  };
+
+  const openEditSwim = (record: SwimRecordWithPool) => {
+    setSwimForm({
+      id: record.id,
+      event_name: record.event_name ?? "",
+      pool_length: String(record.pool_length ?? record.poolLength ?? record.poolLen ?? ""),
+      time_seconds: record.time_seconds != null ? formatTimeSeconds(record.time_seconds) : "",
+      record_date: record.record_date ?? "",
+      notes: record.notes ?? "",
+    });
     setSwimSheetOpen(true);
   };
 
@@ -658,7 +680,10 @@ export default function Records() {
                     >
                       {filteredSwimRecords.map((record) => (
                         <motion.div key={record.id} variants={listItem}>
-                          <Card className="rounded-2xl h-full">
+                          <Card
+                            className="rounded-2xl h-full cursor-pointer active:scale-[0.97] transition-transform"
+                            onClick={() => openEditSwim(record)}
+                          >
                             <CardContent className="p-0">
                               <div className="flex flex-col gap-1 px-3 py-3">
                                 <span className="text-sm font-semibold truncate">{record.event_name}</span>
@@ -687,7 +712,7 @@ export default function Records() {
                       <SheetHeader className="text-left">
                         <SheetTitle className="flex items-center gap-2">
                           <span className="text-lg leading-none">🏊</span>
-                          Nouveau record
+                          {swimForm.id ? "Modifier le record" : "Nouveau record"}
                         </SheetTitle>
                         <SheetDescription>
                           Meilleur temps réalisé à l&apos;entraînement.
@@ -790,9 +815,25 @@ export default function Records() {
 
                         {/* Actions */}
                         <div className="flex gap-2 pb-2">
-                          <Button type="button" variant="outline" onClick={() => setSwimSheetOpen(false)} className="flex-1 rounded-xl h-11">
-                            Annuler
-                          </Button>
+                          {swimForm.id ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                if (swimForm.id && confirm("Supprimer ce record ?")) {
+                                  deleteSwimRecordMut.mutate(swimForm.id);
+                                }
+                              }}
+                              disabled={deleteSwimRecordMut.isPending}
+                              className="rounded-xl h-11 px-3 text-destructive border-destructive/30 hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button type="button" variant="outline" onClick={() => setSwimSheetOpen(false)} className="flex-1 rounded-xl h-11">
+                              Annuler
+                            </Button>
+                          )}
                           <Button type="submit" disabled={upsertSwimRecord.isPending} className="flex-1 rounded-xl h-11 font-semibold">
                             {upsertSwimRecord.isPending ? "Enregistrement…" : "Enregistrer"}
                           </Button>
