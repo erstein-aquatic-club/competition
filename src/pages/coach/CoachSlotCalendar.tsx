@@ -504,7 +504,14 @@ function DaySection({
   onOpenSlot: (instance: SlotInstance) => void;
 }) {
   if (slots.length === 0) {
-    return null; // Hide days with no slots
+    return (
+      <div key={dateIso} className="py-2">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <span className="font-semibold">{abbrev} {label}</span>
+          <span className="text-xs">— Aucun créneau</span>
+        </div>
+      </div>
+    );
   }
 
   return (

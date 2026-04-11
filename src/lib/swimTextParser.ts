@@ -287,6 +287,7 @@ export function parseExerciseTokens(text: string): ExerciseTokens {
   const repsDistMatch = cleaned.match(/(\d+)\s*[*x×]\s*(\d+)/i);
   if (repsDistMatch) {
     result.repetitions = Number(repsDistMatch[1]);
+    if (result.repetitions > 50) result.repetitions = 50;
     result.distance = Number(repsDistMatch[2]);
   } else {
     // Distance alone: starts with a number

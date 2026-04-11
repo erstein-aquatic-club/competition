@@ -606,7 +606,7 @@ function EmptyBody({
         />
         {!isVisibleFromValid && (
           <p className="text-xs text-destructive">
-            La date de visibilité doit être avant ou le jour de la séance.
+            La date ne peut pas être postérieure au jour du créneau.
           </p>
         )}
       </div>
@@ -750,7 +750,7 @@ function FilledBody({
             />
             {!isVisibleFromValid && (
               <p className="text-xs text-destructive">
-                La date de visibilité doit être avant ou le jour de la séance.
+                La date ne peut pas être postérieure au jour du créneau.
               </p>
             )}
             <div className="flex gap-2">

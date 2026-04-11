@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { SwimSessionBuilder } from "@/components/coach/swim/SwimSessionBuilder";
-import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Plus, Route, Search, Timer, Trash2 } from "lucide-react";
+import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Loader2, Plus, Route, Search, Timer, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useAuth } from "@/lib/auth";
@@ -770,19 +770,21 @@ export default function SwimCatalog({
             <button
               type="button"
               onClick={() => setShowCreateFolder(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
+              disabled={createFolderMutation.isPending}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <FolderPlus className="h-4 w-4" />
+              {createFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
               Nouveau dossier
             </button>
             {currentFolder !== null && visibleSessions.length === 0 && currentSubFolders.length === 0 && (
               <button
                 type="button"
                 onClick={() => deleteFolderMutation.mutate(currentFolder)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/30 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                disabled={deleteFolderMutation.isPending}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/30 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Trash2 className="h-4 w-4" />
-                Supprimer ce dossier
+                {deleteFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deleteFolderMutation.isPending ? "Suppression..." : "Supprimer ce dossier"}
               </button>
             )}
             {currentFolder === null && archivedCount > 0 && (
@@ -813,6 +815,12 @@ export default function SwimCatalog({
         )}
 
         <div className="mt-4">
+          {showArchive && !sessionsLoading && visibleSessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Archive className="h-10 w-10 mb-3 opacity-40" />
+              <p className="text-sm">Aucune séance archivée</p>
+            </div>
+          ) : (
           <SessionListView
             sessions={visibleSessions}
             isLoading={sessionsLoading}
@@ -829,6 +837,7 @@ export default function SwimCatalog({
             onShare={showArchive ? undefined : handleShare}
             archiveMode={showArchive ? "restore" : "archive"}
           />
+          )}
           {hasNextSwimPage && (
             <Button
               variant="outline"

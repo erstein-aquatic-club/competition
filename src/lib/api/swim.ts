@@ -109,24 +109,17 @@ export async function createSwimSession(session: any) {
       if (error) throw new Error(error.message);
       return { status: "updated" };
     }
-    // Create new
-    const { data: created, error } = await supabase
-      .from("swim_sessions_catalog")
-      .insert({
-        name: session.name,
-        description: session.description ?? null,
-        folder: session.folder ?? null,
-      })
-      .select("id")
-      .single();
+    // Create new — atomic RPC
+    const { data, error } = await supabase.rpc('create_swim_session_atomic', {
+      p_name: session.name,
+      p_description: session.description ?? null,
+      p_total_distance: session.total_distance ?? null,
+      p_folder: session.folder ?? null,
+      p_created_by: session.created_by ?? null,
+      p_items: JSON.stringify(items),
+    });
     if (error) throw new Error(error.message);
-    if (items.length > 0) {
-      const { error: itemsError } = await supabase
-        .from("swim_session_items")
-        .insert(items.map((item: any) => ({ ...item, catalog_id: created.id })));
-      if (itemsError) throw new Error(itemsError.message);
-    }
-    return { status: "created" };
+    return { status: "created", sessionId: data?.session_id };
   }
 
   const s = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];
