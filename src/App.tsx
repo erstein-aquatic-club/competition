@@ -280,7 +280,7 @@ function AppRouter() {
         <Suspense fallback={<PageSkeleton />}>
           <Switch>
             <Route path="/reset-password" component={ResetPassword} />
-            <Route path="/">{role === "coach" ? <Redirect to="/coach" /> : <Dashboard />}</Route>
+            <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <Dashboard />}</Route>
             <Route path="/progress" component={Progress} />
             <Route path="/hall-of-fame" component={FEATURES.hallOfFame ? HallOfFame : ComingSoon} />
             <Route path="/competition/:id" component={CompetitionDetail} />

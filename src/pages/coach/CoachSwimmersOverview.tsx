@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AthleteSummary } from "@/lib/api/types";
 import type { WellnessCheck } from "@/lib/api/types";
 import { getGroupWellnessForDate, getWellnessRange, computeReadinessScore } from "@/lib/api/wellness";
@@ -141,11 +142,15 @@ interface Props {
   athletesLoading: boolean;
   onBack?: () => void;
   onOpenAthlete: (athlete: AthleteSummary) => void;
+  isAdmin?: boolean;
+  coachesList?: { id: number; display_name: string }[];
+  allAssignments?: { swimmer_id: number; coach_id: number }[];
 }
 
-export default function CoachSwimmersOverview({ athletes, athletesLoading, onBack, onOpenAthlete }: Props) {
+export default function CoachSwimmersOverview({ athletes, athletesLoading, onBack, onOpenAthlete, isAdmin, coachesList, allAssignments }: Props) {
   const [groupFilter, setGroupFilter] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [coachFilter, setCoachFilter] = useState<number | null>(null);
   const [athletesShown, setAthletesShown] = useState(30);
 
   // ACWR values reported by TrainingLoadIndicators children (for sorting)
@@ -292,6 +297,12 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
     if (groupFilter != null) {
       list = list.filter((a) => a.group_id === groupFilter);
     }
+    if (coachFilter !== null && allAssignments) {
+      const swimmerIdsForCoach = new Set(
+        allAssignments.filter((a) => a.coach_id === coachFilter).map((a) => a.swimmer_id)
+      );
+      list = list.filter((a) => a.id != null && swimmerIdsForCoach.has(a.id));
+    }
     switch (sortKey) {
       case "forme":
         list.sort((a, b) => {
@@ -335,10 +346,10 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [athletes, groupFilter, sortKey, athleteKPIs, wellnessByUser, acwrMapVersion]);
+  }, [athletes, groupFilter, sortKey, athleteKPIs, wellnessByUser, acwrMapVersion, coachFilter, allAssignments]);
 
   // Reset pagination when filters change
-  useEffect(() => { setAthletesShown(30); }, [groupFilter, sortKey]);
+  useEffect(() => { setAthletesShown(30); }, [groupFilter, sortKey, coachFilter]);
 
   return (
     <div className="space-y-4 pb-4">
@@ -382,6 +393,25 @@ export default function CoachSwimmersOverview({ athletes, athletesLoading, onBac
           ))}
         </div>
       )}
+
+      {isAdmin && coachesList && coachesList.length > 0 ? (
+        <Select
+          value={coachFilter === null ? "all" : String(coachFilter)}
+          onValueChange={(v) => setCoachFilter(v === "all" ? null : Number(v))}
+        >
+          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+            <SelectValue placeholder="Coach" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les coachs</SelectItem>
+            {coachesList.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.display_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
 
       {/* Sort buttons */}
       <div className="flex items-center gap-2">

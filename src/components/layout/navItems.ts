@@ -1,4 +1,4 @@
-import { Waves, TrendingUp, Target, User, Dumbbell, Settings, FileText, Users, CalendarDays, Library, Home, Trophy, Timer, type LucideIcon } from "lucide-react";
+import { Waves, TrendingUp, Target, User, Dumbbell, FileText, Users, CalendarDays, Library, Home, Timer, type LucideIcon } from "lucide-react";
 import { FEATURES } from "@/lib/features";
 
 type NavItem = {
@@ -11,9 +11,11 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
   const normalizedRole = role ?? "athlete";
   if (normalizedRole === "admin") {
     return [
-      { href: "/profile", icon: User, label: "Profil" },
-      { href: "/admin", icon: Settings, label: "Gestion des comptes" },
-      { href: "/records-admin", icon: Trophy, label: "Records" },
+      { href: "/coach?section=week", icon: CalendarDays, label: "Semaine" },
+      { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
+      { href: "/coach?section=library", icon: Library, label: "Biblio" },
+      { href: "/coach", icon: Home, label: "Home" },
+      { href: "/coach?section=chrono", icon: Timer, label: "Chrono" },
     ];
   }
   if (normalizedRole === "comite") {

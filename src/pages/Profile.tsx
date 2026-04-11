@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Brain, Clock, Bell, BellOff, BellRing, ChevronRight, FileText, type LucideIcon } from "lucide-react";
+import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Brain, Clock, Bell, BellOff, BellRing, ChevronRight, FileText, Settings, Users, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import { compressImage, isAcceptedImageType } from "@/lib/imageUtils";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -743,6 +743,34 @@ export default function Profile() {
                     setActiveSection("neurotype-quiz");
                   }
                 }}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {role === "admin" ? (
+          <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base uppercase tracking-[0.08em]">Administration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ProfileActionRow
+                icon={Settings}
+                title="Gestion des comptes"
+                description="Utilisateurs, rôles, activation"
+                onClick={() => navigate("/admin")}
+              />
+              <ProfileActionRow
+                icon={Users}
+                title="Comité"
+                description="Validation heures, approbations"
+                onClick={() => navigate("/comite")}
+              />
+              <ProfileActionRow
+                icon={Trophy}
+                title="Records Admin"
+                description="Import FFN, paramètres sync"
+                onClick={() => navigate("/records-admin")}
               />
             </CardContent>
           </Card>

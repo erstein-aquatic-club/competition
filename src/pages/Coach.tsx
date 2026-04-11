@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { useMySwimmerIds, filterByAssignment } from "@/hooks/useMySwimmerIds";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -584,6 +585,27 @@ export default function Coach() {
     () => filterByAssignment(athletes, swimmerIds),
     [athletes, swimmerIds],
   );
+
+  const isAdmin = role === "admin";
+
+  const { data: allAssignments = [] } = useQuery({
+    queryKey: ["all-assignments"],
+    queryFn: () => api.getAllAssignments(),
+    enabled: isAdmin,
+  });
+
+  const { data: coachesList = [] } = useQuery<{ id: number; display_name: string }[]>({
+    queryKey: ["coaches-list"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("users")
+        .select("id, display_name")
+        .in("role", ["coach", "admin"]);
+      return (data ?? []) as { id: number; display_name: string }[];
+    },
+    enabled: isAdmin,
+  });
+
   const topAthletes = useMemo(() => myAthletes.slice(0, 5), [myAthletes]);
   const { data: groups = [] } = useQuery({
     queryKey: ["groups"],
@@ -763,6 +785,9 @@ export default function Coach() {
             athletes={myAthletes}
             athletesLoading={athletesLoading}
             onOpenAthlete={handleOpenAthlete}
+            isAdmin={isAdmin}
+            coachesList={coachesList}
+            allAssignments={allAssignments}
           />
         </Suspense>
       ) : null}

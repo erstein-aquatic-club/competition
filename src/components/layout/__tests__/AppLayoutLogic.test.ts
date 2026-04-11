@@ -6,8 +6,18 @@ test("Coach nav items include expected labels", () => {
   const items = getNavItemsForRole("coach");
   const labels = items.map((item) => item.label);
 
-  assert.equal(labels[0], "Natation");
-  assert.ok(labels.includes("Calendrier"));
+  assert.equal(labels[0], "Semaine");
   assert.ok(labels.includes("Nageurs"));
-  assert.ok(labels.includes("Profil"));
+  assert.ok(labels.includes("Biblio"));
+  assert.ok(labels.includes("Home"));
+  assert.ok(labels.includes("Chrono"));
+});
+
+test("Admin nav items match coach nav items", () => {
+  const adminItems = getNavItemsForRole("admin");
+  const coachItems = getNavItemsForRole("coach");
+  const adminLabels = adminItems.map((item) => item.label);
+  const coachLabels = coachItems.map((item) => item.label);
+
+  assert.deepEqual(adminLabels, coachLabels);
 });
