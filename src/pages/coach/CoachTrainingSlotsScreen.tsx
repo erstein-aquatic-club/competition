@@ -211,7 +211,9 @@ const SlotFormSheet = ({
   const queryClient = useQueryClient();
   const isEdit = !!slot;
 
+  const [slotMode, setSlotMode] = useState<"recurring" | "oneoff">("recurring");
   const [dayOfWeek, setDayOfWeek] = useState("1");
+  const [scheduledDate, setScheduledDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
@@ -223,7 +225,9 @@ const SlotFormSheet = ({
   useEffect(() => {
     if (!open) return;
     if (slot) {
+      setSlotMode(slot.scheduled_date ? "oneoff" : "recurring");
       setDayOfWeek(String(slot.day_of_week));
+      setScheduledDate(slot.scheduled_date ?? "");
       setStartTime(formatTime(slot.start_time));
       setEndTime(formatTime(slot.end_time));
       setLocation(slot.location);
@@ -231,7 +235,9 @@ const SlotFormSheet = ({
       setSelectedCoachIds((slot.coaches ?? []).map((c) => c.coach_id));
       setLaneCount(slot.lane_count != null ? String(slot.lane_count) : "");
     } else {
+      setSlotMode("recurring");
       setDayOfWeek("1");
+      setScheduledDate("");
       setStartTime("");
       setEndTime("");
       setLocation("");
@@ -269,14 +275,25 @@ const SlotFormSheet = ({
       });
       return null;
     }
+    if (slotMode === "oneoff" && !scheduledDate) {
+      toast({ title: "Date requise", description: "Veuillez saisir la date du créneau ponctuel.", variant: "destructive" });
+      return null;
+    }
+    let effectiveDayOfWeek = Number(dayOfWeek);
+    if (slotMode === "oneoff" && scheduledDate) {
+      const d = new Date(scheduledDate + "T00:00:00");
+      const jsDay = d.getDay();
+      effectiveDayOfWeek = jsDay === 0 ? 7 : jsDay;
+    }
     return {
-      day_of_week: Number(dayOfWeek),
+      day_of_week: effectiveDayOfWeek,
       start_time: startTime,
       end_time: endTime,
       location: location.trim(),
       lane_count: laneCount ? Number(laneCount) : null,
       group_ids: selectedGroupIds,
       coach_ids: selectedCoachIds,
+      scheduled_date: slotMode === "oneoff" ? scheduledDate : null,
     };
   };
 
@@ -363,22 +380,29 @@ const SlotFormSheet = ({
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
-            {/* Day of week */}
-            <div className="space-y-2">
-              <Label>Jour de la semaine *</Label>
-              <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAYS_FR.map((d, i) => (
-                    <SelectItem key={i + 1} value={String(i + 1)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Recurring / One-off toggle */}
+            {!isEdit && (
+              <div className="flex gap-1 rounded-xl border bg-muted/30 p-0.5">
+                <button type="button" onClick={() => setSlotMode("recurring")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${slotMode === "recurring" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Récurrent</button>
+                <button type="button" onClick={() => setSlotMode("oneoff")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${slotMode === "oneoff" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Ponctuel</button>
+              </div>
+            )}
+            {slotMode === "recurring" ? (
+              <div className="space-y-2">
+                <Label>Jour de la semaine *</Label>
+                <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DAYS_FR.map((d, i) => (<SelectItem key={i + 1} value={String(i + 1)}>{d}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="slot-date">Date *</Label>
+                <input id="slot-date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+              </div>
+            )}
 
             {/* Time range */}
             <div className="grid grid-cols-2 gap-3">
@@ -512,7 +536,7 @@ const SlotFormSheet = ({
               <Button
                 className="w-full"
                 onClick={handleSubmit}
-                disabled={isPending || !startTime || !endTime || !location.trim()}
+                disabled={isPending || !startTime || !endTime || !location.trim() || (slotMode === "oneoff" && !scheduledDate)}
               >
                 {isPending
                   ? "Enregistrement..."
