@@ -4,7 +4,7 @@ import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap } from "../../hooks/useChronoTimer";
 import { WAVE_COLORS } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
-import { Send, RotateCcw, Check, AlertCircle, Clock } from "lucide-react";
+import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
 import type { SwimExerciseLogInput } from "../../lib/api/types";
@@ -17,7 +17,6 @@ interface ChronoResultsProps {
 
 type ExportStatus = "pending" | "sent" | "error";
 
-/** Flatten all reps into a single split_times array for export */
 function flattenSplits(splitsByRep: SplitRecord[][]): { rep: number; time_seconds: number }[] {
   const result: { rep: number; time_seconds: number }[] = [];
   let idx = 1;
@@ -33,9 +32,39 @@ function totalSplitCount(splitsByRep: SplitRecord[][]): number {
   return splitsByRep.reduce((sum, rep) => sum + rep.length, 0);
 }
 
+/** Get total time of a series (last split's cumulative time) */
+function seriesTotalMs(splits: SplitRecord[]): number {
+  return splits.length > 0 ? splits[splits.length - 1].cumulativeMs : 0;
+}
+
+/** Find the index of the best (fastest) series */
+function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
+  let bestIdx = -1;
+  let bestMs = Infinity;
+  for (let i = 0; i < splitsByRep.length; i++) {
+    if (splitsByRep[i].length === 0) continue;
+    const total = seriesTotalMs(splitsByRep[i]);
+    if (total > 0 && total < bestMs) {
+      bestMs = total;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
 export default function ChronoResults({ state, dispatch, onExportComplete }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (key: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const raceEntries = Array.from(state.raceData.values());
   const byLane = new Map<number, typeof raceEntries>();
@@ -46,7 +75,6 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
     byLane.set(lane, list);
   }
   const sortedLanes = Array.from(byLane.keys()).sort((a, b) => a - b);
-  const hasMultipleReps = raceEntries.some((e) => e.splitsByRep.length > 1);
 
   const handleExportAll = useCallback(async () => {
     setExporting(true);
@@ -61,13 +89,12 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
     const results = await Promise.allSettled(
       swimmers.map(async (raceState) => {
         const { swimmer, splitsByRep } = raceState;
-        const repCount = splitsByRep.length;
+        const repCount = splitsByRep.filter((s) => s.length > 0).length;
         const log: SwimExerciseLogInput = {
           exercise_label: "Chrono coach",
           split_times: flattenSplits(splitsByRep),
           notes: `Série chrono — Ligne ${swimmer.lane}${repCount > 1 ? ` — ${repCount} séries` : ""}`,
         };
-
         await createStandaloneSwimLog(String(swimmer.athleteId), log);
         return swimmer.athleteId;
       }),
@@ -100,140 +127,138 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
     }
   }, [raceEntries, exportStatuses, onExportComplete]);
 
-  const handleNewSeries = useCallback(() => {
-    dispatch({ type: "RESET_FOR_NEW_SERIES" });
-  }, [dispatch]);
-
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
+    <div className="flex flex-col gap-5">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Résultats</h2>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewSeries}
-            disabled={exporting}
-          >
+          <Button variant="outline" size="sm" onClick={() => dispatch({ type: "RESET_FOR_NEW_SERIES" })} disabled={exporting}>
             <RotateCcw className="mr-1.5 h-4 w-4" />
             Nouvelle série
           </Button>
-          <Button
-            size="sm"
-            onClick={handleExportAll}
-            disabled={exporting}
-          >
+          <Button size="sm" onClick={handleExportAll} disabled={exporting}>
             <Send className="mr-1.5 h-4 w-4" />
             Envoyer à tous
           </Button>
         </div>
       </div>
 
-      {/* Results cards grouped by lane */}
+      {/* ── Results by lane ── */}
       {sortedLanes.map((lane) => (
-        <div key={lane} className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Ligne {lane}
-          </h3>
+        <div key={lane} className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Ligne {lane}
+            </h3>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
           {byLane.get(lane)!.map((raceState) => {
             const { swimmer, splitsByRep } = raceState;
-            const waveColor = WAVE_COLORS[(swimmer.wave - 1) % WAVE_COLORS.length];
+            const wc = WAVE_COLORS[(swimmer.wave - 1) % WAVE_COLORS.length];
             const status = exportStatuses.get(swimmer.athleteId);
             const total = totalSplitCount(splitsByRep);
+            const bestSeriesIdx = findBestSeriesIdx(splitsByRep);
+            const completedSeries = splitsByRep.filter((s) => s.length > 0);
+            const cardKey = `${swimmer.athleteId}`;
+            const isExpanded = expandedCards.has(cardKey);
 
             return (
-              <div
-                key={swimmer.athleteId}
-                className="rounded-lg border bg-card p-3"
-              >
-                {/* Swimmer header */}
-                <div className="flex items-center justify-between mb-2">
+              <div key={swimmer.athleteId} className="rounded-xl border bg-card overflow-hidden">
+                {/* ── Swimmer header ── */}
+                <div className="flex items-center justify-between px-4 pt-3 pb-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">
+                    <span className="text-base font-bold text-foreground">
                       {swimmer.displayName}
                     </span>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${waveColor.dot}`}
-                    >
-                      {waveColor.label}
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
+                      {wc.label}
                     </span>
                   </div>
                   <ExportStatusBadge status={status} />
                 </div>
 
-                {/* Splits by rep */}
                 {total === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    Aucun split enregistré
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {splitsByRep.map((splits, repIdx) => {
-                      if (splits.length === 0) return null;
-
-                      let bestLapIdx = -1;
-                      let bestLapMs = Infinity;
-                      for (let i = 0; i < splits.length; i++) {
-                        if (splits[i].lapMs < bestLapMs) {
-                          bestLapMs = splits[i].lapMs;
-                          bestLapIdx = i;
-                        }
-                      }
-                      const lastSplit = splits[splits.length - 1];
-
-                      return (
-                        <div key={repIdx}>
-                          {/* Rep header — only show if multiple reps */}
-                          {hasMultipleReps && (
-                            <div className="text-xs font-semibold text-muted-foreground mb-1">
-                              Série {repIdx + 1}
-                            </div>
-                          )}
-
-                          <div className="flex flex-col gap-0.5 mb-1.5">
-                            {splits.map((split, i) => {
-                              const isBest = i === bestLapIdx;
-                              return (
-                                <div
-                                  key={i}
-                                  className={`flex items-center gap-3 font-mono tabular-nums text-sm ${
-                                    isBest ? "text-green-600 dark:text-green-400" : "text-foreground"
-                                  }`}
-                                >
-                                  <span className="w-12 text-right text-muted-foreground text-xs">
-                                    {state.splitDistanceM > 0 ? `${(i + 1) * state.splitDistanceM}m` : `#${i + 1}`}
-                                  </span>
-                                  <span className="w-20">
-                                    {formatTime(split.cumulativeMs)}
-                                  </span>
-                                  <span className="text-muted-foreground">
-                                    ({formatLap(split.lapMs)})
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Rep summary */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 border-t pt-1.5 text-xs text-muted-foreground">
-                            <span>
-                              Total :{" "}
-                              <span className="font-mono tabular-nums text-foreground">
-                                {formatTime(lastSplit.cumulativeMs)}
-                              </span>
-                            </span>
-                            <span>
-                              Meilleur :{" "}
-                              <span className="font-mono tabular-nums text-green-600 dark:text-green-400">
-                                {formatLap(bestLapMs)} (#{bestLapIdx + 1})
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="px-4 pb-3">
+                    <p className="text-sm text-muted-foreground italic">Aucun temps enregistré</p>
                   </div>
+                ) : (
+                  <>
+                    {/* ── Series totals — horizontal row ── */}
+                    <div className="px-4 pb-2">
+                      <div className="flex flex-wrap gap-2">
+                        {splitsByRep.map((splits, idx) => {
+                          if (splits.length === 0) return null;
+                          const totalMs = seriesTotalMs(splits);
+                          const isBest = idx === bestSeriesIdx && completedSeries.length > 1;
+                          return (
+                            <div
+                              key={idx}
+                              className={`rounded-lg border px-3 py-1.5 ${
+                                isBest
+                                  ? "border-green-500/50 bg-green-500/10"
+                                  : "border-border bg-muted/50"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {isBest && <Trophy className="h-3 w-3 text-green-500" />}
+                                <span className="text-[10px] font-medium text-muted-foreground">
+                                  S{idx + 1}
+                                </span>
+                              </div>
+                              <span className={`font-mono tabular-nums text-lg font-black leading-tight ${
+                                isBest ? "text-green-600 dark:text-green-400" : "text-foreground"
+                              }`}>
+                                {formatTime(totalMs)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* ── Expand/collapse splits ── */}
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(cardKey)}
+                      className="flex w-full items-center justify-center gap-1 border-t py-1.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      {isExpanded ? "Masquer les splits" : "Voir les splits"}
+                    </button>
+
+                    {/* ── Splits detail (collapsible) ── */}
+                    {isExpanded && (
+                      <div className="border-t px-4 py-3 flex flex-col gap-3">
+                        {splitsByRep.map((splits, repIdx) => {
+                          if (splits.length === 0) return null;
+                          const isBest = repIdx === bestSeriesIdx && completedSeries.length > 1;
+                          return (
+                            <div key={repIdx}>
+                              {completedSeries.length > 1 && (
+                                <div className={`text-xs font-semibold mb-1 ${isBest ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                  {isBest && "★ "}Série {repIdx + 1}
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-0.5">
+                                {splits.map((split, i) => (
+                                  <div key={i} className="flex items-center gap-3 font-mono tabular-nums text-sm text-foreground">
+                                    <span className="w-12 text-right text-xs text-muted-foreground">
+                                      {state.splitDistanceM > 0 ? `${(i + 1) * state.splitDistanceM}m` : `#${i + 1}`}
+                                    </span>
+                                    <span className="w-20">{formatTime(split.cumulativeMs)}</span>
+                                    <span className="text-muted-foreground">({formatLap(split.lapMs)})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );

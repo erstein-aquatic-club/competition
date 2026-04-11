@@ -199,129 +199,76 @@ export default function ChronoSetup({
         </div>
       )}
 
-      {/* ── Distance config ──────────────────────────── */}
+      {/* ── Série / Distance config ─────────────────── */}
       <div className="flex flex-wrap items-center gap-4">
+        {/* Series count — FIRST */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Séries :</span>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8"
+              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
+              disabled={state.seriesCount <= 0}
+            ><Minus className="h-3.5 w-3.5" /></Button>
+            <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
+              onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+              className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+            />
+            <Button variant="outline" size="icon" className="h-8 w-8"
+              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
+            ><Plus className="h-3.5 w-3.5" /></Button>
+          </div>
+        </div>
+
+        <span className="text-muted-foreground">×</span>
+
         {/* Total distance stepper */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Distance :</span>
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
+            <Button variant="outline" size="icon" className="h-8 w-8"
               onClick={() => {
-                const cur = state.totalDistanceM;
-                const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < cur);
+                const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
                 dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
               }}
               disabled={state.totalDistanceM <= 0}
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={state.totalDistanceM || ""}
-              placeholder="—"
+            ><Minus className="h-3.5 w-3.5" /></Button>
+            <input type="text" inputMode="numeric" value={state.totalDistanceM || ""} placeholder="—"
               onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
               className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
             />
             <span className="text-xs text-muted-foreground">m</span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
+            <Button variant="outline" size="icon" className="h-8 w-8"
               onClick={() => {
-                const cur = state.totalDistanceM;
-                const next = DISTANCE_PRESETS.find((d) => d > cur);
-                dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? cur + 100 });
+                const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
+                dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
               }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+            ><Plus className="h-3.5 w-3.5" /></Button>
           </div>
         </div>
 
-        {/* Split distance stepper */}
+        {/* Split distance */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Splits :</span>
+          <span className="text-sm text-muted-foreground">splits à</span>
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
+            <Button variant="outline" size="icon" className="h-8 w-8"
               onClick={() => {
-                const cur = state.splitDistanceM;
-                const prev = [...SPLIT_PRESETS].reverse().find((d) => d < cur);
+                const prev = [...SPLIT_PRESETS].reverse().find((d) => d < state.splitDistanceM);
                 dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
               }}
               disabled={state.splitDistanceM <= 25}
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={state.splitDistanceM || ""}
-              placeholder="50"
+            ><Minus className="h-3.5 w-3.5" /></Button>
+            <input type="text" inputMode="numeric" value={state.splitDistanceM || ""} placeholder="50"
               onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
               className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
             />
             <span className="text-xs text-muted-foreground">m</span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
+            <Button variant="outline" size="icon" className="h-8 w-8"
               onClick={() => {
-                const cur = state.splitDistanceM;
-                const next = SPLIT_PRESETS.find((d) => d > cur);
-                dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? cur + 25 });
+                const next = SPLIT_PRESETS.find((d) => d > state.splitDistanceM);
+                dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
               }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+            ><Plus className="h-3.5 w-3.5" /></Button>
           </div>
         </div>
-
-        {/* Series count */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Séries :</span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
-              disabled={state.seriesCount <= 0}
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={state.seriesCount || ""}
-              placeholder="∞"
-              onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-              className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Summary */}
-        {state.totalDistanceM > 0 && state.seriesCount > 0 && (
-          <span className="text-xs text-muted-foreground">
-            → {state.seriesCount}×{state.totalDistanceM}m
-            {state.splitDistanceM > 0 && ` (${Math.ceil(state.totalDistanceM / state.splitDistanceM)} splits/série)`}
-          </span>
-        )}
       </div>
 
       {/* ── Lane sections ──────────────────────────────── */}
