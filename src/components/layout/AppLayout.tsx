@@ -154,7 +154,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           const sectionLabel = COACH_SECTION_LABELS[hashSection] || hashSection;
           return (
             <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-background/95 backdrop-blur px-4 py-2 border-b border-border/40">
-              <span className="text-base font-bold tracking-tight text-foreground">{sectionLabel}</span>
+              <span className="text-sm font-semibold text-foreground">{sectionLabel}</span>
             </div>
           );
         })()}

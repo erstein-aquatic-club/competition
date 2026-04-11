@@ -1832,18 +1832,8 @@ const CoachTrainingSlotsScreen = ({
         </div>
       )}
 
-      {/* ── Desktop: row 1 — actions + filter + mode toggle ── */}
+      {/* ── Desktop: row 1 — filter (left) + actions + mode toggle (right) ── */}
       <div className="hidden sm:flex items-center gap-2">
-        {onOpenLibrary && (
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
-            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-            Bibliothèque
-          </Button>
-        )}
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreate}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Nouveau
-        </Button>
         <Select value={filterValue} onValueChange={setFilterValue}>
           <SelectTrigger className="w-44 h-8 text-xs">
             <SelectValue placeholder="Filtrer..." />
@@ -1871,6 +1861,16 @@ const CoachTrainingSlotsScreen = ({
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        {onOpenLibrary && (
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
+            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+            Bibliothèque
+          </Button>
+        )}
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreate}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Nouveau
+        </Button>
         {modeToggle}
       </div>
 
