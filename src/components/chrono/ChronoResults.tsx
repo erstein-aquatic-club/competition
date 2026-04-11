@@ -104,6 +104,7 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
 export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   const toggleExpand = (key: string) => {
@@ -116,14 +117,17 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
   };
 
   const handleSaveDraft = useCallback(async () => {
+    if (savingDraft) return;
+    setSavingDraft(true);
     try {
       await createChronoRecord(buildChronoRecordInput(state, "draft"));
       toast.success("Brouillon enregistré");
       onSaveDraft?.();
     } catch (err: any) {
       toast.error(err.message || "Erreur de sauvegarde");
+      setSavingDraft(false);
     }
-  }, [state, onSaveDraft]);
+  }, [state, onSaveDraft, savingDraft]);
 
   const raceEntries = Array.from(state.raceData.values());
   const byLane = new Map<number, typeof raceEntries>();
@@ -202,7 +206,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Résultats</h2>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={exporting}>
+          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={exporting || savingDraft}>
             <Clock className="mr-1.5 h-4 w-4" />
             Brouillon
           </Button>

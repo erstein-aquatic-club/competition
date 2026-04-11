@@ -124,6 +124,14 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
     toast.success("Chrono supprimé");
   };
 
+  const breadcrumbSegments = useMemo(
+    () => [
+      { label: 'Chrono', href: '#/coach?section=chrono' },
+      { label: 'Historique' },
+    ],
+    [],
+  );
+
   // --- Editor view ---
 
   if (selectedRecord) {
@@ -160,14 +168,6 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
       </div>
     );
   }
-
-  const breadcrumbSegments = useMemo(
-    () => [
-      { label: 'Chrono', href: '#/coach?section=chrono' },
-      { label: 'Historique' },
-    ],
-    [],
-  );
 
   // --- List view ---
 
