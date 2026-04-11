@@ -102,6 +102,38 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-12 — Fix: notifications entretien orphelines + navigateFallback PWA (§102)
+
+**Branche** : `main`
+
+### Contexte
+
+Deux bugs remontés par les utilisateurs :
+1. **Bug entretien fantôme** : François Wagner recevait une notification push "Entretien à compléter" mais rien ne s'affichait dans l'onglet Entretiens. Cause : les entretiens avaient été supprimés mais les notifications restaient en base.
+2. **Bug 404 profil** : Samuel Nonnenmacher a vu une page 404 GitHub Pages en tentant d'enregistrer son IUF. Cause probable : absence de `navigateFallback` dans la config Workbox, ce qui empêche le service worker de servir `index.html` pour les navigations non-hash.
+
+### Changements
+
+1. **Migration `00090_interview_notification_cleanup.sql`** :
+   - Les triggers `auto_notify_interview_created()` et `auto_notify_interview_transition()` stockent désormais `interview_id` et `url` dans le champ `metadata` JSONB
+   - Le `type` des notifications passe de `'message'` à `'interview'` (meilleur routage frontend)
+   - Nouveau trigger `trg_cleanup_interview_notifications` (BEFORE DELETE sur interviews) qui supprime automatiquement les notifications associées
+   - Nettoyage des 4 notifications orphelines existantes (IDs 30, 285, 286, 289)
+
+2. **`vite.config.ts`** : ajout de `navigateFallback` et `navigateFallbackDenylist` dans la config Workbox pour que le service worker serve toujours `index.html` sur les navigations SPA
+
+### Fichiers modifiés
+
+- `supabase/migrations/00090_interview_notification_cleanup.sql` (nouveau)
+- `vite.config.ts` (navigateFallback)
+
+### Limites
+
+- Le bug 404 de Samuel n'est pas reproduit avec certitude — le navigateFallback est un fix préventif
+- Les anciennes notifications (avant cette migration) sans `interview_id` dans metadata ne seront pas nettoyées automatiquement si un entretien est supprimé
+
+---
+
 ## 2026-03-01 — Redesign ObjectiveCard + harmonisation Planif nageur (§86)
 
 **Branche** : `main`

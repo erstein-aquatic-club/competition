@@ -42,6 +42,8 @@ export default defineConfig(({ mode }) => ({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
+        navigateFallback: mode === 'production' ? '/competition/index.html' : '/index.html',
+        navigateFallbackDenylist: [/^\/competition\/api/, /^\/competition\/version\.json/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
