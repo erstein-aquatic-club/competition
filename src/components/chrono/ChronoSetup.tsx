@@ -19,6 +19,7 @@ interface ChronoSetupProps {
   dispatch: React.Dispatch<ChronoAction>;
   athletes: AthleteSummary[];
   allAthletes?: AthleteSummary[];
+  isMobile?: boolean;
 }
 
 export default function ChronoSetup({
@@ -26,7 +27,11 @@ export default function ChronoSetup({
   dispatch,
   athletes,
   allAthletes,
+  isMobile = false,
 }: ChronoSetupProps) {
+  const maxLanes = isMobile ? 3 : 8;
+  const maxSwimmersPerLane = isMobile ? 2 : Infinity;
+  const maxWaves = isMobile ? 2 : 6;
   const [addLane, setAddLane] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -85,7 +90,7 @@ export default function ChronoSetup({
     dispatch({
       type: "SET_WAVE",
       athleteId,
-      wave: (currentWave % 6) + 1,
+      wave: (currentWave % maxWaves) + 1,
     });
   };
 
@@ -129,7 +134,7 @@ export default function ChronoSetup({
           onClick={() =>
             dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })
           }
-          disabled={state.laneCount >= 8}
+          disabled={state.laneCount >= maxLanes}
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -323,17 +328,19 @@ export default function ChronoSetup({
                     );
                   })}
 
-                  {/* Add swimmer button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddLane(lane);
-                      setSearch("");
-                    }}
-                    className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </button>
+                  {/* Add swimmer button — hidden when lane is full on mobile */}
+                  {swimmers.length < maxSwimmersPerLane && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddLane(lane);
+                        setSearch("");
+                      }}
+                      className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted"
+                    >
+                      <Plus className="h-5 w-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -7,12 +7,18 @@ import ChronoRace from "../../components/chrono/ChronoRace";
 import ChronoResults from "../../components/chrono/ChronoResults";
 import { STORAGE_KEYS } from "../../lib/api/client";
 import { Button } from "../../components/ui/button";
-import { Timer } from "lucide-react";
+import { Timer, Smartphone } from "lucide-react";
 import type { AthleteSummary } from "../../lib/api/types";
 
 const BACKUP_KEY = STORAGE_KEYS.CHRONO_BACKUP;
 
-/** Serialize ChronoState for localStorage (Map → array) */
+/** Mobile limits */
+export const MOBILE_LIMITS = {
+  maxLanes: 3,
+  maxSwimmersPerLane: 2,
+  maxWaves: 2,
+} as const;
+
 function serializeState(state: ChronoState): string {
   return JSON.stringify({
     ...state,
@@ -20,17 +26,26 @@ function serializeState(state: ChronoState): string {
   });
 }
 
-/** Deserialize ChronoState from localStorage (array → Map) */
 function deserializeState(raw: string): ChronoState | null {
   try {
     const parsed = JSON.parse(raw);
-    return {
-      ...parsed,
-      raceData: new Map(parsed.raceData),
-    };
+    return { ...parsed, raceData: new Map(parsed.raceData) };
   } catch {
     return null;
   }
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
 }
 
 interface Props {
@@ -41,8 +56,8 @@ interface Props {
 export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
   const [state, dispatch] = useReducer(chronoReducer, initialChronoState);
   const [showRestore, setShowRestore] = useState(false);
+  const isMobile = useIsMobile();
 
-  // Check for backup on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(BACKUP_KEY);
@@ -59,7 +74,6 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
     }
   }, []);
 
-  // Save to localStorage on state changes (skip empty setup)
   useEffect(() => {
     if (state.swimmers.length > 0) {
       try {
@@ -73,9 +87,7 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
       const raw = localStorage.getItem(BACKUP_KEY);
       if (raw) {
         const restored = deserializeState(raw);
-        if (restored) {
-          dispatch({ type: "RESTORE_STATE", state: restored });
-        }
+        if (restored) dispatch({ type: "RESTORE_STATE", state: restored });
       }
     } catch { /* ignore */ }
     setShowRestore(false);
@@ -86,7 +98,6 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
     setShowRestore(false);
   }, []);
 
-  // Clear backup after successful export
   const handleExportComplete = useCallback(() => {
     localStorage.removeItem(BACKUP_KEY);
   }, []);
@@ -96,25 +107,22 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
 
   return (
     <>
-      {/* Mobile guard — chrono is tablet/desktop only */}
-      <div className="flex flex-col items-center justify-center gap-3 p-8 text-center md:hidden" style={{ minHeight: "50vh" }}>
-        <Timer className="h-10 w-10 text-muted-foreground" />
-        <p className="text-lg font-semibold">Chrono non disponible sur mobile</p>
-        <p className="text-sm text-muted-foreground">
-          Utilisez une tablette ou un ordinateur pour accéder au chronomètre.
-        </p>
-      </div>
-
-      {/* Race phase uses full width — no container */}
+      {/* Race phase uses full width */}
       {state.phase === "racing" && (
-        <div className="hidden md:block">
-          <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
-        </div>
+        <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
       )}
 
-      {/* Setup & results use a centered container */}
+      {/* Setup & results */}
       {state.phase !== "racing" && (
-        <div className="hidden md:block max-w-6xl mx-auto p-4">
+        <div className="max-w-6xl mx-auto p-4">
+          {/* Mobile info banner */}
+          {isMobile && state.phase === "setup" && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <Smartphone className="h-3.5 w-3.5 shrink-0" />
+              <span>Mode mobile : max {MOBILE_LIMITS.maxLanes} lignes, {MOBILE_LIMITS.maxSwimmersPerLane} nageurs/ligne, {MOBILE_LIMITS.maxWaves} vagues</span>
+            </div>
+          )}
+
           {showRestore && (
             <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-950/60 p-4 flex items-center justify-between gap-4 shadow-lg shadow-amber-900/20">
               <div className="flex items-center gap-3">
@@ -137,7 +145,7 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
           )}
 
           {state.phase === "setup" && (
-            <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} />
+            <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} isMobile={isMobile} />
           )}
           {state.phase === "results" && (
             <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} />
