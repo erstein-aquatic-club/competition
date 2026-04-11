@@ -6,8 +6,18 @@ import { WAVE_COLORS } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
 import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "../../lib/supabase";
 import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
 import type { SwimExerciseLogInput } from "../../lib/api/types";
+
+/** Resolve public.users integer ID → auth.users UUID */
+async function resolveAuthUid(athleteId: number): Promise<string | null> {
+  const { data, error } = await supabase.rpc("get_auth_uid_for_user", {
+    p_user_id: athleteId,
+  });
+  if (error) return null;
+  return data as string | null;
+}
 
 interface ChronoResultsProps {
   state: ChronoState;
@@ -89,13 +99,18 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
     const results = await Promise.allSettled(
       swimmers.map(async (raceState) => {
         const { swimmer, splitsByRep } = raceState;
+
+        // Resolve auth UUID from public.users integer ID
+        const authUid = await resolveAuthUid(swimmer.athleteId);
+        if (!authUid) throw new Error(`UUID introuvable pour ${swimmer.displayName}`);
+
         const repCount = splitsByRep.filter((s) => s.length > 0).length;
         const log: SwimExerciseLogInput = {
           exercise_label: "Chrono coach",
           split_times: flattenSplits(splitsByRep),
           notes: `Série chrono — Ligne ${swimmer.lane}${repCount > 1 ? ` — ${repCount} séries` : ""}`,
         };
-        await createStandaloneSwimLog(String(swimmer.athleteId), log);
+        await createStandaloneSwimLog(authUid, log);
         return swimmer.athleteId;
       }),
     );
