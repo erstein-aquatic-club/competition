@@ -697,7 +697,7 @@ export default function StrengthCatalog() {
 
   const exerciseEditDialog = (
     <Dialog open={exerciseEditOpen} onOpenChange={setExerciseEditOpen}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto pb-safe">
+      <DialogContent className="sm:max-w-3xl max-h-[85dvh] overflow-y-auto pb-safe">
         <DialogHeader>
           <DialogTitle>Modifier l'exercice</DialogTitle>
         </DialogHeader>
@@ -816,7 +816,7 @@ export default function StrengthCatalog() {
 
   const exerciseCreateDialog = (
     <Dialog open={exerciseDialogOpen} onOpenChange={setExerciseDialogOpen}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto pb-safe">
+      <DialogContent className="sm:max-w-3xl max-h-[85dvh] overflow-y-auto pb-safe">
         <DialogHeader>
           <DialogTitle>Créer un exercice</DialogTitle>
         </DialogHeader>

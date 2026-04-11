@@ -48,13 +48,13 @@ export function ExercisePickerDrawer({ exercises, selectedId, onSelect }: Exerci
       </button>
 
       <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="max-h-[85vh]">
+        <DrawerContent className="max-h-[85dvh]">
           <DrawerHeader className="pb-0">
             <DrawerTitle>Choisir un exercice</DrawerTitle>
           </DrawerHeader>
           <Command className="mt-2" shouldFilter>
             <CommandInput placeholder="Rechercher..." className="h-12" />
-            <CommandList className="max-h-[60vh] px-1 pb-safe">
+            <CommandList className="max-h-[60dvh] px-1 pb-safe">
               <CommandEmpty>Aucun exercice trouvé</CommandEmpty>
               {strengthExercises.length > 0 && (
                 <CommandGroup heading="Travail">

@@ -380,7 +380,7 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
 
           {/* ── Filiere Detail Sheet ── */}
           <Sheet open={!!selectedFiliere} onOpenChange={(o) => !o && setSelectedFiliere(null)}>
-            <SheetContent side="bottom" className="rounded-t-2xl max-h-[75vh] overflow-y-auto">
+            <SheetContent side="bottom" className="rounded-t-2xl max-h-[75dvh] overflow-y-auto">
               <SheetHeader className="pb-0">
                 <SheetTitle className="sr-only">{selectedFiliereData?.name ?? "Filière"}</SheetTitle>
                 <SheetDescription className="sr-only">Détails de la filière</SheetDescription>

@@ -231,7 +231,7 @@ export default function SlotSessionSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          className="rounded-t-3xl max-h-[85vh] overflow-y-auto px-5 pb-8 pt-4"
+          className="rounded-t-3xl max-h-[85dvh] overflow-y-auto px-5 pb-8 pt-4"
         >
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border/60" />
 

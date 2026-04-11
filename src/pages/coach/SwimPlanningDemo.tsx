@@ -578,7 +578,7 @@ export default function SwimPlanningDemo() {
         open={!!filiereSheet}
         onOpenChange={(open) => !open && setFiliereSheet(null)}
       >
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh]">
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh]">
           <SheetHeader className="pb-2">
             <SheetTitle className="text-base">
               {filiereSheet?.existingSlot
@@ -678,7 +678,7 @@ export default function SwimPlanningDemo() {
         open={!!sessionPickerSlot}
         onOpenChange={(open) => !open && setSessionPickerSlot(null)}
       >
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] flex flex-col">
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
           <SheetHeader className="pb-2 shrink-0">
             <SheetTitle className="text-base">Lier une séance</SheetTitle>
             <SheetDescription className="text-xs text-muted-foreground">

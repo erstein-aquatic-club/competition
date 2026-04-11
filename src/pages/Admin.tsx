@@ -831,7 +831,7 @@ export default function Admin() {
 
       {/* Profile edit bottom sheet */}
       <Sheet open={isProfileEditOpen} onOpenChange={setIsProfileEditOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Modifier la fiche — {selectedUser?.display_name}</SheetTitle>
             <SheetDescription>Modifiez les informations du profil utilisateur.</SheetDescription>

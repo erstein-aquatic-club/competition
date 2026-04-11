@@ -1015,7 +1015,7 @@ export function WorkoutRunner({
               <img
                 src={currentExerciseDef.illustration_gif}
                 alt=""
-                className="max-h-[80vh] w-auto max-w-[92vw] rounded-2xl"
+                className="max-h-[80dvh] w-auto max-w-[92vw] rounded-2xl"
                 loading="lazy"
               />
             </div>
@@ -1024,7 +1024,7 @@ export function WorkoutRunner({
       )}
 
       <Sheet open={seriesSheetOpen} onOpenChange={setSeriesSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[80vh] rounded-t-3xl">
+        <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl">
           <SheetHeader>
             <SheetTitle>Aperçu séance</SheetTitle>
           </SheetHeader>
@@ -1079,7 +1079,7 @@ export function WorkoutRunner({
 
       {/* Input Bottom Sheet - Mobile-first numpad */}
       <Drawer open={inputSheetOpen} onOpenChange={setInputSheetOpen}>
-        <DrawerContent className="max-h-[90vh]">
+        <DrawerContent className="max-h-[90dvh]">
           <div className="mx-auto w-full max-w-md px-4 pb-8">
             <DrawerHeader className="pb-2">
               <DrawerTitle className="text-center">

@@ -474,7 +474,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
 
       {/* Edit sheet */}
       <Sheet open={!!editSlot} onOpenChange={(open) => !open && setEditSlot(null)}>
-        <SheetContent side="bottom" className="max-h-[80vh]">
+        <SheetContent side="bottom" className="max-h-[80dvh]">
           <SheetHeader>
             <SheetTitle>Modifier le créneau</SheetTitle>
             <SheetDescription>Ajustez les horaires ou le lieu</SheetDescription>
@@ -495,7 +495,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
 
       {/* Add sheet */}
       <Sheet open={showAddSheet} onOpenChange={setShowAddSheet}>
-        <SheetContent side="bottom" className="max-h-[80vh]">
+        <SheetContent side="bottom" className="max-h-[80dvh]">
           <SheetHeader>
             <SheetTitle>Ajouter un créneau</SheetTitle>
             <SheetDescription>Nouveau créneau personnalisé</SheetDescription>

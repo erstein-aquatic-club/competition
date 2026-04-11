@@ -113,7 +113,7 @@ const SwimmerPicker = ({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      <div className="max-h-[50vh] overflow-y-auto space-y-3">
+      <div className="max-h-[50dvh] overflow-y-auto space-y-3">
         {grouped.map(([groupLabel, groupAthletes]) => (
           <div key={groupLabel}>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">

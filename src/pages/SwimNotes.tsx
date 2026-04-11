@@ -156,7 +156,7 @@ function CreateNoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-sm rounded-2xl max-h-[85dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouvelle note technique</DialogTitle>
         </DialogHeader>

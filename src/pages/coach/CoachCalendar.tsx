@@ -204,7 +204,7 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
 
       {/* Day detail drawer (Sheet) */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="max-h-[70dvh] overflow-y-auto rounded-t-2xl">
           <SheetHeader className="pb-3">
             <SheetTitle className="capitalize text-left">
               {formatDateFR(selectedISO)}

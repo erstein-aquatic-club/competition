@@ -1030,7 +1030,7 @@ export default function Dashboard() {
               className="fixed inset-0 z-overlay bg-black/30"
               onClick={() => setWellnessOpen(false)}
             />
-            <div className="fixed inset-x-0 bottom-0 z-modal max-h-[85vh] overflow-y-auto rounded-t-2xl bg-background border-t border-border shadow-xl px-4 pt-4 pb-6">
+            <div className="fixed inset-x-0 bottom-0 z-modal max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-background border-t border-border shadow-xl px-4 pt-4 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-display font-bold uppercase italic tracking-tight text-primary">
                   Wellness du jour

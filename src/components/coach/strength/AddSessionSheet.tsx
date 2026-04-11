@@ -68,7 +68,7 @@ export function AddSessionSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85vh] flex flex-col rounded-t-2xl">
+      <SheetContent side="bottom" className="max-h-[85dvh] flex flex-col rounded-t-2xl">
         <SheetHeader className="text-left">
           <SheetTitle className="text-base">Ajouter une séance</SheetTitle>
           <SheetDescription className="text-xs">

@@ -708,7 +708,7 @@ export default function Records() {
                   </Button>
 
                   <Sheet open={swimSheetOpen} onOpenChange={setSwimSheetOpen}>
-                    <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-3xl">
+                    <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-3xl">
                       <SheetHeader className="text-left">
                         <SheetTitle className="flex items-center gap-2">
                           <span className="text-lg leading-none">🏊</span>
@@ -940,7 +940,7 @@ export default function Records() {
                       }
                     }}
                   >
-                    <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-3xl">
+                    <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-3xl">
                       <SheetHeader className="text-left">
                         <SheetTitle>{selectedHistoryGroup?.eventCode ?? "Historique"}</SheetTitle>
                         <SheetDescription>

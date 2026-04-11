@@ -143,7 +143,7 @@ export function TimesheetShiftForm({
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="max-h-[72vh] space-y-4 overflow-y-auto px-4 pb-4">
+        <form onSubmit={onSubmit} className="max-h-[72dvh] space-y-4 overflow-y-auto px-4 pb-4">
           <div className="space-y-2">
             <Label htmlFor="shift-date">Date</Label>
             <Input id="shift-date" type="date" value={date} onChange={(event) => onDateChange(event.target.value)} />

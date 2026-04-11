@@ -892,7 +892,7 @@ export default function Profile() {
 
       {/* Edit profile bottom sheet */}
       <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Modifier le profil</SheetTitle>
             <SheetDescription>Mettez à jour vos informations personnelles.</SheetDescription>
@@ -1028,7 +1028,7 @@ export default function Profile() {
 
       {/* Password change bottom sheet */}
       <Sheet open={isPasswordSheetOpen} onOpenChange={setIsPasswordSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Changer le mot de passe</SheetTitle>
             <SheetDescription>Votre mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.</SheetDescription>

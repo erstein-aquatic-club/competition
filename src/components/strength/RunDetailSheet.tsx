@@ -141,7 +141,7 @@ export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDe
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl px-4 pb-8">
+      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-4 pb-8">
         <SheetHeader className="pb-3">
           <SheetTitle className="text-base">
             {dateStr ? format(new Date(dateStr), "EEEE d MMMM yyyy", { locale: fr }) : "Séance"}

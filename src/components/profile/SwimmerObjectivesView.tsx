@@ -297,7 +297,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
 
       {/* Bottom sheet form */}
       <Sheet open={showForm} onOpenChange={setShowForm}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               {editingObj ? "Modifier l'objectif" : "Nouvel objectif"}
