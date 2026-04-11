@@ -843,10 +843,6 @@ export default function Coach() {
       {activeSection === "chrono-history" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachChronoHistoryScreen
-            onSelect={(record) => {
-              // For now, just log — Task 6 will wire this to the editor
-              console.log("Selected record:", record.id);
-            }}
             onBack={() => setActiveSection("home")}
           />
         </Suspense>

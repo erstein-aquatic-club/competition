@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getChronoRecords, deleteChronoRecord } from "../../lib/api/chrono-records";
-import type { ChronoRecord } from "../../lib/api/types";
+import { getChronoRecords, deleteChronoRecord, updateChronoRecord } from "../../lib/api/chrono-records";
+import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
+import { supabase } from "../../lib/supabase";
+import type { ChronoRecord, ChronoRecordSwimmer, SwimExerciseLogInput } from "../../lib/api/types";
+import ChronoSplitEditor from "../../components/chrono/ChronoSplitEditor";
 import { Button } from "../../components/ui/button";
 import {
   AlertDialog,
@@ -17,8 +21,16 @@ import { Trash2, Timer } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
-  onSelect: (record: ChronoRecord) => void;
   onBack: () => void;
+}
+
+/** Resolve public.users integer ID → auth.users UUID */
+async function resolveAuthUid(athleteId: number): Promise<string | null> {
+  const { data, error } = await supabase.rpc("get_auth_uid_for_user", {
+    p_user_id: athleteId,
+  });
+  if (error) return null;
+  return data as string | null;
 }
 
 function relativeDate(iso: string): string {
@@ -36,8 +48,9 @@ function relativeDate(iso: string): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-export default function CoachChronoHistoryScreen({ onSelect, onBack }: Props) {
+export default function CoachChronoHistoryScreen({ onBack }: Props) {
   const queryClient = useQueryClient();
+  const [selectedRecord, setSelectedRecord] = useState<ChronoRecord | null>(null);
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["chrono_records"],
@@ -54,6 +67,100 @@ export default function CoachChronoHistoryScreen({ onSelect, onBack }: Props) {
       toast.error("Erreur lors de la suppression");
     },
   });
+
+  // --- Mutation handlers for ChronoSplitEditor ---
+
+  const handleUpdate = async (swimmers: ChronoRecordSwimmer[]) => {
+    if (!selectedRecord) return;
+    await updateChronoRecord(selectedRecord.id, { swimmers });
+    queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+    setSelectedRecord({ ...selectedRecord, swimmers });
+  };
+
+  const handleSend = async (swimmerIdx?: number) => {
+    if (!selectedRecord) return;
+    const swimmers =
+      swimmerIdx !== undefined
+        ? [selectedRecord.swimmers[swimmerIdx]]
+        : selectedRecord.swimmers;
+
+    for (const sw of swimmers) {
+      const authUid = await resolveAuthUid(sw.athleteId);
+      if (!authUid) {
+        toast.error(`UUID introuvable pour ${sw.displayName}`);
+        continue;
+      }
+      // Flatten all reps into split_times
+      const splitTimes: { rep: number; time_seconds: number }[] = [];
+      let idx = 1;
+      for (const rep of sw.splitsByRep) {
+        for (const s of rep) {
+          splitTimes.push({ rep: idx++, time_seconds: s.cumulativeMs / 1000 });
+        }
+      }
+      const log: SwimExerciseLogInput = {
+        exercise_label: "Chrono coach",
+        split_times: splitTimes,
+        notes: `Série chrono — Ligne ${sw.lane}`,
+      };
+      await createStandaloneSwimLog(authUid, log);
+    }
+
+    // Mark record as sent
+    await updateChronoRecord(selectedRecord.id, { status: "sent" });
+    queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+    setSelectedRecord({ ...selectedRecord, status: "sent" });
+    toast.success(
+      `Envoyé à ${swimmers.length} nageur${swimmers.length > 1 ? "s" : ""}`,
+    );
+  };
+
+  const handleDeleteFromEditor = async () => {
+    if (!selectedRecord) return;
+    await deleteChronoRecord(selectedRecord.id);
+    queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+    setSelectedRecord(null);
+    toast.success("Chrono supprimé");
+  };
+
+  // --- Editor view ---
+
+  if (selectedRecord) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedRecord(null)}
+          >
+            ← Retour
+          </Button>
+          <h2 className="text-lg font-semibold">
+            {selectedRecord.label || "Chrono"}
+          </h2>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              selectedRecord.status === "draft"
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                : "bg-green-500/15 text-green-600 dark:text-green-400"
+            }`}
+          >
+            {selectedRecord.status === "draft" ? "Brouillon" : "Envoyé"}
+          </span>
+        </div>
+        <ChronoSplitEditor
+          record={selectedRecord}
+          onUpdate={handleUpdate}
+          onSend={handleSend}
+          onDelete={handleDeleteFromEditor}
+          readOnly={selectedRecord.status === "sent"}
+        />
+      </div>
+    );
+  }
+
+  // --- List view ---
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,7 +184,7 @@ export default function CoachChronoHistoryScreen({ onSelect, onBack }: Props) {
           {records.map((r) => (
             <button
               key={r.id}
-              onClick={() => onSelect(r)}
+              onClick={() => setSelectedRecord(r)}
               className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted active:scale-[0.98]"
             >
               <div className="flex-1 min-w-0">
