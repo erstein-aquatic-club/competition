@@ -40,7 +40,7 @@ function WaveBar({
 }) {
 
   return (
-    <div className="grid grid-cols-2 gap-3 px-4 py-3 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-2 xl:grid-cols-3">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
@@ -61,7 +61,7 @@ function WaveBar({
                 className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
               >
                 <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-                  {wc.label}{w.currentRep > 0 ? ` R${w.currentRep + 1}` : ""}
+                  {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}` : ""}
                 </span>
                 <span className="flex items-center gap-1.5 text-lg font-black text-white">
                   <Play className="h-4 w-4 fill-current" /> GO
@@ -78,7 +78,7 @@ function WaveBar({
           return (
             <div
               key={w.wave}
-              className={`flex items-center gap-3 rounded-xl border-2 ${wc.border} bg-card min-w-[160px] px-4 py-2`}
+              className={`flex items-center gap-3 rounded-xl border-2 ${wc.border} bg-card overflow-hidden px-4 py-2`}
             >
               {/* Left: wave info */}
               <div className="flex flex-col items-center gap-0.5 shrink-0">
@@ -86,7 +86,7 @@ function WaveBar({
                   {wc.label}
                 </span>
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  Rep {w.currentRep + 1}
+                  Série {w.currentRep + 1}
                 </span>
                 <button
                   type="button"
@@ -96,7 +96,7 @@ function WaveBar({
                   }}
                   className="mt-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
                 >
-                  Suivante
+                  Série suiv.
                 </button>
               </div>
 

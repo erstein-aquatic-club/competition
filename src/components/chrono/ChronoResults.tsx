@@ -65,7 +65,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
         const log: SwimExerciseLogInput = {
           exercise_label: "Chrono coach",
           split_times: flattenSplits(splitsByRep),
-          notes: `Série chrono — Ligne ${swimmer.lane}${repCount > 1 ? ` — ${repCount} reps` : ""}`,
+          notes: `Série chrono — Ligne ${swimmer.lane}${repCount > 1 ? ` — ${repCount} séries` : ""}`,
         };
 
         await createStandaloneSwimLog(String(swimmer.athleteId), log);
@@ -187,7 +187,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
                           {/* Rep header — only show if multiple reps */}
                           {hasMultipleReps && (
                             <div className="text-xs font-semibold text-muted-foreground mb-1">
-                              Rep {repIdx + 1}
+                              Série {repIdx + 1}
                             </div>
                           )}
 

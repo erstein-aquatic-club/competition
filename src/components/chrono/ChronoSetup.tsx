@@ -285,7 +285,7 @@ export default function ChronoSetup({
         {/* Summary */}
         {state.totalDistanceM > 0 && state.splitDistanceM > 0 && (
           <span className="text-xs text-muted-foreground">
-            → {Math.ceil(state.totalDistanceM / state.splitDistanceM)} splits par rep
+            → {Math.ceil(state.totalDistanceM / state.splitDistanceM)} splits par série
           </span>
         )}
       </div>
