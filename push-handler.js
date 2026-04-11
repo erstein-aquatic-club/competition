@@ -22,8 +22,16 @@ self.addEventListener('push', function(event) {
     renotify: true,
   };
 
+  var title = data.title || 'EAC Natation';
+
   event.waitUntil(
-    self.registration.showNotification(data.title || 'EAC Natation', options)
+    (async function() {
+      try {
+        await self.registration.showNotification(title, options);
+      } catch (err) {
+        console.error('[push-handler] showNotification failed:', err);
+      }
+    })()
   );
 });
 
