@@ -332,6 +332,7 @@ interface FeedbackDrawerProps {
   saveState: SaveState;
   isPending: boolean;
   logsBySessionId: Record<string, Session>;
+  getLogForSession?: (sessionId: string) => Session | undefined;
   onClose: () => void;
   onDayOffAll: () => void;
   onOpenSession: (sessionId: string) => void;
@@ -362,6 +363,7 @@ export function FeedbackDrawer({
   saveState,
   isPending,
   logsBySessionId,
+  getLogForSession: getLogForSessionProp,
   onClose,
   onDayOffAll,
   onOpenSession,
@@ -379,6 +381,8 @@ export function FeedbackDrawer({
   onMarkDayAbsent,
   onRemoveDayAbsence,
 }: FeedbackDrawerProps) {
+  // Use getLogForSession helper if provided, fallback to direct lookup
+  const getLog = getLogForSessionProp ?? ((id: string) => logsBySessionId[id]);
   const dragControls = useDragControls();
   const [, setLocation] = useLocation();
   const [unexpectedExpanded, setUnexpectedExpanded] = useState(false);
@@ -534,12 +538,12 @@ export function FeedbackDrawer({
 
                   // Filter out unexpected empty slots (no assignment, no log)
                   const visibleUnexpected = unexpectedSessions.filter(
-                    (s) => !s.isEmpty || Boolean(logsBySessionId[s.id]),
+                    (s) => !s.isEmpty || Boolean(getLog(s.id)),
                   );
 
                   const renderSessionCard = (s: PlannedSession) => {
                     const st = getSessionStatus(s, selectedDate);
-                    const hasLog = Boolean(logsBySessionId[s.id]);
+                    const hasLog = Boolean(getLog(s.id));
                     const isAbsentOverride = st.status === "absent";
                     const isNotExpected = st.status === "not_expected";
                     const isAbsentLike = isAbsentOverride || isNotExpected;
@@ -639,11 +643,11 @@ export function FeedbackDrawer({
                                 )}
                               </div>
                               {/* Aperçu commentaire nageur */}
-                              {logsBySessionId[s.id]?.comments && (
+                              {getLog(s.id)?.comments && (
                                 <div className="mt-1.5 flex items-start gap-1.5 max-w-full">
                                   <MessageCircle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
                                   <p className="text-xs text-muted-foreground line-clamp-2 italic leading-snug">
-                                    {logsBySessionId[s.id].comments}
+                                    {getLog(s.id)?.comments}
                                   </p>
                                 </div>
                               )}
@@ -735,7 +739,7 @@ export function FeedbackDrawer({
                         const st = getSessionStatus(activeSession, selectedDate);
                         const isAbsentOverride = st.status === "absent";
                         const isNotExpected = st.status === "not_expected";
-                        const hasLog = Boolean(logsBySessionId[activeSession.id]);
+                        const hasLog = Boolean(getLog(activeSession.id));
                         const canRate = st.expected && !isAbsentOverride;
 
                         const leftActionLabel = isAbsentOverride ? "Annuler" : isNotExpected ? "Je suis venu" : "Absent";
@@ -834,21 +838,21 @@ export function FeedbackDrawer({
                             </AnimatePresence>
 
                             {/* Coach notes */}
-                            {logsBySessionId[activeSession.id]?.coach_notes && (
+                            {getLog(activeSession.id)?.coach_notes && (
                               <div className="mx-3 mb-3 rounded-2xl bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-400 p-3">
                                 <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
-                                <p className="text-xs text-blue-800 dark:text-blue-300 mt-0.5">{logsBySessionId[activeSession.id].coach_notes}</p>
+                                <p className="text-xs text-blue-800 dark:text-blue-300 mt-0.5">{getLog(activeSession.id)?.coach_notes}</p>
                               </div>
                             )}
 
                             {/* Commentaire nageur sauvegardé (lecture) */}
-                            {logsBySessionId[activeSession.id]?.comments && (
+                            {getLog(activeSession.id)?.comments && (
                               <div className="mx-3 mb-3 rounded-2xl bg-muted/60 border border-border p-3">
                                 <div className="flex items-center gap-1.5 mb-1">
                                   <MessageCircle className="h-3 w-3 text-muted-foreground" />
                                   <p className="text-[10px] font-semibold text-muted-foreground">Mon commentaire</p>
                                 </div>
-                                <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">{logsBySessionId[activeSession.id].comments}</p>
+                                <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">{getLog(activeSession.id)?.comments}</p>
                               </div>
                             )}
 

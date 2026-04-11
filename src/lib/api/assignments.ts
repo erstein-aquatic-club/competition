@@ -96,7 +96,9 @@ export async function getAssignments(
         assigned_slot: assignment.scheduled_slot ?? null,
         status,
         items: strengthSession?.items ?? swimSession?.items,
-      } as Assignment & { cycle?: string; assigned_slot?: string | null };
+        training_slot_id: assignment.training_slot_id ?? null,
+        target_user_id: safeOptionalInt(assignment.target_user_id) ?? null,
+      } as Assignment & { cycle?: string };
       if (sessionType === "strength") {
         base.cycle = strengthSession?.cycle ?? "endurance";
       }

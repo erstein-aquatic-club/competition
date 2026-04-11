@@ -138,6 +138,12 @@ export interface Assignment {
   status: string;
   items?: StrengthSessionItem[] | SwimSessionItem[];
   cycle?: string;
+  /** The training_slot_id this assignment targets (for slot-centric matching) */
+  training_slot_id?: string | null;
+  /** The specific user this assignment targets (null = group assignment) */
+  target_user_id?: number | null;
+  /** The slot indicator from the DB (morning/evening) */
+  assigned_slot?: string | null;
 }
 
 export interface Notification {

@@ -80,7 +80,11 @@ function startOfMonth(d: Date) {
 
 function parseSessionId(sessionId: string) {
   const parts = String(sessionId).split("__");
-  return { iso: parts[0], slotKey: (parts[1] || "") as SlotKey | "" };
+  const rawSlot = parts[1] || "";
+  // If it's a UUID (swimmer slot ID), determine AM/PM from the session context
+  // For now, return the raw value — callers that need a SlotKey should use the session's slotKey instead
+  const slotKey = (rawSlot === "AM" || rawSlot === "PM") ? rawSlot : "";
+  return { iso: parts[0], slotKey: slotKey as SlotKey | "", swimmerSlotId: rawSlot.length > 2 ? rawSlot : undefined };
 }
 
 function clampToStep(value: number, step: number) {
@@ -367,7 +371,14 @@ export default function Dashboard() {
     },
   });
 
-  const state = useDashboardState({ sessions, assignments, userId, user });
+  const { data: swimmerSlots } = useQuery({
+    queryKey: ['swimmer-slots', userId],
+    queryFn: () => api.getSwimmerSlots(userId!),
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const state = useDashboardState({ sessions, assignments, userId, user, swimmerSlots });
 
   const {
     today,
@@ -391,6 +402,7 @@ export default function Dashboard() {
     globalKm,
     dayKm,
     logsBySessionId,
+    getLogForSession,
     setMonthCursor,
     setSelectedISO,
     setDrawerOpen,
@@ -513,10 +525,10 @@ export default function Dashboard() {
         setAttendanceOverrideBySessionId((prev) => ({ ...prev, [sessionId]: "absent" }));
       });
 
-      const existing = logsBySessionId[sessionId];
+      const existing = getLogForSession(sessionId);
       if (existing?.id) deleteMutation.mutate(Number(existing.id));
     },
-    [deleteMutation, logsBySessionId, startTransition, setAttendanceOverrideBySessionId]
+    [deleteMutation, getLogForSession, startTransition, setAttendanceOverrideBySessionId]
   );
 
   const markPresent = useCallback(
@@ -560,10 +572,10 @@ export default function Dashboard() {
     });
 
     idsToOff.forEach((sid) => {
-      const existing = logsBySessionId[sid];
+      const existing = getLogForSession(sid);
       if (existing?.id) deleteMutation.mutate(Number(existing.id));
     });
-  }, [sessionsForSelectedDay, getSessionStatus, selectedDate, startTransition, logsBySessionId, deleteMutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen]);
+  }, [sessionsForSelectedDay, getSessionStatus, selectedDate, startTransition, getLogForSession, deleteMutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen]);
 
   const saveFeedback = useCallback(() => {
     if (!activeSessionId) return;
@@ -572,8 +584,11 @@ export default function Dashboard() {
     const allFilled = INDICATORS.every((i) => Number.isInteger(draftState[i.key]));
     if (!allFilled) return;
 
-    const { iso, slotKey } = parseSessionId(activeSessionId);
-    const slotLabel = slotKey === "PM" ? "Soir" : "Matin";
+    const { iso, slotKey: parsedSlotKey } = parseSessionId(activeSessionId);
+    // For new swimmer-slot IDs, look up the active session to get the actual slotKey (AM/PM)
+    const activeSession = sessionsForSelectedDay.find((s) => s.id === activeSessionId);
+    const effectiveSlotKey = parsedSlotKey || activeSession?.slotKey || "AM";
+    const slotLabel = effectiveSlotKey === "PM" ? "Soir" : "Matin";
 
     const distance = clampToStep(Number(draftState.distanceMeters ?? 0), 100);
     const duration = clampToStep(Number(stableDurationMin), 15);
@@ -599,7 +614,7 @@ export default function Dashboard() {
       stroke_distances: Object.keys(strokeDistances).length > 0 ? strokeDistances : null,
     };
 
-    const existing = logsBySessionId[activeSessionId];
+    const existing = getLogForSession(activeSessionId);
 
     startTransition(() => {
       setAttendanceOverrideBySessionId((prev) => ({ ...prev, [activeSessionId]: "present" }));
@@ -618,7 +633,7 @@ export default function Dashboard() {
 
     setActiveSessionId(null);
     setDetailsOpen(false);
-  }, [activeSessionId, user, userId, draftState, stableDurationMin, logsBySessionId, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen]);
+  }, [activeSessionId, user, userId, draftState, stableDurationMin, sessionsForSelectedDay, getLogForSession, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen]);
 
   const toggleDefaultPresence = useCallback((weekdayIdx: number, slotKey: SlotKey) => {
     setPresenceDefaults((prev) => ({
@@ -995,6 +1010,7 @@ export default function Dashboard() {
           saveState={saveState}
           isPending={isPending}
           logsBySessionId={logsBySessionId}
+          getLogForSession={getLogForSession}
           onClose={closeDay}
           onDayOffAll={dayOffAll}
           onOpenSession={openSession}
@@ -1008,7 +1024,7 @@ export default function Dashboard() {
           onClearOverride={clearOverride}
           onSaveFeedback={saveFeedback}
           onDeleteFeedback={(sessionId) => {
-            const existing = logsBySessionId[sessionId];
+            const existing = getLogForSession(sessionId);
             if (existing?.id) {
               deleteMutation.mutate(Number(existing.id));
               setActiveSessionId(null);
