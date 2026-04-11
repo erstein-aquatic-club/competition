@@ -944,6 +944,7 @@ function TimelineSlotInline({
   height,
 }: TimelineSlotProps & { top: number; height: number }) {
   const isShort = height < 50;
+  const isOneOff = !!slot.scheduled_date;
   const swim = isSwimSlot(slot.location);
   const completionState = getSlotCompletionState(instance);
   const hasAssignment = !!instance?.assignment;
@@ -971,10 +972,10 @@ function TimelineSlotInline({
   return (
     <button
       type="button"
-      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${bgClass}`}
+      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${isOneOff ? "border-dashed " : ""}${bgClass}`}
       style={{ top, height, minHeight: 24 }}
       onClick={() => onSelect(slot)}
-      title={`${formatTime(slot.start_time)}–${formatTime(slot.end_time)} · ${slot.location}${instance?.assignment?.session_name ? ` · ${instance.assignment.session_name}` : ""}`}
+      title={`${isOneOff ? "[Ponctuel] " : ""}${formatTime(slot.start_time)}–${formatTime(slot.end_time)} · ${slot.location}${instance?.assignment?.session_name ? ` · ${instance.assignment.session_name}` : ""}`}
     >
       <div className={`flex flex-col gap-0.5 ${isShort ? "flex-row items-center" : ""}`}>
         <div className="flex items-start justify-between gap-1 min-w-0">
@@ -983,6 +984,11 @@ function TimelineSlotInline({
             <span className="text-[10px] font-medium text-foreground truncate">
               {slot.location}
             </span>
+            {isOneOff && (
+              <span className="shrink-0 rounded bg-violet-500/15 border border-violet-500/30 px-1 text-[8px] font-bold text-violet-600 dark:text-violet-400 leading-tight">
+                1×
+              </span>
+            )}
             {hasOverrides && !cancelled && (
               <AlertTriangle className="h-2.5 w-2.5 text-orange-500 shrink-0" />
             )}
