@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
-import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight } from "lucide-react";
+import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine } from "lucide-react";
 import { useLocation } from "wouter";
 import { BottomActionBar, type SaveState } from "@/components/shared/BottomActionBar";
 import {
@@ -639,37 +639,34 @@ export function FeedbackDrawer({
                     const isAbsentLike = isAbsentOverride || isNotExpected;
                     const needsAction = st.expected && !hasLog && !isAbsentOverride;
 
-                    // Expected slot with no assignment: show dashed placeholder
+                    // Expected slot with no assignment: invite swimmer to log manually
                     if (s.isEmpty && st.expected && !hasLog && !isAbsentOverride) {
-                      const SlotIcon = SLOTS.find((x) => x.key === s.slotKey)?.Icon || Circle;
                       return (
                         <button
                           key={s.id}
                           type="button"
                           onClick={() => onOpenSession(s.id)}
-                          className="w-full rounded-3xl border border-dashed border-border px-3 py-3 text-left transition hover:shadow-sm"
+                          className="group w-full rounded-3xl border-2 border-dashed border-primary/20 bg-primary/[0.03] px-4 py-4 text-left transition hover:border-primary/40 hover:bg-primary/[0.06] hover:shadow-sm active:scale-[0.98]"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="h-10 w-10 rounded-2xl border border-dashed border-border bg-muted/50 flex items-center justify-center">
-                                <SlotIcon className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium text-muted-foreground">Créneau prévu</div>
-                                <div className="mt-0.5 text-xs text-muted-foreground/70">Aucune séance assignée</div>
-                              </div>
+                          <div className="flex items-center gap-3">
+                            <div className="h-11 w-11 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center transition group-hover:bg-primary/15">
+                              <PenLine className="h-5 w-5 text-primary/70" />
                             </div>
-                            <IconButton
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onMarkAbsent(s.id);
-                              }}
-                              label="Absent"
-                              tone="sky"
-                              disabled={isPending}
-                            >
-                              <UserX className="h-5 w-5" />
-                            </IconButton>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-foreground">Entraînement libre</span>
+                                {s.slotTime && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {s.slotTime}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-xs text-muted-foreground/80">
+                                Pas de séance coach — saisis ton ressenti
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-primary/60 group-hover:translate-x-0.5" />
                           </div>
                         </button>
                       );
