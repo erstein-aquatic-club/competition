@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { Session, Assignment, SwimExerciseLogInput } from "@/lib/api";
+import { resolveSwimmerAssignments } from "@/lib/api/assignments";
 import type { ResolvedSlotAssignment, SwimmerTrainingSlot } from "@/lib/api/types";
 
 type SlotKey = "AM" | "PM";
@@ -357,6 +359,28 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
   const hasSwimmerSlots = useMemo(() => (swimmerSlots?.length ?? 0) > 0, [swimmerSlots]);
 
+  // Pre-resolve assignments for dates that have assignments AND swimmer slots
+  const datesNeedingResolution = useMemo(() => {
+    if (!hasSwimmerSlots || !userId) return [] as string[];
+    return Array.from(assignmentsByIso.keys());
+  }, [hasSwimmerSlots, userId, assignmentsByIso]);
+
+  const { data: resolvedByDate } = useQuery({
+    queryKey: ["resolved-assignments-batch", userId, datesNeedingResolution],
+    queryFn: async () => {
+      const results = new Map<string, ResolvedSlotAssignment[]>();
+      await Promise.all(
+        datesNeedingResolution.map(async (date) => {
+          const resolved = await resolveSwimmerAssignments(userId!, date);
+          results.set(date, resolved);
+        }),
+      );
+      return results;
+    },
+    enabled: !!userId && datesNeedingResolution.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
+
   const logsBySessionId = useMemo(() => {
     const list = Array.isArray(sessions) ? sessions : [];
     const map: Record<string, Session> = {};
@@ -369,25 +393,43 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     return map;
   }, [sessions]);
 
-  // Build a secondary lookup: for swimmer-slot IDs (iso__<uuid>), find matching session log
-  // by mapping the slot's time range to AM/PM. This bridges old session logs (stored with AM/PM slot)
-  // to new session IDs (which use the swimmer slot UUID).
+  // Bridge new session IDs (iso__<uuid>) to existing session logs.
+  // Strategy: match by assignment_id first (robust), then fallback to AM/PM (legacy data).
   const getLogForSession = useCallback(
     (sessionId: string): Session | undefined => {
-      // Direct hit (works for both legacy iso__AM and new iso__slotId if session was saved with that ID)
+      // Direct hit (works for legacy iso__AM/PM keys)
       if (logsBySessionId[sessionId]) return logsBySessionId[sessionId];
 
-      // If it's a new-format ID (iso__uuid), try to map to AM/PM
       const parts = sessionId.split("__");
-      if (parts.length === 2 && parts[1].length > 2) {
-        // It's a UUID-style ID — find the swimmer slot to determine AM/PM
-        const slotObj = swimmerSlots?.find((s) => s.id === parts[1]);
-        if (slotObj) {
-          const hour = parseInt(slotObj.start_time.split(":")[0], 10);
-          const legacySlot: SlotKey = hour < 13 ? "AM" : "PM";
-          return logsBySessionId[`${parts[0]}__${legacySlot}`];
+      if (parts.length !== 2) return undefined;
+      const [iso, slotId] = parts;
+
+      // Legacy IDs (AM/PM) — no bridging needed
+      if (slotId === "AM" || slotId === "PM") return undefined;
+
+      // New-format ID (iso__uuid): find the assignmentId from the planned sessions cache
+      const planned = sessionsCacheRef.current.get(iso);
+      const session = planned?.find((s) => s.swimmerSlotId === slotId);
+      const assignmentId = session?.assignmentId;
+
+      // Strategy 1: match by assignment_id in existing logs
+      if (assignmentId) {
+        const datePrefix = `${iso}__`;
+        for (const [key, log] of Object.entries(logsBySessionId)) {
+          if (key.startsWith(datePrefix) && (log as any).assignment_id === assignmentId) {
+            return log;
+          }
         }
       }
+
+      // Strategy 2: fallback to AM/PM mapping (for logs saved before assignment_id existed)
+      const slotObj = swimmerSlots?.find((s) => s.id === slotId);
+      if (slotObj) {
+        const hour = parseInt(slotObj.start_time.split(":")[0], 10);
+        const legacySlot: SlotKey = hour < 13 ? "AM" : "PM";
+        return logsBySessionId[`${iso}__${legacySlot}`];
+      }
+
       return undefined;
     },
     [logsBySessionId, swimmerSlots],
@@ -396,7 +438,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
   const sessionsCacheRef = useRef<Map<string, PlannedSession[]>>(new Map());
   useEffect(() => {
     sessionsCacheRef.current.clear();
-  }, [assignmentsByIso, slotsByDayOfWeek]);
+  }, [assignmentsByIso, slotsByDayOfWeek, resolvedByDate]);
 
   const getSessionsForISO = useCallback(
     (iso: string): PlannedSession[] => {
@@ -413,89 +455,69 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
       // ── NEW PATH: swimmer has personal slots for this weekday ──
       if (hasSwimmerSlots && daySlots && daySlots.length > 0) {
+        // Use pre-resolved assignments (via resolveSwimmerAssignments) when available
+        const resolved = resolvedByDate?.get(iso);
+
         const list: PlannedSession[] = daySlots.map((slot) => {
           const hour = parseInt(slot.start_time.split(":")[0], 10);
           const slotKey: SlotKey = hour < 13 ? "AM" : "PM";
           const slotTime = `${slot.start_time.slice(0, 5)}-${slot.end_time.slice(0, 5)}`;
 
-          // Find matching assignment for this swimmer slot
-          // We need the source training_slot_id from the swimmer slot's source_assignment_id
-          // But we already have it linked in dayAssignments via training_slot_id
-          let bestAssignment: Assignment | undefined;
-          let assignmentSource: PlannedSession['assignmentSource'] = 'none';
-          const alternatives: PlannedSession['alternatives'] = [];
+          // Find the resolved assignment for THIS specific swimmer slot
+          const match = resolved?.find((r) => r.swimmerSlotId === slot.id);
 
-          // Priority 1: individual assignment (target_user_id = userId) matching this slot's training_slot_id
-          // Priority 2: group assignment matching the training_slot_id
-          // We match via assigned_slot (morning/evening) as a fallback since training_slot_id
-          // may not be set on all assignments yet.
-
-          if (dayAssignments.length > 0) {
-            // Try exact training_slot_id match via source_assignment_id linkage
-            // For now, match by slot timing (AM/PM) since that's what existing assignments use
-            const slotScheduledSlot = hour < 13 ? "morning" : "evening";
-
-            // First: individual assignments (target_user_id matches)
-            const individualMatch = dayAssignments.find(
-              (a) =>
-                a.target_user_id === userId &&
-                (a.training_slot_id != null || // exact slot match
-                  a.assigned_slot === slotScheduledSlot || // slot timing match
-                  pickAssignmentSlotKey(a as unknown as Record<string, unknown>, 0) === slotKey), // heuristic match
-            );
-
-            if (individualMatch) {
-              bestAssignment = individualMatch;
-              assignmentSource = 'individual';
-            } else {
-              // Group assignments: match by training_slot_id or slot timing
-              const groupMatches = dayAssignments.filter(
-                (a) =>
-                  !a.target_user_id &&
-                  (a.assigned_slot === slotScheduledSlot ||
-                    pickAssignmentSlotKey(a as unknown as Record<string, unknown>, 0) === slotKey),
-              );
-
-              if (groupMatches.length > 0) {
-                bestAssignment = groupMatches[0];
-                assignmentSource = 'group';
-
-                // Collect alternatives
-                for (let i = 1; i < groupMatches.length; i++) {
-                  const alt = groupMatches[i];
-                  const altRecord = alt as unknown as Record<string, unknown>;
-                  alternatives.push({
-                    assignmentId: typeof alt.id === "number" ? alt.id : Number(alt.id) || 0,
-                    title: String(alt.title ?? "Séance"),
-                    km: assignmentPlannedKm(altRecord),
-                  });
-                }
-              }
-            }
-          }
-
-          if (bestAssignment) {
-            const aRecord = bestAssignment as unknown as Record<string, unknown>;
+          if (match && match.assignment) {
+            const a = match.assignment;
+            const aRecord = a as unknown as Record<string, unknown>;
             const plannedKm = assignmentPlannedKm(aRecord);
             const details = Array.isArray(aRecord?.details)
               ? (aRecord.details as string[]).map(String)
-              : safeLinesFromText(bestAssignment.description);
+              : safeLinesFromText(a.description);
 
             return {
               id: `${iso}__${slot.id}`,
               iso,
               slotKey,
-              title: String(bestAssignment.title ?? "Séance coach"),
-              km: plannedKm,
+              title: String(a.title ?? "Séance coach"),
+              km: plannedKm ?? match.alternatives?.[0]?.km ?? null,
               details,
-              assignmentId: typeof bestAssignment.id === "number" ? bestAssignment.id : Number(bestAssignment.id) || undefined,
+              assignmentId: match.assignmentId ?? undefined,
               isEmpty: false,
               slotTime,
               slotLocation: slot.location,
-              assignmentSource,
-              alternatives: alternatives.length > 0 ? alternatives : undefined,
+              assignmentSource: match.source,
+              alternatives: match.alternatives.length > 0 ? match.alternatives : undefined,
               swimmerSlotId: slot.id,
             };
+          }
+
+          // No resolved data yet (query loading) or no assignment — try fallback from dayAssignments
+          if (!resolved && dayAssignments.length > 0) {
+            // Lightweight fallback: match by AM/PM while resolver loads
+            const slotScheduledSlot = hour < 13 ? "morning" : "evening";
+            const fallback = dayAssignments.find(
+              (a) =>
+                a.target_user_id === userId ||
+                a.assigned_slot === slotScheduledSlot ||
+                pickAssignmentSlotKey(a as unknown as Record<string, unknown>, 0) === slotKey,
+            );
+            if (fallback) {
+              const fRecord = fallback as unknown as Record<string, unknown>;
+              return {
+                id: `${iso}__${slot.id}`,
+                iso,
+                slotKey,
+                title: String(fallback.title ?? "Séance coach"),
+                km: assignmentPlannedKm(fRecord),
+                details: safeLinesFromText(fallback.description),
+                assignmentId: typeof fallback.id === "number" ? fallback.id : Number(fallback.id) || undefined,
+                isEmpty: false,
+                slotTime,
+                slotLocation: slot.location,
+                assignmentSource: fallback.target_user_id === userId ? "individual" : "group",
+                swimmerSlotId: slot.id,
+              };
+            }
           }
 
           // No assignment found for this slot
@@ -509,7 +531,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
             isEmpty: true,
             slotTime,
             slotLocation: slot.location,
-            assignmentSource: 'none',
+            assignmentSource: "none" as const,
             swimmerSlotId: slot.id,
           };
         });
@@ -571,7 +593,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
       cache.set(iso, list);
       return list;
     },
-    [assignmentsByIso, slotsByDayOfWeek, hasSwimmerSlots, userId]
+    [assignmentsByIso, slotsByDayOfWeek, hasSwimmerSlots, userId, resolvedByDate]
   );
 
   const getSessionStatus = useCallback(
