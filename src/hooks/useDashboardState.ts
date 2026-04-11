@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useTransition, useEffect, useRef } from "react";
 import type { Session, Assignment, SwimExerciseLogInput } from "@/lib/api";
+import type { ResolvedSlotAssignment } from "@/lib/api/types";
 
 type SlotKey = "AM" | "PM";
 type IndicatorKey = "difficulty" | "fatigue_end" | "performance" | "engagement";
@@ -24,6 +25,17 @@ type PlannedSession = {
   details: string[];
   assignmentId?: number;
   isEmpty: boolean;
+  // Phase B: optional enrichment fields
+  slotTime?: string;
+  slotLocation?: string;
+  assignmentSource?: 'individual' | 'subgroup' | 'group' | 'none';
+  alternatives?: Array<{
+    assignmentId: number;
+    title: string;
+    km: number | null;
+    subgroupName?: string;
+  }>;
+  swimmerSlotId?: string;
 };
 
 type PresenceDefaults = Record<number, Record<SlotKey, boolean>>;
