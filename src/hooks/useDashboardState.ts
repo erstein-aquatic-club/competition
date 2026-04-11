@@ -347,17 +347,26 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
   }, [swimAssignments]);
 
   // Pre-index swimmer slots by ISO day_of_week (1=Mon .. 7=Sun)
+  // Only include swim-relevant slots (Piscine), exclude gym slots (Salle)
+  const swimSlots = useMemo(() => {
+    if (!swimmerSlots?.length) return [];
+    return swimmerSlots.filter((s) => {
+      const loc = s.location?.toLowerCase() ?? "";
+      // Include pool slots, exclude gym/salle slots
+      return !loc.includes("salle");
+    });
+  }, [swimmerSlots]);
+
   const slotsByDayOfWeek = useMemo(() => {
     const map = new Map<number, SwimmerTrainingSlot[]>();
-    if (!swimmerSlots?.length) return map;
-    for (const s of swimmerSlots) {
+    for (const s of swimSlots) {
       if (!map.has(s.day_of_week)) map.set(s.day_of_week, []);
       map.get(s.day_of_week)!.push(s);
     }
     return map;
-  }, [swimmerSlots]);
+  }, [swimSlots]);
 
-  const hasSwimmerSlots = useMemo(() => (swimmerSlots?.length ?? 0) > 0, [swimmerSlots]);
+  const hasSwimmerSlots = useMemo(() => swimSlots.length > 0, [swimSlots]);
 
   // Pre-resolve assignments for dates that have assignments AND swimmer slots
   const datesNeedingResolution = useMemo(() => {
