@@ -203,7 +203,10 @@ export default function SlotSessionSheet({
       invalidateSlotAssignments();
       setDeleteConfirmOpen(false);
       onOpenChange(false);
-      toast({ title: "Séance supprimée du créneau" });
+      toast({
+        title: "Séance supprimée du créneau",
+        description: "Cette action est irréversible.",
+      });
     },
     onError: () => {
       toast({ title: "Erreur", description: "Impossible de supprimer la séance.", variant: "destructive" });
@@ -507,6 +510,8 @@ function EmptyBody({
   onPickTemplate: (inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string, targetSubgroupId?: number) => void;
   onClose: () => void;
 }) {
+  const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
+
   const handleCreateNew = () => {
     onClose();
     onCreateNew(instance);
@@ -528,7 +533,7 @@ function EmptyBody({
             {groups.map((g) => (
               <label
                 key={g.id}
-                className="flex items-center gap-3 cursor-pointer"
+                className="flex items-center gap-3 cursor-pointer min-h-[44px] py-1.5"
               >
                 <Checkbox
                   checked={selectedGroups.includes(g.group_id)}
@@ -593,8 +598,17 @@ function EmptyBody({
           type="date"
           value={visibleFrom}
           onChange={(e) => onVisibleFromChange(e.target.value)}
-          className="w-full rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className={`w-full rounded-xl border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
+            !isVisibleFromValid
+              ? "border-destructive bg-destructive/5"
+              : "border-border bg-muted/30"
+          }`}
         />
+        {!isVisibleFromValid && (
+          <p className="text-xs text-destructive">
+            La date de visibilité doit être avant ou le jour de la séance.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2.5">
@@ -604,13 +618,14 @@ function EmptyBody({
           description="Créer une séance de zéro"
           onClick={handleCreateNew}
           highlight
+          disabled={!isVisibleFromValid}
         />
         <ActionButton
           icon={<BookOpen className="h-4 w-4" />}
           label="Depuis la bibliothèque"
-          description={selectedGroups.length === 0 ? "Sélectionnez au moins un groupe" : "Réutiliser une séance existante"}
+          description={selectedGroups.length === 0 ? "Sélectionnez au moins un groupe" : !isVisibleFromValid ? "Date de visibilité invalide" : "Réutiliser une séance existante"}
           onClick={handlePickTemplate}
-          disabled={selectedGroups.length === 0}
+          disabled={selectedGroups.length === 0 || !isVisibleFromValid}
         />
       </div>
     </div>
@@ -644,6 +659,8 @@ function FilledBody({
   onEditSession: (sessionId: number) => void;
   onRequestDelete: () => void;
 }) {
+  const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
@@ -725,13 +742,22 @@ function FilledBody({
               type="date"
               value={visibleFrom}
               onChange={(e) => onVisibleFromChange(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
+                !isVisibleFromValid
+                  ? "border-destructive bg-destructive/5"
+                  : "border-border bg-background"
+              }`}
             />
+            {!isVisibleFromValid && (
+              <p className="text-xs text-destructive">
+                La date de visibilité doit être avant ou le jour de la séance.
+              </p>
+            )}
             <div className="flex gap-2">
               <Button
                 size="sm"
                 className="flex-1 rounded-lg"
-                disabled={visibilityLoading}
+                disabled={visibilityLoading || !isVisibleFromValid}
                 onClick={onSaveVisibility}
               >
                 {visibilityLoading ? (

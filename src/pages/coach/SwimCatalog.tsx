@@ -967,7 +967,18 @@ export default function SwimCatalog({
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer la séance ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est définitive. La séance sera supprimée du catalogue.
+              {(() => {
+                if (!pendingDeleteSession || !assignments) {
+                  return "Cette action est définitive. La séance sera supprimée du catalogue.";
+                }
+                const assignedCount = assignments.filter(
+                  (a) => a.session_type === "swim" && a.session_id === pendingDeleteSession.id
+                ).length;
+                if (assignedCount > 0) {
+                  return `Cette séance est assignée à ${assignedCount} créneau${assignedCount > 1 ? "x" : ""}. La suppression annulera ces assignations. Continuer ?`;
+                }
+                return "Cette action est définitive. La séance sera supprimée du catalogue.";
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -137,7 +137,7 @@ function EmptySlotCard({ instance, onTap }: { instance: SlotInstance; onTap: () 
     <button
       type="button"
       onClick={onTap}
-      className="w-full rounded-2xl border-2 border-dashed border-border/50 bg-card/30 p-4 transition-all duration-150 active:scale-[0.98] active:bg-muted/40 hover:border-border"
+      className="w-full rounded-2xl border-2 border-dashed border-border/50 border-l-4 border-l-muted-foreground/20 bg-card/30 p-4 transition-all duration-150 active:scale-[0.98] active:bg-muted/40 hover:border-border"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/50">
@@ -171,6 +171,15 @@ function FilledSlotCard({
   const cfg = STATE_CONFIG[instance.state];
   const isCancelled = instance.state === "cancelled";
 
+  const accentBorder =
+    instance.state === "draft"
+      ? "border-l-4 border-l-amber-500"
+      : instance.state === "published"
+        ? "border-l-4 border-l-emerald-500"
+        : instance.state === "cancelled"
+          ? "border-l-4 border-l-destructive/50"
+          : "";
+
   return (
     <button
       type="button"
@@ -179,6 +188,7 @@ function FilledSlotCard({
         w-full rounded-2xl border p-4 text-left transition-all duration-150
         active:scale-[0.98] hover:shadow-md
         ${cfg.cardClass}
+        ${accentBorder}
         ${isCancelled ? "opacity-60" : "shadow-sm"}
       `}
     >
@@ -368,7 +378,7 @@ export default function CoachSlotCalendar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0"
+            className="h-11 w-11 shrink-0"
             onClick={prevWeek}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -381,7 +391,7 @@ export default function CoachSlotCalendar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0"
+            className="h-11 w-11 shrink-0"
             onClick={nextWeek}
           >
             <ChevronRight className="h-4 w-4" />

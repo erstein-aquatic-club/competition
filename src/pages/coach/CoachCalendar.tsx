@@ -77,6 +77,8 @@ export default function CoachCalendar({ onBack, athletes, groups, swimSessions, 
       target_user_id?: number | null;
     }) => api.assignments_create(params),
     onSuccess: () => {
+      // eslint-disable-next-line no-console
+      console.info("[CoachCalendar] Legacy assignment created — consider migrating to slot-based system");
       queryClient.invalidateQueries({ queryKey: ["coach-calendar-assignments"] });
       queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       toast({ title: "Séance assignée" });

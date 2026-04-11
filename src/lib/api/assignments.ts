@@ -176,7 +176,9 @@ export async function assignments_create(
       })
       .select("id")
       .single();
-    if (!notifError && notif) {
+    if (notifError) {
+      console.warn('[assignments] Notification creation failed:', notifError.message);
+    } else if (notif) {
       const targetPayload: Record<string, unknown> = { notification_id: notif.id };
       if (data.target_user_id) targetPayload.target_user_id = data.target_user_id;
       if (data.target_group_id) targetPayload.target_group_id = data.target_group_id;
@@ -423,7 +425,12 @@ export async function getSlotAssignments(params: {
   }));
 }
 
-/** Update visible_from on all assignments for a slot+date */
+/**
+ * Update visible_from on all assignments for a slot+date.
+ * TODO: If per-group visibility is ever needed, add an optional groupIds param
+ * and scope the UPDATE with `.in("target_group_id", groupIds)`. Currently the
+ * design is intentionally slot-wide: one training slot = one visibility setting.
+ */
 export async function updateSlotVisibility(params: {
   trainingSlotId: string;
   scheduledDate: string;

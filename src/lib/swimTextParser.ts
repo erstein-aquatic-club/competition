@@ -550,7 +550,7 @@ function assembleBlock(raw: RawBlock, blockIndex: number): SwimBlock {
         // x2, x3 (...) — extract repetitions and optional modalities in parens
         const repMatch = line.trimmed.match(/^x(\d+)/i);
         if (repMatch) {
-          block.repetitions = Number(repMatch[1]);
+          block.repetitions = Math.min(Number(repMatch[1]), 50); // Cap to prevent absurd values
         }
         // Extract parenthesized content after xN as block-level info
         const parenMatch = line.trimmed.match(/\(([^)]+)\)/);
@@ -667,6 +667,11 @@ function assembleBlock(raw: RawBlock, blockIndex: number): SwimBlock {
 export function parseSwimText(text: string): SwimBlock[] {
   if (!text || !text.trim()) return [];
 
+  // Guard: reject absurdly long input
+  if (text.length > 10000) {
+    throw new Error("Le texte de la séance est trop long (max 10 000 caractères).");
+  }
+
   // Phase 1: Normalize
   const normalized = text
     .replace(/\r\n/g, "\n")
@@ -723,6 +728,12 @@ export function parseSwimText(text: string): SwimBlock[] {
     } else {
       merged.push(current);
     }
+  }
+
+  // Post-processing validation: warn if input had content but no exercises were parsed
+  const nonEmptyBlocks = merged.filter(b => b.exercises.length > 0);
+  if (merged.length > 0 && nonEmptyBlocks.length === 0) {
+    console.warn('[swimTextParser] No exercises parsed from non-empty input');
   }
 
   return merged;

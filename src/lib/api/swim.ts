@@ -83,9 +83,11 @@ export async function getSwimCatalog(): Promise<SwimSessionTemplate[]> {
 }
 
 export async function createSwimSession(session: any) {
+  if (!Array.isArray(session.items) || session.items.length === 0) {
+    throw new Error("La séance doit contenir au moins un exercice.");
+  }
   if (canUseSupabase()) {
-    const items = Array.isArray(session.items)
-      ? session.items.map((item: any, index: number) => ({
+    const items = session.items.map((item: any, index: number) => ({
           ordre: item.ordre ?? index,
           label: item.label ?? null,
           distance: item.distance ?? null,
@@ -93,27 +95,18 @@ export async function createSwimSession(session: any) {
           intensity: item.intensity ?? null,
           notes: item.notes ?? null,
           raw_payload: item.raw_payload ?? null,
-        }))
-      : [];
+        }));
     if (session.id) {
-      // Update existing
-      const { error } = await supabase
-        .from("swim_sessions_catalog")
-        .update({
-          name: session.name,
-          description: session.description ?? null,
-          folder: session.folder ?? null,
-        })
-        .eq("id", session.id);
+      // Update existing — atomic RPC (DELETE + INSERT in single transaction)
+      const { data, error } = await supabase.rpc('update_swim_session_atomic', {
+        p_session_id: session.id,
+        p_name: session.name,
+        p_description: session.description ?? null,
+        p_total_distance: session.total_distance ?? null,
+        p_folder: session.folder ?? null,
+        p_items: JSON.stringify(items),
+      });
       if (error) throw new Error(error.message);
-      const { error: deleteError } = await supabase.from("swim_session_items").delete().eq("catalog_id", session.id);
-      if (deleteError) throw new Error(deleteError.message);
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from("swim_session_items")
-          .insert(items.map((item: any) => ({ ...item, catalog_id: session.id })));
-        if (itemsError) throw new Error(itemsError.message);
-      }
       return { status: "updated" };
     }
     // Create new

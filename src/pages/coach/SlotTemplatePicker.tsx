@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   CalendarCheck,
   Clock,
+  Eye,
   FolderOpen,
   Search,
   SwatchBook,
@@ -61,6 +62,11 @@ export function SlotTemplatePicker({
   isAssigning = false,
 }: SlotTemplatePickerProps) {
   const [search, setSearch] = useState("");
+  const [previewId, setPreviewId] = useState<number | null>(null);
+
+  const handleTogglePreview = (id: number) => {
+    setPreviewId((prev) => (prev === id ? null : id));
+  };
 
   /* ── data ─────────────────────────────────────────────── */
 
@@ -167,6 +173,8 @@ export function SlotTemplatePicker({
                   assignedIds={assignedIds}
                   isAssigning={isAssigning}
                   onSelect={handleSelect}
+                  previewId={previewId}
+                  onTogglePreview={handleTogglePreview}
                 />
               )}
 
@@ -181,6 +189,8 @@ export function SlotTemplatePicker({
                   assignedIds={assignedIds}
                   isAssigning={isAssigning}
                   onSelect={handleSelect}
+                  previewId={previewId}
+                  onTogglePreview={handleTogglePreview}
                 />
               )}
             </div>
@@ -202,6 +212,8 @@ function SessionGroup({
   assignedIds,
   isAssigning,
   onSelect,
+  previewId,
+  onTogglePreview,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -211,6 +223,8 @@ function SessionGroup({
   assignedIds?: Set<number>;
   isAssigning: boolean;
   onSelect: (s: SwimSessionTemplate) => void;
+  previewId: number | null;
+  onTogglePreview: (id: number) => void;
 }) {
   return (
     <div>
@@ -237,6 +251,8 @@ function SessionGroup({
             isAssigned={assignedIds?.has(session.id) ?? false}
             isAssigning={isAssigning}
             onSelect={onSelect}
+            previewId={previewId}
+            onTogglePreview={onTogglePreview}
           />
         ))}
       </div>
@@ -251,22 +267,24 @@ function SessionCard({
   isAssigned,
   isAssigning,
   onSelect,
+  previewId,
+  onTogglePreview,
 }: {
   session: SwimSessionTemplate;
   isAssigned: boolean;
   isAssigning: boolean;
   onSelect: (s: SwimSessionTemplate) => void;
+  previewId: number | null;
+  onTogglePreview: (id: number) => void;
 }) {
   const totalDistance = calculateSwimTotalDistance(session.items ?? []);
   const relDate = formatRelativeDate(session.created_at);
   const recent = isRecent(session.created_at);
+  const hasItems = (session.items?.length ?? 0) > 0;
 
   return (
-    <button
-      type="button"
-      disabled={isAssigning}
-      onClick={() => onSelect(session)}
-      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none ${
+    <div
+      className={`w-full rounded-xl border p-3 text-left shadow-sm ${
         isAssigned
           ? "border-emerald-500/25 bg-emerald-500/5"
           : recent
@@ -274,56 +292,95 @@ function SessionCard({
             : "border-border bg-card"
       }`}
     >
-      {/* Icon */}
-      <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-          isAssigned
-            ? "bg-emerald-500/15 text-emerald-500"
-            : recent
-              ? "bg-blue-500/15 text-blue-500"
-              : "bg-blue-500/10 text-blue-400"
-        }`}
+      <button
+        type="button"
+        disabled={isAssigning}
+        onClick={() => onSelect(session)}
+        className="flex w-full items-center gap-3 transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
       >
-        {isAssigned ? (
-          <CalendarCheck className="h-5 w-5" />
-        ) : (
-          <SwatchBook className="h-5 w-5" />
-        )}
-      </div>
+        {/* Icon */}
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+            isAssigned
+              ? "bg-emerald-500/15 text-emerald-500"
+              : recent
+                ? "bg-blue-500/15 text-blue-500"
+                : "bg-blue-500/10 text-blue-400"
+          }`}
+        >
+          {isAssigned ? (
+            <CalendarCheck className="h-5 w-5" />
+          ) : (
+            <SwatchBook className="h-5 w-5" />
+          )}
+        </div>
 
-      {/* Text */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-foreground">
-            {session.name}
-          </p>
-          {recent && !isAssigned && (
-            <span className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-              Récent
-            </span>
+        {/* Text */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-medium text-foreground">
+              {session.name}
+            </p>
+            {recent && !isAssigned && (
+              <span className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                Récent
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+            {totalDistance > 0 && (
+              <span>{totalDistance.toLocaleString("fr-FR")} m</span>
+            )}
+            {totalDistance > 0 && session.folder && (
+              <span aria-hidden="true">·</span>
+            )}
+            {session.folder && (
+              <span className="truncate">{session.folder}</span>
+            )}
+            {(totalDistance > 0 || session.folder) && relDate && (
+              <span aria-hidden="true">·</span>
+            )}
+            {relDate && (
+              <span className="inline-flex items-center gap-0.5 shrink-0">
+                <Clock className="h-2.5 w-2.5 opacity-60" />
+                {relDate}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {/* Preview toggle + inline preview */}
+      {hasItems && (
+        <div className="mt-2 flex items-start">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onTogglePreview(session.id); }}
+            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs transition-colors ${
+              previewId === session.id
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            }`}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            <span>{previewId === session.id ? "Masquer" : "Aperçu"}</span>
+          </button>
+        </div>
+      )}
+      {previewId === session.id && (
+        <div className="mt-2 space-y-1 border-t pt-2">
+          {session.items?.slice(0, 5).map((item, i) => (
+            <p key={i} className="text-xs text-muted-foreground truncate">
+              {item.label || (item.distance ? `${item.distance}m` : `Exercice ${i + 1}`)}
+            </p>
+          ))}
+          {(session.items?.length ?? 0) > 5 && (
+            <p className="text-xs text-muted-foreground">
+              +{session.items!.length - 5} exercices...
+            </p>
           )}
         </div>
-        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-          {totalDistance > 0 && (
-            <span>{totalDistance.toLocaleString("fr-FR")} m</span>
-          )}
-          {totalDistance > 0 && session.folder && (
-            <span aria-hidden="true">·</span>
-          )}
-          {session.folder && (
-            <span className="truncate">{session.folder}</span>
-          )}
-          {(totalDistance > 0 || session.folder) && relDate && (
-            <span aria-hidden="true">·</span>
-          )}
-          {relDate && (
-            <span className="inline-flex items-center gap-0.5 shrink-0">
-              <Clock className="h-2.5 w-2.5 opacity-60" />
-              {relDate}
-            </span>
-          )}
-        </div>
-      </div>
-    </button>
+      )}
+    </div>
   );
 }
