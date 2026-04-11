@@ -508,7 +508,7 @@ export function FeedbackDrawer({
           />
           <motion.div
             className={cn(
-              "fixed z-modal bg-background shadow-2xl",
+              "fixed z-modal bg-background shadow-2xl overflow-hidden",
               // Mobile: bottom sheet
               "left-0 right-0 bottom-0 top-auto max-h-[calc(100dvh-env(safe-area-inset-top))] h-[88dvh] rounded-t-3xl",
               // Desktop: drawer à droite
@@ -532,15 +532,15 @@ export function FeedbackDrawer({
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex h-full flex-col">
+            <div className="flex h-full flex-col overflow-hidden">
               <div
-                className="px-5 pt-3 sm:hidden touch-none"
+                className="px-5 pt-3 sm:hidden touch-none shrink-0"
                 onPointerDown={(e) => dragControls.start(e)}
               >
                 <div className="mx-auto h-1.5 w-12 rounded-full bg-muted" />
               </div>
 
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-primary/15 bg-background px-4 sm:px-5 py-2.5">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-primary/15 bg-background px-4 sm:px-5 py-2.5 shrink-0">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary text-primary-foreground shrink-0">
                     <Waves className="h-3.5 w-3.5" />
@@ -554,7 +554,7 @@ export function FeedbackDrawer({
                 </IconButton>
               </div>
 
-              <div className="flex-1 overflow-auto overscroll-contain touch-pan-y p-4 sm:p-5">
+              <div className="flex-1 min-h-0 overflow-auto overscroll-contain touch-pan-y p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {/* Header jour minimal */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -985,7 +985,7 @@ export function FeedbackDrawer({
                               <button
                                 type="button"
                                 onClick={onCloseSession}
-                                className="rounded-2xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                                className="shrink-0 rounded-2xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"
                               >
                                 Retour aux créneaux
                               </button>
@@ -1093,11 +1093,11 @@ export function FeedbackDrawer({
                                       variants={listItem}
                                     >
                                       <div className={cn("text-sm font-semibold", !canRate ? "text-muted-foreground" : "text-foreground")}>{ind.label}</div>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-muted-foreground w-14 text-right shrink-0 leading-tight">
+                                      <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                        <span className="text-[10px] text-muted-foreground w-12 sm:w-14 text-right shrink-0 leading-tight">
                                           {ind.mode === "hard" ? "Facile" : "Mauvaise"}
                                         </span>
-                                        <div className="flex gap-1.5 flex-1 justify-center">
+                                        <div className="flex gap-1 sm:gap-1.5 flex-1 justify-center min-w-0">
                                           {[1, 2, 3, 4, 5].map((n) => {
                                             const isSel = selected === n;
                                             return (
@@ -1107,7 +1107,7 @@ export function FeedbackDrawer({
                                                 disabled={!canRate}
                                                 onClick={() => onDraftStateChange({ ...draftState, [ind.key]: n })}
                                                 className={cn(
-                                                  "h-11 w-11 rounded-2xl border text-sm font-semibold transition",
+                                                  "h-10 w-10 sm:h-11 sm:w-11 rounded-2xl border text-sm font-semibold transition shrink-0",
                                                   !canRate
                                                     ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
                                                     : isSel
@@ -1120,7 +1120,7 @@ export function FeedbackDrawer({
                                             );
                                           })}
                                         </div>
-                                        <span className="text-[10px] text-muted-foreground w-14 shrink-0 leading-tight">
+                                        <span className="text-[10px] text-muted-foreground w-12 sm:w-14 shrink-0 leading-tight">
                                           {ind.mode === "hard" ? "Très dur" : "Excellente"}
                                         </span>
                                       </div>
