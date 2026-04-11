@@ -1832,28 +1832,18 @@ const CoachTrainingSlotsScreen = ({
         </div>
       )}
 
-      {/* ── Desktop: single compact toolbar ── */}
+      {/* ── Desktop: row 1 — actions + filter + mode toggle ── */}
       <div className="hidden sm:flex items-center gap-2">
-        {/* Week navigation */}
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={prevWeek}>
-          <ChevronLeft className="h-4 w-4" />
+        {onOpenLibrary && (
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
+            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+            Bibliothèque
+          </Button>
+        )}
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreate}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Nouveau
         </Button>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-sm font-semibold hover:bg-muted/50 transition-colors"
-          onClick={goToday}
-          title="Revenir à cette semaine"
-        >
-          <span className="text-primary">S{weekNumber}</span>
-          <span className="text-muted-foreground text-xs font-normal">
-            {formatDayMonth(weekMonday)} – {formatDayMonth(weekSunday)}
-          </span>
-        </button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={nextWeek}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-
-        {/* Filter */}
         <Select value={filterValue} onValueChange={setFilterValue}>
           <SelectTrigger className="w-44 h-8 text-xs">
             <SelectValue placeholder="Filtrer..." />
@@ -1880,22 +1870,29 @@ const CoachTrainingSlotsScreen = ({
             ))}
           </SelectContent>
         </Select>
-
-        {/* Spacer */}
         <div className="flex-1" />
-
-        {/* Actions + mode toggle */}
-        {onOpenLibrary && (
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
-            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-            Bibliothèque
-          </Button>
-        )}
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreate}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Nouveau
-        </Button>
         {modeToggle}
+      </div>
+
+      {/* ── Desktop: row 2 — week navigation ── */}
+      <div className="hidden sm:flex items-center justify-center gap-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={prevWeek}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-sm font-semibold hover:bg-muted/50 transition-colors"
+          onClick={goToday}
+          title="Revenir à cette semaine"
+        >
+          <span className="text-primary">S{weekNumber}</span>
+          <span className="text-muted-foreground text-xs font-normal">
+            {formatDayMonth(weekMonday)} – {formatDayMonth(weekSunday)}
+          </span>
+        </button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={nextWeek}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* ── Content ── */}
