@@ -638,9 +638,6 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
       const slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string }> = [];
 
       for (const s of planned) {
-        // Skip empty slots for calendar pills — they show in the drawer but not on the grid
-        if (s.isEmpty) continue;
-
         const st = getSessionStatus(s, d);
         if (!st.expected) {
           const hasLogAnyway = Boolean(getLogForSession(s.id));
