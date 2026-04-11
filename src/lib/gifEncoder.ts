@@ -69,7 +69,11 @@ export function encodeGif(
   }
 
   gif.finish();
-  return new Blob([gif.bytes()], { type: "image/gif" });
+  const blob = new Blob([gif.bytes()], { type: "image/gif" });
+  if (blob.size > 5 * 1024 * 1024) {
+    throw new Error("Le GIF généré dépasse 5 Mo. Essayez un extrait plus court.");
+  }
+  return blob;
 }
 
 export async function videoToGif(

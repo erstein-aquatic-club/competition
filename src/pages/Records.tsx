@@ -110,7 +110,7 @@ function InlineEditBar({
         <Button
           type="button"
           onClick={() => onSave(draft)}
-          className="h-10 w-10 p-0 rounded-xl"
+          className="min-h-[44px] min-w-[44px] h-10 w-10 p-0 rounded-xl"
           aria-label="Valider"
         >
           <Check className="h-5 w-5" />
@@ -120,7 +120,7 @@ function InlineEditBar({
           type="button"
           variant="outline"
           onClick={onCancel}
-          className="h-10 w-10 p-0 rounded-xl"
+          className="min-h-[44px] min-w-[44px] h-10 w-10 p-0 rounded-xl"
           aria-label="Annuler"
         >
           <X className="h-5 w-5" />
@@ -1244,7 +1244,7 @@ export default function Records() {
                                     <button
                                       type="button"
                                       onClick={() => openOneRmEdit(ex.id, record?.weight ?? null)}
-                                      className="inline-flex items-center justify-center h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+                                      className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
                                       aria-label={`Modifier ${ex.nom_exercice}`}
                                     >
                                       <Edit2 className="h-3.5 w-3.5" />
@@ -1321,7 +1321,7 @@ export default function Records() {
                                         setNoteDraft("");
                                       }}
                                       disabled={updateExerciseNote.isPending}
-                                      className="rounded-lg h-9 w-9 p-0 shrink-0"
+                                      className="rounded-lg min-h-[44px] min-w-[44px] h-9 w-9 p-0 shrink-0"
                                       aria-label="Enregistrer"
                                     >
                                       <Check className="h-4 w-4" />
@@ -1331,7 +1331,7 @@ export default function Records() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => { setEditingNoteExerciseId(null); setNoteDraft(""); }}
-                                      className="rounded-lg h-9 w-9 p-0 shrink-0"
+                                      className="rounded-lg min-h-[44px] min-w-[44px] h-9 w-9 p-0 shrink-0"
                                       aria-label="Annuler"
                                     >
                                       <X className="h-4 w-4" />

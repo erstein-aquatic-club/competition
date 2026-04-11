@@ -183,10 +183,17 @@ const SwimmerPlanningTab = ({ athleteId }: Props) => {
   const timelineMondays = useMemo(() => {
     if (!selectedCycle) return [];
     const startDate = effectiveStartDate;
-    const endDate = selectedCycle.end_competition_date;
+    let endDate = selectedCycle.end_competition_date;
+    // Fallback if end competition was deleted: estimate from start + number of existing weeks
+    if (!endDate && startDate) {
+      const weeksCount = weeks.length || 4; // default 4 weeks if no weeks exist
+      const fallback = new Date(startDate + "T00:00:00");
+      fallback.setDate(fallback.getDate() + weeksCount * 7);
+      endDate = fallback.toISOString().split("T")[0];
+    }
     if (!startDate || !endDate) return [];
     return getMondays(startDate, endDate);
-  }, [selectedCycle, effectiveStartDate]);
+  }, [selectedCycle, effectiveStartDate, weeks.length]);
 
   // Map weeks by week_start for quick lookup
   const weeksByStart = useMemo(() => {

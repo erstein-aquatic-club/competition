@@ -86,6 +86,7 @@ export const expandScaleToTen = (value: number | null | undefined): number | nul
 export const estimateOneRm = (weight?: number | null, reps?: number | null): number | null => {
   if (!Number.isFinite(weight) || !Number.isFinite(reps)) return null;
   if ((weight ?? 0) <= 0 || (reps ?? 0) <= 0) return null;
+  if ((reps as number) > 30) return null; // unrealistic rep count — skip estimation
   if (reps === 1) return Math.round(weight as number);
   return Math.round((weight as number) * (1 + (reps as number) / 30));
 };

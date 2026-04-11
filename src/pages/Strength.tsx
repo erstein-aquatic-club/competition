@@ -417,8 +417,8 @@ export default function Strength() {
     onError: (_error, variables) => {
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
+      setIsFinishing(false);
       if (variables?.status === "completed") {
-        setIsFinishing(false);
         toast({ title: "Erreur", description: "Impossible d'enregistrer la séance. Réessayez.", variant: "destructive" });
       }
     },
@@ -556,6 +556,7 @@ export default function Strength() {
 
   const handleLaunchFocus = async () => {
     if (!activeSession) return;
+    if (startRun.isPending) return;
     const lockedCycle = activeSession.cycle ?? cycleType;
     if (activeFilteredItems.length === 0) {
       toast({
@@ -732,6 +733,7 @@ export default function Strength() {
               }}
               onFinish={(result) => {
                 if (!activeRunId) return;
+                if (isFinishing) return;
                 if (!isOnline) {
                   enqueue("updateRun", {
                     run_id: activeRunId,
@@ -852,6 +854,7 @@ export default function Strength() {
                   saveState={saveState}
                   onBack={() => setScreenMode("list")}
                   onLaunch={handleLaunchFocus}
+                  launchDisabled={startRun.isPending}
                   substitutions={substitutions}
                   onSubstitute={handleSubstitute}
                   originalItemCount={originalItemCount}
@@ -878,6 +881,7 @@ export default function Strength() {
                   saveState={saveState}
                   onBack={() => { setScreenMode("list"); setIsPlanMode(false); }}
                   onLaunch={handleLaunchFocus}
+                  launchDisabled={startRun.isPending}
                   substitutions={substitutions}
                   onSubstitute={handleSubstitute}
                   originalItemCount={originalItemCount}

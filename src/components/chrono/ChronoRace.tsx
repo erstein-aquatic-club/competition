@@ -53,6 +53,7 @@ function WaveBar({
             return (
               <button
                 key={w.wave}
+                aria-label={`Lancer la vague ${wc.label}`}
                 onClick={() =>
                   dispatch({
                     type: "LAUNCH_WAVE",
@@ -83,6 +84,12 @@ function WaveBar({
               {/* Recovery countdown — above the card */}
               {intervalMs > 0 && (
                 <div
+                  role="timer"
+                  aria-label={
+                    overdue
+                      ? `Récupération dépassée de ${formatTime(-remainingMs)}`
+                      : `Récupération restante ${formatTime(remainingMs)}`
+                  }
                   className={`flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black transition-colors ${
                     overdue
                       ? "bg-destructive text-destructive-foreground"
@@ -97,6 +104,11 @@ function WaveBar({
                   <span className={`text-xl leading-none ${urgent || overdue ? "text-2xl" : ""}`}>
                     {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
                   </span>
+                  {overdue && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      DÉPASSÉE
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -114,6 +126,7 @@ function WaveBar({
                   </span>
                   <button
                     type="button"
+                    aria-label="Série suivante"
                     onClick={(e) => {
                       e.stopPropagation();
                       dispatch({ type: "NEXT_REP", wave: w.wave });

@@ -75,6 +75,12 @@ export async function subscribeToPush(userId: number): Promise<boolean> {
     { onConflict: "user_id,endpoint" },
   );
 
+  if (!error) {
+    // Clean up stale endpoints for this user (browser may have rotated the endpoint)
+    await supabase.from("push_subscriptions").delete()
+      .eq("user_id", userId).neq("endpoint", endpoint);
+  }
+
   return !error;
 }
 

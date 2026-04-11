@@ -604,7 +604,12 @@ export async function saveStrengthRun(run: any) {
         one_rm_estimates: oneRmEstimates,
       },
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (error.message?.includes("violates foreign key")) {
+        throw new Error("Un exercice référencé n'existe plus. Veuillez rafraîchir la page.");
+      }
+      throw new Error(error.message);
+    }
 
     const result = data as { run_id: number; logs_count: number; one_rm_count: number } | null;
     return { status: "ok", run_id: result?.run_id ?? null };

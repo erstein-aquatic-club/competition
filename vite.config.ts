@@ -90,6 +90,7 @@ export default defineConfig(({ mode }) => ({
         start_url: '/competition/#/',
         scope: '/competition/',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'any',
         theme_color: '#E30613',
         background_color: '#ffffff',

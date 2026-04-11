@@ -515,6 +515,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
               {deleteMutation.isPending ? "Suppression..." : "Supprimer"}

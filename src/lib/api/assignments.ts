@@ -336,6 +336,18 @@ export async function bulkCreateSlotAssignments(params: {
 }): Promise<{ created: number }> {
   if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
+  // Check for existing assignments on the same slot+date+groups to prevent duplicates
+  const { data: existing, error: checkError } = await supabase
+    .from("session_assignments")
+    .select("id")
+    .eq("training_slot_id", params.trainingSlotId)
+    .eq("scheduled_date", params.scheduledDate)
+    .in("target_group_id", params.groupIds);
+  if (checkError) throw new Error(checkError.message);
+  if (existing && existing.length > 0) {
+    throw new Error("Ces groupes ont déjà des assignations sur ce créneau");
+  }
+
   const rows = params.groupIds.map((groupId) => ({
     assignment_type: "swim" as const,
     swim_catalog_id: params.swimCatalogId,

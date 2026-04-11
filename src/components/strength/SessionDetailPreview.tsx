@@ -50,6 +50,7 @@ interface SessionDetailPreviewProps {
   saveState: SaveState;
   onBack: () => void;
   onLaunch: () => void;
+  launchDisabled?: boolean;
   substitutions?: Map<number, { originalIndex: number; exercise: Exercise }>;
   onSubstitute?: (itemIndex: number, exercise: Exercise) => void;
   originalItemCount?: number;
@@ -66,6 +67,7 @@ export function SessionDetailPreview({
   saveState,
   onBack,
   onLaunch,
+  launchDisabled,
   substitutions,
   onSubstitute,
   originalItemCount,
@@ -369,6 +371,7 @@ export function SessionDetailPreview({
           variant="default"
           className="flex-1 h-14 rounded-xl font-bold text-base shadow-lg"
           onClick={onLaunch}
+          disabled={launchDisabled}
         >
           <Play className="h-5 w-5 mr-2" />
           Lancer la séance

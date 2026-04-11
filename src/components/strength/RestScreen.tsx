@@ -177,12 +177,23 @@ export function RestScreen({
       </div>
 
       {/* Pagination dots */}
-      <div className="flex items-center justify-center gap-2 pb-3 shrink-0">
+      <div
+        className="flex items-center justify-center gap-2 pb-3 shrink-0"
+        role="tablist"
+        aria-label="Onglets repos"
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight") { e.preventDefault(); goTo(activeTab + 1); }
+          else if (e.key === "ArrowLeft") { e.preventDefault(); goTo(activeTab - 1); }
+        }}
+      >
         {TAB_LABELS.map((label, i) => (
           <button
             key={label}
             type="button"
+            role="tab"
             aria-label={label}
+            aria-selected={i === activeTab}
+            tabIndex={i === activeTab ? 0 : -1}
             onClick={() => goTo(i)}
             className={cn(
               "rounded-full transition-all duration-300",

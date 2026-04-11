@@ -297,3 +297,7 @@
   25% { transform: rotate(-20deg); }
   75% { transform: rotate(20deg); }
 }
+
+button, a, [role="button"], input, select, textarea {
+  touch-action: manipulation;
+}
