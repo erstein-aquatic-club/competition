@@ -40,7 +40,14 @@ export interface ChronoState {
   waves: WaveState[];
   raceData: Map<number, SwimmerRaceState>; // keyed by athleteId
   stoppedAt: number | null;
+  /** Total distance in meters (0 = not set) */
+  totalDistanceM: number;
+  /** Split distance in meters (0 = not set, splits numbered only) */
+  splitDistanceM: number;
 }
+
+export const DISTANCE_PRESETS = [25, 50, 100, 200, 400, 800, 1500] as const;
+export const SPLIT_PRESETS = [25, 50, 100] as const;
 
 export const WAVE_COLORS = [
   { bg: "bg-cyan-500/20", border: "border-cyan-500", text: "text-cyan-400", dot: "bg-cyan-400", label: "V1" },

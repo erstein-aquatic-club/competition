@@ -136,6 +136,7 @@ function SwimmerCard({
   currentSplits,
   swimmerStoppedAt,
   totalReps,
+  splitDistanceM,
   now,
   dispatch,
   getTimestamp,
@@ -147,6 +148,7 @@ function SwimmerCard({
   currentSplits: { cumulativeMs: number; lapMs: number }[];
   swimmerStoppedAt: number | null;
   totalReps: number;
+  splitDistanceM: number;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -255,7 +257,7 @@ function SwimmerCard({
         {launched && lastSplit ? (
           <div className="flex items-baseline gap-2">
             <span className={`text-xs font-bold text-white rounded px-1 py-0.5 ${wc.dot}`}>
-              #{currentSplits.length}
+              {splitDistanceM > 0 ? `${currentSplits.length * splitDistanceM}m` : `#${currentSplits.length}`}
             </span>
             <span className="font-mono tabular-nums text-sm font-semibold text-foreground">
               {formatTime(lastSplit.cumulativeMs)}
@@ -281,6 +283,7 @@ function LaneSection({
   swimmers,
   waves,
   raceData,
+  splitDistanceM,
   now,
   dispatch,
   getTimestamp,
@@ -289,6 +292,7 @@ function LaneSection({
   swimmers: ChronoState["swimmers"];
   waves: ChronoState["waves"];
   raceData: ChronoState["raceData"];
+  splitDistanceM: number;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -305,7 +309,7 @@ function LaneSection({
         </h3>
         <div className="h-px flex-1 bg-border" />
       </div>
-      <div className="grid grid-cols-2 gap-3 px-4 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 px-4 md:grid-cols-2 xl:grid-cols-3">
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
           const race = raceData.get(s.athleteId);
@@ -319,6 +323,7 @@ function LaneSection({
               currentSplits={race ? race.splitsByRep[race.splitsByRep.length - 1] : []}
               swimmerStoppedAt={race?.stoppedAt ?? null}
               totalReps={race?.splitsByRep.length ?? 1}
+              splitDistanceM={splitDistanceM}
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
@@ -400,6 +405,7 @@ export default function ChronoRace({
             swimmers={state.swimmers}
             waves={state.waves}
             raceData={state.raceData}
+            splitDistanceM={state.splitDistanceM}
             now={now}
             dispatch={dispatch}
             getTimestamp={getTimestamp}

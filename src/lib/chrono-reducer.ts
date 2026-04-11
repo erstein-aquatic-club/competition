@@ -10,6 +10,8 @@ import type {
 
 type ChronoAction =
   | { type: "SET_LANE_COUNT"; count: number }
+  | { type: "SET_TOTAL_DISTANCE"; meters: number }
+  | { type: "SET_SPLIT_DISTANCE"; meters: number }
   | { type: "SET_WAVE_INTERVAL"; wave: number; seconds: number }
   | { type: "ADD_SWIMMER"; swimmer: ChronoSwimmer }
   | { type: "REMOVE_SWIMMER"; athleteId: number }
@@ -52,6 +54,8 @@ export const initialChronoState: ChronoState = {
   waves: [],
   raceData: new Map(),
   stoppedAt: null,
+  totalDistanceM: 0,
+  splitDistanceM: 50,
 };
 
 // ── Reducer ──────────────────────────────────────────────────────────
@@ -64,6 +68,14 @@ export function chronoReducer(
     case "SET_LANE_COUNT": {
       const laneCount = Math.max(1, Math.min(8, action.count));
       return { ...state, laneCount };
+    }
+
+    case "SET_TOTAL_DISTANCE": {
+      return { ...state, totalDistanceM: Math.max(0, action.meters) };
+    }
+
+    case "SET_SPLIT_DISTANCE": {
+      return { ...state, splitDistanceM: Math.max(0, action.meters) };
     }
 
     case "SET_WAVE_INTERVAL": {

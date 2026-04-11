@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../ui/sheet";
-import { WAVE_COLORS } from "../../lib/chrono-types";
+import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS } from "../../lib/chrono-types";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import type { AthleteSummary } from "../../lib/api/types";
@@ -197,6 +197,100 @@ export default function ChronoSetup({
           </div>
         </div>
       )}
+
+      {/* ── Distance config ──────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Total distance stepper */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Distance :</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                const cur = state.totalDistanceM;
+                const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < cur);
+                dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
+              }}
+              disabled={state.totalDistanceM <= 0}
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <input
+              type="number"
+              min={0}
+              step={25}
+              value={state.totalDistanceM || ""}
+              placeholder="—"
+              onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value) || 0 })}
+              className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+            />
+            <span className="text-xs text-muted-foreground">m</span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                const cur = state.totalDistanceM;
+                const next = DISTANCE_PRESETS.find((d) => d > cur);
+                dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? cur + 100 });
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Split distance stepper */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Splits :</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                const cur = state.splitDistanceM;
+                const prev = [...SPLIT_PRESETS].reverse().find((d) => d < cur);
+                dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
+              }}
+              disabled={state.splitDistanceM <= 25}
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <input
+              type="number"
+              min={25}
+              step={25}
+              value={state.splitDistanceM || ""}
+              placeholder="50"
+              onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value) || 50 })}
+              className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+            />
+            <span className="text-xs text-muted-foreground">m</span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                const cur = state.splitDistanceM;
+                const next = SPLIT_PRESETS.find((d) => d > cur);
+                dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? cur + 25 });
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Summary */}
+        {state.totalDistanceM > 0 && state.splitDistanceM > 0 && (
+          <span className="text-xs text-muted-foreground">
+            → {Math.ceil(state.totalDistanceM / state.splitDistanceM)} splits par rep
+          </span>
+        )}
+      </div>
 
       {/* ── Lane sections ──────────────────────────────── */}
       <div className="flex flex-col gap-3">

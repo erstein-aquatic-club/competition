@@ -201,8 +201,8 @@ export default function ChronoResults({ state, dispatch, onExportComplete }: Chr
                                     isBest ? "text-green-600 dark:text-green-400" : "text-foreground"
                                   }`}
                                 >
-                                  <span className="w-6 text-right text-muted-foreground">
-                                    #{i + 1}
+                                  <span className="w-12 text-right text-muted-foreground text-xs">
+                                    {state.splitDistanceM > 0 ? `${(i + 1) * state.splitDistanceM}m` : `#${i + 1}`}
                                   </span>
                                   <span className="w-20">
                                     {formatTime(split.cumulativeMs)}
