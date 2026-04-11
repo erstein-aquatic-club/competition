@@ -572,12 +572,14 @@ type OverrideFormSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   slot: TrainingSlot | null;
+  initialDate?: string;
 };
 
 const OverrideFormSheet = ({
   open,
   onOpenChange,
   slot,
+  initialDate,
 }: OverrideFormSheetProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -591,7 +593,7 @@ const OverrideFormSheet = ({
 
   useEffect(() => {
     if (!open) return;
-    setOverrideDate("");
+    setOverrideDate(initialDate ?? "");
     setStatus("cancelled");
     setNewStartTime(slot ? formatTime(slot.start_time) : "");
     setNewEndTime(slot ? formatTime(slot.end_time) : "");
@@ -1278,6 +1280,7 @@ const CoachTrainingSlotsScreen = ({
   const [showSlotForm, setShowSlotForm] = useState(false);
   const [editingSlot, setEditingSlot] = useState<TrainingSlot | null>(null);
   const [overrideSlot, setOverrideSlot] = useState<TrainingSlot | null>(null);
+  const [overrideInitialDate, setOverrideInitialDate] = useState("");
   const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<SlotInstance | null>(null);
   const [showSessionSheet, setShowSessionSheet] = useState(false);
@@ -1523,6 +1526,7 @@ const CoachTrainingSlotsScreen = ({
 
   const handleManageOverride = (instance: SlotInstance) => {
     setOverrideSlot(instance.slot);
+    setOverrideInitialDate(instance.date);
     setShowOverrideForm(true);
   };
 
@@ -1942,6 +1946,7 @@ const CoachTrainingSlotsScreen = ({
         open={showOverrideForm}
         onOpenChange={setShowOverrideForm}
         slot={overrideSlot}
+        initialDate={overrideInitialDate}
       />
 
       <SlotTemplatePicker
