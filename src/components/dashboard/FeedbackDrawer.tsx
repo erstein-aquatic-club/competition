@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
-import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2 } from "lucide-react";
+import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { BottomActionBar, type SaveState } from "@/components/shared/BottomActionBar";
 import {
@@ -638,6 +638,15 @@ export function FeedbackDrawer({
                                   </span>
                                 )}
                               </div>
+                              {/* Aperçu commentaire nageur */}
+                              {logsBySessionId[s.id]?.comments && (
+                                <div className="mt-1.5 flex items-start gap-1.5 max-w-full">
+                                  <MessageCircle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                                  <p className="text-xs text-muted-foreground line-clamp-2 italic leading-snug">
+                                    {logsBySessionId[s.id].comments}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -829,6 +838,17 @@ export function FeedbackDrawer({
                               <div className="mx-3 mb-3 rounded-2xl bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-400 p-3">
                                 <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
                                 <p className="text-xs text-blue-800 dark:text-blue-300 mt-0.5">{logsBySessionId[activeSession.id].coach_notes}</p>
+                              </div>
+                            )}
+
+                            {/* Commentaire nageur sauvegardé (lecture) */}
+                            {logsBySessionId[activeSession.id]?.comments && (
+                              <div className="mx-3 mb-3 rounded-2xl bg-muted/60 border border-border p-3">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <MessageCircle className="h-3 w-3 text-muted-foreground" />
+                                  <p className="text-[10px] font-semibold text-muted-foreground">Mon commentaire</p>
+                                </div>
+                                <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">{logsBySessionId[activeSession.id].comments}</p>
                               </div>
                             )}
 
