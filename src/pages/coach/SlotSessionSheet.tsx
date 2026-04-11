@@ -421,25 +421,6 @@ function ModeCard({
   );
 }
 
-function PanelHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        Étape 2
-      </p>
-      <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-3">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  );
-}
 
 function SessionUnavailableBody({
   override,
@@ -749,11 +730,6 @@ function SlotManagementPanel({
 
   return (
     <div className="space-y-4">
-      <PanelHeader
-        title="Gérer le créneau"
-        description="Modifiez la structure du créneau ou ajustez uniquement cette date."
-      />
-
       {state === "cancelled" && (
         <div className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3">
           <p className="text-sm font-medium text-foreground">Créneau annulé</p>
