@@ -19,7 +19,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { eventCodeFromFfnName } from "@/lib/objectiveHelpers";
+import { eventCodeFromFfnName, FFN_EVENTS, eventLabel } from "@/lib/objectiveHelpers";
 
 type OneRmRecord = {
   exercise_id: number;
@@ -685,75 +685,117 @@ export default function Records() {
                   <Sheet open={swimSheetOpen} onOpenChange={setSwimSheetOpen}>
                     <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-3xl">
                       <SheetHeader className="text-left">
-                        <SheetTitle>Ajouter un record</SheetTitle>
+                        <SheetTitle className="flex items-center gap-2">
+                          <span className="text-lg leading-none">🏊</span>
+                          Nouveau record
+                        </SheetTitle>
                         <SheetDescription>
-                          Saisis un meilleur temps d&apos;entraînement.
+                          Meilleur temps réalisé à l&apos;entraînement.
                         </SheetDescription>
                       </SheetHeader>
-                      <form onSubmit={handleSwimSubmit} className="mt-5">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2">
-                              <Label className="text-xs mb-1.5 block">Épreuve</Label>
-                              <Input
-                                value={swimForm.event_name}
-                                onChange={(e) => setSwimForm({ ...swimForm, event_name: e.target.value })}
-                                placeholder="Ex: 100 NL, 200 Dos"
-                                className="h-10 rounded-xl"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs mb-1.5 block">Bassin</Label>
-                              <Select
-                                value={swimForm.pool_length}
-                                onValueChange={(value) => setSwimForm({ ...swimForm, pool_length: value })}
+                      <form onSubmit={handleSwimSubmit} className="mt-5 space-y-5">
+                        {/* Épreuve — Select avec FFN_EVENTS */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base leading-none">🏁</span>
+                            <Label className="text-xs font-semibold">Épreuve</Label>
+                          </div>
+                          <Select
+                            value={swimForm.event_name}
+                            onValueChange={(value) => setSwimForm({ ...swimForm, event_name: value })}
+                          >
+                            <SelectTrigger className="h-10 rounded-xl">
+                              <SelectValue placeholder="Choisir une épreuve" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FFN_EVENTS.map((code) => (
+                                <SelectItem key={code} value={eventLabel(code)}>
+                                  {eventLabel(code)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Bassin — toggle pills */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base leading-none">📏</span>
+                            <Label className="text-xs font-semibold">Bassin</Label>
+                          </div>
+                          <div className="flex gap-1.5">
+                            {(["25", "50"] as const).map((len) => (
+                              <button
+                                key={len}
+                                type="button"
+                                onClick={() => setSwimForm({ ...swimForm, pool_length: len })}
+                                className={cx(
+                                  "flex-1 h-10 rounded-xl border text-sm font-bold transition-all active:scale-95",
+                                  swimForm.pool_length === len
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-muted border-border text-muted-foreground hover:bg-muted/70"
+                                )}
                               >
-                                <SelectTrigger className="h-10 rounded-xl">
-                                  <SelectValue placeholder="—" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="25">25m</SelectItem>
-                                  <SelectItem value="50">50m</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs mb-1.5 block">Temps</Label>
-                              <Input
-                                value={swimForm.time_seconds}
-                                inputMode="decimal"
-                                placeholder="1:02.34"
-                                onChange={(e) => setSwimForm({ ...swimForm, time_seconds: e.target.value })}
-                                className="h-10 rounded-xl"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs mb-1.5 block">Date</Label>
-                              <Input
-                                type="date"
-                                value={swimForm.record_date}
-                                onChange={(e) => setSwimForm({ ...swimForm, record_date: e.target.value })}
-                                className="h-10 rounded-xl"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs mb-1.5 block">Notes</Label>
-                              <Input
-                                value={swimForm.notes}
-                                onChange={(e) => setSwimForm({ ...swimForm, notes: e.target.value })}
-                                placeholder="Optionnel"
-                                className="h-10 rounded-xl"
-                              />
-                            </div>
+                                {len}m
+                              </button>
+                            ))}
                           </div>
-                          <div className="flex justify-end gap-2 pb-2">
-                            <Button type="button" variant="outline" onClick={() => setSwimSheetOpen(false)} className="rounded-xl">
-                              Annuler
-                            </Button>
-                            <Button type="submit" disabled={upsertSwimRecord.isPending} className="rounded-xl">
-                              {upsertSwimRecord.isPending ? "Ajout..." : "Ajouter"}
-                            </Button>
+                        </div>
+
+                        {/* Temps + Date */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base leading-none">⏱️</span>
+                              <Label className="text-xs font-semibold">Temps</Label>
+                            </div>
+                            <Input
+                              value={swimForm.time_seconds}
+                              inputMode="decimal"
+                              placeholder="1:02.34"
+                              onChange={(e) => setSwimForm({ ...swimForm, time_seconds: e.target.value })}
+                              className="h-10 rounded-xl font-mono tabular-nums"
+                            />
+                            <p className="text-[10px] text-muted-foreground">Format : mm:ss.cc ou ss.cc</p>
                           </div>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base leading-none">📅</span>
+                              <Label className="text-xs font-semibold">Date</Label>
+                            </div>
+                            <Input
+                              type="date"
+                              value={swimForm.record_date}
+                              onChange={(e) => setSwimForm({ ...swimForm, record_date: e.target.value })}
+                              className="h-10 rounded-xl"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base leading-none">📝</span>
+                            <Label className="text-xs font-semibold">Notes</Label>
+                          </div>
+                          <textarea
+                            value={swimForm.notes}
+                            onChange={(e) => setSwimForm({ ...swimForm, notes: e.target.value })}
+                            placeholder="Contexte, sensations… (optionnel)"
+                            rows={2}
+                            maxLength={500}
+                            className="w-full rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 resize-none"
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 pb-2">
+                          <Button type="button" variant="outline" onClick={() => setSwimSheetOpen(false)} className="flex-1 rounded-xl h-11">
+                            Annuler
+                          </Button>
+                          <Button type="submit" disabled={upsertSwimRecord.isPending} className="flex-1 rounded-xl h-11 font-semibold">
+                            {upsertSwimRecord.isPending ? "Enregistrement…" : "Enregistrer"}
+                          </Button>
                         </div>
                       </form>
                     </SheetContent>
