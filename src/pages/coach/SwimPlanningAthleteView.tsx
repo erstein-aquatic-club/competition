@@ -1,9 +1,9 @@
 /**
- * SwimPlanningAthleteView.tsx — Read-only "swimmer view" overlay
- * Vertical timeline (MyPlanTab style) showing 3 weeks of swim planning.
- * Compact, ergonomic, mobile-first.
+ * SwimPlanningAthleteView.tsx — Read-only swimmer view of the swim planning
+ * Mirrors the coach view (SwimPlanningDemo) exactly, without editing controls.
+ * Chips are tappable to see filière details (description, examples, technicals).
  */
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -22,7 +22,7 @@ import {
 import { ChevronDown, ChevronLeft, Link2 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Helpers
+   Helpers (same as SwimPlanningDemo)
    ═══════════════════════════════════════════════════════════════════ */
 
 function getISOWeekNumber(date: Date): number {
@@ -60,21 +60,12 @@ function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
 }
 
 const DAY_ROWS = [
-  { index: 0, label: "Lun", short: "L" },
-  { index: 1, label: "Mar", short: "M" },
-  { index: 2, label: "Mer", short: "M" },
-  { index: 3, label: "Jeu", short: "J" },
-  { index: 4, label: "Ven", short: "V" },
-  { index: 5, label: "Sam", short: "S" },
-] as const;
-
-const DAY_COLORS = [
-  "bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-  "bg-orange-500/15 text-orange-700 dark:text-orange-400",
-  "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+  { index: 0, label: "Lun" },
+  { index: 1, label: "Mar" },
+  { index: 2, label: "Mer" },
+  { index: 3, label: "Jeu" },
+  { index: 4, label: "Ven" },
+  { index: 5, label: "Sam" },
 ] as const;
 
 function fmtDD_MM(d: Date): string {
@@ -97,7 +88,8 @@ function getWeekMeta(groupId: number, weekKey: string): { weekType?: string; not
   } catch { return {}; }
 }
 
-const WEEK_COUNT = 3;
+const INITIAL_WEEK_COUNT = 13;
+const LOAD_MORE_COUNT = 4;
 
 const TECHNICAL_LABELS: { key: keyof FiliereTechnicals; label: string; unit: string }[] = [
   { key: "heartRate", label: "Fréq. cardiaque", unit: "bpm" },
@@ -122,16 +114,53 @@ interface SwimPlanningAthleteViewProps {
 }
 
 export default function SwimPlanningAthleteView({ open, onClose, groupId }: SwimPlanningAthleteViewProps) {
+  // ── Week generation (infinite scroll, same as coach) ──
   const startMonday = useMemo(() => getMonday(new Date()), []);
-  const weeks = useMemo(() => generateWeeks(startMonday, WEEK_COUNT), [startMonday]);
-  const weekStarts = useMemo(() => weeks.map((w) => w.weekKey), [weeks]);
+  const [weekCount, setWeekCount] = useState(INITIAL_WEEK_COUNT);
+  const weeks = useMemo(() => generateWeeks(startMonday, weekCount), [startMonday, weekCount]);
+  const visibleWeekKeys = useMemo(() => weeks.map((w) => w.weekKey), [weeks]);
 
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) setWeekCount((c) => c + LOAD_MORE_COUNT); },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [open]);
+
+  // ── Slots ──
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
-    queryKey: ["swim-planning-slots", groupId, weekStarts],
-    queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts }),
-    enabled: open && !!groupId && weekStarts.length > 0,
+    queryKey: ["swim-planning-slots", groupId, visibleWeekKeys],
+    queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts: visibleWeekKeys }),
+    enabled: open && !!groupId && visibleWeekKeys.length > 0,
   });
 
+  const slotsByWeek = useMemo(() => {
+    const map = new Map<string, SwimPlanningSlot[]>();
+    for (const s of slots) {
+      const arr = map.get(s.week_start) ?? [];
+      arr.push(s);
+      map.set(s.week_start, arr);
+    }
+    return map;
+  }, [slots]);
+
+  const findSlot = useCallback(
+    (weekKey: string, dayIndex: number, timeSlot: "morning" | "evening"): SwimPlanningSlot | undefined => {
+      const weekSlots = slotsByWeek.get(weekKey);
+      if (!weekSlots) return undefined;
+      return weekSlots.find((s) => s.day_of_week === dayIndex && s.time_slot === timeSlot);
+    },
+    [slotsByWeek],
+  );
+
+  // ── DB filières (description, examples) ──
   const { data: dbFilieres = [] } = useQuery({
     queryKey: ["swim-filieres"],
     queryFn: () => api.getSwimFilieres(),
@@ -145,17 +174,10 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
     return map;
   }, [dbFilieres]);
 
-  const slotsByWeek = useMemo(() => {
-    const map = new Map<string, SwimPlanningSlot[]>();
-    for (const s of slots) {
-      const arr = map.get(s.week_start) ?? [];
-      arr.push(s);
-      map.set(s.week_start, arr);
-    }
-    return map;
-  }, [slots]);
+  // ── Expand state ──
+  const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
 
-  // Bottom sheet state
+  // ── Filière detail sheet ──
   const [selectedFiliere, setSelectedFiliere] = useState<{ filiereId: string; hasSession: boolean } | null>(null);
   const [techOpen, setTechOpen] = useState(false);
 
@@ -179,171 +201,178 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
           transition={{ type: "spring", damping: 28, stiffness: 300 }}
         >
           {/* ── Header ── */}
-          <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl border-b border-border/50">
-            <div className="flex items-center gap-2 px-4 py-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex items-center justify-center h-10 w-10 -ml-2 rounded-xl active:bg-muted/60 transition-colors"
-                aria-label="Fermer"
-              >
-                <ChevronLeft className="h-5 w-5 text-foreground" />
-              </button>
-              <h1 className="text-base font-bold tracking-tight text-foreground">
-                Ma planification
-              </h1>
+          <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b">
+            <div className="px-4 pt-3 pb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex items-center justify-center h-10 w-10 -ml-2 rounded-xl active:bg-muted/60 transition-colors"
+                  aria-label="Fermer"
+                >
+                  <ChevronLeft className="h-5 w-5 text-foreground" />
+                </button>
+                <h1 className="text-lg font-bold tracking-tight text-foreground">
+                  Ma planification
+                </h1>
+              </div>
             </div>
           </div>
 
-          {/* ── Timeline ── */}
-          <div className="overflow-y-auto h-[calc(100dvh-52px)]">
-            {slotsLoading ? (
-              <div className="px-4 pt-4 space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="h-4 w-40 rounded bg-muted animate-pulse" />
-                    <div className="h-12 w-full rounded-xl bg-muted animate-pulse" />
-                    <div className="h-12 w-full rounded-xl bg-muted animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="relative px-4 pt-3 pb-16">
-                {/* Vertical rail */}
-                <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
+          {/* ── Timeline (same layout as coach view) ── */}
+          <div className="overflow-y-auto h-[calc(100dvh-56px)]">
+            <div className="relative px-4 pt-3 pb-24">
+              {/* Vertical rail */}
+              <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
 
-                {weeks.map((week, weekIdx) => {
+              {slotsLoading && slots.length === 0 ? (
+                <div className="space-y-3 pl-8">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="rounded-xl border p-3 animate-pulse motion-reduce:animate-none">
+                      <div className="h-4 w-36 rounded bg-muted" />
+                      <div className="h-3 w-24 mt-2 rounded bg-muted" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                weeks.map((week) => {
                   const current = isCurrentWeek(week.weekKey);
+                  const expanded = expandedWeekKey === week.weekKey;
                   const meta = getWeekMeta(groupId, week.weekKey);
                   const weekSlots = slotsByWeek.get(week.weekKey) ?? [];
-                  const slotMap = new Map<string, SwimPlanningSlot>();
-                  for (const s of weekSlots) slotMap.set(`${s.day_of_week}-${s.time_slot}`, s);
+                  const filledCount = weekSlots.length;
 
                   return (
-                    <motion.div
-                      key={week.weekKey}
-                      className="relative pl-8 mb-5"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: weekIdx * 0.06, duration: 0.3 }}
-                    >
+                    <div key={week.weekKey} className="relative pl-8 mb-2">
                       {/* Timeline dot */}
                       <div className={cn(
-                        "absolute left-[11px] top-1 h-[9px] w-[9px] rounded-full ring-2 ring-background",
-                        current ? "bg-primary" : weekSlots.length > 0 ? "bg-emerald-500" : "bg-muted-foreground/25",
+                        "absolute left-[11px] top-3.5 h-[9px] w-[9px] rounded-full ring-2 ring-background transition-colors",
+                        current ? "bg-primary" : filledCount > 0 ? "bg-emerald-500" : "bg-muted-foreground/25",
                       )} />
 
-                      {/* Week header */}
-                      <div className="mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase",
-                            current
-                              ? "bg-primary/15 text-primary"
-                              : "bg-muted text-muted-foreground",
-                          )}>
-                            S{week.weekNumber}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {fmtDD_MM(week.monday)} – {fmtDD_MM(week.saturday)}
-                          </span>
-                          {meta.weekType && (
-                            <Badge
-                              className="text-[10px] px-1.5 py-0 border-0 shrink-0"
-                              style={{
-                                backgroundColor: weekTypeColor(meta.weekType),
-                                color: weekTypeTextColor(meta.weekType),
-                              }}
-                            >
-                              {meta.weekType}
-                            </Badge>
-                          )}
-                        </div>
-                        {meta.notes && (
-                          <p className="text-[11px] text-muted-foreground/70 mt-0.5 italic line-clamp-1">
-                            {meta.notes}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Day rows — grid with Matin/Soir columns */}
                       <div className={cn(
-                        "rounded-xl border-l-[3px] overflow-hidden bg-card",
-                        current ? "border-l-primary" : "border-l-border",
+                        "rounded-xl border bg-card transition-all overflow-hidden",
+                        current && "ring-2 ring-primary",
                       )}>
-                        {/* Column headers */}
-                        <div className="grid grid-cols-[40px_1fr_1fr] gap-1 px-2.5 pt-2 pb-1">
-                          <div />
-                          <span className="text-[9px] font-semibold text-muted-foreground/50 uppercase tracking-wider text-center">
-                            Matin
-                          </span>
-                          <span className="text-[9px] font-semibold text-muted-foreground/50 uppercase tracking-wider text-center">
-                            Soir
-                          </span>
-                        </div>
-
-                        {/* Day rows */}
-                        <div className="px-2.5 pb-2 space-y-1">
-                          {DAY_ROWS.map((day) => {
-                            const morning = slotMap.get(`${day.index}-morning`);
-                            const evening = slotMap.get(`${day.index}-evening`);
-                            if (!morning && !evening) return null;
-
-                            return (
-                              <div
-                                key={day.index}
-                                className="grid grid-cols-[40px_1fr_1fr] gap-1 items-center"
-                              >
-                                {/* Day badge */}
-                                <span className={cn(
-                                  "inline-flex items-center justify-center rounded-md px-1 py-0.5 text-[10px] font-bold",
-                                  DAY_COLORS[day.index],
-                                )}>
-                                  {day.label}
+                        {/* ── Collapsed header ── */}
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[48px] hover:bg-muted/40 transition-colors active:bg-muted/60"
+                          onClick={() => setExpandedWeekKey(expanded ? null : week.weekKey)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-foreground tabular-nums">
+                                S{week.weekNumber}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {fmtDD_MM(week.monday)} &ndash; {fmtDD_MM(week.saturday)}
+                              </span>
+                              {meta.weekType && (
+                                <Badge
+                                  className="text-[10px] px-1.5 py-0 border-0 shrink-0"
+                                  style={{
+                                    backgroundColor: weekTypeColor(meta.weekType),
+                                    color: weekTypeTextColor(meta.weekType),
+                                  }}
+                                >
+                                  {meta.weekType}
+                                </Badge>
+                              )}
+                              {filledCount > 0 && (
+                                <span className="inline-flex items-center gap-[3px] shrink-0">
+                                  {DAY_ROWS.flatMap((day) =>
+                                    (["morning", "evening"] as const).map((ts) => {
+                                      const slot = weekSlots.find(
+                                        (s) => s.day_of_week === day.index && s.time_slot === ts,
+                                      );
+                                      if (!slot) return null;
+                                      const f = FILIERE_MAP.get(slot.filiere);
+                                      const style = FILIERE_STYLES[f?.color ?? "sky"] ?? FILIERE_STYLES.sky;
+                                      return (
+                                        <span
+                                          key={`${day.index}-${ts}`}
+                                          className={cn("h-[6px] w-[6px] rounded-full shrink-0", style.dot)}
+                                        />
+                                      );
+                                    }),
+                                  )}
                                 </span>
-
-                                {/* Morning cell */}
-                                {morning ? (
-                                  <FiliereChip slot={morning} onTap={handleChipTap} />
-                                ) : (
-                                  <div className="h-[28px] rounded-lg bg-muted/20 flex items-center justify-center">
-                                    <span className="text-muted-foreground/20 text-[10px]">—</span>
-                                  </div>
-                                )}
-
-                                {/* Evening cell */}
-                                {evening ? (
-                                  <FiliereChip slot={evening} onTap={handleChipTap} />
-                                ) : (
-                                  <div className="h-[28px] rounded-lg bg-muted/20 flex items-center justify-center">
-                                    <span className="text-muted-foreground/20 text-[10px]">—</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Empty week */}
-                        {weekSlots.length === 0 && (
-                          <div className="px-3 py-3">
-                            <p className="text-[11px] text-muted-foreground/40 italic">
-                              Pas de séances planifiées
-                            </p>
+                              )}
+                            </div>
+                            {meta.notes && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                                {meta.notes}
+                              </p>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
 
-                {/* End dot */}
-                <div className="relative pl-8">
-                  <div className="absolute left-[11px] top-1 h-[9px] w-[9px] rounded-full bg-muted-foreground/20 ring-2 ring-background" />
-                  <p className="text-[11px] text-muted-foreground/40 font-medium">Fin de la planification</p>
-                </div>
-              </div>
-            )}
+                          {/* Chevron */}
+                          <motion.span
+                            animate={{ rotate: expanded ? 180 : 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="shrink-0"
+                          >
+                            <ChevronDown className="h-4 w-4 text-muted-foreground/40" />
+                          </motion.span>
+                        </button>
+
+                        {/* ── Expanded micro grid (read-only) ── */}
+                        <AnimatePresence>
+                          {expanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              className="overflow-hidden"
+                            >
+                              <div className="border-t bg-muted/20">
+                                {/* Column headers */}
+                                <div className="grid grid-cols-[48px_1fr_1fr] gap-1 px-3 pt-2 pb-1">
+                                  <span />
+                                  <span className="text-[10px] font-semibold text-muted-foreground text-center uppercase tracking-wider">
+                                    Matin
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-muted-foreground text-center uppercase tracking-wider">
+                                    Soir
+                                  </span>
+                                </div>
+
+                                {/* Day rows */}
+                                <div className="px-3 pb-3 space-y-1">
+                                  {DAY_ROWS.map((day) => (
+                                    <div
+                                      key={day.index}
+                                      className="grid grid-cols-[48px_1fr_1fr] gap-1 items-center"
+                                    >
+                                      <span className="text-[11px] font-medium text-muted-foreground pl-0.5">
+                                        {day.label}
+                                      </span>
+                                      <ReadOnlySlotCell
+                                        slot={findSlot(week.weekKey, day.index, "morning")}
+                                        onTap={handleChipTap}
+                                      />
+                                      <ReadOnlySlotCell
+                                        slot={findSlot(week.weekKey, day.index, "evening")}
+                                        onTap={handleChipTap}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Sentinel for infinite scroll */}
+              <div ref={sentinelRef} className="h-4" />
+            </div>
           </div>
 
           {/* ── Filiere Detail Sheet ── */}
@@ -445,34 +474,46 @@ export default function SwimPlanningAthleteView({ open, onClose, groupId }: Swim
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Filiere Chip — inline colored tag (read-only, tappable)
+   ReadOnlySlotCell — read-only chip (tap opens filière detail)
    ═══════════════════════════════════════════════════════════════════ */
 
-function FiliereChip({
+function ReadOnlySlotCell({
   slot,
   onTap,
 }: {
-  slot: SwimPlanningSlot;
+  slot: SwimPlanningSlot | undefined;
   onTap: (filiereId: string, hasSession: boolean) => void;
 }) {
+  if (!slot) {
+    return (
+      <div className="h-9 w-full rounded-lg bg-muted/20 dark:bg-muted/10 flex items-center justify-center">
+        <span className="text-muted-foreground/20 text-xs">—</span>
+      </div>
+    );
+  }
+
   const filiere = FILIERE_MAP.get(slot.filiere);
-  const style = filiere ? FILIERE_STYLES[filiere.color] ?? FILIERE_STYLES.sky : FILIERE_STYLES.sky;
+  const color = filiere?.color ?? "sky";
+  const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
   const hasSession = !!slot.session_id;
 
   return (
     <button
       type="button"
-      onClick={() => onTap(slot.filiere, hasSession)}
       className={cn(
-        "inline-flex items-center gap-1 rounded-lg px-2 py-1 min-h-[28px] transition-all active:scale-[0.96]",
+        "relative h-9 w-full rounded-lg flex items-center justify-center px-1.5 transition-all active:scale-95",
         style.bg,
       )}
+      onClick={() => onTap(slot.filiere, hasSession)}
+      aria-label={filiere?.name ?? slot.filiere}
     >
       <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
         {filiere?.short ?? slot.filiere}
       </span>
       {hasSession && (
-        <Link2 className={cn("h-[10px] w-[10px] shrink-0 opacity-50", style.text)} />
+        <Link2
+          className={cn("absolute top-0.5 right-0.5 h-[10px] w-[10px]", style.text, "opacity-60")}
+        />
       )}
     </button>
   );
