@@ -802,10 +802,10 @@ export default function Strength() {
             icon={<Dumbbell className="h-3.5 w-3.5" />}
           />
 
-          <Tabs defaultValue="start" className="w-full">
+          <Tabs defaultValue="planning" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="start">S'entraîner</TabsTrigger>
               <TabsTrigger value="planning">Mon plan</TabsTrigger>
+              <TabsTrigger value="start">S'entraîner</TabsTrigger>
               <TabsTrigger value="history">Historique</TabsTrigger>
             </TabsList>
 
