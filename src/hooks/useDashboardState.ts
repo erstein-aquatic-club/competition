@@ -636,12 +636,17 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
       let total = 0;
       let completed = 0;
       const slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string }> = [];
+      // Track used log IDs to prevent the same log from being counted for multiple slots
+      const usedLogIds = new Set<number>();
 
       for (const s of planned) {
         const st = getSessionStatus(s, d);
+        const log = getLogForSession(s.id);
+        const hasLog = log != null && !usedLogIds.has(log.id);
+        if (hasLog) usedLogIds.add(log.id);
+
         if (!st.expected) {
-          const hasLogAnyway = Boolean(getLogForSession(s.id));
-          if (hasLogAnyway) {
+          if (hasLog) {
             total += 1;
             completed += 1;
             slots.push({ slotKey: s.slotKey, expected: true, completed: true, absent: false, slotTime: s.slotTime });
@@ -652,7 +657,6 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
         }
         total += 1;
 
-        const hasLog = Boolean(getLogForSession(s.id));
         const isAbsent = st.status === "absent";
         if (hasLog) completed += 1;
 
