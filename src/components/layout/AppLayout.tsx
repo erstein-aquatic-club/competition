@@ -7,6 +7,7 @@ const eacLogo = `${import.meta.env.BASE_URL}logo-eac.webp`;
 import { getNavItemsForRole } from "@/components/layout/navItems";
 import { OfflineDetector } from "@/components/shared/OfflineDetector";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
+import { OfflineSyncBanner } from "@/components/shared/OfflineSyncBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
 
 const COACH_SECTION_LABELS: Record<string, string> = {
@@ -110,6 +111,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background pb-20 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 md:pt-16">
       <OfflineBanner />
+      <OfflineSyncBanner />
       <OfflineDetector />
       <InstallPrompt />
       {/* Desktop Top Nav */}

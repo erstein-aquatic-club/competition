@@ -322,28 +322,27 @@ function useDarkMode() {
   }, []);
 
   useEffect(() => {
-    // User preference takes priority, then default to light
-    const mode = userPref ?? "light";
     const root = document.documentElement;
+    const mode = userPref ?? "light";
+
+    let cleanup: (() => void) | undefined;
 
     if (mode === "dark") {
       root.classList.add("dark");
     } else if (mode === "system") {
       const mql = window.matchMedia("(prefers-color-scheme: dark)");
-      const apply = (e: MediaQueryList | MediaQueryListEvent) => {
-        if (e.matches) {
-          root.classList.add("dark");
-        } else {
-          root.classList.remove("dark");
-        }
-      };
-      apply(mql);
-      const handler = (e: MediaQueryListEvent) => apply(e);
+      root.classList.toggle("dark", mql.matches);
+      const handler = (e: MediaQueryListEvent) =>
+        root.classList.toggle("dark", e.matches);
       mql.addEventListener("change", handler);
-      return () => mql.removeEventListener("change", handler);
+      cleanup = () => mql.removeEventListener("change", handler);
     } else {
       root.classList.remove("dark");
     }
+
+    return () => {
+      cleanup?.();
+    };
   }, [userPref]);
 }
 

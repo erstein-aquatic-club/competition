@@ -48,6 +48,7 @@ export function AddSessionSheet({
     onMutate: (sessionId) => setDuplicatingId(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast({ title: "Séance ajoutée" });
       onOpenChange(false);

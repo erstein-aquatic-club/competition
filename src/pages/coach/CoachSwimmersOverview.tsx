@@ -174,6 +174,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
         groupId: groupFilter ?? undefined,
       }),
     getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.athletes.length < PAGE_SIZE) return undefined;
       const loaded = allPages.reduce((sum, p) => sum + p.athletes.length, 0);
       return loaded < lastPage.total ? loaded : undefined;
     },

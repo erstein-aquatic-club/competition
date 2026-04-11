@@ -374,6 +374,7 @@ export default function StrengthCatalog() {
         search: searchQuery || undefined,
       }),
     getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.sessions.length < STRENGTH_PAGE_SIZE) return undefined;
       const loaded = allPages.reduce((sum, p) => sum + p.sessions.length, 0);
       return loaded < lastPage.total ? loaded : undefined;
     },
@@ -456,6 +457,7 @@ export default function StrengthCatalog() {
     mutationFn: (data: StrengthSessionInput) => api.createStrengthSession(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setIsCreating(false);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
       toast({ title: "Séance créée avec succès" });
@@ -467,6 +469,7 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setExerciseEditOpen(false);
       setEditingExercise(null);
       toast({ title: "Exercice mis à jour" });
@@ -478,6 +481,7 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setPendingDeleteExercise(null);
       toast({ title: "Exercice supprimé" });
     },
@@ -487,6 +491,7 @@ export default function StrengthCatalog() {
     mutationFn: (sessionId: number) => api.deleteStrengthSession(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setPendingDeleteSession(null);
       toast({ title: "Séance supprimée" });
     },
@@ -496,6 +501,7 @@ export default function StrengthCatalog() {
     mutationFn: (data: StrengthSessionInput) => api.updateStrengthSession(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setIsCreating(false);
       setEditingSessionId(null);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
@@ -533,6 +539,7 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast({ title: "Dossier supprimé" });
     },
@@ -543,6 +550,7 @@ export default function StrengthCatalog() {
       api.moveToFolder(itemId, folderId, table),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast({ title: "Déplacé" });
     },
@@ -568,6 +576,7 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       toast({ title: "Copie effectuée" });
       setCopyDialog(null);
     },

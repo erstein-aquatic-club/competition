@@ -303,6 +303,7 @@ function AthletePlanDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       toast({ title: "Cycle supprimé" });
     },
   });
@@ -351,6 +352,7 @@ function AthletePlanDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       toast({ title: "Copie effectuée" });
       setCopyDialog(null);
     },

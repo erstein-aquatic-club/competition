@@ -250,6 +250,7 @@ export default function SwimCatalog({
         folder: currentFolder ?? undefined,
       }),
     getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.sessions.length < SWIM_PAGE_SIZE) return undefined;
       const loaded = allPages.reduce((sum, p) => sum + p.sessions.length, 0);
       return loaded < lastPage.total ? loaded : undefined;
     },
@@ -278,6 +279,7 @@ export default function SwimCatalog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_folders"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setCurrentFolder(null);
     },
   });
@@ -300,6 +302,7 @@ export default function SwimCatalog({
           window.localStorage.removeItem(ARCHIVED_SWIM_SESSIONS_KEY);
           window.localStorage.setItem(ARCHIVE_MIGRATED_KEY, "true");
           queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
+          queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
         }).catch(() => {
           // Will retry next load
         });
@@ -390,6 +393,7 @@ export default function SwimCatalog({
     mutationFn: (data: SwimSessionInput) => api.createSwimSession(data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setIsCreating(false);
       setNewSession(createEmptySession());
       toast({
@@ -409,6 +413,7 @@ export default function SwimCatalog({
     mutationFn: (sessionId: number) => api.deleteSwimSession(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setPendingDeleteSession(null);
       toast({ title: "Séance supprimée" });
     },
@@ -426,6 +431,7 @@ export default function SwimCatalog({
       api.archiveSwimSession(sessionId, archived),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setPendingArchiveSession(null);
       toast({
         title: variables.archived ? "Séance archivée" : "Séance restaurée",
@@ -438,6 +444,7 @@ export default function SwimCatalog({
       api.moveSwimSession(sessionId, folder),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
+      queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setPendingMoveSession(null);
       toast({ title: "Séance déplacée" });
     },

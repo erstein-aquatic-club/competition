@@ -48,6 +48,16 @@
       <span class="rotate-icon">📱</span>
       <p>Tourne ton téléphone en mode portrait</p>
     </div>
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('eac-theme');
+          if (stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
