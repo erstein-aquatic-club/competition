@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
-import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle } from "lucide-react";
+import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { BottomActionBar, type SaveState } from "@/components/shared/BottomActionBar";
 import {
@@ -62,6 +62,16 @@ type PlannedSession = {
   details: string[];
   assignmentId?: number;
   isEmpty: boolean;
+  slotTime?: string;
+  slotLocation?: string;
+  assignmentSource?: 'individual' | 'subgroup' | 'group' | 'none';
+  alternatives?: Array<{
+    assignmentId: number;
+    title: string;
+    km: number | null;
+    subgroupName?: string;
+  }>;
+  swimmerSlotId?: string;
 };
 
 type StrokeDraft = { NL: string; DOS: string; BR: string; PAP: string; QN: string };
@@ -93,6 +103,56 @@ function Chip({ children }: { children: React.ReactNode }) {
     <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
       {children}
     </span>
+  );
+}
+
+function AlternativesSection({
+  alternatives,
+}: {
+  alternatives: NonNullable<PlannedSession['alternatives']>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mt-1 ml-2">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+      >
+        <ChevronRight className={cn("h-3 w-3 transition-transform", expanded && "rotate-90")} />
+        Autres séances disponibles ({alternatives.length})
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-1 space-y-1 pl-4">
+              {alternatives.map((alt) => (
+                <div
+                  key={alt.assignmentId}
+                  className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/30 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-foreground truncate">{alt.title}</p>
+                    {alt.subgroupName && (
+                      <p className="text-[10px] text-muted-foreground">{alt.subgroupName}</p>
+                    )}
+                  </div>
+                  {alt.km != null && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">{fmtKm(alt.km)} km</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -595,7 +655,7 @@ export function FeedbackDrawer({
 
                     const SlotIcon = SLOTS.find((x) => x.key === s.slotKey)?.Icon || Circle;
 
-                    return (
+                    const card = (
                       <button
                         key={s.id}
                         type="button"
@@ -620,9 +680,26 @@ export function FeedbackDrawer({
                             </div>
 
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-foreground">{s.title}</div>
-                              <div className="mt-1 flex items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="truncate text-sm font-semibold text-foreground">{s.title}</div>
+                                {s.slotTime ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {s.slotTime}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground shrink-0">
+                                    {s.slotKey === "AM" ? "Matin" : "Soir"}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1 flex items-center gap-2 flex-wrap">
                                 {s.isEmpty ? <Chip>Vide</Chip> : <Chip>{fmtKm(s.km)} km</Chip>}
+                                {s.assignmentSource === 'individual' && (
+                                  <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">
+                                    Séance personnalisée
+                                  </span>
+                                )}
                                 {hasLog && (
                                   <span className="inline-flex items-center text-emerald-800">
                                     <Check className="h-4 w-4" />
@@ -685,6 +762,18 @@ export function FeedbackDrawer({
                         </div>
                       </button>
                     );
+
+                    // Wrap with alternatives section if available
+                    if (s.alternatives && s.alternatives.length > 0) {
+                      return (
+                        <div key={s.id}>
+                          {card}
+                          <AlternativesSection alternatives={s.alternatives} />
+                        </div>
+                      );
+                    }
+
+                    return card;
                   };
 
                   return (
@@ -756,12 +845,27 @@ export function FeedbackDrawer({
                           <>
                             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                               <div className="min-w-0">
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                  Créneau sélectionné
+                                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                  <span>Créneau sélectionné</span>
+                                  {activeSession.slotTime ? (
+                                    <span className="inline-flex items-center gap-0.5 normal-case tracking-normal">
+                                      <Clock className="h-2.5 w-2.5" />
+                                      {activeSession.slotTime}
+                                    </span>
+                                  ) : (
+                                    <span className="normal-case tracking-normal">
+                                      {activeSession.slotKey === "AM" ? "Matin" : "Soir"}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="truncate text-sm font-semibold text-foreground">{activeSession.title}</div>
-                                <div className="mt-1 flex items-center gap-2">
+                                <div className="mt-1 flex items-center gap-2 flex-wrap">
                                   {activeSession.isEmpty ? <Chip>Vide</Chip> : <Chip>{fmtKm(activeSession.km)} km</Chip>}
+                                  {activeSession.assignmentSource === 'individual' && (
+                                    <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">
+                                      Séance personnalisée
+                                    </span>
+                                  )}
                                   {hasLog ? (
                                     <span className="inline-flex items-center text-emerald-800">
                                       <Check className="h-4 w-4" />

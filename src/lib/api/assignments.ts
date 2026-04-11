@@ -336,6 +336,7 @@ export async function bulkCreateSlotAssignments(params: {
   scheduledSlot: "morning" | "evening";
   visibleFrom: string | null;
   assignedBy: number;
+  targetSubgroupId?: number;
 }): Promise<{ created: number }> {
   if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
@@ -361,6 +362,7 @@ export async function bulkCreateSlotAssignments(params: {
     visible_from: params.visibleFrom,
     assigned_by: params.assignedBy,
     status: "assigned",
+    ...(params.targetSubgroupId ? { target_subgroup_id: params.targetSubgroupId } : {}),
   }));
 
   const { data, error } = await supabase

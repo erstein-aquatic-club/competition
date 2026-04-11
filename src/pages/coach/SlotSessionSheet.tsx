@@ -518,6 +518,13 @@ function EmptyBody({
         </div>
       )}
 
+      {/* TODO: Phase E — Add optional "Sous-groupe" Select dropdown here.
+          Needs to fetch temporary groups (children of selectedGroups) via useQuery
+          and pass target_subgroup_id to bulkCreateSlotAssignments.
+          Requires: 1) Query temporary_groups filtered by parent group IDs
+          2) Add target_subgroup_id param to bulkCreateSlotAssignments
+          3) Pass selected subgroup ID through onPickTemplate callback */}
+
       <div className="space-y-2">
         <Label
           htmlFor="visible-from-empty"

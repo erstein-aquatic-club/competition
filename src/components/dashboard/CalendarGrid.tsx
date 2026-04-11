@@ -16,7 +16,7 @@ function isSameDay(a: Date, b: Date) {
 interface CalendarGridProps {
   monthCursor: Date;
   gridDates: Date[];
-  completionByISO: Record<string, { completed: number; total: number; slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean }> }>;
+  completionByISO: Record<string, { completed: number; total: number; slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string }> }>;
   strengthByISO?: Record<string, boolean>;
   competitionDates?: Set<string>;
   absenceDates?: Set<string>;

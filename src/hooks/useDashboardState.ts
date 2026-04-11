@@ -602,7 +602,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
   }, [monthStart]);
 
   const completionByISO = useMemo(() => {
-    const map: Record<string, { completed: number; total: number; slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean }> }> = {};
+    const map: Record<string, { completed: number; total: number; slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string }> }> = {};
 
     for (const d of gridDates) {
       const iso = toISODate(d);
@@ -610,7 +610,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
       let total = 0;
       let completed = 0;
-      const slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean }> = [];
+      const slots: Array<{ slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string }> = [];
 
       for (const s of planned) {
         const st = getSessionStatus(s, d);
@@ -619,9 +619,9 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           if (hasLogAnyway) {
             total += 1;
             completed += 1;
-            slots.push({ slotKey: s.slotKey, expected: true, completed: true, absent: false });
+            slots.push({ slotKey: s.slotKey, expected: true, completed: true, absent: false, slotTime: s.slotTime });
           } else {
-            slots.push({ slotKey: s.slotKey, expected: false, completed: false, absent: false });
+            slots.push({ slotKey: s.slotKey, expected: false, completed: false, absent: false, slotTime: s.slotTime });
           }
           continue;
         }
@@ -631,7 +631,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
         const isAbsent = st.status === "absent";
         if (hasLog) completed += 1;
 
-        slots.push({ slotKey: s.slotKey, expected: true, completed: hasLog, absent: isAbsent });
+        slots.push({ slotKey: s.slotKey, expected: true, completed: hasLog, absent: isAbsent, slotTime: s.slotTime });
       }
 
       map[iso] = { completed, total, slots };
