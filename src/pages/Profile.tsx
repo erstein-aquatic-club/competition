@@ -378,24 +378,23 @@ export default function Profile() {
     setIsCheckingUpdate(true);
     localStorage.removeItem("app_build_timestamp");
     try {
-      // 1. Force SW to check for a new version
+      // 1. Ask SW to check for a new version (timeout 3s to avoid hanging on slow networks)
       const reg = (window as any).__pwaRegistration as ServiceWorkerRegistration | undefined
         ?? await navigator.serviceWorker?.getRegistration();
       if (reg) {
-        await reg.update();
-        // Wait for new SW to install + activate (skipWaiting is enabled)
-        await new Promise((r) => setTimeout(r, 1500));
+        await Promise.race([
+          reg.update(),
+          new Promise((r) => setTimeout(r, 3000)),
+        ]);
       }
       // 2. Clear all Workbox caches so reload fetches fresh assets
       if ("caches" in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map((key) => caches.delete(key)));
       }
-      // 3. Hard reload
-      window.location.reload();
-    } catch {
-      window.location.reload();
-    }
+    } catch { /* best-effort — always reload below */ }
+    // 3. Always hard reload, even if SW check or cache clear failed
+    window.location.reload();
   };
 
   // Profile edit form with React Hook Form + Zod
