@@ -690,8 +690,8 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
   const sessionsForSelectedDay = useMemo(() => getSessionsForISO(selectedISO), [getSessionsForISO, selectedISO]);
 
-  // Other group assignments for the selected day that are NOT in the swimmer's planned sessions
-  const otherGroupAssignments = useMemo(() => {
+  // Other group assignments for the selected day, converted to PlannedSession
+  const otherGroupSessions = useMemo((): PlannedSession[] => {
     const dayAssignments = assignmentsByIso.get(selectedISO) ?? [];
     if (dayAssignments.length === 0) return [];
     const matchedIds = new Set(
@@ -699,7 +699,22 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
         .filter((s) => s.assignmentId)
         .map((s) => s.assignmentId),
     );
-    return dayAssignments.filter((a) => !matchedIds.has(a.id));
+    const unmatched = dayAssignments.filter((a) => !matchedIds.has(a.id));
+    return unmatched.map((a) => {
+      const aRecord = a as unknown as Record<string, unknown>;
+      const aSlotKey: SlotKey = pickAssignmentSlotKey(aRecord, 0);
+      return {
+        id: `${selectedISO}__group_${a.id}`,
+        iso: selectedISO,
+        slotKey: aSlotKey,
+        title: String(a.title ?? "Séance groupe"),
+        km: assignmentPlannedKm(aRecord),
+        details: safeLinesFromText(a.description),
+        assignmentId: typeof a.id === "number" ? a.id : Number(a.id) || undefined,
+        isEmpty: false,
+        assignmentSource: "group" as const,
+      };
+    });
   }, [selectedISO, assignmentsByIso, sessionsForSelectedDay]);
 
   const selectedDayStatus = completionByISO[selectedISO] || { completed: 0, total: 2, slots: [{ slotKey: "AM" as const, expected: true, completed: false, absent: false }, { slotKey: "PM" as const, expected: true, completed: false, absent: false }] };
@@ -864,7 +879,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     completionByISO,
     selectedDate,
     sessionsForSelectedDay,
-    otherGroupAssignments,
+    otherGroupSessions,
     selectedDayStatus,
     globalKm,
     dayKm,

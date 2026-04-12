@@ -405,7 +405,7 @@ export default function Dashboard() {
     completionByISO,
     selectedDate,
     sessionsForSelectedDay,
-    otherGroupAssignments,
+    otherGroupSessions,
     selectedDayStatus,
     globalKm,
     dayKm,
@@ -595,7 +595,8 @@ export default function Dashboard() {
 
     const { iso, slotKey: parsedSlotKey } = parseSessionId(activeSessionId);
     // For new swimmer-slot IDs, look up the active session to get the actual slotKey (AM/PM)
-    const activeSession = sessionsForSelectedDay.find((s) => s.id === activeSessionId);
+    const activeSession = sessionsForSelectedDay.find((s) => s.id === activeSessionId)
+      ?? otherGroupSessions.find((s) => s.id === activeSessionId);
     const effectiveSlotKey = parsedSlotKey || activeSession?.slotKey || "AM";
     const slotLabel = effectiveSlotKey === "PM" ? "Soir" : "Matin";
 
@@ -1021,7 +1022,7 @@ export default function Dashboard() {
           open={drawerOpen}
           selectedDate={selectedDate}
           sessionsForSelectedDay={sessionsForSelectedDay}
-          otherGroupAssignments={otherGroupAssignments}
+          otherGroupSessions={otherGroupSessions}
           selectedDayStatus={selectedDayStatus}
           dayKm={dayKm}
           activeSessionId={activeSessionId}

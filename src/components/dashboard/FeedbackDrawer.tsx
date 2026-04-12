@@ -400,7 +400,7 @@ interface FeedbackDrawerProps {
   open: boolean;
   selectedDate: Date;
   sessionsForSelectedDay: PlannedSession[];
-  otherGroupAssignments?: Array<{ id: number; title: string; description: string; assigned_date: string; assigned_slot?: string | null; km?: number | null }>;
+  otherGroupSessions?: PlannedSession[];
   selectedDayStatus: { completed: number; total: number };
   dayKm: string;
   activeSessionId: string | null;
@@ -435,7 +435,7 @@ export function FeedbackDrawer({
   open,
   selectedDate,
   sessionsForSelectedDay,
-  otherGroupAssignments = [],
+  otherGroupSessions = [],
   selectedDayStatus,
   dayKm,
   activeSessionId,
@@ -476,7 +476,9 @@ export function FeedbackDrawer({
 
   const activeSession = useMemo(() => {
     if (!activeSessionId) return null;
-    return sessionsForSelectedDay.find((s) => s.id === activeSessionId) || null;
+    return sessionsForSelectedDay.find((s) => s.id === activeSessionId)
+      ?? otherGroupSessions?.find((s) => s.id === activeSessionId)
+      ?? null;
   }, [activeSessionId, sessionsForSelectedDay]);
 
   useEffect(() => {
@@ -855,47 +857,33 @@ export function FeedbackDrawer({
                       )}
 
                       {/* Other group sessions not in swimmer's personal schedule */}
-                      {otherGroupAssignments.length > 0 && (() => {
-                        const iso = selectedDate.toISOString().slice(0, 10);
-                        const groupSessions: PlannedSession[] = otherGroupAssignments.map((a) => ({
-                          id: `${iso}__group_${a.id}`,
-                          iso,
-                          slotKey: (a.assigned_slot === "morning" || a.assigned_slot === "Matin" ? "AM" : "PM") as SlotKey,
-                          title: a.title,
-                          km: null,
-                          details: [],
-                          assignmentId: a.id,
-                          isEmpty: false,
-                          assignmentSource: "group" as const,
-                        }));
-                        return (
-                          <div className="mt-3">
-                            <button
-                              type="button"
-                              onClick={() => setOtherGroupExpanded((v) => !v)}
-                              className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
-                            >
-                              <ChevronDown className={cn("h-4 w-4 transition-transform", otherGroupExpanded && "rotate-180")} />
-                              Autres séances du groupe ({groupSessions.length})
-                            </button>
-                            <AnimatePresence>
-                              {otherGroupExpanded && (
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: "auto" }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="mt-1 grid gap-2">
-                                    {groupSessions.map(renderSessionCard)}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })()}
+                      {otherGroupSessions.length > 0 && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setOtherGroupExpanded((v) => !v)}
+                            className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
+                          >
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", otherGroupExpanded && "rotate-180")} />
+                            Autres séances du groupe ({otherGroupSessions.length})
+                          </button>
+                          <AnimatePresence>
+                            {otherGroupExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-1 grid gap-2">
+                                  {otherGroupSessions.map(renderSessionCard)}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
                     </>
                   );
                 })()}
