@@ -559,6 +559,13 @@ export default function SuiviSemaine() {
       const dayAssignments = assignmentsByDate.get(iso) ?? [];
       const swimAssignments = dayAssignments.filter((assignment) => assignment.session_type === "swim");
       const usedAssignmentIds = new Set<number>();
+      // Track which strength runs have been consumed by slot-based cards so
+      // we can render any orphan run (logged without a matching slot) at the
+      // end of the day loop.
+      const consumedStrengthRunIds = new Set<number>();
+      const markRunConsumed = (run: LocalStrengthRun | undefined) => {
+        if (run?.id != null) consumedStrengthRunIds.add(run.id);
+      };
 
       // Get resolved assignments for this date
       const resolved: ResolvedSlotAssignment[] = assignmentsMap?.get(iso) ?? [];
@@ -580,6 +587,7 @@ export default function SuiviSemaine() {
           const strengthRun = kind === "strength"
             ? findStrengthRun({ iso, slotKey })
             : undefined;
+          markRunConsumed(strengthRun);
           const plannedAssignment = fallbackAssignment;
 
           if (plannedAssignment) {
@@ -684,6 +692,7 @@ export default function SuiviSemaine() {
         const strengthRun = kind === "strength"
           ? findStrengthRun({ iso, slotKey, assignmentId: slotAssignmentId ?? undefined })
           : undefined;
+        markRunConsumed(strengthRun);
         const title = plannedAssignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement");
 
         if (swimSession || strengthRun) {
@@ -753,6 +762,34 @@ export default function SuiviSemaine() {
           }
         }
       }
+
+      // ── Orphan strength runs ──────────────────────────────
+      // A swimmer can log a muscu session on a day where no strength slot
+      // is scheduled (improvised workout, open-gym session, etc.). These
+      // runs were not consumed by any slot-based card above, so we append
+      // one logged card per orphan run on this day.
+      for (const run of completedStrengthRuns) {
+        if (run.id != null && consumedStrengthRunIds.has(run.id)) continue;
+        if (getStrengthRunDateISO(run) !== iso) continue;
+        const runSlotKey = getStrengthRunSlotKey(run) ?? "AM";
+        result.push({
+          type: "logged",
+          kind: "strength",
+          date,
+          iso,
+          slotKey: runSlotKey,
+          slotTime: undefined,
+          slotLocation: undefined,
+          title: "Seance musculation",
+          km: null,
+          session: undefined,
+          strengthRun: run,
+          swimmerSlotId: undefined,
+          assignmentId: run.assignment_id ?? undefined,
+          assignmentSource: undefined,
+        });
+        if (run.id != null) consumedStrengthRunIds.add(run.id);
+      }
     }
 
     return result;
@@ -765,6 +802,7 @@ export default function SuiviSemaine() {
     absencesByDate,
     findStrengthRun,
     findSwimSession,
+    completedStrengthRuns,
     userId,
   ]);
 
