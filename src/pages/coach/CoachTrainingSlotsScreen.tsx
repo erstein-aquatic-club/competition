@@ -2651,10 +2651,10 @@ const CoachTrainingSlotsScreen = ({
             />
           </div>
 
-          {/* ── Desktop timeline (viewport-fitted, breaks out of container for wider view) ── */}
+          {/* ── Desktop timeline (viewport-fitted) ── */}
           <div
             ref={timelineContainerRef}
-            className="hidden sm:block overflow-x-auto -mx-4 px-4 lg:-mx-20 lg:px-4 xl:-mx-32 xl:px-6"
+            className="hidden sm:block overflow-x-auto -mx-4 px-4"
           >
             <div
               className="grid"
