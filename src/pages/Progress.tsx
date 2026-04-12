@@ -543,21 +543,6 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
 
   const content = (
     <>
-      {/* ── Prochaine compétition ────────────────────────────────────── */}
-      <InlineBanner
-        variant="amber"
-        icon={<Trophy />}
-        label={nextCompetition?.name}
-        badge={daysUntilNextComp === 0 ? "Aujourd'hui" : `J-${daysUntilNextComp}`}
-        sublabel={nextCompetition?.location}
-        subbadge={
-          trainingDaysRemaining != null && trainingDaysRemaining > 0
-            ? `${trainingDaysRemaining} séance${trainingDaysRemaining > 1 ? "s" : ""}`
-            : undefined
-        }
-        visible={!!nextCompetition && daysUntilNextComp != null}
-      />
-
       <Tabs defaultValue="swim" className="w-full">
         <TabsList className="grid w-full max-w-[280px] grid-cols-2">
           <TabsTrigger value="swim">Natation</TabsTrigger>
