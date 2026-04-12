@@ -855,59 +855,47 @@ export function FeedbackDrawer({
                       )}
 
                       {/* Other group sessions not in swimmer's personal schedule */}
-                      {otherGroupAssignments.length > 0 && (
-                        <div className="mt-3">
-                          <button
-                            type="button"
-                            onClick={() => setOtherGroupExpanded((v) => !v)}
-                            className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
-                          >
-                            <ChevronDown className={cn("h-4 w-4 transition-transform", otherGroupExpanded && "rotate-180")} />
-                            Autres séances du groupe ({otherGroupAssignments.length})
-                          </button>
-                          <AnimatePresence>
-                            {otherGroupExpanded && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="mt-1 grid gap-2">
-                                  {otherGroupAssignments.map((a) => (
-                                    <button
-                                      key={a.id}
-                                      type="button"
-                                      onClick={() => onOpenSession(`${selectedDate.toISOString().slice(0,10)}__group_${a.id}`)}
-                                      className="w-full min-w-0 rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5 text-left transition hover:bg-muted/40 hover:shadow-sm active:scale-[0.98] overflow-hidden"
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="min-w-0 flex-1">
-                                          <p className="text-sm font-medium truncate">{a.title}</p>
-                                          {a.assigned_slot && (
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                                              {a.assigned_slot === "morning" ? "Matin" : "Soir"}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                                          {a.km != null && (
-                                            <span className="text-[10px] text-muted-foreground">
-                                              {typeof a.km === "number" ? `${(a.km / 1000).toFixed(1)} km` : ""}
-                                            </span>
-                                          )}
-                                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
-                                        </div>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      )}
+                      {otherGroupAssignments.length > 0 && (() => {
+                        const iso = selectedDate.toISOString().slice(0, 10);
+                        const groupSessions: PlannedSession[] = otherGroupAssignments.map((a) => ({
+                          id: `${iso}__group_${a.id}`,
+                          iso,
+                          slotKey: (a.assigned_slot === "morning" || a.assigned_slot === "Matin" ? "AM" : "PM") as SlotKey,
+                          title: a.title,
+                          km: null,
+                          details: [],
+                          assignmentId: a.id,
+                          isEmpty: false,
+                          assignmentSource: "group" as const,
+                        }));
+                        return (
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              onClick={() => setOtherGroupExpanded((v) => !v)}
+                              className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition"
+                            >
+                              <ChevronDown className={cn("h-4 w-4 transition-transform", otherGroupExpanded && "rotate-180")} />
+                              Autres séances du groupe ({groupSessions.length})
+                            </button>
+                            <AnimatePresence>
+                              {otherGroupExpanded && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: "auto" }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="mt-1 grid gap-2">
+                                    {groupSessions.map(renderSessionCard)}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })()}
                     </>
                   );
                 })()}
