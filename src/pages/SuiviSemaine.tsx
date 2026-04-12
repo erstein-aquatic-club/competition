@@ -96,6 +96,13 @@ function slotKeyFromTime(time: string): "AM" | "PM" {
   return hour < 12 ? "AM" : "PM";
 }
 
+/** Normalize session.slot ("Matin"/"Soir"/"AM"/"PM") to "AM"/"PM" */
+function normalizeSlot(slot: string): "AM" | "PM" {
+  const lower = slot.toLowerCase();
+  if (lower === "matin" || lower === "am") return "AM";
+  return "PM";
+}
+
 // ── Indicator colors (from SwimmerFeedbackTab pattern) ────────
 
 const INDICATORS = [
@@ -225,7 +232,8 @@ export default function SuiviSemaine() {
     for (const s of allSessions) {
       // Only keep sessions within this week
       if (!weekISOs.includes(s.date)) continue;
-      const key = `${s.date}_${s.slot}`;
+      // Normalize slot: DB stores "Matin"/"Soir", we match on "AM"/"PM"
+      const key = `${s.date}_${normalizeSlot(s.slot)}`;
       // Keep the most recent (first in descending order)
       if (!map.has(key)) map.set(key, s);
     }
