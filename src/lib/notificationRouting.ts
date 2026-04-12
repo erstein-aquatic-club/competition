@@ -12,7 +12,7 @@ export function resolveNotificationHref(notification: NotificationLinkInput): st
   const haystack = `${title} ${message}`;
 
   if (type === "interview" || haystack.includes("entretien")) {
-    return "/suivi?tab=entretiens";
+    return "/suivi/saison";
   }
 
   if (type === "wellness" || haystack.includes("bien-être") || haystack.includes("te sens-tu")) {
@@ -24,7 +24,7 @@ export function resolveNotificationHref(notification: NotificationLinkInput): st
   }
 
   if (type === "objective" || haystack.includes("objectif")) {
-    return "/suivi?tab=objectifs";
+    return "/suivi/saison";
   }
 
   // Fallback: check metadata URL (strip leading # for Wouter compatibility)
@@ -39,8 +39,7 @@ export function resolveNotificationHref(notification: NotificationLinkInput): st
 
 export function resolveNotificationActionLabel(notification: NotificationLinkInput): string | null {
   const href = resolveNotificationHref(notification);
-  if (href === "/suivi?tab=entretiens") return "Ouvrir l'entretien";
-  if (href === "/suivi?tab=objectifs") return "Ouvrir les objectifs";
+  if (href === "/suivi/saison") return "Ouvrir la saison";
   if (href === "/?wellness=open") return "Remplir mon bien-être";
   if (href === "/") return "Ouvrir l'accueil";
   if (href === "/profile?section=messages") return null;

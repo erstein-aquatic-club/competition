@@ -100,6 +100,9 @@ const Administratif = lazyWithRetry(() => import("@/pages/Administratif"));
 const Comite = lazyWithRetry(() => import("@/pages/Comite"));
 const Strength = lazyWithRetry(() => import("@/pages/Strength"));
 const Suivi = lazyWithRetry(() => import("@/pages/Suivi"));
+const SuiviSemaine = lazyWithRetry(() => import("@/pages/SuiviSemaine"));
+const SuiviSaison = lazyWithRetry(() => import("@/pages/SuiviSaison"));
+const SuiviProgression = lazyWithRetry(() => import("@/pages/SuiviProgression"));
 const Profile = lazyWithRetry(() => import("@/pages/Profile"));
 const Records = lazyWithRetry(() => import("@/pages/Records"));
 const RecordsAdmin = lazyWithRetry(() => import("@/pages/RecordsAdmin"));
@@ -283,7 +286,7 @@ function AppRouter() {
             <Route path="/reset-password" component={ResetPassword} />
             <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <SwimmerHome />}</Route>
             <Route path="/natation" component={Dashboard} />
-            <Route path="/progress">{() => { window.location.hash = "#/suivi?tab=progression"; return null; }}</Route>
+            <Route path="/progress">{() => { window.location.hash = "#/suivi/progression"; return null; }}</Route>
             <Route path="/hall-of-fame" component={FEATURES.hallOfFame ? HallOfFame : ComingSoon} />
             <Route path="/competition/:id" component={CompetitionDetail} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
@@ -300,6 +303,9 @@ function AppRouter() {
             <Route path="/swim-notes" component={SwimNotes} />
             <Route path="/s/:token" component={SharedSwimSession} />
             <Route path="/report/:userId/:month" component={MonthlyReport} />
+            <Route path="/suivi/semaine" component={SuiviSemaine} />
+            <Route path="/suivi/saison" component={SuiviSaison} />
+            <Route path="/suivi/progression" component={SuiviProgression} />
             <Route path="/suivi" component={Suivi} />
             <Route path="/profile" component={Profile} />
             <Route path="/coming-soon" component={ComingSoon} />
