@@ -48,14 +48,76 @@ function WaveBar({
         .map((w) => {
           const wc = WAVE_COLORS[w.wave - 1] ?? WAVE_COLORS[0];
           const launched = w.startedAt !== null;
+          const betweenReps = launched && w.lastFinishedAt !== null;
 
+          // ── Case 1: never launched yet ──
           if (!launched) {
-            const recoveryElapsed = w.lastFinishedAt ? now - w.lastFinishedAt : 0;
+            return (
+              <button
+                key={w.wave}
+                aria-label={`Lancer la vague ${wc.label}`}
+                onClick={() =>
+                  dispatch({
+                    type: "LAUNCH_WAVE",
+                    wave: w.wave,
+                    timestamp: getTimestamp(),
+                  })
+                }
+                className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
+              >
+                <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+                  {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
+                </span>
+                <span className="flex items-center gap-1.5 text-lg font-black text-white">
+                  <Play className="h-4 w-4 fill-current" /> GO
+                </span>
+              </button>
+            );
+          }
+
+          // ── Shared: departure countdown from startedAt ──
+          const elapsed = now - (w.startedAt as number);
+          const intervalMs = w.departureIntervalSec * 1000;
+          const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
+          const urgent = remainingMs >= 0 && remainingMs <= 15000;
+          const overdue = remainingMs <= 0;
+
+          // ── Case 2: between reps — countdown keeps running + GO button ──
+          if (betweenReps) {
+            const recoveryElapsed = now - (w.lastFinishedAt as number);
 
             return (
               <div key={w.wave} className="flex flex-col gap-0">
-                {/* Recovery timer — visible between reps */}
-                {w.lastFinishedAt && (
+                {/* Departure countdown — keeps ticking between reps */}
+                {intervalMs > 0 ? (
+                  <div
+                    role="timer"
+                    aria-label={
+                      overdue
+                        ? `Récupération dépassée de ${formatTime(-remainingMs)}`
+                        : `Récupération restante ${formatTime(remainingMs)}`
+                    }
+                    className={`flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black transition-colors ${
+                      overdue
+                        ? "bg-destructive text-destructive-foreground"
+                        : urgent
+                          ? "bg-destructive/90 text-destructive-foreground animate-pulse"
+                          : "bg-muted text-foreground"
+                    }`}
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                      Récup
+                    </span>
+                    <span className={`text-xl leading-none ${urgent || overdue ? "text-2xl" : ""}`}>
+                      {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
+                    </span>
+                    {overdue && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        DÉPASSÉE
+                      </span>
+                    )}
+                  </div>
+                ) : (
                   <div
                     role="timer"
                     aria-label={`Récupération en cours ${formatTime(recoveryElapsed)}`}
@@ -78,10 +140,10 @@ function WaveBar({
                       timestamp: getTimestamp(),
                     })
                   }
-                  className={`flex flex-col items-center justify-center ${w.lastFinishedAt ? "rounded-b-xl" : "rounded-xl"} ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
+                  className={`flex flex-col items-center justify-center rounded-b-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
                 >
                   <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-                    {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
+                    {wc.label} S{w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
                   </span>
                   <span className="flex items-center gap-1.5 text-lg font-black text-white">
                     <Play className="h-4 w-4 fill-current" /> GO
@@ -91,12 +153,7 @@ function WaveBar({
             );
           }
 
-          const elapsed = now - (w.startedAt as number);
-          const intervalMs = w.departureIntervalSec * 1000;
-          const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
-          const urgent = remainingMs >= 0 && remainingMs <= 15000;
-          const overdue = remainingMs <= 0;
-
+          // ── Case 3: actively racing ──
           return (
             <div key={w.wave} className="flex flex-col gap-0">
               {/* Recovery countdown — above the card */}

@@ -224,10 +224,10 @@ export function chronoReducer(
       const allStopped = waveSwimmers.every((rs) => rs.stoppedAt !== null);
 
       if (allStopped) {
-        // Auto-reset wave for next rep, keep lastFinishedAt for recovery timer
+        // Keep startedAt so departure countdown continues; set lastFinishedAt to signal "between reps"
         const waves = state.waves.map((w) =>
           w.wave === waveNum
-            ? { ...w, startedAt: null, currentRep: w.currentRep + 1, lastFinishedAt: action.timestamp }
+            ? { ...w, currentRep: w.currentRep + 1, lastFinishedAt: action.timestamp }
             : w,
         );
         for (const [id, rs] of newRaceData) {
@@ -246,10 +246,10 @@ export function chronoReducer(
     }
 
     case "NEXT_REP": {
-      // Reset wave for next rep: clear startedAt, increment currentRep, set lastFinishedAt for recovery
+      // Keep startedAt so departure countdown continues; set lastFinishedAt to signal "between reps"
       const waves = state.waves.map((w) =>
         w.wave === action.wave
-          ? { ...w, startedAt: null, currentRep: w.currentRep + 1, lastFinishedAt: Date.now() }
+          ? { ...w, currentRep: w.currentRep + 1, lastFinishedAt: Date.now() }
           : w,
       );
       // Add new empty rep array for each swimmer in this wave, reset stoppedAt
