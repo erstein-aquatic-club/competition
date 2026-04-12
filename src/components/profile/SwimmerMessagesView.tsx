@@ -98,7 +98,10 @@ export default function SwimmerMessagesView({
 
     if (notification.target_id && !notification.read) {
       api.notifications_mark_read({ targetId: notification.target_id })
-        .then(() => queryClient.invalidateQueries({ queryKey: ["profile-notifications"] }))
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
+        })
         .catch(() => {
           // Navigation should not be blocked if mark-read fails.
         });
@@ -132,11 +135,29 @@ export default function SwimmerMessagesView({
 
     if (targetIds.length === 0) return;
 
+    // Immediate local dismiss for snappy UI
     setDismissedTargetIds((current) => Array.from(new Set([...current, ...targetIds])));
     setSelectedTargetId(null);
+
+    // Mark all unread notifications as read server-side so home badge clears
+    const unreadTargetIds = notifications
+      .filter((n) => !n.read && n.target_id != null)
+      .map((n) => n.target_id as number);
+
+    if (unreadTargetIds.length > 0) {
+      Promise.all(unreadTargetIds.map((id) => api.notifications_mark_read({ targetId: id })))
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
+        })
+        .catch(() => {
+          // Non-blocking — local dismiss already applied
+        });
+    }
+
     toast({
-      title: "Notifications masquées",
-      description: "La boîte de réception a été vidée sur cet appareil uniquement.",
+      title: "Notifications effacées",
+      description: "Les notifications ont été marquées comme lues.",
     });
   };
 
