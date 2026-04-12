@@ -273,96 +273,145 @@ export default function SlotSessionSheet({
   const cfg = STATE_CONFIG[state];
   const sessionDisabled = state === "cancelled";
 
+  const handleSheetOpenChange = useCallback((isOpen: boolean) => {
+    if (!isOpen) {
+      setPreviewOpen(false);
+    }
+    onOpenChange(isOpen);
+  }, [onOpenChange]);
+
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+      <Sheet open={open} onOpenChange={handleSheetOpenChange}>
         <SheetContent
           side="bottom"
-          className="rounded-t-3xl max-h-[85dvh] overflow-y-auto px-5 pb-8 pt-4"
+          className="rounded-t-3xl max-h-[90dvh] overflow-y-auto px-5 pb-8 pt-4"
         >
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border/60" />
 
-          <SheetHeader className="mb-5 space-y-1.5 text-left">
-            <div className="flex items-center gap-2">
-              <SheetTitle className="text-base font-bold leading-tight">
-                {formatDateFr(instance.date)}
-              </SheetTitle>
-              {state !== "empty" && (
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] px-2 py-0.5 font-medium leading-none ${cfg.badgeClass}`}
-                >
-                  {cfg.label}
-                </Badge>
-              )}
-            </div>
-            <SheetDescription className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3 w-3 opacity-60" />
-                {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-3 w-3 opacity-60" />
-                {slot.location}
-              </span>
-            </SheetDescription>
-          </SheetHeader>
-
-          <MenuModePicker
-            mode={menuMode}
-            onModeChange={setMenuMode}
-            sessionDisabled={sessionDisabled}
-          />
-
-          {menuMode === "session" ? (
+          {previewOpen ? (
+            /* ── Preview mode ── */
             <>
-              {state === "cancelled" && (
-                <SessionUnavailableBody override={override} />
-              )}
-              {state === "empty" && (
-                <EmptyBody
-                  instance={instance}
-                  groups={groups}
-                  selectedGroups={selectedGroups}
-                  subgroups={subgroups}
-                  selectedSubgroupId={selectedSubgroupId}
-                  onSubgroupChange={setSelectedSubgroupId}
-                  visibleFrom={visibleFrom}
-                  onToggleGroup={handleToggleGroup}
-                  onVisibleFromChange={setVisibleFrom}
-                  onCreateNew={onCreateNew}
-                  onPickTemplate={onPickTemplate}
-                  onClose={() => onOpenChange(false)}
+              <SheetHeader className="sr-only">
+                <SheetTitle>{assignment?.session_name ?? "Séance"}</SheetTitle>
+              </SheetHeader>
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:scale-95 transition-transform"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <h3
+                  className="text-base font-bold tracking-tight uppercase"
+                  style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}
+                >
+                  {assignment?.session_name ?? "Séance"}
+                </h3>
+              </div>
+              {previewLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : previewSession ? (
+                <SwimSessionTimeline
+                  title={previewSession.name}
+                  description={previewSession.description ?? undefined}
+                  items={previewSession.items}
                 />
-              )}
-              {(state === "draft" || state === "published") && (
-                <FilledBody
-                  instance={instance}
-                  assignment={assignment!}
-                  showVisibilityPicker={showVisibilityPicker}
-                  visibleFrom={visibleFrom}
-                  visibilityLoading={visibilityMutation.isPending}
-                  deleteLoading={deleteMutation.isPending}
-                  onToggleVisibilityPicker={() =>
-                    setShowVisibilityPicker((v) => !v)
-                  }
-                  onVisibleFromChange={setVisibleFrom}
-                  onSaveVisibility={handleSaveVisibility}
-                  onEditSession={onEditSession}
-                  onRequestDelete={() => setDeleteConfirmOpen(true)}
-                  onPreview={assignment?.swim_catalog_id != null ? () => setPreviewOpen(true) : undefined}
-                />
+              ) : (
+                <p className="text-center text-sm text-muted-foreground py-8">
+                  Impossible de charger la séance.
+                </p>
               )}
             </>
           ) : (
-            <SlotManagementPanel
-              state={state}
-              override={override}
-              canEditSlot={!!onEditSlot}
-              canManageOverride={!!onManageOverride}
-              onEditSlot={handleEditSlot}
-              onManageOverride={handleManageOverride}
-            />
+            /* ── Normal mode ── */
+            <>
+              <SheetHeader className="mb-5 space-y-1.5 text-left">
+                <div className="flex items-center gap-2">
+                  <SheetTitle className="text-base font-bold leading-tight">
+                    {formatDateFr(instance.date)}
+                  </SheetTitle>
+                  {state !== "empty" && (
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-2 py-0.5 font-medium leading-none ${cfg.badgeClass}`}
+                    >
+                      {cfg.label}
+                    </Badge>
+                  )}
+                </div>
+                <SheetDescription className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3 opacity-60" />
+                    {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3 w-3 opacity-60" />
+                    {slot.location}
+                  </span>
+                </SheetDescription>
+              </SheetHeader>
+
+              <MenuModePicker
+                mode={menuMode}
+                onModeChange={setMenuMode}
+                sessionDisabled={sessionDisabled}
+              />
+
+              {menuMode === "session" ? (
+                <>
+                  {state === "cancelled" && (
+                    <SessionUnavailableBody override={override} />
+                  )}
+                  {state === "empty" && (
+                    <EmptyBody
+                      instance={instance}
+                      groups={groups}
+                      selectedGroups={selectedGroups}
+                      subgroups={subgroups}
+                      selectedSubgroupId={selectedSubgroupId}
+                      onSubgroupChange={setSelectedSubgroupId}
+                      visibleFrom={visibleFrom}
+                      onToggleGroup={handleToggleGroup}
+                      onVisibleFromChange={setVisibleFrom}
+                      onCreateNew={onCreateNew}
+                      onPickTemplate={onPickTemplate}
+                      onClose={() => onOpenChange(false)}
+                    />
+                  )}
+                  {(state === "draft" || state === "published") && (
+                    <FilledBody
+                      instance={instance}
+                      assignment={assignment!}
+                      showVisibilityPicker={showVisibilityPicker}
+                      visibleFrom={visibleFrom}
+                      visibilityLoading={visibilityMutation.isPending}
+                      deleteLoading={deleteMutation.isPending}
+                      onToggleVisibilityPicker={() =>
+                        setShowVisibilityPicker((v) => !v)
+                      }
+                      onVisibleFromChange={setVisibleFrom}
+                      onSaveVisibility={handleSaveVisibility}
+                      onEditSession={onEditSession}
+                      onRequestDelete={() => setDeleteConfirmOpen(true)}
+                      onPreview={assignment?.swim_catalog_id != null ? () => setPreviewOpen(true) : undefined}
+                    />
+                  )}
+                </>
+              ) : (
+                <SlotManagementPanel
+                  state={state}
+                  override={override}
+                  canEditSlot={!!onEditSlot}
+                  canManageOverride={!!onManageOverride}
+                  onEditSlot={handleEditSlot}
+                  onManageOverride={handleManageOverride}
+                />
+              )}
+            </>
           )}
         </SheetContent>
       </Sheet>
@@ -398,46 +447,6 @@ export default function SlotSessionSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Session preview sheet */}
-      <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-3xl max-h-[90dvh] overflow-y-auto px-5 pb-8 pt-4"
-        >
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border/60" />
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:scale-95 transition-transform"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <h3
-              className="text-base font-bold tracking-tight uppercase"
-              style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}
-            >
-              {assignment?.session_name ?? "Séance"}
-            </h3>
-          </div>
-          {previewLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : previewSession ? (
-            <SwimSessionTimeline
-              title={previewSession.name}
-              description={previewSession.description ?? undefined}
-              items={previewSession.items}
-            />
-          ) : (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              Impossible de charger la séance.
-            </p>
-          )}
-        </SheetContent>
-      </Sheet>
     </>
   );
 }
