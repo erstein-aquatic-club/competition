@@ -1,15 +1,14 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { NotificationLogEntry } from "@/lib/api/notificationLog";
 import { BellRing, Clock, MessageSquare, Users, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import { buildCoachHash, type CoachCommsTab } from "./coachRouteState";
 
 const CoachMessagesScreen = lazy(() => import("./CoachMessagesScreen"));
 const CoachSmsScreen = lazy(() => import("./CoachSmsScreen"));
-
-type CommsTab = "notifications" | "sms" | "historique";
 
 type CoachCommsProps = {
   athletes: Array<{
@@ -21,6 +20,8 @@ type CoachCommsProps = {
   }>;
   groups: Array<{ id: number; name: string }>;
   athletesLoading: boolean;
+  initialTab?: CoachCommsTab;
+  initialAthleteId?: number | null;
 };
 
 function NotificationLogList() {
@@ -103,8 +104,24 @@ export default function CoachComms({
   athletes,
   groups,
   athletesLoading,
+  initialTab,
+  initialAthleteId,
 }: CoachCommsProps) {
-  const [tab, setTab] = useState<CommsTab>("notifications");
+  const [tab, setTab] = useState<CoachCommsTab>(initialTab ?? "notifications");
+
+  useEffect(() => {
+    setTab(initialTab ?? "notifications");
+  }, [initialTab]);
+
+  useEffect(() => {
+    const target = buildCoachHash(
+      { section: "comms", tab, athleteId: initialAthleteId ?? null },
+      window.location.hash,
+    );
+    if (window.location.hash !== target) {
+      window.history.replaceState(null, "", target);
+    }
+  }, [initialAthleteId, tab]);
 
   return (
     <div className="space-y-4">
@@ -158,12 +175,14 @@ export default function CoachComms({
             athletes={athletes}
             groups={groups}
             athletesLoading={athletesLoading}
+            initialAthleteId={initialAthleteId}
           />
         ) : tab === "sms" ? (
           <CoachSmsScreen
             athletes={athletes}
             groups={groups}
             athletesLoading={athletesLoading}
+            initialAthleteId={initialAthleteId}
           />
         ) : (
           <NotificationLogList />

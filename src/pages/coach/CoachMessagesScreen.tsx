@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BellRing, SendHorizontal } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -15,9 +15,16 @@ type CoachMessagesScreenProps = {
   athletes: Array<{ id: number | null; display_name: string; email?: string | null; group_id?: number | null; group_label?: string | null }>;
   groups: Array<{ id: number; name: string }>;
   athletesLoading: boolean;
+  initialAthleteId?: number | null;
 };
 
-const CoachMessagesScreen = ({ onBack, athletes, groups, athletesLoading }: CoachMessagesScreenProps) => {
+const CoachMessagesScreen = ({
+  onBack,
+  athletes,
+  groups,
+  athletesLoading,
+  initialAthleteId,
+}: CoachMessagesScreenProps) => {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -76,6 +83,12 @@ const CoachMessagesScreen = ({ onBack, athletes, groups, athletesLoading }: Coac
 
     return { recipients: 0, target: null };
   }, [athletes, targetValue]);
+
+  useEffect(() => {
+    if (initialAthleteId == null) return;
+    if (!athletes.some((athlete) => athlete.id === initialAthleteId)) return;
+    setTargetValue(`user:${initialAthleteId}`);
+  }, [athletes, initialAthleteId]);
 
   const handleSendMessage = async () => {
     if (!selectedTarget.target || selectedTarget.recipients === 0) {

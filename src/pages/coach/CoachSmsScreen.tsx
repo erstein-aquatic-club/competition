@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, Check, ChevronsUpDown, X, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -19,9 +19,16 @@ type CoachSmsScreenProps = {
   athletes: Array<{ id: number | null; display_name: string; email?: string | null; group_id?: number | null; group_label?: string | null }>;
   groups: Array<{ id: number; name: string }>;
   athletesLoading: boolean;
+  initialAthleteId?: number | null;
 };
 
-const CoachSmsScreen = ({ onBack, athletes, groups, athletesLoading }: CoachSmsScreenProps) => {
+const CoachSmsScreen = ({
+  onBack,
+  athletes,
+  groups,
+  athletesLoading,
+  initialAthleteId,
+}: CoachSmsScreenProps) => {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [selectedGroups, setSelectedGroups] = useState<Set<number>>(new Set());
@@ -58,6 +65,13 @@ const CoachSmsScreen = ({ onBack, athletes, groups, athletesLoading }: CoachSmsS
         })),
     [athletes],
   );
+
+  useEffect(() => {
+    if (initialAthleteId == null) return;
+    if (!athletes.some((athlete) => athlete.id === initialAthleteId)) return;
+    setSelectedGroups(new Set());
+    setSelectedUsers(new Set([initialAthleteId]));
+  }, [athletes, initialAthleteId]);
 
   const toggleGroup = (groupId: number) => {
     setSelectedGroups((prev) => {

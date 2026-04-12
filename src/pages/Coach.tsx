@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
+import { buildCoachHash, parseCoachHashLocation, type CoachSection } from "./coach/coachRouteState";
 const CoachSwimmersOverview = lazy(() => import("./coach/CoachSwimmersOverview"));
 const CoachGroupsScreen = lazy(() => import("./coach/CoachGroupsScreen"));
 const CoachCompetitionsScreen = lazy(() => import("./coach/CoachCompetitionsScreen"));
@@ -34,8 +35,6 @@ const CoachMySwimmersScreen = lazy(() => import("./coach/CoachMySwimmersScreen")
 const CoachCommentsScreen = lazy(() => import("./coach/CoachCommentsScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
-
-type CoachSection = "home" | "week" | "swimmers" | "library" | "athlete" | "groups" | "competitions" | "comms" | "chrono" | "chrono-history" | "my-swimmers" | "comments";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -515,30 +514,32 @@ export default function Coach() {
   const role = useAuth((state) => state.role);
   const setSelectedAthlete = useAuth((state) => state.setSelectedAthlete);
   const [, navigate] = useLocation();
-  const [activeSection, setActiveSection] = useState<CoachSection>(() => {
-    const hash = window.location.hash;
-    const match = hash.match(/[?&]section=([^&]+)/);
-    return (match?.[1] as CoachSection) || "home";
-  });
+  const [routeState, setRouteState] = useState(() => parseCoachHashLocation(window.location.hash));
+  const activeSection = routeState.section;
   const kpiPeriod: KpiLookbackPeriod = 7;
   const [selectedCoachAthlete, setSelectedCoachAthlete] = useState<CoachAthleteOption | null>(null);
 
-  // Sync activeSection → URL (replaceState to avoid extra history entries)
+  // Keep local route state aligned with browser hash changes and deep links.
   useEffect(() => {
-    const base = "/coach";
-    const target =
-      activeSection && activeSection !== "home"
-        ? `#${base}?section=${activeSection}`
-        : `#${base}`;
+    const syncFromHash = () => {
+      setRouteState(parseCoachHashLocation(window.location.hash));
+    };
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
+
+  // Sync local route state → URL (replaceState to avoid extra history entries)
+  useEffect(() => {
+    const target = buildCoachHash(routeState, window.location.hash);
     if (window.location.hash !== target) {
       window.history.replaceState(null, "", target);
     }
-  }, [activeSection]);
+  }, [routeState]);
 
   // Reset to home when nav icon is tapped while already on /coach
   useEffect(() => {
     const reset = () => {
-      setActiveSection("home");
+      setRouteState({ section: "home" });
       setSelectedCoachAthlete(null);
     };
     window.addEventListener("nav:reset", reset);
@@ -549,7 +550,11 @@ export default function Coach() {
   useEffect(() => {
     const onSection = (e: Event) => {
       const section = (e as CustomEvent<string>).detail as CoachSection;
-      setActiveSection(section);
+      setRouteState((current) => ({
+        section,
+        tab: section === "comms" ? current.tab : undefined,
+        athleteId: section === "comms" ? current.athleteId : null,
+      }));
       setSelectedCoachAthlete(null);
     };
     window.addEventListener("nav:section", onSection);
@@ -730,7 +735,7 @@ export default function Coach() {
       localStorage.setItem(RECENT_ATHLETES_KEY, JSON.stringify(updated));
     } catch { /* ignore storage errors */ }
     setSelectedCoachAthlete(athlete);
-    setActiveSection("athlete");
+    setRouteState({ section: "athlete" });
   };
 
   if (!coachAccess) {
@@ -758,7 +763,7 @@ export default function Coach() {
     <div className="space-y-6">
       {activeSection === "home" ? (
         <CoachHome
-          onNavigate={setActiveSection}
+          onNavigate={(section) => setRouteState({ section })}
           onOpenRecordsClub={() => navigate("/records-club")}
           onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
@@ -806,7 +811,7 @@ export default function Coach() {
           <CoachSwimmerDetail
             athleteId={selectedCoachAthlete?.id ?? null}
             athleteName={selectedCoachAthlete?.display_name ?? null}
-            onBack={() => setActiveSection("swimmers")}
+            onBack={() => setRouteState({ section: "swimmers" })}
           />
         </Suspense>
       ) : null}
@@ -814,7 +819,7 @@ export default function Coach() {
       {activeSection === "groups" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachGroupsScreen
-            onBack={() => setActiveSection("home")}
+            onBack={() => setRouteState({ section: "home" })}
             athletes={athletes}
             groups={groups}
             athletesLoading={athletesLoading}
@@ -825,7 +830,7 @@ export default function Coach() {
       {activeSection === "competitions" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachCompetitionsScreen
-            onBack={() => setActiveSection("home")}
+            onBack={() => setRouteState({ section: "home" })}
           />
         </Suspense>
       ) : null}
@@ -836,6 +841,8 @@ export default function Coach() {
             athletes={myAthletes}
             groups={groups}
             athletesLoading={athletesLoading}
+            initialTab={routeState.tab}
+            initialAthleteId={routeState.athleteId}
           />
         </Suspense>
       ) : null}
@@ -849,7 +856,7 @@ export default function Coach() {
       {activeSection === "chrono-history" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachChronoHistoryScreen
-            onBack={() => setActiveSection("home")}
+            onBack={() => setRouteState({ section: "home" })}
           />
         </Suspense>
       ) : null}
@@ -859,7 +866,7 @@ export default function Coach() {
           <CoachMySwimmersScreen
             athletes={athletes}
             athletesLoading={athletesLoading}
-            onBack={() => setActiveSection("home")}
+            onBack={() => setRouteState({ section: "home" })}
           />
         </Suspense>
       ) : null}
@@ -867,7 +874,7 @@ export default function Coach() {
       {activeSection === "comments" ? (
         <Suspense fallback={<PageSkeleton />}>
           <CoachCommentsScreen
-            onBack={() => setActiveSection("home")}
+            onBack={() => setRouteState({ section: "home" })}
             onOpenAthlete={handleOpenAthlete}
           />
         </Suspense>
