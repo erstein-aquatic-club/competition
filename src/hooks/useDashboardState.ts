@@ -542,26 +542,28 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           };
         });
 
-        // If there are unmatched assignments (group sessions the resolver didn't link to
-        // swimmer slots), inject them as extra PlannedSessions so they're not lost.
-        const matchedAssignmentIds = new Set(
-          list.filter((s) => s.assignmentId).map((s) => s.assignmentId),
-        );
-        const unmatchedAssignments = dayAssignments.filter((a) => !matchedAssignmentIds.has(a.id));
-        for (const a of unmatchedAssignments) {
-          const aRecord = a as unknown as Record<string, unknown>;
-          const aSlotKey: SlotKey = pickAssignmentSlotKey(aRecord, 0);
-          list.push({
-            id: `${iso}__unmatched_${a.id}`,
-            iso,
-            slotKey: aSlotKey,
-            title: String(a.title ?? "Séance coach"),
-            km: assignmentPlannedKm(aRecord),
-            details: safeLinesFromText(a.description),
-            assignmentId: typeof a.id === "number" ? a.id : Number(a.id) || undefined,
-            isEmpty: false,
-            assignmentSource: "group",
-          });
+        // Inject unmatched assignments ONLY after resolver has loaded
+        // (when resolved is undefined = still loading, don't inject to avoid duplicates)
+        if (resolved) {
+          const matchedAssignmentIds = new Set(
+            list.filter((s) => s.assignmentId).map((s) => s.assignmentId),
+          );
+          const unmatchedAssignments = dayAssignments.filter((a) => !matchedAssignmentIds.has(a.id));
+          for (const a of unmatchedAssignments) {
+            const aRecord = a as unknown as Record<string, unknown>;
+            const aSlotKey: SlotKey = pickAssignmentSlotKey(aRecord, 0);
+            list.push({
+              id: `${iso}__unmatched_${a.id}`,
+              iso,
+              slotKey: aSlotKey,
+              title: String(a.title ?? "Séance coach"),
+              km: assignmentPlannedKm(aRecord),
+              details: safeLinesFromText(a.description),
+              assignmentId: typeof a.id === "number" ? a.id : Number(a.id) || undefined,
+              isEmpty: false,
+              assignmentSource: "group",
+            });
+          }
         }
 
         cache.set(iso, list);
