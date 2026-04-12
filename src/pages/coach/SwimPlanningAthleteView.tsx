@@ -226,6 +226,24 @@ export default function SwimPlanningAthleteView({
     return map;
   }, [visibleCompetitions]);
 
+  const getDayCompetitions = useCallback(
+    (weekMonday: Date, dayIndex: number): Competition[] => {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + dayIndex);
+      d.setHours(0, 0, 0, 0);
+      const t = d.getTime();
+      return visibleCompetitions.filter((c) => {
+        if (!c.date) return false;
+        const start = new Date(c.date.slice(0, 10) + "T00:00:00").getTime();
+        const end = c.end_date
+          ? new Date(c.end_date.slice(0, 10) + "T00:00:00").getTime()
+          : start;
+        return t >= start && t <= end;
+      });
+    },
+    [visibleCompetitions],
+  );
+
   // ── Competition detail sheet ──
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
@@ -428,24 +446,73 @@ export default function SwimPlanningAthleteView({
 
                               {/* Day rows */}
                               <div className="px-3 pb-3 space-y-1">
-                                {DAY_ROWS.map((day) => (
-                                  <div
-                                    key={day.index}
-                                    className="grid grid-cols-[48px_1fr_1fr] gap-1 items-center"
-                                  >
-                                    <span className="text-[11px] font-medium text-muted-foreground pl-0.5">
-                                      {day.label}
-                                    </span>
-                                    <ReadOnlySlotCell
-                                      slot={findSlot(week.weekKey, day.index, "morning")}
-                                      onTap={handleChipTap}
-                                    />
-                                    <ReadOnlySlotCell
-                                      slot={findSlot(week.weekKey, day.index, "evening")}
-                                      onTap={handleChipTap}
-                                    />
-                                  </div>
-                                ))}
+                                {DAY_ROWS.map((day) => {
+                                  const morning = findSlot(week.weekKey, day.index, "morning");
+                                  const evening = findSlot(week.weekKey, day.index, "evening");
+                                  const dayComps = getDayCompetitions(week.monday, day.index);
+                                  const hasComp = dayComps.length > 0;
+                                  const emptyDay = !morning && !evening;
+                                  const primaryComp = dayComps[0];
+
+                                  return (
+                                    <div
+                                      key={day.index}
+                                      className={cn(
+                                        "grid grid-cols-[48px_1fr_1fr] gap-1 items-center rounded-lg transition-colors",
+                                        hasComp &&
+                                          !emptyDay &&
+                                          "bg-amber-50/60 dark:bg-amber-900/15 ring-1 ring-amber-200/60 dark:ring-amber-800/40 pr-1",
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          "text-[11px] font-medium pl-0.5 flex items-center gap-1",
+                                          hasComp
+                                            ? "text-amber-700 dark:text-amber-300 font-semibold"
+                                            : "text-muted-foreground",
+                                        )}
+                                      >
+                                        {hasComp && <Trophy className="h-3 w-3 shrink-0" />}
+                                        {day.label}
+                                      </span>
+
+                                      {hasComp && emptyDay ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedCompetition(primaryComp)}
+                                          className="col-span-2 relative h-9 w-full rounded-lg flex items-center gap-1.5 px-2 overflow-hidden
+                                                     bg-gradient-to-r from-amber-100 via-amber-50 to-amber-100
+                                                     dark:from-amber-900/40 dark:via-amber-900/20 dark:to-amber-900/40
+                                                     border border-amber-300/70 dark:border-amber-700/60
+                                                     text-amber-900 dark:text-amber-100
+                                                     active:scale-[0.98] transition-transform"
+                                          aria-label={primaryComp.name}
+                                        >
+                                          {/* Diagonal stripe accent */}
+                                          <span
+                                            aria-hidden
+                                            className="pointer-events-none absolute inset-0 opacity-[0.18]
+                                                       bg-[repeating-linear-gradient(45deg,_transparent_0_6px,_currentColor_6px_7px)]"
+                                          />
+                                          <Trophy className="relative h-3.5 w-3.5 shrink-0" />
+                                          <span className="relative text-[10px] font-bold tracking-tight truncate flex-1 text-left">
+                                            {primaryComp.name}
+                                          </span>
+                                          {dayComps.length > 1 && (
+                                            <span className="relative text-[9px] font-semibold opacity-70 shrink-0">
+                                              +{dayComps.length - 1}
+                                            </span>
+                                          )}
+                                        </button>
+                                      ) : (
+                                        <>
+                                          <ReadOnlySlotCell slot={morning} onTap={handleChipTap} />
+                                          <ReadOnlySlotCell slot={evening} onTap={handleChipTap} />
+                                        </>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           </motion.div>
