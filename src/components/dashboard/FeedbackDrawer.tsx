@@ -675,7 +675,7 @@ export function FeedbackDrawer({
                     const bg = hasLog
                       ? "bg-status-success-bg border-status-success/30"
                       : isAbsentLike
-                      ? "bg-sky-50 border-sky-200"
+                      ? "bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800"
                       : needsAction
                       ? "bg-status-warning-bg border-status-warning/30"
                       : "bg-card border-border";
@@ -697,7 +697,7 @@ export function FeedbackDrawer({
                                 hasLog
                                   ? "border-status-success/30 bg-status-success-bg"
                                   : isAbsentLike
-                                  ? "border-sky-200 bg-sky-100"
+                                  ? "border-sky-200 dark:border-sky-800 bg-sky-100 dark:bg-sky-900/50"
                                   : needsAction
                                   ? "border-status-warning/30 bg-status-warning-bg"
                                   : "border-border bg-muted"
@@ -1066,7 +1066,7 @@ export function FeedbackDrawer({
                             {/* Ressenti + distance */}
                             <div className="px-4 pb-4">
                               {!canRate && (
-                                <div className="mb-3 rounded-2xl bg-sky-50 text-sky-900 px-3 py-2 text-xs">
+                                <div className="mb-3 rounded-2xl bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 px-3 py-2 text-xs">
                                   {isAbsentOverride ? "Absent: aucun ressenti." : 'Non prévu: appuyez "Je suis venu".'}
                                 </div>
                               )}
