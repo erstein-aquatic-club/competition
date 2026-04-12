@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-import type { SwimPlanningSlot, SwimFiliere } from "@/lib/api/types";
+import { useAuth } from "@/lib/auth";
+import type { SwimPlanningSlot, SwimFiliere, Competition } from "@/lib/api/types";
 import { FILIERES, FILIERE_MAP, FILIERE_STYLES, type FiliereTechnicals } from "@/lib/swimFilieres";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { ChevronDown, ChevronLeft, Link2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, Link2, Trophy } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════════
    Helpers (same as SwimPlanningDemo)
@@ -121,6 +122,7 @@ export default function SwimPlanningAthleteView({
   embedded = false,
 }: SwimPlanningAthleteViewProps) {
   const isVisible = embedded || open;
+  const userId = useAuth((s) => s.userId);
 
   // ── Week generation (infinite scroll, same as coach) ──
   const startMonday = useMemo(() => getMonday(new Date()), []);
@@ -182,6 +184,51 @@ export default function SwimPlanningAthleteView({
     return map;
   }, [dbFilieres]);
 
+  // ── Competitions (to provide context for filière training) ──
+  const { data: allCompetitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: () => api.getCompetitions(),
+    enabled: isVisible,
+  });
+
+  const { data: myCompetitionIds } = useQuery({
+    queryKey: ["my-competition-ids", userId],
+    queryFn: () => api.getMyCompetitionIds(userId),
+    enabled: isVisible && !!userId,
+  });
+
+  const visibleCompetitions = useMemo(() => {
+    if (myCompetitionIds && myCompetitionIds.length > 0) {
+      return allCompetitions.filter((c) => myCompetitionIds.includes(c.id));
+    }
+    return allCompetitions;
+  }, [allCompetitions, myCompetitionIds]);
+
+  // Group competitions by week key (Monday ISO). Multi-day comps span all weeks they touch.
+  const competitionsByWeek = useMemo(() => {
+    const map = new Map<string, Competition[]>();
+    for (const c of visibleCompetitions) {
+      if (!c.date) continue;
+      const start = new Date(c.date.slice(0, 10) + "T00:00:00");
+      const end = c.end_date
+        ? new Date(c.end_date.slice(0, 10) + "T00:00:00")
+        : start;
+      const cursor = getMonday(start);
+      const endMonday = getMonday(end);
+      while (cursor.getTime() <= endMonday.getTime()) {
+        const key = cursor.toISOString().split("T")[0];
+        const arr = map.get(key) ?? [];
+        arr.push(c);
+        map.set(key, arr);
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    }
+    return map;
+  }, [visibleCompetitions]);
+
+  // ── Competition detail sheet ──
+  const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
+
   // ── Expand state ──
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
 
@@ -242,13 +289,21 @@ export default function SwimPlanningAthleteView({
                 const meta = getWeekMeta(groupId, week.weekKey);
                 const weekSlots = slotsByWeek.get(week.weekKey) ?? [];
                 const filledCount = weekSlots.length;
+                const weekCompetitions = competitionsByWeek.get(week.weekKey) ?? [];
+                const hasCompetition = weekCompetitions.length > 0;
 
                 return (
                   <div key={week.weekKey} className="relative pl-8 mb-2">
                     {/* Timeline dot */}
                     <div className={cn(
                       "absolute left-[11px] top-3.5 h-[9px] w-[9px] rounded-full ring-2 ring-background transition-colors",
-                      current ? "bg-primary" : filledCount > 0 ? "bg-emerald-500" : "bg-muted-foreground/25",
+                      hasCompetition
+                        ? "bg-amber-500"
+                        : current
+                          ? "bg-primary"
+                          : filledCount > 0
+                            ? "bg-emerald-500"
+                            : "bg-muted-foreground/25",
                     )} />
 
                     <div className={cn(
@@ -305,6 +360,37 @@ export default function SwimPlanningAthleteView({
                             <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
                               {meta.notes}
                             </p>
+                          )}
+                          {hasCompetition && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {weekCompetitions.map((c) => {
+                                const d = new Date(c.date.slice(0, 10) + "T00:00:00");
+                                return (
+                                  <span
+                                    key={c.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedCompetition(c);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.stopPropagation();
+                                        setSelectedCompetition(c);
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200 max-w-full"
+                                  >
+                                    <Trophy className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{c.name}</span>
+                                    <span className="tabular-nums text-amber-700/70 dark:text-amber-300/70 shrink-0">
+                                      {fmtDD_MM(d)}
+                                    </span>
+                                  </span>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
 
@@ -465,6 +551,65 @@ export default function SwimPlanningAthleteView({
                   )}
                 </AnimatePresence>
               </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Competition Detail Sheet ── */}
+      <Sheet open={!!selectedCompetition} onOpenChange={(o) => !o && setSelectedCompetition(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[70dvh] overflow-y-auto">
+          <SheetHeader className="pb-0">
+            <SheetTitle className="sr-only">{selectedCompetition?.name ?? "Compétition"}</SheetTitle>
+            <SheetDescription className="sr-only">Détails de la compétition</SheetDescription>
+          </SheetHeader>
+          {selectedCompetition && (
+            <div className="space-y-4 pb-6">
+              <div className="flex items-center gap-2.5">
+                <Trophy className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-[15px] font-semibold text-foreground">
+                  {selectedCompetition.name}
+                </h3>
+              </div>
+              <div className="text-[13px] text-foreground/80 space-y-1">
+                <div>
+                  <span className="text-muted-foreground">Date : </span>
+                  {new Date(selectedCompetition.date.slice(0, 10) + "T00:00:00").toLocaleDateString(
+                    "fr-FR",
+                    { weekday: "long", day: "2-digit", month: "long", year: "numeric" },
+                  )}
+                  {selectedCompetition.end_date &&
+                    selectedCompetition.end_date !== selectedCompetition.date && (
+                      <>
+                        {" → "}
+                        {new Date(
+                          selectedCompetition.end_date.slice(0, 10) + "T00:00:00",
+                        ).toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </>
+                    )}
+                </div>
+                {selectedCompetition.location && (
+                  <div>
+                    <span className="text-muted-foreground">Lieu : </span>
+                    {selectedCompetition.location}
+                  </div>
+                )}
+              </div>
+              {selectedCompetition.description && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1">
+                    Description
+                  </p>
+                  <p className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-line">
+                    {selectedCompetition.description}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </SheetContent>
