@@ -620,8 +620,11 @@ export async function resolveSwimmerAssignmentsBatch(
 
   // 6. Resolve for each date
   for (const date of dates) {
+    // Parse local ISO date → use local getDay() to avoid a TZ shift
+    // (new Date("YYYY-MM-DDT00:00:00") is local; getUTCDay() would wrap
+    // to the previous day in timezones west of UTC+0).
     const d = new Date(date + "T00:00:00");
-    const jsDay = d.getUTCDay();
+    const jsDay = d.getDay();
     const dayOfWeek = jsDay === 0 ? 7 : jsDay;
 
     const daySlots = slotsByDay.get(dayOfWeek);
@@ -784,8 +787,10 @@ export async function resolveSwimmerAssignments(
   if (!canUseSupabase()) return [];
 
   // 1. Determine day_of_week (1=Monday … 7=Sunday, ISO standard)
+  // Use local getDay() to match the locally-parsed ISO date — getUTCDay()
+  // would shift to the previous day in timezones east of UTC (e.g. CEST).
   const d = new Date(date + "T00:00:00");
-  const jsDay = d.getUTCDay(); // 0=Sun
+  const jsDay = d.getDay(); // 0=Sun
   const dayOfWeek = jsDay === 0 ? 7 : jsDay;
 
   // 2. Fetch swimmer's personal slots (all days, we filter below)
