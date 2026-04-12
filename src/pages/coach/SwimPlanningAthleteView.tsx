@@ -45,7 +45,7 @@ function getMonday(d: Date): Date {
 
 interface WeekInfo {
   monday: Date;
-  saturday: Date;
+  sunday: Date;
   weekNumber: number;
   weekKey: string;
 }
@@ -54,9 +54,9 @@ function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
   return Array.from({ length: count }, (_, i) => {
     const monday = new Date(startMonday);
     monday.setDate(startMonday.getDate() + i * 7);
-    const saturday = new Date(monday);
-    saturday.setDate(monday.getDate() + 5);
-    return { monday, saturday, weekNumber: getISOWeekNumber(monday), weekKey: monday.toISOString().split("T")[0] };
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return { monday, sunday, weekNumber: getISOWeekNumber(monday), weekKey: monday.toISOString().split("T")[0] };
   });
 }
 
@@ -67,6 +67,7 @@ const DAY_ROWS = [
   { index: 3, label: "Jeu" },
   { index: 4, label: "Ven" },
   { index: 5, label: "Sam" },
+  { index: 6, label: "Dim" },
 ] as const;
 
 function fmtDD_MM(d: Date): string {
@@ -340,7 +341,7 @@ export default function SwimPlanningAthleteView({
                               S{week.weekNumber}
                             </span>
                             <span className="text-[11px] text-muted-foreground">
-                              {fmtDD_MM(week.monday)} &ndash; {fmtDD_MM(week.saturday)}
+                              {fmtDD_MM(week.monday)} &ndash; {fmtDD_MM(week.sunday)}
                             </span>
                             {meta.weekType && (
                               <Badge

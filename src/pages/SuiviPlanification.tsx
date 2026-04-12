@@ -11,25 +11,17 @@ import { cn } from "@/lib/utils";
 
 export default function SuiviPlanification() {
   const [, navigate] = useLocation();
+  const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
   const [activeTab, setActiveTab] = useState<"natation" | "musculation">("natation");
 
-  // Get profile for group_id
-  const { data: authUser } = useQuery({
-    queryKey: ["auth-user"],
-    queryFn: async () => {
-      const { data } = await (await import("@/lib/supabase")).supabase.auth.getUser();
-      return data.user;
-    },
-  });
-  const appUserId = (authUser?.app_metadata as Record<string, unknown>)?.app_user_id as
-    | number
-    | undefined;
-
-  const { data: profile } = useQuery({
-    queryKey: ["my-profile-group"],
-    queryFn: () => api.getProfile({ userId: appUserId }),
-    enabled: !!appUserId,
+  // Share the same cache key as SwimmerHome so the profile is already resolved
+  // when the user lands here from the home screen.
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["profile", user, userId],
+    queryFn: () => api.getProfile({ displayName: user, userId }),
+    enabled: !!user || !!userId,
+    staleTime: 5 * 60_000,
   });
   const groupId = profile?.group_id ?? null;
 
@@ -84,6 +76,16 @@ export default function SuiviPlanification() {
               embedded
               groupId={groupId}
             />
+          ) : profileLoading ? (
+            <div className="space-y-2 pl-8 relative">
+              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="rounded-xl border p-3 animate-pulse motion-reduce:animate-none">
+                  <div className="h-4 w-36 rounded bg-muted" />
+                  <div className="h-3 w-24 mt-2 rounded bg-muted" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="rounded-2xl border border-dashed bg-card/70 px-4 py-10 text-center">
               <Waves className="mx-auto h-10 w-10 text-muted-foreground/40" />

@@ -266,42 +266,12 @@ body {
   display: none;
 }
 
-/* Portrait-only lock overlay for mobile in landscape */
+/* Portrait lock overlay removed — modern mobile handles rotation natively,
+   and the previous CSS + screen.orientation.lock() combo was blocking users
+   on some PWA contexts even in portrait. The #portrait-lock-overlay element
+   in index.html is kept hidden below for legacy cached HTML. */
 #portrait-lock-overlay {
-  display: none;
-}
-
-@media (orientation: landscape) and (max-height: 500px) {
-  #portrait-lock-overlay {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 1rem;
-    background: hsl(0 0% 5% / 0.97);
-    color: white;
-    text-align: center;
-    padding: 2rem;
-  }
-  #portrait-lock-overlay .rotate-icon {
-    font-size: 3rem;
-    animation: rotate-nudge 1.5s ease-in-out infinite;
-  }
-  #portrait-lock-overlay p {
-    font-family: 'Inter', sans-serif;
-    font-size: 1rem;
-    font-weight: 500;
-    opacity: 0.9;
-  }
-}
-
-@keyframes rotate-nudge {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-20deg); }
-  75% { transform: rotate(20deg); }
+  display: none !important;
 }
 
 button, a, [role="button"], input, select, textarea {
