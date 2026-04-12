@@ -653,20 +653,27 @@ export default function SuiviSemaine() {
           assignmentType: r.assignment?.session_type ?? null,
           location: r.slotLocation,
         });
-        const fallbackAssignment = !r.assignment && kind === "swim"
+        // Le résolveur peut matcher une assignation dont le type diverge du
+        // slot (ex: une séance natation sur un créneau muscu de même horaire).
+        // On ignore l'assignation dans ce cas pour éviter d'afficher un titre
+        // de nage sur une carte muscu (et vice-versa).
+        const slotAssignment =
+          r.assignment && r.assignment.session_type === kind ? r.assignment : null;
+        const slotAssignmentId = slotAssignment ? r.assignmentId : null;
+        const fallbackAssignment = !slotAssignment && kind === "swim"
           ? findFallbackAssignmentForSlot(swimAssignments, { slotKey, userId, usedAssignmentIds })
           : undefined;
-        const plannedAssignment = r.assignment ?? fallbackAssignment;
-        if (r.assignmentId) {
-          usedAssignmentIds.add(r.assignmentId);
+        const plannedAssignment = slotAssignment ?? fallbackAssignment;
+        if (slotAssignmentId) {
+          usedAssignmentIds.add(slotAssignmentId);
         } else if (fallbackAssignment) {
           usedAssignmentIds.add(fallbackAssignment.id);
         }
         const swimSession = kind === "swim"
-          ? findSwimSession({ iso, slotKey, assignmentId: r.assignmentId ?? fallbackAssignment?.id })
+          ? findSwimSession({ iso, slotKey, assignmentId: slotAssignmentId ?? fallbackAssignment?.id })
           : undefined;
         const strengthRun = kind === "strength"
-          ? findStrengthRun({ iso, slotKey, assignmentId: r.assignmentId ?? undefined })
+          ? findStrengthRun({ iso, slotKey, assignmentId: slotAssignmentId ?? undefined })
           : undefined;
         const title = plannedAssignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement");
 
@@ -684,9 +691,9 @@ export default function SuiviSemaine() {
             session: swimSession,
             strengthRun,
             swimmerSlotId: r.swimmerSlotId,
-            assignmentId: r.assignmentId ?? fallbackAssignment?.id ?? undefined,
+            assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
             assignmentSource: plannedAssignment
-              ? (r.assignment ? r.source : (plannedAssignment.target_user_id === userId ? "individual" : "group"))
+              ? (slotAssignment ? r.source : (plannedAssignment.target_user_id === userId ? "individual" : "group"))
               : undefined,
           });
         } else if (!plannedAssignment) {
@@ -704,7 +711,7 @@ export default function SuiviSemaine() {
             km: null,
             absenceReason: absence.reason,
             swimmerSlotId: r.swimmerSlotId,
-            assignmentId: r.assignmentId ?? fallbackAssignment?.id ?? undefined,
+            assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
             assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
           });
         } else if (!isFuture(date)) {
@@ -719,7 +726,7 @@ export default function SuiviSemaine() {
             title,
             km: null,
             swimmerSlotId: r.swimmerSlotId,
-            assignmentId: r.assignmentId ?? fallbackAssignment?.id ?? undefined,
+            assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
             assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
           });
         }
