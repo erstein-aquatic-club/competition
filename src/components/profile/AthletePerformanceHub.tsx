@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -17,17 +17,25 @@ import SwimmerObjectivesView from "./SwimmerObjectivesView";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import {
   ArrowLeft,
+  Calendar,
   CalendarClock,
   CalendarRange,
   ChevronRight,
   Clock,
   ExternalLink,
+  Map as MapIcon,
   MapPin,
   MessageSquare,
   Sparkles,
   Target,
+  TrendingUp,
   Trophy,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const LazyProgressContent = lazy(() =>
+  import("@/pages/Progress").then((mod) => ({ default: mod.ProgressContent }))
+);
 
 interface Props {
   athleteId: number;
@@ -444,6 +452,17 @@ function AthleteSeasonPlanning({ athleteId }: { athleteId: number }) {
   );
 }
 
+/** Map legacy/new tab params to the 3-horizon tab values for standalone mode. */
+function resolveStandaloneTab(raw?: string): string {
+  if (!raw) return "semaine";
+  // Backward compatibility: old tab names map to new ones
+  if (raw === "ressentis") return "semaine";
+  if (raw === "entretiens" || raw === "planification" || raw === "objectifs" || raw === "saison") return "saison";
+  if (raw === "progression") return "progression";
+  if (raw === "semaine") return "semaine";
+  return "semaine";
+}
+
 export default function AthletePerformanceHub({
   athleteId,
   athleteName,
@@ -488,72 +507,133 @@ export default function AthletePerformanceHub({
       {/* Objectives always visible above tabs in standalone mode (Suivi page) */}
       {standalone && <SwimmerObjectivesView embedded />}
 
-      <Tabs defaultValue={defaultTab || (standalone ? "ressentis" : "objectifs")} className={standalone ? "space-y-3" : "space-y-4"}>
-        <TabsList className={`grid h-auto w-full gap-2 rounded-2xl bg-transparent p-0 ${standalone ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
-          {!standalone && (
+      {standalone ? (
+        /* ── 3-horizon tabs for swimmer-facing Suivi page ── */
+        <Tabs defaultValue={resolveStandaloneTab(defaultTab)} className="space-y-3">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-2 rounded-2xl bg-transparent p-0">
+            <TabsTrigger value="semaine" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
+              <Calendar className="hidden h-3.5 w-3.5 sm:block" />
+              <span>Semaine</span>
+            </TabsTrigger>
+            <TabsTrigger value="saison" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
+              <MapIcon className="hidden h-3.5 w-3.5 sm:block" />
+              <span>Saison</span>
+            </TabsTrigger>
+            <TabsTrigger value="progression" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
+              <TrendingUp className="hidden h-3.5 w-3.5 sm:block" />
+              <span>Progression</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Semaine = ancien Ressentis */}
+          <TabsContent value="semaine" className="mt-0">
+            <SwimmerFeedbackTab
+              athleteId={athleteId}
+              athleteName={athleteName}
+              showProgressAction={false}
+            />
+          </TabsContent>
+
+          {/* Saison = Entretiens + Planif empilés */}
+          <TabsContent value="saison" className="mt-0 space-y-6">
+            <AthleteInterviewsSection embedded />
+
+            <div className="border-t border-border" />
+
+            <div className="space-y-4">
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="w-full flex items-center gap-2 group">
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                    <h2 className="text-sm font-semibold">Créneaux</h2>
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <AthleteSlots athleteId={athleteId} />
+                </CollapsibleContent>
+              </Collapsible>
+
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CalendarRange className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">Cycle</h2>
+                </div>
+                <AthleteSeasonPlanning athleteId={athleteId} />
+              </section>
+            </div>
+          </TabsContent>
+
+          {/* Progression = Progress page content embedded */}
+          <TabsContent value="progression" className="mt-0">
+            <Suspense fallback={<div className="space-y-4"><Skeleton className="h-12 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>}>
+              <LazyProgressContent />
+            </Suspense>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        /* ── Original 4-tab layout for coach-facing usage ── */
+        <Tabs defaultValue={defaultTab || "objectifs"} className="space-y-4">
+          <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-4 gap-2 rounded-2xl bg-transparent p-0">
             <TabsTrigger value="objectifs" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
               <Target className="hidden h-3.5 w-3.5 sm:block" />
               <span className="sm:hidden">Plan d&apos;action</span>
               <span className="hidden sm:inline">Plan d'action</span>
             </TabsTrigger>
-          )}
-          <TabsTrigger value="ressentis" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
-            <Clock className="hidden h-3.5 w-3.5 sm:block" />
-            <span className="sm:hidden">Ressentis</span>
-            <span className="hidden sm:inline">Ressentis</span>
-          </TabsTrigger>
-          <TabsTrigger value="entretiens" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
-            <MessageSquare className="hidden h-3.5 w-3.5 sm:block" />
-            <span className="sm:hidden">Entretiens</span>
-            <span className="hidden sm:inline">Entretiens</span>
-          </TabsTrigger>
-          <TabsTrigger value="planification" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
-            <CalendarRange className="hidden h-3.5 w-3.5 sm:block" />
-            <span>Planif.</span>
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="ressentis" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
+              <Clock className="hidden h-3.5 w-3.5 sm:block" />
+              <span>Ressentis</span>
+            </TabsTrigger>
+            <TabsTrigger value="entretiens" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
+              <MessageSquare className="hidden h-3.5 w-3.5 sm:block" />
+              <span>Entretiens</span>
+            </TabsTrigger>
+            <TabsTrigger value="planification" className="gap-1 rounded-2xl border border-border bg-card px-3 py-2.5 text-xs data-[state=active]:border-primary/30 data-[state=active]:bg-primary/5 data-[state=active]:text-primary">
+              <CalendarRange className="hidden h-3.5 w-3.5 sm:block" />
+              <span>Planif.</span>
+            </TabsTrigger>
+          </TabsList>
 
-        {!standalone && (
           <TabsContent value="objectifs" className="mt-0">
             <SwimmerObjectivesView embedded />
           </TabsContent>
-        )}
 
-        <TabsContent value="ressentis" className="mt-0">
-          <SwimmerFeedbackTab
-            athleteId={athleteId}
-            athleteName={athleteName}
-            showProgressAction={false}
-          />
-        </TabsContent>
+          <TabsContent value="ressentis" className="mt-0">
+            <SwimmerFeedbackTab
+              athleteId={athleteId}
+              athleteName={athleteName}
+              showProgressAction={false}
+            />
+          </TabsContent>
 
-        <TabsContent value="entretiens" className="mt-0">
-          <AthleteInterviewsSection embedded />
-        </TabsContent>
+          <TabsContent value="entretiens" className="mt-0">
+            <AthleteInterviewsSection embedded />
+          </TabsContent>
 
-        <TabsContent value="planification" className="mt-0 space-y-4">
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center gap-2 group">
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">Créneaux</h2>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <AthleteSlots athleteId={athleteId} />
-            </CollapsibleContent>
-          </Collapsible>
+          <TabsContent value="planification" className="mt-0 space-y-4">
+            <Collapsible defaultOpen>
+              <CollapsibleTrigger asChild>
+                <button type="button" className="w-full flex items-center gap-2 group">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">Créneaux</h2>
+                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <AthleteSlots athleteId={athleteId} />
+              </CollapsibleContent>
+            </Collapsible>
 
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <CalendarRange className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Cycle</h2>
-            </div>
-            <AthleteSeasonPlanning athleteId={athleteId} />
-          </section>
-        </TabsContent>
-      </Tabs>
+            <section className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarRange className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Cycle</h2>
+              </div>
+              <AthleteSeasonPlanning athleteId={athleteId} />
+            </section>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

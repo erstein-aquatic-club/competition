@@ -157,7 +157,16 @@ const PERIOD_OPTIONS = [
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+/** Headless version for embedding inside other pages (no PageHeader). */
+export function ProgressContent() {
+  return <ProgressInner embedded />;
+}
+
 export default function Progress() {
+  return <ProgressInner />;
+}
+
+function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
   const role = useAuth((s) => s.role);
@@ -532,13 +541,8 @@ export default function Progress() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  return (
-    <div className="space-y-4 pb-4">
-      <PageHeader
-        title="Analyse"
-        icon={<BarChart3 className="h-3.5 w-3.5" />}
-      />
-
+  const content = (
+    <>
       {/* ── Prochaine compétition ────────────────────────────────────── */}
       <InlineBanner
         variant="amber"
@@ -891,6 +895,20 @@ export default function Progress() {
           </CollapsibleSection>
         </TabsContent>
       </Tabs>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{content}</div>;
+  }
+
+  return (
+    <div className="space-y-4 pb-4">
+      <PageHeader
+        title="Analyse"
+        icon={<BarChart3 className="h-3.5 w-3.5" />}
+      />
+      {content}
     </div>
   );
 }

@@ -10,7 +10,7 @@ function readTabFromHash(): string | undefined {
   if (typeof window === "undefined") return undefined;
   const hash = window.location.hash;
   const match = hash.match(/[?&]tab=([^&]+)/);
-  return match?.[1] || undefined;
+  return match?.[1] || undefined; // resolveStandaloneTab handles mapping inside the hub
 }
 
 export default function Suivi() {
