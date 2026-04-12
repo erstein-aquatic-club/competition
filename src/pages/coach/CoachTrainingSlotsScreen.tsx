@@ -2049,7 +2049,7 @@ const CoachTrainingSlotsScreen = ({
           const start = isModified && ov?.new_start_time ? ov.new_start_time : slot.start_time;
           const end = isModified && ov?.new_end_time ? ov.new_end_time : slot.end_time;
           const location = isModified && ov?.new_location ? ov.new_location : slot.location;
-          const coachesLabel = (slot.coaches ?? []).map((c) => c.coach_name).join(", ") || "Coach non défini";
+          const coachesLabel = (slot.coaches ?? []).map((c) => c.coach_name).join(", ") || "Non défini";
           return {
             start,
             end,
@@ -2225,7 +2225,7 @@ const CoachTrainingSlotsScreen = ({
         ctx.fill();
 
         const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
-        const coachLine = truncate(`Coach: ${s.coachesLabel}`, cardW - 22, "600 12px Inter, sans-serif");
+        const coachLine = truncate(s.coachesLabel, cardW - 22, "600 12px Inter, sans-serif");
         const locationLine = truncate(`Lieu: ${s.location}`, cardW - 22, "500 11.5px Inter, sans-serif");
 
         ctx.fillStyle = fg;
