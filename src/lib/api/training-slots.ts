@@ -100,6 +100,11 @@ export async function getTrainingSlotsForGroup(groupId: number): Promise<Trainin
 export async function createTrainingSlot(input: TrainingSlotInput): Promise<TrainingSlot> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
 
+  // Ownership required by RLS (00102): created_by must match app_user_id
+  const { data: { session } } = await supabase.auth.getSession();
+  const appUserId = session?.user?.app_metadata?.app_user_id as number | undefined;
+  if (!appUserId) throw new Error("User ID not found");
+
   const { data: slot, error: slotErr } = await supabase
     .from("training_slots")
     .insert({
@@ -110,6 +115,7 @@ export async function createTrainingSlot(input: TrainingSlotInput): Promise<Trai
       session_type: input.session_type,
       lane_count: input.lane_count,
       scheduled_date: input.scheduled_date ?? null,
+      created_by: appUserId,
     })
     .select()
     .single();
