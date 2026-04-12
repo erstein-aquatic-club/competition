@@ -369,7 +369,6 @@ export default function CoachSlotCalendar({
         scale: 2,
         useCORS: true,
         logging: false,
-        foreignObjectRendering: true,
         onclone,
       });
 
