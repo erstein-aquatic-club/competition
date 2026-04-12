@@ -608,7 +608,16 @@ export default function SuiviSemaine() {
             continue;
           }
 
-          if (!plannedAssignment) continue;
+          // Créneau muscu sans assignation : on rend quand même pour
+          // garder le slot visible dans la semaine.
+          const shouldRenderWithoutAssignment = !plannedAssignment && kind === "strength";
+          if (!plannedAssignment && !shouldRenderWithoutAssignment) continue;
+
+          const fallbackTitle = plannedAssignment?.title
+            ?? (kind === "strength" ? "Seance musculation" : "Entrainement");
+          const assignmentSource: "individual" | "group" = plannedAssignment
+            ? (plannedAssignment.target_user_id === userId ? "individual" : "group")
+            : "group";
 
           if (absence) {
             result.push({
@@ -619,12 +628,12 @@ export default function SuiviSemaine() {
               slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: plannedAssignment.title,
+              title: fallbackTitle,
               km: null,
               absenceReason: absence.reason,
               swimmerSlotId: slot.id,
-              assignmentId: plannedAssignment.id,
-              assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
+              assignmentId: plannedAssignment?.id,
+              assignmentSource,
             });
           } else if (!isFuture(date)) {
             result.push({
@@ -635,11 +644,11 @@ export default function SuiviSemaine() {
               slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: plannedAssignment.title,
+              title: fallbackTitle,
               km: null,
               swimmerSlotId: slot.id,
-              assignmentId: plannedAssignment.id,
-              assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
+              assignmentId: plannedAssignment?.id,
+              assignmentSource,
             });
           }
         }
@@ -696,39 +705,52 @@ export default function SuiviSemaine() {
               ? (slotAssignment ? r.source : (plannedAssignment.target_user_id === userId ? "individual" : "group"))
               : undefined,
           });
-        } else if (!plannedAssignment) {
-          continue;
-        } else if (absence) {
-          result.push({
-            type: "absent",
-            kind,
-            date,
-            iso,
-            slotKey,
-            slotTime: r.slotTime,
-            slotLocation: r.slotLocation,
-            title,
-            km: null,
-            absenceReason: absence.reason,
-            swimmerSlotId: r.swimmerSlotId,
-            assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
-            assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
-          });
-        } else if (!isFuture(date)) {
-          result.push({
-            type: "missed",
-            kind,
-            date,
-            iso,
-            slotKey,
-            slotTime: r.slotTime,
-            slotLocation: r.slotLocation,
-            title,
-            km: null,
-            swimmerSlotId: r.swimmerSlotId,
-            assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
-            assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
-          });
+        } else {
+          // Pour un créneau muscu sans assignation dédiée, on ne veut pas
+          // perdre le créneau — le slot est un engagement en soi, on rend
+          // quand même la carte missed/absent avec le titre fallback.
+          // Pour la natation, on garde l'ancien comportement (besoin d'une
+          // assignation pour éviter d'inonder la vue de créneaux vides).
+          const shouldRenderWithoutAssignment =
+            !plannedAssignment && kind === "strength";
+          if (!plannedAssignment && !shouldRenderWithoutAssignment) {
+            continue;
+          }
+          const assignmentSource: "individual" | "group" = plannedAssignment
+            ? (plannedAssignment.target_user_id === userId ? "individual" : "group")
+            : "group";
+          if (absence) {
+            result.push({
+              type: "absent",
+              kind,
+              date,
+              iso,
+              slotKey,
+              slotTime: r.slotTime,
+              slotLocation: r.slotLocation,
+              title,
+              km: null,
+              absenceReason: absence.reason,
+              swimmerSlotId: r.swimmerSlotId,
+              assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
+              assignmentSource,
+            });
+          } else if (!isFuture(date)) {
+            result.push({
+              type: "missed",
+              kind,
+              date,
+              iso,
+              slotKey,
+              slotTime: r.slotTime,
+              slotLocation: r.slotLocation,
+              title,
+              km: null,
+              swimmerSlotId: r.swimmerSlotId,
+              assignmentId: slotAssignmentId ?? fallbackAssignment?.id ?? undefined,
+              assignmentSource,
+            });
+          }
         }
       }
     }
