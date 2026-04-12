@@ -266,19 +266,19 @@ export default function SlotSessionSheet({
     onManageOverride(instance);
   };
 
-  // ── Guard ────────────────────────────────────────────────
-  if (!instance) return null;
-
-  const { state, slot, assignment, override, groups } = instance;
-  const cfg = STATE_CONFIG[state];
-  const sessionDisabled = state === "cancelled";
-
   const handleSheetOpenChange = useCallback((isOpen: boolean) => {
     if (!isOpen) {
       setPreviewOpen(false);
     }
     onOpenChange(isOpen);
   }, [onOpenChange]);
+
+  // ── Guard ────────────────────────────────────────────────
+  if (!instance) return null;
+
+  const { state, slot, assignment, override, groups } = instance;
+  const cfg = STATE_CONFIG[state];
+  const sessionDisabled = state === "cancelled";
 
   return (
     <>
