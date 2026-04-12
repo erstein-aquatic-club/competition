@@ -2152,6 +2152,37 @@ const CoachTrainingSlotsScreen = ({
       ctx.restore();
     };
 
+    const drawStopSignIcon = (x: number, y: number, size: number) => {
+      const cx = x + size / 2;
+      const cy = y + size / 2;
+      const r = size * 0.46;
+
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i < 8; i += 1) {
+        const angle = (-Math.PI / 2) + i * (Math.PI / 4);
+        const px = cx + r * Math.cos(angle);
+        const py = cy + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = "#dc2626";
+      ctx.fill();
+      ctx.lineWidth = Math.max(1.8, size * 0.08);
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `700 ${Math.max(7, Math.round(size * 0.24))}px Inter, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("STOP", cx, cy + 0.5);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.restore();
+    };
+
     const gridX = padX + leftAxisWidth;
     const gridY = padY + headerTitleH + daysHeaderH;
     const gridW = width - padX - gridX;
@@ -2271,28 +2302,51 @@ const CoachTrainingSlotsScreen = ({
         const coachLine = truncate(s.coachesLabel, textMaxWidth, "600 21px Inter, sans-serif");
         const locationLine = truncate(`Lieu: ${s.location}`, textMaxWidth, "500 19px Inter, sans-serif");
 
+        const textX = cardX + 12;
+        const timeY = cardY + 36;
+        const coachY = cardY + 76;
+        const locY = cardY + 109;
+
         ctx.fillStyle = fg;
         ctx.font = "700 28px Inter, sans-serif";
-        ctx.fillText(timeLine, cardX + 12, cardY + 36);
+        ctx.fillText(timeLine, textX, timeY);
         ctx.font = "600 21px Inter, sans-serif";
-        ctx.fillText(coachLine, cardX + 12, cardY + 76);
+        ctx.fillText(coachLine, textX, coachY);
         ctx.fillStyle = s.isCancelled ? "#94a3b8" : "#64748b";
         ctx.font = "500 19px Inter, sans-serif";
-        ctx.fillText(locationLine, cardX + 12, cardY + 109);
+        ctx.fillText(locationLine, textX, locY);
 
-        const iconSize = 24;
+        const iconSize = 28;
         const iconX = cardX + cardW - iconSize - 10;
         const iconY = cardY + cardH - iconSize - 10;
-        const iconColor = s.isCancelled ? "#94a3b8" : s.swim ? "#2563eb" : "#b45309";
-        if (s.swim) drawWavesIcon(iconX, iconY, iconSize, iconColor);
-        else drawDumbbellIcon(iconX, iconY, iconSize, iconColor);
+        const iconColor = s.swim ? "#2563eb" : "#b45309";
+        if (s.isCancelled) {
+          drawStopSignIcon(iconX, iconY, iconSize);
+        } else if (s.swim) {
+          drawWavesIcon(iconX, iconY, iconSize, iconColor);
+        } else {
+          drawDumbbellIcon(iconX, iconY, iconSize, iconColor);
+        }
 
         if (s.isCancelled) {
+          const strikeX1 = textX;
+          const strikeX2 = cardX + cardW - iconSize - 16;
           ctx.strokeStyle = "#6b7280";
-          ctx.lineWidth = 1.3;
+          ctx.lineWidth = 2;
+
           ctx.beginPath();
-          ctx.moveTo(cardX + 12, cardY + 41);
-          ctx.lineTo(cardX + cardW - 10, cardY + 41);
+          ctx.moveTo(strikeX1, timeY - 6);
+          ctx.lineTo(strikeX2, timeY - 6);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(strikeX1, coachY - 6);
+          ctx.lineTo(strikeX2, coachY - 6);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(strikeX1, locY - 6);
+          ctx.lineTo(strikeX2, locY - 6);
           ctx.stroke();
         }
       }
