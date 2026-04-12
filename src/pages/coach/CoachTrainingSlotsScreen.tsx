@@ -1863,6 +1863,7 @@ const CoachTrainingSlotsScreen = ({
 
   // Measure available viewport height below the timeline container
   const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const exportContentRef = useRef<HTMLDivElement>(null);
   const [availableHeight, setAvailableHeight] = useState(0);
 
   useEffect(() => {
