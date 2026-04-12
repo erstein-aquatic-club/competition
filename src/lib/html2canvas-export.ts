@@ -47,6 +47,7 @@ function snapshotComputedStyle(node: HTMLElement, resolver: HTMLElement): StyleS
 }
 
 function applyComputedStyle(node: HTMLElement, snapshot: StyleSnapshot): void {
+  node.style.cssText = "";
   for (const [property, value] of snapshot) {
     node.style.setProperty(property, value);
   }
@@ -97,6 +98,7 @@ export function buildHtml2CanvasOnClone(
     ];
     const count = Math.min(clonedNodes.length, snapshots.length);
     for (let i = 0; i < count; i += 1) {
+      clonedNodes[i].removeAttribute("class");
       applyComputedStyle(clonedNodes[i], snapshots[i]);
     }
 
