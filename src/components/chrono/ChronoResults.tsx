@@ -4,9 +4,21 @@ import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap } from "../../hooks/useChronoTimer";
 import { WAVE_COLORS } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
-import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../../components/ui/alert-dialog";
+import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
+import { STORAGE_KEYS } from "../../lib/api/client";
 import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
 import type { SwimExerciseLogInput, ChronoRecordInput } from "../../lib/api/types";
 import { createChronoRecord } from "../../lib/api/chrono-records";
@@ -25,6 +37,7 @@ interface ChronoResultsProps {
   dispatch: React.Dispatch<ChronoAction>;
   onExportComplete?: () => void;
   onSaveDraft?: () => void;
+  onDiscard?: () => void;
 }
 
 type ExportStatus = "pending" | "sent" | "error";
@@ -101,7 +114,7 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
   return bestIdx;
 }
 
-export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft }: ChronoResultsProps) {
+export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft, onDiscard }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -342,6 +355,40 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
           })}
         </div>
       ))}
+
+      {/* ── Discard button ── */}
+      <div className="flex justify-center pt-2 pb-4">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5" disabled={exporting}>
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer ces résultats ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Les chronos seront perdus définitivement.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  localStorage.removeItem(STORAGE_KEYS.CHRONO_BACKUP);
+                  dispatch({ type: "RESET_FOR_NEW_SERIES" });
+                  onDiscard?.();
+                  toast("Résultats supprimés", { duration: 2000 });
+                }}
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
