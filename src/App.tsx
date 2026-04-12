@@ -74,18 +74,15 @@ function useVersionCheck() {
       } catch { /* offline or fetch error — ignore */ }
     };
 
-    // Check on mount + periodically + on visibility change
-    const timeout = setTimeout(checkVersion, 5_000); // 5s after app load
+    // Check on mount (5s delay) + periodically every 30 min.
+    // Do NOT check on visibilitychange: it causes window.location.reload()
+    // every time the app returns from background, resulting in a blank page.
+    const timeout = setTimeout(checkVersion, 5_000);
     const interval = setInterval(checkVersion, VERSION_CHECK_INTERVAL_MS);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') checkVersion();
-    };
-    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 }
