@@ -31,7 +31,6 @@ import {
   BarChart3,
   MessageCircle,
   MapPin,
-  Calendar,
   ChevronRight,
   Coffee,
 } from "lucide-react";
@@ -440,14 +439,14 @@ export default function SwimmerHome() {
   // ── Section F: Quick access links ────────────────────────────
   const quickLinks = useMemo(
     () => [
-      { icon: Trophy, label: "Records", href: "/records", color: "text-amber-500 bg-amber-500/10" },
-      { icon: Crown, label: "Club", href: "/hall-of-fame", color: "text-yellow-600 bg-yellow-500/10" },
-      { icon: FileText, label: "Notes", href: "/swim-notes", color: "text-blue-500 bg-blue-500/10" },
+      { icon: Trophy, label: "Records", href: "/records", color: "text-amber-600 dark:text-amber-400 bg-amber-500/12 dark:bg-amber-500/20" },
+      { icon: Crown, label: "Club", href: "/hall-of-fame", color: "text-yellow-600 dark:text-yellow-400 bg-yellow-500/12 dark:bg-yellow-500/20" },
+      { icon: FileText, label: "Notes", href: "/swim-notes", color: "text-blue-600 dark:text-blue-400 bg-blue-500/12 dark:bg-blue-500/20" },
       {
         icon: BarChart3,
         label: "Rapport",
         href: `/report/${userId}/${format(new Date(), "yyyy-MM")}`,
-        color: "text-emerald-500 bg-emerald-500/10",
+        color: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/12 dark:bg-emerald-500/20",
       },
     ],
     [userId],
@@ -457,15 +456,17 @@ export default function SwimmerHome() {
   return (
     <div className="mx-auto max-w-lg px-4 pb-24">
       {/* Section A — Header */}
-      <div className="flex items-center justify-between pt-4 pb-3">
+      <div className="flex items-center justify-between pt-5 pb-4">
         <div>
-          <h1 className="text-xl font-semibold">Bonjour {firstName}</h1>
-          <p className="text-sm text-muted-foreground capitalize">{today}</p>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Bonjour <span className="font-bold">{firstName}</span>
+          </h1>
+          <p className="text-[13px] text-muted-foreground/80 capitalize mt-0.5">{today}</p>
         </div>
         <button onClick={() => navigate("/profile")} className="shrink-0">
-          <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+          <Avatar className="h-9 w-9 ring-2 ring-primary/25 shadow-md shadow-primary/10">
             <AvatarImage src={profile?.avatar_url ?? undefined} />
-            <AvatarFallback className="text-xs">
+            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
               {firstName?.[0]?.toUpperCase() ?? "?"}
             </AvatarFallback>
           </Avatar>
@@ -473,7 +474,7 @@ export default function SwimmerHome() {
       </div>
 
       <motion.div
-        className="space-y-4"
+        className="space-y-5"
         initial="hidden"
         animate="visible"
         variants={staggerChildren}
@@ -510,14 +511,14 @@ export default function SwimmerHome() {
             Aujourd'hui
           </p>
           {todaySessions.length === 0 ? (
-            <Card className="p-4">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
-                  <Coffee className="h-5 w-5" />
+            <Card className="p-4 bg-gradient-to-br from-sky-50/50 to-blue-50/30 dark:from-sky-950/20 dark:to-blue-950/10 border-sky-100/60 dark:border-sky-900/30">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100/80 dark:bg-sky-900/30">
+                  <Coffee className="h-5 w-5 text-sky-600 dark:text-sky-400" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">Jour de repos</p>
-                  <p className="text-xs">Aucune séance prévue aujourd'hui</p>
+                  <p className="text-xs text-muted-foreground/70">Profite bien de ta journée</p>
                 </div>
               </div>
             </Card>
@@ -531,18 +532,20 @@ export default function SwimmerHome() {
                 return (
                   <Card
                     key={session.id}
-                    className="p-3 cursor-pointer transition-colors hover:bg-accent/50 active:scale-[0.99]"
+                    className={`relative overflow-hidden p-3 cursor-pointer transition-all hover:bg-accent/50 active:scale-[0.98] ${
+                      session.isMuscu
+                        ? "border-l-[3px] border-l-amber-500"
+                        : "border-l-[3px] border-l-primary"
+                    }`}
                     onClick={() => {
                       if (session.isMuscu) {
                         navigate("/strength");
                       } else {
-                        // Navigate to Natation calendar which opens the FeedbackDrawer
                         navigate("/natation");
                       }
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      {/* Left: type + slot icon */}
                       <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                           session.isMuscu
@@ -557,38 +560,42 @@ export default function SwimmerHome() {
                         />
                       </div>
 
-                      {/* Center: info */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <SlotIcon className="h-3 w-3 text-muted-foreground" />
+                          <SlotIcon className="h-3 w-3 text-muted-foreground/70" />
                           <span className="text-xs text-muted-foreground font-medium">
                             {session.slotKey === "AM" ? "Matin" : "Soir"}
                             {session.slotTime && ` · ${session.slotTime}`}
                           </span>
                         </div>
-                        <p className="text-sm font-medium truncate mt-0.5">
+                        <p className="text-sm font-semibold truncate mt-0.5">
                           {session.isEmpty ? "Entraînement libre" : session.title}
                         </p>
                         {session.km != null && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             {fmtKm(session.km)} km
                           </p>
                         )}
                       </div>
 
-                      {/* Right: status */}
                       <div className="shrink-0">
                         {logged ? (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15">
-                            <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          <div className="flex h-7 items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5">
+                            <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                              Fait
+                            </span>
                           </div>
                         ) : session.isMuscu ? (
-                          <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg">
-                            Démarrer
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2.5 py-1 rounded-full">
+                            Lancer
                           </span>
                         ) : (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500/15">
-                            <Clock className="h-4 w-4 text-orange-500" />
+                          <div className="flex h-7 items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5">
+                            <Clock className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
+                            <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+                              A faire
+                            </span>
                           </div>
                         )}
                       </div>
@@ -607,29 +614,29 @@ export default function SwimmerHome() {
               Prochaine compétition
             </p>
             <Card
-              className="p-4 cursor-pointer transition-colors hover:bg-accent/50 active:scale-[0.99] border-amber-200/50 dark:border-amber-800/30"
+              className="p-4 cursor-pointer transition-all hover:bg-amber-50/40 dark:hover:bg-amber-950/20 active:scale-[0.98] border-amber-200/60 dark:border-amber-800/40 bg-gradient-to-br from-amber-50/40 to-orange-50/20 dark:from-amber-950/15 dark:to-orange-950/10"
               onClick={() => navigate(`/competition/${nextCompetition.id}`)}
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                  <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 dark:bg-amber-500/20">
+                  <Trophy className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <span className="absolute -top-1.5 -right-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-500 text-[11px] font-extrabold text-white px-1 shadow-sm">
+                    {nextCompetition.daysUntil === 0 ? "J" : `J-${nextCompetition.daysUntil}`}
+                  </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold truncate">{nextCompetition.name}</p>
-                    <span className="shrink-0 text-xs font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">
-                      J-{nextCompetition.daysUntil}
-                    </span>
-                  </div>
+                  <p className="text-sm font-bold truncate text-amber-950 dark:text-amber-100">
+                    {nextCompetition.name}
+                  </p>
                   {nextCompetition.location && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground truncate">
+                      <MapPin className="h-3 w-3 text-amber-600/60 dark:text-amber-400/60" />
+                      <span className="text-xs text-amber-800/70 dark:text-amber-300/60 truncate">
                         {nextCompetition.location}
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-amber-700/70 dark:text-amber-400/60">
                     {compRaces && compRaces.length > 0 && (
                       <span>{compRaces.length} course{compRaces.length > 1 ? "s" : ""}</span>
                     )}
@@ -640,7 +647,7 @@ export default function SwimmerHome() {
                     )}
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+                <ChevronRight className="h-4 w-4 text-amber-400 dark:text-amber-500 mt-1 shrink-0" />
               </div>
             </Card>
           </motion.div>
@@ -653,30 +660,28 @@ export default function SwimmerHome() {
               Messages
             </p>
             <Card
-              className="p-4 cursor-pointer transition-colors hover:bg-violet-50/50 dark:hover:bg-violet-950/20 active:scale-[0.99] border-violet-200/50 dark:border-violet-800/30 bg-violet-50/30 dark:bg-violet-950/10"
+              className="p-4 cursor-pointer transition-all hover:bg-violet-50/60 dark:hover:bg-violet-950/30 active:scale-[0.98] border-violet-200/60 dark:border-violet-800/40 bg-gradient-to-br from-violet-50/50 to-purple-50/30 dark:from-violet-950/20 dark:to-purple-950/10"
               onClick={() => navigate("/profile?section=messages")}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 dark:bg-violet-500/20">
                   <MessageCircle className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white px-1 shadow-sm">
+                    {unreadCount}
+                  </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                      {unreadCount} nouveau{unreadCount > 1 ? "x" : ""}
-                    </p>
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white px-1.5">
-                      {unreadCount}
-                    </span>
-                  </div>
+                  <p className="text-sm font-bold text-violet-900 dark:text-violet-200">
+                    {unreadCount} message{unreadCount > 1 ? "s" : ""} non lu{unreadCount > 1 ? "s" : ""}
+                  </p>
                   {latestUnread && (
-                    <p className="text-xs text-violet-700/70 dark:text-violet-300/60 truncate mt-0.5">
+                    <p className="text-xs text-violet-700/60 dark:text-violet-300/50 truncate mt-0.5">
                       {latestUnread.title}
                       {latestUnread.message ? ` — ${latestUnread.message}` : ""}
                     </p>
                   )}
                 </div>
-                <ChevronRight className="h-4 w-4 text-violet-400 shrink-0" />
+                <ChevronRight className="h-4 w-4 text-violet-400 dark:text-violet-500 shrink-0" />
               </div>
             </Card>
           </motion.div>
@@ -687,17 +692,17 @@ export default function SwimmerHome() {
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-2">
             Accès rapides
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2.5">
             {quickLinks.map((link) => (
               <button
                 key={link.href}
                 onClick={() => navigate(link.href)}
-                className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-accent/50 active:scale-95"
+                className="flex flex-col items-center gap-2 rounded-2xl border border-border/80 bg-card p-3.5 transition-all hover:bg-accent/50 hover:shadow-sm active:scale-95"
               >
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${link.color}`}>
-                  <link.icon className="h-5 w-5" />
+                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${link.color}`}>
+                  <link.icon className="h-[22px] w-[22px]" />
                 </div>
-                <span className="text-[11px] font-medium text-muted-foreground">
+                <span className="text-[11px] font-semibold text-muted-foreground">
                   {link.label}
                 </span>
               </button>
