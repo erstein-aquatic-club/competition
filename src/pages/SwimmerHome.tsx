@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { filterVisibleNotifications, readDismissedNotificationTargetIds } from "@/lib/notificationsVisibility";
 import type { Competition, Session } from "@/lib/api";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -461,8 +462,9 @@ export default function SwimmerHome() {
 
   const unreadNotifications = useMemo(() => {
     const notifs = notificationsResult?.notifications ?? [];
-    return notifs.filter((n) => !n.read);
-  }, [notificationsResult]);
+    const dismissedTargetIds = readDismissedNotificationTargetIds(userId ?? 0);
+    return filterVisibleNotifications(notifs, dismissedTargetIds).filter((n) => !n.read);
+  }, [notificationsResult, userId]);
 
   const unreadCount = unreadNotifications.length;
   const latestUnread = unreadNotifications[0] ?? null;

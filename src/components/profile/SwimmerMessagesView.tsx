@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Notification } from "@/lib/api";
+import {
+  filterVisibleNotifications,
+  getDismissedUnreadTargetIds,
+  persistDismissedNotificationTargetIds,
+  readDismissedNotificationTargetIds,
+} from "@/lib/notificationsVisibility";
 import { resolveNotificationActionLabel, resolveNotificationHref } from "@/lib/notificationRouting";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +20,6 @@ type Props = {
   onBack: () => void;
   onOpenProfileSection: (section: "home" | "messages") => void;
 };
-
-const getDismissedStorageKey = (userId: number) => `profile-notifications-dismissed:${userId}`;
 
 function formatNotificationDate(value: string) {
   const date = new Date(value);
@@ -32,23 +35,14 @@ function formatNotificationDate(value: string) {
 export default function SwimmerMessagesView({
   userId,
   onBack,
-  onOpenProfileSection,
+  onOpenProfileSection: _onOpenProfileSection,
 }: Props) {
-  const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const syncedDismissedUnreadIdsRef = useRef<Set<number>>(new Set());
   const [selectedTargetId, setSelectedTargetId] = useState<number | null>(null);
   const [dismissedTargetIds, setDismissedTargetIds] = useState<number[]>(() => {
-    if (typeof window === "undefined" || userId <= 0) return [];
-    try {
-      const raw = window.localStorage.getItem(getDismissedStorageKey(userId));
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed)
-        ? parsed.map((value) => Number(value)).filter((value) => Number.isFinite(value))
-        : [];
-    } catch {
-      return [];
-    }
+    return readDismissedNotificationTargetIds(userId);
   });
 
   const { data, isLoading } = useQuery({
@@ -61,18 +55,22 @@ export default function SwimmerMessagesView({
     enabled: userId > 0,
   });
 
+  const allNotifications = data?.notifications ?? [];
+
   const notifications = useMemo(
-    () =>
-      (data?.notifications ?? []).filter(
-        (notification) =>
-          notification.target_id == null || !dismissedTargetIds.includes(notification.target_id),
-      ),
-    [data?.notifications, dismissedTargetIds],
+    () => filterVisibleNotifications(allNotifications, dismissedTargetIds),
+    [allNotifications, dismissedTargetIds],
+  );
+
+  const hiddenNotificationCount = Math.max(allNotifications.length - notifications.length, 0);
+
+  const dismissedUnreadTargetIds = useMemo(
+    () => getDismissedUnreadTargetIds(allNotifications, dismissedTargetIds),
+    [allNotifications, dismissedTargetIds],
   );
 
   useEffect(() => {
-    if (typeof window === "undefined" || userId <= 0) return;
-    window.localStorage.setItem(getDismissedStorageKey(userId), JSON.stringify(dismissedTargetIds));
+    persistDismissedNotificationTargetIds(userId, dismissedTargetIds);
   }, [dismissedTargetIds, userId]);
 
   useEffect(() => {
@@ -84,8 +82,29 @@ export default function SwimmerMessagesView({
       current && notifications.some((notification) => notification.target_id === current)
         ? current
         : notifications.find((notification) => !notification.read)?.target_id ?? notifications[0].target_id ?? null,
-    );
+      );
   }, [notifications]);
+
+  useEffect(() => {
+    if (dismissedUnreadTargetIds.length === 0) return;
+
+    const unsyncedIds = dismissedUnreadTargetIds.filter(
+      (targetId) => !syncedDismissedUnreadIdsRef.current.has(targetId),
+    );
+
+    if (unsyncedIds.length === 0) return;
+
+    unsyncedIds.forEach((targetId) => syncedDismissedUnreadIdsRef.current.add(targetId));
+
+    Promise.all(unsyncedIds.map((targetId) => api.notifications_mark_read({ targetId })))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
+      })
+      .catch(() => {
+        unsyncedIds.forEach((targetId) => syncedDismissedUnreadIdsRef.current.delete(targetId));
+      });
+  }, [dismissedUnreadTargetIds, queryClient]);
 
   const selectedNotification = useMemo(
     () =>
@@ -161,6 +180,14 @@ export default function SwimmerMessagesView({
     });
   };
 
+  const handleRestoreHiddenNotifications = () => {
+    setDismissedTargetIds([]);
+    toast({
+      title: "Messages réaffichés",
+      description: "Les notifications masquées sur cet appareil sont de nouveau visibles.",
+    });
+  };
+
   return (
     <div className="space-y-5 pb-24">
       <div className="space-y-1">
@@ -204,11 +231,20 @@ export default function SwimmerMessagesView({
               <Inbox className="h-5 w-5 text-primary" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold">Aucun message pour le moment</p>
+              <p className="text-sm font-semibold">
+                {hiddenNotificationCount > 0 ? "Tous les messages sont masqués ici" : "Aucun message pour le moment"}
+              </p>
               <p className="text-sm text-muted-foreground">
-                Les notifications du coach et les rappels automatiques apparaîtront ici.
+                {hiddenNotificationCount > 0
+                  ? "La home n'affichera plus ces messages comme non lus. Vous pouvez les réafficher sur cet appareil si besoin."
+                  : "Les notifications du coach et les rappels automatiques apparaîtront ici."}
               </p>
             </div>
+            {hiddenNotificationCount > 0 ? (
+              <Button variant="outline" size="sm" onClick={handleRestoreHiddenNotifications}>
+                Réafficher les messages masqués
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
