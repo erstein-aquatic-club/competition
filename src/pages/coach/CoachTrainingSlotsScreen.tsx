@@ -2003,7 +2003,6 @@ const CoachTrainingSlotsScreen = ({
   }));
 
   // ── Export image ───────────────────────────────────────
-  const exportContentRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
 
   const shareOrDownloadPng = useCallback(async (blob: Blob, fileName: string) => {
@@ -2643,10 +2642,10 @@ const CoachTrainingSlotsScreen = ({
             />
           </div>
 
-          {/* ── Desktop timeline (viewport-fitted) ── */}
+          {/* ── Desktop timeline (viewport-fitted, breaks out of container for wider view) ── */}
           <div
             ref={timelineContainerRef}
-            className="hidden sm:block overflow-x-auto -mx-4 px-4"
+            className="hidden sm:block overflow-x-auto -mx-4 px-4 lg:w-[calc(100%+12rem)] lg:-ml-24 lg:px-6 xl:w-[calc(100%+20rem)] xl:-ml-40 xl:px-8"
           >
             <div
               className="grid"
