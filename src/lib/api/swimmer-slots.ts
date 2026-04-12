@@ -45,7 +45,7 @@ export async function initSwimmerSlots(
   // Fetch group's training slots with assignments
   const { data: assignments, error: assignErr } = await supabase
     .from("training_slot_assignments")
-    .select("id, slot_id, training_slots!inner(day_of_week, start_time, end_time, location, is_active)")
+    .select("id, slot_id, training_slots!inner(day_of_week, start_time, end_time, location, session_type, is_active)")
     .eq("group_id", groupId);
   if (assignErr) throw new Error(assignErr.message);
 
@@ -58,6 +58,7 @@ export async function initSwimmerSlots(
       start_time: a.training_slots.start_time,
       end_time: a.training_slots.end_time,
       location: a.training_slots.location,
+      session_type: a.training_slots.session_type ?? "swim",
       created_by: createdBy,
     }));
 
@@ -87,6 +88,7 @@ export async function createSwimmerSlot(
       start_time: input.start_time,
       end_time: input.end_time,
       location: input.location,
+      session_type: input.session_type,
       created_by: createdBy,
     })
     .select()
@@ -99,7 +101,7 @@ export async function createSwimmerSlot(
 
 export async function updateSwimmerSlot(
   slotId: string,
-  input: Partial<Pick<SwimmerTrainingSlotInput, "day_of_week" | "start_time" | "end_time" | "location">>,
+  input: Partial<Pick<SwimmerTrainingSlotInput, "day_of_week" | "start_time" | "end_time" | "location" | "session_type">>,
 ): Promise<SwimmerTrainingSlot> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data, error } = await supabase

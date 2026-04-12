@@ -657,6 +657,8 @@ export interface TrainingSlot {
   start_time: string;
   end_time: string;
   location: string;
+  /** Type de séance : natation ou musculation */
+  session_type: "swim" | "strength";
   is_active: boolean;
   created_by: number | null;
   created_at: string;
@@ -699,6 +701,7 @@ export interface TrainingSlotInput {
   start_time: string;
   end_time: string;
   location: string;
+  session_type: "swim" | "strength";
   lane_count: number | null;
   group_ids: number[];
   coach_ids: number[];
@@ -724,6 +727,7 @@ export interface SwimmerTrainingSlot {
   start_time: string;
   end_time: string;
   location: string;
+  session_type: "swim" | "strength";
   is_active: boolean;
   created_by: number | null;
   created_at: string;
@@ -736,6 +740,7 @@ export interface SwimmerTrainingSlotInput {
   start_time: string;
   end_time: string;
   location: string;
+  session_type: "swim" | "strength";
 }
 
 // ── Competition Prep (Races, Routines, Checklists) ─────────

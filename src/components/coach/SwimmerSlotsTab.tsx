@@ -39,10 +39,9 @@ function durationLabel(start: string, end: string): string {
   return `${h}h${String(m).padStart(2, "0")}`;
 }
 
-/** True if slot is a swimming session (vs PPG/muscu) based on location */
-function isSwimSlot(location: string): boolean {
-  const loc = location.toLowerCase();
-  return loc.includes("piscine") || loc.includes("bassin") || (!loc.includes("salle") && !loc.includes("muscu") && !loc.includes("ppg") && !loc.includes("gym"));
+/** True if slot is a swimming session (vs PPG/muscu) — based on explicit session_type */
+function isSwimSlot(slot: { session_type?: "swim" | "strength" | null }): boolean {
+  return (slot.session_type ?? "swim") === "swim";
 }
 
 type Props = {
@@ -319,7 +318,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
                   const endMin = timeToMinutes(slot.end_time) - stripRange.start * 60;
                   const topPct = Math.max(0, (startMin / stripTotalMin) * 100);
                   const heightPct = Math.max(8, ((endMin - startMin) / stripTotalMin) * 100);
-                  const swim = isSwimSlot(slot.location);
+                  const swim = isSwimSlot(slot);
 
                   return (
                     <div
@@ -383,7 +382,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
         ) : (
           <div className="space-y-2">
             {selectedDaySlots.map((s: any) => {
-              const swim = isSwimSlot(s.location);
+              const swim = isSwimSlot(s);
               return (
                 <button
                   key={s.id}
@@ -513,6 +512,47 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
   );
 }
 
+// ── Session type toggle (swim vs strength) ──────
+
+function SessionTypeToggle({
+  value,
+  onChange,
+}: {
+  value: "swim" | "strength";
+  onChange: (v: "swim" | "strength") => void;
+}) {
+  return (
+    <div>
+      <Label>Type de séance</Label>
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        {(
+          [
+            { id: "swim", label: "Natation", dot: "bg-blue-500" },
+            { id: "strength", label: "Musculation", dot: "bg-amber-400" },
+          ] as const
+        ).map((opt) => {
+          const active = value === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onChange(opt.id)}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${opt.dot}`} />
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Slot Edit Form (inline) ─────────────────────
 
 function SlotEditForm({
@@ -529,9 +569,11 @@ function SlotEditForm({
   const [startTime, setStartTime] = useState(slot.start_time.slice(0, 5));
   const [endTime, setEndTime] = useState(slot.end_time.slice(0, 5));
   const [location, setLocation] = useState(slot.location);
+  const [sessionType, setSessionType] = useState<"swim" | "strength">(slot.session_type ?? "swim");
 
   return (
     <div className="space-y-4 pt-4">
+      <SessionTypeToggle value={sessionType} onChange={setSessionType} />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Début</Label>
@@ -549,7 +591,7 @@ function SlotEditForm({
       <div className="flex gap-2">
         <Button
           className="flex-1"
-          onClick={() => onSave({ start_time: startTime, end_time: endTime, location })}
+          onClick={() => onSave({ start_time: startTime, end_time: endTime, location, session_type: sessionType })}
           disabled={isPending}
         >
           Enregistrer
@@ -575,9 +617,11 @@ function SlotAddForm({
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("10:00");
   const [location, setLocation] = useState("");
+  const [sessionType, setSessionType] = useState<"swim" | "strength">("swim");
 
   return (
     <div className="space-y-4 pt-4">
+      <SessionTypeToggle value={sessionType} onChange={setSessionType} />
       <div>
         <Label>Jour</Label>
         <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
@@ -610,6 +654,7 @@ function SlotAddForm({
           start_time: startTime,
           end_time: endTime,
           location,
+          session_type: sessionType,
         })}
         disabled={isPending || !location}
       >

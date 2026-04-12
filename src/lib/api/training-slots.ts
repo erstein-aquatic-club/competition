@@ -77,6 +77,7 @@ export async function getTrainingSlots(): Promise<TrainingSlot[]> {
     start_time: s.start_time,
     end_time: s.end_time,
     location: s.location,
+    session_type: (s.session_type === "strength" ? "strength" : "swim") as "swim" | "strength",
     is_active: s.is_active,
     created_by: s.created_by,
     created_at: s.created_at,
@@ -106,6 +107,7 @@ export async function createTrainingSlot(input: TrainingSlotInput): Promise<Trai
       start_time: input.start_time,
       end_time: input.end_time,
       location: input.location,
+      session_type: input.session_type,
       lane_count: input.lane_count,
       scheduled_date: input.scheduled_date ?? null,
     })
@@ -155,6 +157,7 @@ export async function updateTrainingSlot(slotId: string, input: TrainingSlotInpu
       start_time: input.start_time,
       end_time: input.end_time,
       location: input.location,
+      session_type: input.session_type,
       lane_count: input.lane_count,
       scheduled_date: input.scheduled_date ?? null,
     })

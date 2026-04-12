@@ -104,6 +104,53 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-12 — `session_type` explicite sur les créneaux (natation / musculation)
+
+**Branche** : `codex/checkpoint-workspace-2026-04-12`
+**Chantier ROADMAP** : hors roadmap (dette technique + UX coach)
+
+### Contexte — Pourquoi ce patch
+Jusqu'à présent, la distinction natation vs musculation d'un créneau reposait sur du parsing de `location` (`includes("salle")`, `includes("piscine")`, etc.) dupliqué dans 3 helpers `isSwimSlot()` aux règles divergentes. Cela rendait la ségrégation des vues fragile (un créneau nommé "Gymnase Nord" tombait côté nage par défaut) et empêchait de distinguer explicitement un créneau muscu en piscine. Le coach a demandé une propriété de type stockée en base, avec rattrapage des créneaux existants et sélecteur dédié dans le drawer de création/modification.
+
+### Changements réalisés
+- **DB** : migration `00093_slot_session_type.sql` ajoutant `session_type TEXT NOT NULL DEFAULT 'swim' CHECK (session_type IN ('swim','strength'))` sur `training_slots` et `swimmer_training_slots`, plus index partiel sur `training_slots(session_type) WHERE is_active`.
+- **Backfill** : `UPDATE ... SET session_type = CASE WHEN location ILIKE '%salle%' THEN 'strength' ELSE 'swim' END` sur les deux tables.
+- **Types TS** : `session_type: "swim" | "strength"` ajouté à `TrainingSlot`, `TrainingSlotInput`, `SwimmerTrainingSlot`, `SwimmerTrainingSlotInput`.
+- **API** : `src/lib/api/training-slots.ts` lit et écrit `session_type` (create/update/select). `src/lib/api/swimmer-slots.ts` idem, y compris l'héritage depuis `training_slots` dans `initSwimmerSlots`.
+- **Helper unifié** : les 3 `isSwimSlot()` parseurs de chaîne sont remplacés par `isSwimSlot(slot)` qui lit `slot.session_type ?? "swim"` (fichiers : `CoachTrainingSlotsScreen.tsx`, `AthletePerformanceHub.tsx`, `SwimmerSlotsTab.tsx`).
+- **UI drawer coach** (frontend-design) : `SlotFormSheet` gagne un segmented control "Type de séance" (Natation / Musculation) en tête de formulaire, au-dessus du toggle Récurrent/Ponctuel. Pill coulissant bleu ↔ ambre avec `shadow-inner`, icônes `Waves` / `Dumbbell` (lucide), cibles ≥ 44 px, `active:scale-[0.98]`, transitions 300 ms. État `sessionType` ajouté au composant, reset dans `useEffect`, propagé dans `buildInput()`.
+- **UI drawer nageur** : `SwimmerSlotsTab` expose un `SessionTypeToggle` équivalent (plus léger) dans les formulaires add/edit du bottom sheet.
+
+### Fichiers modifiés
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00093_slot_session_type.sql` | Nouveau — colonne + backfill + contrainte + index |
+| `src/lib/api/types.ts` | Ajout `session_type` dans 4 interfaces Training/Swimmer slots |
+| `src/lib/api/training-slots.ts` | Read/insert/update de `session_type` |
+| `src/lib/api/swimmer-slots.ts` | Read/insert/update + héritage depuis `training_slots` |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Nouveau segmented control + state + `isSwimSlot(slot)` + `createTrainingSlot` enrichi |
+| `src/components/coach/SwimmerSlotsTab.tsx` | `SessionTypeToggle` + formulaires add/edit enrichis |
+| `src/components/profile/AthletePerformanceHub.tsx` | Helper `isSwimSlot` unifié |
+
+### Tests
+- `npx tsc --noEmit` : ✅ clean
+- `npm test -- --run` : ✅ 195/195 pass
+- Migration : fichier SQL prêt ; **application via MCP Supabase bloquée (token expiré)** — à rejouer après `/auth` sur le plugin Supabase.
+- Tests manuels à effectuer : création d'un créneau Musculation → couleur ambre dans calendrier, filtrage par type, héritage vers `swimmer_training_slots`.
+
+### Décisions prises
+- Nommage `session_type` (et pas `slot_type`) pour rester aligné sur `assignments.session_type` déjà utilisé dans tout le code (`"swim" | "strength"`), évitant un vocabulaire parallèle.
+- Valeur par défaut `swim` (NOT NULL + DEFAULT) pour garantir qu'aucun créneau existant ne reste `null` et que les nouvelles insertions sans `session_type` explicite tombent sur nage — cohérent avec le comportement historique.
+- Backfill `ILIKE '%salle%'` : une seule règle, simple et auditable, là où l'ancien `isSwimSlot` accumulait 4 keywords divergents. Le coach peut toujours corriger a posteriori via le drawer.
+- Le helper `isSwimSlot(slot)` est conservé (plutôt que d'inliner `slot.session_type === "swim"`) pour garder un point d'extension unique et absorber le fallback `?? "swim"` pour les créneaux legacy en localStorage.
+
+### Limites / dette
+- La migration n'a pas encore été appliquée à la prod — token MCP Supabase expiré en cours de session. Le fichier `.sql` est versionné et prêt à être rejoué.
+- Les anciens créneaux dont `location` contient "Piscine de Muscu" (cas inexistant en prod mais théoriquement possible) seront backfillés `swim` alors qu'ils devraient être `strength` — correction manuelle via le drawer.
+- Aucun test automatisé sur la cohérence type/couleur dans les timelines — à ajouter si la régression apparaît.
+
+---
+
 ## 2026-04-12 — Fix: notifications entretien orphelines + navigateFallback PWA (§102)
 
 **Branche** : `main`

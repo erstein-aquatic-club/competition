@@ -62,6 +62,8 @@ import {
   Ban,
   Share2,
   Loader2,
+  Waves,
+  Dumbbell,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -145,10 +147,9 @@ function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** True if slot is a swimming session (vs PPG/muscu) based on location */
-function isSwimSlot(location: string): boolean {
-  const loc = location.toLowerCase();
-  return loc.includes("piscine") || loc.includes("bassin") || (!loc.includes("salle") && !loc.includes("muscu") && !loc.includes("ppg") && !loc.includes("gym"));
+/** True if slot is a swimming session (vs PPG/muscu) — based on explicit session_type */
+function isSwimSlot(slot: { session_type?: "swim" | "strength" | null }): boolean {
+  return (slot.session_type ?? "swim") === "swim";
 }
 
 function buildSwimLibraryContext(
@@ -220,6 +221,7 @@ const SlotFormSheet = ({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
+  const [sessionType, setSessionType] = useState<"swim" | "strength">("swim");
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
   const [selectedCoachIds, setSelectedCoachIds] = useState<number[]>([]);
   const [laneCount, setLaneCount] = useState("");
@@ -234,6 +236,7 @@ const SlotFormSheet = ({
       setStartTime(formatTime(slot.start_time));
       setEndTime(formatTime(slot.end_time));
       setLocation(slot.location);
+      setSessionType(slot.session_type ?? "swim");
       setSelectedGroupIds(slot.assignments.map((a) => a.group_id));
       setSelectedCoachIds((slot.coaches ?? []).map((c) => c.coach_id));
       setLaneCount(slot.lane_count != null ? String(slot.lane_count) : "");
@@ -244,6 +247,7 @@ const SlotFormSheet = ({
       setStartTime("");
       setEndTime("");
       setLocation("");
+      setSessionType("swim");
       setSelectedGroupIds([]);
       setSelectedCoachIds([]);
       setLaneCount("");
@@ -293,6 +297,7 @@ const SlotFormSheet = ({
       start_time: startTime,
       end_time: endTime,
       location: location.trim(),
+      session_type: sessionType,
       lane_count: laneCount ? Number(laneCount) : null,
       group_ids: selectedGroupIds,
       coach_ids: selectedCoachIds,
@@ -392,6 +397,57 @@ const SlotFormSheet = ({
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
+            {/* ── Session type selector (swim vs strength) ───── */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Type de séance
+              </Label>
+              <div
+                role="radiogroup"
+                aria-label="Type de séance"
+                className="relative grid grid-cols-2 gap-1 rounded-2xl border border-border/60 bg-muted/30 p-1 shadow-inner"
+              >
+                {/* Sliding accent pill */}
+                <div
+                  aria-hidden
+                  className={`pointer-events-none absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-xl border transition-all duration-300 ease-out ${
+                    sessionType === "swim"
+                      ? "left-1 border-blue-500/40 bg-blue-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(59,130,246,0.25)]"
+                      : "left-[calc(50%+0.125rem)] border-amber-500/40 bg-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(245,158,11,0.25)]"
+                  }`}
+                />
+                {(
+                  [
+                    { id: "swim", label: "Natation", Icon: Waves, activeColor: "text-blue-600 dark:text-blue-300" },
+                    { id: "strength", label: "Musculation", Icon: Dumbbell, activeColor: "text-amber-700 dark:text-amber-300" },
+                  ] as const
+                ).map(({ id, label, Icon, activeColor }) => {
+                  const active = sessionType === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setSessionType(id)}
+                      className={`relative z-10 flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold tracking-tight transition-all duration-200 active:scale-[0.98] ${
+                        active
+                          ? `${activeColor}`
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-4 w-4 transition-transform duration-300 ${
+                          active ? "scale-110" : "scale-100"
+                        }`}
+                      />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Recurring / One-off toggle */}
             {!isEdit && (
               <div className="flex gap-1 rounded-xl border bg-muted/30 p-0.5">
@@ -692,6 +748,7 @@ const OverrideFormSheet = ({
           start_time: newStartTime || formatTime(slot.start_time),
           end_time: newEndTime || formatTime(slot.end_time),
           location: nextLocation,
+          session_type: slot.session_type,
           lane_count: slot.lane_count ?? null,
           group_ids: slot.assignments.map((a) => a.group_id),
           coach_ids: selectedCoachIds,
@@ -1005,7 +1062,7 @@ const TimelineSlot = ({
   const top = timeToPx(slot.start_time);
   const height = durationPx(slot.start_time, slot.end_time);
   const isShort = height < 50;
-  const swim = isSwimSlot(slot.location);
+  const swim = isSwimSlot(slot);
   const completionState = getSlotCompletionState(instance);
   const hasAssignment = !!instance?.assignment;
   const isDraft = instance?.state === "draft";
@@ -1104,7 +1161,7 @@ function TimelineSlotInline({
 }: TimelineSlotProps & { top: number; height: number }) {
   const isShort = height < 50;
   const isOneOff = !!slot.scheduled_date;
-  const swim = isSwimSlot(slot.location);
+  const swim = isSwimSlot(slot);
   const completionState = getSlotCompletionState(instance);
   const hasAssignment = !!instance?.assignment;
   const isDraft = instance?.state === "draft";
@@ -1351,7 +1408,7 @@ const MobileView = ({
                   const endMin = timeToMinutes(effEnd) - stripRange.start * 60;
                   const topPct = Math.max(0, (startMin / stripTotalMin) * 100);
                   const heightPct = Math.max(8, ((endMin - startMin) / stripTotalMin) * 100);
-                  const swim = isSwimSlot(slot.location);
+                  const swim = isSwimSlot(slot);
                   const cancelled = cancelledSlotIds.has(slot.id);
                   const isPublished = instance?.state === "published";
                   const isDraft = instance?.state === "draft";
@@ -1405,7 +1462,7 @@ const MobileView = ({
         ) : (
           <div className="space-y-2">
             {selectedDaySlots.map((slot) => {
-              const swim = isSwimSlot(slot.location);
+              const swim = isSwimSlot(slot);
               const cancelled = cancelledSlotIds.has(slot.id);
               const slotOverrides = overridesBySlot.get(slot.id) ?? [];
               const hasOverrides = slotOverrides.length > 0;
@@ -1674,6 +1731,7 @@ const CoachTrainingSlotsScreen = ({
       start_time: s.start_time,
       end_time: s.end_time,
       location: s.location,
+      session_type: s.session_type ?? "swim",
       is_active: s.is_active,
       created_by: s.created_by,
       created_at: s.created_at,
@@ -2035,7 +2093,7 @@ const CoachTrainingSlotsScreen = ({
             start,
             end,
             location,
-            swim: isSwimSlot(location),
+            swim: isSwimSlot(slot),
             isModified,
             isCancelled,
             state: instance?.state ?? "empty",

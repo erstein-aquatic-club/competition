@@ -92,9 +92,8 @@ function daysBetween(dateA: string, dateB: string): number {
 
 const DAYS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
-function isSwimSlot(location: string): boolean {
-  const l = location.toLowerCase();
-  return l.includes("piscine") || l.includes("bassin") || l.includes("natation") || l.includes("nage");
+function isSwimSlot(slot: { session_type?: "swim" | "strength" | null }): boolean {
+  return (slot.session_type ?? "swim") === "swim";
 }
 
 function durationLabel(start: string, end: string): string {
@@ -153,7 +152,7 @@ function AthleteSlots({ athleteId }: { athleteId: number }) {
               {DAYS_FR[dow - 1]}
             </p>
             {daySlots.map((s) => {
-              const swim = isSwimSlot(s.location);
+              const swim = isSwimSlot(s);
               return (
                 <div
                   key={s.id}
