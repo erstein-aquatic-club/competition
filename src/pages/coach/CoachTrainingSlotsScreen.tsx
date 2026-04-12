@@ -2324,22 +2324,6 @@ const CoachTrainingSlotsScreen = ({
           ctx.fillText(groupsLine, textX, textCursor);
         }
 
-        // "Modifié" badge in top-right corner
-        if (s.isModified && !s.isCancelled) {
-          const badgeText = "Modifié";
-          ctx.font = "700 20px Inter, sans-serif";
-          const badgeW = ctx.measureText(badgeText).width + 16;
-          const badgeH = 28;
-          const badgeX = cardX + cardW - badgeW - 10;
-          const badgeY = cardY + 12;
-          ctx.fillStyle = "#f97316";
-          ctx.beginPath();
-          ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 6);
-          ctx.fill();
-          ctx.fillStyle = "#ffffff";
-          ctx.fillText(badgeText, badgeX + 8, badgeY + 20);
-        }
-
         const iconSize = 40;
         const iconX = cardX + cardW - iconSize - 14;
         const iconY = cardY + cardH - iconSize - 14;
