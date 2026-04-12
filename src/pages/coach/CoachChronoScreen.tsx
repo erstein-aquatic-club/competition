@@ -107,7 +107,7 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
     dispatch({ type: "RESET_FOR_NEW_SERIES" });
   }, []);
 
-  const isRacing = state.phase === "racing" && state.waves.some((w) => w.startedAt && !w.stopped);
+  const isRacing = state.phase === "racing";
   const { now, getTimestamp } = useChronoTimer(isRacing);
 
   return (

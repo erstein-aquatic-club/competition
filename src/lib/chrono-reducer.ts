@@ -42,7 +42,7 @@ export function computeWaves(
 
   return sorted.map((wave) => {
     const existing = existingMap.get(wave);
-    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 0 };
+    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 0, lastFinishedAt: null };
   });
 }
 
@@ -131,7 +131,7 @@ export function chronoReducer(
           stoppedAt: null,
         });
       }
-      const waves = state.waves.map((w) => ({ ...w, currentRep: 0 }));
+      const waves = state.waves.map((w) => ({ ...w, currentRep: 0, lastFinishedAt: null }));
       return {
         ...state,
         phase: "racing",
@@ -144,7 +144,7 @@ export function chronoReducer(
     case "LAUNCH_WAVE": {
       const waves = state.waves.map((w) =>
         w.wave === action.wave
-          ? { ...w, startedAt: action.timestamp }
+          ? { ...w, startedAt: action.timestamp, lastFinishedAt: null }
           : w,
       );
       return { ...state, waves };
@@ -224,10 +224,10 @@ export function chronoReducer(
       const allStopped = waveSwimmers.every((rs) => rs.stoppedAt !== null);
 
       if (allStopped) {
-        // Auto-reset wave for next rep
+        // Auto-reset wave for next rep, keep lastFinishedAt for recovery timer
         const waves = state.waves.map((w) =>
           w.wave === waveNum
-            ? { ...w, startedAt: null, currentRep: w.currentRep + 1 }
+            ? { ...w, startedAt: null, currentRep: w.currentRep + 1, lastFinishedAt: action.timestamp }
             : w,
         );
         for (const [id, rs] of newRaceData) {
@@ -246,10 +246,10 @@ export function chronoReducer(
     }
 
     case "NEXT_REP": {
-      // Reset wave for next rep: clear startedAt, increment currentRep
+      // Reset wave for next rep: clear startedAt, increment currentRep, set lastFinishedAt for recovery
       const waves = state.waves.map((w) =>
         w.wave === action.wave
-          ? { ...w, startedAt: null, currentRep: w.currentRep + 1 }
+          ? { ...w, startedAt: null, currentRep: w.currentRep + 1, lastFinishedAt: Date.now() }
           : w,
       );
       // Add new empty rep array for each swimmer in this wave, reset stoppedAt
@@ -297,6 +297,7 @@ export function chronoReducer(
         startedAt: null,
         stopped: false,
         currentRep: 0,
+        lastFinishedAt: null,
       }));
       return {
         ...state,

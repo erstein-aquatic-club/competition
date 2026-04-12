@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap } from "../../hooks/useChronoTimer";
@@ -50,26 +50,44 @@ function WaveBar({
           const launched = w.startedAt !== null;
 
           if (!launched) {
+            const recoveryElapsed = w.lastFinishedAt ? now - w.lastFinishedAt : 0;
+
             return (
-              <button
-                key={w.wave}
-                aria-label={`Lancer la vague ${wc.label}`}
-                onClick={() =>
-                  dispatch({
-                    type: "LAUNCH_WAVE",
-                    wave: w.wave,
-                    timestamp: getTimestamp(),
-                  })
-                }
-                className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
-              >
-                <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-                  {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
-                </span>
-                <span className="flex items-center gap-1.5 text-lg font-black text-white">
-                  <Play className="h-4 w-4 fill-current" /> GO
-                </span>
-              </button>
+              <div key={w.wave} className="flex flex-col gap-0">
+                {/* Recovery timer — visible between reps */}
+                {w.lastFinishedAt && (
+                  <div
+                    role="timer"
+                    aria-label={`Récupération en cours ${formatTime(recoveryElapsed)}`}
+                    className="flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black bg-muted text-foreground"
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                      Récup
+                    </span>
+                    <span className="text-xl leading-none">
+                      {formatTime(recoveryElapsed)}
+                    </span>
+                  </div>
+                )}
+                <button
+                  aria-label={`Lancer la vague ${wc.label}`}
+                  onClick={() =>
+                    dispatch({
+                      type: "LAUNCH_WAVE",
+                      wave: w.wave,
+                      timestamp: getTimestamp(),
+                    })
+                  }
+                  className={`flex flex-col items-center justify-center ${w.lastFinishedAt ? "rounded-b-xl" : "rounded-xl"} ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
+                >
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+                    {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-lg font-black text-white">
+                    <Play className="h-4 w-4 fill-current" /> GO
+                  </span>
+                </button>
+              </div>
             );
           }
 
@@ -369,6 +387,14 @@ export default function ChronoRace({
   getTimestamp,
 }: ChronoRaceProps) {
   const lanes = Array.from({ length: state.laneCount }, (_, i) => i + 1);
+
+  // Lock screen orientation to landscape on mobile
+  useEffect(() => {
+    const so = screen?.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void>; unlock?: () => void };
+    if (!so?.lock) return;
+    so.lock("landscape").catch(() => {/* not supported or denied */});
+    return () => { so.unlock?.(); };
+  }, []);
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">

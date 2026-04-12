@@ -29,6 +29,8 @@ export interface WaveState {
   currentRep: number;
   /** Departure interval in seconds for this wave (0 = no countdown) */
   departureIntervalSec: number;
+  /** Timestamp when all swimmers in the wave finished (for recovery timer) */
+  lastFinishedAt: number | null;
 }
 
 export type ChronoPhase = "setup" | "racing" | "results";
