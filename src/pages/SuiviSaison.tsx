@@ -4,8 +4,7 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import type { TrainingWeek, Interview } from "@/lib/api";
-import type { ResolvedSlotAssignment, SwimPlanningSlot } from "@/lib/api/types";
-import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
+import type { SwimPlanningSlot } from "@/lib/api/types";
 import { FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -22,7 +21,6 @@ import {
   MapPin,
   MessageSquare,
   Plus,
-  Sparkles,
   Trophy,
 } from "lucide-react";
 
@@ -40,11 +38,6 @@ function formatDate(dateStr: string): string {
 function fmtShort(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
-}
-
-function fmtDay(iso: string): string {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
 
 function getSunday(mondayIso: string): string {
@@ -81,21 +74,6 @@ function daysBetween(dateA: string, dateB: string): number {
   const a = new Date(dateA + "T00:00:00");
   const b = new Date(dateB + "T00:00:00");
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function getWeekDates(mondayIso: string): string[] {
-  const dates: string[] = [];
-  const d = new Date(mondayIso + "T00:00:00");
-  for (let i = 0; i < 7; i++) {
-    dates.push(d.toISOString().split("T")[0]);
-    d.setDate(d.getDate() + 1);
-  }
-  return dates;
-}
-
-function isSwimSlot(location: string): boolean {
-  const l = location.toLowerCase();
-  return l.includes("piscine") || l.includes("bassin") || l.includes("natation") || l.includes("nage");
 }
 
 function interviewStatusLabel(status: Interview["status"]): string {
@@ -223,100 +201,6 @@ function WeekFiliereGrid({ monday, groupId }: { monday: string; groupId: number 
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ── Expanded week detail ────────────────────────────────────────
-
-function ExpandedWeekDays({ monday, userId }: { monday: string; userId: number }) {
-  const dates = useMemo(() => getWeekDates(monday), [monday]);
-
-  const { data: assignmentMap, isLoading } = useQuery({
-    queryKey: ["swimmer-assignments-batch", userId, monday],
-    queryFn: () => resolveSwimmerAssignmentsBatch(userId, dates),
-    enabled: !!userId,
-    staleTime: 60_000,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="space-y-1.5 pt-2">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-8 rounded-lg" />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1 pt-2">
-      {dates.map((date) => {
-        const slots: ResolvedSlotAssignment[] = assignmentMap?.get(date) ?? [];
-        const hasSlots = slots.length > 0;
-
-        return (
-          <div key={date} className="flex items-start gap-2 py-1">
-            <span className="text-[11px] font-medium text-muted-foreground w-16 shrink-0 pt-0.5 capitalize">
-              {fmtDay(date)}
-            </span>
-            <div className="flex-1 min-w-0">
-              {!hasSlots ? (
-                <span className="text-[11px] text-muted-foreground/50 italic">(repos)</span>
-              ) : (
-                <div className="space-y-1">
-                  {slots.map((slot) => {
-                    const swim = isSwimSlot(slot.slotLocation);
-                    const a = slot.assignment;
-                    // Compute distance for swim
-                    let distance = 0;
-                    let exerciseCount = 0;
-                    if (a?.items) {
-                      if (a.session_type === "swim") {
-                        distance = (a.items as Array<{ distance?: number | null }>)
-                          .reduce((sum, it) => sum + (it.distance ?? 0), 0);
-                      } else {
-                        exerciseCount = a.items.length;
-                      }
-                    }
-
-                    return (
-                      <div
-                        key={slot.swimmerSlotId}
-                        className="flex items-center gap-2 rounded-lg border bg-card/80 px-2 py-1"
-                      >
-                        <div className={`w-1 h-5 rounded-full shrink-0 ${swim ? "bg-blue-500" : "bg-amber-400"}`} />
-                        <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
-                          {slot.slotTime}
-                        </span>
-                        {a ? (
-                          <span className="text-[11px] font-medium truncate flex-1 min-w-0">
-                            {a.title}
-                            {a.session_type === "swim" && distance > 0 && (
-                              <span className="text-muted-foreground/50 ml-1 font-normal">
-                                {distance >= 1000 ? `${(distance / 1000).toFixed(1)}km` : `${distance}m`}
-                              </span>
-                            )}
-                            {a.session_type === "strength" && exerciseCount > 0 && (
-                              <span className="text-muted-foreground/50 ml-1 font-normal">
-                                {exerciseCount} exo{exerciseCount > 1 ? "s" : ""}
-                              </span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground/40 italic flex-1">
-                            Pas de seance
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -584,10 +468,10 @@ export default function SuiviSaison() {
       />
 
       <div className="space-y-5 pt-3">
-        {/* ── Objectives horizontal scroll ─────────────────── */}
+        {/* ── Objectives ────────────────────────────────────── */}
         {objectives.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-2">
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Objectifs
               </h2>
@@ -601,36 +485,20 @@ export default function SuiviSaison() {
                 Ajouter
               </Button>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory scrollbar-none">
+            <div className="space-y-1.5">
               {objectives.map((obj) => (
-                <div key={obj.id} className="snap-start shrink-0 w-40 overflow-hidden">
-                  <ObjectiveCard
-                    objective={obj}
-                    performances={performances}
-                    compact
-                  />
-                </div>
+                <ObjectiveCard
+                  key={obj.id}
+                  objective={obj}
+                  performances={performances}
+                  compact
+                />
               ))}
             </div>
           </section>
         )}
 
-        {/* ── Summary card ─────────────────────────────────── */}
-        {upcomingCompetitions.length > 0 && (
-          <div className="rounded-2xl border bg-gradient-to-br from-primary/[0.08] via-background to-amber-500/[0.06] p-3.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">
-                {upcomingCompetitions.length} echeance{upcomingCompetitions.length > 1 ? "s" : ""}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {plannedCycles.length} cycle{plannedCycles.length > 1 ? "s" : ""} planifie{plannedCycles.length > 1 ? "s" : ""}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* ── Empty state ──────────────────────────────────── */}
+        {/* ── Empty state / Timeline ─────────────────────── */}
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-14 rounded-2xl" />
@@ -752,14 +620,10 @@ export default function SuiviSaison() {
                             transition={{ duration: 0.25, ease: "easeInOut" }}
                             className="overflow-hidden"
                           >
-                            <div className="border-t px-3 py-2.5 space-y-2.5">
+                            <div className="border-t px-3 py-2.5">
                               {/* Filiere micro-grid */}
                               {groupId && (
                                 <WeekFiliereGrid monday={item.monday} groupId={groupId} />
-                              )}
-                              {/* Session assignments */}
-                              {userId && (
-                                <ExpandedWeekDays monday={item.monday} userId={userId} />
                               )}
                             </div>
                           </motion.div>
