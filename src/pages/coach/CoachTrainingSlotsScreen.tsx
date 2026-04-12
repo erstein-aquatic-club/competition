@@ -611,6 +611,7 @@ type OverrideFormSheetProps = {
   onOpenChange: (open: boolean) => void;
   slot: TrainingSlot | null;
   initialDate?: string;
+  coaches: Array<{ id: number; display_name: string }>;
 };
 
 const OverrideFormSheet = ({
@@ -618,30 +619,108 @@ const OverrideFormSheet = ({
   onOpenChange,
   slot,
   initialDate,
+  coaches,
 }: OverrideFormSheetProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [overrideDate, setOverrideDate] = useState("");
   const [status, setStatus] = useState<"cancelled" | "modified">("cancelled");
+  const [effectiveDate, setEffectiveDate] = useState("");
   const [newStartTime, setNewStartTime] = useState("");
   const [newEndTime, setNewEndTime] = useState("");
   const [newLocation, setNewLocation] = useState("");
+  const [selectedCoachIds, setSelectedCoachIds] = useState<number[]>([]);
   const [reason, setReason] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setOverrideDate(initialDate ?? "");
     setStatus("cancelled");
+    setEffectiveDate(initialDate ?? "");
     setNewStartTime(slot ? formatTime(slot.start_time) : "");
     setNewEndTime(slot ? formatTime(slot.end_time) : "");
     setNewLocation(slot?.location ?? "");
+    setSelectedCoachIds((slot?.coaches ?? []).map((c) => c.coach_id));
     setReason("");
-  }, [open, slot]);
+  }, [open, slot, initialDate]);
 
-  const createMutation = useMutation({
-    mutationFn: (input: TrainingSlotOverrideInput) =>
-      api.createSlotOverride(input),
+  const toggleCoach = (id: number) => {
+    setSelectedCoachIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!slot) throw new Error("Créneau introuvable");
+      if (!overrideDate) throw new Error("Date requise");
+
+      if (status === "cancelled") {
+        await api.createSlotOverride({
+          slot_id: slot.id,
+          override_date: overrideDate,
+          status: "cancelled",
+          reason: reason.trim() || null,
+        });
+        return;
+      }
+
+      const targetDate = effectiveDate || overrideDate;
+      const nextLocation = newLocation.trim() || slot.location;
+      const baseCoachIds = (slot.coaches ?? [])
+        .map((c) => c.coach_id)
+        .sort((a, b) => a - b);
+      const nextCoachIds = [...selectedCoachIds].sort((a, b) => a - b);
+
+      const coachesChanged =
+        baseCoachIds.length !== nextCoachIds.length ||
+        baseCoachIds.some((id, i) => id !== nextCoachIds[i]);
+      const movedToAnotherDate = targetDate !== overrideDate;
+
+      // If day or coaches change, model it as:
+      // 1) one-off slot on target date with the updated setup
+      // 2) cancellation of the recurring slot on the original date
+      if (movedToAnotherDate || coachesChanged) {
+        if (!targetDate) throw new Error("Date cible requise");
+
+        const d = new Date(`${targetDate}T00:00:00`);
+        const jsDay = d.getDay();
+        const targetDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+        await api.createTrainingSlot({
+          day_of_week: targetDayOfWeek,
+          start_time: newStartTime || formatTime(slot.start_time),
+          end_time: newEndTime || formatTime(slot.end_time),
+          location: nextLocation,
+          lane_count: slot.lane_count ?? null,
+          group_ids: slot.assignments.map((a) => a.group_id),
+          coach_ids: selectedCoachIds,
+          scheduled_date: targetDate,
+        });
+
+        await api.createSlotOverride({
+          slot_id: slot.id,
+          override_date: overrideDate,
+          status: "cancelled",
+          reason: reason.trim() || null,
+        });
+
+        return;
+      }
+
+      const input: TrainingSlotOverrideInput = {
+        slot_id: slot.id,
+        override_date: overrideDate,
+        status: "modified",
+        new_start_time: newStartTime || null,
+        new_end_time: newEndTime || null,
+        new_location: newLocation.trim() ? newLocation.trim() : null,
+        reason: reason.trim() || null,
+      };
+
+      await api.createSlotOverride(input);
+    },
     onSuccess: () => {
       toast({ title: "Exception enregistree" });
       void queryClient.invalidateQueries({
@@ -649,6 +728,8 @@ const OverrideFormSheet = ({
       });
       void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
       void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -670,21 +751,15 @@ const OverrideFormSheet = ({
       });
       return;
     }
-
-    const input: TrainingSlotOverrideInput = {
-      slot_id: slot.id,
-      override_date: overrideDate,
-      status,
-      new_start_time: status === "modified" ? newStartTime || null : null,
-      new_end_time: status === "modified" ? newEndTime || null : null,
-      new_location:
-        status === "modified" && newLocation.trim()
-          ? newLocation.trim()
-          : null,
-      reason: reason.trim() || null,
-    };
-
-    createMutation.mutate(input);
+    if (status === "modified" && !effectiveDate) {
+      toast({
+        title: "Date cible requise",
+        description: "Veuillez saisir la date du créneau modifié.",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveMutation.mutate();
   };
 
   return (
@@ -741,6 +816,19 @@ const OverrideFormSheet = ({
           {/* Modified fields */}
           {status === "modified" && (
             <>
+              <div className="space-y-2">
+                <Label htmlFor="ovr-target-date">Nouvelle date / jour</Label>
+                <input
+                  id="ovr-target-date"
+                  type="date"
+                  value={effectiveDate}
+                  onChange={(e) => setEffectiveDate(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Changez la date pour deplacer le creneau sur un autre jour.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ovr-start">Nouvel horaire debut</Label>
@@ -771,6 +859,40 @@ const OverrideFormSheet = ({
                   onChange={(e) => setNewLocation(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Coachs pour cette exception</Label>
+                <div className="flex flex-wrap gap-2">
+                  {coaches.map((c) => {
+                    const selected = selectedCoachIds.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => toggleCoach(c.id)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          selected
+                            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            : "border-muted bg-muted/40 text-muted-foreground"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                            selected
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : "border-muted-foreground/40"
+                          }`}
+                        >
+                          {selected && <Check className="h-2.5 w-2.5" />}
+                        </span>
+                        {c.display_name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Si la date ou les coachs changent, un creneau ponctuel sera cree et le creneau initial sera annule sur la date d'origine.
+                </p>
+              </div>
             </>
           )}
 
@@ -789,9 +911,9 @@ const OverrideFormSheet = ({
           <Button
             className="w-full"
             onClick={handleSubmit}
-            disabled={createMutation.isPending || !overrideDate}
+            disabled={saveMutation.isPending || !overrideDate}
           >
-            {createMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
           </Button>
         </div>
       </SheetContent>
@@ -2298,6 +2420,7 @@ const CoachTrainingSlotsScreen = ({
         onOpenChange={setShowOverrideForm}
         slot={overrideSlot}
         initialDate={overrideInitialDate}
+        coaches={coachesForForm}
       />
 
       <SlotTemplatePicker
