@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   describeIndicatorValue,
+  findStrengthRunForSlot,
+  formatLocalDateISO,
   formatClockTime,
   formatSlotTime,
   inferSessionKind,
@@ -17,6 +19,52 @@ test("inferSessionKind prefers assignment type and falls back to slot location",
   assert.equal(inferSessionKind({ assignmentType: "swim", location: "Salle" }), "swim");
   assert.equal(inferSessionKind({ location: "Salle musculation" }), "strength");
   assert.equal(inferSessionKind({ location: "Piscine Erstein" }), "swim");
+});
+
+test("formatLocalDateISO preserves the local calendar date", () => {
+  assert.equal(formatLocalDateISO(new Date(2026, 3, 7, 0, 0, 0)), "2026-04-07");
+  assert.equal(formatLocalDateISO(new Date(2026, 11, 31, 23, 59, 59)), "2026-12-31");
+});
+
+test("findStrengthRunForSlot falls back to local date and slot for legacy runs", () => {
+  const assignmentRun = {
+    id: 1,
+    assignment_id: 42,
+    started_at: "2026-04-07T18:00:00+02:00",
+  };
+  const legacyRun = {
+    id: 2,
+    started_at: "2026-04-07T18:30:00+02:00",
+  };
+  const dateOnlyRun = {
+    id: 3,
+    date: "2026-04-08",
+  };
+
+  assert.equal(
+    findStrengthRunForSlot([legacyRun, assignmentRun], {
+      iso: "2026-04-07",
+      slotKey: "PM",
+      assignmentId: 42,
+    })?.id,
+    1,
+  );
+
+  assert.equal(
+    findStrengthRunForSlot([legacyRun], {
+      iso: "2026-04-07",
+      slotKey: "PM",
+    })?.id,
+    2,
+  );
+
+  assert.equal(
+    findStrengthRunForSlot([dateOnlyRun], {
+      iso: "2026-04-08",
+      slotKey: "PM",
+    })?.id,
+    3,
+  );
 });
 
 test("describeIndicatorValue returns a clickable explanation for valid notes", () => {

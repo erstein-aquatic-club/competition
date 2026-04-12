@@ -62,12 +62,15 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+export function formatLocalDateISO(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isToday(d: Date): boolean {
-  return isoDate(d) === isoDate(new Date());
+  return formatLocalDateISO(d) === formatLocalDateISO(new Date());
 }
 
 function isFuture(d: Date): boolean {
@@ -197,6 +200,49 @@ export function describeIndicatorValue(meta: IndicatorMeta, value: number | null
   return `${meta.fullLabel} ${numeric}/5 - ${description}`;
 }
 
+function getStrengthRunDateValue(run: LocalStrengthRun): string | null {
+  return run.completed_at || run.started_at || run.date || run.created_at || null;
+}
+
+function getStrengthRunDateISO(run: LocalStrengthRun): string | null {
+  const raw = getStrengthRunDateValue(run);
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatLocalDateISO(parsed);
+}
+
+function getStrengthRunSlotKey(run: LocalStrengthRun): "AM" | "PM" | null {
+  const raw = run.completed_at || run.started_at || run.created_at || null;
+  if (!raw || /^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.getHours() < 12 ? "AM" : "PM";
+}
+
+export function findStrengthRunForSlot(
+  runs: LocalStrengthRun[],
+  params: {
+    iso: string;
+    slotKey: "AM" | "PM";
+    assignmentId?: number;
+  },
+): LocalStrengthRun | undefined {
+  if (params.assignmentId) {
+    const assignmentMatch = runs.find((run) => Number(run.assignment_id) === params.assignmentId);
+    if (assignmentMatch) return assignmentMatch;
+  }
+
+  const dateMatches = runs.filter((run) => getStrengthRunDateISO(run) === params.iso);
+  if (dateMatches.length === 0) return undefined;
+
+  const slotMatches = dateMatches.filter((run) => getStrengthRunSlotKey(run) === params.slotKey);
+  if (slotMatches.length > 0) return slotMatches[0];
+
+  return dateMatches.length === 1 ? dateMatches[0] : undefined;
+}
+
 // ── Indicator colors ─────────────────────────────────────────
 
 function indicatorColor(mode: "hard" | "good", value: number | null | undefined): string {
@@ -242,8 +288,14 @@ export default function SuiviSemaine() {
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
   const monday = useMemo(() => addDays(getMonday(new Date()), weekOffset * 7), [weekOffset]);
-  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
-  const weekISOs = useMemo(() => weekDates.map(isoDate), [weekDates]);
+  const weekDates = useMemo<Date[]>(
+    () => Array.from({ length: 7 }, (_, i) => addDays(monday, i)),
+    [monday],
+  );
+  const weekISOs = useMemo<string[]>(
+    () => weekDates.map(formatLocalDateISO),
+    [weekDates],
+  );
 
   // Wellness sheet
   const [wellnessOpen, setWellnessOpen] = useState(false);
@@ -297,7 +349,7 @@ export default function SuiviSemaine() {
   });
 
   // Today's wellness
-  const todayISO = isoDate(new Date());
+  const todayISO = formatLocalDateISO(new Date());
   const { data: todayWellness } = useQuery({
     queryKey: ["wellness", userId, todayISO],
     queryFn: () => getWellnessForDate(userId!, todayISO),
@@ -352,16 +404,10 @@ export default function SuiviSemaine() {
     return map;
   }, [allSessions, weekISOs]);
 
-  const strengthRunsByAssignmentId = useMemo(() => {
-    const map = new Map<number, LocalStrengthRun>();
-    const runs = strengthHistory?.runs ?? [];
-    for (const run of runs) {
-      const assignmentId = Number(run.assignment_id);
-      if (!Number.isFinite(assignmentId) || assignmentId <= 0 || map.has(assignmentId)) continue;
-      map.set(assignmentId, run);
-    }
-    return map;
-  }, [strengthHistory]);
+  const completedStrengthRuns = useMemo(
+    () => strengthHistory?.runs ?? [],
+    [strengthHistory],
+  );
 
   const findSwimSession = useCallback((params: {
     iso: string;
@@ -373,6 +419,14 @@ export default function SuiviSemaine() {
     }
     return swimSessionsByDateSlot.get(`${params.iso}_${params.slotKey}`);
   }, [swimSessionsByAssignmentId, swimSessionsByDateSlot]);
+
+  const findStrengthRun = useCallback((params: {
+    iso: string;
+    slotKey: "AM" | "PM";
+    assignmentId?: number;
+  }): LocalStrengthRun | undefined => {
+    return findStrengthRunForSlot(completedStrengthRuns, params);
+  }, [completedStrengthRuns]);
 
   const cards = useMemo<TimelineCard[]>(() => {
     const result: TimelineCard[] = [];
@@ -394,8 +448,11 @@ export default function SuiviSemaine() {
           const swimSession = kind === "swim"
             ? findSwimSession({ iso, slotKey })
             : undefined;
+          const strengthRun = kind === "strength"
+            ? findStrengthRun({ iso, slotKey })
+            : undefined;
 
-          if (swimSession) {
+          if (swimSession || strengthRun) {
             result.push({
               type: "logged",
               kind,
@@ -405,8 +462,9 @@ export default function SuiviSemaine() {
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
               title: kind === "strength" ? "Seance musculation" : "Entrainement",
-              km: swimSession.distance > 0 ? swimSession.distance : null,
+              km: swimSession?.distance && swimSession.distance > 0 ? swimSession.distance : null,
               session: swimSession,
+              strengthRun,
               swimmerSlotId: slot.id,
             });
             continue;
@@ -453,8 +511,8 @@ export default function SuiviSemaine() {
         const swimSession = kind === "swim"
           ? findSwimSession({ iso, slotKey, assignmentId: r.assignmentId ?? undefined })
           : undefined;
-        const strengthRun = kind === "strength" && r.assignmentId
-          ? strengthRunsByAssignmentId.get(r.assignmentId)
+        const strengthRun = kind === "strength"
+          ? findStrengthRun({ iso, slotKey, assignmentId: r.assignmentId ?? undefined })
           : undefined;
         const title = r.assignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement");
 
@@ -517,7 +575,7 @@ export default function SuiviSemaine() {
     assignmentsMap,
     swimmerSlots,
     absencesByDate,
-    strengthRunsByAssignmentId,
+    findStrengthRun,
     findSwimSession,
   ]);
 
