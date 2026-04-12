@@ -24,7 +24,7 @@ import {
   Dumbbell,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Session, PlannedAbsence } from "@/lib/api";
+import type { Session, PlannedAbsence, Assignment } from "@/lib/api";
 import type { ResolvedSlotAssignment } from "@/lib/api/types";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
 import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
@@ -96,13 +96,13 @@ function formatWeekRange(monday: Date): string {
 }
 
 /** Derive AM/PM slot key from a time string like "17:00" */
-function slotKeyFromTime(time: string): "AM" | "PM" {
+function slotKeyFromTime(time: string): SlotKey {
   const hour = parseInt(time.split(":")[0], 10);
   return hour < 12 ? "AM" : "PM";
 }
 
 /** Normalize session.slot ("Matin"/"Soir"/"AM"/"PM") to "AM"/"PM" */
-function normalizeSlot(slot: string): "AM" | "PM" {
+function normalizeSlot(slot: string): SlotKey {
   const lower = slot.toLowerCase();
   if (lower === "matin" || lower === "am") return "AM";
   return "PM";
@@ -130,6 +130,7 @@ function slotSortValue(raw?: string): number {
 }
 
 type SessionKind = "swim" | "strength";
+type SlotKey = "AM" | "PM";
 
 export function inferSessionKind(params: {
   assignmentType?: SessionKind | null;
@@ -148,6 +149,66 @@ export function inferSessionKind(params: {
     return "strength";
   }
   return "swim";
+}
+
+function pickAssignmentSlotKey(a: Record<string, unknown>, fallbackIdx: number): SlotKey {
+  const direct =
+    a?.slot ??
+    a?.session_slot ??
+    a?.assigned_slot ??
+    a?.time_slot ??
+    a?.timeOfDay ??
+    a?.slot_key ??
+    a?.slotKey;
+
+  const norm = String(direct || "").toLowerCase();
+  if (norm.includes("mat") || norm.includes("morning") || norm === "am") return "AM";
+  if (norm.includes("soir") || norm.includes("evening") || norm === "pm") return "PM";
+
+  const hay = `${a?.title ?? ""} ${a?.description ?? ""}`.toLowerCase();
+  if (hay.includes("matin") || hay.includes(" am ") || hay.includes("(am)")) return "AM";
+  if (hay.includes("soir") || hay.includes(" pm ") || hay.includes("(pm)")) return "PM";
+
+  return fallbackIdx === 0 ? "AM" : "PM";
+}
+
+function assignmentIso(a: Record<string, unknown>): string | null {
+  const raw = a?.assigned_date ?? a?.date ?? a?.day ?? a?.scheduled_for ?? a?.scheduledAt ?? null;
+  if (!raw) return null;
+  const s = String(raw);
+  const iso = s.length >= 10 ? s.slice(0, 10) : s;
+  return /\d{4}-\d{2}-\d{2}/.test(iso) ? iso : null;
+}
+
+export function findFallbackAssignmentForSlot(
+  assignments: Assignment[],
+  params: {
+    slotKey: SlotKey;
+    userId?: number | null;
+    usedAssignmentIds?: Set<number>;
+  },
+): Assignment | undefined {
+  const used = params.usedAssignmentIds ?? new Set<number>();
+  const slotScheduledSlot = params.slotKey === "AM" ? "morning" : "evening";
+
+  const individualMatch = assignments.find((assignment, idx) =>
+    !used.has(assignment.id) &&
+    assignment.target_user_id === params.userId &&
+    pickAssignmentSlotKey(assignment as unknown as Record<string, unknown>, idx) === params.slotKey,
+  ) ?? assignments.find((assignment) =>
+    !used.has(assignment.id) &&
+    assignment.target_user_id === params.userId,
+  );
+  if (individualMatch) return individualMatch;
+
+  return assignments.find((assignment, idx) =>
+    !used.has(assignment.id) &&
+    !assignment.target_user_id &&
+    (
+      assignment.assigned_slot === slotScheduledSlot ||
+      pickAssignmentSlotKey(assignment as unknown as Record<string, unknown>, idx) === params.slotKey
+    ),
+  );
 }
 
 const HARD_SCALE = [
@@ -352,6 +413,12 @@ export default function SuiviSemaine() {
     enabled: !!userId && weekISOs.length > 0,
   });
 
+  const { data: assignments = [] } = useQuery({
+    queryKey: ["assignments", userId, "week-view"],
+    queryFn: () => api.getAssignments(user ?? "", userId),
+    enabled: !!userId && !!user,
+  });
+
   // Swim sessions (ressentis)
   const { data: allSessions = [] } = useQuery({
     queryKey: ["sessions", userId],
@@ -416,6 +483,17 @@ export default function SuiviSemaine() {
     return map;
   }, [myAbsences]);
 
+  const assignmentsByDate = useMemo(() => {
+    const map = new Map<string, Assignment[]>();
+    for (const assignment of assignments) {
+      const iso = assignmentIso(assignment as unknown as Record<string, unknown>);
+      if (!iso || !weekISOs.includes(iso)) continue;
+      if (!map.has(iso)) map.set(iso, []);
+      map.get(iso)!.push(assignment);
+    }
+    return map;
+  }, [assignments, weekISOs]);
+
   const swimSessionsByAssignmentId = useMemo(() => {
     const map = new Map<number, Session>();
     for (const s of allSessions) {
@@ -469,6 +547,9 @@ export default function SuiviSemaine() {
       const iso = weekISOs[dayIdx];
       const dayOfWeek = dayIdx + 1; // 1=Monday
       const absence = absencesByDate.get(iso);
+      const dayAssignments = assignmentsByDate.get(iso) ?? [];
+      const swimAssignments = dayAssignments.filter((assignment) => assignment.session_type === "swim");
+      const usedAssignmentIds = new Set<number>();
 
       // Get resolved assignments for this date
       const resolved: ResolvedSlotAssignment[] = assignmentsMap?.get(iso) ?? [];
@@ -478,12 +559,20 @@ export default function SuiviSemaine() {
         for (const slot of daySlots) {
           const kind = inferSessionKind({ location: slot.location });
           const slotKey = slotKeyFromTime(slot.start_time);
+          const fallbackAssignment = kind === "swim"
+            ? findFallbackAssignmentForSlot(swimAssignments, { slotKey, userId, usedAssignmentIds })
+            : undefined;
           const swimSession = kind === "swim"
-            ? findSwimSession({ iso, slotKey })
+            ? findSwimSession({ iso, slotKey, assignmentId: fallbackAssignment?.id })
             : undefined;
           const strengthRun = kind === "strength"
             ? findStrengthRun({ iso, slotKey })
             : undefined;
+          const plannedAssignment = fallbackAssignment;
+
+          if (plannedAssignment) {
+            usedAssignmentIds.add(plannedAssignment.id);
+          }
 
           if (swimSession || strengthRun) {
             result.push({
@@ -494,14 +583,20 @@ export default function SuiviSemaine() {
               slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: kind === "strength" ? "Seance musculation" : "Entrainement",
+              title: plannedAssignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement"),
               km: swimSession?.distance && swimSession.distance > 0 ? swimSession.distance : null,
               session: swimSession,
               strengthRun,
               swimmerSlotId: slot.id,
+              assignmentId: plannedAssignment?.id,
+              assignmentSource: plannedAssignment
+                ? (plannedAssignment.target_user_id === userId ? "individual" : "group")
+                : undefined,
             });
             continue;
           }
+
+          if (!plannedAssignment) continue;
 
           if (absence) {
             result.push({
@@ -512,10 +607,12 @@ export default function SuiviSemaine() {
               slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: kind === "strength" ? "Seance musculation" : "Entrainement",
+              title: plannedAssignment.title,
               km: null,
               absenceReason: absence.reason,
               swimmerSlotId: slot.id,
+              assignmentId: plannedAssignment.id,
+              assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
             });
           } else if (!isFuture(date)) {
             result.push({
@@ -526,9 +623,11 @@ export default function SuiviSemaine() {
               slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: kind === "strength" ? "Seance musculation" : "Entrainement",
+              title: plannedAssignment.title,
               km: null,
               swimmerSlotId: slot.id,
+              assignmentId: plannedAssignment.id,
+              assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
             });
           }
         }
@@ -541,13 +640,22 @@ export default function SuiviSemaine() {
           assignmentType: r.assignment?.session_type ?? null,
           location: r.slotLocation,
         });
+        const fallbackAssignment = !r.assignment && kind === "swim"
+          ? findFallbackAssignmentForSlot(swimAssignments, { slotKey, userId, usedAssignmentIds })
+          : undefined;
+        const plannedAssignment = r.assignment ?? fallbackAssignment;
+        if (r.assignmentId) {
+          usedAssignmentIds.add(r.assignmentId);
+        } else if (fallbackAssignment) {
+          usedAssignmentIds.add(fallbackAssignment.id);
+        }
         const swimSession = kind === "swim"
-          ? findSwimSession({ iso, slotKey, assignmentId: r.assignmentId ?? undefined })
+          ? findSwimSession({ iso, slotKey, assignmentId: r.assignmentId ?? fallbackAssignment?.id })
           : undefined;
         const strengthRun = kind === "strength"
           ? findStrengthRun({ iso, slotKey, assignmentId: r.assignmentId ?? undefined })
           : undefined;
-        const title = r.assignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement");
+        const title = plannedAssignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement");
 
         if (swimSession || strengthRun) {
           result.push({
@@ -563,9 +671,13 @@ export default function SuiviSemaine() {
             session: swimSession,
             strengthRun,
             swimmerSlotId: r.swimmerSlotId,
-            assignmentId: r.assignmentId ?? undefined,
-            assignmentSource: r.source,
+            assignmentId: r.assignmentId ?? fallbackAssignment?.id ?? undefined,
+            assignmentSource: plannedAssignment
+              ? (r.assignment ? r.source : (plannedAssignment.target_user_id === userId ? "individual" : "group"))
+              : undefined,
           });
+        } else if (!plannedAssignment) {
+          continue;
         } else if (absence) {
           result.push({
             type: "absent",
@@ -579,8 +691,8 @@ export default function SuiviSemaine() {
             km: null,
             absenceReason: absence.reason,
             swimmerSlotId: r.swimmerSlotId,
-            assignmentId: r.assignmentId ?? undefined,
-            assignmentSource: r.source,
+            assignmentId: r.assignmentId ?? fallbackAssignment?.id ?? undefined,
+            assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
           });
         } else if (!isFuture(date)) {
           result.push({
@@ -594,8 +706,8 @@ export default function SuiviSemaine() {
             title,
             km: null,
             swimmerSlotId: r.swimmerSlotId,
-            assignmentId: r.assignmentId ?? undefined,
-            assignmentSource: r.source,
+            assignmentId: r.assignmentId ?? fallbackAssignment?.id ?? undefined,
+            assignmentSource: plannedAssignment.target_user_id === userId ? "individual" : "group",
           });
         }
       }
@@ -606,10 +718,12 @@ export default function SuiviSemaine() {
     weekDates,
     weekISOs,
     assignmentsMap,
+    assignmentsByDate,
     swimmerSlots,
     absencesByDate,
     findStrengthRun,
     findSwimSession,
+    userId,
   ]);
 
   // ── Group cards by day ─────────────────────────────────────

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   describeIndicatorValue,
+  findFallbackAssignmentForSlot,
   findStrengthRunForSlot,
   formatLocalDateISO,
   formatClockTime,
@@ -66,6 +67,74 @@ test("findStrengthRunForSlot falls back to local date and slot for legacy runs",
       slotKey: "PM",
     })?.id,
     3,
+  );
+});
+
+test("findFallbackAssignmentForSlot prefers slot-matching individual swim assignments", () => {
+  const assignments = [
+    {
+      id: 10,
+      session_id: 1,
+      session_type: "swim" as const,
+      title: "Mercredi soir",
+      description: "",
+      assigned_date: "2026-04-08",
+      status: "assigned",
+      target_user_id: 7,
+      assigned_slot: "evening",
+    },
+    {
+      id: 11,
+      session_id: 2,
+      session_type: "swim" as const,
+      title: "Samedi matin",
+      description: "",
+      assigned_date: "2026-04-11",
+      status: "assigned",
+      target_user_id: 7,
+      assigned_slot: "morning",
+    },
+  ];
+
+  assert.equal(
+    findFallbackAssignmentForSlot(assignments, {
+      slotKey: "AM",
+      userId: 7,
+    })?.id,
+    11,
+  );
+
+  assert.equal(
+    findFallbackAssignmentForSlot(assignments, {
+      slotKey: "PM",
+      userId: 7,
+    })?.id,
+    10,
+  );
+});
+
+test("findFallbackAssignmentForSlot skips already used assignments", () => {
+  const assignments = [
+    {
+      id: 21,
+      session_id: 1,
+      session_type: "swim" as const,
+      title: "Groupe matin",
+      description: "",
+      assigned_date: "2026-04-12",
+      status: "assigned",
+      target_user_id: null,
+      assigned_slot: "morning",
+    },
+  ];
+
+  assert.equal(
+    findFallbackAssignmentForSlot(assignments, {
+      slotKey: "AM",
+      userId: 7,
+      usedAssignmentIds: new Set([21]),
+    }),
+    undefined,
   );
 });
 
