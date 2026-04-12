@@ -59,6 +59,63 @@ Deno.serve(async (req) => {
     });
   }
 
+  // --- Authentication gate ----------------------------------------------------
+  // Two allowed callers:
+  //   1) DB webhook trigger (00044_push_webhook_trigger.sql) → shared secret header
+  //   2) Authenticated coach/admin via supabase.functions.invoke (JWT)
+  // Anonymous callers and athletes are rejected.
+  const WEBHOOK_SECRET = Deno.env.get("PUSH_WEBHOOK_SECRET") ?? "";
+  const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+  const isWebhookCall =
+    WEBHOOK_SECRET.length > 0 && providedSecret === WEBHOOK_SECRET;
+
+  let isAuthorizedManualCaller = false;
+  if (!isWebhookCall) {
+    const authHeader = req.headers.get("authorization") ?? "";
+    if (!authHeader.toLowerCase().startsWith("bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.slice("bearer ".length).trim();
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+    const { data: userData, error: userErr } = await userClient.auth.getUser(
+      token
+    );
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Primary source of role: JWT app_metadata.app_user_role (set by
+    // handle_new_auth_user trigger). Fallback: query users table in case of
+    // legacy accounts whose JWT has not been refreshed.
+    let role =
+      (userData.user.app_metadata?.app_user_role as string | undefined) ??
+      null;
+    if (!role) {
+      const { data: profile } = await userClient
+        .from("users")
+        .select("role")
+        .eq("auth_user_id", userData.user.id)
+        .maybeSingle();
+      role = (profile?.role as string | undefined) ?? null;
+    }
+    if (!role || !["coach", "admin"].includes(role)) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    isAuthorizedManualCaller = true;
+  }
+
   try {
     const payload = await req.json();
 
@@ -98,6 +155,14 @@ Deno.serve(async (req) => {
         targetUserIds = (members || []).map((m: any) => m.user_id);
       }
     } else {
+      // Manual payload path — only coach/admin JWT allowed (webhook path goes
+      // through the `INSERT` branch above).
+      if (!isAuthorizedManualCaller) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       title = payload.title || "EAC Natation";
       body = payload.body || "";
       url = payload.url || resolveNotificationUrl(payload);
