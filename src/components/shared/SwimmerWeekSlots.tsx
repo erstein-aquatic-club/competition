@@ -216,19 +216,39 @@ function GroupSlotCard({
       }`}
     >
       {/* Time + modality icon */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Clock className="h-3 w-3 opacity-60" />
-        <span>
-          {formatTimeRange(instance.slot.start_time, instance.slot.end_time)}
-        </span>
-        <span className="ml-auto">
-          {muscu ? (
-            <Dumbbell className="h-3.5 w-3.5 text-amber-500" />
-          ) : (
-            <Waves className="h-3.5 w-3.5 text-sky-500" />
-          )}
-        </span>
-      </div>
+      {(() => {
+        const override = instance.override;
+        const hasTimeOverride =
+          override?.status === "modified" &&
+          (override.new_start_time || override.new_end_time);
+        const displayStart = hasTimeOverride && override.new_start_time
+          ? override.new_start_time
+          : instance.slot.start_time;
+        const displayEnd = hasTimeOverride && override.new_end_time
+          ? override.new_end_time
+          : instance.slot.end_time;
+
+        return (
+          <div className="flex items-center gap-2">
+            <Clock className={`h-3.5 w-3.5 ${muscu ? "text-amber-500/70" : "text-sky-500/70"}`} />
+            <span className="text-sm font-bold text-foreground tracking-tight">
+              {formatTimeRange(displayStart, displayEnd)}
+            </span>
+            {hasTimeOverride && (
+              <span className="text-[11px] text-muted-foreground/60 line-through">
+                {formatTimeRange(instance.slot.start_time, instance.slot.end_time)}
+              </span>
+            )}
+            <span className="ml-auto">
+              {muscu ? (
+                <Dumbbell className="h-3.5 w-3.5 text-amber-500" />
+              ) : (
+                <Waves className="h-3.5 w-3.5 text-sky-500" />
+              )}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Session name + distance */}
       {instance.state === "published" && instance.assignment?.session_name && (
