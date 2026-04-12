@@ -2033,10 +2033,10 @@ const CoachTrainingSlotsScreen = ({
     const padX = 28;
     const padY = 24;
     const leftAxisWidth = 72;
-    const colGap = 8;
+    const colGap = 10;
     const colCount = 7;
-    const headerTitleH = 56;
-    const daysHeaderH = 44;
+    const headerTitleH = 92;
+    const daysHeaderH = 56;
 
     const weekData = weekDates.map((date, i) => {
       const day = i + 1;
@@ -2086,7 +2086,7 @@ const CoachTrainingSlotsScreen = ({
     }
 
     const totalHours = Math.max(1, (endMin - startMin) / 60);
-    const pxPerHour = 66;
+    const pxPerHour = 72;
     const timelineHeight = Math.max(560, totalHours * pxPerHour);
     const height = padY + headerTitleH + daysHeaderH + timelineHeight + padY;
 
@@ -2119,12 +2119,15 @@ const CoachTrainingSlotsScreen = ({
 
     // Title
     ctx.fillStyle = "#0f172a";
-    ctx.font = "700 30px Inter, sans-serif";
+    ctx.font = "700 34px Inter, sans-serif";
     ctx.fillText(
       `Créneaux — S${weekNumber} · ${formatDayMonth(weekDates[0])} – ${formatDayMonth(weekDates[6])}`,
       padX,
-      padY + 32,
+      padY + 38,
     );
+    ctx.fillStyle = "#64748b";
+    ctx.font = "500 15px Inter, sans-serif";
+    ctx.fillText("Vue semaine (timeline horaire)", padX, padY + 66);
 
     // Day headers
     for (let i = 0; i < weekData.length; i += 1) {
@@ -2132,19 +2135,19 @@ const CoachTrainingSlotsScreen = ({
       const center = x + colW / 2;
       const day = weekData[i];
       ctx.fillStyle = "#64748b";
-      ctx.font = "700 12px Inter, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 14);
-      ctx.fillStyle = "#111827";
       ctx.font = "700 13px Inter, sans-serif";
-      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 4);
+      ctx.textAlign = "center";
+      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 16);
+      ctx.fillStyle = "#111827";
+      ctx.font = "700 15px Inter, sans-serif";
+      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 8);
       ctx.textAlign = "left";
     }
 
     // Background columns
     for (let i = 0; i < colCount; i += 1) {
       const x = gridX + i * (colW + colGap);
-      ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#f1f5f9";
+      ctx.fillStyle = "#f8fafc";
       ctx.fillRect(x, gridY, colW, timelineHeight);
     }
 
@@ -2159,7 +2162,7 @@ const CoachTrainingSlotsScreen = ({
       ctx.stroke();
 
       ctx.fillStyle = "#64748b";
-      ctx.font = "600 11px Inter, sans-serif";
+      ctx.font = "600 12px Inter, sans-serif";
       ctx.fillText(`${String(h).padStart(2, "0")}h`, padX + 8, y + 4);
     }
 
@@ -2180,58 +2183,66 @@ const CoachTrainingSlotsScreen = ({
       for (const s of weekData[i].slots) {
         const startY = yFromMinutes(timeToMinutes(s.start)) + 2;
         const endY = yFromMinutes(timeToMinutes(s.end)) - 2;
-        const cardH = Math.max(42, endY - startY);
+        const cardH = Math.max(62, endY - startY);
         const cardY = startY;
         const cardX = dayX + 6;
         const cardW = colW - 12;
 
-        let bg = s.swim ? "#dbeafe" : "#fef3c7";
-        let border = s.swim ? "#60a5fa" : "#f59e0b";
-        let fg = s.swim ? "#1e3a8a" : "#92400e";
+        let bg = "#ffffff";
+        let border = "#cbd5e1";
+        let fg = "#0f172a";
+        let accent = s.swim ? "#3b82f6" : "#f59e0b";
 
         if (s.state === "published") {
-          bg = "#dcfce7";
-          border = "#34d399";
-          fg = "#065f46";
+          border = "#86efac";
+          accent = "#10b981";
         } else if (s.state === "draft") {
-          bg = "#fef3c7";
-          border = "#f59e0b";
-          fg = "#92400e";
+          border = "#fcd34d";
+          accent = "#f59e0b";
         }
         if (s.isModified) {
-          bg = "#ffedd5";
           border = "#fb923c";
-          fg = "#9a3412";
+          accent = "#f97316";
         }
         if (s.isCancelled) {
-          bg = "#e5e7eb";
           border = "#9ca3af";
-          fg = "#6b7280";
+          fg = "#64748b";
+          accent = "#94a3b8";
         }
 
         ctx.fillStyle = bg;
         ctx.strokeStyle = border;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.1;
         ctx.beginPath();
         ctx.roundRect(cardX, cardY, cardW, cardH, 8);
         ctx.fill();
         ctx.stroke();
 
+        // Left accent bar for quick visual scan
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.roundRect(cardX + 1, cardY + 1, 5, cardH - 2, 4);
+        ctx.fill();
+
         const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
-        const coachLine = truncate(`Coach: ${s.coachesLabel}`, cardW - 14, "600 10.5px Inter, sans-serif");
+        const coachLine = truncate(`Coach: ${s.coachesLabel}`, cardW - 22, "600 12px Inter, sans-serif");
+        const locationLine = truncate(`Lieu: ${s.location}`, cardW - 22, "500 11.5px Inter, sans-serif");
 
         ctx.fillStyle = fg;
-        ctx.font = "700 11.5px Inter, sans-serif";
-        ctx.fillText(timeLine, cardX + 7, cardY + 14);
-        ctx.font = "600 10.5px Inter, sans-serif";
-        ctx.fillText(coachLine, cardX + 7, cardY + 28);
+        ctx.font = "700 14px Inter, sans-serif";
+        ctx.fillText(timeLine, cardX + 12, cardY + 18);
+        ctx.font = "600 12px Inter, sans-serif";
+        ctx.fillText(coachLine, cardX + 12, cardY + 35);
+        ctx.fillStyle = s.isCancelled ? "#94a3b8" : "#64748b";
+        ctx.font = "500 11.5px Inter, sans-serif";
+        ctx.fillText(locationLine, cardX + 12, cardY + 51);
 
         if (s.isCancelled) {
           ctx.strokeStyle = "#6b7280";
           ctx.lineWidth = 1.3;
           ctx.beginPath();
-          ctx.moveTo(cardX + 7, cardY + 19);
-          ctx.lineTo(cardX + cardW - 7, cardY + 19);
+          ctx.moveTo(cardX + 12, cardY + 22);
+          ctx.lineTo(cardX + cardW - 10, cardY + 22);
           ctx.stroke();
         }
       }
