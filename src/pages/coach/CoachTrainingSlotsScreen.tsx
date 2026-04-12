@@ -2186,26 +2186,30 @@ const CoachTrainingSlotsScreen = ({
         const cardX = dayX + 6;
         const cardW = colW - 12;
 
-        let bg = "#ffffff";
-        let border = "#cbd5e1";
+        // Match coach timeline palette:
+        // cancelled > modified > published > draft > swim/default
+        let bg = s.swim ? "rgba(59,130,246,0.15)" : "rgba(251,191,36,0.15)"; // blue-500/15 | amber-400/15
+        let border = s.swim ? "rgba(96,165,250,0.40)" : "rgba(251,191,36,0.40)"; // blue-400/40 | amber-400/40
         let fg = "#0f172a";
-        let accent = s.swim ? "#3b82f6" : "#f59e0b";
 
         if (s.state === "published") {
-          border = "#86efac";
-          accent = "#10b981";
+          bg = "rgba(16,185,129,0.12)"; // emerald-500/12
+          border = "rgba(16,185,129,0.30)"; // emerald-500/30
+          fg = "#065f46";
         } else if (s.state === "draft") {
-          border = "#fcd34d";
-          accent = "#f59e0b";
+          bg = "rgba(245,158,11,0.12)"; // amber-500/12
+          border = "rgba(245,158,11,0.30)"; // amber-500/30
+          fg = "#92400e";
         }
         if (s.isModified) {
-          border = "#fb923c";
-          accent = "#f97316";
+          bg = "rgba(249,115,22,0.12)"; // orange-500/12
+          border = "rgba(251,146,60,0.40)"; // orange-400/40
+          fg = "#9a3412";
         }
         if (s.isCancelled) {
-          border = "#9ca3af";
+          bg = "rgba(148,163,184,0.16)"; // muted-like tint
+          border = "rgba(100,116,139,0.22)"; // muted-foreground/20-ish
           fg = "#64748b";
-          accent = "#94a3b8";
         }
 
         ctx.fillStyle = bg;
@@ -2215,12 +2219,6 @@ const CoachTrainingSlotsScreen = ({
         ctx.roundRect(cardX, cardY, cardW, cardH, 10);
         ctx.fill();
         ctx.stroke();
-
-        // Left accent bar for quick visual scan
-        ctx.fillStyle = accent;
-        ctx.beginPath();
-        ctx.roundRect(cardX + 1, cardY + 1, 5, cardH - 2, 4);
-        ctx.fill();
 
         const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
         const coachLine = truncate(s.coachesLabel, cardW - 22, "600 16px Inter, sans-serif");
