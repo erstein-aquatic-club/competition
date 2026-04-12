@@ -180,8 +180,8 @@ export const buildRunUpdatePayload = (update: {
   if (update.progress_pct !== undefined) payload.progress_pct = update.progress_pct;
   if (update.status) payload.status = update.status;
   if (update.status === 'completed') payload.completed_at = new Date().toISOString();
-  if (update.fatigue !== undefined)
-    payload.raw_payload = { fatigue: update.fatigue, comments: update.comments };
+  if (update.fatigue !== undefined) payload.fatigue = update.fatigue;
+  if (update.comments !== undefined) payload.comments = update.comments;
   return payload;
 };
 

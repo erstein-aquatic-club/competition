@@ -53,7 +53,13 @@ type CoachHomeProps = {
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
   kpiLoading: boolean;
-  fatigueAlerts: Array<{ athleteName: string; rating: number }>;
+  fatigueAlerts: Array<{
+    athleteName: string;
+    rating: number;
+    average: number;
+    sampleCount: number;
+    level: "high" | "max";
+  }>;
   groups: Array<{ id: number; name: string; member_count?: number | null; is_temporary?: boolean; is_active?: boolean; parent_group_id?: number | null }>;
 };
 
@@ -71,6 +77,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 const RECENT_ATHLETES_KEY = "eac-recent-coach-athletes";
 const DAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"] as const;
+const FATIGUE_ALERT_MIN_SAMPLES = 2;
+const FATIGUE_ALERT_HIGH_THRESHOLD = 4.2;
+const FATIGUE_ALERT_MAX_THRESHOLD = 4.7;
 
 /** Get Monday of the current week (ISO week, Monday = first day) */
 function getMondayOfWeek(d: Date): Date {
@@ -187,6 +196,10 @@ const CoachHome = ({
 
   // ── Section C: Fatigue alerts (max 3) ──────────────────────
   const topAlerts = useMemo(() => fatigueAlerts.slice(0, 3), [fatigueAlerts]);
+  const hasMaxFatigueAlert = useMemo(
+    () => topAlerts.some((alert) => alert.level === "max"),
+    [topAlerts],
+  );
 
   // ── Section C-bis: Recent swimmer comments (48h) ──────────
   const { data: recentComments } = useQuery({
@@ -316,9 +329,15 @@ const CoachHome = ({
         <section className="space-y-2.5">
           <SectionLabel>Alertes</SectionLabel>
 
-          <div className="space-y-1.5 rounded-2xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/50 dark:bg-red-950/25">
+          <div className={[
+            "space-y-1.5 rounded-2xl border p-3",
+            hasMaxFatigueAlert
+              ? "border-red-200 bg-red-50/70 dark:border-red-900/50 dark:bg-red-950/25"
+              : "border-amber-200 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/25",
+          ].join(" ")}>
             {topAlerts.map((alert) => {
               const athlete = athletes.find((a) => a.display_name === alert.athleteName);
+              const isMaxAlert = alert.level === "max";
               return (
                 <button
                   key={alert.athleteName}
@@ -330,16 +349,49 @@ const CoachHome = ({
                   className="flex w-full items-center gap-3 rounded-2xl bg-white/70 dark:bg-black/20 px-3.5 py-2.5 text-left transition-colors active:bg-white/90"
                 >
                   <span className="relative flex h-3 w-3 shrink-0">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                    <span
+                      className={[
+                        "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60",
+                        isMaxAlert ? "bg-red-400" : "bg-amber-400",
+                      ].join(" ")}
+                    />
+                    <span
+                      className={[
+                        "relative inline-flex h-3 w-3 rounded-full",
+                        isMaxAlert ? "bg-red-500" : "bg-amber-500",
+                      ].join(" ")}
+                    />
                   </span>
-                  <span className="flex-1 text-sm font-semibold text-red-900 dark:text-red-200">
+                  <span
+                    className={[
+                      "flex-1 text-sm font-semibold",
+                      isMaxAlert ? "text-red-900 dark:text-red-200" : "text-amber-900 dark:text-amber-200",
+                    ].join(" ")}
+                  >
                     {alert.athleteName}
                   </span>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-red-600 dark:text-red-400">
-                    Fatigue max
+                  <span
+                    className={[
+                      "text-[9px] font-black uppercase tracking-widest",
+                      isMaxAlert ? "text-red-600 dark:text-red-400" : "text-amber-700 dark:text-amber-400",
+                    ].join(" ")}
+                  >
+                    {isMaxAlert ? "Fatigue max" : "Fatigue élevée"}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 text-red-400" />
+                  <span
+                    className={[
+                      "text-[10px] font-bold tabular-nums",
+                      isMaxAlert ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300",
+                    ].join(" ")}
+                  >
+                    {alert.average.toFixed(1)}/5
+                  </span>
+                  <ChevronRight
+                    className={[
+                      "h-3.5 w-3.5",
+                      isMaxAlert ? "text-red-400" : "text-amber-500",
+                    ].join(" ")}
+                  />
                 </button>
               );
             })}
@@ -500,13 +552,32 @@ const CoachHome = ({
 const getDateOnly = (value: Date) => value.toISOString().split("T")[0];
 const getRunTimestamp = (run: LocalStrengthRun) =>
   new Date(run.completed_at || run.started_at || run.date || run.created_at || 0).getTime();
+const normalizeFatigueValue = (value: unknown): number | null => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  if (num <= 5) {
+    return Math.min(5, Math.max(1, num));
+  }
+  if (num <= 10) {
+    return Math.min(5, Math.max(1, num / 2));
+  }
+  return null;
+};
+const getRunFatigueValue = (run: LocalStrengthRun): number | null => {
+  const direct = normalizeFatigueValue(run.fatigue);
+  if (direct != null) return direct;
+  const rawPayload = run.raw_payload as Record<string, unknown> | null | undefined;
+  return normalizeFatigueValue(rawPayload?.fatigue);
+};
 
 const buildFatigueRating = (values: number[]) => {
-  if (!values.length) return null;
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-  // Values are already normalized to 1-5 scale by mapFromDbSession/normalizeScaleToFive
+  const normalizedValues = values
+    .map((value) => normalizeFatigueValue(value))
+    .filter((value): value is number => value != null);
+  if (!normalizedValues.length) return null;
+  const average = normalizedValues.reduce((sum, value) => sum + value, 0) / normalizedValues.length;
   const rating = Math.min(5, Math.max(1, Math.round(average)));
-  return { average, rating };
+  return { average, rating, sampleCount: normalizedValues.length };
 };
 
 // ── Coach (outer router component — unchanged) ─────────────────────────────
@@ -660,9 +731,8 @@ export default function Coach() {
           const runs = strength?.runs ?? [];
           const recentRuns = runs.filter((run: LocalStrengthRun) => getRunTimestamp(run) >= startDate.getTime());
           const runFatigueValues = recentRuns
-            .map((run: LocalStrengthRun) => run.fatigue ?? run.feeling ?? run.rpe)
-            .filter((value: unknown): value is number => Number.isFinite(Number(value)))
-            .map((value: unknown) => Number(value));
+            .map((run: LocalStrengthRun) => getRunFatigueValue(run))
+            .filter((value): value is number => value != null);
           const strengthLoad = recentRuns.reduce((sum: number, run: LocalStrengthRun) => {
             const runEffort = Number(run.feeling ?? run.rpe ?? 0);
             const runDuration = Number(run.duration ?? 0);
@@ -702,11 +772,25 @@ export default function Coach() {
       );
 
       const fatigueAlerts = perAthlete
-        .filter((entry) => entry.fatigueRating?.rating === 5)
+        .filter((entry) => {
+          if (!entry.fatigueRating) return false;
+          if (entry.fatigueRating.sampleCount < FATIGUE_ALERT_MIN_SAMPLES) return false;
+          return entry.fatigueRating.average >= FATIGUE_ALERT_HIGH_THRESHOLD;
+        })
         .map((entry) => ({
           athleteName: entry.athleteName,
           rating: entry.fatigueRating?.rating ?? 0,
-        }));
+          average: entry.fatigueRating?.average ?? 0,
+          sampleCount: entry.fatigueRating?.sampleCount ?? 0,
+          level:
+            (entry.fatigueRating?.average ?? 0) >= FATIGUE_ALERT_MAX_THRESHOLD
+              ? ("max" as const)
+              : ("high" as const),
+        }))
+        .sort((a, b) => {
+          if (b.average !== a.average) return b.average - a.average;
+          return b.sampleCount - a.sampleCount;
+        });
       const mostLoadedAthlete = perAthlete
         .filter((entry) => entry.loadScore > 0)
         .sort((a, b) => b.loadScore - a.loadScore)[0];

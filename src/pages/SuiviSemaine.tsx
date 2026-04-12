@@ -2,8 +2,8 @@
  * SuiviSemaine — Weekly timeline view for swimmers.
  *
  * Shows a day-by-day breakdown of the current (or past) week with:
- * - Logged sessions (ressentis) with indicator pastilles
- * - Missed sessions (no feedback yet) with tap-to-log CTA
+ * - Logged swim feedback and completed strength runs
+ * - Missed sessions (no feedback yet) with contextual CTA
  * - Absent sessions with undo capability
  * - Wellness CTA banner when today's check is not logged
  */
@@ -21,10 +21,12 @@ import {
   Clock,
   Droplets,
   Heart,
+  Dumbbell,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Session, PlannedAbsence } from "@/lib/api";
 import type { ResolvedSlotAssignment } from "@/lib/api/types";
+import type { LocalStrengthRun } from "@/lib/types";
 import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
 import { getWellnessForDate } from "@/lib/api/wellness";
 import { useAuth } from "@/lib/auth";
@@ -77,7 +79,6 @@ function isFuture(d: Date): boolean {
 }
 
 const DAY_NAMES_FR = ["Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam.", "Dim."];
-const DAY_NAMES_FULL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
 function formatDateShort(d: Date): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
@@ -103,14 +104,100 @@ function normalizeSlot(slot: string): "AM" | "PM" {
   return "PM";
 }
 
-// ── Indicator colors (from SwimmerFeedbackTab pattern) ────────
+export function formatClockTime(raw: string): string {
+  const [hours = "0", minutes = "0"] = String(raw).split(":");
+  const hh = String(Number.parseInt(hours, 10) || 0).padStart(2, "0");
+  const mm = String(Number.parseInt(minutes, 10) || 0).padStart(2, "0");
+  return `${hh}h${mm}`;
+}
 
-const INDICATORS = [
-  { key: "effort" as const, label: "Diff.", mode: "hard" as const },
-  { key: "feeling" as const, label: "Fat.", mode: "hard" as const },
-  { key: "performance" as const, label: "Perf", mode: "good" as const },
-  { key: "engagement" as const, label: "Eng.", mode: "good" as const },
+export function formatSlotTime(raw?: string): string | null {
+  if (!raw) return null;
+  const [start, end] = String(raw).split("-");
+  if (!end) return formatClockTime(raw);
+  return `${formatClockTime(start)} - ${formatClockTime(end)}`;
+}
+
+function slotSortValue(raw?: string): number {
+  if (!raw) return Number.MAX_SAFE_INTEGER;
+  const [start] = String(raw).split("-");
+  const [hours = "0", minutes = "0"] = start.split(":");
+  return (Number.parseInt(hours, 10) || 0) * 60 + (Number.parseInt(minutes, 10) || 0);
+}
+
+type SessionKind = "swim" | "strength";
+
+export function inferSessionKind(params: {
+  assignmentType?: SessionKind | null;
+  location?: string | null;
+}): SessionKind {
+  if (params.assignmentType === "swim" || params.assignmentType === "strength") {
+    return params.assignmentType;
+  }
+  const location = params.location?.toLowerCase() ?? "";
+  if (
+    location.includes("salle") ||
+    location.includes("muscu") ||
+    location.includes("gym") ||
+    location.includes("ppg")
+  ) {
+    return "strength";
+  }
+  return "swim";
+}
+
+const HARD_SCALE = [
+  "Tres facile",
+  "Plutot facile",
+  "Modere",
+  "Plutot dur",
+  "Tres dur",
 ];
+
+const GOOD_SCALE = [
+  "Tres mauvaise",
+  "Plutot mauvaise",
+  "Moyenne",
+  "Plutot bonne",
+  "Excellente",
+];
+
+const FATIGUE_SCALE = [
+  "Tres frais",
+  "Plutot frais",
+  "Normal",
+  "Fatigue",
+  "Epuise",
+];
+
+type IndicatorMeta = {
+  key: string;
+  shortLabel: string;
+  fullLabel: string;
+  mode: "hard" | "good";
+  descriptions: string[];
+};
+
+const SWIM_INDICATORS: IndicatorMeta[] = [
+  { key: "effort", shortLabel: "Diff.", fullLabel: "Difficulte", mode: "hard", descriptions: HARD_SCALE },
+  { key: "feeling", shortLabel: "Fat.", fullLabel: "Fatigue fin", mode: "hard", descriptions: FATIGUE_SCALE },
+  { key: "performance", shortLabel: "Perf.", fullLabel: "Performance percue", mode: "good", descriptions: GOOD_SCALE },
+  { key: "engagement", shortLabel: "Eng.", fullLabel: "Engagement", mode: "good", descriptions: GOOD_SCALE },
+];
+
+const STRENGTH_INDICATORS: IndicatorMeta[] = [
+  { key: "feeling", shortLabel: "Diff.", fullLabel: "Difficulte seance", mode: "hard", descriptions: HARD_SCALE },
+  { key: "fatigue", shortLabel: "Fat.", fullLabel: "Fatigue fin", mode: "hard", descriptions: FATIGUE_SCALE },
+];
+
+export function describeIndicatorValue(meta: IndicatorMeta, value: number | null | undefined): string | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 1 || numeric > 5) return null;
+  const description = meta.descriptions[numeric - 1] ?? "";
+  return `${meta.fullLabel} ${numeric}/5 - ${description}`;
+}
+
+// ── Indicator colors ─────────────────────────────────────────
 
 function indicatorColor(mode: "hard" | "good", value: number | null | undefined): string {
   const v = Number(value);
@@ -127,6 +214,7 @@ type CardType = "logged" | "missed" | "absent";
 
 interface TimelineCard {
   type: CardType;
+  kind: SessionKind;
   date: Date;
   iso: string;
   slotKey: "AM" | "PM";
@@ -135,6 +223,7 @@ interface TimelineCard {
   title: string;
   km: number | null;
   session?: Session;
+  strengthRun?: LocalStrengthRun;
   absenceReason?: string | null;
   swimmerSlotId?: string;
   assignmentId?: number;
@@ -178,11 +267,26 @@ export default function SuiviSemaine() {
     enabled: !!userId && weekISOs.length > 0,
   });
 
-  // Sessions (ressentis)
+  // Swim sessions (ressentis)
   const { data: allSessions = [] } = useQuery({
     queryKey: ["sessions", userId],
     queryFn: () => api.getSessions(user!, userId),
     enabled: !!user,
+  });
+
+  // Strength history (real muscu runs only)
+  const { data: strengthHistory } = useQuery({
+    queryKey: ["strength-history-week", userId, weekISOs[0], weekISOs[6]],
+    queryFn: () =>
+      api.getStrengthHistory(user ?? "", {
+        athleteId: userId,
+        from: weekISOs[0],
+        to: weekISOs[6],
+        status: "completed",
+        limit: 200,
+      }),
+    enabled: !!userId && !!user && weekISOs.length === 7,
+    staleTime: 60_000,
   });
 
   // Absences
@@ -227,18 +331,48 @@ export default function SuiviSemaine() {
     return map;
   }, [myAbsences]);
 
-  const sessionsByDateSlot = useMemo(() => {
+  const swimSessionsByAssignmentId = useMemo(() => {
+    const map = new Map<number, Session>();
+    for (const s of allSessions) {
+      if (!weekISOs.includes(s.date)) continue;
+      if (typeof s.assignment_id === "number" && Number.isFinite(s.assignment_id) && !map.has(s.assignment_id)) {
+        map.set(s.assignment_id, s);
+      }
+    }
+    return map;
+  }, [allSessions, weekISOs]);
+
+  const swimSessionsByDateSlot = useMemo(() => {
     const map = new Map<string, Session>();
     for (const s of allSessions) {
-      // Only keep sessions within this week
       if (!weekISOs.includes(s.date)) continue;
-      // Normalize slot: DB stores "Matin"/"Soir", we match on "AM"/"PM"
       const key = `${s.date}_${normalizeSlot(s.slot)}`;
-      // Keep the most recent (first in descending order)
       if (!map.has(key)) map.set(key, s);
     }
     return map;
   }, [allSessions, weekISOs]);
+
+  const strengthRunsByAssignmentId = useMemo(() => {
+    const map = new Map<number, LocalStrengthRun>();
+    const runs = strengthHistory?.runs ?? [];
+    for (const run of runs) {
+      const assignmentId = Number(run.assignment_id);
+      if (!Number.isFinite(assignmentId) || assignmentId <= 0 || map.has(assignmentId)) continue;
+      map.set(assignmentId, run);
+    }
+    return map;
+  }, [strengthHistory]);
+
+  const findSwimSession = useCallback((params: {
+    iso: string;
+    slotKey: "AM" | "PM";
+    assignmentId?: number;
+  }): Session | undefined => {
+    if (params.assignmentId && swimSessionsByAssignmentId.has(params.assignmentId)) {
+      return swimSessionsByAssignmentId.get(params.assignmentId);
+    }
+    return swimSessionsByDateSlot.get(`${params.iso}_${params.slotKey}`);
+  }, [swimSessionsByAssignmentId, swimSessionsByDateSlot]);
 
   const cards = useMemo<TimelineCard[]>(() => {
     const result: TimelineCard[] = [];
@@ -247,41 +381,47 @@ export default function SuiviSemaine() {
       const date = weekDates[dayIdx];
       const iso = weekISOs[dayIdx];
       const dayOfWeek = dayIdx + 1; // 1=Monday
+      const absence = absencesByDate.get(iso);
 
       // Get resolved assignments for this date
       const resolved: ResolvedSlotAssignment[] = assignmentsMap?.get(iso) ?? [];
 
       if (resolved.length === 0) {
-        // Check if there are slots for this day (even without assignment)
         const daySlots = swimmerSlots.filter((s) => s.day_of_week === dayOfWeek);
         for (const slot of daySlots) {
-          const sk = slotKeyFromTime(slot.start_time);
-          const matchKey = `${iso}_${sk}`;
-          const session = sessionsByDateSlot.get(matchKey);
-          const absence = absencesByDate.get(iso);
+          const kind = inferSessionKind({ location: slot.location });
+          const slotKey = slotKeyFromTime(slot.start_time);
+          const swimSession = kind === "swim"
+            ? findSwimSession({ iso, slotKey })
+            : undefined;
 
-          if (session) {
+          if (swimSession) {
             result.push({
               type: "logged",
+              kind,
               date,
               iso,
-              slotKey: sk,
+              slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: "Entraînement",
-              km: session.distance > 0 ? session.distance : null,
-              session,
+              title: kind === "strength" ? "Seance musculation" : "Entrainement",
+              km: swimSession.distance > 0 ? swimSession.distance : null,
+              session: swimSession,
               swimmerSlotId: slot.id,
             });
-          } else if (absence) {
+            continue;
+          }
+
+          if (absence) {
             result.push({
               type: "absent",
+              kind,
               date,
               iso,
-              slotKey: sk,
+              slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: "Entraînement",
+              title: kind === "strength" ? "Seance musculation" : "Entrainement",
               km: null,
               absenceReason: absence.reason,
               swimmerSlotId: slot.id,
@@ -289,12 +429,13 @@ export default function SuiviSemaine() {
           } else if (!isFuture(date)) {
             result.push({
               type: "missed",
+              kind,
               date,
               iso,
-              slotKey: sk,
+              slotKey,
               slotTime: `${slot.start_time}-${slot.end_time}`,
               slotLocation: slot.location,
-              title: "Entraînement",
+              title: kind === "strength" ? "Seance musculation" : "Entrainement",
               km: null,
               swimmerSlotId: slot.id,
             });
@@ -304,23 +445,32 @@ export default function SuiviSemaine() {
       }
 
       for (const r of resolved) {
-        const sk = slotKeyFromTime(r.slotTime.split("-")[0]);
-        const matchKey = `${iso}_${sk}`;
-        const session = sessionsByDateSlot.get(matchKey);
-        const absence = absencesByDate.get(iso);
-        const title = r.assignment?.title || "Entraînement";
+        const slotKey = slotKeyFromTime(r.slotTime.split("-")[0]);
+        const kind = inferSessionKind({
+          assignmentType: r.assignment?.session_type ?? null,
+          location: r.slotLocation,
+        });
+        const swimSession = kind === "swim"
+          ? findSwimSession({ iso, slotKey, assignmentId: r.assignmentId ?? undefined })
+          : undefined;
+        const strengthRun = kind === "strength" && r.assignmentId
+          ? strengthRunsByAssignmentId.get(r.assignmentId)
+          : undefined;
+        const title = r.assignment?.title || (kind === "strength" ? "Seance musculation" : "Entrainement");
 
-        if (session) {
+        if (swimSession || strengthRun) {
           result.push({
             type: "logged",
+            kind,
             date,
             iso,
-            slotKey: sk,
+            slotKey,
             slotTime: r.slotTime,
             slotLocation: r.slotLocation,
             title,
-            km: session.distance > 0 ? session.distance : null,
-            session,
+            km: swimSession?.distance && swimSession.distance > 0 ? swimSession.distance : null,
+            session: swimSession,
+            strengthRun,
             swimmerSlotId: r.swimmerSlotId,
             assignmentId: r.assignmentId ?? undefined,
             assignmentSource: r.source,
@@ -328,9 +478,10 @@ export default function SuiviSemaine() {
         } else if (absence) {
           result.push({
             type: "absent",
+            kind,
             date,
             iso,
-            slotKey: sk,
+            slotKey,
             slotTime: r.slotTime,
             slotLocation: r.slotLocation,
             title,
@@ -343,9 +494,10 @@ export default function SuiviSemaine() {
         } else if (!isFuture(date)) {
           result.push({
             type: "missed",
+            kind,
             date,
             iso,
-            slotKey: sk,
+            slotKey,
             slotTime: r.slotTime,
             slotLocation: r.slotLocation,
             title,
@@ -359,7 +511,15 @@ export default function SuiviSemaine() {
     }
 
     return result;
-  }, [weekDates, weekISOs, assignmentsMap, swimmerSlots, sessionsByDateSlot, absencesByDate]);
+  }, [
+    weekDates,
+    weekISOs,
+    assignmentsMap,
+    swimmerSlots,
+    absencesByDate,
+    strengthRunsByAssignmentId,
+    findSwimSession,
+  ]);
 
   // ── Group cards by day ─────────────────────────────────────
 
@@ -370,23 +530,35 @@ export default function SuiviSemaine() {
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(card);
     }
+    for (const [key, list] of grouped.entries()) {
+      grouped.set(
+        key,
+        list.slice().sort((a, b) => {
+          const byTime = slotSortValue(a.slotTime) - slotSortValue(b.slotTime);
+          if (byTime !== 0) return byTime;
+          return a.kind.localeCompare(b.kind);
+        }),
+      );
+    }
     return grouped;
   }, [cards]);
 
-  // ── Navigate to calendar for feedback ──────────────────────
+  // ── Navigate to feedback/detail screen ─────────────────────
 
   const openFeedback = useCallback(
-    (iso: string) => {
-      // Navigate to the natation calendar, which has FeedbackDrawer
-      // The date is encoded in the URL to pre-select it
-      navigate(`/natation?date=${iso}`);
+    (card: TimelineCard) => {
+      if (card.kind === "strength") {
+        navigate("/strength");
+        return;
+      }
+      navigate(`/natation?date=${card.iso}`);
     },
     [navigate],
   );
 
   // ── Wellness banner visibility ─────────────────────────────
 
-  const showWellnessBanner = weekOffset === 0 && !todayWellness && userId;
+  const showWellnessBanner = weekOffset === 0 && !todayWellness && !!userId;
 
   // ── Render ─────────────────────────────────────────────────
 
@@ -403,7 +575,7 @@ export default function SuiviSemaine() {
         <button
           type="button"
           onClick={() => setWeekOffset((o) => o - 1)}
-          className="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition active:scale-95"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card transition hover:bg-muted active:scale-95"
           aria-label="Semaine precedente"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -420,7 +592,7 @@ export default function SuiviSemaine() {
           type="button"
           onClick={() => setWeekOffset((o) => o + 1)}
           disabled={weekOffset >= 0}
-          className="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition active:scale-95 disabled:opacity-30"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card transition hover:bg-muted active:scale-95 disabled:opacity-30"
           aria-label="Semaine suivante"
         >
           <ChevronRight className="h-4 w-4" />
@@ -432,16 +604,16 @@ export default function SuiviSemaine() {
         <button
           type="button"
           onClick={() => setWellnessOpen(true)}
-          className="w-full mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3 hover:bg-primary/10 transition active:scale-[0.98]"
+          className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 transition hover:bg-primary/10 active:scale-[0.98]"
         >
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Heart className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-left min-w-0">
+          <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-foreground">Comment te sens-tu ce matin ?</p>
             <p className="text-[11px] text-muted-foreground">Remplis ton check bien-etre du jour</p>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </button>
       )}
 
@@ -458,7 +630,7 @@ export default function SuiviSemaine() {
             <div key={iso}>
               {/* Day separator */}
               <div className={cn(
-                "flex items-center gap-2 py-2 mt-2",
+                "mt-2 flex items-center gap-2 py-2",
                 today && "text-primary",
                 future && "opacity-50",
               )}>
@@ -470,7 +642,7 @@ export default function SuiviSemaine() {
                 </span>
                 <span className={cn(
                   "text-xs",
-                  today ? "text-primary font-semibold" : "text-muted-foreground",
+                  today ? "font-semibold text-primary" : "text-muted-foreground",
                 )}>
                   {formatDateShort(date)}
                 </span>
@@ -482,13 +654,13 @@ export default function SuiviSemaine() {
 
               {/* Cards or empty state */}
               {dayCards.length === 0 && !future ? (
-                <p className="text-[11px] text-muted-foreground py-1 pl-1">
+                <p className="py-1 pl-1 text-[11px] text-muted-foreground">
                   Pas de créneau
                 </p>
               ) : dayCards.length === 0 && future ? null : (
                 <div className="space-y-2">
                   {dayCards.map((card) => {
-                    const cardKey = `${card.iso}_${card.slotKey}_${card.swimmerSlotId ?? "x"}`;
+                    const cardKey = `${card.iso}_${card.kind}_${card.swimmerSlotId ?? card.assignmentId ?? card.slotTime ?? "x"}`;
                     const isExpanded = expandedKey === cardKey;
 
                     if (card.type === "logged") {
@@ -512,12 +684,11 @@ export default function SuiviSemaine() {
                       );
                     }
 
-                    // missed
                     return (
                       <MissedCard
                         key={cardKey}
                         card={card}
-                        onTap={() => openFeedback(card.iso)}
+                        onTap={() => openFeedback(card)}
                         onMarkAbsent={() =>
                           absenceMutation.mutate({ date: card.iso })
                         }
@@ -557,6 +728,52 @@ export default function SuiviSemaine() {
 
 // ── Sub-components ───────────────────────────────────────────
 
+function IndicatorPill({
+  meta,
+  value,
+  active,
+  onToggle,
+}: {
+  meta: IndicatorMeta;
+  value: number | null | undefined;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const tooltip = describeIndicatorValue(meta, value);
+
+  return (
+    <span className="relative group">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        className={cn(
+          "inline-flex h-6 w-6 items-center justify-center rounded-lg text-[10px] font-bold",
+          "cursor-pointer",
+          indicatorColor(meta.mode, value),
+        )}
+        aria-label={tooltip ?? meta.fullLabel}
+        title={tooltip ?? meta.fullLabel}
+      >
+        {value ?? "\u2014"}
+      </button>
+      {tooltip && (
+        <span
+          className={cn(
+            "pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[9px] font-semibold text-background transition-opacity",
+            "opacity-0 group-hover:opacity-100",
+            active && "opacity-100",
+          )}
+        >
+          {tooltip}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function LoggedCard({
   card,
   expanded,
@@ -566,19 +783,45 @@ function LoggedCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const session = card.session!;
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const isStrength = card.kind === "strength";
+  const session = card.session;
+  const strengthRun = card.strengthRun;
+  const indicators = isStrength ? STRENGTH_INDICATORS : SWIM_INDICATORS;
+  const comments = isStrength ? strengthRun?.comments : session?.comments;
+  const hasExpandableContent = Boolean(comments || session?.coach_notes);
+
   return (
     <button
       type="button"
-      onClick={onToggle}
-      className="w-full rounded-2xl border bg-card p-3 text-left hover:border-primary/20 transition-all"
+      onClick={() => {
+        setActiveTooltip(null);
+        onToggle();
+      }}
+      className={cn(
+        "w-full rounded-2xl border p-3 text-left transition-all",
+        isStrength
+          ? "border-amber-200/70 bg-amber-50/40 hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-950/10"
+          : "bg-card hover:border-primary/20",
+      )}
     >
       {/* Top row: slot info */}
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-1.5">
+      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+            isStrength
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
+          )}
+        >
+          {isStrength ? <Dumbbell className="h-3 w-3" /> : <Droplets className="h-3 w-3" />}
+          {isStrength ? "Muscu" : "Natation"}
+        </span>
         {card.slotTime && (
           <span className="flex items-center gap-0.5">
             <Clock className="h-3 w-3" />
-            {card.slotTime}
+            {formatSlotTime(card.slotTime)}
           </span>
         )}
         {card.slotLocation && (
@@ -589,38 +832,43 @@ function LoggedCard({
         )}
       </div>
 
-      {/* Title + distance + indicators */}
+      {/* Title + session facts + indicators */}
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="text-sm font-semibold text-foreground">{card.title}</span>
-          {session.distance > 0 && (
-            <span className="text-xs text-muted-foreground ml-1.5">
+          {!isStrength && session && session.distance > 0 && (
+            <span className="ml-1.5 text-xs text-muted-foreground">
               {session.distance}m
             </span>
           )}
+          {isStrength && strengthRun?.duration && strengthRun.duration > 0 && (
+            <span className="ml-1.5 text-xs text-muted-foreground">
+              {strengthRun.duration} min
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {INDICATORS.map((ind) => {
-            const value = session[ind.key] as number | null | undefined;
+        <div className="flex shrink-0 items-center gap-1">
+          {indicators.map((indicator) => {
+            const value = isStrength
+              ? (strengthRun?.[indicator.key as keyof LocalStrengthRun] as number | null | undefined)
+              : (session?.[indicator.key as keyof Session] as number | null | undefined);
+            const tooltipId = `${card.iso}-${card.assignmentId ?? card.swimmerSlotId ?? "x"}-${indicator.key}`;
             return (
-              <span
-                key={ind.key}
-                className={cn(
-                  "inline-flex items-center justify-center h-6 w-6 rounded-lg text-[10px] font-bold",
-                  indicatorColor(ind.mode, value),
-                )}
-                title={ind.label}
-              >
-                {value ?? "\u2014"}
-              </span>
+              <IndicatorPill
+                key={indicator.key}
+                meta={indicator}
+                value={value}
+                active={activeTooltip === tooltipId}
+                onToggle={() => setActiveTooltip(activeTooltip === tooltipId ? null : tooltipId)}
+              />
             );
           })}
         </div>
       </div>
 
       {/* Expandable details */}
-      {(session.comments || session.coach_notes) && (
-        <div className="flex justify-end mt-1">
+      {hasExpandableContent && (
+        <div className="mt-1 flex justify-end">
           <ChevronDown
             className={cn(
               "h-3.5 w-3.5 text-muted-foreground transition-transform",
@@ -630,13 +878,13 @@ function LoggedCard({
         </div>
       )}
 
-      {expanded && (
-        <div className="mt-2 pt-2 border-t border-border space-y-2">
-          {session.comments && (
-            <p className="text-xs text-foreground whitespace-pre-wrap">{session.comments}</p>
+      {expanded && hasExpandableContent && (
+        <div className="mt-2 space-y-2 border-t border-border pt-2">
+          {comments && (
+            <p className="whitespace-pre-wrap text-xs text-foreground">{comments}</p>
           )}
-          {session.coach_notes && (
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-400 p-2">
+          {session?.coach_notes && (
+            <div className="rounded-lg border-l-4 border-blue-400 bg-blue-50 p-2 dark:bg-blue-950/20">
               <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
               <p className="text-xs text-blue-800 dark:text-blue-300">{session.coach_notes}</p>
             </div>
@@ -656,14 +904,34 @@ function MissedCard({
   onTap: () => void;
   onMarkAbsent: () => void;
 }) {
+  const isStrength = card.kind === "strength";
+
   return (
-    <div className="rounded-2xl border-2 border-dashed border-border p-3 opacity-70">
+    <div
+      className={cn(
+        "rounded-2xl border-2 border-dashed p-3 opacity-80",
+        isStrength
+          ? "border-amber-200/80 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10"
+          : "border-border",
+      )}
+    >
       {/* Slot info */}
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-1.5">
+      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+            isStrength
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
+          )}
+        >
+          {isStrength ? <Dumbbell className="h-3 w-3" /> : <Droplets className="h-3 w-3" />}
+          {isStrength ? "Muscu" : "Natation"}
+        </span>
         {card.slotTime && (
           <span className="flex items-center gap-0.5">
             <Clock className="h-3 w-3" />
-            {card.slotTime}
+            {formatSlotTime(card.slotTime)}
           </span>
         )}
         {card.slotLocation && (
@@ -677,16 +945,18 @@ function MissedCard({
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">{card.title}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Pas de ressenti</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {isStrength ? "Pas de bilan muscu" : "Pas de ressenti"}
+          </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               onMarkAbsent();
             }}
-            className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted transition active:scale-95"
+            className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground transition hover:bg-muted active:scale-95"
           >
             <XCircle className="h-3 w-3" />
             Absent
@@ -694,10 +964,15 @@ function MissedCard({
           <button
             type="button"
             onClick={onTap}
-            className="flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary hover:bg-primary/20 transition active:scale-95"
+            className={cn(
+              "flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-semibold transition active:scale-95",
+              isStrength
+                ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                : "bg-primary/10 text-primary hover:bg-primary/20",
+            )}
           >
-            <Droplets className="h-3 w-3" />
-            Saisir
+            {isStrength ? <Dumbbell className="h-3 w-3" /> : <Droplets className="h-3 w-3" />}
+            {isStrength ? "Ouvrir" : "Saisir"}
           </button>
         </div>
       </div>
@@ -712,26 +987,41 @@ function AbsentCard({
   card: TimelineCard;
   onUndo: () => void;
 }) {
+  const isStrength = card.kind === "strength";
+
   return (
-    <div className="rounded-2xl border border-border bg-muted/30 p-2.5 flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2 min-w-0">
-        {card.slotTime && (
-          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
-            <Clock className="h-3 w-3" />
-            {card.slotTime}
+    <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-muted/30 p-2.5">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          {card.slotTime && (
+            <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {formatSlotTime(card.slotTime)}
+            </span>
+          )}
+          <span
+            className={cn(
+              "rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
+              isStrength
+                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
+            )}
+          >
+            {isStrength ? "Muscu" : "Natation"}
           </span>
-        )}
-        <span className="rounded-md bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-400">
-          Absent
-        </span>
+          <span className="rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            Absent
+          </span>
+        </div>
+        <p className="mt-1 truncate text-[11px] font-medium text-foreground">{card.title}</p>
         {card.absenceReason && (
-          <span className="text-[10px] text-muted-foreground truncate">{card.absenceReason}</span>
+          <span className="text-[10px] text-muted-foreground">{card.absenceReason}</span>
         )}
       </div>
       <button
         type="button"
         onClick={onUndo}
-        className="h-7 w-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted transition active:scale-95 shrink-0"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card transition hover:bg-muted active:scale-95"
         aria-label="Annuler absence"
       >
         <Undo2 className="h-3.5 w-3.5 text-muted-foreground" />
