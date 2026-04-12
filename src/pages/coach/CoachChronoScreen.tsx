@@ -1,4 +1,5 @@
 import { useReducer, useEffect, useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { chronoReducer, initialChronoState } from "../../lib/chrono-reducer";
 import type { ChronoState } from "../../lib/chrono-types";
 import { useChronoTimer } from "../../hooks/useChronoTimer";
@@ -54,6 +55,7 @@ interface Props {
 }
 
 export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
+  const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(chronoReducer, initialChronoState);
   const [showRestore, setShowRestore] = useState(false);
   const isMobile = useIsMobile();
@@ -100,12 +102,14 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
 
   const handleExportComplete = useCallback(() => {
     localStorage.removeItem(BACKUP_KEY);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+  }, [queryClient]);
 
   const handleSaveDraft = useCallback(() => {
     localStorage.removeItem(BACKUP_KEY);
+    queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
     dispatch({ type: "RESET_FOR_NEW_SERIES" });
-  }, []);
+  }, [queryClient]);
 
   const isRacing = state.phase === "racing";
   const { now, getTimestamp } = useChronoTimer(isRacing);

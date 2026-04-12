@@ -138,6 +138,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
       onSaveDraft?.();
     } catch (err: any) {
       toast.error(err.message || "Erreur de sauvegarde");
+    } finally {
       setSavingDraft(false);
     }
   }, [state, onSaveDraft, savingDraft]);
