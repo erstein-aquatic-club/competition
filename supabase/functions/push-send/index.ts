@@ -21,7 +21,9 @@ function resolveNotificationUrl(payload: {
 }): string {
   const metadataUrl = payload.metadata?.url;
   if (typeof metadataUrl === "string" && metadataUrl.trim()) {
-    return metadataUrl;
+    // Ensure push URLs always start with # for the service worker push-handler
+    const cleaned = metadataUrl.trim();
+    return cleaned.startsWith("#") ? cleaned : `#${cleaned}`;
   }
 
   const type = String(payload.type || "").toLowerCase();
@@ -30,7 +32,7 @@ function resolveNotificationUrl(payload: {
   const haystack = `${title} ${body}`;
 
   if (type === "interview" || haystack.includes("entretien")) {
-    return "#/profile?section=interviews";
+    return "#/suivi?tab=entretiens";
   }
 
   if (type === "assignment") {
@@ -38,10 +40,10 @@ function resolveNotificationUrl(payload: {
   }
 
   if (type === "objective" || haystack.includes("objectif")) {
-    return "#/profile?section=objectives";
+    return "#/suivi?tab=objectifs";
   }
 
-  if (type === "wellness") {
+  if (type === "wellness" || haystack.includes("bien-être") || haystack.includes("te sens-tu")) {
     return "#/?wellness=open";
   }
 
