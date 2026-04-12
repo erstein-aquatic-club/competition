@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Brain, Clock, Bell, BellOff, BellRing, ChevronRight, FileText, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
+import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import { compressImage, isAcceptedImageType } from "@/lib/imageUtils";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -30,8 +30,7 @@ import type { BadgeDefinition } from "@/lib/achievementRules";
 import SwimmerMessagesView from "@/components/profile/SwimmerMessagesView";
 import { NeurotypQuiz } from "@/components/neurotype/NeurotypQuiz";
 import NeurotypResultView from "@/components/neurotype/NeurotypResult";
-import { NEUROTYPE_PROFILES } from "@/lib/neurotype-quiz-data";
-import type { NeurotypResult as NeurotypResultType, NeurotypCode } from "@/lib/api/types";
+import type { NeurotypResult as NeurotypResultType } from "@/lib/api/types";
 
 type ProfileSection =
   | "home"
@@ -66,19 +65,6 @@ function readProfileSectionFromHash(): ProfileSection {
   }
 }
 
-function readDismissedNotificationIds(userId: number | null | undefined): number[] {
-  if (typeof window === "undefined" || !userId) return [];
-  try {
-    const raw = window.localStorage.getItem(`profile-notifications-dismissed:${userId}`);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.map((value) => Number(value)).filter((value) => Number.isFinite(value))
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 
 export const shouldShowRecords = (role: string | null) => role !== "coach" && role !== "admin" && role !== "comite";
 
@@ -95,7 +81,6 @@ export const getRoleLabel = (role: string | null) => {
   }
 };
 
-const getNeurotypName = (code: string) => NEUROTYPE_PROFILES[code as NeurotypCode]?.name ?? code;
 
 const THEME_OPTIONS = [
   { value: "light", label: "Clair", icon: Sun },
@@ -182,43 +167,6 @@ function ProfileActionRow({
   );
 }
 
-function ProfileActionTile({
-  icon: Icon,
-  title,
-  meta,
-  onClick,
-  accentClassName = "text-primary",
-  badgeLabel,
-}: {
-  icon: LucideIcon;
-  title: string;
-  meta?: string | null;
-  onClick: () => void;
-  accentClassName?: string;
-  badgeLabel?: string | null;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-3xl border border-border/70 bg-background/70 p-4 text-left transition hover:border-primary/25 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-          <Icon className={`h-5 w-5 ${accentClassName}`} />
-        </div>
-        {badgeLabel ? (
-          <Badge variant="secondary" className="shrink-0 text-[10px] uppercase tracking-[0.08em]">
-            {badgeLabel}
-          </Badge>
-        ) : null}
-      </div>
-      <p className="mt-3 text-sm font-semibold">{title}</p>
-      {meta ? <p className="mt-1 text-xs text-muted-foreground">{meta}</p> : null}
-    </button>
-  );
-}
-
 // Profile edit validation schema
 const profileEditSchema = z.object({
   group_id: z.string().optional(),
@@ -281,7 +229,6 @@ export default function Profile() {
   const [pendingNeurotypResult, setPendingNeurotypResult] = useState<NeurotypResultType | null>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
-  const [dismissedTargetIds, setDismissedTargetIds] = useState<number[]>([]);
 
   // Badge achievement checker — evaluates rules and unlocks new badges
   const isSwimmer = role === "athlete";
@@ -332,9 +279,6 @@ export default function Profile() {
     }
   }, []);
 
-  useEffect(() => {
-    setDismissedTargetIds(readDismissedNotificationIds(userId));
-  }, [userId, activeSection]);
 
   const handleTogglePush = async () => {
     if (!userId) return;
@@ -436,17 +380,6 @@ export default function Profile() {
     refetchGroups();
   };
 
-  const isSwimmerProfile = showRecords;
-
-  const { data: profileNotifications } = useQuery({
-    queryKey: ["profile-notifications-summary", userId],
-    queryFn: () =>
-      api.notifications_list({
-        targetUserId: userId ?? null,
-        limit: 100,
-      }),
-    enabled: isSwimmerProfile && !!userId,
-  });
 
 
   const avatarSrc = useMemo(() => {
@@ -456,19 +389,6 @@ export default function Profile() {
     return "";
   }, [profile, user]);
 
-  const visibleNotifications = useMemo(
-    () =>
-      (profileNotifications?.notifications ?? []).filter(
-        (notification) =>
-          notification.target_id == null || !dismissedTargetIds.includes(notification.target_id),
-      ),
-    [dismissedTargetIds, profileNotifications?.notifications],
-  );
-
-  const unreadMessageCount = useMemo(
-    () => visibleNotifications.filter((notification) => !notification.read).length,
-    [visibleNotifications],
-  );
 
 
   const updateProfile = useMutation({
@@ -720,80 +640,6 @@ export default function Profile() {
       </div>
 
       <div className="space-y-4">
-        {isSwimmerProfile && unreadMessageCount > 0 ? (
-          <Card className="overflow-hidden border-primary/15 bg-gradient-to-r from-primary/[0.08] via-card to-amber-500/[0.08] shadow-sm">
-            <CardContent className="space-y-3 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Maintenant</p>
-                <Badge className="text-[10px]">1</Badge>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setActiveSection("messages")}>
-                  {unreadMessageCount} message{unreadMessageCount > 1 ? "s" : ""}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {showRecords ? (
-          <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base uppercase tracking-[0.08em]">Accès rapides</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              <ProfileActionTile
-                icon={BellRing}
-                title="Messages"
-                meta={unreadMessageCount > 0 ? `${unreadMessageCount} non lu${unreadMessageCount > 1 ? "s" : ""}` : "Boîte vide"}
-                badgeLabel={unreadMessageCount > 0 ? String(unreadMessageCount) : null}
-                onClick={() => setActiveSection("messages")}
-              />
-              <ProfileActionTile
-                icon={Clock}
-                title="Mon suivi"
-                meta="Plan et ressentis"
-                onClick={() => navigate("/suivi")}
-              />
-              <ProfileActionTile
-                icon={Trophy}
-                title="Records"
-                meta="Performances"
-                onClick={() => navigate("/records")}
-              />
-              <ProfileActionTile
-                icon={Trophy}
-                title="Club"
-                meta="Hall of Fame"
-                onClick={() => navigate("/hall-of-fame")}
-              />
-              <ProfileActionTile
-                icon={FileText}
-                title="Rapport mensuel"
-                meta="Bilan du mois"
-                onClick={() => {
-                  const now = new Date();
-                  const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-                  navigate(`/report/${userId}/${m}`);
-                }}
-              />
-              <ProfileActionTile
-                icon={Brain}
-                title="Neurotype"
-                meta={profile?.neurotype_result ? getNeurotypName(profile.neurotype_result.dominant) : "Découvrir"}
-                onClick={() => {
-                  if (profile?.neurotype_result) {
-                    setPendingNeurotypResult(profile.neurotype_result);
-                    setActiveSection("neurotype-result");
-                  } else {
-                    setActiveSection("neurotype-quiz");
-                  }
-                }}
-              />
-            </CardContent>
-          </Card>
-        ) : null}
-
         {role === "admin" ? (
           <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
             <CardHeader className="pb-3">
