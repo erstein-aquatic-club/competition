@@ -34,7 +34,7 @@ import { getContrastTextColor } from "@/lib/design-tokens";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
 import { motion } from "framer-motion";
 import { slideUp } from "@/lib/animations";
-import { ChevronDown, TrendingUp, TrendingDown, BarChart3, Trophy } from "lucide-react";
+import { ChevronDown, TrendingUp, TrendingDown, BarChart3, Trophy, Waves, Dumbbell, HeartPulse } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
 import { PageHeader } from "@/components/shared/PageHeader";
 
@@ -628,10 +628,28 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const content = (
     <>
       <Tabs defaultValue="swim" className="w-full">
-        <TabsList className="grid w-full max-w-[360px] grid-cols-3">
-          <TabsTrigger value="swim">Natation</TabsTrigger>
-          <TabsTrigger value="strength">Musculation</TabsTrigger>
-          <TabsTrigger value="health">Santé</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1.5 bg-transparent p-0">
+          <TabsTrigger
+            value="swim"
+            className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-blue-500 data-[state=active]:bg-blue-500/5 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-300"
+          >
+            <Waves className="mr-1 h-3 w-3" />
+            Natation
+          </TabsTrigger>
+          <TabsTrigger
+            value="strength"
+            className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-amber-500 data-[state=active]:bg-amber-500/5 data-[state=active]:text-amber-700 dark:data-[state=active]:text-amber-300"
+          >
+            <Dumbbell className="mr-1 h-3 w-3" />
+            Musculation
+          </TabsTrigger>
+          <TabsTrigger
+            value="health"
+            className="rounded-xl border bg-card px-2 py-2 text-xs data-[state=active]:border-emerald-500 data-[state=active]:bg-emerald-500/5 data-[state=active]:text-emerald-700 dark:data-[state=active]:text-emerald-300"
+          >
+            <HeartPulse className="mr-1 h-3 w-3" />
+            Santé
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Natation ──────────────────────────────────────────────────────── */}
