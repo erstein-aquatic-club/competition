@@ -103,6 +103,7 @@ const Suivi = lazyWithRetry(() => import("@/pages/Suivi"));
 const SuiviSemaine = lazyWithRetry(() => import("@/pages/SuiviSemaine"));
 const SuiviSaison = lazyWithRetry(() => import("@/pages/SuiviSaison"));
 const SuiviProgression = lazyWithRetry(() => import("@/pages/SuiviProgression"));
+const SuiviEntretiens = lazyWithRetry(() => import("@/pages/SuiviEntretiens"));
 const Profile = lazyWithRetry(() => import("@/pages/Profile"));
 const Records = lazyWithRetry(() => import("@/pages/Records"));
 const RecordsAdmin = lazyWithRetry(() => import("@/pages/RecordsAdmin"));
@@ -306,6 +307,7 @@ function AppRouter() {
             <Route path="/suivi/semaine" component={SuiviSemaine} />
             <Route path="/suivi/saison" component={SuiviSaison} />
             <Route path="/suivi/progression" component={SuiviProgression} />
+            <Route path="/suivi/entretiens" component={SuiviEntretiens} />
             <Route path="/suivi" component={Suivi} />
             <Route path="/profile" component={Profile} />
             <Route path="/coming-soon" component={ComingSoon} />

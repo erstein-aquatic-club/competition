@@ -383,7 +383,7 @@ export default function Suivi() {
             {/* ── Card: Mes entretiens ────────────────────────────── */}
             <button
               type="button"
-              onClick={() => navigate("/suivi/saison")}
+              onClick={() => navigate("/suivi/entretiens")}
               className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
