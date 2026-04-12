@@ -110,12 +110,10 @@ export default function SwimmerMessagesView({
 
     if (href === "/profile?section=messages") return;
 
-    if (href === "/") {
-      window.location.hash = "#/";
-      return;
-    }
-
-    navigate(href);
+    // Use window.location.assign to force a full hash navigation,
+    // bypassing Profile's hash sync effect which can overwrite the hash.
+    const base = window.location.pathname + window.location.search;
+    window.location.assign(`${base}#${href}`);
   };
 
   const handleNotificationPress = (notification: Notification) => {
