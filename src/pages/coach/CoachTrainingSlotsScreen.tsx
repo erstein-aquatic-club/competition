@@ -2029,15 +2029,15 @@ const CoachTrainingSlotsScreen = ({
   }, []);
 
   const buildFallbackWeekPng = useCallback(async (): Promise<Blob> => {
-    const width = 1720;
-    const padX = 24;
-    const padY = 24;
-    const leftAxisWidth = 108;
-    const colGap = 12;
+    const width = 2400;
+    const padX = 40;
+    const padY = 40;
+    const leftAxisWidth = 150;
+    const colGap = 16;
     const visibleWeekDates = weekDates.slice(0, 6); // Lun -> Sam (sans dimanche)
     const colCount = visibleWeekDates.length;
-    const headerTitleH = 156;
-    const daysHeaderH = 86;
+    const headerTitleH = 200;
+    const daysHeaderH = 120;
 
     const weekData = visibleWeekDates.map((date, i) => {
       const day = i + 1;
@@ -2051,6 +2051,8 @@ const CoachTrainingSlotsScreen = ({
           const end = isModified && ov?.new_end_time ? ov.new_end_time : slot.end_time;
           const location = isModified && ov?.new_location ? ov.new_location : slot.location;
           const coachesLabel = (slot.coaches ?? []).map((c) => c.coach_name).join(", ") || "Non défini";
+          const sessionName = instance?.assignment?.session_name ?? null;
+          const groupsLabel = slot.assignments.map((a) => a.group_name).join(", ");
           return {
             start,
             end,
@@ -2060,6 +2062,8 @@ const CoachTrainingSlotsScreen = ({
             isCancelled,
             state: instance?.state ?? "empty",
             coachesLabel,
+            sessionName,
+            groupsLabel,
           };
         })
         .sort((a, b) => a.start.localeCompare(b.start));
@@ -2087,8 +2091,8 @@ const CoachTrainingSlotsScreen = ({
     }
 
     const totalHours = Math.max(1, (endMin - startMin) / 60);
-    const pxPerHour = 112;
-    const timelineHeight = Math.max(920, totalHours * pxPerHour);
+    const pxPerHour = 160;
+    const timelineHeight = Math.max(1200, totalHours * pxPerHour);
     const height = padY + headerTitleH + daysHeaderH + timelineHeight + padY;
 
     const canvas = document.createElement("canvas");
@@ -2196,11 +2200,11 @@ const CoachTrainingSlotsScreen = ({
 
     // Title
     ctx.fillStyle = "#0f172a";
-    ctx.font = "700 56px Inter, sans-serif";
+    ctx.font = "700 76px Inter, sans-serif";
     ctx.fillText(
       `Créneaux — S${weekNumber} · ${formatDayMonth(visibleWeekDates[0])} – ${formatDayMonth(visibleWeekDates[visibleWeekDates.length - 1])}`,
       padX,
-      padY + 62,
+      padY + 80,
     );
 
     // Day headers
@@ -2209,12 +2213,12 @@ const CoachTrainingSlotsScreen = ({
       const center = x + colW / 2;
       const day = weekData[i];
       ctx.fillStyle = "#64748b";
-      ctx.font = "700 22px Inter, sans-serif";
+      ctx.font = "700 32px Inter, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 24);
+      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 30);
       ctx.fillStyle = "#111827";
-      ctx.font = "700 28px Inter, sans-serif";
-      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 14);
+      ctx.font = "700 38px Inter, sans-serif";
+      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 18);
       ctx.textAlign = "left";
     }
 
@@ -2236,8 +2240,8 @@ const CoachTrainingSlotsScreen = ({
       ctx.stroke();
 
       ctx.fillStyle = "#64748b";
-      ctx.font = "600 20px Inter, sans-serif";
-      ctx.fillText(`${String(h).padStart(2, "0")}h`, padX + 6, y + 6);
+      ctx.font = "600 30px Inter, sans-serif";
+      ctx.fillText(`${String(h).padStart(2, "0")}h`, padX + 8, y + 8);
     }
 
     // Vertical separators
@@ -2257,10 +2261,10 @@ const CoachTrainingSlotsScreen = ({
       for (const s of weekData[i].slots) {
         const startY = yFromMinutes(timeToMinutes(s.start)) + 2;
         const endY = yFromMinutes(timeToMinutes(s.end)) - 2;
-        const cardH = Math.max(132, endY - startY);
+        const cardH = Math.max(200, endY - startY);
         const cardY = startY;
-        const cardX = dayX + 6;
-        const cardW = colW - 12;
+        const cardX = dayX + 8;
+        const cardW = colW - 16;
 
         // Match coach timeline palette:
         // cancelled > modified > published > draft > swim/default
@@ -2290,35 +2294,60 @@ const CoachTrainingSlotsScreen = ({
 
         ctx.fillStyle = bg;
         ctx.strokeStyle = border;
-        ctx.lineWidth = 1.3;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(cardX, cardY, cardW, cardH, 10);
+        ctx.roundRect(cardX, cardY, cardW, cardH, 14);
         ctx.fill();
         ctx.stroke();
 
-        const iconReserve = 38;
-        const textMaxWidth = cardW - 22 - iconReserve;
+        const iconReserve = 52;
+        const textMaxWidth = cardW - 30 - iconReserve;
         const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
-        const coachLine = truncate(s.coachesLabel, textMaxWidth, "600 21px Inter, sans-serif");
-        const locationLine = truncate(`Lieu: ${s.location}`, textMaxWidth, "500 19px Inter, sans-serif");
+        const sessionLine = s.sessionName ? truncate(s.sessionName, textMaxWidth, "700 34px Inter, sans-serif") : null;
+        const coachLine = truncate(s.coachesLabel, textMaxWidth, "600 30px Inter, sans-serif");
+        const locationLine = truncate(s.location, textMaxWidth, "500 28px Inter, sans-serif");
+        const groupsLine = s.groupsLabel ? truncate(s.groupsLabel, textMaxWidth, "500 26px Inter, sans-serif") : null;
 
-        const textX = cardX + 12;
-        const timeY = cardY + 36;
-        const coachY = cardY + 76;
-        const locY = cardY + 109;
+        const textX = cardX + 16;
+        let textCursor = cardY + 48;
 
+        // Time
         ctx.fillStyle = fg;
-        ctx.font = "700 28px Inter, sans-serif";
-        ctx.fillText(timeLine, textX, timeY);
-        ctx.font = "600 21px Inter, sans-serif";
-        ctx.fillText(coachLine, textX, coachY);
-        ctx.fillStyle = s.isCancelled ? "#94a3b8" : "#64748b";
-        ctx.font = "500 19px Inter, sans-serif";
-        ctx.fillText(locationLine, textX, locY);
+        ctx.font = "700 40px Inter, sans-serif";
+        ctx.fillText(timeLine, textX, textCursor);
+        textCursor += 46;
 
-        const iconSize = 28;
-        const iconX = cardX + cardW - iconSize - 10;
-        const iconY = cardY + cardH - iconSize - 10;
+        // Session name
+        if (sessionLine) {
+          const sessionColor = s.state === "published" ? "#065f46" : s.state === "draft" ? "#92400e" : fg;
+          ctx.fillStyle = s.isModified ? "#9a3412" : sessionColor;
+          ctx.font = "700 34px Inter, sans-serif";
+          ctx.fillText(sessionLine, textX, textCursor);
+          textCursor += 40;
+        }
+
+        // Coach
+        ctx.fillStyle = fg;
+        ctx.font = "600 30px Inter, sans-serif";
+        ctx.fillText(coachLine, textX, textCursor);
+        textCursor += 36;
+
+        // Location
+        ctx.fillStyle = s.isCancelled ? "#94a3b8" : "#64748b";
+        ctx.font = "500 28px Inter, sans-serif";
+        ctx.fillText(locationLine, textX, textCursor);
+        textCursor += 32;
+
+        // Groups
+        if (groupsLine) {
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "500 26px Inter, sans-serif";
+          ctx.fillText(groupsLine, textX, textCursor);
+        }
+
+        const iconSize = 40;
+        const iconX = cardX + cardW - iconSize - 14;
+        const iconY = cardY + cardH - iconSize - 14;
         const iconColor = s.swim ? "#2563eb" : "#b45309";
         if (s.isCancelled) {
           drawStopSignIcon(iconX, iconY, iconSize);
@@ -2329,24 +2358,11 @@ const CoachTrainingSlotsScreen = ({
         }
 
         if (s.isCancelled) {
-          const strikeX1 = textX;
-          const strikeX2 = cardX + cardW - iconSize - 16;
-          ctx.strokeStyle = "#6b7280";
-          ctx.lineWidth = 2;
-
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.moveTo(strikeX1, timeY - 6);
-          ctx.lineTo(strikeX2, timeY - 6);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(strikeX1, coachY - 6);
-          ctx.lineTo(strikeX2, coachY - 6);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(strikeX1, locY - 6);
-          ctx.lineTo(strikeX2, locY - 6);
+          ctx.moveTo(cardX + 10, cardY + cardH / 2);
+          ctx.lineTo(cardX + cardW - iconReserve, cardY + cardH / 2);
           ctx.stroke();
         }
       }
