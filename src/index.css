@@ -83,6 +83,12 @@
   --color-tag-educ-text: hsl(var(--tag-educ-text));
 }
 
+/* Prevent overscroll bounce on mobile (dock lifts on iOS PWA) */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 /* Timeline block reveal animation */
 @keyframes timeline-block-reveal {
   from {
