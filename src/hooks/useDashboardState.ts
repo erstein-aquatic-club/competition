@@ -454,6 +454,13 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
       const daySlots = slotsByDayOfWeek.get(dayOfWeek);
       const dayAssignments = assignmentsByIso.get(iso) ?? [];
 
+      // If swimmer has personal slots configured but NONE for this weekday,
+      // return empty list — group assignments go to otherGroupAssignments dropdown
+      if (hasSwimmerSlots && (!daySlots || daySlots.length === 0)) {
+        cache.set(iso, []);
+        return [];
+      }
+
       // ── NEW PATH: swimmer has personal slots for this weekday ──
       if (hasSwimmerSlots && daySlots && daySlots.length > 0) {
         // Use pre-resolved assignments (via resolveSwimmerAssignments) when available

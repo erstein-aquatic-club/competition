@@ -876,9 +876,11 @@ export function FeedbackDrawer({
                               >
                                 <div className="mt-1 grid gap-2">
                                   {otherGroupAssignments.map((a) => (
-                                    <div
+                                    <button
                                       key={a.id}
-                                      className="rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5"
+                                      type="button"
+                                      onClick={() => onOpenSession(`${selectedDate.toISOString().slice(0,10)}__group_${a.id}`)}
+                                      className="w-full min-w-0 rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5 text-left transition hover:bg-muted/40 hover:shadow-sm active:scale-[0.98] overflow-hidden"
                                     >
                                       <div className="flex items-center justify-between">
                                         <div className="min-w-0 flex-1">
@@ -889,13 +891,16 @@ export function FeedbackDrawer({
                                             </p>
                                           )}
                                         </div>
-                                        {a.km != null && (
-                                          <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                                            {typeof a.km === "number" ? `${(a.km / 1000).toFixed(1)} km` : ""}
-                                          </span>
-                                        )}
+                                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                          {a.km != null && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                              {typeof a.km === "number" ? `${(a.km / 1000).toFixed(1)} km` : ""}
+                                            </span>
+                                          )}
+                                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                                        </div>
                                       </div>
-                                    </div>
+                                    </button>
                                   ))}
                                 </div>
                               </motion.div>
