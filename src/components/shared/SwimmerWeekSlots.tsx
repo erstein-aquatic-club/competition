@@ -6,14 +6,25 @@
  */
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
+import { getSwimSessionById } from "@/lib/api/swim";
 import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Dumbbell,
+  Loader2,
   MapPin,
-  XCircle,
+  Waves,
 } from "lucide-react";
 import {
   useSlotCalendar,
@@ -158,38 +169,65 @@ function ModePill({
 
 // ── Group slot card (read-only) ─────────────────────────────
 
-function GroupSlotCard({ instance }: { instance: SlotInstance }) {
-  const isCancelled = instance.state === "cancelled";
+function isMuscu(location: string): boolean {
+  return location.toLowerCase().includes("salle");
+}
+
+function GroupSlotCard({
+  instance,
+  onTap,
+}: {
+  instance: SlotInstance;
+  onTap?: () => void;
+}) {
+  const muscu = isMuscu(instance.slot.location);
 
   const accentClass =
     instance.state === "published"
-      ? "border-l-emerald-500"
-      : instance.state === "cancelled"
-        ? "border-l-destructive/50"
-        : "border-l-border";
+      ? muscu
+        ? "border-l-amber-500"
+        : "border-l-sky-500"
+      : "border-l-border";
 
-  const bgClass = isCancelled
-    ? "bg-muted/30 opacity-60"
-    : instance.state === "published"
+  const bgClass =
+    instance.state === "published"
       ? "bg-card"
       : "bg-card/40 border-dashed";
 
+  const clickable = !!onTap;
+
   return (
     <div
-      className={`rounded-xl border border-l-4 p-3 ${accentClass} ${bgClass}`}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onTap : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onTap?.();
+              }
+            }
+          : undefined
+      }
+      className={`rounded-xl border border-l-4 p-3 ${accentClass} ${bgClass}${
+        clickable ? " cursor-pointer active:scale-[0.98] transition-transform" : ""
+      }`}
     >
-      {/* Time */}
+      {/* Time + modality icon */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Clock className="h-3 w-3 opacity-60" />
-        <span className={isCancelled ? "line-through" : ""}>
+        <span>
           {formatTimeRange(instance.slot.start_time, instance.slot.end_time)}
         </span>
-        {isCancelled && (
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
-            <XCircle className="h-3 w-3" />
-            Annulé
-          </span>
-        )}
+        <span className="ml-auto">
+          {muscu ? (
+            <Dumbbell className="h-3.5 w-3.5 text-amber-500" />
+          ) : (
+            <Waves className="h-3.5 w-3.5 text-sky-500" />
+          )}
+        </span>
       </div>
 
       {/* Session name + distance */}
@@ -215,17 +253,8 @@ function GroupSlotCard({ instance }: { instance: SlotInstance }) {
       {/* Location */}
       <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
         <MapPin className="h-3 w-3 opacity-50" />
-        <span className={isCancelled ? "line-through" : ""}>
-          {instance.slot.location}
-        </span>
+        <span>{instance.slot.location}</span>
       </div>
-
-      {/* Cancellation reason */}
-      {isCancelled && instance.override?.reason && (
-        <p className="text-[10px] text-muted-foreground mt-1.5 italic">
-          {instance.override.reason}
-        </p>
-      )}
     </div>
   );
 }
@@ -266,6 +295,14 @@ export default function SwimmerWeekSlots({
 
   const hasPersoSlots = (swimmerSlots?.length ?? 0) > 0;
   const [mode, setMode] = useState<SlotMode>("groupe");
+  const [previewCatalogId, setPreviewCatalogId] = useState<number | null>(null);
+
+  const { data: previewSession, isLoading: previewLoading } = useQuery({
+    queryKey: ["swim-session-preview", previewCatalogId],
+    queryFn: () => getSwimSessionById(previewCatalogId!),
+    enabled: previewCatalogId != null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const today = useMemo(() => todayIso(), []);
   const weekLabel = useMemo(
@@ -278,7 +315,7 @@ export default function SwimmerWeekSlots({
     const map = new Map<string, SlotInstance[]>();
     for (const dateIso of weekDates) {
       const dayInstances = instancesByDate.get(dateIso) ?? [];
-      const visible = dayInstances.filter((i) => i.state !== "draft");
+      const visible = dayInstances.filter((i) => i.state !== "draft" && i.state !== "cancelled");
       if (visible.length > 0) {
         map.set(dateIso, visible);
       }
@@ -395,6 +432,11 @@ export default function SwimmerWeekSlots({
                     <GroupSlotCard
                       key={`${instance.slot.id}-${instance.date}`}
                       instance={instance}
+                      onTap={
+                        instance.assignment?.swim_catalog_id
+                          ? () => setPreviewCatalogId(instance.assignment!.swim_catalog_id!)
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -464,6 +506,36 @@ export default function SwimmerWeekSlots({
           )}
         </div>
       )}
+      {/* Session preview sheet */}
+      <Sheet
+        open={previewCatalogId != null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewCatalogId(null);
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle>{previewSession?.name ?? "Séance"}</SheetTitle>
+          </SheetHeader>
+          <div className="pb-6">
+            {previewLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : previewSession?.items?.length ? (
+              <SwimSessionTimeline
+                title={previewSession.name ?? "Séance"}
+                items={previewSession.items}
+                showHeader={false}
+              />
+            ) : (
+              <p className="text-center text-sm text-muted-foreground py-8">
+                Aucun détail disponible
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }
