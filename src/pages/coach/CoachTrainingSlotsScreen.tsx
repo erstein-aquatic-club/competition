@@ -52,7 +52,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  MapPin,
   Plus,
   Trash2,
   AlertTriangle,
@@ -63,6 +62,8 @@ import {
   ArrowRightLeft,
   Share2,
   Loader2,
+  Waves,
+  Dumbbell,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -1042,7 +1043,11 @@ const TimelineSlot = ({
         {/* Location */}
         <div className="flex items-start justify-between gap-1 min-w-0">
           <div className="flex items-center gap-1 min-w-0">
-            <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+            {swim ? (
+              <Waves className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+            ) : (
+              <Dumbbell className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+            )}
             <span className="text-[10px] font-medium text-foreground truncate">
               {slot.location}
             </span>
@@ -1151,8 +1156,10 @@ function TimelineSlotInline({
           <div className="flex items-center gap-1 min-w-0">
             {isModified ? (
               <ArrowRightLeft className="h-2.5 w-2.5 shrink-0 text-orange-500" />
+            ) : swim ? (
+              <Waves className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
             ) : (
-              <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+              <Dumbbell className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
             )}
             <span className="text-[10px] font-medium text-foreground truncate">
               {effectiveLocation}
@@ -1497,8 +1504,10 @@ const MobileView = ({
                       <div className="flex items-center gap-1.5 mt-1">
                         {isModified ? (
                           <ArrowRightLeft className="h-3 w-3 text-orange-500 flex-shrink-0" />
+                        ) : swim ? (
+                          <Waves className="h-3 w-3 text-blue-500 flex-shrink-0" />
                         ) : (
-                          <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <Dumbbell className="h-3 w-3 text-amber-500 flex-shrink-0" />
                         )}
                         <span className={`text-xs truncate ${isModified ? "text-orange-700 dark:text-orange-300" : "text-muted-foreground"}`}>
                           {effLocation}
@@ -2645,7 +2654,7 @@ const CoachTrainingSlotsScreen = ({
           {/* ── Desktop timeline (viewport-fitted, breaks out of container for wider view) ── */}
           <div
             ref={timelineContainerRef}
-            className="hidden sm:block overflow-x-auto -mx-4 px-4 lg:w-[calc(100%+12rem)] lg:-ml-24 lg:px-6 xl:w-[calc(100%+20rem)] xl:-ml-40 xl:px-8"
+            className="hidden sm:block overflow-x-auto -mx-4 px-4 lg:-mx-20 lg:px-4 xl:-mx-32 xl:px-6"
           >
             <div
               className="grid"

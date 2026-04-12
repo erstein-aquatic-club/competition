@@ -82,6 +82,43 @@ export async function getSwimCatalog(): Promise<SwimSessionTemplate[]> {
   }));
 }
 
+export async function getSwimSessionById(sessionId: number): Promise<SwimSessionTemplate | null> {
+  if (canUseSupabase()) {
+    const { data: catalog, error } = await supabase
+      .from("swim_sessions_catalog")
+      .select("*, swim_session_items(*)")
+      .eq("id", sessionId)
+      .single();
+    if (error || !catalog) return null;
+    return {
+      id: safeInt(catalog.id, Date.now()),
+      name: String(catalog.name || ""),
+      description: catalog.description ?? null,
+      created_by: safeOptionalInt(catalog.created_by) ?? null,
+      created_at: catalog.created_at ?? null,
+      updated_at: catalog.updated_at ?? null,
+      folder: catalog.folder ?? null,
+      is_archived: catalog.is_archived ?? false,
+      items: Array.isArray(catalog.swim_session_items)
+        ? catalog.swim_session_items
+            .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
+            .map((item: any, index: number) => ({
+              id: safeOptionalInt(item.id) ?? undefined,
+              catalog_id: safeOptionalInt(item.catalog_id) ?? undefined,
+              ordre: safeOptionalInt(item.ordre) ?? index,
+              label: item.label ?? null,
+              distance: safeOptionalInt(item.distance) ?? null,
+              duration: safeOptionalInt(item.duration) ?? null,
+              intensity: item.intensity ?? null,
+              notes: item.notes ?? null,
+              raw_payload: parseRawPayload(item.raw_payload),
+            }))
+        : [],
+    };
+  }
+  return null;
+}
+
 export async function createSwimSession(session: any) {
   if (!Array.isArray(session.items) || session.items.length === 0) {
     throw new Error("La séance doit contenir au moins un exercice.");

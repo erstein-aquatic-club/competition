@@ -158,6 +158,7 @@ export {
 
 export {
   getSwimCatalog,
+  getSwimSessionById,
   getSwimSessionsPaginated,
   createSwimSession,
   deleteSwimSession,

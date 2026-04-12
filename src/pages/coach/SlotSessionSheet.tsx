@@ -50,6 +50,8 @@ import {
   Loader2,
   Ban,
   AlertTriangle,
+  ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import {
   updateSlotVisibility,
@@ -57,6 +59,8 @@ import {
 } from "@/lib/api/assignments";
 import { supabase, canUseSupabase } from "@/lib/api/client";
 import type { SlotInstance, SlotState } from "@/hooks/useSlotCalendar";
+import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
+import { getSwimSessionById } from "@/lib/api/swim";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -141,6 +145,16 @@ export default function SlotSessionSheet({
   const [showVisibilityPicker, setShowVisibilityPicker] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuMode, setMenuMode] = useState<MenuMode>("session");
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Fetch session details for preview
+  const previewCatalogId = instance?.assignment?.swim_catalog_id ?? null;
+  const { data: previewSession, isLoading: previewLoading } = useQuery({
+    queryKey: ["swim-session-preview", previewCatalogId],
+    queryFn: () => getSwimSessionById(previewCatalogId!),
+    enabled: previewOpen && previewCatalogId != null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Fetch subgroups (temporary groups that are children of the selected groups)
   const { data: subgroups = [] } = useQuery({
@@ -170,6 +184,7 @@ export default function SlotSessionSheet({
     setShowVisibilityPicker(false);
     setDeleteConfirmOpen(false);
     setMenuMode(instance.state === "cancelled" ? "slot" : "session");
+    setPreviewOpen(false);
   }, [instance]);
 
   // ── Mutations ────────────────────────────────────────────
@@ -335,6 +350,7 @@ export default function SlotSessionSheet({
                   onSaveVisibility={handleSaveVisibility}
                   onEditSession={onEditSession}
                   onRequestDelete={() => setDeleteConfirmOpen(true)}
+                  onPreview={assignment?.swim_catalog_id != null ? () => setPreviewOpen(true) : undefined}
                 />
               )}
             </>
@@ -382,6 +398,46 @@ export default function SlotSessionSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Session preview sheet */}
+      <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-3xl max-h-[90dvh] overflow-y-auto px-5 pb-8 pt-4"
+        >
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border/60" />
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:scale-95 transition-transform"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <h3
+              className="text-base font-bold tracking-tight uppercase"
+              style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}
+            >
+              {assignment?.session_name ?? "Séance"}
+            </h3>
+          </div>
+          {previewLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : previewSession ? (
+            <SwimSessionTimeline
+              title={previewSession.name}
+              description={previewSession.description ?? undefined}
+              items={previewSession.items}
+            />
+          ) : (
+            <p className="text-center text-sm text-muted-foreground py-8">
+              Impossible de charger la séance.
+            </p>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
@@ -646,6 +702,7 @@ function FilledBody({
   onSaveVisibility,
   onEditSession,
   onRequestDelete,
+  onPreview,
 }: {
   instance: SlotInstance;
   assignment: NonNullable<SlotInstance["assignment"]>;
@@ -658,39 +715,78 @@ function FilledBody({
   onSaveVisibility: () => void;
   onEditSession: (sessionId: number) => void;
   onRequestDelete: () => void;
+  onPreview?: () => void;
 }) {
   const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-        <p className="text-sm font-semibold text-foreground leading-snug">
-          {assignment.session_name ?? "Séance sans nom"}
-        </p>
-        {assignment.session_distance != null &&
-          assignment.session_distance > 0 && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {assignment.session_distance} m
+      {onPreview ? (
+        <button
+          type="button"
+          onClick={onPreview}
+          className="w-full rounded-xl border border-border/50 bg-muted/30 p-4 text-left transition-colors active:scale-[0.98] active:bg-muted/50 hover:bg-muted/40 cursor-pointer"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground leading-snug">
+              {assignment.session_name ?? "Séance sans nom"}
             </p>
-          )}
-        <div className="mt-2 flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-2 py-0.5 font-medium leading-none ${STATE_CONFIG[instance.state].badgeClass}`}
-          >
-            {STATE_CONFIG[instance.state].label}
-          </Badge>
-          {assignment.visible_from && (
-            <span className="text-[10px] text-muted-foreground">
-              Visible le{" "}
-              {new Date(assignment.visible_from).toLocaleDateString("fr-FR", {
-                day: "numeric",
-                month: "short",
-              })}
-            </span>
-          )}
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+          </div>
+          {assignment.session_distance != null &&
+            assignment.session_distance > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {assignment.session_distance} m
+              </p>
+            )}
+          <div className="mt-2 flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-2 py-0.5 font-medium leading-none ${STATE_CONFIG[instance.state].badgeClass}`}
+            >
+              {STATE_CONFIG[instance.state].label}
+            </Badge>
+            {assignment.visible_from && (
+              <span className="text-[10px] text-muted-foreground">
+                Visible le{" "}
+                {new Date(assignment.visible_from).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            )}
+          </div>
+        </button>
+      ) : (
+        <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+          <p className="text-sm font-semibold text-foreground leading-snug">
+            {assignment.session_name ?? "Séance sans nom"}
+          </p>
+          {assignment.session_distance != null &&
+            assignment.session_distance > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {assignment.session_distance} m
+              </p>
+            )}
+          <div className="mt-2 flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-2 py-0.5 font-medium leading-none ${STATE_CONFIG[instance.state].badgeClass}`}
+            >
+              {STATE_CONFIG[instance.state].label}
+            </Badge>
+            {assignment.visible_from && (
+              <span className="text-[10px] text-muted-foreground">
+                Visible le{" "}
+                {new Date(assignment.visible_from).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {instance.groups.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
