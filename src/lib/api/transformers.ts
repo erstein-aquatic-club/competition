@@ -174,6 +174,9 @@ export const buildRunUpdatePayload = (update: {
   progress_pct?: number;
   status?: 'in_progress' | 'completed' | 'abandoned';
   fatigue?: number;
+  feeling?: number;
+  rpe?: number;
+  duration?: number;
   comments?: string;
 }): Record<string, unknown> => {
   const payload: Record<string, unknown> = {};
@@ -181,6 +184,9 @@ export const buildRunUpdatePayload = (update: {
   if (update.status) payload.status = update.status;
   if (update.status === 'completed') payload.completed_at = new Date().toISOString();
   if (update.fatigue !== undefined) payload.fatigue = update.fatigue;
+  if (update.feeling !== undefined) payload.feeling = update.feeling;
+  if (update.rpe !== undefined) payload.rpe = update.rpe;
+  if (update.duration !== undefined) payload.duration = update.duration;
   if (update.comments !== undefined) payload.comments = update.comments;
   return payload;
 };

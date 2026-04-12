@@ -6,6 +6,8 @@ import {
   formatLocalDateISO,
   formatClockTime,
   formatSlotTime,
+  getStrengthRunDifficulty,
+  getStrengthRunIndicatorValue,
   inferSessionKind,
 } from "@/pages/SuiviSemaine";
 
@@ -65,6 +67,34 @@ test("findStrengthRunForSlot falls back to local date and slot for legacy runs",
     })?.id,
     3,
   );
+});
+
+test("getStrengthRunIndicatorValue uses set difficulty before run-level fallback", () => {
+  const runWithLogs = {
+    id: 10,
+    feeling: 2,
+    fatigue: 4,
+    strength_set_logs: [
+      { exercise_id: 1, difficulty: 4 },
+      { exercise_id: 1, difficulty: 5 },
+      { exercise_id: 1, difficulty: 3 },
+    ],
+  };
+
+  assert.equal(getStrengthRunDifficulty(runWithLogs), 4);
+  assert.equal(getStrengthRunIndicatorValue(runWithLogs, "difficulty"), 4);
+  assert.equal(getStrengthRunIndicatorValue(runWithLogs, "fatigue"), 4);
+});
+
+test("getStrengthRunIndicatorValue falls back to raw payload and run fields", () => {
+  const run = {
+    id: 11,
+    feeling: 5,
+    raw_payload: { fatigue: 3 },
+  };
+
+  assert.equal(getStrengthRunIndicatorValue(run, "difficulty"), 5);
+  assert.equal(getStrengthRunIndicatorValue(run, "fatigue"), 3);
 });
 
 test("describeIndicatorValue returns a clickable explanation for valid notes", () => {

@@ -26,11 +26,12 @@ import {
 import { api } from "@/lib/api";
 import type { Session, PlannedAbsence } from "@/lib/api";
 import type { ResolvedSlotAssignment } from "@/lib/api/types";
-import type { LocalStrengthRun } from "@/lib/types";
+import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
 import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
 import { getWellnessForDate } from "@/lib/api/wellness";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { computeAvgDifficulty } from "@/lib/strengthHistoryUtils";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
 import {
@@ -189,7 +190,7 @@ const SWIM_INDICATORS: IndicatorMeta[] = [
 ];
 
 const STRENGTH_INDICATORS: IndicatorMeta[] = [
-  { key: "feeling", shortLabel: "Diff.", fullLabel: "Difficulte seance", mode: "hard", descriptions: HARD_SCALE },
+  { key: "difficulty", shortLabel: "Diff.", fullLabel: "Difficulte seance", mode: "hard", descriptions: HARD_SCALE },
   { key: "fatigue", shortLabel: "Fat.", fullLabel: "Fatigue fin", mode: "hard", descriptions: FATIGUE_SCALE },
 ];
 
@@ -198,6 +199,38 @@ export function describeIndicatorValue(meta: IndicatorMeta, value: number | null
   if (!Number.isFinite(numeric) || numeric < 1 || numeric > 5) return null;
   const description = meta.descriptions[numeric - 1] ?? "";
   return `${meta.fullLabel} ${numeric}/5 - ${description}`;
+}
+
+function normalizeRunScaleValue(value: unknown): number | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 1 || numeric > 5) return null;
+  return numeric;
+}
+
+function getStrengthRunLogs(run: LocalStrengthRun): SetLogEntry[] {
+  return (run.strength_set_logs ?? run.logs ?? []) as SetLogEntry[];
+}
+
+export function getStrengthRunDifficulty(run: LocalStrengthRun): number | null {
+  const fromLogs = computeAvgDifficulty(getStrengthRunLogs(run));
+  if (fromLogs > 0) return fromLogs;
+  const rawPayload = run.raw_payload as Record<string, unknown> | null | undefined;
+  return normalizeRunScaleValue(rawPayload?.difficulty ?? run.feeling);
+}
+
+export function getStrengthRunIndicatorValue(
+  run: LocalStrengthRun | undefined,
+  key: string,
+): number | null {
+  if (!run) return null;
+  if (key === "difficulty") {
+    return getStrengthRunDifficulty(run);
+  }
+  if (key === "fatigue") {
+    const rawPayload = run.raw_payload as Record<string, unknown> | null | undefined;
+    return normalizeRunScaleValue(run.fatigue ?? rawPayload?.fatigue);
+  }
+  return null;
 }
 
 function getStrengthRunDateValue(run: LocalStrengthRun): string | null {
@@ -908,7 +941,7 @@ function LoggedCard({
         <div className="flex shrink-0 items-center gap-1">
           {indicators.map((indicator) => {
             const value = isStrength
-              ? (strengthRun?.[indicator.key as keyof LocalStrengthRun] as number | null | undefined)
+              ? getStrengthRunIndicatorValue(strengthRun, indicator.key)
               : (session?.[indicator.key as keyof Session] as number | null | undefined);
             const tooltipId = `${card.iso}-${card.assignmentId ?? card.swimmerSlotId ?? "x"}-${indicator.key}`;
             return (
