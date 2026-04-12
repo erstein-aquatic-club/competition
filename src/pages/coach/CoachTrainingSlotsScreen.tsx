@@ -2032,12 +2032,12 @@ const CoachTrainingSlotsScreen = ({
     const width = 1720;
     const padX = 24;
     const padY = 24;
-    const leftAxisWidth = 88;
+    const leftAxisWidth = 108;
     const colGap = 12;
     const visibleWeekDates = weekDates.slice(0, 6); // Lun -> Sam (sans dimanche)
     const colCount = visibleWeekDates.length;
-    const headerTitleH = 132;
-    const daysHeaderH = 72;
+    const headerTitleH = 156;
+    const daysHeaderH = 86;
 
     const weekData = visibleWeekDates.map((date, i) => {
       const day = i + 1;
@@ -2087,8 +2087,8 @@ const CoachTrainingSlotsScreen = ({
     }
 
     const totalHours = Math.max(1, (endMin - startMin) / 60);
-    const pxPerHour = 88;
-    const timelineHeight = Math.max(740, totalHours * pxPerHour);
+    const pxPerHour = 112;
+    const timelineHeight = Math.max(920, totalHours * pxPerHour);
     const height = padY + headerTitleH + daysHeaderH + timelineHeight + padY;
 
     const canvas = document.createElement("canvas");
@@ -2120,11 +2120,11 @@ const CoachTrainingSlotsScreen = ({
 
     // Title
     ctx.fillStyle = "#0f172a";
-    ctx.font = "700 44px Inter, sans-serif";
+    ctx.font = "700 56px Inter, sans-serif";
     ctx.fillText(
       `Créneaux — S${weekNumber} · ${formatDayMonth(visibleWeekDates[0])} – ${formatDayMonth(visibleWeekDates[visibleWeekDates.length - 1])}`,
       padX,
-      padY + 48,
+      padY + 62,
     );
 
     // Day headers
@@ -2133,12 +2133,12 @@ const CoachTrainingSlotsScreen = ({
       const center = x + colW / 2;
       const day = weekData[i];
       ctx.fillStyle = "#64748b";
-      ctx.font = "700 17px Inter, sans-serif";
+      ctx.font = "700 22px Inter, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 20);
+      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 24);
       ctx.fillStyle = "#111827";
-      ctx.font = "700 20px Inter, sans-serif";
-      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 12);
+      ctx.font = "700 28px Inter, sans-serif";
+      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 14);
       ctx.textAlign = "left";
     }
 
@@ -2160,8 +2160,8 @@ const CoachTrainingSlotsScreen = ({
       ctx.stroke();
 
       ctx.fillStyle = "#64748b";
-      ctx.font = "600 15px Inter, sans-serif";
-      ctx.fillText(`${String(h).padStart(2, "0")}h`, padX + 8, y + 4);
+      ctx.font = "600 20px Inter, sans-serif";
+      ctx.fillText(`${String(h).padStart(2, "0")}h`, padX + 6, y + 6);
     }
 
     // Vertical separators
@@ -2181,7 +2181,7 @@ const CoachTrainingSlotsScreen = ({
       for (const s of weekData[i].slots) {
         const startY = yFromMinutes(timeToMinutes(s.start)) + 2;
         const endY = yFromMinutes(timeToMinutes(s.end)) - 2;
-        const cardH = Math.max(94, endY - startY);
+        const cardH = Math.max(132, endY - startY);
         const cardY = startY;
         const cardX = dayX + 6;
         const cardW = colW - 12;
@@ -2221,24 +2221,24 @@ const CoachTrainingSlotsScreen = ({
         ctx.stroke();
 
         const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
-        const coachLine = truncate(s.coachesLabel, cardW - 22, "600 16px Inter, sans-serif");
-        const locationLine = truncate(`Lieu: ${s.location}`, cardW - 22, "500 15px Inter, sans-serif");
+        const coachLine = truncate(s.coachesLabel, cardW - 22, "600 21px Inter, sans-serif");
+        const locationLine = truncate(`Lieu: ${s.location}`, cardW - 22, "500 19px Inter, sans-serif");
 
         ctx.fillStyle = fg;
-        ctx.font = "700 20px Inter, sans-serif";
-        ctx.fillText(timeLine, cardX + 12, cardY + 26);
-        ctx.font = "600 16px Inter, sans-serif";
-        ctx.fillText(coachLine, cardX + 12, cardY + 52);
+        ctx.font = "700 28px Inter, sans-serif";
+        ctx.fillText(timeLine, cardX + 12, cardY + 36);
+        ctx.font = "600 21px Inter, sans-serif";
+        ctx.fillText(coachLine, cardX + 12, cardY + 76);
         ctx.fillStyle = s.isCancelled ? "#94a3b8" : "#64748b";
-        ctx.font = "500 15px Inter, sans-serif";
-        ctx.fillText(locationLine, cardX + 12, cardY + 75);
+        ctx.font = "500 19px Inter, sans-serif";
+        ctx.fillText(locationLine, cardX + 12, cardY + 109);
 
         if (s.isCancelled) {
           ctx.strokeStyle = "#6b7280";
           ctx.lineWidth = 1.3;
           ctx.beginPath();
-          ctx.moveTo(cardX + 12, cardY + 30);
-          ctx.lineTo(cardX + cardW - 10, cardY + 30);
+          ctx.moveTo(cardX + 12, cardY + 41);
+          ctx.lineTo(cardX + cardW - 10, cardY + 41);
           ctx.stroke();
         }
       }
