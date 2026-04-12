@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
@@ -60,6 +60,8 @@ import {
   CircleDashed,
   Ban,
   ArrowRightLeft,
+  Share2,
+  Loader2,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -1877,6 +1879,69 @@ const CoachTrainingSlotsScreen = ({
     display_name: c.display_name,
   }));
 
+  // ── Export image ───────────────────────────────────────
+  const exportContentRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportImage = useCallback(async () => {
+    const el = exportContentRef.current;
+    if (!el || exporting) return;
+    setExporting(true);
+    try {
+      // Show the export-only header during capture
+      const exportHeader = el.querySelector(".export-visible") as HTMLElement | null;
+      if (exportHeader) exportHeader.style.display = "block";
+
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(el, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      // Hide it again
+      if (exportHeader) exportHeader.style.display = "";
+
+      const fileName = `semaine-${weekMondayIso}.png`;
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast({ title: "Erreur", description: "Impossible de générer l'image", variant: "destructive" });
+          setExporting(false);
+          return;
+        }
+
+        // Try Web Share API first (mobile)
+        if (navigator.share && navigator.canShare) {
+          const file = new File([blob], fileName, { type: "image/png" });
+          const shareData = { files: [file] };
+          try {
+            if (navigator.canShare(shareData)) {
+              await navigator.share(shareData);
+              setExporting(false);
+              return;
+            }
+          } catch {
+            // User cancelled or share failed — fall through to download
+          }
+        }
+
+        // Fallback: download PNG
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        setExporting(false);
+      }, "image/png");
+    } catch (err) {
+      toast({ title: "Erreur export", description: String(err), variant: "destructive" });
+      setExporting(false);
+    }
+  }, [exporting, weekMondayIso, toast]);
+
   return (
     <div className="space-y-4 pb-24">
       {/* ── Mobile header ── */}
@@ -1900,6 +1965,15 @@ const CoachTrainingSlotsScreen = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="flex items-center justify-center h-9 w-9 rounded-full border border-border bg-card text-muted-foreground active:scale-90 transition-all disabled:opacity-50"
+              onClick={handleExportImage}
+              disabled={exporting || slotsLoading}
+              aria-label="Exporter en image"
+            >
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+            </button>
             {onOpenLibrary && (
               <button
                 type="button"
@@ -1976,6 +2050,15 @@ const CoachTrainingSlotsScreen = ({
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground"
+          onClick={handleExportImage}
+          disabled={exporting || slotsLoading}
+        >
+          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+        </Button>
         {onOpenLibrary && (
           <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
@@ -2072,6 +2155,15 @@ const CoachTrainingSlotsScreen = ({
               Ce nageur hérite des créneaux du groupe. Personnalisez depuis sa fiche.
             </div>
           )}
+
+          {/* ── Capturable content area ── */}
+          <div ref={exportContentRef}>
+          {/* Export-only header — hidden on screen, visible in capture */}
+          <div className="hidden export-visible px-1 pb-3">
+            <p className="text-base font-bold capitalize" style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}>
+              Séances — S{weekNumber} · {formatDayMonth(weekDates[0])} – {formatDayMonth(weekDates[6])}
+            </p>
+          </div>
 
           {/* ── Mobile view ── */}
           <div className="sm:hidden">
@@ -2176,6 +2268,7 @@ const CoachTrainingSlotsScreen = ({
               })}
             </div>
           </div>
+          </div>{/* end exportContentRef */}
         </>
       )}
 
