@@ -2029,49 +2029,66 @@ const CoachTrainingSlotsScreen = ({
   }, []);
 
   const buildFallbackWeekPng = useCallback(async (): Promise<Blob> => {
-    const width = 1600;
+    const width = 1880;
     const padX = 28;
-    const padY = 28;
-    const colGap = 12;
+    const padY = 24;
+    const leftAxisWidth = 72;
+    const colGap = 8;
     const colCount = 7;
-    const colWidth = Math.floor((width - padX * 2 - colGap * (colCount - 1)) / colCount);
+    const headerTitleH = 56;
+    const daysHeaderH = 44;
 
     const weekData = weekDates.map((date, i) => {
       const day = i + 1;
-      const slots = (slotsByDay.get(day) ?? []).map((slot) => {
-        const instance = slotInstancesById.get(slot.id);
-        const ov = instance?.override;
-        const isModified = ov?.status === "modified";
-        const isCancelled = instance?.state === "cancelled";
-        const start = isModified && ov?.new_start_time ? ov.new_start_time : slot.start_time;
-        const end = isModified && ov?.new_end_time ? ov.new_end_time : slot.end_time;
-        const location = isModified && ov?.new_location ? ov.new_location : slot.location;
-        const statusLabel = isCancelled
-          ? "Annulé"
-          : isModified
-            ? "Modifié"
-            : instance?.state === "published"
-              ? "Publié"
-              : instance?.state === "draft"
-                ? "Brouillon"
-                : "";
-
-        return { start, end, location, statusLabel };
-      });
+      const slots = (slotsByDay.get(day) ?? [])
+        .map((slot) => {
+          const instance = slotInstancesById.get(slot.id);
+          const ov = instance?.override;
+          const isModified = ov?.status === "modified";
+          const isCancelled = instance?.state === "cancelled";
+          const start = isModified && ov?.new_start_time ? ov.new_start_time : slot.start_time;
+          const end = isModified && ov?.new_end_time ? ov.new_end_time : slot.end_time;
+          const location = isModified && ov?.new_location ? ov.new_location : slot.location;
+          const coachesLabel = (slot.coaches ?? []).map((c) => c.coach_name).join(", ") || "Coach non défini";
+          return {
+            start,
+            end,
+            location,
+            swim: isSwimSlot(location),
+            isModified,
+            isCancelled,
+            state: instance?.state ?? "empty",
+            coachesLabel,
+          };
+        })
+        .sort((a, b) => a.start.localeCompare(b.start));
 
       return {
-        label: `${DAYS_SHORT[i]} ${date.getDate()}`,
-        month: date.toLocaleDateString("fr-FR", { month: "short" }),
+        dayShort: DAYS_SHORT[i],
+        dayFull: DAYS_FR[i],
+        dateLabel: formatDayMonth(date),
         slots,
       };
     });
 
-    const maxSlots = Math.max(1, ...weekData.map((d) => d.slots.length));
-    const slotRowH = 36;
-    const colHeaderH = 52;
-    const colHeight = colHeaderH + maxSlots * slotRowH + 16;
-    const headerH = 64;
-    const height = padY * 2 + headerH + colHeight;
+    const allTimes = weekData.flatMap((d) => d.slots.flatMap((s) => [timeToMinutes(s.start), timeToMinutes(s.end)]));
+    let startMin = TIMELINE_START * 60;
+    let endMin = TIMELINE_END * 60;
+    if (allTimes.length > 0) {
+      const min = Math.min(...allTimes);
+      const max = Math.max(...allTimes);
+      startMin = Math.max(0, Math.floor((min - 60) / 60) * 60);
+      endMin = Math.min(24 * 60, Math.ceil((max + 60) / 60) * 60);
+      if (endMin <= startMin) {
+        startMin = TIMELINE_START * 60;
+        endMin = TIMELINE_END * 60;
+      }
+    }
+
+    const totalHours = Math.max(1, (endMin - startMin) / 60);
+    const pxPerHour = 66;
+    const timelineHeight = Math.max(560, totalHours * pxPerHour);
+    const height = padY + headerTitleH + daysHeaderH + timelineHeight + padY;
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -2079,60 +2096,145 @@ const CoachTrainingSlotsScreen = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Impossible de créer le canvas");
 
+    const truncate = (txt: string, maxWidth: number, font: string) => {
+      ctx.font = font;
+      if (ctx.measureText(txt).width <= maxWidth) return txt;
+      let out = txt;
+      while (out.length > 0 && ctx.measureText(`${out}…`).width > maxWidth) {
+        out = out.slice(0, -1);
+      }
+      return out.length > 0 ? `${out}…` : "";
+    };
+
+    const gridX = padX + leftAxisWidth;
+    const gridY = padY + headerTitleH + daysHeaderH;
+    const gridW = width - padX - gridX;
+    const colW = (gridW - colGap * (colCount - 1)) / colCount;
+
+    const yFromMinutes = (minutes: number) =>
+      gridY + ((minutes - startMin) / (endMin - startMin)) * timelineHeight;
+
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "#111827";
-    ctx.font = "700 28px Inter, sans-serif";
+    // Title
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "700 30px Inter, sans-serif";
     ctx.fillText(
       `Créneaux — S${weekNumber} · ${formatDayMonth(weekDates[0])} – ${formatDayMonth(weekDates[6])}`,
       padX,
-      padY + 30,
+      padY + 32,
     );
 
-    const startY = padY + headerH;
+    // Day headers
     for (let i = 0; i < weekData.length; i += 1) {
-      const x = padX + i * (colWidth + colGap);
-      const d = weekData[i];
+      const x = gridX + i * (colW + colGap);
+      const center = x + colW / 2;
+      const day = weekData[i];
+      ctx.fillStyle = "#64748b";
+      ctx.font = "700 12px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(day.dayShort.toUpperCase(), center, padY + headerTitleH - 14);
+      ctx.fillStyle = "#111827";
+      ctx.font = "700 13px Inter, sans-serif";
+      ctx.fillText(day.dateLabel, center, padY + headerTitleH + 4);
+      ctx.textAlign = "left";
+    }
 
-      // Column card
-      ctx.fillStyle = "#f9fafb";
-      ctx.strokeStyle = "#e5e7eb";
-      ctx.lineWidth = 1;
+    // Background columns
+    for (let i = 0; i < colCount; i += 1) {
+      const x = gridX + i * (colW + colGap);
+      ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#f1f5f9";
+      ctx.fillRect(x, gridY, colW, timelineHeight);
+    }
+
+    // Hour lines + labels
+    for (let h = Math.ceil(startMin / 60); h <= Math.floor(endMin / 60); h += 1) {
+      const y = yFromMinutes(h * 60);
+      ctx.strokeStyle = h % 2 === 0 ? "#cbd5e1" : "#e2e8f0";
+      ctx.lineWidth = h % 2 === 0 ? 1.2 : 1;
       ctx.beginPath();
-      ctx.roundRect(x, startY, colWidth, colHeight, 10);
-      ctx.fill();
+      ctx.moveTo(gridX, y);
+      ctx.lineTo(gridX + gridW, y);
       ctx.stroke();
 
-      // Day header
-      ctx.fillStyle = "#111827";
-      ctx.font = "700 15px Inter, sans-serif";
-      ctx.fillText(d.label, x + 10, startY + 22);
-      ctx.fillStyle = "#6b7280";
-      ctx.font = "500 12px Inter, sans-serif";
-      ctx.fillText(d.month, x + 10, startY + 40);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "600 11px Inter, sans-serif";
+      ctx.fillText(`${String(h).padStart(2, "0")}h`, padX + 8, y + 4);
+    }
 
-      if (d.slots.length === 0) {
-        ctx.fillStyle = "#9ca3af";
-        ctx.font = "500 12px Inter, sans-serif";
-        ctx.fillText("Aucun créneau", x + 10, startY + colHeaderH + 18);
-        continue;
+    // Vertical separators
+    for (let i = 0; i <= colCount; i += 1) {
+      const x = i === colCount ? gridX + gridW : gridX + i * (colW + colGap) - (i > 0 ? colGap / 2 : 0);
+      ctx.strokeStyle = "#dbe3ee";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, gridY);
+      ctx.lineTo(x, gridY + timelineHeight);
+      ctx.stroke();
+    }
+
+    // Slot cards
+    for (let i = 0; i < weekData.length; i += 1) {
+      const dayX = gridX + i * (colW + colGap);
+      for (const s of weekData[i].slots) {
+        const startY = yFromMinutes(timeToMinutes(s.start)) + 2;
+        const endY = yFromMinutes(timeToMinutes(s.end)) - 2;
+        const cardH = Math.max(42, endY - startY);
+        const cardY = startY;
+        const cardX = dayX + 6;
+        const cardW = colW - 12;
+
+        let bg = s.swim ? "#dbeafe" : "#fef3c7";
+        let border = s.swim ? "#60a5fa" : "#f59e0b";
+        let fg = s.swim ? "#1e3a8a" : "#92400e";
+
+        if (s.state === "published") {
+          bg = "#dcfce7";
+          border = "#34d399";
+          fg = "#065f46";
+        } else if (s.state === "draft") {
+          bg = "#fef3c7";
+          border = "#f59e0b";
+          fg = "#92400e";
+        }
+        if (s.isModified) {
+          bg = "#ffedd5";
+          border = "#fb923c";
+          fg = "#9a3412";
+        }
+        if (s.isCancelled) {
+          bg = "#e5e7eb";
+          border = "#9ca3af";
+          fg = "#6b7280";
+        }
+
+        ctx.fillStyle = bg;
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
+        const coachLine = truncate(`Coach: ${s.coachesLabel}`, cardW - 14, "600 10.5px Inter, sans-serif");
+
+        ctx.fillStyle = fg;
+        ctx.font = "700 11.5px Inter, sans-serif";
+        ctx.fillText(timeLine, cardX + 7, cardY + 14);
+        ctx.font = "600 10.5px Inter, sans-serif";
+        ctx.fillText(coachLine, cardX + 7, cardY + 28);
+
+        if (s.isCancelled) {
+          ctx.strokeStyle = "#6b7280";
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          ctx.moveTo(cardX + 7, cardY + 19);
+          ctx.lineTo(cardX + cardW - 7, cardY + 19);
+          ctx.stroke();
+        }
       }
-
-      d.slots.forEach((s, idx) => {
-        const rowY = startY + colHeaderH + idx * slotRowH;
-        const status = s.statusLabel ? ` · ${s.statusLabel}` : "";
-        const line1 = `${formatTime(s.start)}-${formatTime(s.end)}${status}`;
-
-        ctx.fillStyle = "#111827";
-        ctx.font = "600 12px Inter, sans-serif";
-        ctx.fillText(line1, x + 10, rowY + 14);
-
-        ctx.fillStyle = "#6b7280";
-        ctx.font = "500 11px Inter, sans-serif";
-        const location = s.location.length > 26 ? `${s.location.slice(0, 25)}…` : s.location;
-        ctx.fillText(location, x + 10, rowY + 29);
-      });
     }
 
     const blob = await new Promise<Blob>((resolve, reject) => {
@@ -2142,7 +2244,7 @@ const CoachTrainingSlotsScreen = ({
       }, "image/png");
     });
     return blob;
-  }, [weekDates, slotsByDay, slotInstancesById, weekNumber]);
+  }, [slotsByDay, slotInstancesById, weekDates, weekNumber]);
 
   const handleExportImage = useCallback(async () => {
     const el = exportContentRef.current;
