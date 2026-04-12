@@ -302,6 +302,9 @@ const SlotFormSheet = ({
     onSuccess: () => {
       toast({ title: "Creneau cree" });
       void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
+      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -319,6 +322,9 @@ const SlotFormSheet = ({
     onSuccess: () => {
       toast({ title: "Creneau mis a jour" });
       void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
+      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -335,6 +341,9 @@ const SlotFormSheet = ({
     onSuccess: () => {
       toast({ title: "Creneau supprime" });
       void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
+      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -634,6 +643,7 @@ const OverrideFormSheet = ({
       void queryClient.invalidateQueries({
         queryKey: ["training-slot-overrides"],
       });
+      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
       void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
       onOpenChange(false);
     },
@@ -1544,11 +1554,23 @@ const CoachTrainingSlotsScreen = ({
     return slots;
   }, [slots, filterValue, swimmerHasCustom, swimmerSlotsAsTraining, athletes, swimmerFilterId]);
 
+  // Overrides scoped to the selected week
+  const weekMondayIso = toIsoDate(weekMonday);
+  const weekSundayIso = toIsoDate(weekSunday);
+
+  // Filter out one-off slots that don't belong to the current week
+  const weekFilteredSlots = useMemo(() => {
+    return filteredSlots.filter((s) => {
+      if (!s.scheduled_date) return true; // recurring → always show
+      return s.scheduled_date >= weekMondayIso && s.scheduled_date <= weekSundayIso;
+    });
+  }, [filteredSlots, weekMondayIso, weekSundayIso]);
+
   // Group filtered slots by day, sorted by start_time
   const slotsByDay = useMemo(() => {
     const map = new Map<number, TrainingSlot[]>();
     for (let d = 1; d <= 7; d++) map.set(d, []);
-    for (const s of filteredSlots) {
+    for (const s of weekFilteredSlots) {
       map.get(s.day_of_week)!.push(s);
     }
     // Sort each day by start_time
@@ -1556,11 +1578,7 @@ const CoachTrainingSlotsScreen = ({
       list.sort((a, b) => a.start_time.localeCompare(b.start_time));
     }
     return map;
-  }, [filteredSlots]);
-
-  // Overrides scoped to the selected week
-  const weekMondayIso = toIsoDate(weekMonday);
-  const weekSundayIso = toIsoDate(weekSunday);
+  }, [weekFilteredSlots]);
 
   const { data: slotAssignments = [] } = useQuery({
     queryKey: ["slot-assignments", weekMondayIso, weekSundayIso],
@@ -1601,11 +1619,11 @@ const CoachTrainingSlotsScreen = ({
     const map = new Map<string, SlotInstance>();
     const today = todayIso();
 
-    for (const slot of filteredSlots) {
+    for (const slot of weekFilteredSlots) {
       const slotDate = weekDates[slot.day_of_week - 1];
       if (!slotDate) continue;
 
-      const scheduledDate = toIsoDate(slotDate);
+      const scheduledDate = slot.scheduled_date ?? toIsoDate(slotDate);
       const override = weekOverrides.find(
         (item) =>
           item.slot_id === slot.id &&
@@ -1629,13 +1647,13 @@ const CoachTrainingSlotsScreen = ({
     }
 
     return map;
-  }, [filteredSlots, slotAssignments, weekDates, weekOverrides]);
+  }, [weekFilteredSlots, slotAssignments, weekDates, weekOverrides]);
 
   // ── Adaptive timeline range (desktop) ─────────────────────
   const timelineRange = useMemo(() => {
     let minH = 22;
     let maxH = 6;
-    filteredSlots.forEach((s) => {
+    weekFilteredSlots.forEach((s) => {
       const startH = Math.floor(timeToMinutes(s.start_time) / 60);
       const endH = Math.ceil(timeToMinutes(s.end_time) / 60);
       if (startH < minH) minH = startH;
@@ -1646,7 +1664,7 @@ const CoachTrainingSlotsScreen = ({
     const start = Math.max(0, minH - 1);
     const end = Math.min(24, maxH + 1);
     return { start, end, hours: end - start };
-  }, [filteredSlots]);
+  }, [weekFilteredSlots]);
 
   const timelineHourLabels = useMemo(
     () => Array.from({ length: timelineRange.hours + 1 }, (_, i) => timelineRange.start + i),
