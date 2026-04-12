@@ -781,7 +781,7 @@ export default function SuiviSemaine() {
   // ── Render ─────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-4xl px-4 pb-28">
+    <div className="mx-auto max-w-4xl overflow-x-hidden px-4 pb-28">
       <PageHeader
         title="Ma semaine"
         backHref="/suivi"
@@ -1024,10 +1024,10 @@ function LoggedCard({
       )}
     >
       {/* Top row: slot info */}
-      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="mb-1.5 flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+            "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
             isStrength
               ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
               : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
@@ -1037,15 +1037,15 @@ function LoggedCard({
           {isStrength ? "Muscu" : "Natation"}
         </span>
         {card.slotTime && (
-          <span className="flex items-center gap-0.5">
+          <span className="flex shrink-0 items-center gap-0.5">
             <Clock className="h-3 w-3" />
             {formatSlotTime(card.slotTime)}
           </span>
         )}
         {card.slotLocation && (
-          <span className="flex items-center gap-0.5">
-            <MapPin className="h-3 w-3" />
-            {card.slotLocation}
+          <span className="flex min-w-0 items-center gap-0.5">
+            <MapPin className="h-3 w-3 shrink-0" />
+            <span className="truncate">{card.slotLocation}</span>
           </span>
         )}
       </div>
@@ -1134,10 +1134,10 @@ function MissedCard({
       )}
     >
       {/* Slot info */}
-      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="mb-1.5 flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+            "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
             isStrength
               ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
               : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
@@ -1147,15 +1147,15 @@ function MissedCard({
           {isStrength ? "Muscu" : "Natation"}
         </span>
         {card.slotTime && (
-          <span className="flex items-center gap-0.5">
+          <span className="flex shrink-0 items-center gap-0.5">
             <Clock className="h-3 w-3" />
             {formatSlotTime(card.slotTime)}
           </span>
         )}
         {card.slotLocation && (
-          <span className="flex items-center gap-0.5">
-            <MapPin className="h-3 w-3" />
-            {card.slotLocation}
+          <span className="flex min-w-0 items-center gap-0.5">
+            <MapPin className="h-3 w-3 shrink-0" />
+            <span className="truncate">{card.slotLocation}</span>
           </span>
         )}
       </div>
