@@ -1,0 +1,728 @@
+import { useMemo, useState, useCallback } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useQueries } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import type { TrainingWeek, Interview } from "@/lib/api";
+import type { ResolvedSlotAssignment } from "@/lib/api/types";
+import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
+import { useAuth } from "@/lib/auth";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { ObjectiveCard } from "@/components/shared/ObjectiveCard";
+import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  CalendarRange,
+  ChevronRight,
+  ExternalLink,
+  MapPin,
+  MessageSquare,
+  Plus,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function fmtShort(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+}
+
+function fmtDay(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+}
+
+function getSunday(mondayIso: string): string {
+  const d = new Date(mondayIso + "T00:00:00");
+  d.setDate(d.getDate() + 6);
+  return d.toISOString().split("T")[0];
+}
+
+function isCurrentWeek(mondayIso: string): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(mondayIso + "T00:00:00");
+  const sunday = new Date(mondayIso + "T00:00:00");
+  sunday.setDate(sunday.getDate() + 6);
+  return today >= monday && today <= sunday;
+}
+
+function getMondays(startDate: string, endDate: string): string[] {
+  const mondays: string[] = [];
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  const current = new Date(start);
+  const day = current.getDay();
+  const diffToMonday = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
+  current.setDate(current.getDate() + diffToMonday);
+  while (current <= end) {
+    mondays.push(current.toISOString().split("T")[0]);
+    current.setDate(current.getDate() + 7);
+  }
+  return mondays;
+}
+
+function daysBetween(dateA: string, dateB: string): number {
+  const a = new Date(dateA + "T00:00:00");
+  const b = new Date(dateB + "T00:00:00");
+  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getWeekDates(mondayIso: string): string[] {
+  const dates: string[] = [];
+  const d = new Date(mondayIso + "T00:00:00");
+  for (let i = 0; i < 7; i++) {
+    dates.push(d.toISOString().split("T")[0]);
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+function isSwimSlot(location: string): boolean {
+  const l = location.toLowerCase();
+  return l.includes("piscine") || l.includes("bassin") || l.includes("natation") || l.includes("nage");
+}
+
+function interviewStatusLabel(status: Interview["status"]): string {
+  switch (status) {
+    case "draft_athlete":
+      return "A preparer";
+    case "draft_coach":
+      return "En attente coach";
+    case "sent":
+      return "A completer";
+    case "signed":
+      return "Termine";
+    default:
+      return status;
+  }
+}
+
+function interviewStatusColor(status: Interview["status"]): string {
+  switch (status) {
+    case "draft_athlete":
+      return "text-amber-600 bg-amber-500/10";
+    case "draft_coach":
+      return "text-blue-600 bg-blue-500/10";
+    case "sent":
+      return "text-primary bg-primary/10";
+    case "signed":
+      return "text-emerald-600 bg-emerald-500/10";
+    default:
+      return "text-muted-foreground bg-muted";
+  }
+}
+
+// ── Timeline item types ─────────────────────────────────────────
+
+type TimelineItem =
+  | { type: "cycle-header"; cycleId: string; cycleName: string; weeksDone: number; weeksTotal: number }
+  | { type: "week"; monday: string; weekIndex: number; week: TrainingWeek | undefined; isCurrent: boolean }
+  | { type: "competition"; id: string; name: string; date: string; location: string; daysUntil: number }
+  | { type: "interview"; interview: Interview };
+
+// ── Expanded week detail ────────────────────────────────────────
+
+function ExpandedWeekDays({ monday, userId }: { monday: string; userId: number }) {
+  const dates = useMemo(() => getWeekDates(monday), [monday]);
+
+  const { data: assignmentMap, isLoading } = useQuery({
+    queryKey: ["swimmer-assignments-batch", userId, monday],
+    queryFn: () => resolveSwimmerAssignmentsBatch(userId, dates),
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-1.5 pt-2">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-8 rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1 pt-2">
+      {dates.map((date) => {
+        const slots: ResolvedSlotAssignment[] = assignmentMap?.get(date) ?? [];
+        const hasSlots = slots.length > 0;
+
+        return (
+          <div key={date} className="flex items-start gap-2 py-1">
+            <span className="text-[11px] font-medium text-muted-foreground w-16 shrink-0 pt-0.5 capitalize">
+              {fmtDay(date)}
+            </span>
+            <div className="flex-1 min-w-0">
+              {!hasSlots ? (
+                <span className="text-[11px] text-muted-foreground/50 italic">(repos)</span>
+              ) : (
+                <div className="space-y-1">
+                  {slots.map((slot) => {
+                    const swim = isSwimSlot(slot.slotLocation);
+                    const a = slot.assignment;
+                    // Compute distance for swim
+                    let distance = 0;
+                    let exerciseCount = 0;
+                    if (a?.items) {
+                      if (a.session_type === "swim") {
+                        distance = (a.items as Array<{ distance?: number | null }>)
+                          .reduce((sum, it) => sum + (it.distance ?? 0), 0);
+                      } else {
+                        exerciseCount = a.items.length;
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={slot.swimmerSlotId}
+                        className="flex items-center gap-2 rounded-lg border bg-card/80 px-2 py-1"
+                      >
+                        <div className={`w-1 h-5 rounded-full shrink-0 ${swim ? "bg-blue-500" : "bg-amber-400"}`} />
+                        <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+                          {slot.slotTime}
+                        </span>
+                        {a ? (
+                          <span className="text-[11px] font-medium truncate flex-1 min-w-0">
+                            {a.title}
+                            {a.session_type === "swim" && distance > 0 && (
+                              <span className="text-muted-foreground/50 ml-1 font-normal">
+                                {distance >= 1000 ? `${(distance / 1000).toFixed(1)}km` : `${distance}m`}
+                              </span>
+                            )}
+                            {a.session_type === "strength" && exerciseCount > 0 && (
+                              <span className="text-muted-foreground/50 ml-1 font-normal">
+                                {exerciseCount} exo{exerciseCount > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground/40 italic flex-1">
+                            Pas de seance
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main page ───────────────────────────────────────────────────
+
+export default function SuiviSaison() {
+  const [, navigate] = useLocation();
+  const userId = useAuth((s) => s.userId);
+  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+
+  // ── Data fetching ───────────────────────────────────────
+
+  const { data: competitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: () => api.getCompetitions(),
+  });
+
+  const { data: assignedIds = [] } = useQuery({
+    queryKey: ["my-competition-ids", userId],
+    queryFn: () => api.getMyCompetitionIds(userId!),
+    enabled: !!userId,
+  });
+
+  const { data: cycles = [] } = useQuery({
+    queryKey: ["training-cycles", "athlete", userId],
+    queryFn: () => api.getTrainingCycles({ athleteId: userId! }),
+    enabled: !!userId,
+  });
+
+  const { data: interviews = [] } = useQuery({
+    queryKey: ["my-interviews"],
+    queryFn: () => api.getMyInterviews(),
+  });
+
+  const { data: objectives = [] } = useQuery({
+    queryKey: ["athlete-objectives"],
+    queryFn: () => api.getAthleteObjectives(),
+  });
+
+  // Fetch profile for IUF + performances
+  const { data: authUser } = useQuery({
+    queryKey: ["auth-user"],
+    queryFn: async () => {
+      const { data } = await (await import("@/lib/supabase")).supabase.auth.getUser();
+      return data.user;
+    },
+  });
+  const appUserId = (authUser?.app_metadata as Record<string, unknown>)?.app_user_id as number | undefined;
+
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile-iuf"],
+    queryFn: () => api.getProfile({ userId: appUserId }),
+    enabled: !!appUserId,
+  });
+  const iuf = profile?.ffn_iuf ?? null;
+
+  const perfFromDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 360);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const { data: performances = [] } = useQuery({
+    queryKey: ["swimmer-performances-recent", iuf],
+    queryFn: () => api.getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
+    enabled: !!iuf,
+  });
+
+  // ── Derived data ────────────────────────────────────────
+
+  const upcomingCompetitions = useMemo(() => {
+    const assignedSet = new Set(assignedIds);
+    return competitions
+      .filter((c) => assignedSet.has(c.id) && c.date >= todayIso)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [assignedIds, competitions, todayIso]);
+
+  const nextCompetition = upcomingCompetitions[0] ?? null;
+
+  // Map cycles by end_competition_id
+  const cyclesByCompetitionId = useMemo(() => {
+    const map = new Map<string, (typeof cycles)[number]>();
+    cycles
+      .slice()
+      .sort((a, b) => (a.end_competition_date ?? "").localeCompare(b.end_competition_date ?? ""))
+      .forEach((cycle) => {
+        if (cycle.end_competition_id && !map.has(cycle.end_competition_id)) {
+          map.set(cycle.end_competition_id, cycle);
+        }
+      });
+    return map;
+  }, [cycles]);
+
+  // Filter planned cycles
+  const plannedCycles = useMemo(() => {
+    const seen = new Set<string>();
+    return upcomingCompetitions
+      .map((c) => cyclesByCompetitionId.get(c.id) ?? null)
+      .filter((cycle): cycle is NonNullable<typeof cycle> => {
+        if (!cycle || seen.has(cycle.id)) return false;
+        seen.add(cycle.id);
+        return true;
+      });
+  }, [cyclesByCompetitionId, upcomingCompetitions]);
+
+  // Fetch weeks for all planned cycles
+  const weekQueries = useQueries({
+    queries: plannedCycles.map((cycle) => ({
+      queryKey: ["training-weeks", cycle.id],
+      queryFn: () => api.getTrainingWeeks(cycle.id),
+      enabled: !!cycle.id,
+    })),
+  });
+
+  const weeksByCycleId = useMemo(() => {
+    const map = new Map<string, TrainingWeek[]>();
+    plannedCycles.forEach((cycle, index) => {
+      map.set(cycle.id, (weekQueries[index]?.data as TrainingWeek[] | undefined) ?? []);
+    });
+    return map;
+  }, [plannedCycles, weekQueries]);
+
+  // ── Build unified timeline ──────────────────────────────
+
+  const timelineItems = useMemo(() => {
+    const items: TimelineItem[] = [];
+
+    // For each upcoming competition with a cycle, build timeline
+    for (const comp of upcomingCompetitions) {
+      const cycle = cyclesByCompetitionId.get(comp.id);
+      if (!cycle) {
+        // Competition without cycle — just show event
+        items.push({
+          type: "competition",
+          id: comp.id,
+          name: comp.name,
+          date: comp.date,
+          location: comp.location ?? "",
+          daysUntil: daysBetween(todayIso, comp.date),
+        });
+        continue;
+      }
+
+      const cycleStart = cycle.start_date ?? cycle.start_competition_date ?? todayIso;
+      const allMondays = getMondays(cycleStart, comp.date);
+      const cycleWeeks = weeksByCycleId.get(cycle.id) ?? [];
+      const weeksByStart = new Map(cycleWeeks.map((w) => [w.week_start, w]));
+
+      // Count completed weeks (before today)
+      const weeksDone = allMondays.filter((m) => m < todayIso).length;
+
+      // Cycle header
+      items.push({
+        type: "cycle-header",
+        cycleId: cycle.id,
+        cycleName: cycle.name,
+        weeksDone,
+        weeksTotal: allMondays.length,
+      });
+
+      // Interleave weeks and events
+      // Collect interviews within this cycle's date range
+      const cycleEnd = comp.date;
+      const relevantInterviews = interviews.filter(
+        (iv) => iv.date >= cycleStart && iv.date <= cycleEnd,
+      );
+
+      // Build a combined list sorted by date
+      type Sortable = { date: string; item: TimelineItem };
+      const sortables: Sortable[] = [];
+
+      allMondays.forEach((monday, idx) => {
+        const week = weeksByStart.get(monday);
+        const current = isCurrentWeek(monday);
+        // Only show future and current weeks (+ 2 past weeks for context)
+        const isPast = monday < todayIso && !current;
+        const pastWeeks = allMondays.filter((m) => m < todayIso && !isCurrentWeek(m)).length;
+        const pastIndex = allMondays.filter((m) => m < monday && m < todayIso).length;
+        if (isPast && pastIndex < pastWeeks - 2) return;
+
+        sortables.push({
+          date: monday,
+          item: {
+            type: "week",
+            monday,
+            weekIndex: idx + 1,
+            week,
+            isCurrent: current,
+          },
+        });
+      });
+
+      relevantInterviews.forEach((iv) => {
+        sortables.push({
+          date: iv.date,
+          item: { type: "interview", interview: iv },
+        });
+      });
+
+      sortables.sort((a, b) => a.date.localeCompare(b.date));
+
+      for (const s of sortables) {
+        items.push(s.item);
+      }
+
+      // Competition event at end
+      items.push({
+        type: "competition",
+        id: comp.id,
+        name: comp.name,
+        date: comp.date,
+        location: comp.location ?? "",
+        daysUntil: daysBetween(todayIso, comp.date),
+      });
+    }
+
+    // Add standalone interviews not covered by any cycle
+    const cycleInterviewIds = new Set<string>();
+    for (const item of items) {
+      if (item.type === "interview") cycleInterviewIds.add(item.interview.id);
+    }
+    const standaloneInterviews = interviews.filter(
+      (iv) => !cycleInterviewIds.has(iv.id) && iv.date >= todayIso,
+    );
+    for (const iv of standaloneInterviews) {
+      items.push({ type: "interview", interview: iv });
+    }
+
+    return items;
+  }, [upcomingCompetitions, cyclesByCompetitionId, weeksByCycleId, interviews, todayIso]);
+
+  // ── Actions ─────────────────────────────────────────────
+
+  const toggleWeek = useCallback((monday: string) => {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(monday)) next.delete(monday);
+      else next.add(monday);
+      return next;
+    });
+  }, []);
+
+  // ── Render ──────────────────────────────────────────────
+
+  const isLoading = !userId;
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 pb-24">
+      {/* Sticky header */}
+      <PageHeader
+        title="Ma saison"
+        icon={<CalendarRange className="h-3.5 w-3.5" />}
+        backHref="/suivi"
+        backLabel="Mon suivi"
+        action={
+          nextCompetition ? (
+            <Badge className="border-primary/20 bg-primary/10 text-primary text-[11px] px-2 py-1">
+              J-{daysBetween(todayIso, nextCompetition.date)}
+            </Badge>
+          ) : undefined
+        }
+      />
+
+      <div className="space-y-5 pt-3">
+        {/* ── Objectives horizontal scroll ─────────────────── */}
+        {objectives.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Objectifs
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-[11px] text-primary"
+                onClick={() => navigate("/suivi?tab=objectifs")}
+              >
+                <Plus className="h-3 w-3" />
+                Ajouter
+              </Button>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory scrollbar-none">
+              {objectives.map((obj) => (
+                <div key={obj.id} className="snap-start shrink-0 w-40">
+                  <ObjectiveCard
+                    objective={obj}
+                    performances={performances}
+                    compact
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Summary card ─────────────────────────────────── */}
+        {upcomingCompetitions.length > 0 && (
+          <div className="rounded-2xl border bg-gradient-to-br from-primary/[0.08] via-background to-amber-500/[0.06] p-3.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">
+                {upcomingCompetitions.length} echeance{upcomingCompetitions.length > 1 ? "s" : ""}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {plannedCycles.length} cycle{plannedCycles.length > 1 ? "s" : ""} planifie{plannedCycles.length > 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Empty state ──────────────────────────────────── */}
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-14 rounded-2xl" />
+            <Skeleton className="h-10 rounded-xl" />
+            <Skeleton className="h-10 rounded-xl" />
+            <Skeleton className="h-10 rounded-xl" />
+          </div>
+        ) : timelineItems.length === 0 ? (
+          <div className="rounded-3xl border border-dashed bg-card/70 px-4 py-10 text-center">
+            <CalendarRange className="mx-auto h-10 w-10 text-muted-foreground/60" />
+            <p className="mt-3 text-sm font-medium">Aucune echeance a venir</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ton plan de saison apparaitra ici quand ton coach aura programme tes cycles.
+            </p>
+          </div>
+        ) : (
+          /* ── Timeline ──────────────────────────────────── */
+          <div className="relative ml-3 space-y-2 border-l-2 border-border pl-4">
+            {timelineItems.map((item, idx) => {
+              if (item.type === "cycle-header") {
+                return (
+                  <div key={`cycle-${item.cycleId}`} className="relative -ml-[1.35rem]">
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+                    <div className="ml-6 rounded-2xl border bg-card/90 px-3.5 py-2.5 shadow-sm">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold">{item.cycleName}</span>
+                        <Badge variant="secondary" className="text-[10px]">
+                          Sem {item.weeksDone}/{item.weeksTotal}
+                        </Badge>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                          style={{ width: `${item.weeksTotal > 0 ? (item.weeksDone / item.weeksTotal) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (item.type === "week") {
+                const isExpanded = expandedWeeks.has(item.monday);
+                const sunday = getSunday(item.monday);
+
+                return (
+                  <Collapsible
+                    key={`week-${item.monday}`}
+                    open={isExpanded}
+                    onOpenChange={() => toggleWeek(item.monday)}
+                  >
+                    <div className="relative -ml-[1.35rem]">
+                      <div
+                        className={`absolute left-0 top-3.5 h-2 w-2 rounded-full border-2 border-background ${
+                          item.isCurrent ? "bg-primary" : "bg-muted-foreground/30"
+                        }`}
+                      />
+                      <div
+                        className={`ml-6 rounded-xl border bg-card px-3 py-2 text-xs ${
+                          item.isCurrent ? "ring-2 ring-primary/30 bg-primary/[0.04]" : ""
+                        }`}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <button type="button" className="w-full text-left">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <ChevronRight
+                                className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
+                                  isExpanded ? "rotate-90" : ""
+                                }`}
+                              />
+                              <span className="text-muted-foreground whitespace-nowrap">
+                                Sem. {item.weekIndex}
+                              </span>
+                              <span className="text-muted-foreground/70 whitespace-nowrap">
+                                {fmtShort(item.monday)} - {fmtShort(sunday)}
+                              </span>
+                              {item.week?.week_type && (
+                                <Badge
+                                  className="ml-auto border-0 px-1.5 py-0 text-[10px]"
+                                  style={{
+                                    backgroundColor: weekTypeColor(item.week.week_type),
+                                    color: weekTypeTextColor(item.week.week_type),
+                                  }}
+                                >
+                                  {item.week.week_type}
+                                </Badge>
+                              )}
+                              {item.isCurrent && (
+                                <Badge className="border-primary/20 bg-primary/10 text-[10px] text-primary px-1.5 py-0">
+                                  Cette semaine
+                                </Badge>
+                              )}
+                            </div>
+                            {item.week?.notes && (
+                              <p className="mt-1 pl-5 text-[11px] text-muted-foreground line-clamp-2">
+                                {item.week.notes}
+                              </p>
+                            )}
+                          </button>
+                        </CollapsibleTrigger>
+
+                        <CollapsibleContent>
+                          {userId && (
+                            <ExpandedWeekDays monday={item.monday} userId={userId} />
+                          )}
+                        </CollapsibleContent>
+                      </div>
+                    </div>
+                  </Collapsible>
+                );
+              }
+
+              if (item.type === "competition") {
+                return (
+                  <div key={`comp-${item.id}-${idx}`} className="relative -ml-[1.35rem]">
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-amber-500 border-2 border-background" />
+                    <button
+                      type="button"
+                      className="ml-6 w-[calc(100%-1.5rem)] text-left rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-amber-500/10 px-3.5 py-3 shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
+                      onClick={() => navigate(`/competition/${item.id}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Trophy className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="text-sm font-semibold">{item.name}</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{formatDate(item.date)}</span>
+                            {item.location && (
+                              <>
+                                <span>-</span>
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{item.location}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge variant="outline" className="text-[10px] font-semibold">
+                            J-{item.daysUntil}
+                          </Badge>
+                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                );
+              }
+
+              if (item.type === "interview") {
+                const iv = item.interview;
+                const needsAction = iv.status === "draft_athlete" || iv.status === "sent";
+
+                return (
+                  <div key={`iv-${iv.id}`} className="relative -ml-[1.35rem]">
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-background" />
+                    <div className="ml-6 rounded-xl border-l-4 border-l-blue-500 border border-border bg-card px-3 py-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <MessageSquare className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="text-xs font-semibold">Entretien</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDate(iv.date)}</span>
+                        <Badge className={`text-[10px] px-1.5 py-0 ml-auto border-0 ${interviewStatusColor(iv.status)}`}>
+                          {interviewStatusLabel(iv.status)}
+                        </Badge>
+                      </div>
+                      {needsAction && (
+                        <p className="mt-1 text-[11px] text-amber-600 font-medium">
+                          Action requise de ta part
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
