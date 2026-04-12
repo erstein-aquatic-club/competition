@@ -1,6 +1,6 @@
 
 import { useLocation } from "wouter";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 const eacLogo = `${import.meta.env.BASE_URL}logo-eac.webp`;
@@ -59,7 +59,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const hash = useSyncExternalStore(subscribeHash, getHash);
   const role = useAuth((s) => s.role);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const navItems = getNavItemsForRole(role);
+
+  const scrollToTop = useCallback(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, []);
 
   const handleNavClick = useCallback((href: string) => {
     const [hrefPath, hrefQuery] = href.split("?");
@@ -72,7 +77,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       if (!hrefQuery || !new URLSearchParams(hrefQuery).has("section")) {
         window.dispatchEvent(new CustomEvent(NAV_RESET_EVENT));
       }
-      window.scrollTo(0, 0);
+      scrollToTop();
     } else if (location === hrefPath) {
       // Same base route (e.g. /coach) but different section — update hash
       // and notify Coach.tsx via custom event
@@ -87,15 +92,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         window.location.hash = `#${hrefPath}`;
         window.dispatchEvent(new CustomEvent(NAV_RESET_EVENT));
       }
-      window.scrollTo(0, 0);
+      scrollToTop();
     } else {
       navigate(href);
     }
-  }, [hash, location, navigate]);
+  }, [hash, location, navigate, scrollToTop]);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location]);
+    scrollToTop();
+  }, [location, scrollToTop]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -109,7 +114,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background pb-20 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0 md:pt-16">
+    <div className="flex flex-col h-[100dvh] bg-background md:pt-16">
       <OfflineBanner />
       <OfflineSyncBanner />
       <OfflineDetector />
@@ -148,26 +153,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
 
-      {/* Main Content */}
-      <main className="container max-w-lg mx-auto p-4 md:max-w-3xl lg:max-w-4xl">
-        {/* Coach Header — section title */}
-        {(role === "coach" || role === "admin") && (() => {
-          const hashSection = hash.match(/[?&]section=([^&]+)/)?.[1] || "home";
-          const sectionLabel = COACH_SECTION_LABELS[hashSection] || hashSection;
-          return (
-            <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-background/95 backdrop-blur px-4 py-2 border-b border-border/40">
-              <span className="text-sm font-semibold text-foreground">{sectionLabel}</span>
-            </div>
-          );
-        })()}
-        {children}
+      {/* Main Content — scrollable area */}
+      <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-none">
+        <div className="container max-w-lg mx-auto p-4 pb-4 md:max-w-3xl lg:max-w-4xl">
+          {/* Coach Header — section title */}
+          {(role === "coach" || role === "admin") && (() => {
+            const hashSection = hash.match(/[?&]section=([^&]+)/)?.[1] || "home";
+            const sectionLabel = COACH_SECTION_LABELS[hashSection] || hashSection;
+            return (
+              <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-background/95 backdrop-blur px-4 py-2 border-b border-border/40">
+                <span className="text-sm font-semibold text-foreground">{sectionLabel}</span>
+              </div>
+            );
+          })()}
+          {children}
+        </div>
       </main>
 
-      {/* Mobile Bottom Nav - Enhanced for accessibility */}
+      {/* Mobile Bottom Nav - static in flex layout, no more position:fixed */}
       <nav
         aria-label="Navigation principale"
         className={cn(
-          "md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border/50 z-mobilenav shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]",
+          "md:hidden shrink-0 bg-card/95 backdrop-blur-lg border-t border-border/50 z-mobilenav shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]",
           "supports-[padding:env(safe-area-inset-bottom)]:pb-[env(safe-area-inset-bottom)]",
           isFocusMode && "hidden",
         )}

@@ -454,7 +454,7 @@ export default function SwimmerHome() {
 
   // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="mx-auto max-w-lg px-4 pb-24">
+    <div className="mx-auto max-w-lg px-4 pb-4">
       {/* Section A — Header */}
       <div className="flex items-center justify-between pt-5 pb-4">
         <div>
