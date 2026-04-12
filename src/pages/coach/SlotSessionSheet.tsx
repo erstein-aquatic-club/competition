@@ -294,6 +294,7 @@ export default function SlotSessionSheet({
             <>
               <SheetHeader className="sr-only">
                 <SheetTitle>{assignment?.session_name ?? "Séance"}</SheetTitle>
+                <SheetDescription>Aperçu de la séance</SheetDescription>
               </SheetHeader>
               <div className="flex items-center gap-2 mb-4">
                 <button
