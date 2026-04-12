@@ -1,25 +1,23 @@
 import { useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import type { TrainingWeek, Interview } from "@/lib/api";
-import type { ResolvedSlotAssignment } from "@/lib/api/types";
+import type { ResolvedSlotAssignment, SwimPlanningSlot } from "@/lib/api/types";
 import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
+import { FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ObjectiveCard } from "@/components/shared/ObjectiveCard";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   CalendarRange,
-  ChevronRight,
+  ChevronDown,
   ExternalLink,
   MapPin,
   MessageSquare,
@@ -130,6 +128,44 @@ function interviewStatusColor(status: Interview["status"]): string {
   }
 }
 
+// ── Filiere micro-grid helpers ──────────────────────────────────
+
+const DAY_ROWS = [
+  { index: 0, label: "Lun" },
+  { index: 1, label: "Mar" },
+  { index: 2, label: "Mer" },
+  { index: 3, label: "Jeu" },
+  { index: 4, label: "Ven" },
+  { index: 5, label: "Sam" },
+] as const;
+
+function MiniFiliereDot({ slot }: { slot: SwimPlanningSlot | undefined }) {
+  if (!slot) {
+    return (
+      <div className="h-7 w-full rounded-md bg-muted/20 dark:bg-muted/10 flex items-center justify-center">
+        <span className="text-muted-foreground/15 text-[9px]">—</span>
+      </div>
+    );
+  }
+
+  const filiere = FILIERE_MAP.get(slot.filiere);
+  const color = filiere?.color ?? "sky";
+  const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
+
+  return (
+    <div
+      className={cn(
+        "h-7 w-full rounded-md flex items-center justify-center px-1",
+        style.bg,
+      )}
+    >
+      <span className={cn("text-[9px] font-semibold truncate leading-tight", style.text)}>
+        {filiere?.short ?? slot.filiere}
+      </span>
+    </div>
+  );
+}
+
 // ── Timeline item types ─────────────────────────────────────────
 
 type TimelineItem =
@@ -137,6 +173,59 @@ type TimelineItem =
   | { type: "week"; monday: string; weekIndex: number; week: TrainingWeek | undefined; isCurrent: boolean }
   | { type: "competition"; id: string; name: string; date: string; location: string; daysUntil: number }
   | { type: "interview"; interview: Interview };
+
+// ── Filiere micro-grid for expanded week ───────────────────────
+
+function WeekFiliereGrid({ monday, groupId }: { monday: string; groupId: number }) {
+  const weekStarts = useMemo(() => [monday], [monday]);
+
+  const { data: slots = [], isLoading } = useQuery({
+    queryKey: ["swim-planning-slots-week", groupId, monday],
+    queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts }),
+    enabled: !!groupId,
+    staleTime: 60_000,
+  });
+
+  const findSlot = useCallback(
+    (dayIndex: number, timeSlot: "morning" | "evening"): SwimPlanningSlot | undefined => {
+      return slots.find((s) => s.day_of_week === dayIndex && s.time_slot === timeSlot);
+    },
+    [slots],
+  );
+
+  if (isLoading) {
+    return <Skeleton className="h-16 rounded-lg" />;
+  }
+
+  if (slots.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border bg-muted/10 overflow-hidden">
+      {/* Column headers */}
+      <div className="grid grid-cols-[40px_1fr_1fr] gap-0.5 px-2 pt-1.5 pb-0.5">
+        <span />
+        <span className="text-[9px] font-semibold text-muted-foreground/50 text-center uppercase tracking-wider">
+          Matin
+        </span>
+        <span className="text-[9px] font-semibold text-muted-foreground/50 text-center uppercase tracking-wider">
+          Soir
+        </span>
+      </div>
+      {/* Day rows */}
+      <div className="px-2 pb-2 space-y-0.5">
+        {DAY_ROWS.map((day) => (
+          <div key={day.index} className="grid grid-cols-[40px_1fr_1fr] gap-0.5 items-center">
+            <span className="text-[10px] font-medium text-muted-foreground/60">
+              {day.label}
+            </span>
+            <MiniFiliereDot slot={findSlot(day.index, "morning")} />
+            <MiniFiliereDot slot={findSlot(day.index, "evening")} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Expanded week detail ────────────────────────────────────────
 
@@ -269,7 +358,7 @@ export default function SuiviSaison() {
     queryFn: () => api.getAthleteObjectives(),
   });
 
-  // Fetch profile for IUF + performances
+  // Fetch profile for IUF + performances + group_id
   const { data: authUser } = useQuery({
     queryKey: ["auth-user"],
     queryFn: async () => {
@@ -285,6 +374,7 @@ export default function SuiviSaison() {
     enabled: !!appUserId,
   });
   const iuf = profile?.ffn_iuf ?? null;
+  const groupId = profile?.group_id ?? null;
 
   const perfFromDate = useMemo(() => {
     const d = new Date();
@@ -513,7 +603,7 @@ export default function SuiviSaison() {
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory scrollbar-none">
               {objectives.map((obj) => (
-                <div key={obj.id} className="snap-start shrink-0 w-40">
+                <div key={obj.id} className="snap-start shrink-0 w-40 overflow-hidden">
                   <ObjectiveCard
                     objective={obj}
                     performances={performances}
@@ -558,13 +648,17 @@ export default function SuiviSaison() {
           </div>
         ) : (
           /* ── Timeline ──────────────────────────────────── */
-          <div className="relative ml-3 space-y-2 border-l-2 border-border pl-4">
+          <div className="relative px-0 pt-3 pb-24">
+            {/* Vertical rail */}
+            <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
+
             {timelineItems.map((item, idx) => {
               if (item.type === "cycle-header") {
                 return (
-                  <div key={`cycle-${item.cycleId}`} className="relative -ml-[1.35rem]">
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-primary border-2 border-background" />
-                    <div className="ml-6 rounded-2xl border bg-card/90 px-3.5 py-2.5 shadow-sm">
+                  <div key={`cycle-${item.cycleId}`} className="relative pl-8 mb-2">
+                    {/* Cycle dot */}
+                    <div className="absolute left-[11px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-primary ring-2 ring-background" />
+                    <div className="rounded-2xl border bg-card/90 px-3.5 py-2.5 shadow-sm">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold">{item.cycleName}</span>
                         <Badge variant="secondary" className="text-[10px]">
@@ -586,81 +680,104 @@ export default function SuiviSaison() {
               if (item.type === "week") {
                 const isExpanded = expandedWeeks.has(item.monday);
                 const sunday = getSunday(item.monday);
+                const isPast = item.monday < todayIso && !item.isCurrent;
 
                 return (
-                  <Collapsible
-                    key={`week-${item.monday}`}
-                    open={isExpanded}
-                    onOpenChange={() => toggleWeek(item.monday)}
-                  >
-                    <div className="relative -ml-[1.35rem]">
-                      <div
-                        className={`absolute left-0 top-3.5 h-2 w-2 rounded-full border-2 border-background ${
-                          item.isCurrent ? "bg-primary" : "bg-muted-foreground/30"
-                        }`}
-                      />
-                      <div
-                        className={`ml-6 rounded-xl border bg-card px-3 py-2 text-xs ${
-                          item.isCurrent ? "ring-2 ring-primary/30 bg-primary/[0.04]" : ""
-                        }`}
+                  <div key={`week-${item.monday}`} className="relative pl-8 mb-2">
+                    {/* Week dot */}
+                    <div className={cn(
+                      "absolute left-[11px] top-3.5 h-[9px] w-[9px] rounded-full ring-2 ring-background transition-colors",
+                      item.isCurrent ? "bg-primary" : isPast ? "bg-muted-foreground/25" : "bg-muted-foreground/25",
+                    )} />
+
+                    <div className={cn(
+                      "rounded-xl border bg-card overflow-hidden transition-all",
+                      item.isCurrent && "ring-2 ring-primary",
+                    )}>
+                      {/* Week header button */}
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[44px] hover:bg-muted/40 transition-colors active:bg-muted/60"
+                        onClick={() => toggleWeek(item.monday)}
                       >
-                        <CollapsibleTrigger asChild>
-                          <button type="button" className="w-full text-left">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <ChevronRight
-                                className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
-                                  isExpanded ? "rotate-90" : ""
-                                }`}
-                              />
-                              <span className="text-muted-foreground whitespace-nowrap">
-                                Sem. {item.weekIndex}
-                              </span>
-                              <span className="text-muted-foreground/70 whitespace-nowrap">
-                                {fmtShort(item.monday)} - {fmtShort(sunday)}
-                              </span>
-                              {item.week?.week_type && (
-                                <Badge
-                                  className="ml-auto border-0 px-1.5 py-0 text-[10px]"
-                                  style={{
-                                    backgroundColor: weekTypeColor(item.week.week_type),
-                                    color: weekTypeTextColor(item.week.week_type),
-                                  }}
-                                >
-                                  {item.week.week_type}
-                                </Badge>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-foreground tabular-nums">
+                              Sem. {item.weekIndex}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {fmtShort(item.monday)} &ndash; {fmtShort(sunday)}
+                            </span>
+                            {item.week?.week_type && (
+                              <Badge
+                                className="ml-auto border-0 px-1.5 py-0 text-[10px]"
+                                style={{
+                                  backgroundColor: weekTypeColor(item.week.week_type),
+                                  color: weekTypeTextColor(item.week.week_type),
+                                }}
+                              >
+                                {item.week.week_type}
+                              </Badge>
+                            )}
+                            {item.isCurrent && (
+                              <Badge className="border-primary/20 bg-primary/10 text-[10px] text-primary px-1.5 py-0">
+                                Cette semaine
+                              </Badge>
+                            )}
+                          </div>
+                          {item.week?.notes && (
+                            <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
+                              {item.week.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Chevron with rotation animation */}
+                        <motion.span
+                          animate={{ rotate: isExpanded ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="shrink-0"
+                        >
+                          <ChevronDown className="h-4 w-4 text-muted-foreground/40" />
+                        </motion.span>
+                      </button>
+
+                      {/* Expanded content with AnimatePresence */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="border-t px-3 py-2.5 space-y-2.5">
+                              {/* Filiere micro-grid */}
+                              {groupId && (
+                                <WeekFiliereGrid monday={item.monday} groupId={groupId} />
                               )}
-                              {item.isCurrent && (
-                                <Badge className="border-primary/20 bg-primary/10 text-[10px] text-primary px-1.5 py-0">
-                                  Cette semaine
-                                </Badge>
+                              {/* Session assignments */}
+                              {userId && (
+                                <ExpandedWeekDays monday={item.monday} userId={userId} />
                               )}
                             </div>
-                            {item.week?.notes && (
-                              <p className="mt-1 pl-5 text-[11px] text-muted-foreground line-clamp-2">
-                                {item.week.notes}
-                              </p>
-                            )}
-                          </button>
-                        </CollapsibleTrigger>
-
-                        <CollapsibleContent>
-                          {userId && (
-                            <ExpandedWeekDays monday={item.monday} userId={userId} />
-                          )}
-                        </CollapsibleContent>
-                      </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                  </Collapsible>
+                  </div>
                 );
               }
 
               if (item.type === "competition") {
                 return (
-                  <div key={`comp-${item.id}-${idx}`} className="relative -ml-[1.35rem]">
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-amber-500 border-2 border-background" />
+                  <div key={`comp-${item.id}-${idx}`} className="relative pl-8 mb-2">
+                    {/* Competition dot */}
+                    <div className="absolute left-[11px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-amber-500 ring-2 ring-background" />
                     <button
                       type="button"
-                      className="ml-6 w-[calc(100%-1.5rem)] text-left rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-amber-500/10 px-3.5 py-3 shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
+                      className="w-full text-left rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-amber-500/10 px-3.5 py-3 shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
                       onClick={() => navigate(`/competition/${item.id}`)}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -697,9 +814,10 @@ export default function SuiviSaison() {
                 const needsAction = iv.status === "draft_athlete" || iv.status === "sent";
 
                 return (
-                  <div key={`iv-${iv.id}`} className="relative -ml-[1.35rem]">
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-background" />
-                    <div className="ml-6 rounded-xl border-l-4 border-l-blue-500 border border-border bg-card px-3 py-2.5">
+                  <div key={`iv-${iv.id}`} className="relative pl-8 mb-2">
+                    {/* Interview dot */}
+                    <div className="absolute left-[11px] top-1/2 -translate-y-1/2 h-[9px] w-[9px] rounded-full bg-blue-500 ring-2 ring-background" />
+                    <div className="rounded-xl border-l-4 border-l-blue-500 border border-border bg-card px-3 py-2.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <MessageSquare className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                         <span className="text-xs font-semibold">Entretien</span>
