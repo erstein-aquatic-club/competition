@@ -23,13 +23,10 @@ import {
   Trophy,
   FileText,
   ChevronRight,
-  X,
   Sun,
   Moon,
   Clock,
 } from "lucide-react";
-import { WellnessBanner } from "@/components/wellness/WellnessBanner";
-import { WellnessForm } from "@/components/wellness/WellnessForm";
 import { ChallengeProgressBar } from "@/components/shared/ChallengeProgressBar";
 import { getActiveChallenges } from "@/lib/api/challenges";
 import { fetchUserGroupIds } from "@/lib/api/client";
@@ -148,7 +145,6 @@ export default function Dashboard() {
 
   const [, navigate] = useLocation();
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
-  const [wellnessOpen, setWellnessOpen] = React.useState(false);
   // Override when swimmer picks an alternative session for a slot
   const [alternativeOverride, setAlternativeOverride] = React.useState<{
     sessionId: string;
@@ -156,17 +152,6 @@ export default function Dashboard() {
     title: string;
     km: number | null;
   } | null>(null);
-
-  // Auto-open wellness drawer from push notification deep link (?wellness=open)
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
-    if (params.get('wellness') === 'open') {
-      setWellnessOpen(true);
-      // Clean up URL param
-      const hashBase = window.location.hash.split('?')[0];
-      window.history.replaceState(null, '', window.location.pathname + hashBase);
-    }
-  }, []);
 
   // Get Supabase auth UUID for swim exercise logs
   const [authUuid, setAuthUuid] = React.useState<string | null>(null);
@@ -822,11 +807,6 @@ export default function Dashboard() {
           className="mt-2"
         />
 
-        {/* Wellness banner */}
-        {userId && (
-          <WellnessBanner userId={userId} onOpen={() => setWellnessOpen(true)} />
-        )}
-
         {/* Active challenges */}
         {activeChallenges.length > 0 && (
           <div className="mt-2 space-y-2">
@@ -1069,41 +1049,6 @@ export default function Dashboard() {
           }
         />
 
-        {/* Wellness Drawer */}
-        {wellnessOpen && userId && (
-          <>
-            <div
-              className="fixed inset-0 z-overlay bg-black/30"
-              onClick={() => setWellnessOpen(false)}
-            />
-            <div className="fixed inset-x-0 bottom-0 z-modal max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-background border-t border-border shadow-xl px-4 pt-4 pb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-display font-bold uppercase italic tracking-tight text-primary">
-                  Wellness du jour
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setWellnessOpen(false)}
-                  className="h-8 w-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80"
-                  aria-label="Fermer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <WellnessForm
-                userId={userId}
-                date={(() => {
-                  const d = new Date();
-                  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                })()}
-                onSaved={() => {
-                  setWellnessOpen(false);
-                  queryClient.invalidateQueries({ queryKey: ["wellness"] });
-                }}
-              />
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
