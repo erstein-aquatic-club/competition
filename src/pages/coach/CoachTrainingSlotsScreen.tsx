@@ -2107,6 +2107,51 @@ const CoachTrainingSlotsScreen = ({
       return out.length > 0 ? `${out}…` : "";
     };
 
+    const drawWavesIcon = (x: number, y: number, size: number, color: string) => {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(2, size * 0.1);
+      ctx.lineCap = "round";
+      for (let row = 0; row < 2; row += 1) {
+        const yy = y + size * (0.38 + row * 0.28);
+        ctx.beginPath();
+        ctx.moveTo(x + size * 0.08, yy);
+        ctx.quadraticCurveTo(x + size * 0.22, yy - size * 0.13, x + size * 0.36, yy);
+        ctx.quadraticCurveTo(x + size * 0.5, yy + size * 0.13, x + size * 0.64, yy);
+        ctx.quadraticCurveTo(x + size * 0.78, yy - size * 0.13, x + size * 0.92, yy);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+
+    const drawDumbbellIcon = (x: number, y: number, size: number, color: string) => {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = Math.max(2, size * 0.1);
+      ctx.lineCap = "round";
+
+      const midY = y + size * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x + size * 0.26, midY);
+      ctx.lineTo(x + size * 0.74, midY);
+      ctx.stroke();
+
+      const plateW = size * 0.11;
+      const plateHOuter = size * 0.58;
+      const plateHInner = size * 0.44;
+      const leftX = x + size * 0.1;
+      const rightX = x + size * 0.79;
+      const outerY = y + (size - plateHOuter) / 2;
+      const innerY = y + (size - plateHInner) / 2;
+
+      ctx.fillRect(leftX, outerY, plateW, plateHOuter);
+      ctx.fillRect(leftX + plateW + size * 0.05, innerY, plateW, plateHInner);
+      ctx.fillRect(rightX - plateW - size * 0.05, innerY, plateW, plateHInner);
+      ctx.fillRect(rightX, outerY, plateW, plateHOuter);
+      ctx.restore();
+    };
+
     const gridX = padX + leftAxisWidth;
     const gridY = padY + headerTitleH + daysHeaderH;
     const gridW = width - padX - gridX;
@@ -2220,9 +2265,11 @@ const CoachTrainingSlotsScreen = ({
         ctx.fill();
         ctx.stroke();
 
+        const iconReserve = 38;
+        const textMaxWidth = cardW - 22 - iconReserve;
         const timeLine = `${formatTime(s.start)} – ${formatTime(s.end)}`;
-        const coachLine = truncate(s.coachesLabel, cardW - 22, "600 21px Inter, sans-serif");
-        const locationLine = truncate(`Lieu: ${s.location}`, cardW - 22, "500 19px Inter, sans-serif");
+        const coachLine = truncate(s.coachesLabel, textMaxWidth, "600 21px Inter, sans-serif");
+        const locationLine = truncate(`Lieu: ${s.location}`, textMaxWidth, "500 19px Inter, sans-serif");
 
         ctx.fillStyle = fg;
         ctx.font = "700 28px Inter, sans-serif";
@@ -2232,6 +2279,13 @@ const CoachTrainingSlotsScreen = ({
         ctx.fillStyle = s.isCancelled ? "#94a3b8" : "#64748b";
         ctx.font = "500 19px Inter, sans-serif";
         ctx.fillText(locationLine, cardX + 12, cardY + 109);
+
+        const iconSize = 24;
+        const iconX = cardX + cardW - iconSize - 10;
+        const iconY = cardY + cardH - iconSize - 10;
+        const iconColor = s.isCancelled ? "#94a3b8" : s.swim ? "#2563eb" : "#b45309";
+        if (s.swim) drawWavesIcon(iconX, iconY, iconSize, iconColor);
+        else drawDumbbellIcon(iconX, iconY, iconSize, iconColor);
 
         if (s.isCancelled) {
           ctx.strokeStyle = "#6b7280";
