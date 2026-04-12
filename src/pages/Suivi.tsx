@@ -22,9 +22,7 @@ import {
   TrendingUp,
   ChevronRight,
   Sparkles,
-  AlertTriangle,
 } from "lucide-react";
-import type { Session, Competition, WellnessCheck } from "@/lib/api/types";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -54,22 +52,6 @@ function daysUntil(dateStr: string): number {
   const target = new Date(dateStr + "T00:00:00");
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
-
-function indicatorColor(mode: "hard" | "good", value: number | null | undefined): string {
-  const v = Number(value);
-  if (!Number.isFinite(v) || v < 1 || v > 5) return "bg-muted text-muted-foreground";
-  const effective = mode === "hard" ? 6 - v : v;
-  if (effective >= 4) return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400";
-  if (effective >= 3) return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
-  return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-}
-
-const INDICATOR_LABELS = [
-  { key: "effort" as const, label: "Diff", mode: "hard" as const },
-  { key: "fatigue" as const, label: "Fat", mode: "hard" as const },
-  { key: "performance" as const, label: "Perf", mode: "good" as const },
-  { key: "engagement" as const, label: "Eng", mode: "good" as const },
-];
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -304,12 +286,12 @@ export default function Suivi() {
         icon={<Sparkles className="h-3.5 w-3.5" />}
       />
 
-      <div className="mt-4 space-y-4">
+      <div className="mt-4 space-y-3">
         {isLoading ? (
           <>
-            <Skeleton className="h-40 rounded-3xl" />
-            <Skeleton className="h-36 rounded-3xl" />
-            <Skeleton className="h-32 rounded-3xl" />
+            <Skeleton className="h-[68px] rounded-2xl" />
+            <Skeleton className="h-[68px] rounded-2xl" />
+            <Skeleton className="h-[68px] rounded-2xl" />
           </>
         ) : (
           <>
@@ -317,70 +299,24 @@ export default function Suivi() {
             <button
               type="button"
               onClick={() => navigate("/suivi/semaine")}
-              className="w-full text-left rounded-3xl border bg-card shadow-sm hover:border-primary/20 transition-all cursor-pointer p-4"
+              className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     <Calendar className="h-4 w-4" />
                   </div>
-                  <h2 className="text-base font-semibold">Ma semaine</h2>
+                  <h2 className="text-sm font-semibold">Ma semaine</h2>
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                    {weekSessions.length}/{expectedThisWeek} seances
+                    {weekSessions.length}/{expectedThisWeek}
                   </span>
                 </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
               </div>
-
-              {/* Recent sessions with indicators */}
-              {recentWeekSessions.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {recentWeekSessions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <span className="w-20 shrink-0 text-xs text-muted-foreground">
-                        {formatSessionDate(s.date)}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-xs">
-                        {s.distance
-                          ? `${Math.round(Number(s.distance))}m`
-                          : s.slot || "Seance"}
-                      </span>
-                      <div className="flex gap-1">
-                        {INDICATOR_LABELS.map((ind) => {
-                          const val = (s as any)[ind.key] as
-                            | number
-                            | null
-                            | undefined;
-                          return (
-                            <span
-                              key={ind.key}
-                              className={`inline-flex h-5 items-center rounded-md px-1.5 text-[10px] font-medium ${indicatorColor(ind.mode, val)}`}
-                            >
-                              {ind.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Aucune seance enregistree cette semaine
-                </p>
-              )}
-
               {sessionsWithoutFeedback > 0 && (
-                <div className="mt-2.5 flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  <span>
-                    {sessionsWithoutFeedback} seance
-                    {sessionsWithoutFeedback > 1 ? "s" : ""} sans ressenti
-                  </span>
-                </div>
+                <p className="mt-1.5 pl-[46px] text-xs text-amber-600 dark:text-amber-400 truncate">
+                  {sessionsWithoutFeedback} seance{sessionsWithoutFeedback > 1 ? "s" : ""} sans ressenti
+                </p>
               )}
             </button>
 
@@ -388,137 +324,49 @@ export default function Suivi() {
             <button
               type="button"
               onClick={() => navigate("/suivi/saison")}
-              className="w-full text-left rounded-3xl border bg-card shadow-sm hover:border-primary/20 transition-all cursor-pointer p-4"
+              className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                     <Map className="h-4 w-4" />
                   </div>
-                  <h2 className="text-base font-semibold">Ma saison</h2>
+                  <h2 className="text-sm font-semibold">Ma saison</h2>
                   {daysToComp != null && daysToComp >= 0 && (
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       J-{daysToComp}
                     </span>
                   )}
                 </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
               </div>
-
-              <div className="mt-3 space-y-1.5 text-sm">
-                {/* Cycle progress */}
-                {activeCycle && currentWeekInfo ? (
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-xs text-foreground">
-                      {activeCycle.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      Sem {currentWeekInfo.weekNum}/{currentWeekInfo.total}
-                      {currentWeekInfo.type
-                        ? ` \u00b7 ${currentWeekInfo.type}`
-                        : ""}
-                    </span>
-                    <div className="ml-auto h-1.5 w-16 rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{
-                          width: `${Math.min(100, (currentWeekInfo.weekNum / currentWeekInfo.total) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    Aucun cycle en cours
-                  </span>
-                )}
-
-                {/* Frequency */}
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>
-                    🏊 {slotCounts.swim} creneaux/sem
-                  </span>
-                </div>
-
-                {/* Pending interviews */}
-                {pendingInterviews.length > 0 && (
-                  <div className="text-xs text-amber-700 dark:text-amber-400">
-                    📎 {pendingInterviews.length} entretien
-                    {pendingInterviews.length > 1 ? "s" : ""} a preparer
-                  </div>
-                )}
-
-                {/* Objectives */}
-                {objectives.length > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    🎯 {objectives.length} objectif
-                    {objectives.length > 1 ? "s" : ""}
-                  </div>
-                )}
-
-                {/* Next competition */}
-                {nextCompetition && (
-                  <div className="text-xs text-muted-foreground">
-                    🏆 {nextCompetition.name}
-                    {nextCompetition.location
-                      ? ` \u00b7 ${nextCompetition.location}`
-                      : ""}
-                  </div>
-                )}
-              </div>
+              <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
+                {activeCycle && currentWeekInfo
+                  ? `${activeCycle.name} \u00b7 Sem ${currentWeekInfo.weekNum}/${currentWeekInfo.total}${currentWeekInfo.type ? ` \u00b7 ${currentWeekInfo.type}` : ""}`
+                  : "Aucun cycle en cours"}
+              </p>
             </button>
 
             {/* ── Card: Ma progression ─────────────────────────── */}
             <button
               type="button"
               onClick={() => navigate("/suivi/progression")}
-              className="w-full text-left rounded-3xl border bg-card shadow-sm hover:border-primary/20 transition-all cursor-pointer p-4"
+              className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                     <TrendingUp className="h-4 w-4" />
                   </div>
-                  <h2 className="text-base font-semibold">Ma progression</h2>
+                  <h2 className="text-sm font-semibold">Ma progression</h2>
                 </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
               </div>
-
-              <div className="mt-3 space-y-1.5 text-sm">
-                {/* Readiness */}
-                {readinessInfo ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      Readiness 7j
-                    </span>
-                    <div className="flex h-5 items-center gap-1.5">
-                      <div className="h-1.5 w-16 rounded-full bg-muted">
-                        <div
-                          className={`h-full rounded-full transition-all ${readinessInfo.avg >= 70 ? "bg-emerald-500" : readinessInfo.avg >= 50 ? "bg-amber-500" : "bg-red-500"}`}
-                          style={{ width: `${readinessInfo.avg}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium">
-                        {readinessInfo.avg}%
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    Pas de donnees bien-etre recentes
-                  </span>
-                )}
-
-                {/* Volume 30 days */}
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>
-                    🏊 {volumeInfo.km > 0 ? `${volumeInfo.km} km` : "0 km"}{" "}
-                    · {volumeInfo.sessionCount} seance
-                    {volumeInfo.sessionCount !== 1 ? "s" : ""}
-                  </span>
-                  <span className="text-[10px]">30 derniers jours</span>
-                </div>
-              </div>
+              <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
+                {readinessInfo || volumeInfo.km > 0
+                  ? `${readinessInfo ? `Readiness ${readinessInfo.avg}%` : ""}${readinessInfo && volumeInfo.km > 0 ? " \u00b7 " : ""}${volumeInfo.km > 0 ? `${volumeInfo.km} km (30j)` : ""}`
+                  : "Pas encore de donnees"}
+              </p>
             </button>
           </>
         )}
@@ -527,15 +375,3 @@ export default function Suivi() {
   );
 }
 
-// ── Utility ────────────────────────────────────────────────────
-
-function formatSessionDate(dateStr: string | undefined): string {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    const days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-    return `${days[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
-  } catch {
-    return dateStr;
-  }
-}
