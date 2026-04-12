@@ -12,6 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import SwimmerWeekSlots from "@/components/shared/SwimmerWeekSlots";
 import { WellnessBanner } from "@/components/wellness/WellnessBanner";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
 import { format } from "date-fns";
@@ -708,6 +709,11 @@ export default function SwimmerHome() {
               </button>
             ))}
           </div>
+        </motion.div>
+
+        {/* Section G — Ma semaine */}
+        <motion.div variants={slideUp}>
+          <SwimmerWeekSlots swimmerSlots={swimmerSlots ?? []} />
         </motion.div>
       </motion.div>
     </div>

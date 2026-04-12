@@ -187,7 +187,7 @@ function GroupSlotCard({ instance }: { instance: SlotInstance }) {
         {isCancelled && (
           <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
             <XCircle className="h-3 w-3" />
-            Annul&eacute;
+            Annulé
           </span>
         )}
       </div>
@@ -208,7 +208,7 @@ function GroupSlotCard({ instance }: { instance: SlotInstance }) {
       {/* Empty state label */}
       {instance.state === "empty" && (
         <p className="text-xs text-muted-foreground/60 mt-1">
-          Aucune s&eacute;ance
+          Aucune séance
         </p>
       )}
 
@@ -318,6 +318,7 @@ export default function SwimmerWeekSlots({
           size="icon"
           className="h-8 w-8 shrink-0"
           onClick={prevWeek}
+          aria-label="Semaine précédente"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -331,6 +332,7 @@ export default function SwimmerWeekSlots({
           size="icon"
           className="h-8 w-8 shrink-0"
           onClick={nextWeek}
+          aria-label="Semaine suivante"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -403,7 +405,7 @@ export default function SwimmerWeekSlots({
           {/* Empty state */}
           {visibleGroupByDate.size === 0 && (
             <p className="text-center text-xs text-muted-foreground/60 py-6">
-              Aucun cr&eacute;neau cette semaine
+              Aucun créneau cette semaine
             </p>
           )}
         </div>
@@ -457,7 +459,7 @@ export default function SwimmerWeekSlots({
           {/* Empty state */}
           {personalByDate.size === 0 && (
             <p className="text-center text-xs text-muted-foreground/60 py-6">
-              Aucun cr&eacute;neau personnel
+              Aucun créneau personnel
             </p>
           )}
         </div>
