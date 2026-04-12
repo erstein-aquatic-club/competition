@@ -364,9 +364,21 @@ supabase.auth.onAuthStateChange((event, session) => {
   // All other events (INITIAL_SESSION, SIGNED_IN, PASSWORD_RECOVERY, etc.)
   if (session) {
     const state = useAuth.getState();
-    state.loginFromSession(session);
     lastRefreshAt = Date.now();
     startRefreshTimer();
+
+    if (state.isLoaded && state.user) {
+      // User already loaded (e.g. app returning from background): only update tokens,
+      // do NOT reset isLoaded to false — that would blank the UI.
+      useAuth.setState({
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+      });
+    } else {
+      // First load: call loginFromSession then loadUser to complete the profile fetch.
+      state.loginFromSession(session);
+      state.loadUser().catch(() => {});
+    }
   } else {
     useAuth.setState({
       user: null,
@@ -380,6 +392,7 @@ supabase.auth.onAuthStateChange((event, session) => {
     });
   }
 });
+
 
 // ---------------------------------------------------------------------------
 // Proactive session refresh timer
