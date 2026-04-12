@@ -12,6 +12,7 @@ import { computeSlotState, resolveSlotAssignment } from "@/hooks/useSlotCalendar
 import { deriveScheduledSlot } from "@/lib/api/assignments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 
 import SlotSessionSheet from "./SlotSessionSheet";
 import { SlotTemplatePicker } from "./SlotTemplatePicker";
@@ -1887,21 +1888,18 @@ const CoachTrainingSlotsScreen = ({
     const el = exportContentRef.current;
     if (!el || exporting) return;
     setExporting(true);
+    let cleanupCapture = () => {};
     try {
-      // Show the export-only header during capture
-      const exportHeader = el.querySelector(".export-visible") as HTMLElement | null;
-      if (exportHeader) exportHeader.style.display = "block";
-
       const html2canvas = (await import("html2canvas")).default;
+      const { onclone, cleanup } = buildHtml2CanvasOnClone(el);
+      cleanupCapture = cleanup;
       const canvas = await html2canvas(el, {
         backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
         logging: false,
+        onclone,
       });
-
-      // Hide it again
-      if (exportHeader) exportHeader.style.display = "";
 
       const fileName = `semaine-${weekMondayIso}.png`;
 
@@ -1939,6 +1937,8 @@ const CoachTrainingSlotsScreen = ({
     } catch (err) {
       toast({ title: "Erreur export", description: String(err), variant: "destructive" });
       setExporting(false);
+    } finally {
+      cleanupCapture();
     }
   }, [exporting, weekMondayIso, toast]);
 
