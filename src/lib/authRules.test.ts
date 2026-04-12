@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { requiresPasswordForRole } from "./authRules";
+import { requiresApprovalForRole, requiresPasswordForRole } from "./authRules";
 
 test("requiresPasswordForRole returns true for athlete role", () => {
   assert.equal(requiresPasswordForRole("athlete"), true);
@@ -16,4 +16,16 @@ test("requiresPasswordForRole returns true for privileged roles", () => {
 test("requiresPasswordForRole handles nullish roles", () => {
   assert.equal(requiresPasswordForRole(null), false);
   assert.equal(requiresPasswordForRole(undefined), false);
+});
+
+test("requiresApprovalForRole only requires validation for coach accounts", () => {
+  assert.equal(requiresApprovalForRole("coach"), true);
+  assert.equal(requiresApprovalForRole("athlete"), false);
+  assert.equal(requiresApprovalForRole("admin"), false);
+  assert.equal(requiresApprovalForRole("comite"), false);
+});
+
+test("requiresApprovalForRole handles nullish roles", () => {
+  assert.equal(requiresApprovalForRole(null), false);
+  assert.equal(requiresApprovalForRole(undefined), false);
 });

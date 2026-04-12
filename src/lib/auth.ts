@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { supabase } from "./supabase";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { requiresApprovalForRole } from "./authRules";
 
 const COACH_SELECTED_ATHLETE_ID_KEY = "coach_selected_athlete_id";
 const COACH_SELECTED_ATHLETE_NAME_KEY = "coach_selected_athlete_name";
@@ -96,6 +97,8 @@ interface AuthState {
   userId: number | null;
   role: string | null;
   isApproved: boolean | null;
+  approvalStatus: "not_required" | "approved" | "pending" | "unknown";
+  isLoaded: boolean;
   selectedAthleteId: number | null;
   selectedAthleteName: string | null;
   accessToken: string | null;
@@ -122,6 +125,8 @@ export const useAuth = create<AuthState>((set) => ({
   userId: null,
   role: null,
   isApproved: null,
+  approvalStatus: "unknown",
+  isLoaded: false,
   selectedAthleteId: readStoredSelectedAthleteId(),
   selectedAthleteName: readStoredSelectedAthleteName(),
   accessToken: null,
@@ -132,18 +137,32 @@ export const useAuth = create<AuthState>((set) => ({
     const displayName = extractDisplayName(supabaseUser);
     const userId = extractAppUserId(supabaseUser);
     const role = extractAppUserRole(supabaseUser);
+    const requiresApproval = requiresApprovalForRole(role);
     set({
       user: displayName,
       userId,
       role,
-      isApproved: null,
+      isApproved: requiresApproval ? null : true,
+      approvalStatus: requiresApproval ? "unknown" : "not_required",
+      isLoaded: false,
       accessToken: session.access_token,
       refreshToken: session.refresh_token,
     });
   },
 
   login: ({ user, accessToken, refreshToken, userId, role }) => {
-    set({ user, accessToken, refreshToken, userId: userId ?? null, role: role ?? null });
+    const resolvedRole = role ?? null;
+    const requiresApproval = requiresApprovalForRole(resolvedRole);
+    set({
+      user,
+      accessToken,
+      refreshToken,
+      userId: userId ?? null,
+      role: resolvedRole,
+      isApproved: requiresApproval ? null : true,
+      approvalStatus: requiresApproval ? "unknown" : "not_required",
+      isLoaded: true,
+    });
   },
 
   logout: async () => {
@@ -155,6 +174,8 @@ export const useAuth = create<AuthState>((set) => ({
       userId: null,
       role: null,
       isApproved: null,
+      approvalStatus: "not_required",
+      isLoaded: true,
       accessToken: null,
       refreshToken: null,
       selectedAthleteId: null,
@@ -184,7 +205,16 @@ export const useAuth = create<AuthState>((set) => ({
   loadUser: async () => {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) {
-      set({ user: null, userId: null, role: null, isApproved: null, accessToken: null, refreshToken: null });
+      set({
+        user: null,
+        userId: null,
+        role: null,
+        isApproved: null,
+        approvalStatus: "not_required",
+        isLoaded: true,
+        accessToken: null,
+        refreshToken: null,
+      });
       return null;
     }
     let session = data.session;
@@ -205,7 +235,10 @@ export const useAuth = create<AuthState>((set) => ({
     }
 
     let role = extractAppUserRole(supabaseUser);
-    let isApproved: boolean | null = null;
+    let isApproved: boolean | null = requiresApprovalForRole(role) ? null : true;
+    let approvalStatus: AuthState["approvalStatus"] = requiresApprovalForRole(role)
+      ? "unknown"
+      : "not_required";
 
     // Fetch the authoritative role from public.users to handle stale JWT claims.
     // The JWT claim (app_user_role) can be outdated if the role was changed
@@ -225,17 +258,35 @@ export const useAuth = create<AuthState>((set) => ({
       }
 
       // Fetch approval status from user_profiles
-      try {
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("is_approved")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (profile) {
-          isApproved = profile.is_approved ?? null;
+      const requiresApproval = requiresApprovalForRole(role);
+      isApproved = requiresApproval ? null : true;
+      approvalStatus = requiresApproval ? "unknown" : "not_required";
+
+      if (requiresApproval) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from("user_profiles")
+            .select("is_approved")
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (profileError) {
+            throw profileError;
+          }
+          if (profile?.is_approved === true) {
+            isApproved = true;
+            approvalStatus = "approved";
+          } else if (profile?.is_approved === false) {
+            isApproved = false;
+            approvalStatus = "pending";
+          } else {
+            isApproved = null;
+            approvalStatus = "unknown";
+          }
+        } catch {
+          // Keep the gate closed when approval cannot be verified
+          isApproved = null;
+          approvalStatus = "unknown";
         }
-      } catch {
-        // Fall back to null if DB query fails
       }
     }
 
@@ -244,6 +295,8 @@ export const useAuth = create<AuthState>((set) => ({
       userId,
       role,
       isApproved,
+      approvalStatus,
+      isLoaded: true,
       accessToken: session.access_token,
       refreshToken: session.refresh_token,
     });
@@ -295,6 +348,8 @@ supabase.auth.onAuthStateChange((event, session) => {
       userId: null,
       role: null,
       isApproved: null,
+      approvalStatus: "not_required",
+      isLoaded: true,
       accessToken: null,
       refreshToken: null,
       selectedAthleteId: null,
@@ -318,6 +373,8 @@ supabase.auth.onAuthStateChange((event, session) => {
       userId: null,
       role: null,
       isApproved: null,
+      approvalStatus: "not_required",
+      isLoaded: true,
       accessToken: null,
       refreshToken: null,
     });

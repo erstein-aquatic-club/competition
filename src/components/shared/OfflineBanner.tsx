@@ -15,7 +15,7 @@ export function OfflineBanner() {
           className="bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium"
         >
           <WifiOff className="h-4 w-4" />
-          Hors connexion — données en lecture seule
+          Hors connexion — certaines modifications seront synchronisees plus tard
         </motion.div>
       )}
     </AnimatePresence>

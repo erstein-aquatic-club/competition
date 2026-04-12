@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, AlertCircle } from "lucide-react";
+import { Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { cn } from "@/lib/utils";
-
-type SyncStatus = "synced" | "conflict" | null;
 
 /**
  * OfflineSyncBanner — shows a brief notification when the user comes back online.
@@ -14,7 +12,7 @@ type SyncStatus = "synced" | "conflict" | null;
 export function OfflineSyncBanner() {
   const isOnline = useOnlineStatus();
   const wasOffline = useRef(false);
-  const [status, setStatus] = useState<SyncStatus>(null);
+  const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
     if (!isOnline) {
@@ -24,18 +22,16 @@ export function OfflineSyncBanner() {
 
     if (wasOffline.current) {
       wasOffline.current = false;
-      // For now we always report "synced". When real conflict detection is
-      // wired in, this can be changed to "conflict" based on version comparison.
-      setStatus("synced");
+      setShowBanner(true);
 
-      const timer = setTimeout(() => setStatus(null), 5000);
+      const timer = setTimeout(() => setShowBanner(false), 5000);
       return () => clearTimeout(timer);
     }
   }, [isOnline]);
 
   return (
     <AnimatePresence>
-      {status && (
+      {showBanner && (
         <div className="fixed top-3 left-0 right-0 z-[var(--z-index-toast)] pointer-events-none flex justify-center px-4">
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.9 }}
@@ -48,20 +44,12 @@ export function OfflineSyncBanner() {
               "pointer-events-auto inline-flex items-center gap-2 rounded-full px-4 py-2",
               "shadow-lg shadow-black/10 dark:shadow-black/30",
               "backdrop-blur-xl border",
-              status === "synced"
-                ? "bg-emerald-500/90 text-white border-emerald-400/30"
-                : "bg-amber-500/90 text-white border-amber-400/30",
+              "bg-emerald-500/90 text-white border-emerald-400/30",
             )}
           >
-            {status === "synced" ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <AlertCircle className="h-3.5 w-3.5" />
-            )}
+            <Check className="h-3.5 w-3.5" />
             <span className="text-xs font-semibold">
-              {status === "synced"
-                ? "Données synchronisées"
-                : "Conflit — données serveur appliquées"}
+              Connexion retablie
             </span>
           </motion.div>
         </div>

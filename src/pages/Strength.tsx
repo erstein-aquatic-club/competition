@@ -19,7 +19,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { OneRmGate } from "@/components/strength/OneRmGate";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { enqueue, getQueue, clearQueue } from "@/lib/offlineQueue";
+import { enqueue } from "@/lib/offlineQueue";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -201,20 +201,6 @@ export default function Strength() {
       });
     }
   }, [wasRestored, toast]);
-
-  // Flush offline queue when coming back online
-  useEffect(() => {
-    if (!isOnline) return;
-    const queue = getQueue();
-    if (queue.length === 0) return;
-    clearQueue();
-    queryClient.invalidateQueries({ queryKey: ["strength_history"] });
-    queryClient.invalidateQueries({ queryKey: ["1rm"] });
-    toast({
-      title: "Données synchronisées",
-      description: `${queue.length} action(s) en attente traitée(s).`,
-    });
-  }, [isOnline, queryClient, toast]);
 
   const cycleOptions: Array<{ value: StrengthCycleType; label: string }> = [
     { value: "endurance", label: "Endurance" },
@@ -735,11 +721,13 @@ export default function Strength() {
                 if (!activeRunId) return;
                 if (isFinishing) return;
                 if (!isOnline) {
-                  enqueue("updateRun", {
+                  enqueue("strength-run-completed", {
                     run_id: activeRunId,
                     assignment_id: activeAssignment?.id ?? undefined,
                     session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
                     athlete_id: userId ?? undefined,
+                    athlete_name: user ?? undefined,
+                    started_at: sessionStartTime ? new Date(sessionStartTime).toISOString() : null,
                     date: new Date().toISOString(),
                     progress_pct: 100,
                     status: "completed",

@@ -18,6 +18,8 @@ import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { UpdateNotification } from "@/components/shared/UpdateNotification";
 import { PWAInstallGate } from "@/components/shared/PWAInstallGate";
 import { PushPermissionBanner } from "@/components/shared/PushPermissionBanner";
+import { requiresApprovalForRole } from "@/lib/authRules";
+import { OfflineMutationSync } from "@/components/shared/OfflineMutationSync";
 
 // Retry wrapper for lazy imports — handles stale chunk filenames after deployments
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -252,6 +254,12 @@ function AppRouter() {
   const user = useAuth((s) => s.user);
   const role = useAuth((s) => s.role);
   const isApproved = useAuth((s) => s.isApproved);
+  const approvalStatus = useAuth((s) => s.approvalStatus);
+  const isLoaded = useAuth((s) => s.isLoaded);
+
+  if (!isLoaded) {
+    return <PageSkeleton />;
+  }
 
   if (!user) {
     return (
@@ -269,11 +277,11 @@ function AppRouter() {
     );
   }
 
-  if (user && isApproved === false) {
+  if (user && requiresApprovalForRole(role) && approvalStatus !== "approved") {
     return (
       <ErrorBoundary>
         <Suspense fallback={<PageSkeleton />}>
-          <AwaitingApproval />
+          <AwaitingApproval mode={isApproved === false ? "pending" : "verification-error"} />
         </Suspense>
       </ErrorBoundary>
     );
@@ -401,6 +409,7 @@ function App() {
         <DarkModeApplier />
         <TooltipProvider>
           <UpdateNotification />
+          <OfflineMutationSync />
           <PushPermissionBanner />
           <Toaster />
           <Router hook={useHashLocation}>

@@ -25,13 +25,22 @@ export function getQueueSize(): number {
   return getQueue().length;
 }
 
+export function saveQueue(queue: QueuedMutation[]) {
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+}
+
 export function clearQueue() {
   localStorage.removeItem(QUEUE_KEY);
+}
+
+export function removeQueueItem(id: string) {
+  const queue = getQueue().filter((item) => item.id !== id);
+  saveQueue(queue);
 }
 
 export function dequeue(): QueuedMutation | undefined {
   const queue = getQueue();
   const item = queue.shift();
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  saveQueue(queue);
   return item;
 }
