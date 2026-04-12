@@ -69,6 +69,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 | §8 4 bugfixes (IUF Coach, RecordsClub, Reprendre, 1RM 404) | ✅ Fait | 2026-02-12 |
 | §9 RecordsAdmin UX: incomplete swimmer warnings | ✅ Fait | 2026-02-12 |
 | §10 Fix: extract age from competition_name, remove birthdate requirement | ✅ Fait | 2026-02-12 |
+| §102 Refonte interface nageur (Home + Dock + Suivi 3 horizons) | ✅ Fait | 2026-04-12 |
 | §11 Fix: FFN event code mapping (Bra., Pap., 4 N.) | ✅ Fait | 2026-02-12 |
 | §12 Fix: ignoreDuplicates empêche mise à jour performances + diagnostic stats | ✅ Fait | 2026-02-12 |
 | §13 Fix: pagination Supabase + normalizeEventCode robuste | ✅ Fait | 2026-02-12 |
@@ -7700,3 +7701,81 @@ Les nageurs peuvent laisser un commentaire textuel dans leur ressenti de séance
 **Fichiers modifiés** : 12 fichiers (types, assignments, helpers, api, useDashboardState, Dashboard, FeedbackDrawer, DayCell, CalendarGrid, SlotSessionSheet)
 **Tests** : `npx tsc --noEmit` — 3 erreurs préexistantes uniquement
 **Design doc** : `docs/plans/2026-04-11-assignment-inheritance-design.md`
+
+---
+
+## 2026-04-12 — Refonte interface nageur (Home + Dock + Suivi 3 horizons)
+**Branche** : `main`
+**Chantier ROADMAP** : §102 — Refonte interface nageur
+
+### Contexte — Pourquoi ce patch
+L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) où le Profil servait de fourre-tout (Records, Messages, Hall of Fame, Rapport mensuel, Neurotype, Badges). Pas de Home dédiée comme côté coach. Le wellness était enfoui dans le calendrier. Accès aux différentes vues nécessitait souvent 2-3 taps.
+
+### Changements réalisés
+
+**Nouveau dock nageur (5 onglets) :**
+- Natation (calendrier) | Muscu | Home (centre) | Suivi | Profil
+- Home devient la route par défaut `/` pour les nageurs
+- Dashboard déplacé sur `/natation`
+
+**Nouvelle page SwimmerHome (6 sections) :**
+- Section A : Header "Bonjour {prénom}" + date FR + avatar avec navigation Profil
+- Section B : Wellness du jour (WellnessBanner migré depuis Dashboard + WellnessForm en Sheet)
+- Section C : Séances du jour (cards AM/PM avec bordure colorée, statut logged/pending, FeedbackDrawer)
+- Section D : Prochaine compétition (conditionnel, J-X countdown, checklist progress, races)
+- Section E : Messages coach (conditionnel, badge unread, aperçu, thème violet)
+- Section F : Accès rapides (grille 4 tuiles : Records, Club, Notes, Rapport)
+
+**Dashboard nettoyé :**
+- WellnessBanner et WellnessForm retirés (migrés vers Home)
+- Tout le reste (calendrier, FeedbackDrawer, challenges) inchangé
+
+**Profil allégé :**
+- Grille "Accès rapides" supprimée (déplacée vers Home)
+- Card "Messages" supprimée (déplacée vers Home)
+- Conserve : Hero, Badges, Neurotype, Mon compte, Déconnexion
+
+**Suivi restructuré en 3 horizons temporels :**
+- Tab "Semaine" (court terme) = ex-Ressentis
+- Tab "Saison" (moyen terme) = Entretiens + Planification fusionnés
+- Tab "Progression" (long terme) = Progress absorbé (lazy-loaded)
+- `/progress` redirige vers `/suivi?tab=progression`
+- Backward-compatible : `?tab=objectifs` et `?tab=entretiens` mappent vers Saison
+
+**Design polish :**
+- Bordures gauche colorées (bleu nage / ambre muscu)
+- Badges statut textuels ("Fait", "A faire", "Lancer")
+- Gradient cards (ambre compétition, violet messages)
+- Avatar avec shadow glow
+- Animations framer-motion staggerées
+- Dark mode complet
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/SwimmerHome.tsx` | Créé — nouvelle page Home nageur |
+| `src/components/layout/navItems.ts` | Modifié — nouveau dock athlete |
+| `src/App.tsx` | Modifié — routing SwimmerHome, /natation, redirect /progress |
+| `src/pages/Dashboard.tsx` | Modifié — retrait wellness |
+| `src/pages/Profile.tsx` | Modifié — retrait accès rapides + messages card |
+| `src/components/profile/AthletePerformanceHub.tsx` | Modifié — 3 tabs horizons (standalone mode) |
+| `src/pages/Progress.tsx` | Modifié — export ProgressContent pour embedding |
+
+### Tests
+- `npx tsc --noEmit` : 0 erreurs
+- `npm test` : 167/169 (2 échecs pré-existants : gifEncoder, StrengthCatalogDefaults)
+- Test visuel : dev server http://localhost:8082/
+
+### Décisions prises
+- Home au centre du dock (position d'honneur, comme le coach)
+- Wellness migré vers Home (supprimé du Dashboard) — pas de doublon
+- Les 3 horizons Suivi ne s'appliquent qu'en mode standalone (nageur) — le hub coach garde ses 4 tabs originaux
+- ProgressContent exporté en named export avec prop `embedded` pour éviter le PageHeader en mode tab
+- Messages restent accessibles via `/profile?section=messages` (backward-compatible)
+
+### Limites / dette
+- Tab "Saison" = simple empilement Entretiens + Planif (redesign complet prévu en Phase 2)
+- Tab "Semaine" = contenu identique à ex-Ressentis (sparklines wellness prévues en Phase 2)
+- Les session cards Home naviguent vers `/natation` plutôt qu'ouvrir directement le FeedbackDrawer (compromis technique)
+- Design doc : `docs/plans/2026-04-12-swimmer-home-redesign-design.md`

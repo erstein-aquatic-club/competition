@@ -52,7 +52,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/lib/supabase.ts` | Client Supabase | ~70 lignes |
 | `src/lib/features.ts` | Feature flags | 5 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | |
-| `src/pages/Dashboard.tsx` | Dashboard nageur (calendrier, ressenti) | ~1680 lignes |
+| `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |
+| `src/pages/Dashboard.tsx` | Calendrier natation nageur (ex-Accueil, route /natation) | ~1620 lignes |
 | `src/pages/Strength.tsx` | Module musculation nageur | ~1340 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1300 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1150 lignes |
@@ -232,6 +233,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 63 | Historique Chronos + Éditeur Splits | Haute | Fait (§98) |
 | 64 | Remédiation audit (sécurité, perf, UX, robustesse) | Haute | Fait (§100) |
 | 65 | Refonte assignation avec héritage créneau perso | Haute | Fait (§101) |
+| 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Fait (§102) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-03-27 (§90 Planification muscu par nageur)*
+*Dernière mise à jour : 2026-04-12 (§102 Refonte interface nageur)*
 
 ## Légende
 

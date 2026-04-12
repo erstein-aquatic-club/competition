@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-10 (§99 Commentaires nageurs home coach + push)*
+*Dernière mise à jour : 2026-04-12 (§102 Refonte interface nageur — Home + Dock + Suivi 3 horizons)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -69,6 +69,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 61 | Attribution coach ↔ nageur (1 coach principal par nageur) | Haute | Moyenne | Fait (§98) |
 | 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Moyenne | Fait (§99) |
 | 63 | Historique Chronos + Éditeur Splits | Haute | Moyenne | Fait (§98) |
+| 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Haute | Fait (§102) |
 
 ---
 
