@@ -266,7 +266,7 @@ function GroupSlotCard({
       {/* Empty state label */}
       {instance.state === "empty" && (
         <p className="text-xs text-muted-foreground/60 mt-1">
-          Aucune séance
+          Aucune séance assignée
         </p>
       )}
 
