@@ -91,8 +91,8 @@ function materializePersonalSlots(
   for (const dateIso of weekDates) {
     const [y, m, d] = dateIso.split("-").map(Number);
     const jsDate = new Date(y, m - 1, d);
-    // day_of_week in DB: 0=Monday..6=Sunday (same as useSlotCalendar convention)
-    const dow = (jsDate.getDay() + 6) % 7;
+    // day_of_week in DB: 1=Monday..7=Sunday (ISO weekday, same as SwimmerHome convention)
+    const dow = jsDate.getDay() === 0 ? 7 : jsDate.getDay();
     for (const slot of slots) {
       if (slot.day_of_week === dow && slot.is_active) {
         instances.push({ date: dateIso, slot });
