@@ -101,9 +101,10 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/shared/PWAInstallGate.tsx` | Gate installation PWA mobile | ~130 lignes |
 | `src/components/shared/PushPermissionBanner.tsx` | Banner permission push post-login | ~70 lignes |
 | `public/push-handler.js` | Service Worker push event handler | ~40 lignes |
-| `src/pages/Suivi.tsx` | Hub Mon suivi (3 cartes aperçu → drill-down) | ~310 lignes |
-| `src/pages/SuiviSemaine.tsx` | Vue semaine drill-down (ressentis + séances manquées + absences) | ~733 lignes |
-| `src/pages/SuiviSaison.tsx` | Vue saison drill-down (timeline unifiée natation/muscu) | ~728 lignes |
+| `src/pages/Suivi.tsx` | Hub Mon suivi (4 cartes aperçu → drill-down) | ~310 lignes |
+| `src/pages/SuiviSemaine.tsx` | Vue semaine drill-down (timeline jour/créneau : nage + muscu + absences + wellness) | ~1240 lignes |
+| `src/pages/SuiviPlanification.tsx` | Vue planification saison (natation infinite scroll + musculation Mon plan) | ~105 lignes |
+| `src/pages/SuiviObjectifs.tsx` | Vue objectifs drill-down (CRUD objectifs + compétitions à venir) | ~111 lignes |
 | `src/pages/SuiviProgression.tsx` | Vue progression drill-down (wrapper Progress) | ~50 lignes |
 | `src/hooks/useSwipeNavigation.ts` | Hook swipe horizontal framer-motion (calendrier) | ~30 lignes |
 | `src/components/shared/PullToRefresh.tsx` | Composant pull-to-refresh générique framer-motion | ~60 lignes |
@@ -238,6 +239,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 65 | Refonte assignation avec héritage créneau perso | Haute | Fait (§101) |
 | 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Fait (§102) |
 | 67 | Restructuration vue "Mon suivi" (hub + drill-down) | Haute | Fait (§103) |
+| 68 | Sous-vues Suivi enrichies (Semaine nage+muscu, Planification, Objectifs) + bugs PWA | Haute | Fait (§104) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

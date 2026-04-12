@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-12 (§102 Refonte interface nageur)*
+*Dernière mise à jour : 2026-04-12 (§104 Corrections bugs PWA + logiques nageur)*
 
 ## Légende
 
@@ -363,14 +363,33 @@ Tous les feature flags sont activés.
 | RPC atomique strength session | ✅ | `00052_rpc.sql`, `strength.ts` | Transaction unique UPDATE+DELETE+INSERT (§82) |
 | Pagination listes longues | ✅ | `Admin.tsx`, `SwimCatalog.tsx`, `CoachSwimmersOverview.tsx` | "Voir plus" client-side, cap 30-50 items (§82) |
 | Coach deep linking URL | ✅ | `Coach.tsx` | URL synchro activeSection via replaceState (§82) |
-| Page Suivi hub + drill-down | ✅ | `Suivi.tsx`, `SuiviSemaine.tsx`, `SuiviSaison.tsx`, `SuiviProgression.tsx` | Hub /suivi avec 3 cartes aperçu → sous-routes dédiées (semaine, saison, progression) (§103) |
+| Page Suivi hub + drill-down | ✅ | `Suivi.tsx`, `SuiviSemaine.tsx`, `SuiviPlanification.tsx`, `SuiviObjectifs.tsx`, `SuiviProgression.tsx` | Hub /suivi avec 4 cartes aperçu → sous-routes dédiées (semaine, planification, objectifs, progression) (§103/§104) |
 | Profil allégé | ✅ | `Profile.tsx` | Retrait sections suivi, ajout tuile Club, redirect compat (§83) |
 | Swipe calendrier | ✅ | `useSwipeNavigation.ts`, `CalendarGrid.tsx`, `Dashboard.tsx` | Navigation mois par swipe horizontal framer-motion (§83) |
 | Drag-to-dismiss drawer | ✅ | `FeedbackDrawer.tsx` | Geste drag handle pour fermer le drawer (§83) |
 | Pull-to-refresh Dashboard | ✅ | `PullToRefresh.tsx`, `Dashboard.tsx` | Geste pull-down pour rafraîchir les données (§83) |
 
 
----
+### Suivi nageur — détail sous-vues (§104)
+
+| Fonctionnalité | Statut | Fichiers | Notes |
+|----------------|--------|----------|-------|
+| Vue semaine enrichie (natation + muscu) | ✅ | `SuiviSemaine.tsx` | Timeline jour par jour : sessions loggées (nage + muscu), manquées, absences. Navigation semaine ←→. Indicateurs ressentis colorés (diff/fatigue/perf/engagement). Expansion inline. Intégration résultats musculation (strength runs) à côté des ressentis nage |
+| Vue semaine — sources d'assignation | ✅ | `SuiviSemaine.tsx`, `assignments.ts` | 3 sources : créneaux perso résolus (priorité), fallback individuel, fallback groupe. Badge couleur par source (individual/subgroup/group) |
+| Vue semaine — wellness banner | ✅ | `SuiviSemaine.tsx`, `WellnessForm.tsx` | Bannière si bien-être non saisi aujourd'hui + Sheet overlay (semaine courante uniquement) |
+| Vue planification (natation) | ✅ | `SuiviPlanification.tsx`, `SwimPlanningAthleteView.tsx` | Toggle Natation/Musculation. Mode Natation : timeline verticale infinie des semaines avec types, dots filière, expansion micro-grille 6j×2 créneaux (matin/soir). Mode Musculation : Mon plan muscu (MyPlanTab) |
+| Vue planification — infinite scroll | ✅ | `SwimPlanningAthleteView.tsx` | IntersectionObserver avec re-création correcte après chaque load-more (rootMargin 100px). Bug décalage scroll corrigé (§104) |
+| Vue planification — fiche filière | ✅ | `SwimPlanningAthleteView.tsx`, `FILIERE_MAP` | Sheet bottom au tap sur chip : nom, description DB, exemples, accordion détails techniques (9 métriques) |
+| Vue objectifs nageur drill-down | ✅ | `SuiviObjectifs.tsx`, `SwimmerObjectivesView.tsx` | CRUD objectifs perso + lecture objectifs coach (ObjectiveCard ring SVG). Compétitions à venir avec J-X badge et accès direct détail compétition |
+| Affichage créneaux perso Ma semaine | ✅ | `SwimmerWeekSlots.tsx` | Bug décalage d'un jour corrigé (convention day_of_week : 1=Lundi..7=Dimanche, cohérente avec SwimmerHome) |
+
+### Stabilité PWA (§104)
+
+| Fonctionnalité | Statut | Fichiers | Notes |
+|----------------|--------|----------|-------|
+| Fix page blanche au retour arrière-plan | ✅ | `auth.ts`, `App.tsx`, `main.tsx` | Triple fix : (1) `onAuthStateChange` ne remet plus `isLoaded=false` si user déjà chargé — mise à jour tokens uniquement. (2) `useVersionCheck` ne déclenche plus de reload au `visibilitychange`. (3) SW `r.update()` supprimé au `visibilitychange` |
+| Refresh token sans interruption session | ✅ | `auth.ts` | Si `INITIAL_SESSION`/`SIGNED_IN` arrive (retour premier plan iOS) : tokens mis à jour sans toucher à `isLoaded` ni re-render du router |
+
 
 ## Exercices sans GIF
 
