@@ -142,12 +142,28 @@ export function chronoReducer(
     }
 
     case "LAUNCH_WAVE": {
+      const prevWave = state.waves.find((w) => w.wave === action.wave);
+      const wasFinished = prevWave?.lastFinishedAt !== null;
       const waves = state.waves.map((w) =>
         w.wave === action.wave
-          ? { ...w, startedAt: action.timestamp, lastFinishedAt: null }
+          ? { ...w, startedAt: action.timestamp, lastFinishedAt: null, currentRep: wasFinished ? w.currentRep + 1 : w.currentRep }
           : w,
       );
-      return { ...state, waves };
+      // Reset swimmers for next rep when relaunching after all finished
+      let raceData = state.raceData;
+      if (wasFinished) {
+        raceData = new Map(state.raceData);
+        for (const [id, rs] of raceData) {
+          if (rs.swimmer.wave === action.wave) {
+            raceData.set(id, {
+              ...rs,
+              splitsByRep: [...rs.splitsByRep, []],
+              stoppedAt: null,
+            });
+          }
+        }
+      }
+      return { ...state, waves, raceData };
     }
 
     case "RECORD_SPLIT": {
@@ -224,21 +240,12 @@ export function chronoReducer(
       const allStopped = waveSwimmers.every((rs) => rs.stoppedAt !== null);
 
       if (allStopped) {
-        // Keep startedAt so departure countdown continues; set lastFinishedAt to signal "between reps"
+        // Mark wave as "between reps" — swimmers stay frozen until next LAUNCH_WAVE
         const waves = state.waves.map((w) =>
           w.wave === waveNum
-            ? { ...w, currentRep: w.currentRep + 1, lastFinishedAt: action.timestamp }
+            ? { ...w, lastFinishedAt: action.timestamp }
             : w,
         );
-        for (const [id, rs] of newRaceData) {
-          if (rs.swimmer.wave === waveNum) {
-            newRaceData.set(id, {
-              ...rs,
-              splitsByRep: [...rs.splitsByRep, []],
-              stoppedAt: null,
-            });
-          }
-        }
         return { ...state, waves, raceData: newRaceData };
       }
 
@@ -246,24 +253,13 @@ export function chronoReducer(
     }
 
     case "NEXT_REP": {
-      // Keep startedAt so departure countdown continues; set lastFinishedAt to signal "between reps"
+      // Mark wave as "between reps" — swimmers stay frozen until next LAUNCH_WAVE
       const waves = state.waves.map((w) =>
         w.wave === action.wave
-          ? { ...w, currentRep: w.currentRep + 1, lastFinishedAt: Date.now() }
+          ? { ...w, lastFinishedAt: Date.now() }
           : w,
       );
-      // Add new empty rep array for each swimmer in this wave, reset stoppedAt
-      const newRaceData = new Map(state.raceData);
-      for (const [id, rs] of newRaceData) {
-        if (rs.swimmer.wave === action.wave) {
-          newRaceData.set(id, {
-            ...rs,
-            splitsByRep: [...rs.splitsByRep, []],
-            stoppedAt: null,
-          });
-        }
-      }
-      return { ...state, waves, raceData: newRaceData };
+      return { ...state, waves };
     }
 
     case "STOP_RACE": {
