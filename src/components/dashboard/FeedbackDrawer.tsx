@@ -554,7 +554,7 @@ export function FeedbackDrawer({
                 </IconButton>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-auto overscroll-contain touch-pan-y p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {/* Header jour minimal */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -646,7 +646,7 @@ export function FeedbackDrawer({
                           key={s.id}
                           type="button"
                           onClick={() => onOpenSession(s.id)}
-                          className="group w-full rounded-3xl border-2 border-dashed border-primary/20 bg-primary/[0.03] px-4 py-4 text-left transition hover:border-primary/40 hover:bg-primary/[0.06] hover:shadow-sm active:scale-[0.98]"
+                          className="group w-full min-w-0 rounded-3xl border-2 border-dashed border-primary/20 bg-primary/[0.03] px-4 py-4 text-left transition overflow-hidden hover:border-primary/40 hover:bg-primary/[0.06] hover:shadow-sm active:scale-[0.98]"
                         >
                           <div className="flex items-center gap-3">
                             <div className="h-11 w-11 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center transition group-hover:bg-primary/15">
@@ -687,7 +687,7 @@ export function FeedbackDrawer({
                         key={s.id}
                         type="button"
                         onClick={() => onOpenSession(s.id)}
-                        className={cn("w-full rounded-3xl border px-3 py-3 text-left transition", bg, "hover:shadow-sm")}
+                        className={cn("w-full min-w-0 rounded-3xl border px-3 py-3 text-left transition overflow-hidden", bg, "hover:shadow-sm")}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
@@ -822,7 +822,7 @@ export function FeedbackDrawer({
 
                   return (
                     <>
-                      <div className="mt-4 grid gap-2">
+                      <div className="mt-4 grid gap-2 overflow-hidden">
                         {primarySessions.map(renderSessionCard)}
                       </div>
 

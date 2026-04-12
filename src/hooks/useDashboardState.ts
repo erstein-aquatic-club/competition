@@ -542,29 +542,9 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
           };
         });
 
-        // Inject unmatched assignments ONLY after resolver has loaded
-        // (when resolved is undefined = still loading, don't inject to avoid duplicates)
-        if (resolved) {
-          const matchedAssignmentIds = new Set(
-            list.filter((s) => s.assignmentId).map((s) => s.assignmentId),
-          );
-          const unmatchedAssignments = dayAssignments.filter((a) => !matchedAssignmentIds.has(a.id));
-          for (const a of unmatchedAssignments) {
-            const aRecord = a as unknown as Record<string, unknown>;
-            const aSlotKey: SlotKey = pickAssignmentSlotKey(aRecord, 0);
-            list.push({
-              id: `${iso}__unmatched_${a.id}`,
-              iso,
-              slotKey: aSlotKey,
-              title: String(a.title ?? "Séance coach"),
-              km: assignmentPlannedKm(aRecord),
-              details: safeLinesFromText(a.description),
-              assignmentId: typeof a.id === "number" ? a.id : Number(a.id) || undefined,
-              isEmpty: false,
-              assignmentSource: "group",
-            });
-          }
-        }
+        // Unmatched group assignments (not linked to any swimmer slot) are NOT
+        // injected here — they appear in the "Autres séances du groupe" dropdown
+        // via otherGroupAssignments memo.
 
         cache.set(iso, list);
         return list;
