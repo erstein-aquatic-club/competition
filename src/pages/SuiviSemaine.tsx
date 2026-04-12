@@ -133,12 +133,21 @@ type SessionKind = "swim" | "strength";
 type SlotKey = "AM" | "PM";
 
 export function inferSessionKind(params: {
+  /** Explicit type coming from the training_slot / swimmer_training_slot row */
+  slotSessionType?: SessionKind | null;
+  /** Explicit type coming from the assignment row */
   assignmentType?: SessionKind | null;
+  /** Legacy fallback — only used if neither slot nor assignment expose a type */
   location?: string | null;
 }): SessionKind {
+  // Slot type is the source of truth (set by the coach in the drawer).
+  if (params.slotSessionType === "swim" || params.slotSessionType === "strength") {
+    return params.slotSessionType;
+  }
   if (params.assignmentType === "swim" || params.assignmentType === "strength") {
     return params.assignmentType;
   }
+  // Legacy fallback for any row that predates the session_type migration.
   const location = params.location?.toLowerCase() ?? "";
   if (
     location.includes("salle") ||
@@ -557,7 +566,10 @@ export default function SuiviSemaine() {
       if (resolved.length === 0) {
         const daySlots = swimmerSlots.filter((s) => s.day_of_week === dayOfWeek);
         for (const slot of daySlots) {
-          const kind = inferSessionKind({ location: slot.location });
+          const kind = inferSessionKind({
+            slotSessionType: slot.session_type,
+            location: slot.location,
+          });
           const slotKey = slotKeyFromTime(slot.start_time);
           const fallbackAssignment = kind === "swim"
             ? findFallbackAssignmentForSlot(swimAssignments, { slotKey, userId, usedAssignmentIds })
@@ -637,6 +649,7 @@ export default function SuiviSemaine() {
       for (const r of resolved) {
         const slotKey = slotKeyFromTime(r.slotTime.split("-")[0]);
         const kind = inferSessionKind({
+          slotSessionType: r.slotSessionType,
           assignmentType: r.assignment?.session_type ?? null,
           location: r.slotLocation,
         });
@@ -1004,10 +1017,10 @@ function LoggedCard({
         onToggle();
       }}
       className={cn(
-        "w-full rounded-2xl border p-3 text-left transition-all",
+        "w-full rounded-2xl border border-l-4 p-3 text-left transition-all",
         isStrength
-          ? "border-amber-200/70 bg-amber-50/40 hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-950/10"
-          : "bg-card hover:border-primary/20",
+          ? "border-amber-200/70 border-l-amber-500 bg-amber-50/40 hover:border-amber-300 dark:border-amber-900/40 dark:border-l-amber-500 dark:bg-amber-950/10"
+          : "border-border border-l-blue-500 bg-blue-50/30 hover:border-blue-300 dark:border-blue-900/40 dark:border-l-blue-500 dark:bg-blue-950/10",
       )}
     >
       {/* Top row: slot info */}
@@ -1114,10 +1127,10 @@ function MissedCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border-2 border-dashed p-3 opacity-80",
+        "rounded-2xl border-2 border-l-4 border-dashed p-3 opacity-80",
         isStrength
-          ? "border-amber-200/80 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10"
-          : "border-border",
+          ? "border-amber-200/80 border-l-amber-500 bg-amber-50/30 dark:border-amber-900/40 dark:border-l-amber-500 dark:bg-amber-950/10"
+          : "border-border border-l-blue-500 bg-blue-50/20 dark:border-blue-900/40 dark:border-l-blue-500 dark:bg-blue-950/10",
       )}
     >
       {/* Slot info */}
@@ -1195,7 +1208,14 @@ function AbsentCard({
   const isStrength = card.kind === "strength";
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-muted/30 p-2.5">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-2xl border border-l-4 bg-muted/30 p-2.5",
+        isStrength
+          ? "border-border border-l-amber-500"
+          : "border-border border-l-blue-500",
+      )}
+    >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           {card.slotTime && (

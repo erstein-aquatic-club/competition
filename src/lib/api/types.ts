@@ -898,6 +898,8 @@ export interface ResolvedSlotAssignment {
   slotTime: string;
   /** Location of the slot */
   slotLocation: string;
+  /** Type de séance du créneau (natation ou musculation) */
+  slotSessionType: "swim" | "strength";
   /** The training_slot_id this personal slot was initialized from (via source_assignment_id) */
   sourceTrainingSlotId: string | null;
   /** The resolved session assignment (or null if no session assigned) */
