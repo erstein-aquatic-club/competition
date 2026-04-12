@@ -381,33 +381,33 @@ export default function Suivi() {
             </button>
 
             {/* ── Card: Mes entretiens ────────────────────────────── */}
-            {interviews.length > 0 && (
-              <button
-                type="button"
-                onClick={() => navigate("/suivi/saison")}
-                className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
-                      <MessageSquare className="h-4 w-4" />
-                    </div>
-                    <h2 className="text-sm font-semibold">Mes entretiens</h2>
-                    {pendingInterviews.length > 0 && (
-                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                        {pendingInterviews.length} en attente
-                      </span>
-                    )}
+            <button
+              type="button"
+              onClick={() => navigate("/suivi/saison")}
+              className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                    <MessageSquare className="h-4 w-4" />
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+                  <h2 className="text-sm font-semibold">Mes entretiens</h2>
+                  {pendingInterviews.length > 0 && (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                      {pendingInterviews.length} en attente
+                    </span>
+                  )}
                 </div>
-                <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
-                  {nextInterview
-                    ? `Prochain : ${new Date(nextInterview.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`
-                    : `${interviews.length} entretien${interviews.length > 1 ? "s" : ""} au total`}
-                </p>
-              </button>
-            )}
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+              </div>
+              <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
+                {nextInterview
+                  ? `Prochain : ${new Date(nextInterview.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`
+                  : interviews.length > 0
+                    ? `${interviews.length} entretien${interviews.length > 1 ? "s" : ""} au total`
+                    : "Aucun entretien pour le moment"}
+              </p>
+            </button>
           </>
         )}
       </div>
