@@ -20,6 +20,7 @@ import {
   Calendar,
   Map,
   TrendingUp,
+  MessageSquare,
   ChevronRight,
   Sparkles,
 } from "lucide-react";
@@ -228,11 +229,20 @@ export default function Suivi() {
     return { swim, muscu: 0 }; // muscu slots tracked separately
   }, [swimmerSlots]);
 
-  // Pending interviews
+  // Pending interviews (need swimmer action)
   const pendingInterviews = useMemo(
     () => interviews.filter((i) => i.status === "draft_athlete" || i.status === "sent"),
     [interviews],
   );
+
+  // Next upcoming interview (any status, future date)
+  const nextInterview = useMemo(() => {
+    const now = toISODate(new Date());
+    const upcoming = interviews
+      .filter((i) => i.date >= now)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return upcoming[0] ?? null;
+  }, [interviews]);
 
   // Objectives reached (those with target_time where current best <= target)
   const objectivesReached = useMemo(
@@ -289,6 +299,7 @@ export default function Suivi() {
       <div className="mt-4 space-y-3">
         {isLoading ? (
           <>
+            <Skeleton className="h-[68px] rounded-2xl" />
             <Skeleton className="h-[68px] rounded-2xl" />
             <Skeleton className="h-[68px] rounded-2xl" />
             <Skeleton className="h-[68px] rounded-2xl" />
@@ -368,6 +379,35 @@ export default function Suivi() {
                   : "Pas encore de donnees"}
               </p>
             </button>
+
+            {/* ── Card: Mes entretiens ────────────────────────────── */}
+            {interviews.length > 0 && (
+              <button
+                type="button"
+                onClick={() => navigate("/suivi/saison")}
+                className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                      <MessageSquare className="h-4 w-4" />
+                    </div>
+                    <h2 className="text-sm font-semibold">Mes entretiens</h2>
+                    {pendingInterviews.length > 0 && (
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                        {pendingInterviews.length} en attente
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+                </div>
+                <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
+                  {nextInterview
+                    ? `Prochain : ${new Date(nextInterview.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`
+                    : `${interviews.length} entretien${interviews.length > 1 ? "s" : ""} au total`}
+                </p>
+              </button>
+            )}
           </>
         )}
       </div>

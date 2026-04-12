@@ -4,7 +4,8 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import type { TrainingWeek, Interview } from "@/lib/api";
-import type { SwimPlanningSlot } from "@/lib/api/types";
+import type { ResolvedSlotAssignment, SwimPlanningSlot } from "@/lib/api/types";
+import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
 import { FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -140,6 +141,88 @@ function MiniFiliereDot({ slot }: { slot: SwimPlanningSlot | undefined }) {
       <span className={cn("text-[9px] font-semibold truncate leading-tight", style.text)}>
         {filiere?.short ?? slot.filiere}
       </span>
+    </div>
+  );
+}
+
+// ── Compact assigned sessions per week ─────────────────────────
+
+const DAY_LABELS_SHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+function getWeekDates(mondayIso: string): string[] {
+  const dates: string[] = [];
+  const d = new Date(mondayIso + "T00:00:00");
+  for (let i = 0; i < 7; i++) {
+    dates.push(d.toISOString().split("T")[0]);
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+function WeekAssignedSessions({ monday, userId }: { monday: string; userId: number }) {
+  const dates = useMemo(() => getWeekDates(monday), [monday]);
+
+  const { data: assignmentMap, isLoading } = useQuery({
+    queryKey: ["swimmer-assignments-batch", userId, monday],
+    queryFn: () => resolveSwimmerAssignmentsBatch(userId, dates),
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
+
+  if (isLoading) return <Skeleton className="h-12 rounded-lg" />;
+
+  // Collect days that have assignments
+  const daysWithSessions: Array<{ dayLabel: string; sessions: Array<{ title: string; type: "swim" | "strength" }> }> = [];
+
+  for (let i = 0; i < dates.length; i++) {
+    const slots: ResolvedSlotAssignment[] = assignmentMap?.get(dates[i]) ?? [];
+    const assigned = slots.filter((s) => s.assignment);
+    if (assigned.length === 0) continue;
+
+    daysWithSessions.push({
+      dayLabel: DAY_LABELS_SHORT[i],
+      sessions: assigned.map((s) => ({
+        title: s.assignment!.title || "Séance",
+        type: s.assignment!.session_type === "strength" ? "strength" : "swim",
+      })),
+    });
+  }
+
+  if (daysWithSessions.length === 0) return null;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40">
+        Séances assignées
+      </p>
+      <div className="space-y-0.5">
+        {daysWithSessions.map((day) => (
+          <div key={day.dayLabel} className="flex items-center gap-2">
+            <span className="text-[10px] font-medium text-muted-foreground/50 w-7 shrink-0">
+              {day.dayLabel}
+            </span>
+            <div className="flex-1 min-w-0 flex items-center gap-1 flex-wrap">
+              {day.sessions.map((s, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[140px]",
+                    s.type === "swim"
+                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                  )}
+                >
+                  <span className={cn(
+                    "h-1.5 w-1.5 rounded-full shrink-0",
+                    s.type === "swim" ? "bg-blue-500" : "bg-amber-400",
+                  )} />
+                  {s.title}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -620,10 +703,14 @@ export default function SuiviSaison() {
                             transition={{ duration: 0.25, ease: "easeInOut" }}
                             className="overflow-hidden"
                           >
-                            <div className="border-t px-3 py-2.5">
-                              {/* Filiere micro-grid */}
+                            <div className="border-t px-3 py-2.5 space-y-2.5">
+                              {/* Filiere micro-grid (natation) */}
                               {groupId && (
                                 <WeekFiliereGrid monday={item.monday} groupId={groupId} />
+                              )}
+                              {/* Assigned sessions (natation + muscu) */}
+                              {userId && (
+                                <WeekAssignedSessions monday={item.monday} userId={userId} />
                               )}
                             </div>
                           </motion.div>
