@@ -2006,6 +2006,144 @@ const CoachTrainingSlotsScreen = ({
   const exportContentRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
 
+  const shareOrDownloadPng = useCallback(async (blob: Blob, fileName: string) => {
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], fileName, { type: "image/png" });
+      const shareData = { files: [file] };
+      try {
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      } catch {
+        // User cancelled or share failed — fall through to download
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const buildFallbackWeekPng = useCallback(async (): Promise<Blob> => {
+    const width = 1600;
+    const padX = 28;
+    const padY = 28;
+    const colGap = 12;
+    const colCount = 7;
+    const colWidth = Math.floor((width - padX * 2 - colGap * (colCount - 1)) / colCount);
+
+    const weekData = weekDates.map((date, i) => {
+      const day = i + 1;
+      const slots = (slotsByDay.get(day) ?? []).map((slot) => {
+        const instance = slotInstancesById.get(slot.id);
+        const ov = instance?.override;
+        const isModified = ov?.status === "modified";
+        const isCancelled = instance?.state === "cancelled";
+        const start = isModified && ov?.new_start_time ? ov.new_start_time : slot.start_time;
+        const end = isModified && ov?.new_end_time ? ov.new_end_time : slot.end_time;
+        const location = isModified && ov?.new_location ? ov.new_location : slot.location;
+        const statusLabel = isCancelled
+          ? "Annulé"
+          : isModified
+            ? "Modifié"
+            : instance?.state === "published"
+              ? "Publié"
+              : instance?.state === "draft"
+                ? "Brouillon"
+                : "";
+
+        return { start, end, location, statusLabel };
+      });
+
+      return {
+        label: `${DAYS_SHORT[i]} ${date.getDate()}`,
+        month: date.toLocaleDateString("fr-FR", { month: "short" }),
+        slots,
+      };
+    });
+
+    const maxSlots = Math.max(1, ...weekData.map((d) => d.slots.length));
+    const slotRowH = 36;
+    const colHeaderH = 52;
+    const colHeight = colHeaderH + maxSlots * slotRowH + 16;
+    const headerH = 64;
+    const height = padY * 2 + headerH + colHeight;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Impossible de créer le canvas");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "#111827";
+    ctx.font = "700 28px Inter, sans-serif";
+    ctx.fillText(
+      `Créneaux — S${weekNumber} · ${formatDayMonth(weekDates[0])} – ${formatDayMonth(weekDates[6])}`,
+      padX,
+      padY + 30,
+    );
+
+    const startY = padY + headerH;
+    for (let i = 0; i < weekData.length; i += 1) {
+      const x = padX + i * (colWidth + colGap);
+      const d = weekData[i];
+
+      // Column card
+      ctx.fillStyle = "#f9fafb";
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(x, startY, colWidth, colHeight, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      // Day header
+      ctx.fillStyle = "#111827";
+      ctx.font = "700 15px Inter, sans-serif";
+      ctx.fillText(d.label, x + 10, startY + 22);
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "500 12px Inter, sans-serif";
+      ctx.fillText(d.month, x + 10, startY + 40);
+
+      if (d.slots.length === 0) {
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "500 12px Inter, sans-serif";
+        ctx.fillText("Aucun créneau", x + 10, startY + colHeaderH + 18);
+        continue;
+      }
+
+      d.slots.forEach((s, idx) => {
+        const rowY = startY + colHeaderH + idx * slotRowH;
+        const status = s.statusLabel ? ` · ${s.statusLabel}` : "";
+        const line1 = `${formatTime(s.start)}-${formatTime(s.end)}${status}`;
+
+        ctx.fillStyle = "#111827";
+        ctx.font = "600 12px Inter, sans-serif";
+        ctx.fillText(line1, x + 10, rowY + 14);
+
+        ctx.fillStyle = "#6b7280";
+        ctx.font = "500 11px Inter, sans-serif";
+        const location = s.location.length > 26 ? `${s.location.slice(0, 25)}…` : s.location;
+        ctx.fillText(location, x + 10, rowY + 29);
+      });
+    }
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error("Impossible de générer l'image"));
+      }, "image/png");
+    });
+    return blob;
+  }, [weekDates, slotsByDay, slotInstancesById, weekNumber]);
+
   const handleExportImage = useCallback(async () => {
     const el = exportContentRef.current;
     if (!el || exporting) return;
@@ -2015,54 +2153,39 @@ const CoachTrainingSlotsScreen = ({
       const html2canvas = (await import("html2canvas")).default;
       const { onclone, cleanup } = buildHtml2CanvasOnClone(el);
       cleanupCapture = cleanup;
-      const canvas = await html2canvas(el, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        onclone,
-      });
-
       const fileName = `semaine-${weekMondayIso}.png`;
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast({ title: "Erreur", description: "Impossible de générer l'image", variant: "destructive" });
-          setExporting(false);
-          return;
+      let blob: Blob;
+      try {
+        const canvas = await html2canvas(el, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          onclone,
+        });
+        blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((b) => {
+            if (b) resolve(b);
+            else reject(new Error("Impossible de générer l'image"));
+          }, "image/png");
+        });
+      } catch (captureErr) {
+        const msg = String(captureErr).toLowerCase();
+        if (msg.includes("oklab") || msg.includes("unsupported color function")) {
+          blob = await buildFallbackWeekPng();
+        } else {
+          throw captureErr;
         }
+      }
 
-        // Try Web Share API first (mobile)
-        if (navigator.share && navigator.canShare) {
-          const file = new File([blob], fileName, { type: "image/png" });
-          const shareData = { files: [file] };
-          try {
-            if (navigator.canShare(shareData)) {
-              await navigator.share(shareData);
-              setExporting(false);
-              return;
-            }
-          } catch {
-            // User cancelled or share failed — fall through to download
-          }
-        }
-
-        // Fallback: download PNG
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        URL.revokeObjectURL(url);
-        setExporting(false);
-      }, "image/png");
+      await shareOrDownloadPng(blob, fileName);
     } catch (err) {
       toast({ title: "Erreur export", description: String(err), variant: "destructive" });
-      setExporting(false);
     } finally {
       cleanupCapture();
+      setExporting(false);
     }
-  }, [exporting, weekMondayIso, toast]);
+  }, [buildFallbackWeekPng, exporting, shareOrDownloadPng, toast, weekMondayIso]);
 
   return (
     <div className="space-y-4 pb-24">
