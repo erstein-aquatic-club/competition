@@ -136,11 +136,11 @@ export default function SwimPlanningAthleteView({
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => { if (entries[0]?.isIntersecting) setWeekCount((c) => c + LOAD_MORE_COUNT); },
-      { rootMargin: "200px" },
+      { rootMargin: "100px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isVisible]);
+  }, [isVisible, weekCount]);
 
   // ── Slots ──
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
