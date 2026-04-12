@@ -60,7 +60,6 @@ import {
   Check,
   CircleDashed,
   Ban,
-  ArrowRightLeft,
   Share2,
   Loader2,
 } from "lucide-react";
@@ -1114,34 +1113,31 @@ function TimelineSlotInline({
   const isModified = ov?.status === "modified";
   const effectiveLocation = (isModified && ov?.new_location) ? ov.new_location : slot.location;
 
+  // Modified slots keep their swim/strength base color — orange is only an accent
   const bgClass = cancelled
     ? "bg-muted/50 border-muted-foreground/20 opacity-50 line-through"
-    : isModified
-      ? "bg-orange-500/12 border-orange-400/40 hover:bg-orange-500/20"
-      : isPublished
-        ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
-        : isDraft
-          ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
+    : isPublished
+      ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
+      : isDraft
+        ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
       : swim
         ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
         : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
 
-  const iconClass = isModified
-    ? "text-orange-500"
-    : isPublished
-      ? "text-emerald-600 dark:text-emerald-400"
-      : isDraft
-        ? "text-amber-600 dark:text-amber-400"
-        : swim
-          ? "text-blue-500"
-          : "text-amber-500";
+  const iconClass = isPublished
+    ? "text-emerald-600 dark:text-emerald-400"
+    : isDraft
+      ? "text-amber-600 dark:text-amber-400"
+      : swim
+        ? "text-blue-500"
+        : "text-amber-500";
 
-  const borderStyle = isOneOff ? "border-dashed " : isModified ? "border-dashed border-orange-400/60 " : "";
+  const borderStyle = isOneOff ? "border-dashed " : "";
 
   return (
     <button
       type="button"
-      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${borderStyle}${bgClass}`}
+      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${borderStyle}${bgClass}${isModified ? " border-t-[3px] border-t-orange-500" : ""}`}
       style={{ top, height, minHeight: 24 }}
       onClick={() => onSelect(slot)}
       title={`${isOneOff ? "[Ponctuel] " : ""}${isModified ? "[Modifié] " : ""}${formatTime(slot.start_time)}–${formatTime(slot.end_time)} · ${effectiveLocation}${instance?.assignment?.session_name ? ` · ${instance.assignment.session_name}` : ""}`}
@@ -1149,11 +1145,7 @@ function TimelineSlotInline({
       <div className={`flex flex-col gap-0.5 ${isShort ? "flex-row items-center" : ""}`}>
         <div className="flex items-start justify-between gap-1 min-w-0">
           <div className="flex items-center gap-1 min-w-0">
-            {isModified ? (
-              <ArrowRightLeft className="h-2.5 w-2.5 shrink-0 text-orange-500" />
-            ) : (
-              <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
-            )}
+            <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
             <span className="text-[10px] font-medium text-foreground truncate">
               {effectiveLocation}
             </span>
@@ -1163,7 +1155,7 @@ function TimelineSlotInline({
               </span>
             )}
             {isModified && (
-              <span className="shrink-0 rounded bg-orange-500/15 border border-orange-500/30 px-1 text-[8px] font-bold text-orange-600 dark:text-orange-400 leading-tight">
+              <span className="shrink-0 rounded-sm bg-orange-500 px-1 text-[8px] font-bold text-white leading-tight">
                 Modifié
               </span>
             )}
@@ -1199,11 +1191,9 @@ function TimelineSlotInline({
         {!isShort && hasAssignment && (
           <span
             className={`text-[9px] truncate ${
-              isModified
-                ? "text-orange-700 dark:text-orange-300"
-                : isDraft
-                  ? "text-amber-700 dark:text-amber-300"
-                  : "text-emerald-700 dark:text-emerald-300"
+              isDraft
+                ? "text-amber-700 dark:text-amber-300"
+                : "text-emerald-700 dark:text-emerald-300"
             }`}
           >
             {instance?.assignment?.session_name ?? "Séance"}
@@ -1372,16 +1362,14 @@ const MobileView = ({
                       className={`absolute left-1 right-1 rounded-sm ${
                         cancelled
                           ? "bg-muted-foreground/20"
-                          : isMod
-                            ? "bg-orange-500/50"
-                            : isPublished
-                              ? "bg-emerald-500/50"
-                              : isDraft
-                                ? "bg-amber-500/50"
-                            : swim
-                              ? "bg-blue-500/40"
-                              : "bg-amber-400/50"
-                      }`}
+                          : isPublished
+                            ? "bg-emerald-500/50"
+                            : isDraft
+                              ? "bg-amber-500/50"
+                          : swim
+                            ? "bg-blue-500/40"
+                            : "bg-amber-400/50"
+                      }${isMod && !cancelled ? " border-t-2 border-t-orange-500" : ""}`}
                       style={{
                         top: `${topPct}%`,
                         height: `${heightPct}%`,
@@ -1438,22 +1426,18 @@ const MobileView = ({
                   className={`w-full text-left rounded-xl border transition-all active:scale-[0.98] ${
                     cancelled
                       ? "opacity-50 border-border bg-card"
-                      : isModified
-                        ? "border-orange-400/50 bg-orange-500/5"
-                        : "border-border bg-card hover:border-border/80"
-                  }`}
+                      : "border-border bg-card hover:border-border/80"
+                  }${isModified && !cancelled ? " border-t-[3px] border-t-orange-500" : ""}`}
                   onClick={() => onSelect(slot)}
                 >
                   <div className="flex">
-                    {/* Color accent bar */}
+                    {/* Color accent bar — always type-colored */}
                     <div className={`w-1 rounded-l-xl flex-shrink-0 ${
                       cancelled
                         ? "bg-muted-foreground/30"
-                        : isModified
-                          ? "bg-orange-500"
-                          : swim
-                            ? "bg-blue-500"
-                            : "bg-amber-400"
+                        : swim
+                          ? "bg-blue-500"
+                          : "bg-amber-400"
                     }`} />
 
                     <div className="flex-1 px-3 py-2.5 min-w-0">
@@ -1461,7 +1445,7 @@ const MobileView = ({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={`text-sm font-bold tabular-nums ${
-                            cancelled ? "line-through text-muted-foreground" : isModified ? "text-orange-700 dark:text-orange-300" : "text-foreground"
+                            cancelled ? "line-through text-muted-foreground" : "text-foreground"
                           }`}>
                             {formatTime(effStart)} – {formatTime(effEnd)}
                           </span>
@@ -1471,11 +1455,9 @@ const MobileView = ({
                             </span>
                           )}
                           <span className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md font-medium ${
-                            isModified
-                              ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                              : swim
-                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                                : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
+                            swim
+                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                              : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
                           }`}>
                             {durationLabel(effStart, effEnd)}
                           </span>
@@ -1483,7 +1465,7 @@ const MobileView = ({
                         <div className="flex items-center gap-1.5">
                           <SlotCompletionBadge state={completionState} />
                           {isModified && (
-                            <span className="shrink-0 rounded bg-orange-500/15 border border-orange-500/30 px-1.5 py-0.5 text-[9px] font-bold text-orange-600 dark:text-orange-400 leading-tight">
+                            <span className="shrink-0 rounded-sm bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-tight">
                               Modifié
                             </span>
                           )}
@@ -1495,12 +1477,8 @@ const MobileView = ({
 
                       {/* Location */}
                       <div className="flex items-center gap-1.5 mt-1">
-                        {isModified ? (
-                          <ArrowRightLeft className="h-3 w-3 text-orange-500 flex-shrink-0" />
-                        ) : (
-                          <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                        )}
-                        <span className={`text-xs truncate ${isModified ? "text-orange-700 dark:text-orange-300" : "text-muted-foreground"}`}>
+                        <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs text-muted-foreground truncate">
                           {effLocation}
                         </span>
                         {isModified && effLocation !== slot.location && (
@@ -2266,29 +2244,23 @@ const CoachTrainingSlotsScreen = ({
         const cardX = dayX + 8;
         const cardW = colW - 16;
 
-        // Match coach timeline palette:
-        // cancelled > modified > published > draft > swim/default
-        let bg = s.swim ? "rgba(59,130,246,0.15)" : "rgba(251,191,36,0.15)"; // blue-500/15 | amber-400/15
-        let border = s.swim ? "rgba(96,165,250,0.40)" : "rgba(251,191,36,0.40)"; // blue-400/40 | amber-400/40
+        // Keep swim/strength base color — modified gets orange top accent only
+        let bg = s.swim ? "rgba(59,130,246,0.15)" : "rgba(251,191,36,0.15)";
+        let border = s.swim ? "rgba(96,165,250,0.40)" : "rgba(251,191,36,0.40)";
         let fg = "#0f172a";
 
         if (s.state === "published") {
-          bg = "rgba(16,185,129,0.12)"; // emerald-500/12
-          border = "rgba(16,185,129,0.30)"; // emerald-500/30
+          bg = "rgba(16,185,129,0.12)";
+          border = "rgba(16,185,129,0.30)";
           fg = "#065f46";
         } else if (s.state === "draft") {
-          bg = "rgba(245,158,11,0.12)"; // amber-500/12
-          border = "rgba(245,158,11,0.30)"; // amber-500/30
+          bg = "rgba(245,158,11,0.12)";
+          border = "rgba(245,158,11,0.30)";
           fg = "#92400e";
         }
-        if (s.isModified) {
-          bg = "rgba(249,115,22,0.12)"; // orange-500/12
-          border = "rgba(251,146,60,0.40)"; // orange-400/40
-          fg = "#9a3412";
-        }
         if (s.isCancelled) {
-          bg = "rgba(148,163,184,0.16)"; // muted-like tint
-          border = "rgba(100,116,139,0.22)"; // muted-foreground/20-ish
+          bg = "rgba(148,163,184,0.16)";
+          border = "rgba(100,116,139,0.22)";
           fg = "#64748b";
         }
 
@@ -2299,6 +2271,14 @@ const CoachTrainingSlotsScreen = ({
         ctx.roundRect(cardX, cardY, cardW, cardH, 14);
         ctx.fill();
         ctx.stroke();
+
+        // Orange top accent bar for modified slots
+        if (s.isModified && !s.isCancelled) {
+          ctx.fillStyle = "#f97316"; // orange-500
+          ctx.beginPath();
+          ctx.roundRect(cardX, cardY, cardW, 5, [14, 14, 0, 0]);
+          ctx.fill();
+        }
 
         const iconReserve = 52;
         const textMaxWidth = cardW - 30 - iconReserve;
@@ -2319,8 +2299,7 @@ const CoachTrainingSlotsScreen = ({
 
         // Session name
         if (sessionLine) {
-          const sessionColor = s.state === "published" ? "#065f46" : s.state === "draft" ? "#92400e" : fg;
-          ctx.fillStyle = s.isModified ? "#9a3412" : sessionColor;
+          ctx.fillStyle = s.state === "published" ? "#065f46" : s.state === "draft" ? "#92400e" : fg;
           ctx.font = "700 34px Inter, sans-serif";
           ctx.fillText(sessionLine, textX, textCursor);
           textCursor += 40;
@@ -2343,6 +2322,22 @@ const CoachTrainingSlotsScreen = ({
           ctx.fillStyle = "#94a3b8";
           ctx.font = "500 26px Inter, sans-serif";
           ctx.fillText(groupsLine, textX, textCursor);
+        }
+
+        // "Modifié" badge in top-right corner
+        if (s.isModified && !s.isCancelled) {
+          const badgeText = "Modifié";
+          ctx.font = "700 20px Inter, sans-serif";
+          const badgeW = ctx.measureText(badgeText).width + 16;
+          const badgeH = 28;
+          const badgeX = cardX + cardW - badgeW - 10;
+          const badgeY = cardY + 12;
+          ctx.fillStyle = "#f97316";
+          ctx.beginPath();
+          ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 6);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(badgeText, badgeX + 8, badgeY + 20);
         }
 
         const iconSize = 40;
