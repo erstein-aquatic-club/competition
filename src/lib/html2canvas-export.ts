@@ -1,85 +1,68 @@
-type ColorSnapshot = {
-  color: string;
-  backgroundColor: string;
-  backgroundImage: string;
-  borderTopColor: string;
-  borderRightColor: string;
-  borderBottomColor: string;
-  borderLeftColor: string;
-  outlineColor: string;
-  textDecorationColor: string;
-  boxShadow: string;
-  textShadow: string;
-  fill: string;
-  stroke: string;
-};
+type StyleEntry = [property: string, value: string];
+type StyleSnapshot = StyleEntry[];
 
 const CAPTURE_ATTR = "data-html2canvas-capture-id";
 
-function snapshotColors(node: HTMLElement): ColorSnapshot {
+function snapshotComputedStyle(node: HTMLElement): StyleSnapshot {
   const style = window.getComputedStyle(node);
-  return {
-    color: style.color,
-    backgroundColor: style.backgroundColor,
-    backgroundImage: style.backgroundImage,
-    borderTopColor: style.borderTopColor,
-    borderRightColor: style.borderRightColor,
-    borderBottomColor: style.borderBottomColor,
-    borderLeftColor: style.borderLeftColor,
-    outlineColor: style.outlineColor,
-    textDecorationColor: style.textDecorationColor,
-    boxShadow: style.boxShadow,
-    textShadow: style.textShadow,
-    fill: style.fill,
-    stroke: style.stroke,
-  };
+  const entries: StyleSnapshot = [];
+
+  for (let i = 0; i < style.length; i += 1) {
+    const property = style[i];
+    // Skip CSS variables to avoid re-injecting unresolved modern functions.
+    if (!property || property.startsWith("--")) continue;
+    const value = style.getPropertyValue(property);
+    if (!value) continue;
+    entries.push([property, value]);
+  }
+
+  return entries;
 }
 
-function applySnapshot(node: HTMLElement, snapshot: ColorSnapshot): void {
-  node.style.color = snapshot.color;
-  node.style.backgroundColor = snapshot.backgroundColor;
-  node.style.backgroundImage = snapshot.backgroundImage;
-  node.style.borderTopColor = snapshot.borderTopColor;
-  node.style.borderRightColor = snapshot.borderRightColor;
-  node.style.borderBottomColor = snapshot.borderBottomColor;
-  node.style.borderLeftColor = snapshot.borderLeftColor;
-  node.style.outlineColor = snapshot.outlineColor;
-  node.style.textDecorationColor = snapshot.textDecorationColor;
-  node.style.boxShadow = snapshot.boxShadow;
-  node.style.textShadow = snapshot.textShadow;
-  if (snapshot.fill && snapshot.fill !== "none") {
-    node.style.fill = snapshot.fill;
-  }
-  if (snapshot.stroke && snapshot.stroke !== "none") {
-    node.style.stroke = snapshot.stroke;
+function applyComputedStyle(node: HTMLElement, snapshot: StyleSnapshot): void {
+  for (const [property, value] of snapshot) {
+    node.style.setProperty(property, value);
   }
 }
 
 /**
- * html2canvas cannot parse some modern CSS color functions produced by Tailwind v4
- * (e.g. color-mix(... in oklab ...)).
- *
- * We snapshot resolved colors from the live DOM and apply them inline on the cloned DOM.
+ * html2canvas can fail on Tailwind v4 color functions (oklab/color-mix).
+ * To avoid parser errors, we inline fully computed styles on the cloned subtree.
  */
 export function buildHtml2CanvasOnClone(
   sourceRoot: HTMLElement,
-  options?: { showSelector?: string },
+  options?: { showSelector?: string; stripStylesheets?: boolean },
 ): { onclone: (clonedDocument: Document) => void; cleanup: () => void } {
   const captureId = `h2c-${Math.random().toString(36).slice(2)}`;
   sourceRoot.setAttribute(CAPTURE_ATTR, captureId);
 
-  const sourceNodes = [sourceRoot, ...Array.from(sourceRoot.querySelectorAll<HTMLElement>("*"))];
-  const snapshots = sourceNodes.map(snapshotColors);
+  const sourceNodes = [
+    sourceRoot,
+    ...Array.from(sourceRoot.querySelectorAll<HTMLElement>("*")),
+  ];
+  const snapshots = sourceNodes.map(snapshotComputedStyle);
   const showSelector = options?.showSelector ?? ".export-visible";
+  const stripStylesheets = options?.stripStylesheets ?? true;
 
   const onclone = (clonedDocument: Document) => {
-    const clonedRoot = clonedDocument.querySelector<HTMLElement>(`[${CAPTURE_ATTR}="${captureId}"]`);
+    const clonedRoot = clonedDocument.querySelector<HTMLElement>(
+      `[${CAPTURE_ATTR}="${captureId}"]`,
+    );
     if (!clonedRoot) return;
 
-    const clonedNodes = [clonedRoot, ...Array.from(clonedRoot.querySelectorAll<HTMLElement>("*"))];
+    if (stripStylesheets) {
+      clonedDocument
+        .querySelectorAll("style, link[rel='stylesheet']")
+        .forEach((node) => node.remove());
+    }
+
+    const clonedNodes = [
+      clonedRoot,
+      ...Array.from(clonedRoot.querySelectorAll<HTMLElement>("*")),
+    ];
     const count = Math.min(clonedNodes.length, snapshots.length);
     for (let i = 0; i < count; i += 1) {
-      applySnapshot(clonedNodes[i], snapshots[i]);
+      applyComputedStyle(clonedNodes[i], snapshots[i]);
     }
 
     if (showSelector) {
