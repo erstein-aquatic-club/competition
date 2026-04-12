@@ -18,7 +18,8 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { useLocation } from "wouter";
 import {
   Calendar,
-  Map,
+  Target,
+  CalendarRange,
   TrendingUp,
   MessageSquare,
   ChevronRight,
@@ -306,6 +307,35 @@ export default function Suivi() {
           </>
         ) : (
           <>
+            {/* ── Card: Mes objectifs ─────────────────────────── */}
+            <button
+              type="button"
+              onClick={() => navigate("/suivi/objectifs")}
+              className="w-full text-left rounded-2xl border bg-card p-4 hover:border-primary/20 transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                    <Target className="h-4 w-4" />
+                  </div>
+                  <h2 className="text-sm font-semibold">Mes objectifs</h2>
+                  {daysToComp != null && daysToComp >= 0 && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      J-{daysToComp}
+                    </span>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+              </div>
+              <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
+                {objectives.length > 0
+                  ? `${objectives.length} objectif${objectives.length > 1 ? "s" : ""}${objectivesReached > 0 ? ` · ${objectivesReached} suivi${objectivesReached > 1 ? "s" : ""}` : ""}${nextCompetition ? ` · Prochaine échéance ${new Date(nextCompetition.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}` : ""}`
+                  : nextCompetition
+                    ? `Prochaine échéance : ${nextCompetition.name} le ${new Date(nextCompetition.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`
+                    : "Définis tes objectifs et retrouve tes prochaines échéances"}
+              </p>
+            </button>
+
             {/* ── Card: Ma semaine ─────────────────────────────── */}
             <button
               type="button"
@@ -331,7 +361,7 @@ export default function Suivi() {
               )}
             </button>
 
-            {/* ── Card: Ma saison ──────────────────────────────── */}
+            {/* ── Card: Ma planification ──────────────────────── */}
             <button
               type="button"
               onClick={() => navigate("/suivi/saison")}
@@ -340,9 +370,9 @@ export default function Suivi() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
-                    <Map className="h-4 w-4" />
+                    <CalendarRange className="h-4 w-4" />
                   </div>
-                  <h2 className="text-sm font-semibold">Ma saison</h2>
+                  <h2 className="text-sm font-semibold">Ma planification</h2>
                   {daysToComp != null && daysToComp >= 0 && (
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       J-{daysToComp}
@@ -353,8 +383,8 @@ export default function Suivi() {
               </div>
               <p className="mt-1.5 pl-[46px] text-xs text-muted-foreground truncate">
                 {activeCycle && currentWeekInfo
-                  ? `${activeCycle.name} \u00b7 Sem ${currentWeekInfo.weekNum}/${currentWeekInfo.total}${currentWeekInfo.type ? ` \u00b7 ${currentWeekInfo.type}` : ""}`
-                  : "Aucun cycle en cours"}
+                  ? `${activeCycle.name} \u00b7 Sem ${currentWeekInfo.weekNum}/${currentWeekInfo.total}${currentWeekInfo.type ? ` \u00b7 ${currentWeekInfo.type}` : ""}${slotCounts.swim > 0 ? ` \u00b7 ${slotCounts.swim} créneau${slotCounts.swim > 1 ? "x" : ""} natation` : ""}`
+                  : "Natation et musculation planifiées par ton coach"}
               </p>
             </button>
 
@@ -414,4 +444,3 @@ export default function Suivi() {
     </div>
   );
 }
-

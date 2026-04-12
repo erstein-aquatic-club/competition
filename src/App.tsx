@@ -103,7 +103,8 @@ const Comite = lazyWithRetry(() => import("@/pages/Comite"));
 const Strength = lazyWithRetry(() => import("@/pages/Strength"));
 const Suivi = lazyWithRetry(() => import("@/pages/Suivi"));
 const SuiviSemaine = lazyWithRetry(() => import("@/pages/SuiviSemaine"));
-const SuiviSaison = lazyWithRetry(() => import("@/pages/SuiviSaison"));
+const SuiviPlanification = lazyWithRetry(() => import("@/pages/SuiviPlanification"));
+const SuiviObjectifs = lazyWithRetry(() => import("@/pages/SuiviObjectifs"));
 const SuiviProgression = lazyWithRetry(() => import("@/pages/SuiviProgression"));
 const SuiviEntretiens = lazyWithRetry(() => import("@/pages/SuiviEntretiens"));
 const Profile = lazyWithRetry(() => import("@/pages/Profile"));
@@ -313,7 +314,8 @@ function AppRouter() {
             <Route path="/s/:token" component={SharedSwimSession} />
             <Route path="/report/:userId/:month" component={MonthlyReport} />
             <Route path="/suivi/semaine" component={SuiviSemaine} />
-            <Route path="/suivi/saison" component={SuiviSaison} />
+            <Route path="/suivi/objectifs" component={SuiviObjectifs} />
+            <Route path="/suivi/saison" component={SuiviPlanification} />
             <Route path="/suivi/progression" component={SuiviProgression} />
             <Route path="/suivi/entretiens" component={SuiviEntretiens} />
             <Route path="/suivi" component={Suivi} />

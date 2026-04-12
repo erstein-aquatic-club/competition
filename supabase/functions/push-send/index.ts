@@ -32,7 +32,7 @@ function resolveNotificationUrl(payload: {
   const haystack = `${title} ${body}`;
 
   if (type === "interview" || haystack.includes("entretien")) {
-    return "#/suivi?tab=entretiens";
+    return "#/suivi/entretiens";
   }
 
   if (type === "assignment") {
@@ -40,7 +40,7 @@ function resolveNotificationUrl(payload: {
   }
 
   if (type === "objective" || haystack.includes("objectif")) {
-    return "#/suivi?tab=objectifs";
+    return "#/suivi/objectifs";
   }
 
   if (type === "wellness" || haystack.includes("bien-être") || haystack.includes("te sens-tu")) {

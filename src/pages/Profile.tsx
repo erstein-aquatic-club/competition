@@ -46,12 +46,12 @@ function readProfileSectionFromHash(): ProfileSection {
 
   // Redirect old sections to /suivi
   if (requested === "performance-hub" || requested === "objectives" || requested === "interviews") {
-    const tabMap: Record<string, string> = {
-      "performance-hub": "objectifs",
-      objectives: "objectifs",
-      interviews: "entretiens",
+    const routeMap: Record<string, string> = {
+      "performance-hub": "/suivi/objectifs",
+      objectives: "/suivi/objectifs",
+      interviews: "/suivi/entretiens",
     };
-    window.location.hash = `#/suivi?tab=${tabMap[requested]}`;
+    window.location.hash = `#${routeMap[requested]}`;
     return "home";
   }
 
