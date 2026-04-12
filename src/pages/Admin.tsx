@@ -78,6 +78,45 @@ export const updateUserRoleInList = (users: UserSummary[], userId: number, role:
 const parseErrorMessage = (error: unknown, fallbackMessage: string) =>
   summarizeApiError(error, fallbackMessage).message;
 
+type AdminMutationAction = "createCoach" | "updateUserRole" | "disableUser";
+type AdminMutationStatus = string;
+
+export function getAdminMutationFeedback(action: AdminMutationAction, status: AdminMutationStatus) {
+  if (status === "skipped") {
+    return {
+      shouldInvalidate: false,
+      shouldApplyOptimisticData: false,
+      title: "Action non executee",
+      description: "Cette action n'a pas ete envoyee car Supabase n'est pas disponible dans cet environnement.",
+    };
+  }
+
+  if (action === "createCoach") {
+    return {
+      shouldInvalidate: true,
+      shouldApplyOptimisticData: false,
+      title: "Coach cree",
+      description: null,
+    };
+  }
+
+  if (action === "updateUserRole") {
+    return {
+      shouldInvalidate: true,
+      shouldApplyOptimisticData: true,
+      title: "Role mis a jour",
+      description: null,
+    };
+  }
+
+  return {
+    shouldInvalidate: true,
+    shouldApplyOptimisticData: false,
+    title: "Compte desactive",
+    description: null,
+  };
+}
+
 export default function Admin() {
   const { useMemo, useState } = React;
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((state) => state.role);
@@ -124,10 +163,16 @@ export default function Admin() {
       setCreatedCoachPassword(null);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      reset();
-      setCreatedCoachPassword(data.initialPassword ?? null);
-      toast({ title: "Coach créé" });
+      const feedback = getAdminMutationFeedback("createCoach", data.status);
+      if (feedback.shouldInvalidate) {
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+        reset();
+        setCreatedCoachPassword(data.initialPassword ?? null);
+      }
+      toast({
+        title: feedback.title,
+        description: feedback.description ?? undefined,
+      });
     },
     onError: (error: unknown) => {
       toast({
@@ -139,12 +184,20 @@ export default function Admin() {
 
   const updateUserRole = useMutation({
     mutationFn: (payload: { userId: number; role: UserRole }) => api.updateUserRole(payload),
-    onSuccess: (_data, variables) => {
-      queryClient.setQueryData<UserSummary[]>(["admin-users", includeInactive], (current) =>
-        current ? updateUserRoleInList(current, variables.userId, variables.role) : current,
-      );
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Rôle mis à jour" });
+    onSuccess: (data, variables) => {
+      const feedback = getAdminMutationFeedback("updateUserRole", data.status);
+      if (feedback.shouldApplyOptimisticData) {
+        queryClient.setQueryData<UserSummary[]>(["admin-users", includeInactive], (current) =>
+          current ? updateUserRoleInList(current, variables.userId, variables.role) : current,
+        );
+      }
+      if (feedback.shouldInvalidate) {
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      }
+      toast({
+        title: feedback.title,
+        description: feedback.description ?? undefined,
+      });
     },
     onError: (error: unknown) => {
       toast({
@@ -156,9 +209,15 @@ export default function Admin() {
 
   const disableUser = useMutation({
     mutationFn: (payload: { userId: number }) => api.disableUser(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Compte désactivé" });
+    onSuccess: (data) => {
+      const feedback = getAdminMutationFeedback("disableUser", data.status);
+      if (feedback.shouldInvalidate) {
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      }
+      toast({
+        title: feedback.title,
+        description: feedback.description ?? undefined,
+      });
     },
     onError: (error: unknown) => {
       toast({

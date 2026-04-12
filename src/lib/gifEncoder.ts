@@ -1,4 +1,49 @@
-import { GIFEncoder, quantize, applyPalette } from "gifenc";
+import * as gifencModule from "gifenc";
+
+type GifencExports = {
+  GIFEncoder: () => {
+    writeFrame: (
+      index: Uint8Array,
+      width: number,
+      height: number,
+      options: { palette: number[][]; delay: number },
+    ) => void;
+    finish: () => void;
+    bytes: () => Uint8Array;
+  };
+  quantize: (data: Uint8ClampedArray, maxColors: number) => number[][];
+  applyPalette: (data: Uint8ClampedArray, palette: number[][]) => Uint8Array;
+};
+
+function resolveGifencExports(): GifencExports {
+  const moduleLike = gifencModule as unknown as {
+    default?: unknown;
+    GIFEncoder?: unknown;
+    quantize?: unknown;
+    applyPalette?: unknown;
+  };
+
+  const candidate: unknown =
+    "GIFEncoder" in moduleLike
+      ? moduleLike
+      : moduleLike.default && typeof moduleLike.default === "object"
+        ? moduleLike.default
+        : null;
+
+  if (
+    candidate &&
+    typeof candidate === "object" &&
+    "GIFEncoder" in candidate &&
+    "quantize" in candidate &&
+    "applyPalette" in candidate
+  ) {
+    return candidate as GifencExports;
+  }
+
+  throw new Error("gifenc exports are unavailable in this runtime.");
+}
+
+const { GIFEncoder, quantize, applyPalette } = resolveGifencExports();
 
 export const MAX_GIF_WIDTH = 240;
 export const MAX_DURATION_S = 5;

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Competition } from "@/lib/api";
+import type { Competition, Session } from "@/lib/api";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -80,6 +80,11 @@ type TodaySession = {
   assignmentId?: number;
 };
 
+type TodaySessionCompletionLookup = {
+  assignmentIds: Set<number>;
+  slotKeys: Set<string>;
+};
+
 // ── Assignment helpers (simplified from useDashboardState) ─────
 
 function pickAssignmentSlotKey(a: Record<string, unknown>, fallbackIdx: number): SlotKey {
@@ -123,6 +128,40 @@ function assignmentPlannedKm(a: Record<string, unknown>): number | null {
   const km = a?.km ?? a?.distance_km ?? a?.planned_km ?? null;
   if (km != null && Number.isFinite(Number(km))) return Number(km);
   return null;
+}
+
+export function buildTodaySessionCompletionLookup(
+  sessions: Session[] | null | undefined,
+  todayDate: string,
+): TodaySessionCompletionLookup {
+  const assignmentIds = new Set<number>();
+  const slotKeys = new Set<string>();
+
+  for (const session of Array.isArray(sessions) ? sessions : []) {
+    const iso = String(session?.date ?? "").slice(0, 10);
+    if (iso !== todayDate) continue;
+
+    if (typeof session.assignment_id === "number" && Number.isFinite(session.assignment_id)) {
+      assignmentIds.add(session.assignment_id);
+    }
+
+    const slot: SlotKey = session?.slot === "Soir" ? "PM" : "AM";
+    slotKeys.add(`${iso}__${slot}`);
+  }
+
+  return { assignmentIds, slotKeys };
+}
+
+export function isTodaySessionLogged(
+  session: Pick<TodaySession, "assignmentId" | "slotKey">,
+  completionLookup: TodaySessionCompletionLookup,
+  todayDate: string,
+): boolean {
+  if (typeof session.assignmentId === "number" && Number.isFinite(session.assignmentId)) {
+    return completionLookup.assignmentIds.has(session.assignmentId);
+  }
+
+  return completionLookup.slotKeys.has(`${todayDate}__${session.slotKey}`);
 }
 
 // ── Component ──────────────────────────────────────────────────
@@ -338,22 +377,13 @@ export default function SwimmerHome() {
   ]);
 
   // Check if sessions have been logged today
-  const logsBySessionKey = useMemo(() => {
-    const list = Array.isArray(sessions) ? sessions : [];
-    const map: Record<string, boolean> = {};
-    for (const s of list) {
-      const iso = String(s?.date ?? "").slice(0, 10);
-      if (iso !== todayDate) continue;
-      const slot: SlotKey = s?.slot === "Soir" ? "PM" : "AM";
-      map[`${iso}__${slot}`] = true;
-    }
-    return map;
-  }, [sessions, todayDate]);
+  const completionLookup = useMemo(
+    () => buildTodaySessionCompletionLookup(sessions, todayDate),
+    [sessions, todayDate],
+  );
 
   function isSessionLogged(session: TodaySession): boolean {
-    // Check by legacy key
-    if (logsBySessionKey[`${todayDate}__${session.slotKey}`]) return true;
-    return false;
+    return isTodaySessionLogged(session, completionLookup, todayDate);
   }
 
   // ── Section D: Next competition ──────────────────────────────
