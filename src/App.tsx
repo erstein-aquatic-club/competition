@@ -111,6 +111,7 @@ const SwimPlanningDemo = lazyWithRetry(() => import("@/pages/coach/SwimPlanningD
 const CompetitionDetail = lazyWithRetry(() => import("@/pages/CompetitionDetail"));
 const SwimNotes = lazyWithRetry(() => import("@/pages/SwimNotes"));
 const MonthlyReport = lazyWithRetry(() => import("@/pages/MonthlyReport"));
+const SwimmerHome = lazyWithRetry(() => import("@/pages/SwimmerHome"));
 const ComingSoon = lazyWithRetry(() => import("@/pages/ComingSoon"));
 const AwaitingApproval = lazyWithRetry(() => import("@/pages/AwaitingApproval"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
@@ -280,8 +281,9 @@ function AppRouter() {
         <Suspense fallback={<PageSkeleton />}>
           <Switch>
             <Route path="/reset-password" component={ResetPassword} />
-            <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <Dashboard />}</Route>
-            <Route path="/progress" component={Progress} />
+            <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <SwimmerHome />}</Route>
+            <Route path="/natation" component={Dashboard} />
+            <Route path="/progress">{() => { window.location.hash = "#/suivi?tab=progression"; return null; }}</Route>
             <Route path="/hall-of-fame" component={FEATURES.hallOfFame ? HallOfFame : ComingSoon} />
             <Route path="/competition/:id" component={CompetitionDetail} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
