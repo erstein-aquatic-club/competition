@@ -499,9 +499,9 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
             };
           }
 
-          // Fallback ONLY while resolver is actively loading (not when disabled/empty)
-          if (!resolved && isResolvingAssignments && dayAssignments.length > 0) {
-            // Lightweight fallback while resolver loads — prioritize individual over group
+          // Fallback: resolver hasn't loaded yet, OR resolver loaded but found no match
+          // for this slot — try timing-based matching from dayAssignments
+          if (dayAssignments.length > 0) {
             const slotScheduledSlot = hour < 13 ? "morning" : "evening";
             // Priority 1: individual assignment
             const fallback = dayAssignments.find(
