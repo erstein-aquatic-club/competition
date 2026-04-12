@@ -7808,3 +7808,25 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - Routes dédiées plutôt que state interne pour le deep linking et la maintenabilité
 - Timeline Saison hybride semaine/jour (dépliable) cohérente avec la planif natation existante
 - Séances manquées intercalées dans la vue Semaine pour maximiser la saisie des ressentis
+
+## §105 — 2026-04-12 — Onglet "Santé" dans Ma progression
+
+**Contexte :** La page Ma progression (`/#/progress`) n'avait que deux onglets (Natation, Musculation). Besoin d'un suivi détaillé des check-ins wellness pour que le nageur puisse visualiser l'évolution de sa forme générale au même endroit que ses statistiques sportives.
+
+**Changements :**
+- Ajout d'un 3ᵉ onglet `Santé` dans `Progress.tsx` (TabsList passe de `grid-cols-2` à `grid-cols-3`, max-w 360px)
+- Nouveau state `healthPeriodDays` (7j / 30j / 1 an, reset sur `nav:reset`)
+- Query `getWellnessRange(athleteId, from, to)` sur la période sélectionnée
+- Calcul des moyennes (readiness, sleep_quality, sleep_hours, fatigue, soreness, mood, stress) et trend vs période précédente
+- Hero KPI **Forme** (readiness /100) avec trend %
+- `AreaChart` vert de l'évolution readiness sur la période
+- `ProgressBar` pour chaque métrique (inversées pour fatigue/soreness/stress)
+- Section repliable « Détail par métrique » : 6 mini `AreaChart` (sommeil qualité/heures, humeur, fatigue, courbatures, stress) avec couleurs distinctes
+
+**Fichiers modifiés :**
+- `src/pages/Progress.tsx` — +3ᵉ onglet Santé, query wellness, data processing, render (~180 lignes ajoutées)
+
+**Décisions :**
+- Réutilisation des composants existants (`HeroKpi`, `ProgressBar`, `MetricPill`, `CollapsibleSection`, `ChartSkeleton`) pour rester cohérent avec les 2 onglets existants
+- Périodes identiques à Natation/Musculation (7/30/365) pour homogénéité
+- Tendance readiness calculée vs la même fenêtre précédente (même logique que `computeTrend` côté natation)

@@ -2,7 +2,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { Competition } from "@/lib/api/types";
+import { getWellnessRange } from "@/lib/api/wellness";
+import type { Competition, WellnessCheck } from "@/lib/api/types";
 import { computeTrainingDaysRemaining } from "@/lib/date";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -183,12 +184,14 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const [historyTo] = useState("");
   const [swimPeriodDays, setSwimPeriodDays] = useState(30);
   const [strengthPeriodDays, setStrengthPeriodDays] = useState(30);
+  const [healthPeriodDays, setHealthPeriodDays] = useState(30);
 
   // Reset view state when dock icon is tapped while already on this page
   useEffect(() => {
     const reset = () => {
       setSwimPeriodDays(30);
       setStrengthPeriodDays(30);
+      setHealthPeriodDays(30);
     };
     window.addEventListener("nav:reset", reset);
     return () => window.removeEventListener("nav:reset", reset);
@@ -298,6 +301,15 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   });
 
   const isStrengthLoading = isStrengthSummaryLoading || isStrengthAggregateLoading;
+
+  // ─── Wellness (Santé) query ───────────────────────────────────────────────
+  const healthFromISO = format(subDays(new Date(), healthPeriodDays), "yyyy-MM-dd");
+  const healthToISO = format(new Date(), "yyyy-MM-dd");
+  const { data: wellnessChecks = [], isLoading: isHealthLoading } = useQuery<WellnessCheck[]>({
+    queryKey: ["wellness_range", athleteKey, healthFromISO, healthToISO],
+    queryFn: () => getWellnessRange(athleteId!, healthFromISO, healthToISO),
+    enabled: !!athleteId,
+  });
   const strengthRunsPeriod = strengthHistorySummary?.runs ?? [];
   const exerciseSummary = strengthHistorySummary?.exercise_summary ?? [];
   const strengthAggregatePeriods = strengthAggregate?.periods ?? [];
@@ -539,14 +551,87 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
     return format(parsed, "dd/MM/yyyy");
   };
 
+  // ─── Health (Wellness) Data Processing ────────────────────────────────────
+
+  const wellnessSorted = useMemo(
+    () => [...wellnessChecks].sort((a, b) => a.date.localeCompare(b.date)),
+    [wellnessChecks],
+  );
+
+  const healthChartData = useMemo(
+    () =>
+      wellnessSorted.map((w) => ({
+        date: format(new Date(w.date + "T00:00:00"), "dd/MM"),
+        readiness: w.readiness_score,
+        sleep_quality: w.sleep_quality,
+        sleep_hours: w.sleep_hours,
+        fatigue: w.fatigue,
+        soreness: w.soreness,
+        mood: w.mood,
+        stress: w.stress,
+      })),
+    [wellnessSorted],
+  );
+
+  const healthAverages = useMemo(() => {
+    const n = wellnessSorted.length;
+    if (!n) {
+      return {
+        readiness: null,
+        sleep_quality: null,
+        sleep_hours: null,
+        fatigue: null,
+        soreness: null,
+        mood: null,
+        stress: null,
+      };
+    }
+    const sum = wellnessSorted.reduce(
+      (acc, w) => {
+        acc.readiness += w.readiness_score ?? 0;
+        acc.sleep_quality += w.sleep_quality ?? 0;
+        acc.sleep_hours += w.sleep_hours ?? 0;
+        acc.fatigue += w.fatigue ?? 0;
+        acc.soreness += w.soreness ?? 0;
+        acc.mood += w.mood ?? 0;
+        acc.stress += w.stress ?? 0;
+        return acc;
+      },
+      { readiness: 0, sleep_quality: 0, sleep_hours: 0, fatigue: 0, soreness: 0, mood: 0, stress: 0 },
+    );
+    return {
+      readiness: sum.readiness / n,
+      sleep_quality: sum.sleep_quality / n,
+      sleep_hours: sum.sleep_hours / n,
+      fatigue: sum.fatigue / n,
+      soreness: sum.soreness / n,
+      mood: sum.mood / n,
+      stress: sum.stress / n,
+    };
+  }, [wellnessSorted]);
+
+  const healthReadinessTrend = useMemo(() => {
+    if (!healthAverages.readiness || !wellnessChecks.length) return null;
+    const prevFrom = format(subDays(new Date(), healthPeriodDays * 2), "yyyy-MM-dd");
+    const prevTo = healthFromISO;
+    const prev = wellnessChecks.filter((w) => w.date >= prevFrom && w.date < prevTo);
+    if (!prev.length) return null;
+    const prevAvg = prev.reduce((acc, w) => acc + (w.readiness_score ?? 0), 0) / prev.length;
+    if (prevAvg === 0) return null;
+    return ((healthAverages.readiness - prevAvg) / prevAvg) * 100;
+  }, [healthAverages.readiness, wellnessChecks, healthPeriodDays, healthFromISO]);
+
+  const healthChecksCount = wellnessSorted.length;
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   const content = (
     <>
       <Tabs defaultValue="swim" className="w-full">
-        <TabsList className="grid w-full max-w-[280px] grid-cols-2">
+        <TabsList className="grid w-full max-w-[360px] grid-cols-3">
           <TabsTrigger value="swim">Natation</TabsTrigger>
           <TabsTrigger value="strength">Musculation</TabsTrigger>
+          <TabsTrigger value="health">Santé</TabsTrigger>
         </TabsList>
 
         {/* ── Natation ──────────────────────────────────────────────────────── */}
@@ -878,6 +963,154 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
               )}
             </div>
           </CollapsibleSection>
+        </TabsContent>
+
+        {/* ── Santé ─────────────────────────────────────────────────────────── */}
+
+        <TabsContent value="health" className="space-y-4 mt-4">
+          <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {PERIOD_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setHealthPeriodDays(option.value)}
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    healthPeriodDays === option.value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Hero KPI — Forme (readiness) */}
+          <HeroKpi
+            value={healthAverages.readiness !== null ? Math.round(healthAverages.readiness).toString() : "-"}
+            unit="/100"
+            label={`forme moyenne sur ${healthPeriodDays} jours`}
+            trend={healthReadinessTrend}
+            trendLabel="vs période préc."
+          />
+
+          {/* Mini metrics pills */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <MetricPill value={`${healthChecksCount} check-ins`} />
+            <MetricPill
+              value={
+                healthAverages.sleep_hours !== null
+                  ? `${healthAverages.sleep_hours.toFixed(1)}h sommeil`
+                  : "- sommeil"
+              }
+            />
+          </div>
+
+          {/* Courbe readiness */}
+          <motion.div variants={slideUp} initial="hidden" animate="visible">
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardContent className="p-0 h-[160px] w-full">
+                {isHealthLoading ? (
+                  <ChartSkeleton />
+                ) : healthChartData.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    Aucune donnée wellness sur la période.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={healthChartData}>
+                      <defs>
+                        <linearGradient id="readinessGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis domain={[0, 100]} fontSize={10} tickLine={false} axisLine={false} width={28} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(value: number) => [`${value}/100`, "Forme"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="readiness"
+                        stroke="hsl(142, 70%, 45%)"
+                        strokeWidth={2}
+                        fill="url(#readinessGradient)"
+                        dot={false}
+                        activeDot={{ r: 5, strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Moyennes par métrique */}
+          <motion.div className="space-y-3" variants={slideUp} initial="hidden" animate="visible">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Moyennes sur la période
+            </h3>
+            <ProgressBar label="Sommeil (qualité)" value={healthAverages.sleep_quality} max={10} />
+            <ProgressBar label="Sommeil (heures)" value={healthAverages.sleep_hours} max={12} />
+            <ProgressBar label="Humeur" value={healthAverages.mood} max={10} />
+            <ProgressBar label="Fatigue" value={healthAverages.fatigue} max={5} invert />
+            <ProgressBar label="Courbatures" value={healthAverages.soreness} max={5} invert />
+            <ProgressBar label="Stress" value={healthAverages.stress} max={5} invert />
+          </motion.div>
+
+          {/* Détails par métrique — mini charts */}
+          {healthChartData.length > 0 && (
+            <CollapsibleSection title="Détail par métrique">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {[
+                  { key: "sleep_quality", label: "Sommeil (qualité)", color: "hsl(220, 70%, 55%)", max: 10 },
+                  { key: "sleep_hours", label: "Sommeil (heures)", color: "hsl(260, 60%, 55%)", max: 12 },
+                  { key: "mood", label: "Humeur", color: "hsl(45, 90%, 55%)", max: 10 },
+                  { key: "fatigue", label: "Fatigue", color: "hsl(15, 80%, 55%)", max: 5 },
+                  { key: "soreness", label: "Courbatures", color: "hsl(0, 75%, 55%)", max: 5 },
+                  { key: "stress", label: "Stress", color: "hsl(340, 65%, 55%)", max: 5 },
+                ].map((metric) => (
+                  <div key={metric.key} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">{metric.label}</span>
+                      <span className="text-xs font-mono tabular-nums text-foreground">
+                        {(healthAverages[metric.key as keyof typeof healthAverages] ?? 0) !== null
+                          ? (healthAverages[metric.key as keyof typeof healthAverages] as number | null)?.toFixed(1)
+                          : "-"}
+                      </span>
+                    </div>
+                    <div className="h-[90px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={healthChartData}>
+                          <defs>
+                            <linearGradient id={`grad-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={metric.color} stopOpacity={0.35} />
+                              <stop offset="100%" stopColor={metric.color} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="date" fontSize={9} tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, metric.max]} hide />
+                          <Tooltip contentStyle={tooltipStyle} />
+                          <Area
+                            type="monotone"
+                            dataKey={metric.key}
+                            stroke={metric.color}
+                            strokeWidth={2}
+                            fill={`url(#grad-${metric.key})`}
+                            dot={false}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
         </TabsContent>
       </Tabs>
     </>
