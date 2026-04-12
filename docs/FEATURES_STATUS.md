@@ -363,7 +363,7 @@ Tous les feature flags sont activés.
 | RPC atomique strength session | ✅ | `00052_rpc.sql`, `strength.ts` | Transaction unique UPDATE+DELETE+INSERT (§82) |
 | Pagination listes longues | ✅ | `Admin.tsx`, `SwimCatalog.tsx`, `CoachSwimmersOverview.tsx` | "Voir plus" client-side, cap 30-50 items (§82) |
 | Coach deep linking URL | ✅ | `Coach.tsx` | URL synchro activeSection via replaceState (§82) |
-| Page Suivi standalone | ✅ | `Suivi.tsx`, `AthletePerformanceHub.tsx` | Page top-level /suivi avec 4 onglets (objectifs, entretiens, planif, ressentis) (§83) |
+| Page Suivi hub + drill-down | ✅ | `Suivi.tsx`, `SuiviSemaine.tsx`, `SuiviSaison.tsx`, `SuiviProgression.tsx` | Hub /suivi avec 3 cartes aperçu → sous-routes dédiées (semaine, saison, progression) (§103) |
 | Profil allégé | ✅ | `Profile.tsx` | Retrait sections suivi, ajout tuile Club, redirect compat (§83) |
 | Swipe calendrier | ✅ | `useSwipeNavigation.ts`, `CalendarGrid.tsx`, `Dashboard.tsx` | Navigation mois par swipe horizontal framer-motion (§83) |
 | Drag-to-dismiss drawer | ✅ | `FeedbackDrawer.tsx` | Geste drag handle pour fermer le drawer (§83) |

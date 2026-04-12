@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-12 (§102 Refonte interface nageur — Home + Dock + Suivi 3 horizons)*
+*Dernière mise à jour : 2026-04-12 (§103 Restructuration vue "Mon suivi" — hub + drill-down)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -70,6 +70,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 62 | Commentaires nageurs sur home coach + push notification | Moyenne | Moyenne | Fait (§99) |
 | 63 | Historique Chronos + Éditeur Splits | Haute | Moyenne | Fait (§98) |
 | 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Haute | Fait (§102) |
+| 67 | Restructuration vue "Mon suivi" (hub + drill-down) | Haute | Haute | Fait (§103) |
 
 ---
 

@@ -70,6 +70,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 | §9 RecordsAdmin UX: incomplete swimmer warnings | ✅ Fait | 2026-02-12 |
 | §10 Fix: extract age from competition_name, remove birthdate requirement | ✅ Fait | 2026-02-12 |
 | §102 Refonte interface nageur (Home + Dock + Suivi 3 horizons) | ✅ Fait | 2026-04-12 |
+| §103 Restructuration vue "Mon suivi" (hub + drill-down) | ✅ Fait | 2026-04-12 |
 | §11 Fix: FFN event code mapping (Bra., Pap., 4 N.) | ✅ Fait | 2026-02-12 |
 | §12 Fix: ignoreDuplicates empêche mise à jour performances + diagnostic stats | ✅ Fait | 2026-02-12 |
 | §13 Fix: pagination Supabase + normalizeEventCode robuste | ✅ Fait | 2026-02-12 |
@@ -7779,3 +7780,31 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - Tab "Semaine" = contenu identique à ex-Ressentis (sparklines wellness prévues en Phase 2)
 - Les session cards Home naviguent vers `/natation` plutôt qu'ouvrir directement le FeedbackDrawer (compromis technique)
 - Design doc : `docs/plans/2026-04-12-swimmer-home-redesign-design.md`
+
+## §103 — Restructuration vue "Mon suivi" (hub + drill-down)
+
+**Contexte :** La page Suivi utilisait un système de tabs (Semaine/Saison/Progression) insuffisant pour la richesse des données. Refonte en hub avec 3 sous-routes dédiées.
+
+**Changements :**
+- Hub `/#/suivi` avec 3 cartes d'aperçu riches (KPIs, indicateurs, compteurs)
+- Vue `/#/suivi/semaine` : timeline chronologique mixant ressentis saisis et séances manquées, signalement d'absence, intégration FeedbackDrawer
+- Vue `/#/suivi/saison` : timeline unifiée natation/muscu (cycles, semaines dépliables, compétitions, entretiens, objectifs)
+- Vue `/#/suivi/progression` : wrapper Progress existant avec header retour
+- Suppression du mode standalone dans AthletePerformanceHub (conserve le mode coach 4 onglets)
+- Mise à jour du routing (3 sous-routes) et des liens de notification
+
+**Fichiers créés :**
+- `src/pages/SuiviSemaine.tsx` (~733 lignes)
+- `src/pages/SuiviSaison.tsx` (~728 lignes)
+- `src/pages/SuiviProgression.tsx` (~50 lignes)
+
+**Fichiers modifiés :**
+- `src/pages/Suivi.tsx` — réécriture complète en hub
+- `src/components/profile/AthletePerformanceHub.tsx` — suppression mode standalone
+- `src/App.tsx` — ajout 3 sous-routes
+- `src/lib/notificationRouting.ts` — liens mis à jour
+
+**Décisions :**
+- Routes dédiées plutôt que state interne pour le deep linking et la maintenabilité
+- Timeline Saison hybride semaine/jour (dépliable) cohérente avec la planif natation existante
+- Séances manquées intercalées dans la vue Semaine pour maximiser la saisie des ressentis

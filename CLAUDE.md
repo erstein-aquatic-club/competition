@@ -101,7 +101,10 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/shared/PWAInstallGate.tsx` | Gate installation PWA mobile | ~130 lignes |
 | `src/components/shared/PushPermissionBanner.tsx` | Banner permission push post-login | ~70 lignes |
 | `public/push-handler.js` | Service Worker push event handler | ~40 lignes |
-| `src/pages/Suivi.tsx` | Page standalone suivi nageur (4 onglets via AthletePerformanceHub) | ~55 lignes |
+| `src/pages/Suivi.tsx` | Hub Mon suivi (3 cartes aperçu → drill-down) | ~310 lignes |
+| `src/pages/SuiviSemaine.tsx` | Vue semaine drill-down (ressentis + séances manquées + absences) | ~733 lignes |
+| `src/pages/SuiviSaison.tsx` | Vue saison drill-down (timeline unifiée natation/muscu) | ~728 lignes |
+| `src/pages/SuiviProgression.tsx` | Vue progression drill-down (wrapper Progress) | ~50 lignes |
 | `src/hooks/useSwipeNavigation.ts` | Hook swipe horizontal framer-motion (calendrier) | ~30 lignes |
 | `src/components/shared/PullToRefresh.tsx` | Composant pull-to-refresh générique framer-motion | ~60 lignes |
 | `src/hooks/useCoachEventsTimeline.ts` | Hook timeline échéances coach (fetch + normalisation) | ~130 lignes |
@@ -234,6 +237,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 64 | Remédiation audit (sécurité, perf, UX, robustesse) | Haute | Fait (§100) |
 | 65 | Refonte assignation avec héritage créneau perso | Haute | Fait (§101) |
 | 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Fait (§102) |
+| 67 | Restructuration vue "Mon suivi" (hub + drill-down) | Haute | Fait (§103) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
