@@ -187,12 +187,14 @@ function GroupSlotCard({
       ? muscu
         ? "border-l-amber-500"
         : "border-l-sky-500"
-      : "border-l-border";
+      : muscu
+        ? "border-l-amber-300/60"
+        : "border-l-sky-300/60";
 
   const bgClass =
     instance.state === "published"
-      ? "bg-card"
-      : "bg-card/40 border-dashed";
+      ? "bg-card shadow-sm"
+      : "bg-card/90";
 
   const clickable = !!onTap;
 
