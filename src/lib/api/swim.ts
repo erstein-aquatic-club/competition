@@ -104,7 +104,7 @@ export async function createSwimSession(session: any) {
         p_description: session.description ?? null,
         p_total_distance: session.total_distance ?? null,
         p_folder: session.folder ?? null,
-        p_items: JSON.stringify(items),
+        p_items: items,
       });
       if (error) throw new Error(error.message);
       return { status: "updated" };
@@ -116,7 +116,7 @@ export async function createSwimSession(session: any) {
       p_total_distance: session.total_distance ?? null,
       p_folder: session.folder ?? null,
       p_created_by: session.created_by ?? null,
-      p_items: JSON.stringify(items),
+      p_items: items,
     });
     if (error) throw new Error(error.message);
     return { status: "created", sessionId: data?.session_id };
