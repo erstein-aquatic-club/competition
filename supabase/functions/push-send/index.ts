@@ -61,24 +61,23 @@ Deno.serve(async (req) => {
 
   // --- Authentication gate ----------------------------------------------------
   // Two allowed callers:
-  //   1) DB webhook trigger (00044_push_webhook_trigger.sql) → shared secret header
-  //   2) Authenticated coach/admin via supabase.functions.invoke (JWT)
+  //   1) DB webhook trigger (00044_push_webhook_trigger.sql) → Bearer token
+  //      equals the project service_role key (pg_net pulls it from vault)
+  //   2) Authenticated coach/admin via supabase.functions.invoke (user JWT)
   // Anonymous callers and athletes are rejected.
-  const WEBHOOK_SECRET = Deno.env.get("PUSH_WEBHOOK_SECRET") ?? "";
-  const providedSecret = req.headers.get("x-webhook-secret") ?? "";
-  const isWebhookCall =
-    WEBHOOK_SECRET.length > 0 && providedSecret === WEBHOOK_SECRET;
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const token = authHeader.slice("bearer ".length).trim();
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const isWebhookCall = serviceRoleKey.length > 0 && token === serviceRoleKey;
 
   let isAuthorizedManualCaller = false;
   if (!isWebhookCall) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    if (!authHeader.toLowerCase().startsWith("bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const token = authHeader.slice("bearer ".length).trim();
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
