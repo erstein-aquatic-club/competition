@@ -17,17 +17,12 @@ const updateSW = registerSW({
     if (r) {
       (window as any).__pwaRegistration = r;
 
-      // Periodic update check every hour
+      // Periodic update check every hour (only) — do NOT check on visibilitychange:
+      // calling r.update() every time the app comes back from background causes
+      // the SW to activate a new version mid-session, which blanks the page on iOS PWA.
       setInterval(() => {
         r.update().catch(() => {});
       }, UPDATE_INTERVAL_MS);
-
-      // Check for updates when app regains focus (PWA returning from background)
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          r.update().catch(() => {});
-        }
-      });
     }
   },
   onNeedRefresh() {
