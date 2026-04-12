@@ -147,8 +147,14 @@ const CoachHome = ({
 
   // Build per-day info: which days have slots, which have sessions
   const weekDays = useMemo(() => {
-    // Set of day_of_week values that have at least one slot
-    const daysWithSlots = new Set(slots.map((s) => s.day_of_week));
+    const mondayIso = formatDateIso(monday);
+    const sundayIso = formatDateIso(sunday);
+    // Set of day_of_week values that have at least one slot (filter out one-off slots outside this week)
+    const weekSlots = slots.filter((s) => {
+      if (!s.scheduled_date) return true;
+      return s.scheduled_date >= mondayIso && s.scheduled_date <= sundayIso;
+    });
+    const daysWithSlots = new Set(weekSlots.map((s) => s.day_of_week));
     // Set of day_of_week values that have at least one session assignment this week
     const daysWithSessions = new Set<number>();
     for (const a of slotAssignments) {
@@ -167,8 +173,8 @@ const CoachHome = ({
       }
     }
 
-    const totalSlots = slots.length;
-    const slotsWithSession = slots.filter((s) => daysWithSessions.has(s.day_of_week)).length;
+    const totalSlots = weekSlots.length;
+    const slotsWithSession = weekSlots.filter((s) => daysWithSessions.has(s.day_of_week)).length;
     const emptySlotsCount = totalSlots - slotsWithSession;
 
     return {
@@ -178,7 +184,7 @@ const CoachHome = ({
       slotsWithSession,
       emptySlotsCount,
     };
-  }, [slots, slotAssignments]);
+  }, [slots, slotAssignments, monday, sunday]);
 
   // ── Section C: Fatigue alerts (max 3) ──────────────────────
   const topAlerts = useMemo(() => fatigueAlerts.slice(0, 3), [fatigueAlerts]);

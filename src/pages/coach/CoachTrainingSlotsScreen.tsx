@@ -59,6 +59,7 @@ import {
   Check,
   CircleDashed,
   Ban,
+  ArrowRightLeft,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -984,46 +985,64 @@ function TimelineSlotInline({
   const hasAssignment = !!instance?.assignment;
   const isDraft = instance?.state === "draft";
   const isPublished = instance?.state === "published";
+  const ov = instance?.override;
+  const isModified = ov?.status === "modified";
+  const effectiveLocation = (isModified && ov?.new_location) ? ov.new_location : slot.location;
 
   const bgClass = cancelled
     ? "bg-muted/50 border-muted-foreground/20 opacity-50 line-through"
-    : isPublished
-      ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
-      : isDraft
-        ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
-    : swim
-      ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
-      : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
-
-  const iconClass = isPublished
-    ? "text-emerald-600 dark:text-emerald-400"
-    : isDraft
-      ? "text-amber-600 dark:text-amber-400"
+    : isModified
+      ? "bg-orange-500/12 border-orange-400/40 hover:bg-orange-500/20"
+      : isPublished
+        ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
+        : isDraft
+          ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
       : swim
-        ? "text-blue-500"
-        : "text-amber-500";
+        ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
+        : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
+
+  const iconClass = isModified
+    ? "text-orange-500"
+    : isPublished
+      ? "text-emerald-600 dark:text-emerald-400"
+      : isDraft
+        ? "text-amber-600 dark:text-amber-400"
+        : swim
+          ? "text-blue-500"
+          : "text-amber-500";
+
+  const borderStyle = isOneOff ? "border-dashed " : isModified ? "border-dashed border-orange-400/60 " : "";
 
   return (
     <button
       type="button"
-      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${isOneOff ? "border-dashed " : ""}${bgClass}`}
+      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-0.5 text-left overflow-hidden cursor-pointer transition-colors ${borderStyle}${bgClass}`}
       style={{ top, height, minHeight: 24 }}
       onClick={() => onSelect(slot)}
-      title={`${isOneOff ? "[Ponctuel] " : ""}${formatTime(slot.start_time)}–${formatTime(slot.end_time)} · ${slot.location}${instance?.assignment?.session_name ? ` · ${instance.assignment.session_name}` : ""}`}
+      title={`${isOneOff ? "[Ponctuel] " : ""}${isModified ? "[Modifié] " : ""}${formatTime(slot.start_time)}–${formatTime(slot.end_time)} · ${effectiveLocation}${instance?.assignment?.session_name ? ` · ${instance.assignment.session_name}` : ""}`}
     >
       <div className={`flex flex-col gap-0.5 ${isShort ? "flex-row items-center" : ""}`}>
         <div className="flex items-start justify-between gap-1 min-w-0">
           <div className="flex items-center gap-1 min-w-0">
-            <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+            {isModified ? (
+              <ArrowRightLeft className="h-2.5 w-2.5 shrink-0 text-orange-500" />
+            ) : (
+              <MapPin className={`h-2.5 w-2.5 shrink-0 ${iconClass}`} />
+            )}
             <span className="text-[10px] font-medium text-foreground truncate">
-              {slot.location}
+              {effectiveLocation}
             </span>
             {isOneOff && (
               <span className="shrink-0 rounded bg-violet-500/15 border border-violet-500/30 px-1 text-[8px] font-bold text-violet-600 dark:text-violet-400 leading-tight">
                 1×
               </span>
             )}
-            {hasOverrides && !cancelled && (
+            {isModified && (
+              <span className="shrink-0 rounded bg-orange-500/15 border border-orange-500/30 px-1 text-[8px] font-bold text-orange-600 dark:text-orange-400 leading-tight">
+                Modifié
+              </span>
+            )}
+            {hasOverrides && !cancelled && !isModified && (
               <AlertTriangle className="h-2.5 w-2.5 text-orange-500 shrink-0" />
             )}
           </div>
@@ -1055,9 +1074,11 @@ function TimelineSlotInline({
         {!isShort && hasAssignment && (
           <span
             className={`text-[9px] truncate ${
-              isDraft
-                ? "text-amber-700 dark:text-amber-300"
-                : "text-emerald-700 dark:text-emerald-300"
+              isModified
+                ? "text-orange-700 dark:text-orange-300"
+                : isDraft
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-emerald-700 dark:text-emerald-300"
             }`}
           >
             {instance?.assignment?.session_name ?? "Séance"}
@@ -1206,13 +1227,17 @@ const MobileView = ({
               {/* Mini slot bars — proportional to time range */}
               <div className="w-full px-1 mt-1.5 h-8 relative">
                 {daySlots.map((slot) => {
-                  const startMin = timeToMinutes(slot.start_time) - stripRange.start * 60;
-                  const endMin = timeToMinutes(slot.end_time) - stripRange.start * 60;
+                  const instance = slotInstancesById.get(slot.id);
+                  const ov = instance?.override;
+                  const isMod = ov?.status === "modified";
+                  const effStart = (isMod && ov?.new_start_time) ? ov.new_start_time : slot.start_time;
+                  const effEnd = (isMod && ov?.new_end_time) ? ov.new_end_time : slot.end_time;
+                  const startMin = timeToMinutes(effStart) - stripRange.start * 60;
+                  const endMin = timeToMinutes(effEnd) - stripRange.start * 60;
                   const topPct = Math.max(0, (startMin / stripTotalMin) * 100);
                   const heightPct = Math.max(8, ((endMin - startMin) / stripTotalMin) * 100);
                   const swim = isSwimSlot(slot.location);
                   const cancelled = cancelledSlotIds.has(slot.id);
-                  const instance = slotInstancesById.get(slot.id);
                   const isPublished = instance?.state === "published";
                   const isDraft = instance?.state === "draft";
 
@@ -1222,13 +1247,15 @@ const MobileView = ({
                       className={`absolute left-1 right-1 rounded-sm ${
                         cancelled
                           ? "bg-muted-foreground/20"
-                          : isPublished
-                            ? "bg-emerald-500/50"
-                            : isDraft
-                              ? "bg-amber-500/50"
-                          : swim
-                            ? "bg-blue-500/40"
-                            : "bg-amber-400/50"
+                          : isMod
+                            ? "bg-orange-500/50"
+                            : isPublished
+                              ? "bg-emerald-500/50"
+                              : isDraft
+                                ? "bg-amber-500/50"
+                            : swim
+                              ? "bg-blue-500/40"
+                              : "bg-amber-400/50"
                       }`}
                       style={{
                         top: `${topPct}%`,
@@ -1273,13 +1300,22 @@ const MobileView = ({
               const completionState = getSlotCompletionState(instance);
               const isPublished = instance?.state === "published";
               const isDraft = instance?.state === "draft";
+              const ov = instance?.override;
+              const isModified = ov?.status === "modified";
+              const effStart = (isModified && ov?.new_start_time) ? ov.new_start_time : slot.start_time;
+              const effEnd = (isModified && ov?.new_end_time) ? ov.new_end_time : slot.end_time;
+              const effLocation = (isModified && ov?.new_location) ? ov.new_location : slot.location;
 
               return (
                 <button
                   key={slot.id}
                   type="button"
-                  className={`w-full text-left rounded-xl border bg-card transition-all active:scale-[0.98] ${
-                    cancelled ? "opacity-50 border-border" : "border-border hover:border-border/80"
+                  className={`w-full text-left rounded-xl border transition-all active:scale-[0.98] ${
+                    cancelled
+                      ? "opacity-50 border-border bg-card"
+                      : isModified
+                        ? "border-orange-400/50 bg-orange-500/5"
+                        : "border-border bg-card hover:border-border/80"
                   }`}
                   onClick={() => onSelect(slot)}
                 >
@@ -1288,9 +1324,11 @@ const MobileView = ({
                     <div className={`w-1 rounded-l-xl flex-shrink-0 ${
                       cancelled
                         ? "bg-muted-foreground/30"
-                        : swim
-                          ? "bg-blue-500"
-                          : "bg-amber-400"
+                        : isModified
+                          ? "bg-orange-500"
+                          : swim
+                            ? "bg-blue-500"
+                            : "bg-amber-400"
                     }`} />
 
                     <div className="flex-1 px-3 py-2.5 min-w-0">
@@ -1298,21 +1336,33 @@ const MobileView = ({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={`text-sm font-bold tabular-nums ${
-                            cancelled ? "line-through text-muted-foreground" : "text-foreground"
+                            cancelled ? "line-through text-muted-foreground" : isModified ? "text-orange-700 dark:text-orange-300" : "text-foreground"
                           }`}>
-                            {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
+                            {formatTime(effStart)} – {formatTime(effEnd)}
                           </span>
+                          {isModified && (effStart !== slot.start_time || effEnd !== slot.end_time) && (
+                            <span className="text-[10px] tabular-nums text-muted-foreground line-through">
+                              {formatTime(slot.start_time)}–{formatTime(slot.end_time)}
+                            </span>
+                          )}
                           <span className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md font-medium ${
-                            swim
-                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                              : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
+                            isModified
+                              ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                              : swim
+                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
                           }`}>
-                            {durationLabel(slot.start_time, slot.end_time)}
+                            {durationLabel(effStart, effEnd)}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <SlotCompletionBadge state={completionState} />
-                          {hasOverrides && !cancelled && (
+                          {isModified && (
+                            <span className="shrink-0 rounded bg-orange-500/15 border border-orange-500/30 px-1.5 py-0.5 text-[9px] font-bold text-orange-600 dark:text-orange-400 leading-tight">
+                              Modifié
+                            </span>
+                          )}
+                          {hasOverrides && !cancelled && !isModified && (
                             <AlertTriangle className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
                           )}
                         </div>
@@ -1320,10 +1370,19 @@ const MobileView = ({
 
                       {/* Location */}
                       <div className="flex items-center gap-1.5 mt-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs text-muted-foreground truncate">
-                          {slot.location}
+                        {isModified ? (
+                          <ArrowRightLeft className="h-3 w-3 text-orange-500 flex-shrink-0" />
+                        ) : (
+                          <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <span className={`text-xs truncate ${isModified ? "text-orange-700 dark:text-orange-300" : "text-muted-foreground"}`}>
+                          {effLocation}
                         </span>
+                        {isModified && effLocation !== slot.location && (
+                          <span className="text-[10px] text-muted-foreground line-through truncate">
+                            {slot.location}
+                          </span>
+                        )}
                       </div>
 
                       {instance?.assignment?.session_name && (
@@ -1654,8 +1713,14 @@ const CoachTrainingSlotsScreen = ({
     let minH = 22;
     let maxH = 6;
     weekFilteredSlots.forEach((s) => {
-      const startH = Math.floor(timeToMinutes(s.start_time) / 60);
-      const endH = Math.ceil(timeToMinutes(s.end_time) / 60);
+      // Account for override times that may shift the slot
+      const instance = slotInstancesById.get(s.id);
+      const ov = instance?.override;
+      const isMod = ov?.status === "modified";
+      const effStart = (isMod && ov?.new_start_time) ? ov.new_start_time : s.start_time;
+      const effEnd = (isMod && ov?.new_end_time) ? ov.new_end_time : s.end_time;
+      const startH = Math.floor(timeToMinutes(effStart) / 60);
+      const endH = Math.ceil(timeToMinutes(effEnd) / 60);
       if (startH < minH) minH = startH;
       if (endH > maxH) maxH = endH;
     });
@@ -1664,7 +1729,7 @@ const CoachTrainingSlotsScreen = ({
     const start = Math.max(0, minH - 1);
     const end = Math.min(24, maxH + 1);
     return { start, end, hours: end - start };
-  }, [weekFilteredSlots]);
+  }, [weekFilteredSlots, slotInstancesById]);
 
   const timelineHourLabels = useMemo(
     () => Array.from({ length: timelineRange.hours + 1 }, (_, i) => timelineRange.start + i),
@@ -2086,13 +2151,18 @@ const CoachTrainingSlotsScreen = ({
 
                     {/* Slot blocks */}
                     {daySlots.map((slot) => {
-                      const slotTop = ((timeToMinutes(slot.start_time) - timelineRange.start * 60) / 60) * dynamicPxPerHour;
-                      const slotHeight = ((timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)) / 60) * dynamicPxPerHour;
+                      const instance = slotInstancesById.get(slot.id);
+                      const ov = instance?.override;
+                      const isModified = ov?.status === "modified";
+                      const effectiveStart = (isModified && ov?.new_start_time) ? ov.new_start_time : slot.start_time;
+                      const effectiveEnd = (isModified && ov?.new_end_time) ? ov.new_end_time : slot.end_time;
+                      const slotTop = ((timeToMinutes(effectiveStart) - timelineRange.start * 60) / 60) * dynamicPxPerHour;
+                      const slotHeight = ((timeToMinutes(effectiveEnd) - timeToMinutes(effectiveStart)) / 60) * dynamicPxPerHour;
                       return (
                         <TimelineSlotInline
                           key={slot.id}
                           slot={slot}
-                          instance={slotInstancesById.get(slot.id)}
+                          instance={instance}
                           hasOverrides={(overridesBySlot.get(slot.id) ?? []).length > 0}
                           cancelled={cancelledSlotIds.has(slot.id)}
                           onSelect={handleSelect}

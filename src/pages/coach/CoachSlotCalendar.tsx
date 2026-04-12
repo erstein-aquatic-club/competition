@@ -1,8 +1,8 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Plus, Calendar, BookOpen, MapPin, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar, BookOpen, MapPin, Clock, Share2, Loader2 } from "lucide-react";
 import { useSlotCalendar, type SlotInstance, type SlotState } from "@/hooks/useSlotCalendar";
 import SlotSessionSheet from "./SlotSessionSheet";
 import { SlotTemplatePicker } from "./SlotTemplatePicker";
@@ -350,6 +350,69 @@ export default function CoachSlotCalendar({
     [mondayIso, sundayIso],
   );
 
+  // ── Export image ───────────────────────────────────────
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportImage = useCallback(async () => {
+    const el = contentRef.current;
+    if (!el || exporting) return;
+    setExporting(true);
+    try {
+      // Show the export-only header during capture
+      const exportHeader = el.querySelector(".export-visible") as HTMLElement | null;
+      if (exportHeader) exportHeader.style.display = "block";
+
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(el, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      // Hide it again
+      if (exportHeader) exportHeader.style.display = "";
+
+      const fileName = `semaine-${mondayIso}.png`;
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast({ title: "Erreur", description: "Impossible de générer l'image", variant: "destructive" });
+          setExporting(false);
+          return;
+        }
+
+        // Try Web Share API first (mobile)
+        if (navigator.share && navigator.canShare) {
+          const file = new File([blob], fileName, { type: "image/png" });
+          const shareData = { files: [file] };
+          try {
+            if (navigator.canShare(shareData)) {
+              await navigator.share(shareData);
+              setExporting(false);
+              return;
+            }
+          } catch {
+            // User cancelled or share failed — fall through to download
+          }
+        }
+
+        // Fallback: download PNG
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        setExporting(false);
+      }, "image/png");
+    } catch (err) {
+      toast({ title: "Erreur export", description: String(err), variant: "destructive" });
+      setExporting(false);
+    }
+  }, [exporting, mondayIso, toast]);
+
   return (
     <>
     <div className="space-y-0 pb-24">
@@ -367,10 +430,21 @@ export default function CoachSlotCalendar({
           >
             Séances
           </h1>
-          <Button variant="ghost" size="sm" className="-mr-2 text-primary" onClick={onOpenLibrary}>
-            <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-            Bibliothèque
-          </Button>
+          <div className="flex items-center gap-1 -mr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground"
+              onClick={handleExportImage}
+              disabled={exporting || isLoading}
+            >
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={onOpenLibrary}>
+              <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+              Bibliothèque
+            </Button>
+          </div>
         </div>
 
         {/* Week navigation */}
@@ -410,8 +484,18 @@ export default function CoachSlotCalendar({
         </div>
       </div>
 
-      {/* ── Day sections ── */}
-      <div className="space-y-5 pt-4">
+      {/* ── Day sections (capturable area) ── */}
+      <div ref={contentRef} className="space-y-5 pt-4">
+        {/* Export-only header — hidden on screen, visible in capture */}
+        <div className="hidden export-visible px-1 pb-2">
+          <p
+            className="text-base font-bold capitalize"
+            style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}
+          >
+            Séances — {weekLabel}
+          </p>
+        </div>
+
         {isLoading ? (
           <>
             <DaySkeleton />
