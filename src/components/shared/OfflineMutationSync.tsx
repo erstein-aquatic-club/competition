@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
-import { getQueue, removeQueueItem, type QueuedMutation } from "@/lib/offlineQueue";
+import { getQueue, markRetry, removeQueueItem, type QueuedMutation } from "@/lib/offlineQueue";
 import { supabase } from "@/lib/supabase";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useAuth } from "@/lib/auth";
@@ -101,19 +101,35 @@ export function OfflineMutationSync() {
     const syncQueuedMutations = async () => {
       isSyncingRef.current = true;
       let syncedCount = 0;
+      let poisonedCount = 0;
+      let lastError: unknown = null;
 
       try {
+        // Per-item try/catch: a failing mutation must not block the rest
+        // of the queue. After MAX_RETRY_ATTEMPTS consecutive failures
+        // markRetry() drops the item as "poisoned" so the queue drains.
         for (const mutation of queue) {
           if (cancelled) break;
 
           if (!isQueuedStrengthCompletion(mutation)) {
             console.warn("[offline-sync] Unsupported queued mutation:", mutation.type);
+            removeQueueItem(mutation.id);
             continue;
           }
 
-          await replayStrengthCompletion(mutation.payload);
-          removeQueueItem(mutation.id);
-          syncedCount += 1;
+          try {
+            await replayStrengthCompletion(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+          } catch (itemError) {
+            lastError = itemError;
+            console.error(
+              `[offline-sync] Replay failed for ${mutation.id} (${mutation.type}):`,
+              itemError,
+            );
+            const dropped = markRetry(mutation.id);
+            if (dropped) poisonedCount += 1;
+          }
         }
 
         if (!cancelled && syncedCount > 0) {
@@ -127,13 +143,18 @@ export function OfflineMutationSync() {
             description: `${syncedCount} séance(s) hors ligne ont été enregistrée(s).`,
           });
         }
-      } catch (error) {
-        console.error("[offline-sync] Replay failed:", error);
-        if (!cancelled) {
+
+        if (!cancelled && poisonedCount > 0) {
+          toast({
+            title: "Synchronisation partielle",
+            description: `${poisonedCount} séance(s) n'ont pas pu être synchronisées après plusieurs tentatives et ont été abandonnées.`,
+            variant: "destructive",
+          });
+        } else if (!cancelled && lastError && syncedCount === 0) {
           toast({
             title: "Synchronisation en attente",
-            description: error instanceof Error
-              ? error.message
+            description: lastError instanceof Error
+              ? lastError.message
               : "Impossible de synchroniser les données hors ligne pour le moment.",
             variant: "destructive",
           });
