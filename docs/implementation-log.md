@@ -7996,3 +7996,97 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 **Décisions :**
 - Fix ciblé et non intrusif : le mode overlay (non-embedded) conserve exactement son layout existant — seul le mode embedded bascule en flow naturel
 - Ajout d'un commentaire explicatif pour éviter la régression (future réintroduction de `h-full`)
+
+
+## §110 — 2026-04-13 — Audit sécurité & robustesse (Sprint post-audit)
+
+**Contexte :** Audit transversal backend/frontend pour identifier failles RLS, bugs métier critiques et frictions UX bloquantes. 4 agents Explore dispatchés en parallèle (créneaux coach, musculation nageur, RLS/Edge Functions, UX transversal). L'audit a produit ~50 findings dont **la moitié étaient des faux positifs** — chaque claim a été vérifié en lisant le code source et la DB réelle avant d'être traité. Tout exécuté en solo + Agent Team sur la branche `sprint1-security-fixes` puis mergé fast-forward sur main.
+
+**Changements réalisés (9 commits) :**
+
+### Sécurité RLS & Edge Function (Sprint 1)
+- **Migration 00102** (`supabase/migrations/00102_sprint1_security_fixes.sql`) :
+  - `admin_audit_log` INSERT restreint à `app_user_role() = 'admin'` (était `WITH CHECK (true)` → log falsifiable)
+  - `training_slots` + `training_slot_assignments` + `training_slot_overrides` UPDATE/DELETE exigent `created_by = app_user_id()` (sinon admin) pour empêcher un coach de muter les créneaux d'un autre
+  - Backfill `training_slots.created_by` sur 3 slots orphelins → admin (id 1)
+  - `avatars` storage bucket : ownership via `split_part(name,'.',1) = app_user_id()::text` (convention path flat `<userId>.<ext>` découverte en lisant `uploadAvatar`)
+  - `exercise-gifs` storage bucket : mutations restreintes à `coach`/`admin` (path `exercises/<ts>-<rand>.<ext>` sans scoping user)
+- **`src/lib/api/training-slots.ts`** : `createTrainingSlot()` envoie désormais `created_by` depuis `session.user.app_metadata.app_user_id` pour satisfaire la nouvelle policy
+- **Edge Function `push-send` v33** (`supabase/functions/push-send/index.ts`) : garde d'authentification à 2 chemins
+  - Webhook DB : détecté via `token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` (le trigger 00044 envoie déjà la clé via `pg_net`, aucun nouveau secret nécessaire)
+  - Manuel : JWT Bearer → `auth.getUser()` + rôle `coach`/`admin` (fallback query `users.role` si `app_metadata.app_user_role` absent)
+  - Anonyme/athlete → 401/403
+  - Pivot en cours de route : le plan initial prévoyait un secret partagé `x-webhook-secret` via `ALTER DATABASE postgres SET app.push_webhook_secret`, mais le rôle MCP n'a pas la permission `ALTER DATABASE`. Détection service_role bien plus simple, zéro config dashboard.
+- **Migration 00104** (`00104_fix_interview_notification_url.sql`) : corrige les triggers `auto_notify_interview_created` + `auto_notify_interview_transition` qui stockaient `metadata.url = "/suivi?tab=entretiens"` (ancien hub à query param) → `/suivi/entretiens` (route drill-down depuis §67). Backfill de la notif id 374 existante. Lien corrigé aussi dans `SuiviSaison.tsx` (bouton "Ajouter objectif")
+
+### Musculation nageur (Sprint 2)
+- **`src/hooks/useStrengthState.ts`** : `shouldPersist` inclut désormais `activeRunId !== null` en plus de `screenMode === focus|reader`. Avant, sortir du mode focus vers "list" effaçait immédiatement `focusStorageKey` → un refresh PWA après exit perdait tous les logs accumulés. Maintenant la clé est préservée tant qu'une séance est active.
+- **`src/pages/Strength.tsx onFinish`** : guard toast destructif "Aucune série enregistrée" si `activeRunLogs.length === 0`, annule le finish. Empêche les séances fantômes qui polluaient l'historique (tonnage 0, sRPE non calculable).
+- **`src/components/strength/WorkoutRunner.tsx applyDraftValue`** : bornes silencieuses weight ∈ [0, 1000] kg et reps ∈ [1, 200] pour rejeter les overflows de frappe (le keypad empêche déjà les doubles décimaux et caractères non numériques).
+- **Migration 00106** (`00106_strength_set_logs_check_bounds.sql`) : CHECK constraints défensives sur `strength_set_logs.difficulty BETWEEN 1 AND 5` et `strength_set_logs.rpe BETWEEN 1 AND 10`. UI déjà bornée via `ScaleSelector5`, mais une écriture directe via API aurait pu insérer des valeurs aberrantes. 0 violations existantes.
+- **`src/lib/api/client.ts estimateOneRm`** : commentaire explicite "Epley formula: 1RM = weight × (1 + reps/30)" avec avertissement "cached in one_rm_records, changing invalidates history".
+
+### Créneaux (Sprint 3)
+- **Migration 00105** (`00105_validate_visible_from_check.sql`) : `VALIDATE CONSTRAINT chk_visible_from_before_date` sur `session_assignments` (constraint créée `NOT VALID` dans 00088, donc inactive). 0 violations existantes, activée en place.
+- **`src/lib/api/assignments.ts bulkCreateSlotAssignments`** : intercepte l'erreur `23505` (unique violation sur `idx_sa_unique_slot_group_v2`) et affiche "Ces groupes ont déjà des assignations sur ce créneau" au lieu du message postgres brut. Couvre la race condition entre la pre-check et l'insert concurrent — l'enforcer reste l'index unique partiel côté DB.
+
+### UX quick wins (Sprint 4)
+- **`src/components/shared/OfflineSyncBanner.tsx`** : typo "retablie" → "rétablie"
+- **`src/pages/Records.tsx`** : suppression de `console.log("[EAC] obj debug: ...")` qui leakait les objectifs/événements en DevTools
+- **`src/components/shared/InstallPrompt.tsx`** : suppression des `console.log` prompt install (bruit pur, aucune valeur debug)
+
+**Fichiers modifiés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00102_sprint1_security_fixes.sql` | Nouveau (197 l) — RLS audit log, training_slots, storage |
+| `supabase/migrations/00104_fix_interview_notification_url.sql` | Nouveau — triggers notif + backfill |
+| `supabase/migrations/00105_validate_visible_from_check.sql` | Nouveau — VALIDATE constraint |
+| `supabase/migrations/00106_strength_set_logs_check_bounds.sql` | Nouveau — CHECK bornes RPE/difficulty |
+| `supabase/functions/push-send/index.ts` | Garde authentification webhook + JWT |
+| `supabase/functions/_shared/cors.ts` | Retour à la config CORS minimale |
+| `src/lib/api/training-slots.ts` | `created_by` à l'insert |
+| `src/lib/api/assignments.ts` | Gestion erreur 23505 sur bulk create |
+| `src/lib/api/client.ts` | Commentaire Epley |
+| `src/hooks/useStrengthState.ts` | Persist tant que run actif |
+| `src/pages/Strength.tsx` | Guard séance vide |
+| `src/components/strength/WorkoutRunner.tsx` | Bornes weight/reps |
+| `src/pages/SuiviSaison.tsx` | Navigate `/suivi/objectifs` |
+| `src/components/shared/OfflineSyncBanner.tsx` | Typo |
+| `src/pages/Records.tsx` | Cleanup console.log |
+| `src/components/shared/InstallPrompt.tsx` | Cleanup console.log |
+| `docs/plans/2026-04-12-sprint1-security-fixes.md` | Plan source |
+
+**Tests :**
+- `npx tsc --noEmit` propre (hors erreurs pré-existantes stories/TimesheetHelpers)
+- Vérification policies via `pg_policies` : 1 audit, 6 training_slots, 3 avatars, 3 exercise_gifs — tous `qual`/`with_check` conformes
+- `get_advisors` security : seul warning pré-existant (leaked password protection) — non lié
+- `push-send` v33 déployée ACTIVE via MCP (verify_jwt=true)
+- Vérifié manuellement : la FK `strength_session_runs.assignment_id → session_assignments(id) ON DELETE SET NULL` garantit déjà qu'une assignment supprimée mid-séance ne casse pas le save du run (M4 faux positif)
+- Vérifié : C6 `chk_visible_from_before_date` avait 0 violations avant activation
+- Vérifié : 0 sessions avec `rpe`/`difficulty` hors bornes avant ajout CHECK
+
+**Décisions prises :**
+- **Pivot push-send** : abandon du secret partagé `x-webhook-secret` au profit de la détection service_role JWT après que MCP ait refusé `ALTER DATABASE SET`. Plus simple, plus sécurisé (le trigger utilise déjà la clé service_role via vault), zéro config dashboard requise.
+- **Soft-delete assignments (M4)** : abandonné après vérification. La FK `ON DELETE SET NULL` existante couvre déjà le cas — ajouter soft-delete aurait introduit de la dette (filtrer `.neq("status","cancelled")` partout, risque d'oublis) pour zéro gain fonctionnel.
+- **Timezone DST (C3)** : laissé en backlog. Impact réel de 2 jours par an (26 octobre 2026 et mars 2027), coût refactor élevé (adoption `date-fns-tz`, refonte de tous les helpers date). Monitoring passif recommandé.
+- **Formule 1RM** : Epley fixe, pas de choix utilisateur. Changer invaliderait la cache `one_rm_records` et casserait l'historique.
+- **Guard séance vide** : côté UI uniquement, pas côté RPC. Le path online utilise `updateStrengthRun` qui ne touche pas aux logs (sync incrémentale via `logStrengthSet`) — le serveur n'a rien à valider.
+- **Execution model** : mix solo + Agent Team. Team `sprint1-security` avec 2 teammates (sql-engineer + push-engineer) pour Sprint 1 (domaines indépendants). Les 8 autres commits en solo direct car plus rapide.
+- **Faux positifs audit** : ~50% taux de FP. Leçon : toute finding d'agent Explore doit être vérifiée en relisant le code et la DB avant d'être traitée. Documenté dans le bilan pour les futurs audits.
+
+**Limites / dette :**
+- M4 (lien assignment préservé mid-session) : la FK `ON DELETE SET NULL` dégrade silencieusement le run en orphelin. Un soft-delete préserverait le lien historique, mais le coût/bénéfice est défavorable.
+- C3 DST : le bug théorique reste. Surveiller visuellement les 2 dates de changement d'heure.
+- Notifications push en prod : déploiement de `push-send` v33 + migration 00102/00104 faits ensemble via MCP. Aucun rollback automatique prévu — si un flux casse, diagnostiquer et repatcher en urgence.
+- Le `x-webhook-secret` dans `_shared/cors.ts` a été ajouté puis retiré dans la même session (pivot). Historique git montre le churn.
+
+**Commits (fast-forward sur main) :**
+- `03545902` fix(rls): sprint1 security lock-down (audit log, slots, storage)
+- `463a1291` fix(edge): authenticate push-send callers (webhook secret + JWT role) [superseded]
+- `a9099e4b` fix(edge): simplify push-send auth — detect service_role via Bearer token
+- `35bf5f94` fix(notifications): corrige les liens entretien et objectifs vers les routes drill-down
+- `d2ac0e40` fix(strength): prévient les pertes de logs et les séances vides
+- `539ef042` chore: quick UX fixes (typo + console.log cleanup)
+- `f003965c` fix(slots): valide la contrainte visible_from + message clair sur doublons
+- `fe9cb328` fix(strength): bornes charge/reps + CHECK constraints RPE/difficulty
