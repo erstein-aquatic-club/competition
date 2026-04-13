@@ -7938,3 +7938,24 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - Conserver l'accordion "Détails techniques" existant (pas de changement d'IA/UX structurelle)
 - Icônes colorées pour réutiliser la sémantique de couleur déjà établie par filière, plutôt que des couleurs neutres
 - Ordre priorisant ce que le nageur regarde en premier (durée/intensité/récup)
+
+## §107 — 2026-04-13 — Jauges comparatives de filières (Ma planification nageur)
+
+**Contexte :** §106 ajoutait des icônes par métrique mais chaque filière restait décrite en texte brut. Le nageur ne pouvait pas comparer instantanément "Entretien aérobie" vs "Puissance anaérobie lactique" — il fallait lire les valeurs. Besoin d'une signature visuelle immédiate par filière, dans l'esprit "radar / barres signal".
+
+**Changements :**
+- `FiliereLevels` (1-5) ajouté à `swimFilieres.ts` avec 4 axes normalisés : `intensity`, `duration` (effort), `recovery`, `lactate`. `null` pour Technique (= "variable")
+- Niveaux calibrés pour chaque filière (ex. Entretien aéro = intensité 2 / durée 5 / récup 1 / lactates 1 ; Puiss ana lact = 5 / 2 / 5 / 5)
+- `FILIERE_STYLES` enrichi de `fill` (bg solide filière) et `track` (bg translucide 15%)
+- Nouveau composant interne `FiliereGauge` : 5 pills horizontales segmentées, avec animation staggered à l'ouverture du sheet
+- Bloc "Profil comparatif" inséré en haut du sheet de détail filière (juste sous le titre, avant description), 4 lignes `icône + label + jauge + tag (léger/moyen/maximal)`
+
+**Fichiers modifiés :**
+- `src/lib/swimFilieres.ts` — interface `FiliereLevels`, `levels` sur chaque filière, `fill`/`track` dans `FILIERE_STYLES`
+- `src/pages/coach/SwimPlanningAthleteView.tsx` — `GAUGE_METRICS`, `FiliereGauge`, bloc de profil comparatif
+
+**Décisions :**
+- Jauges à 5 segments (et non gauge continue) pour la lisibilité "coup d'œil" et la cohérence avec d'autres indicateurs de forme (wellness)
+- Réutilisation de la couleur de la filière pour les segments remplis → la signature chromatique de la filière se retrouve dans son profil (puissant effet mémoire)
+- Tag textuel contextualisé par métrique (ex. intensité "léger/maximal", durée "court/long") plutôt qu'un score numérique — plus parlant pour l'athlète
+- Technique conserve ses pills en mode "track only" + tag "variable" pour rester cohérent sans mentir sur des valeurs inexistantes

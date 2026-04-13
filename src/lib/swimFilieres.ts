@@ -10,12 +10,28 @@ export interface FiliereTechnicals {
   workType: string;
 }
 
+/**
+ * Normalized levels (1-5) used to render comparative gauges across filières.
+ * `null` means "variable" (e.g. Technique) and should render as "—".
+ *   intensity : effort global (1 = très léger, 5 = maximal)
+ *   duration  : durée d'un effort continu (1 = très court, 5 = très long)
+ *   recovery  : temps de récupération entre répétitions (1 = minimal, 5 = complet)
+ *   lactate   : production d'acide lactique (1 = aucune, 5 = maximale)
+ */
+export interface FiliereLevels {
+  intensity: number | null;
+  duration: number | null;
+  recovery: number | null;
+  lactate: number | null;
+}
+
 export interface Filiere {
   id: string;
   name: string;
   short: string;
   color: string;
   technicals: FiliereTechnicals;
+  levels: FiliereLevels;
 }
 
 export const FILIERES: Filiere[] = [
@@ -35,6 +51,7 @@ export const FILIERES: Filiere[] = [
       recovery: "10-30s passive",
       workType: "Continu, échauffement, technique, récupération",
     },
+    levels: { intensity: 2, duration: 5, recovery: 1, lactate: 1 },
   },
   {
     id: "capacite-aerobie",
@@ -52,6 +69,7 @@ export const FILIERES: Filiere[] = [
       recovery: "10s passive / sans",
       workType: "Distances continues, fartleck, interval training lent",
     },
+    levels: { intensity: 2, duration: 5, recovery: 1, lactate: 2 },
   },
   {
     id: "puissance-aerobie",
@@ -69,6 +87,7 @@ export const FILIERES: Filiere[] = [
       recovery: "10-30s passive / sans",
       workType: "Distances continues, interval training rapide, intermittent",
     },
+    levels: { intensity: 3, duration: 4, recovery: 2, lactate: 3 },
   },
   {
     id: "capacite-anaerobie-lact",
@@ -86,6 +105,7 @@ export const FILIERES: Filiere[] = [
       recovery: "10s+2mn / 3mn",
       workType: "Fractionné (passive et/ou active)",
     },
+    levels: { intensity: 4, duration: 3, recovery: 3, lactate: 4 },
   },
   {
     id: "puissance-anaerobie-lact",
@@ -103,6 +123,7 @@ export const FILIERES: Filiere[] = [
       recovery: "Complète (5-10mn)",
       workType: "Fractionné, simulateurs, épreuves 50-100 (active entre répét.)",
     },
+    levels: { intensity: 5, duration: 2, recovery: 5, lactate: 5 },
   },
   {
     id: "capacite-anaerobie-alact",
@@ -120,6 +141,7 @@ export const FILIERES: Filiere[] = [
       recovery: "1mn",
       workType: "Séries répétées (passive)",
     },
+    levels: { intensity: 4, duration: 1, recovery: 2, lactate: 1 },
   },
   {
     id: "puissance-anaerobie-alact",
@@ -137,6 +159,7 @@ export const FILIERES: Filiere[] = [
       recovery: "2min30",
       workType: "Sprints départ, reprises de nages, virages (passive ou active)",
     },
+    levels: { intensity: 5, duration: 1, recovery: 4, lactate: 1 },
   },
   {
     id: "technique",
@@ -154,18 +177,22 @@ export const FILIERES: Filiere[] = [
       recovery: "Variable",
       workType: "Éducatifs, drills, coordination, coulées",
     },
+    levels: { intensity: null, duration: null, recovery: null, lactate: null },
   },
 ] as const;
 
 export const FILIERE_MAP = new Map(FILIERES.map((f) => [f.id, f]));
 
-export const FILIERE_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  sky:     { bg: "bg-sky-100 dark:bg-sky-900/30",         text: "text-sky-700 dark:text-sky-300",         dot: "bg-sky-500" },
-  emerald: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
-  orange:  { bg: "bg-orange-100 dark:bg-orange-900/30",   text: "text-orange-700 dark:text-orange-300",   dot: "bg-orange-500" },
-  red:     { bg: "bg-red-100 dark:bg-red-900/30",         text: "text-red-700 dark:text-red-300",         dot: "bg-red-500" },
-  violet:  { bg: "bg-violet-100 dark:bg-violet-900/30",   text: "text-violet-700 dark:text-violet-300",   dot: "bg-violet-500" },
-  slate:   { bg: "bg-slate-200 dark:bg-slate-800/50",     text: "text-slate-700 dark:text-slate-300",     dot: "bg-slate-500" },
-  zinc:    { bg: "bg-zinc-200 dark:bg-zinc-800/50",       text: "text-zinc-700 dark:text-zinc-300",       dot: "bg-zinc-500" },
-  cyan:    { bg: "bg-cyan-100 dark:bg-cyan-900/30",       text: "text-cyan-700 dark:text-cyan-300",       dot: "bg-cyan-500" },
+export const FILIERE_STYLES: Record<
+  string,
+  { bg: string; text: string; dot: string; fill: string; track: string }
+> = {
+  sky:     { bg: "bg-sky-100 dark:bg-sky-900/30",         text: "text-sky-700 dark:text-sky-300",         dot: "bg-sky-500",     fill: "bg-sky-500",     track: "bg-sky-500/15" },
+  emerald: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", fill: "bg-emerald-500", track: "bg-emerald-500/15" },
+  orange:  { bg: "bg-orange-100 dark:bg-orange-900/30",   text: "text-orange-700 dark:text-orange-300",   dot: "bg-orange-500",  fill: "bg-orange-500",  track: "bg-orange-500/15" },
+  red:     { bg: "bg-red-100 dark:bg-red-900/30",         text: "text-red-700 dark:text-red-300",         dot: "bg-red-500",     fill: "bg-red-500",     track: "bg-red-500/15" },
+  violet:  { bg: "bg-violet-100 dark:bg-violet-900/30",   text: "text-violet-700 dark:text-violet-300",   dot: "bg-violet-500",  fill: "bg-violet-500",  track: "bg-violet-500/15" },
+  slate:   { bg: "bg-slate-200 dark:bg-slate-800/50",     text: "text-slate-700 dark:text-slate-300",     dot: "bg-slate-500",   fill: "bg-slate-500",   track: "bg-slate-500/15" },
+  zinc:    { bg: "bg-zinc-200 dark:bg-zinc-800/50",       text: "text-zinc-700 dark:text-zinc-300",       dot: "bg-zinc-500",    fill: "bg-zinc-500",    track: "bg-zinc-500/15" },
+  cyan:    { bg: "bg-cyan-100 dark:bg-cyan-900/30",       text: "text-cyan-700 dark:text-cyan-300",       dot: "bg-cyan-500",    fill: "bg-cyan-500",    track: "bg-cyan-500/15" },
 };

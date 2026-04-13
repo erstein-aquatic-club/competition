@@ -9,7 +9,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SwimPlanningSlot, SwimFiliere, Competition } from "@/lib/api/types";
-import { FILIERES, FILIERE_MAP, FILIERE_STYLES, type FiliereTechnicals } from "@/lib/swimFilieres";
+import {
+  FILIERES,
+  FILIERE_MAP,
+  FILIERE_STYLES,
+  type FiliereTechnicals,
+  type FiliereLevels,
+} from "@/lib/swimFilieres";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +131,64 @@ const TECHNICAL_LABELS: {
   { key: "lactate", label: "Lactates", unit: "mmol/L", icon: FlaskConical },
   { key: "workType", label: "Type de travail", unit: "", icon: Activity, full: true },
 ];
+
+const GAUGE_METRICS: {
+  key: keyof FiliereLevels;
+  label: string;
+  icon: LucideIcon;
+  scale: [string, string];
+}[] = [
+  { key: "intensity", label: "Intensité",    icon: Zap,          scale: ["léger",  "maximal"] },
+  { key: "duration",  label: "Durée effort", icon: Timer,        scale: ["court",  "long"] },
+  { key: "recovery",  label: "Récup.",       icon: Hourglass,    scale: ["aucune", "complète"] },
+  { key: "lactate",   label: "Lactates",     icon: FlaskConical, scale: ["aucun",  "max"] },
+];
+
+/**
+ * Segmented gauge — 5 pills.  Filled pills use the filière's solid color,
+ * empty pills use the filière's translucent track color. Variable (Technique)
+ * renders an em dash.
+ */
+function FiliereGauge({
+  value,
+  fillClass,
+  trackClass,
+}: {
+  value: number | null;
+  fillClass: string;
+  trackClass: string;
+}) {
+  if (value == null) {
+    return (
+      <div className="flex items-center gap-1" aria-label="variable">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <span key={i} className={cn("h-1.5 flex-1 rounded-full", trackClass)} />
+        ))}
+      </div>
+    );
+  }
+  const clamped = Math.max(0, Math.min(5, value));
+  return (
+    <div className="flex items-center gap-1" role="meter" aria-valuenow={clamped} aria-valuemin={1} aria-valuemax={5}>
+      {Array.from({ length: 5 }).map((_, i) => {
+        const filled = i < clamped;
+        return (
+          <motion.span
+            key={i}
+            initial={{ scaleX: 0, opacity: 0 }}
+            animate={{ scaleX: 1, opacity: 1 }}
+            transition={{ delay: 0.05 * i, duration: 0.25, ease: "easeOut" }}
+            style={{ transformOrigin: "left center" }}
+            className={cn(
+              "h-1.5 flex-1 rounded-full",
+              filled ? fillClass : trackClass,
+            )}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Main Component
@@ -569,6 +633,41 @@ export default function SwimPlanningAthleteView({
                 {selectedFiliere?.hasSession && (
                   <Link2 className="h-3.5 w-3.5 text-muted-foreground/50 ml-auto" />
                 )}
+              </div>
+
+              {/* Comparative gauges — quick visual profile */}
+              <div
+                className={cn(
+                  "rounded-2xl border border-border/40 p-3.5 space-y-2.5",
+                  "bg-gradient-to-br from-muted/40 to-muted/10",
+                )}
+              >
+                {GAUGE_METRICS.map(({ key, label, icon: Icon, scale }) => {
+                  const value = selectedFiliereData.levels[key];
+                  return (
+                    <div key={key} className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                      <div className="flex items-center gap-1.5 min-w-[92px]">
+                        <Icon className={cn("h-3.5 w-3.5", selectedStyle.text)} strokeWidth={2.5} />
+                        <span className="text-[11px] font-semibold text-foreground/85 tracking-tight">
+                          {label}
+                        </span>
+                      </div>
+                      <FiliereGauge
+                        value={value}
+                        fillClass={selectedStyle.fill}
+                        trackClass={selectedStyle.track}
+                      />
+                      <span
+                        className={cn(
+                          "text-[9px] font-medium uppercase tracking-wider tabular-nums min-w-[54px] text-right",
+                          value == null ? "text-muted-foreground/40 italic" : "text-muted-foreground/60",
+                        )}
+                      >
+                        {value == null ? "variable" : value >= 4 ? scale[1] : value <= 2 ? scale[0] : "moyen"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Description */}
