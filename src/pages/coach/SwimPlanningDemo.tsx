@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-import type { SwimPlanningSlot, SwimPlanningSlotInput, GroupSummary, SwimSessionTemplate, SwimFiliere } from "@/lib/api/types";
+import type { SwimPlanningSlot, SwimPlanningSlotInput, GroupSummary, SwimSessionTemplate, SwimFiliere, Competition } from "@/lib/api/types";
 import { FILIERES, FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,7 @@ import {
   Search,
   Settings2,
   Trash2,
+  Trophy,
   Unlink,
   Waves,
   X,
@@ -231,6 +232,54 @@ export default function SwimPlanningDemo() {
     }
     return map;
   }, [slots]);
+
+  // ── Competitions (context for filière training) ──
+  const { data: allCompetitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: () => api.getCompetitions(),
+  });
+
+  // Group competitions by week key (Monday ISO). Multi-day comps span all weeks they touch.
+  const competitionsByWeek = useMemo(() => {
+    const map = new Map<string, Competition[]>();
+    for (const c of allCompetitions) {
+      if (!c.date) continue;
+      const start = new Date(c.date.slice(0, 10) + "T00:00:00");
+      const end = c.end_date
+        ? new Date(c.end_date.slice(0, 10) + "T00:00:00")
+        : start;
+      const cursor = getMonday(start);
+      const endMonday = getMonday(end);
+      while (cursor.getTime() <= endMonday.getTime()) {
+        const key = cursor.toISOString().split("T")[0];
+        const arr = map.get(key) ?? [];
+        arr.push(c);
+        map.set(key, arr);
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    }
+    return map;
+  }, [allCompetitions]);
+
+  const getDayCompetitions = useCallback(
+    (weekMonday: Date, dayIndex: number): Competition[] => {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + dayIndex);
+      d.setHours(0, 0, 0, 0);
+      const t = d.getTime();
+      return allCompetitions.filter((c) => {
+        if (!c.date) return false;
+        const start = new Date(c.date.slice(0, 10) + "T00:00:00").getTime();
+        const end = c.end_date
+          ? new Date(c.end_date.slice(0, 10) + "T00:00:00").getTime()
+          : start;
+        return t >= start && t <= end;
+      });
+    },
+    [allCompetitions],
+  );
+
+  const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
   // ── Expanded week ──
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
@@ -521,6 +570,7 @@ export default function SwimPlanningDemo() {
               : {};
             const weekSlots = slotsByWeek.get(week.weekKey) ?? [];
             const filledCount = weekSlots.length;
+            const weekCompetitions = competitionsByWeek.get(week.weekKey) ?? [];
 
             return (
               <WeekCard
@@ -532,6 +582,9 @@ export default function SwimPlanningDemo() {
                 meta={meta}
                 filledCount={filledCount}
                 weekSlots={weekSlots}
+                weekCompetitions={weekCompetitions}
+                getDayCompetitions={getDayCompetitions}
+                onSelectCompetition={setSelectedCompetition}
                 editWeekType={editWeekType}
                 setEditWeekType={setEditWeekType}
                 editWeekNotes={editWeekNotes}
@@ -775,6 +828,76 @@ export default function SwimPlanningDemo() {
         open={showFiliereEditor}
         onClose={() => setShowFiliereEditor(false)}
       />
+
+      {/* ── Competition Detail Sheet ── */}
+      <Sheet
+        open={!!selectedCompetition}
+        onOpenChange={(o) => !o && setSelectedCompetition(null)}
+      >
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[70dvh] overflow-y-auto">
+          <SheetHeader className="pb-0">
+            <SheetTitle className="sr-only">
+              {selectedCompetition?.name ?? "Compétition"}
+            </SheetTitle>
+            <SheetDescription className="sr-only">
+              Détails de la compétition
+            </SheetDescription>
+          </SheetHeader>
+          {selectedCompetition && (
+            <div className="space-y-4 pb-6">
+              <div className="flex items-center gap-2.5">
+                <Trophy className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-[15px] font-semibold text-foreground">
+                  {selectedCompetition.name}
+                </h3>
+              </div>
+              <div className="text-[13px] text-foreground/80 space-y-1">
+                <div>
+                  <span className="text-muted-foreground">Date : </span>
+                  {new Date(
+                    selectedCompetition.date.slice(0, 10) + "T00:00:00",
+                  ).toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  {selectedCompetition.end_date &&
+                    selectedCompetition.end_date !== selectedCompetition.date && (
+                      <>
+                        {" → "}
+                        {new Date(
+                          selectedCompetition.end_date.slice(0, 10) + "T00:00:00",
+                        ).toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </>
+                    )}
+                </div>
+                {selectedCompetition.location && (
+                  <div>
+                    <span className="text-muted-foreground">Lieu : </span>
+                    {selectedCompetition.location}
+                  </div>
+                )}
+              </div>
+              {selectedCompetition.description && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1">
+                    Description
+                  </p>
+                  <p className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-line">
+                    {selectedCompetition.description}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -876,6 +999,9 @@ interface WeekCardProps {
   meta: { weekType?: string; notes?: string };
   filledCount: number;
   weekSlots: SwimPlanningSlot[];
+  weekCompetitions: Competition[];
+  getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
+  onSelectCompetition: (c: Competition) => void;
   editWeekType: string;
   setEditWeekType: (v: string) => void;
   editWeekNotes: string;
@@ -902,6 +1028,9 @@ function WeekCard({
   meta,
   filledCount,
   weekSlots,
+  weekCompetitions,
+  getDayCompetitions,
+  onSelectCompetition,
   editWeekType,
   setEditWeekType,
   editWeekNotes,
@@ -915,6 +1044,7 @@ function WeekCard({
   onCellTap,
   onLinkTap,
 }: WeekCardProps) {
+  const hasCompetition = weekCompetitions.length > 0;
   const datalistId = `wt-${week.weekKey}`;
 
   return (
@@ -923,7 +1053,13 @@ function WeekCard({
       <div
         className={cn(
           "absolute left-[11px] top-3.5 h-[9px] w-[9px] rounded-full ring-2 ring-background transition-colors",
-          isCurrent ? "bg-primary" : filledCount > 0 ? "bg-emerald-500" : "bg-muted-foreground/25",
+          hasCompetition
+            ? "bg-amber-500"
+            : isCurrent
+              ? "bg-primary"
+              : filledCount > 0
+                ? "bg-emerald-500"
+                : "bg-muted-foreground/25",
         )}
       />
 
@@ -1039,6 +1175,37 @@ function WeekCard({
                     {meta.notes}
                   </p>
                 )}
+                {hasCompetition && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {weekCompetitions.map((c) => {
+                      const d = new Date(c.date.slice(0, 10) + "T00:00:00");
+                      return (
+                        <span
+                          key={c.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectCompetition(c);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              onSelectCompetition(c);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200 max-w-full"
+                        >
+                          <Trophy className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{c.name}</span>
+                          <span className="tabular-nums text-amber-700/70 dark:text-amber-300/70 shrink-0">
+                            {fmtDD_MM(d)}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Edit pencil */}
@@ -1073,9 +1240,12 @@ function WeekCard({
                 >
                   <MicroGrid
                     weekKey={week.weekKey}
+                    weekMonday={week.monday}
                     findSlot={findSlot}
                     onCellTap={onCellTap}
                     onLinkTap={onLinkTap}
+                    getDayCompetitions={getDayCompetitions}
+                    onSelectCompetition={onSelectCompetition}
                   />
                 </motion.div>
               )}
@@ -1093,11 +1263,15 @@ function WeekCard({
 
 function MicroGrid({
   weekKey,
+  weekMonday,
   findSlot,
   onCellTap,
   onLinkTap,
+  getDayCompetitions,
+  onSelectCompetition,
 }: {
   weekKey: string;
+  weekMonday: Date;
   findSlot: (
     weekKey: string,
     dayIndex: number,
@@ -1105,6 +1279,8 @@ function MicroGrid({
   ) => SwimPlanningSlot | undefined;
   onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
   onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
+  getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
+  onSelectCompetition: (c: Competition) => void;
 }) {
   return (
     <div className="border-t bg-muted/20">
@@ -1121,26 +1297,80 @@ function MicroGrid({
 
       {/* Day rows */}
       <div className="px-3 pb-3 space-y-1">
-        {DAY_ROWS.map((day) => (
-          <div
-            key={day.index}
-            className="grid grid-cols-[48px_1fr_1fr] gap-1 items-center"
-          >
-            <span className="text-[11px] font-medium text-muted-foreground pl-0.5">
-              {day.label}
-            </span>
-            <SlotCell
-              slot={findSlot(weekKey, day.index, "morning")}
-              onTap={() => onCellTap(day.index, "morning")}
-              onLinkTap={() => onLinkTap(day.index, "morning")}
-            />
-            <SlotCell
-              slot={findSlot(weekKey, day.index, "evening")}
-              onTap={() => onCellTap(day.index, "evening")}
-              onLinkTap={() => onLinkTap(day.index, "evening")}
-            />
-          </div>
-        ))}
+        {DAY_ROWS.map((day) => {
+          const morning = findSlot(weekKey, day.index, "morning");
+          const evening = findSlot(weekKey, day.index, "evening");
+          const dayComps = getDayCompetitions(weekMonday, day.index);
+          const hasComp = dayComps.length > 0;
+          const emptyDay = !morning && !evening;
+          const primaryComp = dayComps[0];
+
+          return (
+            <div
+              key={day.index}
+              className={cn(
+                "grid grid-cols-[48px_1fr_1fr] gap-1 items-center rounded-lg transition-colors",
+                hasComp &&
+                  !emptyDay &&
+                  "bg-amber-50/60 dark:bg-amber-900/15 ring-1 ring-amber-200/60 dark:ring-amber-800/40 pr-1",
+              )}
+            >
+              <span
+                className={cn(
+                  "text-[11px] font-medium pl-0.5 flex items-center gap-1",
+                  hasComp
+                    ? "text-amber-700 dark:text-amber-300 font-semibold"
+                    : "text-muted-foreground",
+                )}
+              >
+                {hasComp && <Trophy className="h-3 w-3 shrink-0" />}
+                {day.label}
+              </span>
+
+              {hasComp && emptyDay ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectCompetition(primaryComp)}
+                  className="col-span-2 relative h-9 w-full rounded-lg flex items-center gap-1.5 px-2 overflow-hidden
+                             bg-gradient-to-r from-amber-100 via-amber-50 to-amber-100
+                             dark:from-amber-900/40 dark:via-amber-900/20 dark:to-amber-900/40
+                             border border-amber-300/70 dark:border-amber-700/60
+                             text-amber-900 dark:text-amber-100
+                             active:scale-[0.98] transition-transform"
+                  aria-label={primaryComp.name}
+                >
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-[0.18]
+                               bg-[repeating-linear-gradient(45deg,_transparent_0_6px,_currentColor_6px_7px)]"
+                  />
+                  <Trophy className="relative h-3.5 w-3.5 shrink-0" />
+                  <span className="relative text-[10px] font-bold tracking-tight truncate flex-1 text-left">
+                    {primaryComp.name}
+                  </span>
+                  {dayComps.length > 1 && (
+                    <span className="relative text-[9px] font-semibold opacity-70 shrink-0">
+                      +{dayComps.length - 1}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <>
+                  <SlotCell
+                    slot={morning}
+                    onTap={() => onCellTap(day.index, "morning")}
+                    onLinkTap={() => onLinkTap(day.index, "morning")}
+                  />
+                  <SlotCell
+                    slot={evening}
+                    onTap={() => onCellTap(day.index, "evening")}
+                    onLinkTap={() => onLinkTap(day.index, "evening")}
+                  />
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
