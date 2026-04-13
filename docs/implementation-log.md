@@ -7959,3 +7959,24 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - Réutilisation de la couleur de la filière pour les segments remplis → la signature chromatique de la filière se retrouve dans son profil (puissant effet mémoire)
 - Tag textuel contextualisé par métrique (ex. intensité "léger/maximal", durée "court/long") plutôt qu'un score numérique — plus parlant pour l'athlète
 - Technique conserve ses pills en mode "track only" + tag "variable" pour rester cohérent sans mentir sur des valeurs inexistantes
+
+## §108 — 2026-04-13 — Rafraîchissement planning nageur (fix cache)
+
+**Contexte :** Quand le coach modifiait la planification natation (slots, filières), les changements n'apparaissaient pas immédiatement côté nageur. Le `queryClient` global (`src/lib/queryClient.ts`) est configuré avec `staleTime: Infinity`, ce qui veut dire qu'une fois chargé, un slot reste en cache indéfiniment. Les `invalidateQueries` déclenchés côté coach ne traversent évidemment pas vers le navigateur du nageur. `refetchOnWindowFocus` ne suffit pas sur mobile PWA où la fenêtre n'est pas forcément "blurred" au sens browser.
+
+**Changements :**
+- Dans `SwimPlanningAthleteView.tsx`, override explicite du cache sur la query `["swim-planning-slots", groupId, visibleWeekKeys]` :
+  - `staleTime: 15_000` (au lieu de `Infinity`)
+  - `refetchOnMount: "always"` (refetch à chaque retour sur la vue)
+  - `refetchOnWindowFocus: true` (explicite)
+  - `refetchInterval: isVisible ? 30_000 : false` (poll léger tant que la vue est affichée, stoppé sinon)
+- Query `["swim-filieres"]` : `staleTime` passé de 10 min à 60s + `refetchOnMount: "always"` pour que les descriptions/exemples éditées par le coach remontent rapidement
+
+**Fichiers modifiés :**
+- `src/pages/coach/SwimPlanningAthleteView.tsx` — overrides de cache sur 2 queries
+
+**Décisions :**
+- Pas de Supabase Realtime (channel `postgres_changes`) : aucun autre endroit de l'app ne l'utilise, l'infra publication n'est pas configurée, et un polling 30s est largement suffisant pour l'usage (le nageur consulte sa planif en session, pas en continu)
+- 30s est le bon compromis fraîcheur / charge : une modif coach apparaît au pire 30s plus tard sans stresser l'API
+- Le refetch est scoppé à `isVisible` (IntersectionObserver existant) donc aucun polling quand la vue est hors écran
+- `queryClient` global non modifié pour ne pas impacter les autres écrans qui dépendent du `staleTime: Infinity`

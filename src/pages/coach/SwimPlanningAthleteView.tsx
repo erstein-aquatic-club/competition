@@ -231,11 +231,22 @@ export default function SwimPlanningAthleteView({
   }, [isVisible, weekCount]);
 
   // ── Slots ──
+  // Note: the global queryClient uses `staleTime: Infinity`, so without the
+  // overrides below the swimmer would never see coach edits until the tab
+  // regained focus. We poll every 30s while the view is visible, refetch on
+  // every mount, and keep a short stale window so revisits are always fresh.
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
     queryKey: ["swim-planning-slots", groupId, visibleWeekKeys],
     queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts: visibleWeekKeys }),
     enabled: isVisible && !!groupId && visibleWeekKeys.length > 0,
+    staleTime: 15_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: isVisible ? 30_000 : false,
   });
+
+  // Filières table (description/examples) — coach may edit, keep fresh on revisit
+  // (staleTime 60s overrides the Infinity default)
 
   const slotsByWeek = useMemo(() => {
     const map = new Map<string, SwimPlanningSlot[]>();
@@ -261,7 +272,8 @@ export default function SwimPlanningAthleteView({
     queryKey: ["swim-filieres"],
     queryFn: () => api.getSwimFilieres(),
     enabled: isVisible,
-    staleTime: 10 * 60_000,
+    staleTime: 60_000,
+    refetchOnMount: "always",
   });
 
   const dbFiliereMap = useMemo(() => {
