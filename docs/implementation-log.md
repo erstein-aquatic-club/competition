@@ -104,6 +104,48 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-13 — Fix: suppression créneau d'entraînement silencieusement bloquée par RLS
+
+**Branche** : `main`
+**Chantier ROADMAP** : hotfix (suite §80 sécurité RLS + sprint1 00102)
+
+### Contexte — Pourquoi ce patch
+Un coach a remonté que la suppression d'un créneau hebdomadaire (ex: lundi matin) ne fonctionnait pas : le toast "Créneau supprimé" s'affichait mais le créneau réapparaissait.
+
+**Cause racine** (deux bugs combinés) :
+1. `deleteTrainingSlot` effectue un soft-delete `UPDATE training_slots SET is_active=false` — il passe donc par la policy RLS `training_slots_coach_update` (pas `..._coach_delete`), qui depuis la migration 00102 exige `created_by = app_user_id()`.
+2. La migration 00102 avait backfillé `created_by` des slots orphelins sur un compte admin, et les slots créés par un autre coach sont de toute façon interdits à la modification. Résultat : RLS filtre l'UPDATE, 0 ligne touchée.
+3. Côté client, l'UPDATE n'avait pas de `.select()` : Supabase renvoie `error: null / data: null` sur RLS-filtered update → `onSuccess` déclenche le toast, la query est invalidée, la ligne existe toujours. Silencieux.
+
+### Changements réalisés
+1. **Migration `00103_training_slots_shared_coach_write.sql`** : assouplissement des policies UPDATE/DELETE sur `training_slots`, `training_slot_assignments`, `training_slot_overrides` → tout utilisateur de rôle `coach` ou `admin` peut modifier/supprimer (au lieu de `created_by = app_user_id()` uniquement). Justification : EAC est un club unique, les créneaux sont des ressources partagées. `created_by` reste l'audit trail ; les athlètes/comité restent bloqués en écriture.
+2. **Défense en profondeur client** (`src/lib/api/training-slots.ts`) : `deleteTrainingSlot` et `updateTrainingSlot` ajoutent `.select("id")` sur l'UPDATE et lèvent une erreur explicite ("Suppression/Modification refusée — permissions insuffisantes") si 0 ligne affectée. Empêche tout futur silent-fail de ce genre et fait apparaître le toast destructif côté UI.
+
+### Fichiers modifiés
+| Fichier | Nature |
+|---|---|
+| `supabase/migrations/00103_training_slots_shared_coach_write.sql` | Nouvelle migration RLS (6 policies remplacées) |
+| `src/lib/api/training-slots.ts` | `.select()` + garde "0 lignes" sur update/delete |
+| `docs/implementation-log.md` | Cette entrée |
+
+### Tests
+- `npx tsc --noEmit` : OK
+- **À appliquer manuellement** : migration via MCP Supabase (`mcp__plugin_supabase_supabase__apply_migration`) — non appliqué dans cette session car MCP pas chargé.
+- **Tests manuels à faire après déploiement** :
+  - [ ] Coach A supprime un créneau créé par coach B → le créneau disparaît de `Ma semaine`.
+  - [ ] Coach modifie un créneau orphelin (backfill admin) → modification prise en compte.
+  - [ ] Athlète tente un UPDATE sur `training_slots` via console → RLS toujours bloquante.
+
+### Décisions prises
+- **Option retenue** : "n'importe quel coach peut modifier/supprimer n'importe quel créneau" (option B). Cohérent avec les autres ressources partagées du coach (catalogues nage/muscu, groupes, compétitions).
+- **Rejet** de l'option conservatrice (coach listé dans `training_slot_coaches`) : ne débloque pas les slots orphelins backfillés sur admin.
+- **Soft delete conservé** (`is_active=false`) plutôt que DELETE réel : préserve l'historique des sessions passées pointant sur ce slot.
+
+### Limites / dette
+- Les soft-deletes passent toujours par la policy UPDATE ; l'idéal long terme serait un RPC `soft_delete_training_slot` SECURITY DEFINER avec check explicite. Pour ce hotfix on garde la policy update assouplie, suffisante.
+
+---
+
 ## 2026-04-12 — `session_type` explicite sur les créneaux (natation / musculation)
 
 **Branche** : `codex/checkpoint-workspace-2026-04-12`
@@ -7877,3 +7919,22 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - Réutilisation des composants existants (`HeroKpi`, `ProgressBar`, `MetricPill`, `CollapsibleSection`, `ChartSkeleton`) pour rester cohérent avec les 2 onglets existants
 - Périodes identiques à Natation/Musculation (7/30/365) pour homogénéité
 - Tendance readiness calculée vs la même fenêtre précédente (même logique que `computeTrend` côté natation)
+
+## §106 — 2026-04-13 — Icônes filières dans Ma planification nageur
+
+**Contexte :** Sur la vue "Ma planification" côté nageur (`SwimPlanningAthleteView.tsx`), le sheet de détail d'une filière affichait les caractéristiques techniques (durée, intensité, récup, etc.) sous forme d'une grille 2 colonnes texte brut, peu scannable visuellement. Le nageur devait lire chaque label pour comprendre à quoi correspondait la valeur.
+
+**Changements :**
+- Chaque métrique technique est désormais rendue comme une petite carte avec icône Lucide colorée à gauche, label + valeur à droite
+- Icônes dédiées : Timer (durée effort), Zap (intensité), Hourglass (récup), Repeat2 (répétitions), Ruler (distance), Flame (effort perçu), Heart (fréq. cardiaque), FlaskConical (lactates), Activity (type de travail)
+- Les icônes reprennent la couleur de la filière (`selectedStyle.bg` + `selectedStyle.text`) pour un repérage visuel instantané et la cohérence chromatique avec le chip
+- Réordonnancement des métriques : durée/intensité/récup en premier (les plus lues) ; "Type de travail" en pleine largeur en bas
+- Cartes avec border, fond `bg-muted/30`, rounded-xl pour structurer visuellement
+
+**Fichiers modifiés :**
+- `src/pages/coach/SwimPlanningAthleteView.tsx` — import icônes Lucide, enrichissement `TECHNICAL_LABELS` avec icône + flag `full`, refonte du render accordion (~35 lignes modifiées)
+
+**Décisions :**
+- Conserver l'accordion "Détails techniques" existant (pas de changement d'IA/UX structurelle)
+- Icônes colorées pour réutiliser la sémantique de couleur déjà établie par filière, plutôt que des couleurs neutres
+- Ordre priorisant ce que le nageur regarde en premier (durée/intensité/récup)

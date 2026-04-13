@@ -20,7 +20,22 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { ChevronDown, ChevronLeft, Link2, Trophy } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  Link2,
+  Trophy,
+  Heart,
+  FlaskConical,
+  Flame,
+  Timer,
+  Ruler,
+  Repeat2,
+  Zap,
+  Hourglass,
+  Activity,
+  type LucideIcon,
+} from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════════
    Helpers (same as SwimPlanningDemo)
@@ -93,16 +108,22 @@ function getWeekMeta(groupId: number, weekKey: string): { weekType?: string; not
 const INITIAL_WEEK_COUNT = 13;
 const LOAD_MORE_COUNT = 4;
 
-const TECHNICAL_LABELS: { key: keyof FiliereTechnicals; label: string; unit: string }[] = [
-  { key: "heartRate", label: "Fréq. cardiaque", unit: "bpm" },
-  { key: "lactate", label: "Lactates", unit: "mmol/L" },
-  { key: "effort", label: "Effort perçu", unit: "/20" },
-  { key: "duration", label: "Durée série", unit: "" },
-  { key: "distance", label: "Distances", unit: "m" },
-  { key: "reps", label: "Répétitions", unit: "" },
-  { key: "intensity", label: "Intensité", unit: "" },
-  { key: "recovery", label: "Récupération", unit: "" },
-  { key: "workType", label: "Travail", unit: "" },
+const TECHNICAL_LABELS: {
+  key: keyof FiliereTechnicals;
+  label: string;
+  unit: string;
+  icon: LucideIcon;
+  full?: boolean;
+}[] = [
+  { key: "duration", label: "Durée effort", unit: "", icon: Timer },
+  { key: "intensity", label: "Intensité", unit: "", icon: Zap },
+  { key: "recovery", label: "Récup.", unit: "", icon: Hourglass },
+  { key: "reps", label: "Répétitions", unit: "", icon: Repeat2 },
+  { key: "distance", label: "Distance", unit: "m", icon: Ruler },
+  { key: "effort", label: "Effort perçu", unit: "/20", icon: Flame },
+  { key: "heartRate", label: "Fréq. card.", unit: "bpm", icon: Heart },
+  { key: "lactate", label: "Lactates", unit: "mmol/L", icon: FlaskConical },
+  { key: "workType", label: "Type de travail", unit: "", icon: Activity, full: true },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -599,18 +620,38 @@ export default function SwimPlanningAthleteView({
                       transition={{ duration: 0.2, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-2 pb-1">
-                        {TECHNICAL_LABELS.map(({ key, label, unit }) => {
+                      <div className="grid grid-cols-2 gap-2 pt-2 pb-1">
+                        {TECHNICAL_LABELS.map(({ key, label, unit, icon: Icon, full }) => {
                           const val = selectedFiliereData.technicals[key];
                           return (
-                            <div key={key}>
-                              <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-0.5">
-                                {label}
-                              </p>
-                              <p className="text-[12px] font-medium text-foreground/85">
-                                {val}
-                                {unit && <span className="text-muted-foreground/40 text-[10px] ml-0.5">{unit}</span>}
-                              </p>
+                            <div
+                              key={key}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-xl border border-border/40 bg-muted/30 px-2.5 py-2",
+                                full && "col-span-2",
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                  selectedStyle.bg,
+                                )}
+                              >
+                                <Icon className={cn("h-4 w-4", selectedStyle.text)} strokeWidth={2.25} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60 leading-tight">
+                                  {label}
+                                </p>
+                                <p className="text-[12px] font-semibold text-foreground leading-tight mt-0.5 truncate">
+                                  {val}
+                                  {unit && (
+                                    <span className="text-muted-foreground/50 text-[10px] font-normal ml-1">
+                                      {unit}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
                             </div>
                           );
                         })}
