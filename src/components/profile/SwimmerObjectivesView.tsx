@@ -72,7 +72,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
     queryKey: ["athlete-objectives"],
     queryFn: () => api.getAthleteObjectives(),
     enabled: !!authUid,
-    refetchInterval: 30_000,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Get swimmer IUF from profile, then performances (last 360 days) for progress gauge
