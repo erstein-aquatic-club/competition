@@ -58,9 +58,26 @@ type CompetitionTab = "courses" | "routines" | "timeline" | "checklist";
 export default function CompetitionDetail() {
   const [, params] = useRoute("/competition/:id");
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<CompetitionTab>("checklist");
-
   const competitionId = params?.id ?? null;
+
+  // Persist the active tab per competition in sessionStorage so that
+  // hitting back/forward or navigating away and coming back preserves
+  // the user's context (checklist → routines → back shouldn't reset to
+  // checklist, which was the pre-audit behavior).
+  const tabStorageKey = competitionId ? `competition-tab-${competitionId}` : null;
+  const [activeTab, setActiveTab] = useState<CompetitionTab>(() => {
+    if (typeof window === "undefined" || !tabStorageKey) return "checklist";
+    const stored = window.sessionStorage.getItem(tabStorageKey);
+    if (stored === "courses" || stored === "routines" || stored === "timeline" || stored === "checklist") {
+      return stored;
+    }
+    return "checklist";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !tabStorageKey) return;
+    window.sessionStorage.setItem(tabStorageKey, activeTab);
+  }, [activeTab, tabStorageKey]);
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
