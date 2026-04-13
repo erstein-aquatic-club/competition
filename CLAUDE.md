@@ -23,21 +23,29 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 
 | Fichier | Rôle | Taille |
 |---------|------|--------|
-| `src/lib/api.ts` | Façade API (stubs → modules) | ~426 lignes |
-| `src/lib/api/types.ts` | Interfaces TypeScript | 281 lignes |
-| `src/lib/api/client.ts` | Supabase client, utilitaires | 252 lignes |
-| `src/lib/api/transformers.ts` | Fonctions de transformation strength | 187 lignes |
-| `src/lib/api/helpers.ts` | Fonctions de mapping | 151 lignes |
-| `src/lib/api/localStorage.ts` | Stockage local fallback | 85 lignes |
-| `src/lib/api/index.ts` | Re-exports centralisés | ~174 lignes |
-| `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~850 lignes |
-| `src/lib/api/records.ts` | Hall of fame, records club, perfs | ~350 lignes |
-| `src/lib/api/users.ts` | Profil, athlètes, approbation | ~250 lignes |
-| `src/lib/api/assignments.ts` | Assignments CRUD | ~230 lignes |
-| `src/lib/api/notifications.ts` | Notifications CRUD | ~210 lignes |
-| `src/lib/api/timesheet.ts` | Pointage heures CRUD | ~180 lignes |
-| `src/lib/api/swim.ts` | Catalogue nage, sessions, partage public | ~220 lignes |
-| `src/components/swim/ExerciseLogInline.tsx` | Formulaire inline saisie technique par exercice (§58) | ~160 lignes |
+| `src/lib/api.ts` | Façade API (stubs → modules) | ~893 lignes |
+| `src/lib/api/types.ts` | Interfaces TypeScript (sessions, strength, users, comps, wellness, cycles, challenges, achievements, pain) | ~994 lignes |
+| `src/lib/api/client.ts` | Supabase client, utilitaires | ~316 lignes |
+| `src/lib/api/transformers.ts` | Fonctions de transformation strength | ~228 lignes |
+| `src/lib/api/helpers.ts` | Fonctions de mapping | ~161 lignes |
+| `src/lib/api/localStorage.ts` | Stockage local fallback | ~119 lignes |
+| `src/lib/api/index.ts` | Re-exports centralisés | ~416 lignes |
+| `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
+| `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |
+| `src/lib/api/users.ts` | Profil, athlètes, approbation | ~450 lignes |
+| `src/lib/api/assignments.ts` | Assignments CRUD (sessions, slots, tracking) | ~1015 lignes |
+| `src/lib/api/notifications.ts` | Notifications CRUD | ~261 lignes |
+| `src/lib/api/timesheet.ts` | Pointage heures CRUD | ~326 lignes |
+| `src/lib/api/swim.ts` | Catalogue nage, sessions, partage public | ~416 lignes |
+| `src/lib/api/wellness.ts` | Wellness checks + scoring readiness | ~84 lignes |
+| `src/lib/api/challenges.ts` | CRUD challenges | ~118 lignes |
+| `src/lib/api/achievements.ts` | CRUD achievements | ~55 lignes |
+| `src/lib/api/painReports.ts` | CRUD pain reports | ~69 lignes |
+| `src/lib/api/audit.ts` | Logs d'audit | ~32 lignes |
+| `src/lib/api/notificationLog.ts` | Logs notifications envoyées | ~26 lignes |
+| `src/lib/api/swim-planning.ts` | Planification séances natation | ~44 lignes |
+| `src/lib/api/swim-filieres.ts` | Gestion filières natation | ~27 lignes |
+| `src/components/swim/ExerciseLogInline.tsx` | Formulaire inline saisie technique par exercice (§58) | ~294 lignes |
 | `src/pages/SharedSwimSession.tsx` | Page publique séance partagée (token UUID) | ~130 lignes |
 | `src/lib/api/swim-logs.ts` | Notes techniques exercices natation | ~90 lignes |
 | `src/lib/api/temporary-groups.ts` | CRUD groupes temporaires (stages) | ~300 lignes |
@@ -48,43 +56,43 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/lib/swimTextParser.ts` | Parser texte → SwimBlock[], normaliseurs partagés | ~400 lignes |
 | `src/lib/swimConsultationUtils.ts` | Helpers partagés consultation séance (BlockGroup, groupItemsByBlock) | ~197 lignes |
 | `src/components/swim/SwimSessionTimeline.tsx` | Timeline verticale colorée, rail intensité, toggle 3 niveaux | ~555 lignes |
-| `src/lib/auth.ts` | Gestion auth, session, rôles | ~240 lignes |
+| `src/lib/auth.ts` | Gestion auth, session, rôles | ~444 lignes |
 | `src/lib/supabase.ts` | Client Supabase | ~70 lignes |
 | `src/lib/features.ts` | Feature flags | 5 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | |
 | `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |
-| `src/pages/Dashboard.tsx` | Calendrier natation nageur (ex-Accueil, route /natation) | ~1620 lignes |
-| `src/pages/Strength.tsx` | Module musculation nageur | ~1340 lignes |
-| `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1300 lignes |
-| `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1150 lignes |
-| `src/pages/Records.tsx` | Records personnels + FFN sync | ~920 lignes |
+| `src/pages/Dashboard.tsx` | Calendrier natation nageur (ex-Accueil, route /natation) | ~1055 lignes |
+| `src/pages/Strength.tsx` | Module musculation nageur | ~921 lignes |
+| `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
+| `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1384 lignes |
+| `src/pages/Records.tsx` | Records personnels + FFN sync | ~1376 lignes |
 | `src/pages/RecordsClub.tsx` | Records club (sections nage, drill-down progressif) | ~840 lignes |
 | `src/pages/RecordsAdmin.tsx` | Admin records + gestion nageurs | ~300 lignes |
 | `src/pages/Login.tsx` | Login + inscription | ~340 lignes |
 | `src/pages/coach/CoachCalendar.tsx` | Calendrier coach (vue mensuelle assignations) | ~266 lignes |
 | `src/hooks/useCoachCalendarState.ts` | Hook état calendrier coach (grille, query, slots) | ~187 lignes |
-| `src/pages/coach/CoachSwimmersOverview.tsx` | Dashboard synthétique nageurs (grille cards, KPIs) | ~310 lignes |
+| `src/pages/coach/CoachSwimmersOverview.tsx` | Dashboard synthétique nageurs (grille cards, KPIs) | ~648 lignes |
 | `src/pages/coach/CoachSwimmerDetail.tsx` | Page fiche nageur (4 onglets consolidés: Résumé/Planning/Échanges/Comms) (§92) | ~120 lignes |
 | `src/pages/coach/SwimmerFeedbackTab.tsx` | Onglet ressentis (liste chronologique sessions) | ~120 lignes |
-| `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) | ~390 lignes |
-| `src/pages/coach/CoachGroupsScreen.tsx` | UI gestion groupes temporaires (stages) | ~580 lignes |
-| `src/pages/coach/CoachCompetitionsScreen.tsx` | UI compétitions coach + assignations + SMS | ~470 lignes |
+| `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) | ~574 lignes |
+| `src/pages/coach/CoachGroupsScreen.tsx` | UI gestion groupes temporaires (stages) | ~1012 lignes |
+| `src/pages/coach/CoachCompetitionsScreen.tsx` | UI compétitions coach + assignations + SMS | ~834 lignes |
 | `src/pages/coach/CoachWeekView.tsx` | Wrapper toggle semaine/mois (calendrier unifié) (§92) | ~80 lignes |
 | `src/pages/coach/CoachLibrary.tsx` | Wrapper tabs bibliothèque nage/muscu (§92) | ~60 lignes |
 | `src/pages/coach/CoachComms.tsx` | Wrapper tabs notifications/SMS (§92) | ~60 lignes |
 | `src/lib/api/planning.ts` | CRUD macro-cycles + semaines | ~200 lignes |
 | `src/lib/api/interviews.ts` | CRUD entretiens + transitions multi-phases | ~200 lignes |
-| `src/pages/coach/SwimmerPlanningTab.tsx` | Onglet planification fiche nageur (timeline cycles) | ~440 lignes |
-| `src/pages/coach/SwimmerInterviewsTab.tsx` | Onglet entretiens fiche nageur (workflow multi-phases) | ~440 lignes |
+| `src/pages/coach/SwimmerPlanningTab.tsx` | Onglet planification fiche nageur (timeline cycles) | ~844 lignes |
+| `src/pages/coach/SwimmerInterviewsTab.tsx` | Onglet entretiens fiche nageur (workflow multi-phases) | ~1193 lignes |
 | `src/components/profile/AthleteInterviewsSection.tsx` | Entretiens côté nageur (formulaire, signature, historique) | ~320 lignes |
 | `src/components/shared/ObjectiveCard.tsx` | Composant partagé objectifs (ring SVG, grid 2x2, compact) | ~260 lignes |
 | `src/lib/objectiveHelpers.ts` | Helpers partagés objectifs (FFN_EVENTS, formatTime) | ~40 lignes |
 | `src/lib/imageUtils.ts` | Compression image Canvas (avatar upload, WebP/JPEG ≤200KB) | ~95 lignes |
 | `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) | ~530 lignes |
 | `src/pages/coach/CoachSmsScreen.tsx` | Écran SMS généraliste coach (groupe/nageur) | ~190 lignes |
-| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) | ~560 lignes |
-| `src/pages/coach/CoachSlotCalendar.tsx` | Calendrier semaine créneaux + séances (§85) | ~440 lignes |
-| `src/pages/coach/SlotSessionSheet.tsx` | Bottom sheet actions créneau (créer/modifier/visibilité/supprimer) (§85) | ~375 lignes |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) | ~2839 lignes |
+| `src/pages/coach/CoachSlotCalendar.tsx` | Calendrier semaine créneaux + séances (§85) | ~654 lignes |
+| `src/pages/coach/SlotSessionSheet.tsx` | Bottom sheet actions créneau (créer/modifier/visibilité/supprimer) (§85) | ~1024 lignes |
 | `src/pages/coach/SlotTemplatePicker.tsx` | Picker templates bibliothèque séances (§85) | ~150 lignes |
 | `src/hooks/useSlotCalendar.ts` | Hook matérialisation créneaux récurrents → instances semaine (§85) | ~230 lignes |
 | `src/lib/neurotype-quiz-data.ts` | 30 questions quiz + 5 profils neurotype + couleurs | ~450 lignes |
@@ -150,15 +158,74 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/shared/OfflineSyncBanner.tsx` | Banner reconnexion offline (§100) | ~40 lignes |
 | `src/hooks/useCoachBreadcrumb.ts` | Hook breadcrumb segments coach (§100) | ~10 lignes |
 | `src/pages/coach/CoachCommentsScreen.tsx` | Écran inbox commentaires coach (§99) | ~240 lignes |
+| `src/pages/Profile.tsx` | Page profil nageur (hub) | ~920 lignes |
+| `src/pages/Progress.tsx` | Page progression nageur (graphes, santé) | ~1150 lignes |
+| `src/pages/HallOfFame.tsx` | Hall of Fame club | ~366 lignes |
+| `src/pages/Coach.tsx` | Hub coach (home, KPIs) | ~969 lignes |
+| `src/pages/Admin.tsx` | Hub admin (utilisateurs, configuration) | ~970 lignes |
+| `src/pages/Administratif.tsx` | Vue administrative (timesheet, exports) | ~978 lignes |
+| `src/pages/SuiviSaison.tsx` | Vue saison (suivi long terme) | ~797 lignes |
+| `src/pages/MonthlyReport.tsx` | Rapport mensuel généré | ~462 lignes |
+| `src/pages/SwimSessionView.tsx` | Vue détail séance natation | ~500 lignes |
+| `src/pages/SwimNotes.tsx` | Notes techniques nage | ~306 lignes |
+| `src/pages/coach/SwimPlanningAthleteView.tsx` | Vue planning athlète (coach) | ~914 lignes |
+| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation | ~1392 lignes |
+| `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach | ~264 lignes |
+| `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
+| `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
+| `src/components/dashboard/SwimExerciseLogsHistory.tsx` | Historique logs exercices nage | ~505 lignes |
+| `src/components/coach/strength/AthletePlansTab.tsx` | Onglet plans athlète (coach muscu) | ~934 lignes |
+| `src/components/coach/strength/StrengthSessionBuilder.tsx` | Builder séance muscu | ~282 lignes |
+| `src/components/coach/strength/StrengthExerciseCard.tsx` | Carte exercice muscu | ~223 lignes |
+| `src/components/coach/swim/SwimSessionBuilder.tsx` | Builder séance natation | ~532 lignes |
+| `src/components/coach/swim/SwimExerciseForm.tsx` | Formulaire exercice nage | ~331 lignes |
+| `src/components/coach/PlanningWizard.tsx` | Wizard planification (coach) | ~472 lignes |
+| `src/components/coach/CoachChallengesSection.tsx` | Section challenges coach | ~363 lignes |
+| `src/components/coach/SwimVolumeCharts.tsx` | Graphes volume nage | ~414 lignes |
+| `src/components/coach/AttendancePerformanceChart.tsx` | Graphe assiduité/perf | ~305 lignes |
+| `src/components/coach/TrainingLoadChart.tsx` | Graphe charge entraînement | ~291 lignes |
+| `src/components/coach/WellnessTrend.tsx` | Tendance wellness | ~289 lignes |
+| `src/components/profile/AthletePerformanceHub.tsx` | Hub performances athlète | ~546 lignes |
+| `src/components/profile/SwimmerMessagesView.tsx` | Vue messages nageur | ~338 lignes |
+| `src/components/profile/BadgesGrid.tsx` | Grille badges/achievements | ~228 lignes |
+| `src/components/shared/SwimmerWeekSlots.tsx` | Créneaux semaine nageur | ~563 lignes |
+| `src/components/strength/SessionDetailPreview.tsx` | Aperçu détail séance muscu | ~382 lignes |
+| `src/components/strength/SessionList.tsx` | Liste séances muscu | ~399 lignes |
+| `src/components/strength/ExerciseProgressChart.tsx` | Graphe progression exercice | ~335 lignes |
+| `src/components/strength/HistoryTable.tsx` | Tableau historique muscu | ~329 lignes |
+| `src/components/strength/StrengthLeaderboard.tsx` | Leaderboard muscu | ~294 lignes |
+| `src/components/strength/InProgressCard.tsx` | Carte séance en cours | ~212 lignes |
+| `src/components/wellness/WellnessForm.tsx` | Formulaire wellness check | ~342 lignes |
+| `src/components/wellness/BodySvg.tsx` | SVG corps interactif (douleurs) | ~247 lignes |
+| `src/components/timesheet/TimesheetShiftForm.tsx` | Formulaire shift pointage | ~296 lignes |
+| `src/components/timesheet/TimesheetTimeWheel.tsx` | Roue sélection heure | ~252 lignes |
+| `src/components/layout/AppLayout.tsx` | Layout racine app | ~217 lignes |
+| `src/hooks/useDashboardState.ts` | Façade dashboard nageur (compose 4 sous-hooks) (§112) | ~260 lignes |
+| `src/hooks/dashboard/internal.ts` | Types + helpers purs partagés dashboard (§112) | ~245 lignes |
+| `src/hooks/dashboard/useDashboardSessions.ts` | Queries sessions/slots/assignments (§112) | ~282 lignes |
+| `src/hooks/dashboard/useCompletionStatus.ts` | Statut complétion sessions (§112) | ~108 lignes |
+| `src/hooks/dashboard/useDayMetrics.ts` | Métriques km jour/global (§112) | ~77 lignes |
+| `src/hooks/dashboard/useFeedbackDraft.ts` | État draft feedback isolé (§112) | ~109 lignes |
+| `src/hooks/useMonthlyReport.ts` | Hook rapport mensuel | ~479 lignes |
+| `src/hooks/useAttendancePerformance.ts` | Hook assiduité/perf | ~270 lignes |
+| `src/hooks/useSwimAnalytics.ts` | Hook analytics natation | ~258 lignes |
+| `src/hooks/useTrainingLoad.ts` | Hook charge entraînement | ~258 lignes |
+| `src/hooks/useStrengthState.ts` | Hook état muscu | ~202 lignes |
+| `src/lib/types.ts` | Types globaux | ~555 lignes |
+| `src/lib/export-records-pdf.ts` | Export PDF records | ~456 lignes |
+| `src/lib/design-tokens.ts` | Design tokens (couleurs, espacements) | ~254 lignes |
+| `src/lib/schema.ts` | Schéma Drizzle (tables) | ~670 lignes |
 
 ## Edge Functions Supabase
 
 | Fonction | Statut | Chemin |
 |----------|--------|--------|
-| `admin-user` | Fonctionnelle | `supabase/functions/admin-user/` |
-| `ffn-performances` | Fonctionnelle | `supabase/functions/ffn-performances/` |
-| `import-club-records` | Fonctionnelle | `supabase/functions/import-club-records/` |
-| `push-send` | Fonctionnelle | `supabase/functions/push-send/` |
+| `admin-user` | Fonctionnelle (ACTIVE, v97) | `supabase/functions/admin-user/` |
+| `ffn-sync` | Fonctionnelle (ACTIVE, v53) — cron sync FFN | `supabase/functions/ffn-sync/` |
+| `ffn-performances` | Fonctionnelle (ACTIVE, v62) | `supabase/functions/ffn-performances/` |
+| `import-club-records` | Fonctionnelle (ACTIVE, v73) | `supabase/functions/import-club-records/` |
+| `migrate-gifs` | Fonctionnelle (ACTIVE, v2) — migration one-shot GIF exercices | `supabase/functions/migrate-gifs/` |
+| `push-send` | Fonctionnelle (ACTIVE, v33) | `supabase/functions/push-send/` |
 
 ## Documentation
 
@@ -240,6 +307,14 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Fait (§102) |
 | 67 | Restructuration vue "Mon suivi" (hub + drill-down) | Haute | Fait (§103) |
 | 68 | Sous-vues Suivi enrichies (Semaine nage+muscu, Planification, Objectifs) + bugs PWA | Haute | Fait (§104) |
+| 69 | Onglet "Santé" dans Ma progression | Moyenne | Fait (§105) |
+| 70 | Icônes filières dans Ma planification nageur | Faible | Fait (§106) |
+| 71 | Jauges comparatives de filières (Ma planification) | Moyenne | Fait (§107) |
+| 72 | Rafraîchissement planning nageur (fix cache) | Haute | Fait (§108) |
+| 73 | Fix blank "Ma planification" au premier rendu | Haute | Fait (§109) |
+| 74 | Audit sécurité & robustesse (Sprint post-audit, RLS, Edge Fns, contraintes) | Haute | Fait (§110) |
+| 75 | Fix infinite loop IntersectionObserver Ma planification | Haute | Fait (§111) |
+| 76 | Performance fixes batch (refetchOnWindowFocus, staleTime objectives, découpe useDashboardState, memo coach slots) | Haute | Fait (§112) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
@@ -250,12 +325,28 @@ Chaque session de développement doit suivre ce protocole (détail complet dans 
 1. **Avant** : Lire `CLAUDE.md` → `docs/ROADMAP.md` (chantier ciblé) → `docs/FEATURES_STATUS.md`
 2. **Pendant** : Ajouter une entrée dans `docs/implementation-log.md` pour chaque patch (contexte, changements, fichiers modifiés, tests, décisions, limites)
 3. **Après** : Mettre à jour les 4 fichiers de suivi :
-   - `docs/ROADMAP.md` — statut du chantier (A faire → En cours → Fait)
+   - `docs/ROADMAP.md` — statut du chantier (A faire → En cours → Fait) **+ ligne `*Dernière mise à jour*` en tête du fichier**
    - `docs/FEATURES_STATUS.md` — statut des features impactées (❌ → ⚠️ → ✅)
    - `docs/implementation-log.md` — entrée déjà ajoutée au §2
-   - `CLAUDE.md` — si fichiers clés ajoutés/supprimés ou chantier terminé
+   - `CLAUDE.md` — voir règles ci-dessous
 
-> **Règle d'or : aucun patch sans entrée dans `implementation-log.md`.**
+### Règles de mise à jour de CLAUDE.md (obligatoires)
+
+Le tableau "Fichiers clés" et la table "Chantiers futurs" dérivent rapidement si on ne les met pas à jour à chaque patch. À la fin de chaque § :
+
+1. **Tableau "Fichiers clés"** — pour CHAQUE fichier touché par le patch :
+   - **Nouveau fichier** créé ≥ 150 lignes OU jouant un rôle architectural (page, hook, module API, écran coach, composant orchestrateur) → **ajouter une ligne** au tableau, avec : chemin exact, rôle en 1 phrase, taille mesurée via `wc -l` (jamais estimée).
+   - **Fichier existant** dont la taille a varié de **> 30 %** depuis la dernière entrée → **mettre à jour la colonne taille** (toujours via `wc -l`, format `~N lignes`).
+   - **Fichier supprimé/renommé** → **supprimer/renommer la ligne** correspondante.
+   - **Ne jamais inventer de taille.** Si pas mesurée, ne pas écrire de chiffre.
+
+2. **Tableau "Chantiers futurs (ROADMAP)"** — pour CHAQUE § ajouté à `implementation-log.md` :
+   - Ajouter une ligne au tableau avec le numéro de chantier suivant, titre court, priorité, et `Fait (§N)` où N = numéro de l'entrée dans `implementation-log.md`.
+   - **Le tableau de CLAUDE.md doit toujours pointer vers le dernier § du log.** Si le log a §N et CLAUDE.md s'arrête à §N-1, c'est un bug à corriger immédiatement.
+
+3. **Edge Functions** — si une Edge Function est ajoutée/supprimée/renommée dans `supabase/functions/`, mettre à jour la table "Edge Functions Supabase".
+
+> **Règle d'or : aucun patch sans entrée dans `implementation-log.md` ET sans mise à jour correspondante de CLAUDE.md (fichiers clés + chantier).**
 
 ## Migrations Supabase
 

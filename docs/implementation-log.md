@@ -8130,3 +8130,59 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 - Garde-fou minimal et localisé plutôt que refonte du système d'infinite scroll
 - 600ms est suffisamment long pour qu'un seul cycle render/observer-recreate soit absorbé, mais court pour ne pas gêner un scroll utilisateur réel
 - Polling 30s retiré car d'une part redondant, d'autre part contributeur potentiel à l'instabilité de la query au mount
+
+## §112 — 2026-04-13 — Performance fixes batch (batterie PWA, polling, Dashboard monolithe, memo coach slots)
+
+**Contexte :** Audit performance du jour (§voir audit competition/) a identifié plusieurs problèmes concrets : `refetchOnWindowFocus: true` sur queryClient (drain batterie PWA à chaque retour d'arrière-plan), polling 30s inutile sur objectifs nageur, hook `useDashboardState` monolithique de 907 LOC re-rendant 50+ composants à chaque keystroke draft, et `TimelineSlotInline` recréé à chaque render de `CoachTrainingSlotsScreen` via un `handleSelect` non-mémorisé.
+
+**Changements réalisés :**
+
+1. **`queryClient` defaults (Task 1)** — `refetchOnWindowFocus: false` + `refetchOnReconnect: true`. Stoppe la tempête de refetch Supabase au retour PWA tout en gardant la resynchro après perte réseau. Le `staleTime: Infinity` par défaut reste en place : les invalidations explicites des mutations restent la seule source de refetch.
+
+2. **`SwimmerObjectivesView` (Task 2)** — remplacement de `refetchInterval: 30_000` par `staleTime: 5 * 60 * 1000`. Les mutations CRUD objectifs invalident déjà la clé `["athlete-objectives"]` (ligne 147), aucune dette d'invalidation à combler.
+
+3. **Découpe `useDashboardState` (Task 3)** — hook monolithe (907 LOC) transformé en façade (260 LOC) composant 4 hooks spécialisés + un module de types/helpers partagés :
+   - `src/hooks/dashboard/internal.ts` (245 LOC) — types (`PlannedSession`, `DraftState`, `PresenceDefaults`, `AttendanceOverrides`, `SlotKey`) + helpers purs
+   - `src/hooks/dashboard/useDashboardSessions.ts` (282 LOC) — queries sessions/slots/assignments, indexation, `getSessionsForISO`, `getLogForSession`
+   - `src/hooks/dashboard/useCompletionStatus.ts` (108 LOC) — `getSessionStatus` + map `completionByISO`
+   - `src/hooks/dashboard/useDayMetrics.ts` (77 LOC) — `dayKm` + `globalKm` dérivés
+   - `src/hooks/dashboard/useFeedbackDraft.ts` (109 LOC) — `DraftState` isolé
+   - `src/hooks/useDashboardState.ts` devient une façade (260 LOC) qui compose les 4 hooks et conserve **l'API publique identique** (aucun consommateur touché — `Dashboard.tsx`, `FeedbackDrawer.tsx` intacts). Types re-exportés depuis la façade.
+   - 12 tests d'intégration ajoutés (`src/hooks/dashboard/__tests__/dashboard-hooks.test.tsx`) couvrant les helpers purs d'`internal.ts`. Pas de `renderHook` car le repo n'a pas d'environnement DOM configuré (pas de `jsdom`/`happy-dom`) et on ne voulait pas ajouter de dep.
+
+4. **Memoization `CoachTrainingSlotsScreen` (Task 4)** — audit montre que le timeline desktop est **absolute-positioned** (`top`/`height` calculés à la minute), donc **incompatible avec `react-window`/`FixedSizeList`** sans rewrite majeur du layout. Le vrai bottleneck identifié par l'agent : `handleSelect` était recréé à chaque render, invalidant toutes les instances memoizées potentielles de `TimelineSlotInline`. Correctif :
+   - `TimelineSlotInline` → `TimelineSlotInlineImpl` puis `memo(…)` exporté
+   - `handleSelect` wrappé dans `useCallback([slotInstancesById])`, `handleOpenInstance` inliné dedans
+   - `react-window` **non installé** (inutile pour l'approche retenue)
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/queryClient.ts` | `refetchOnWindowFocus: false` + `refetchOnReconnect: true` |
+| `src/components/profile/SwimmerObjectivesView.tsx` | Polling 30s → `staleTime` 5 min |
+| `src/hooks/useDashboardState.ts` | 907 → 260 LOC, façade |
+| `src/hooks/dashboard/internal.ts` | **Nouveau** (245 LOC) — types + helpers partagés |
+| `src/hooks/dashboard/useDashboardSessions.ts` | **Nouveau** (282 LOC) |
+| `src/hooks/dashboard/useCompletionStatus.ts` | **Nouveau** (108 LOC) |
+| `src/hooks/dashboard/useDayMetrics.ts` | **Nouveau** (77 LOC) |
+| `src/hooks/dashboard/useFeedbackDraft.ts` | **Nouveau** (109 LOC) |
+| `src/hooks/dashboard/__tests__/dashboard-hooks.test.tsx` | **Nouveau** (97 LOC, 12 tests) |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | `memo` + `useCallback` sur `TimelineSlotInline` / `handleSelect` |
+
+**Tests :**
+- `npx tsc --noEmit` : clean
+- `npm test -- --run src/hooks/dashboard` : 12/12 ✅
+- `npm test -- --run` post-merge : baseline inchangée (pre-existing failures `useSlotCalendar`, `TimesheetHelpers` non liés)
+- Smoke tests visuels : **à faire au prochain dev run** (Dashboard nageur keystroke fluide, Coach Slots scroll et sélection)
+
+**Décisions prises :**
+- `refetchOnReconnect: true` (et pas `false`) car PWA offline doit resynchroniser après reconnexion — c'est le focus qui pose problème, pas la reconnexion
+- Pas de `react-window` sur `CoachTrainingSlotsScreen` : le timeline desktop est en layout absolu, la virtualisation standard ne s'applique pas. Si le DOM devient un bottleneck mesuré, la bonne réponse serait une refonte du layout (grid-based) avant une virtualisation — hors scope ici
+- Façade `useDashboardState` à 260 LOC et non <150 : la cible <150 était irréaliste car le hook porte aussi la persistance localStorage (4 effets), l'état UI local, les mémos dérivés `selectedISO`/`otherGroupSessions`, les effets `nav:reset`/auto-close, et le contrat de retour de 45 lignes. Tout ce qui était extractible l'a été
+- TDD sur les helpers purs plutôt que `renderHook` : pas de dep ajoutée (pas de `jsdom`), et les helpers d'`internal.ts` contiennent toute la logique testable
+
+**Limites / dette :**
+- Les tests d'intégration Dashboard couvrent les helpers purs mais pas les interactions React des hooks (ajouter `happy-dom` + `renderHook` dans un prochain patch si on veut couvrir les effets)
+- Smoke test visuel nageur/coach à faire en review avant merge prod
+- `CoachTrainingSlotsScreen` reste à 2839 LOC — découpe fine possible plus tard

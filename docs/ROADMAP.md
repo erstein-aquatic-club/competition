@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-12 (§103 Restructuration vue "Mon suivi" — hub + drill-down)*
+*Dernière mise à jour : 2026-04-13 (§112 Performance fixes batch — refetchOnWindowFocus, staleTime objectives, découpe useDashboardState, memo coach slots)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
