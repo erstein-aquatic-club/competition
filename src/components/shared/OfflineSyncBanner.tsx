@@ -49,7 +49,7 @@ export function OfflineSyncBanner() {
           >
             <Check className="h-3.5 w-3.5" />
             <span className="text-xs font-semibold">
-              Connexion retablie
+              Connexion rétablie
             </span>
           </motion.div>
         </div>

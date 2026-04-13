@@ -44,12 +44,7 @@ export function InstallPrompt() {
     setIsInstalling(true)
     const promptEvent = deferredPrompt as any
     promptEvent.prompt()
-    const { outcome } = await promptEvent.userChoice
-    if (outcome === "accepted") {
-      console.log("[EAC] User accepted the install prompt")
-    } else {
-      console.log("[EAC] User dismissed the install prompt")
-    }
+    await promptEvent.userChoice
     setDeferredPrompt(null)
     setIsInstalling(false)
   }

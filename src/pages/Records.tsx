@@ -384,8 +384,6 @@ export default function Records() {
   // Target time from objective for the expanded event
   const chartTargetTime = useMemo(() => {
     if (!histExpandedEvent) return null;
-    // eslint-disable-next-line no-console
-    console.log("[EAC] obj debug:", { histExpandedEvent, objCode: eventCodeFromFfnName(histExpandedEvent), objectives: objectives.length, objs: objectives.map(o => o.event_code + ":" + o.target_time_seconds) });
     const objCode = eventCodeFromFfnName(histExpandedEvent);
     if (!objCode) return null;
     const obj = objectives.find(
