@@ -723,7 +723,19 @@ export function FeedbackDrawer({
                                 )}
                               </div>
                               <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                {s.isEmpty ? <Chip>Vide</Chip> : <Chip>{fmtKm(s.km)} km</Chip>}
+                                {s.isEmpty ? (
+                                  <Chip>Vide</Chip>
+                                ) : (
+                                  <Chip>
+                                    {(() => {
+                                      const log = getLog(s.id);
+                                      const logMeters = Number(log?.distance);
+                                      return Number.isFinite(logMeters) && logMeters > 0
+                                        ? fmtKm(metersToKm(logMeters))
+                                        : fmtKm(s.km);
+                                    })()} km
+                                  </Chip>
+                                )}
                                 {s.assignmentSource === 'individual' && (
                                   <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">
                                     Séance personnalisée
@@ -935,7 +947,19 @@ export function FeedbackDrawer({
                                 </div>
                                 <div className="truncate text-sm font-semibold text-foreground">{activeSession.title}</div>
                                 <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                  {activeSession.isEmpty ? <Chip>Vide</Chip> : <Chip>{fmtKm(activeSession.km)} km</Chip>}
+                                  {activeSession.isEmpty ? (
+                                    <Chip>Vide</Chip>
+                                  ) : (
+                                    <Chip>
+                                      {(() => {
+                                        const log = getLog(activeSession.id);
+                                        const logMeters = Number(log?.distance);
+                                        return Number.isFinite(logMeters) && logMeters > 0
+                                          ? fmtKm(metersToKm(logMeters))
+                                          : fmtKm(activeSession.km);
+                                      })()} km
+                                    </Chip>
+                                  )}
                                   {activeSession.assignmentSource === 'individual' && (
                                     <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">
                                       Séance personnalisée

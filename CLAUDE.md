@@ -315,6 +315,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 74 | Audit sécurité & robustesse (Sprint post-audit, RLS, Edge Fns, contraintes) | Haute | Fait (§110) |
 | 75 | Fix infinite loop IntersectionObserver Ma planification | Haute | Fait (§111) |
 | 76 | Performance fixes batch (refetchOnWindowFocus, staleTime objectives, découpe useDashboardState, memo coach slots) | Haute | Fait (§112) |
+| 77 | Fix FeedbackDrawer — suppression ressenti (RLS) + distance affichée | Haute | Fait (§113) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

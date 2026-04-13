@@ -8186,3 +8186,33 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 - Les tests d'intégration Dashboard couvrent les helpers purs mais pas les interactions React des hooks (ajouter `happy-dom` + `renderHook` dans un prochain patch si on veut couvrir les effets)
 - Smoke test visuel nageur/coach à faire en review avant merge prod
 - `CoachTrainingSlotsScreen` reste à 2839 LOC — découpe fine possible plus tard
+
+## §113 — 2026-04-13 — Fixes FeedbackDrawer (suppression ressenti + distance affichée)
+
+**Contexte :** Deux bugs rapportés côté nageur dans le `FeedbackDrawer` : (1) le bouton « Supprimer le ressenti » ne faisait rien (toast de succès mais ligne conservée en base), (2) la distance affichée dans le chip du créneau restait figée sur la distance planifiée même après saisie d'une distance réelle différente.
+
+**Changements réalisés :**
+
+1. **Migration `00108_dim_sessions_athlete_delete.sql`** — la policy `dim_sessions_delete` n'autorisait que coach/admin. Un DELETE athlète passait le filtre RLS à vide → PostgREST renvoyait 204 / 0 row affected sans erreur, donc `onSuccess` de la mutation déclenchait un toast trompeur. Nouvelle policy alignée sur les `select/insert/update` : `USING (athlete_id = app_user_id() OR app_user_role() IN ('admin', 'coach'))`. Appliquée via MCP.
+
+2. **`FeedbackDrawer.tsx` — chips distance (lignes 726 & 938)** — avant : `<Chip>{fmtKm(s.km)} km</Chip>` affichait toujours la distance planifiée (`PlannedSession.km`). Après : si un log existe pour la session, on affiche `fmtKm(metersToKm(log.distance))` (la distance réellement saisie via le stepper) ; sinon fallback planifié. Patch appliqué au chip de la liste des créneaux ET au chip du créneau actif.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00108_dim_sessions_athlete_delete.sql` | **Nouveau** — policy DELETE étendue aux athlètes |
+| `src/components/dashboard/FeedbackDrawer.tsx` | Chip distance : log > planifié quand log dispo |
+
+**Tests :**
+- `npx tsc --noEmit` : clean
+- Migration appliquée via MCP (`{"success":true}`)
+- Smoke test visuel à faire au prochain dev run (supprimer un ressenti + vérifier persistance, saisir distance custom et vérifier affichage)
+
+**Décisions prises :**
+- Fix RLS-side plutôt que workaround client : une suppression silencieuse est un bug de sécurité/UX, la policy cohérente est la bonne réponse
+- Fallback au `s.km` planifié quand pas de log : comportement existant préservé, on ne change que la branche « log présent »
+
+**Limites / dette :**
+- Pas de test unitaire ajouté (fix ciblé, pas de nouvelle logique métier)
+- Le placeholder `{"→"} km` (ligne 1239 de la barre d'action) reste en place — non concerné par le bug rapporté
