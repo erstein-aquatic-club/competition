@@ -217,13 +217,29 @@ export default function SwimPlanningAthleteView({
   const visibleWeekKeys = useMemo(() => weeks.map((w) => w.weekKey), [weeks]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // Guards against re-entrant infinite loops: when `weekCount` changes the
+  // effect below recreates the IntersectionObserver, which fires immediately
+  // if the sentinel is still inside the (rootMargin-extended) viewport. That
+  // would call setWeekCount again, re-run the effect, and so on — the query
+  // key would churn and the view would stay stuck in "loading" forever
+  // (especially in embedded mode where the parent is the scroll container).
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
     if (!isVisible) return;
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      (entries) => { if (entries[0]?.isIntersecting) setWeekCount((c) => c + LOAD_MORE_COUNT); },
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loadingMoreRef.current) {
+          loadingMoreRef.current = true;
+          setWeekCount((c) => c + LOAD_MORE_COUNT);
+          // Release the lock after the next paint so a real scroll can
+          // trigger the next page, but a same-frame re-fire from the new
+          // observer cannot.
+          setTimeout(() => { loadingMoreRef.current = false; }, 600);
+        }
+      },
       { rootMargin: "100px" },
     );
     observer.observe(el);
@@ -231,22 +247,18 @@ export default function SwimPlanningAthleteView({
   }, [isVisible, weekCount]);
 
   // ── Slots ──
-  // Note: the global queryClient uses `staleTime: Infinity`, so without the
-  // overrides below the swimmer would never see coach edits until the tab
-  // regained focus. We poll every 30s while the view is visible, refetch on
-  // every mount, and keep a short stale window so revisits are always fresh.
+  // We set a short staleTime so the swimmer picks up coach edits on revisit
+  // (the global queryClient uses staleTime: Infinity). Note: we intentionally
+  // don't set refetchOnMount/refetchInterval here — combining them with the
+  // `enabled` gate was causing the embedded view to render blank on first
+  // mount in SuiviPlanification (§109). The next page revisit / focus is
+  // sufficient to refresh.
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
     queryKey: ["swim-planning-slots", groupId, visibleWeekKeys],
     queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts: visibleWeekKeys }),
     enabled: isVisible && !!groupId && visibleWeekKeys.length > 0,
     staleTime: 15_000,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: isVisible ? 30_000 : false,
   });
-
-  // Filières table (description/examples) — coach may edit, keep fresh on revisit
-  // (staleTime 60s overrides the Infinity default)
 
   const slotsByWeek = useMemo(() => {
     const map = new Map<string, SwimPlanningSlot[]>();
@@ -273,7 +285,6 @@ export default function SwimPlanningAthleteView({
     queryFn: () => api.getSwimFilieres(),
     enabled: isVisible,
     staleTime: 60_000,
-    refetchOnMount: "always",
   });
 
   const dbFiliereMap = useMemo(() => {

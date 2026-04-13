@@ -8110,3 +8110,23 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 ### Tests
 - `npx tsc --noEmit` : OK
 - Test manuel : ouvrir le formulaire, cliquer "Créer" avec champs vides → toasts explicites apparaissent.
+
+## §111 — 2026-04-13 — Fix infinite loop IntersectionObserver "Ma planification"
+
+**Contexte :** Après §109, la vue Ma planification natation continuait à rester blanche (ou en chargement perpétuel) au premier rendu côté nageur — toggler vers Musculation était toujours nécessaire pour la débloquer. La cause était plus subtile que le simple problème de hauteur.
+
+**Cause racine :** Dans `SwimPlanningAthleteView.tsx`, l'effet qui crée l'`IntersectionObserver` du sentinel d'infinite scroll a `[isVisible, weekCount]` comme dépendances (ajouté en `55e7d51f`). Quand `weekCount` change, l'effet se ré-exécute et **crée un nouvel observer**, qui se déclenche immédiatement si le sentinel est encore dans le viewport étendu (rootMargin 100px). Cela rappelle `setWeekCount(c => c + 4)`, ré-exécute l'effet, recrée l'observer, etc. → boucle infinie. À chaque itération, `weeks` change → `visibleWeekKeys` change → la query key `["swim-planning-slots", groupId, visibleWeekKeys]` change → react-query relance la requête → loading state perpétuel. Toggler sur Musculation démontait le composant, cassant la boucle, et le re-mount stabilisait l'état.
+
+**Pourquoi ça ne se voyait pas en mode overlay (non-embedded) :** Avant §109, le composant avait son propre conteneur `flex-1 overflow-y-auto`, donc le sentinel était positionné au sein d'un scroll container distinct du viewport, et la condition d'intersection dépendait du scroll interne. En embedded (SuiviPlanification), le scroll container devient le `<main>` parent et le sentinel se trouve bien plus souvent dans la zone d'intersection au mount initial.
+
+**Changements :**
+- Ajout d'un `loadingMoreRef` guard : quand le callback de l'observer se déclenche, on incrémente `weekCount` mais on bloque toute ré-entrée pendant 600ms via `setTimeout`. Le scroll réel reste possible (l'observer continue d'écouter), mais une ré-exécution synchrone post-render via le nouvel observer ne peut plus se déclencher.
+
+**Fichiers modifiés :**
+- `src/pages/coach/SwimPlanningAthleteView.tsx` — ajout du ref guard sur l'IntersectionObserver
+- `src/pages/coach/SwimPlanningAthleteView.tsx` — révert §108 (refetchOnMount/refetchInterval) qui aggravait le symptôme en relançant la query en boucle
+
+**Décisions :**
+- Garde-fou minimal et localisé plutôt que refonte du système d'infinite scroll
+- 600ms est suffisamment long pour qu'un seul cycle render/observer-recreate soit absorbé, mais court pour ne pas gêner un scroll utilisateur réel
+- Polling 30s retiré car d'une part redondant, d'autre part contributeur potentiel à l'instabilité de la query au mount
