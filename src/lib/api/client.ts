@@ -83,6 +83,9 @@ export const expandScaleToTen = (value: number | null | undefined): number | nul
 
 // --- 1RM estimation ---
 
+// Epley formula: 1RM = weight × (1 + reps / 30)
+// Cached in one_rm_records.weight; changing the formula would invalidate
+// all historical estimates, so it's intentionally fixed.
 export const estimateOneRm = (weight?: number | null, reps?: number | null): number | null => {
   if (!Number.isFinite(weight) || !Number.isFinite(reps)) return null;
   if ((weight ?? 0) <= 0 || (reps ?? 0) <= 0) return null;

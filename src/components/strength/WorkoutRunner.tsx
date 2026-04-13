@@ -552,6 +552,11 @@ export function WorkoutRunner({
         ? Number(draftValue.replace(",", "."))
         : Number(draftValue);
     if (!Number.isFinite(parsed)) return;
+    // Bounds: weight ∈ [0, 1000] kg (BODYWEIGHT_SENTINEL handled upstream),
+    // reps ∈ [1, 200]. Absurd values are silently rejected — the keypad
+    // already prevents most malformed input but this catches overflow typos.
+    if (activeInput === "weight" && (parsed < 0 || parsed > 1000)) return;
+    if (activeInput === "reps" && (parsed < 1 || parsed > 200)) return;
     setCurrentSetInputs((prev: Record<number, SetInputValues>) => ({
       ...prev,
       [currentSetIndex - 1]: {
