@@ -155,8 +155,9 @@ export async function createTrainingSlot(input: TrainingSlotInput): Promise<Trai
 export async function updateTrainingSlot(slotId: string, input: TrainingSlotInput): Promise<TrainingSlot> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
 
-  // Update slot fields
-  const { error: slotErr } = await supabase
+  // Update slot fields — `.select()` surfaces RLS-filtered updates as errors
+  // instead of silent no-ops (see deleteTrainingSlot note).
+  const { data: updatedRows, error: slotErr } = await supabase
     .from("training_slots")
     .update({
       day_of_week: input.day_of_week,
@@ -167,8 +168,14 @@ export async function updateTrainingSlot(slotId: string, input: TrainingSlotInpu
       lane_count: input.lane_count,
       scheduled_date: input.scheduled_date ?? null,
     })
-    .eq("id", slotId);
+    .eq("id", slotId)
+    .select("id");
   if (slotErr) throw new Error(slotErr.message);
+  if (!updatedRows || updatedRows.length === 0) {
+    throw new Error(
+      "Modification refusée (aucune ligne affectée) — permissions insuffisantes.",
+    );
+  }
 
   // Replace group assignments: delete all then re-insert
   const { error: delAssignErr } = await supabase
@@ -214,11 +221,20 @@ export async function updateTrainingSlot(slotId: string, input: TrainingSlotInpu
 
 export async function deleteTrainingSlot(slotId: string): Promise<void> {
   if (!canUseSupabase()) return;
-  const { error } = await supabase
+  // `.select()` is required so PostgREST returns the affected rows; without
+  // it a RLS-filtered UPDATE resolves with `error: null` + `data: null`,
+  // producing a silent failure (toast says "supprimé" but row is intact).
+  const { data, error } = await supabase
     .from("training_slots")
     .update({ is_active: false })
-    .eq("id", slotId);
+    .eq("id", slotId)
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error(
+      "Suppression refusée (aucune ligne affectée) — permissions insuffisantes.",
+    );
+  }
 }
 
 // ── OVERRIDES ───────────────────────────────────────────────
