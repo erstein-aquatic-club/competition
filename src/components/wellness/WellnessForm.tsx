@@ -128,6 +128,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
     mutationFn: async () => {
       const readiness = computeReadinessScore({
         sleep_quality: sleepQuality,
+        sleep_hours: sleepHours,
         fatigue,
         soreness,
         mood,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeReadinessScore } from '../wellness';
+import { computeReadinessScore, sleepDurationScore } from '../wellness';
 
 describe('computeReadinessScore', () => {
   it('returns 100 for best values (all 1s)', () => {
@@ -61,6 +61,47 @@ describe('computeReadinessScore', () => {
       stress: 5,
     });
     expect(score).toBeGreaterThanOrEqual(0);
+  });
+
+  it('penalises short sleep duration even with good perceived quality', () => {
+    const withoutHours = computeReadinessScore({
+      sleep_quality: 5,
+      fatigue: 3,
+      soreness: 3,
+      mood: 3,
+      stress: 3,
+    });
+    const shortNight = computeReadinessScore({
+      sleep_quality: 5,
+      sleep_hours: 4,
+      fatigue: 3,
+      soreness: 3,
+      mood: 3,
+      stress: 3,
+    });
+    expect(shortNight).toBeLessThan(withoutHours);
+  });
+
+  it('rewards optimal 8h sleep compared to 5h with same quality', () => {
+    const base = {
+      sleep_quality: 3,
+      fatigue: 3,
+      soreness: 3,
+      mood: 3,
+      stress: 3,
+    };
+    const optimal = computeReadinessScore({ ...base, sleep_hours: 8 });
+    const short = computeReadinessScore({ ...base, sleep_hours: 5 });
+    expect(optimal).toBeGreaterThan(short);
+  });
+
+  it('sleepDurationScore peaks at 8h and decays symmetrically', () => {
+    expect(sleepDurationScore(8)).toBe(5);
+    expect(sleepDurationScore(7)).toBe(4);
+    expect(sleepDurationScore(9)).toBe(4);
+    expect(sleepDurationScore(4)).toBe(1);
+    expect(sleepDurationScore(12)).toBe(1);
+    expect(sleepDurationScore(0)).toBe(1);
   });
 
   it('returns integer values', () => {

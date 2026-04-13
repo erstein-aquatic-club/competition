@@ -7,15 +7,35 @@ import type { WellnessCheck } from './types';
 
 // --- Readiness score computation ---
 
+/**
+ * Convertit une durée de sommeil en score subjectif 1-5.
+ * Pic à 8h (score 5), pénalité progressive en dessous et au-dessus.
+ * - ≤4h → 1, 5h → 2, 6h → 3, 7h → 4, 8h → 5 (pic)
+ * - 9h → 4, 10h → 3, 11h → 2, ≥12h → 1
+ */
+export function sleepDurationScore(hours: number): number {
+  if (!Number.isFinite(hours) || hours <= 0) return 1;
+  const score = hours <= 8 ? 1 + (hours - 4) : 5 - (hours - 8);
+  return Math.max(1, Math.min(5, score));
+}
+
 export function computeReadinessScore(data: {
   sleep_quality: number;
+  sleep_hours?: number | null;
   fatigue: number;
   soreness: number;
   mood: number;
   stress: number;
 }): number {
+  // Sommeil combiné : qualité ressentie (50%) + durée objective (50%)
+  // Fallback sur la seule qualité si la durée n'est pas renseignée.
+  const effectiveSleep =
+    data.sleep_hours != null
+      ? (data.sleep_quality + sleepDurationScore(data.sleep_hours)) / 2
+      : data.sleep_quality;
+
   const raw =
-    (data.sleep_quality +
+    (effectiveSleep +
       (11 - data.fatigue * 2) +
       (11 - data.soreness * 2) +
       data.mood +
