@@ -547,15 +547,18 @@ export function WorkoutRunner({
 
   const applyDraftValue = () => {
     if (!currentBlock) return;
-    const parsed =
-      activeInput === "weight"
+    const isBodyweightDraft =
+      activeInput === "weight" && draftValue === String(BODYWEIGHT_SENTINEL);
+    const parsed = isBodyweightDraft
+      ? BODYWEIGHT_SENTINEL
+      : activeInput === "weight"
         ? Number(draftValue.replace(",", "."))
         : Number(draftValue);
     if (!Number.isFinite(parsed)) return;
-    // Bounds: weight ∈ [0, 1000] kg (BODYWEIGHT_SENTINEL handled upstream),
+    // Bounds: weight ∈ [0, 1000] kg (plus BODYWEIGHT_SENTINEL = -1 pour PDC),
     // reps ∈ [1, 200]. Absurd values are silently rejected — the keypad
     // already prevents most malformed input but this catches overflow typos.
-    if (activeInput === "weight" && (parsed < 0 || parsed > 1000)) return;
+    if (activeInput === "weight" && !isBodyweightDraft && (parsed < 0 || parsed > 1000)) return;
     if (activeInput === "reps" && (parsed < 1 || parsed > 200)) return;
     setCurrentSetInputs((prev: Record<number, SetInputValues>) => ({
       ...prev,
