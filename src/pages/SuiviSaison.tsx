@@ -562,7 +562,7 @@ export default function SuiviSaison() {
                 variant="ghost"
                 size="sm"
                 className="h-7 gap-1 text-[11px] text-primary"
-                onClick={() => navigate("/suivi?tab=objectifs")}
+                onClick={() => navigate("/suivi/objectifs")}
               >
                 <Plus className="h-3 w-3" />
                 Ajouter
