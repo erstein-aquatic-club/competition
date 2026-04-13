@@ -8090,3 +8090,23 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - `539ef042` chore: quick UX fixes (typo + console.log cleanup)
 - `f003965c` fix(slots): valide la contrainte visible_from + message clair sur doublons
 - `fe9cb328` fix(strength): bornes charge/reps + CHECK constraints RPE/difficulty
+
+## 2026-04-13 — Fix bouton "Créer" grisé sur créneau ponctuel
+**Branche** : `main`
+**Chantier ROADMAP** : N/A — correctif UX
+
+### Contexte
+Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un créneau ponctuel, sans indication du champ manquant. Le bouton désactivait silencieusement si `startTime`, `endTime`, `location` ou `scheduledDate` (en mode oneoff) était vide. Anti-pattern UX : bouton grisé sans feedback.
+
+### Changements réalisés
+- `SlotFormSheet` : réduit la condition `disabled` du bouton "Créer/Enregistrer" à `isPending` uniquement.
+- `buildInput()` contient déjà les toasts de validation explicites (horaires, lieu, date ponctuelle) — ils s'affichent maintenant au clic pour guider le coach.
+
+### Fichiers modifiés
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Suppression des guards `disabled` silencieux sur le bouton submit |
+
+### Tests
+- `npx tsc --noEmit` : OK
+- Test manuel : ouvrir le formulaire, cliquer "Créer" avec champs vides → toasts explicites apparaissent.

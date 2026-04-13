@@ -604,7 +604,7 @@ const SlotFormSheet = ({
               <Button
                 className="w-full"
                 onClick={handleSubmit}
-                disabled={isPending || !startTime || !endTime || !location.trim() || (slotMode === "oneoff" && !scheduledDate)}
+                disabled={isPending}
               >
                 {isPending
                   ? "Enregistrement..."
