@@ -240,6 +240,8 @@ const CompetitionFormSheet = ({
     updateMutation.isPending ||
     deleteMutation.isPending;
 
+  const dateRangeInvalid = Boolean(date && endDate && endDate < date);
+
   const dateCls = "flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
   const handleStartChange = (v: string) => {
@@ -408,7 +410,7 @@ const CompetitionFormSheet = ({
               <Button
                 className="w-full"
                 onClick={handleSubmit}
-                disabled={isPending || !name.trim() || !date || !endDate}
+                disabled={isPending || !name.trim() || !date || !endDate || dateRangeInvalid}
               >
                 {isPending
                   ? "Enregistrement..."

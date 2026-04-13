@@ -240,6 +240,25 @@ body {
   --status-error-bg: 0 40% 15%;
 }
 
+/* Bridge the --z-index-* custom properties to Tailwind 4's class-based API.
+   Without these, className="z-overlay", "z-modal", "z-nav", "z-fab" were
+   silently ignored by Tailwind and the elements fell back to z-auto
+   (they still rendered on top thanks to DOM order, but explicit stacking
+   was broken). Used in PageHeader, Dashboard, FeedbackDrawer, BottomSheet,
+   RestScreen, WorkoutRunner, AppLayout, Administratif. */
+@utility z-overlay {
+  z-index: var(--z-index-overlay);
+}
+@utility z-fab {
+  z-index: var(--z-index-fab);
+}
+@utility z-nav {
+  z-index: var(--z-index-nav);
+}
+@utility z-modal {
+  z-index: var(--z-index-modal);
+}
+
 @layer base {
   * {
     @apply border-border;

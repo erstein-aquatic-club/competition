@@ -123,8 +123,8 @@ export function OfflineMutationSync() {
           queryClient.invalidateQueries({ queryKey: ["1rm"] });
           queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
           toast({
-            title: "Donnees synchronisees",
-            description: `${syncedCount} seance(s) hors ligne ont ete enregistree(s).`,
+            title: "Données synchronisées",
+            description: `${syncedCount} séance(s) hors ligne ont été enregistrée(s).`,
           });
         }
       } catch (error) {
@@ -134,7 +134,7 @@ export function OfflineMutationSync() {
             title: "Synchronisation en attente",
             description: error instanceof Error
               ? error.message
-              : "Impossible de synchroniser les donnees hors ligne pour le moment.",
+              : "Impossible de synchroniser les données hors ligne pour le moment.",
             variant: "destructive",
           });
         }
