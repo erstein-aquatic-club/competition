@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
@@ -1150,7 +1150,7 @@ const TimelineSlot = ({
 };
 
 /** Inline variant of TimelineSlot that receives pre-computed top/height */
-function TimelineSlotInline({
+function TimelineSlotInlineImpl({
   slot,
   instance,
   hasOverrides,
@@ -1260,6 +1260,8 @@ function TimelineSlotInline({
     </button>
   );
 }
+
+const TimelineSlotInline = memo(TimelineSlotInlineImpl);
 
 // ── Mobile View: Week Strip + Day Detail ────────────────────────
 
@@ -1942,11 +1944,12 @@ const CoachTrainingSlotsScreen = ({
     setShowSessionSheet(true);
   };
 
-  const handleSelect = (slot: TrainingSlot) => {
+  const handleSelect = useCallback((slot: TrainingSlot) => {
     const instance = slotInstancesById.get(slot.id);
     if (!instance) return;
-    handleOpenInstance(instance);
-  };
+    setSelectedInstance(instance);
+    setShowSessionSheet(true);
+  }, [slotInstancesById]);
 
   const handleEditSlot = (instance: SlotInstance) => {
     setEditingSlot(instance.slot);
