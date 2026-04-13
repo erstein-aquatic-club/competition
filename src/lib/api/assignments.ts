@@ -372,7 +372,14 @@ export async function bulkCreateSlotAssignments(params: {
     .insert(rows)
     .select("id");
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Unique violation on idx_sa_unique_slot_group_v2 means a concurrent
+    // request raced past the pre-check and created the assignment first.
+    if ((error as { code?: string }).code === "23505") {
+      throw new Error("Ces groupes ont déjà des assignations sur ce créneau");
+    }
+    throw new Error(error.message);
+  }
   return { created: data?.length ?? 0 };
 }
 
