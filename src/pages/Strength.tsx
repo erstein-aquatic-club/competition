@@ -720,6 +720,14 @@ export default function Strength() {
               onFinish={(result) => {
                 if (!activeRunId) return;
                 if (isFinishing) return;
+                if (!activeRunLogs || activeRunLogs.length === 0) {
+                  toast({
+                    title: "Aucune série enregistrée",
+                    description: "Valide au moins une série avant de terminer la séance.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 if (!isOnline) {
                   enqueue("strength-run-completed", {
                     run_id: activeRunId,

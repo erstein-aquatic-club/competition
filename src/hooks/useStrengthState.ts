@@ -114,7 +114,12 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
   // Save focus state to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const shouldPersist = screenMode === "focus" || screenMode === "reader";
+    // Persist while a run is in progress, even if the user has exited focus
+    // mode to browse the list — otherwise a PWA refresh after onExitFocus
+    // drops all accumulated logs (see Strength.tsx:683 "Don't clear run state").
+    const hasActiveRun = activeRunId !== null;
+    const shouldPersist =
+      screenMode === "focus" || screenMode === "reader" || hasActiveRun;
     if (!shouldPersist || !activeSession) {
       window.localStorage.removeItem(focusStorageKey);
       return;
