@@ -363,7 +363,16 @@ export default function SwimPlanningAthleteView({
 
   const planningContent = (
     <>
-      <div className="max-w-lg mx-auto md:max-w-3xl lg:max-w-4xl h-full flex flex-col">
+      <div
+        className={cn(
+          "max-w-lg mx-auto md:max-w-3xl lg:max-w-4xl",
+          // Only use the full-height flex layout when rendered as a full-screen
+          // overlay. When embedded (e.g. SuiviPlanification tab), the parent has
+          // no intrinsic height so `h-full` collapses to 0 and the content
+          // disappears until a re-render; let it flow naturally instead.
+          !embedded && "h-full flex flex-col",
+        )}
+      >
         {!embedded && (
           <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b">
             <div className="px-4 pt-3 pb-3">
@@ -384,7 +393,7 @@ export default function SwimPlanningAthleteView({
           </div>
         )}
 
-        <div className={cn("overflow-y-auto flex-1", embedded && "overflow-visible")}>
+        <div className={cn(!embedded && "overflow-y-auto flex-1")}>
           <div className={cn("relative px-4 pb-24", embedded ? "pt-1" : "pt-3")}>
             {/* Vertical rail */}
             <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />

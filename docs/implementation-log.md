@@ -7980,3 +7980,19 @@ L'interface nageur avait un dock 5 onglets (Accueil/Analyse/Muscu/Suivi/Profil) 
 - 30s est le bon compromis fraîcheur / charge : une modif coach apparaît au pire 30s plus tard sans stresser l'API
 - Le refetch est scoppé à `isVisible` (IntersectionObserver existant) donc aucun polling quand la vue est hors écran
 - `queryClient` global non modifié pour ne pas impacter les autres écrans qui dépendent du `staleTime: Infinity`
+
+## §109 — 2026-04-13 — Fix blank de "Ma planification" au premier rendu
+
+**Contexte :** Depuis §102/§103, `SwimPlanningAthleteView` est embarqué dans `SuiviPlanification` via la prop `embedded`. Sur l'arrivée sur la page, la vue natation restait blanche ; il fallait toggler sur Muscu puis revenir sur Natation pour que le contenu s'affiche.
+
+**Cause racine :** Le wrapper de `planningContent` utilisait `h-full flex flex-col` même en mode embedded, et le conteneur de scroll utilisait `flex-1 overflow-y-auto` (avec un override `overflow-visible` en embedded, mais **en laissant `flex-1`**). Le parent direct dans `SuiviPlanification` (`<div className="mt-4">`) n'a pas de hauteur explicite, donc `h-full` résolvait à **0**, `flex-1` à 0, et le contenu ne peignait pas de manière fiable au premier rendu. Un remount (via toggle) déclenchait un reflow différent qui parfois rétablissait l'affichage — d'où la manipulation nécessaire.
+
+**Changements :**
+- `SwimPlanningAthleteView.tsx` : les classes `h-full flex flex-col` sur le wrapper et `flex-1 overflow-y-auto` sur le conteneur de scroll sont désormais appliquées uniquement quand `!embedded`. En mode embedded, le contenu flotte naturellement dans le layout parent (qui est un flux document normal).
+
+**Fichiers modifiés :**
+- `src/pages/coach/SwimPlanningAthleteView.tsx` — conditionnement des classes flex/height sur `embedded`
+
+**Décisions :**
+- Fix ciblé et non intrusif : le mode overlay (non-embedded) conserve exactement son layout existant — seul le mode embedded bascule en flow naturel
+- Ajout d'un commentaire explicatif pour éviter la régression (future réintroduction de `h-full`)
