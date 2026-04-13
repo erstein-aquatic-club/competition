@@ -1939,11 +1939,6 @@ const CoachTrainingSlotsScreen = ({
     setShowSlotForm(true);
   };
 
-  const handleOpenInstance = (instance: SlotInstance) => {
-    setSelectedInstance(instance);
-    setShowSessionSheet(true);
-  };
-
   const handleSelect = useCallback((slot: TrainingSlot) => {
     const instance = slotInstancesById.get(slot.id);
     if (!instance) return;

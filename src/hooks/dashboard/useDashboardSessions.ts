@@ -128,7 +128,8 @@ export function useDashboardSessions({ sessions, assignments, userId, swimmerSlo
 
       return undefined;
     },
-    [logsBySessionId, swimmerSlots],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sessionsCacheRef is invalidated when assignmentsByIso changes
+    [logsBySessionId, swimmerSlots, assignmentsByIso],
   );
 
   const getSessionsForISO = useCallback(
