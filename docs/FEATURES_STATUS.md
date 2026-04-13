@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-12 (§104 Corrections bugs PWA + logiques nageur)*
+*Dernière mise à jour : 2026-04-13 (§110 Audit sécurité & robustesse — 4 sprints consolidés)*
 
 ## Légende
 
@@ -121,6 +121,11 @@ Tous les feature flags sont activés.
 | Hall of Fame | ✅ | `HallOfFame.tsx` | Podium visuel top 3 + rangs 4-5 compacts, sticky header compact, sélecteur période (7j/30j/3mois/1an), refresh auto après ajout séance (§38, §46, §51) |
 | Gestion coach imports perfs | ✅ | `RecordsAdmin.tsx` | Import individuel par nageur + historique des imports |
 | Sécurité RLS renforcée | ✅ | Migration `00046` | Policies restreintes sur 4 tables (app_settings, swimmer_performances, import_logs, strength_folders) (§80) |
+| RLS audit log lock-down | ✅ | Migration `00102` | `admin_audit_log` INSERT restreint à `app_user_role()='admin'` (était `WITH CHECK (true)`) (§110) |
+| RLS training_slots ownership | ✅ | Migration `00102` | UPDATE/DELETE sur slots + assignments + overrides exige `created_by = app_user_id()` ou admin (§110) |
+| RLS storage avatars/gifs | ✅ | Migration `00102` | Avatars ownership par `split_part(name,'.',1)`, exercise-gifs mutations coach/admin only (§110) |
+| CHECK strength_set_logs bornes | ✅ | Migration `00106` | `difficulty ∈ [1,5]`, `rpe ∈ [1,10]` en défense profondeur (§110) |
+| CHECK session_assignments visible_from | ✅ | Migration `00105` | `chk_visible_from_before_date` activée (était `NOT VALID`) (§110) |
 
 ### Messagerie
 
@@ -281,7 +286,7 @@ Tous les feature flags sont activés.
 | Service Worker push handler | ✅ | `public/push-handler.js`, `vite.config.ts` | importScripts dans Workbox generateSW |
 | Client push helpers | ✅ | `pushHelpers.ts`, `push.ts` | Subscribe/unsubscribe/check, split pur/browser |
 | Push permission banner | ✅ | `PushPermissionBanner.tsx`, `App.tsx` | Banner post-login, dismissible localStorage |
-| Edge Function push-send | ✅ | `supabase/functions/push-send/index.ts` | npm:web-push@3.6.7, nettoyage tokens expirés |
+| Edge Function push-send | ✅ | `supabase/functions/push-send/index.ts` | npm:web-push@3.6.7, nettoyage tokens expirés, auth webhook service_role + JWT coach/admin (§110 v33) |
 | Database webhook trigger | ✅ | `00044_push_webhook_trigger.sql` | pg_net trigger sur notification_targets INSERT |
 | Push toggle dans Profil | ✅ | `Profile.tsx` | Activer/désactiver depuis la page profil |
 | VAPID keys config | ✅ | `pushConfig.ts`, `pages.yml` | GitHub Secrets + Supabase Secrets |
