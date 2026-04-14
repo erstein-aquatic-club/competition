@@ -156,8 +156,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content — scrollable area */}
       <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-none">
         <div className="container max-w-lg mx-auto p-4 pb-4 md:max-w-3xl lg:max-w-5xl xl:max-w-6xl">
-          {/* Coach Header — section title */}
-          {(role === "coach" || role === "admin") && (() => {
+          {/* Coach Header — section title (only on /coach route) */}
+          {(role === "coach" || role === "admin") && location === "/coach" && (() => {
             const hashSection = hash.match(/[?&]section=([^&]+)/)?.[1] || "home";
             const sectionLabel = COACH_SECTION_LABELS[hashSection] || hashSection;
             return (
