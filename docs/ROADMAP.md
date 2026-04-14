@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-14 (§115 Suppression code orphelin `CoachSlotCalendar.tsx` — 766 LOC de dette supprimées)*
+*Dernière mise à jour : 2026-04-14 (§116 Session 1 urgences backend — fix cron `slot-session-reminder` (rec.id), vault push-send service_role, drop bucket list policies)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

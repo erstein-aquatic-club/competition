@@ -8292,3 +8292,45 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 
 **Limites / dette :**
 - Aucune.
+
+## §116 — 2026-04-14 — Session 1 urgences backend (cron `slot-session-reminder`, push-send 401, bucket policies)
+
+**Contexte :** Audit approfondi du projet (frontend + backend Supabase via MCP) a mis en évidence trois bugs actifs en prod qu'aucun monitoring ne remontait :
+
+1. **Cron `slot-session-reminder`** (jobid=2, `*/15 * * * *`) échouait à chaque tick avec `ERROR: record "rec" has no field "id"`. Le bloc PL/pgSQL sélectionnait `sa.id AS assignment_id` mais tentait ensuite `UPDATE session_assignments SET notified_at = NOW() WHERE id = rec.id`. L'alias masquait la colonne. **Depuis le déploiement de §85 (slot-centric sessions), aucun rappel "Séance terminée ?" n'avait jamais été envoyé.**
+2. **Edge function `push-send`** retournait 401 sur 100 % des invocations (6/6 dans la fenêtre 24h observée). Le vault secret `push_edge_function_key` contenait un JWT de rôle `anon` au lieu de `service_role` — probablement depuis toujours. Le check `token === SUPABASE_SERVICE_ROLE_KEY` dans `supabase/functions/push-send/index.ts:77` retournait donc false, la fn tombait dans la branche `auth.getUser(anon)`, GoTrue rejetait (anon n'est pas un JWT user), 401 systématique. **Conséquence : aucune notification push n'avait jamais été envoyée via le trigger webhook `trg_push_notification_on_target_insert` (00044) en prod.**
+3. **Advisor sécu `public_bucket_allows_listing`** : buckets `avatars` et `exercise-gifs` ont `public = true` ET une policy `SELECT ... USING (bucket_id = '…')` au rôle `public`. L'URL directe `/storage/v1/object/public/…` fonctionne via le flag bucket (pas via la policy RLS), donc la policy large permet inutilement `storage.from(bucket).list()` à n'importe quel client anonyme.
+
+**Changements réalisés :**
+
+1. **`00109_fix_slot_session_reminder_cron.sql`** — `cron.unschedule('slot-session-reminder')` puis `cron.schedule(...)` avec le command corrigé : `WHERE id = rec.assignment_id` au lieu de `rec.id`. Ajout d'un **garde-fou** `ts.end_time >= (LOCALTIME - INTERVAL '2 hours')` pour éviter qu'au premier tick réussi, toutes les assignations du jour reçoivent d'un coup un rappel rétroactif (backlog).
+2. **Secret vault `push_edge_function_key`** remplacé par la vraie clé `service_role` via `vault.update_secret('da5ac28c-…', '<service_role_jwt>')`. Vérifié par read-back : payload décodé = `{"role":"service_role","ref":"fscnobivsgornxdwqwlk"}`. **Pas de migration versionnée** (les secrets ne sont pas du DDL et ne doivent pas être dans le repo).
+3. **`00110_storage_drop_public_list_policies.sql`** — `DROP POLICY avatars_public_read, exercise_gifs_public_read ON storage.objects`. Aucune policy de remplacement : les buckets restent `public = true`, les URLs directes fonctionnent via l'endpoint `/object/public/`, et aucun `.list()` n'a été trouvé côté frontend ni edge functions.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00109_fix_slot_session_reminder_cron.sql` | **Nouveau** (appliqué via MCP `apply_migration`) |
+| `supabase/migrations/00110_storage_drop_public_list_policies.sql` | **Nouveau** (appliqué via MCP `apply_migration`) |
+| `vault.secrets.push_edge_function_key` | Secret remplacé (anon → service_role) via `vault.update_secret()` |
+
+**Tests :**
+- ✅ Verif read-back du vault : payload = `role:service_role` confirmé.
+- ✅ `pg_policies` après DROP : 0 row pour `avatars_public_read` / `exercise_gifs_public_read`.
+- ✅ `cron.job` après reschedule : job 2 actif, `*/15 * * * *`, command contient `rec.assignment_id`.
+- ⏳ **Prochain tick cron (21:15 UTC)** : l'ERROR doit disparaître des logs postgres. Dernier tick fautif observé à 21:00:00.310 UTC (11 s avant l'application du fix). À vérifier avec `get_logs service=postgres` d'ici 15 min.
+- ⏳ **Prochain INSERT notification_targets** : `push-send` doit retourner 200. Vérifiable via `SELECT status_code FROM net._http_response ORDER BY created DESC LIMIT 5` après une écriture.
+
+**Décisions prises :**
+- **Fix vault minimal plutôt que refacto code** — remplacer le secret est une 1-liner réversible et zero-downtime. L'idée long terme (décoder le JWT et matcher sur `payload.role === 'service_role'` au lieu de l'égalité stricte `token === SUPABASE_SERVICE_ROLE_KEY`) est notée pour une future session perf/robustesse. L'égalité stricte actuelle reste fragile à toute rotation de clé.
+- **Garde-fou 2h sur le cron** — sans lui, le premier tick aurait potentiellement envoyé des rappels pour toutes les séances déjà terminées du jour (`notified_at IS NULL` est vrai pour 100 % de l'historique). Le garde-fou limite le rattrapage à une fenêtre raisonnable.
+- **Drop policies sans remplacement** plutôt qu'une policy restrictive `authenticated only` — le code ne fait jamais de `.list()`, donc aucune policy SELECT n'est nécessaire. Si un besoin admin apparaît plus tard, ajouter une policy `role IN ('coach','admin')` sera trivial.
+- **Pas de suppression de `migrate-gifs` edge function** — `delete_edge_function` n'est pas exposé par le MCP. Action manuelle utilisateur (Dashboard) à faire ultérieurement.
+- **Leaked password protection** — toggle Dashboard, action manuelle utilisateur.
+
+**Limites / dette :**
+- **Amélioration robustesse push-send différée** : l'auth gate de `push-send/index.ts:62-94` reste sensible à toute rotation future du `service_role`. À remplacer par un décodage JWT + vérif `payload.role === 'service_role'` dans une session perf ultérieure (Session 5).
+- **Cron `LOCALTIME` vs fuseau** : le serveur Supabase tourne en UTC, le code compare `ts.end_time` (typed `time`) à `LOCALTIME` (local UTC). Ça fonctionne parce que les `end_time` des créneaux sont probablement en UTC côté DB, mais si l'app doit un jour supporter plusieurs timezones, remplacer par `(NOW() AT TIME ZONE 'Europe/Paris')::time`. Hors scope Session 1.
+- **Push notifications historiques perdues** : toutes les notifications push émises via le trigger depuis le déploiement §79 sont perdues (elles ont été 401). Pas de rattrapage prévu — elles concernaient des événements passés.
+- **Vérification post-fix différée** : je n'ai pas pu observer le prochain tick cron 21:15 UTC ni un INSERT `notification_targets` en live. À confirmer par l'utilisateur à J+1.

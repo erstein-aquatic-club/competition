@@ -319,6 +319,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 77 | Fix FeedbackDrawer — suppression ressenti (RLS) + distance affichée | Haute | Fait (§113) |
 | 78 | Jours de compétition dans vue semaine coach (bandeau + quick sheet) | Moyenne | Fait (§114) |
 | 79 | Suppression code orphelin `CoachSlotCalendar.tsx` (766 LOC) | Basse | Fait (§115) |
+| 80 | Session 1 urgences backend (cron `rec.id`, push-send vault service_role, bucket list policies) | Haute | Fait (§116) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
