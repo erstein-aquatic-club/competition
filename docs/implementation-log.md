@@ -8326,8 +8326,8 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 - **Fix vault minimal plutôt que refacto code** — remplacer le secret est une 1-liner réversible et zero-downtime. L'idée long terme (décoder le JWT et matcher sur `payload.role === 'service_role'` au lieu de l'égalité stricte `token === SUPABASE_SERVICE_ROLE_KEY`) est notée pour une future session perf/robustesse. L'égalité stricte actuelle reste fragile à toute rotation de clé.
 - **Garde-fou 2h sur le cron** — sans lui, le premier tick aurait potentiellement envoyé des rappels pour toutes les séances déjà terminées du jour (`notified_at IS NULL` est vrai pour 100 % de l'historique). Le garde-fou limite le rattrapage à une fenêtre raisonnable.
 - **Drop policies sans remplacement** plutôt qu'une policy restrictive `authenticated only` — le code ne fait jamais de `.list()`, donc aucune policy SELECT n'est nécessaire. Si un besoin admin apparaît plus tard, ajouter une policy `role IN ('coach','admin')` sera trivial.
-- **Pas de suppression de `migrate-gifs` edge function** — `delete_edge_function` n'est pas exposé par le MCP. Action manuelle utilisateur (Dashboard) à faire ultérieurement.
-- **Leaked password protection** — toggle Dashboard, action manuelle utilisateur.
+- **Pas de suppression de `migrate-gifs` edge function** — `delete_edge_function` n'est pas exposé par le MCP (seulement `deploy`, `get`, `list`). Action manuelle utilisateur via Dashboard ou `supabase functions delete migrate-gifs` CLI. Non bloquant (la fonction consomme ~0 ressource tant qu'elle n'est pas invoquée).
+- **Leaked password protection HIBP non activée** — feature Supabase Pro uniquement, le projet est sur plan inférieur. Finding advisor conservé comme "accepté" (hors scope sans upgrade).
 
 **Limites / dette :**
 - **Amélioration robustesse push-send différée** : l'auth gate de `push-send/index.ts:62-94` reste sensible à toute rotation future du `service_role`. À remplacer par un décodage JWT + vérif `payload.role === 'service_role'` dans une session perf ultérieure (Session 5).
