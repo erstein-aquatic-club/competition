@@ -6,11 +6,43 @@ import { ChevronLeft, ChevronRight, Plus, Calendar, BookOpen, MapPin, Clock, Sha
 import { useSlotCalendar, type SlotInstance, type SlotState } from "@/hooks/useSlotCalendar";
 import SlotSessionSheet from "./SlotSessionSheet";
 import { SlotTemplatePicker } from "./SlotTemplatePicker";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bulkCreateSlotAssignments, deriveScheduledSlot } from "@/lib/api/assignments";
+import { getCompetitions } from "@/lib/api/competitions";
+import type { Competition } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
+import { CompetitionDayBanner } from "@/components/coach/CompetitionDayBanner";
+import { CompetitionQuickSheet } from "@/components/coach/CompetitionQuickSheet";
+
+interface CompetitionDayEntry {
+  competition: Competition;
+  dayIndex: number;
+  totalDays: number;
+}
+
+function diffDaysInclusive(startIso: string, endIso: string): number {
+  const [sy, sm, sd] = startIso.split("-").map(Number);
+  const [ey, em, ed] = endIso.split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd).getTime();
+  const end = new Date(ey, em - 1, ed).getTime();
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+function iterateDatesInclusive(startIso: string, endIso: string): string[] {
+  const [sy, sm, sd] = startIso.split("-").map(Number);
+  const [ey, em, ed] = endIso.split("-").map(Number);
+  const out: string[] = [];
+  const cur = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  const pad = (v: number) => String(v).padStart(2, "0");
+  while (cur.getTime() <= end.getTime()) {
+    out.push(`${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
 
 // ── Props ──────────────────────────────────────────────────
 
@@ -18,6 +50,7 @@ interface CoachSlotCalendarProps {
   onBack: () => void;
   onOpenLibrary: () => void;
   onOpenSlot?: (instance: SlotInstance) => void;
+  onOpenCompetitions?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -255,6 +288,7 @@ function FilledSlotCard({
 export default function CoachSlotCalendar({
   onBack,
   onOpenLibrary,
+  onOpenCompetitions,
 }: CoachSlotCalendarProps) {
   const {
     weekOffset,
@@ -271,6 +305,53 @@ export default function CoachSlotCalendar({
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // ── Competitions overlay ──────────────────────────────
+  const { data: competitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: getCompetitions,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const competitionsByDate = useMemo(() => {
+    const map = new Map<string, CompetitionDayEntry[]>();
+    const weekSet = new Set(weekDates);
+    for (const c of competitions) {
+      if (!c.date) continue;
+      const endIso = c.end_date && c.end_date >= c.date ? c.end_date : c.date;
+      const totalDays = diffDaysInclusive(c.date, endIso);
+      const allDays = iterateDatesInclusive(c.date, endIso);
+      allDays.forEach((iso, idx) => {
+        if (!weekSet.has(iso)) return;
+        const entry: CompetitionDayEntry = {
+          competition: c,
+          dayIndex: idx + 1,
+          totalDays,
+        };
+        const arr = map.get(iso) ?? [];
+        arr.push(entry);
+        map.set(iso, arr);
+      });
+    }
+    return map;
+  }, [competitions, weekDates]);
+
+  const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
+  const [compSheetOpen, setCompSheetOpen] = useState(false);
+
+  const handleOpenCompetition = useCallback((c: Competition) => {
+    setSelectedCompetition(c);
+    setCompSheetOpen(true);
+  }, []);
+
+  const handleViewCompetitionDetail = useCallback(() => {
+    setCompSheetOpen(false);
+    if (onOpenCompetitions) {
+      onOpenCompetitions();
+    } else {
+      window.location.hash = "#/coach/competitions";
+    }
+  }, [onOpenCompetitions]);
 
   // ── Sheet state ────────────────────────────────────────
   const [selectedInstance, setSelectedInstance] = useState<SlotInstance | null>(null);
@@ -516,7 +597,9 @@ export default function CoachSlotCalendar({
                 label={label}
                 isToday={isToday}
                 slots={slots}
+                competitions={competitionsByDate.get(dateIso) ?? []}
                 onOpenSlot={handleOpenSlot}
+                onOpenCompetition={handleOpenCompetition}
               />
             );
           })
@@ -552,6 +635,16 @@ export default function CoachSlotCalendar({
       />
     )}
 
+    <CompetitionQuickSheet
+      competition={selectedCompetition}
+      open={compSheetOpen}
+      onOpenChange={(open) => {
+        setCompSheetOpen(open);
+        if (!open) setSelectedCompetition(null);
+      }}
+      onViewDetail={handleViewCompetitionDetail}
+    />
+
     <SlotTemplatePicker
       open={templatePickerOpen}
       onOpenChange={(open) => {
@@ -578,16 +671,20 @@ function DaySection({
   label,
   isToday,
   slots,
+  competitions,
   onOpenSlot,
+  onOpenCompetition,
 }: {
   dateIso: string;
   abbrev: string;
   label: string;
   isToday: boolean;
   slots: SlotInstance[];
+  competitions: CompetitionDayEntry[];
   onOpenSlot: (instance: SlotInstance) => void;
+  onOpenCompetition: (competition: Competition) => void;
 }) {
-  if (slots.length === 0) {
+  if (slots.length === 0 && competitions.length === 0) {
     return (
       <div key={dateIso} className="py-2">
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -629,6 +726,21 @@ function DaySection({
             </span>
           )}
         </div>
+
+        {/* Competition banners (above slot cards) */}
+        {competitions.length > 0 && (
+          <div className="mb-2 space-y-2">
+            {competitions.map((entry) => (
+              <CompetitionDayBanner
+                key={`${entry.competition.id}-${dateIso}`}
+                competition={entry.competition}
+                dayIndex={entry.dayIndex}
+                totalDays={entry.totalDays}
+                onTap={() => onOpenCompetition(entry.competition)}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Slot cards stack */}
         <div className="space-y-2">

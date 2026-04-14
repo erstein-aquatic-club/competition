@@ -206,6 +206,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/hooks/dashboard/useCompletionStatus.ts` | Statut complétion sessions (§112) | ~108 lignes |
 | `src/hooks/dashboard/useDayMetrics.ts` | Métriques km jour/global (§112) | ~77 lignes |
 | `src/hooks/dashboard/useFeedbackDraft.ts` | État draft feedback isolé (§112) | ~109 lignes |
+| `src/components/coach/CompetitionDayBanner.tsx` | Bandeau compétition vue semaine coach (§114) | ~56 lignes |
+| `src/components/coach/CompetitionQuickSheet.tsx` | Quick sheet résumé compétition (§114) | ~91 lignes |
 | `src/hooks/useMonthlyReport.ts` | Hook rapport mensuel | ~479 lignes |
 | `src/hooks/useAttendancePerformance.ts` | Hook assiduité/perf | ~270 lignes |
 | `src/hooks/useSwimAnalytics.ts` | Hook analytics natation | ~258 lignes |
@@ -316,6 +318,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 75 | Fix infinite loop IntersectionObserver Ma planification | Haute | Fait (§111) |
 | 76 | Performance fixes batch (refetchOnWindowFocus, staleTime objectives, découpe useDashboardState, memo coach slots) | Haute | Fait (§112) |
 | 77 | Fix FeedbackDrawer — suppression ressenti (RLS) + distance affichée | Haute | Fait (§113) |
+| 78 | Jours de compétition dans vue semaine coach (bandeau + quick sheet) | Moyenne | Fait (§114) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

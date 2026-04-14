@@ -17,6 +17,10 @@ import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 import SlotSessionSheet from "./SlotSessionSheet";
 import { SlotTemplatePicker } from "./SlotTemplatePicker";
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
+import { getCompetitions } from "@/lib/api/competitions";
+import type { Competition } from "@/lib/api/types";
+import { CompetitionDayBanner } from "@/components/coach/CompetitionDayBanner";
+import { CompetitionQuickSheet } from "@/components/coach/CompetitionQuickSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,7 +68,37 @@ import {
   Loader2,
   Waves,
   Dumbbell,
+  Trophy,
 } from "lucide-react";
+
+// ── Competition types (week overlay) ─────────────────────────────
+interface CompetitionDayEntry {
+  competition: Competition;
+  dayIndex: number;
+  totalDays: number;
+}
+
+function diffDaysInclusive(startIso: string, endIso: string): number {
+  const [sy, sm, sd] = startIso.split("-").map(Number);
+  const [ey, em, ed] = endIso.split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd).getTime();
+  const end = new Date(ey, em - 1, ed).getTime();
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+function iterateDatesInclusive(startIso: string, endIso: string): string[] {
+  const [sy, sm, sd] = startIso.split("-").map(Number);
+  const [ey, em, ed] = endIso.split("-").map(Number);
+  const out: string[] = [];
+  const cur = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  const pad = (v: number) => String(v).padStart(2, "0");
+  while (cur.getTime() <= end.getTime()) {
+    out.push(`${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -1276,6 +1310,8 @@ type MobileViewProps = {
   onPrevWeek: () => void;
   onNextWeek: () => void;
   weekNumber: number;
+  competitionsByDate: Map<string, CompetitionDayEntry[]>;
+  onOpenCompetition: (competition: Competition) => void;
 };
 
 /** Compute duration string from two time strings */
@@ -1299,6 +1335,8 @@ const MobileView = ({
   onPrevWeek,
   onNextWeek,
   weekNumber,
+  competitionsByDate,
+  onOpenCompetition,
 }: MobileViewProps) => {
   // Auto-select today's day (1=Mon...7=Sun), or Monday if today isn't in this week
   const [selectedDay, setSelectedDay] = useState<number>(() => {
@@ -1368,6 +1406,7 @@ const MobileView = ({
           const isToday = toIsoDate(date) === todayStr;
           const isSelected = dow === selectedDay;
           const daySlots = slotsByDay.get(dow) ?? [];
+          const hasCompetition = (competitionsByDate.get(toIsoDate(date)) ?? []).length > 0;
 
           return (
             <button
@@ -1380,6 +1419,10 @@ const MobileView = ({
               }`}
               onClick={() => setSelectedDay(dow)}
             >
+              {/* Competition indicator dot */}
+              {hasCompetition && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-rose-500" />
+              )}
               {/* Day label */}
               <span className={`text-[10px] font-semibold uppercase tracking-wider ${
                 isToday ? "text-primary" : "text-muted-foreground"
@@ -1450,6 +1493,24 @@ const MobileView = ({
 
       {/* ── Day detail: slot cards ── */}
       <div className="space-y-2">
+        {(() => {
+          const selectedDate = weekDates[selectedDay - 1];
+          const entries = selectedDate ? (competitionsByDate.get(toIsoDate(selectedDate)) ?? []) : [];
+          if (entries.length === 0) return null;
+          return (
+            <div className="space-y-2 mb-2">
+              {entries.map((entry) => (
+                <CompetitionDayBanner
+                  key={`${entry.competition.id}-mobile`}
+                  competition={entry.competition}
+                  dayIndex={entry.dayIndex}
+                  totalDays={entry.totalDays}
+                  onTap={() => onOpenCompetition(entry.competition)}
+                />
+              ))}
+            </div>
+          );
+        })()}
         <h3 className="text-sm font-semibold text-foreground px-0.5">
           {DAYS_FR[selectedDay - 1]} {weekDates[selectedDay - 1]?.getDate()}{" "}
           <span className="font-normal text-muted-foreground">
@@ -1665,6 +1726,49 @@ const CoachTrainingSlotsScreen = ({
       return d;
     });
   }, [weekMonday]);
+
+  // ── Competitions overlay ─────────────────────────────
+  const { data: competitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: getCompetitions,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const competitionsByDate = useMemo(() => {
+    const map = new Map<string, CompetitionDayEntry[]>();
+    const weekIsoSet = new Set(weekDates.map((d) => toIsoDate(d)));
+    for (const c of competitions) {
+      if (!c.date) continue;
+      const endIso = c.end_date && c.end_date >= c.date ? c.end_date : c.date;
+      const totalDays = diffDaysInclusive(c.date, endIso);
+      const allDays = iterateDatesInclusive(c.date, endIso);
+      allDays.forEach((iso, idx) => {
+        if (!weekIsoSet.has(iso)) return;
+        const entry: CompetitionDayEntry = {
+          competition: c,
+          dayIndex: idx + 1,
+          totalDays,
+        };
+        const arr = map.get(iso) ?? [];
+        arr.push(entry);
+        map.set(iso, arr);
+      });
+    }
+    return map;
+  }, [competitions, weekDates]);
+
+  const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
+  const [compSheetOpen, setCompSheetOpen] = useState(false);
+
+  const handleOpenCompetition = useCallback((c: Competition) => {
+    setSelectedCompetition(c);
+    setCompSheetOpen(true);
+  }, []);
+
+  const handleViewCompetitionDetail = useCallback(() => {
+    setCompSheetOpen(false);
+    window.location.hash = "#/coach/competitions";
+  }, []);
 
   const prevWeek = () =>
     setWeekMonday((m) => {
@@ -2691,6 +2795,8 @@ const CoachTrainingSlotsScreen = ({
               onPrevWeek={prevWeek}
               onNextWeek={nextWeek}
               weekNumber={weekNumber}
+              competitionsByDate={competitionsByDate}
+              onOpenCompetition={handleOpenCompetition}
             />
           </div>
 
@@ -2719,6 +2825,34 @@ const CoachTrainingSlotsScreen = ({
                     <span className={`text-[10px] ${isToday ? "text-primary font-bold" : "text-muted-foreground/60"}`}>
                       {formatDayMonth(date)}
                     </span>
+                  </div>
+                );
+              })}
+
+              {/* ── Competition strips row (desktop) ── */}
+              <div />
+              {weekDates.map((date, i) => {
+                const entries = competitionsByDate.get(toIsoDate(date)) ?? [];
+                return (
+                  <div key={`comp-${i}`} className="px-0.5 pb-1">
+                    {entries.map((entry) => (
+                      <button
+                        key={`${entry.competition.id}-desk`}
+                        type="button"
+                        onClick={() => handleOpenCompetition(entry.competition)}
+                        className="w-full text-left px-1.5 py-1 mb-1 rounded-md bg-gradient-to-r from-rose-500/15 to-orange-500/10 border border-rose-500/30 flex items-center gap-1 hover:bg-rose-500/20 transition-colors"
+                      >
+                        <Trophy className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
+                        <span className="text-[10px] font-semibold truncate text-foreground">
+                          {entry.competition.name}
+                        </span>
+                        {entry.totalDays > 1 && (
+                          <span className="text-[9px] text-rose-600/70 dark:text-rose-400/70 shrink-0">
+                            J{entry.dayIndex}
+                          </span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 );
               })}
@@ -2784,6 +2918,16 @@ const CoachTrainingSlotsScreen = ({
           </div>{/* end exportContentRef */}
         </>
       )}
+
+      <CompetitionQuickSheet
+        competition={selectedCompetition}
+        open={compSheetOpen}
+        onOpenChange={(open) => {
+          setCompSheetOpen(open);
+          if (!open) setSelectedCompetition(null);
+        }}
+        onViewDetail={handleViewCompetitionDetail}
+      />
 
       <SlotSessionSheet
         instance={selectedInstance}

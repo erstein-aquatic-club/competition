@@ -8216,3 +8216,49 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 **Limites / dette :**
 - Pas de test unitaire ajouté (fix ciblé, pas de nouvelle logique métier)
 - Le placeholder `{"→"} km` (ligne 1239 de la barre d'action) reste en place — non concerné par le bug rapporté
+
+
+## §114 — 2026-04-14 — Jours de compétition dans la vue semaine coach
+
+**Contexte :** Dans la vue semaine coach (`CoachTrainingSlotsScreen`, rendue par `CoachWeekView` en mode "Semaine"), les jours de compétition n'étaient pas visibles — le coach devait aller sur l'écran Compétitions dédié pour vérifier. Objectif : intégrer un indicateur visuel non-intrusif des compétitions directement dans la vue semaine, sans masquer les créneaux d'entraînement (les coachs programment souvent un échauffement ou une récupération le jour J).
+
+**Changements réalisés :**
+
+1. **Nouveau composant `CompetitionDayBanner`** (`src/components/coach/CompetitionDayBanner.tsx`, 56 LOC) — Carte rounded-2xl avec Trophy icon dans tuile rose-500/15, label "COMPÉTITION" uppercase tracking-widest, nom + lieu tronqués, pastille "Jour X/Y" si multi-jours, ChevronRight. Gradient rose→orange-500/10 pour se distinguer visuellement des cartes draft (amber) et published (emerald).
+
+2. **Nouveau composant `CompetitionQuickSheet`** (`src/components/coach/CompetitionQuickSheet.tsx`, 91 LOC) — Radix Sheet (bottom) avec header Trophy + nom, date range (formatée fr-FR, multi-jours géré), lieu, description, bouton pleine largeur "Voir la compétition" (ArrowRight) qui route vers `#/coach/competitions`.
+
+3. **Intégration dans `CoachTrainingSlotsScreen.tsx`** :
+   - Helpers purs `diffDaysInclusive` + `iterateDatesInclusive` pour le découpage multi-jours (math en local time, pas de DST surprise).
+   - `useQuery(["competitions"], getCompetitions, staleTime: 5min)` + `competitionsByDate: Map<isoDate, CompetitionDayEntry[]>` via `useMemo` — pour chaque compétition, itère date..end_date inclusif et indexe `{ competition, dayIndex, totalDays }` sur les dates présentes dans `weekDates`.
+   - State `selectedCompetition` + `compSheetOpen`, handlers `handleOpenCompetition` / `handleViewCompetitionDetail`.
+   - **MobileView** (vue mobile) : petit dot rose (h-1.5 w-1.5) en `absolute top-1 right-1` sur le bouton de jour quand ≥1 compétition ; `CompetitionDayBanner` stacké au-dessus du `<h3>` du détail jour pour le jour sélectionné.
+   - **Desktop grid** : nouvelle ligne insérée entre les day headers et la timeline, avec un bouton pill rose compact (Trophy + nom tronqué + "J{dayIndex}" si multi-jours) par jour concerné, cliquable.
+   - Rendu de `<CompetitionQuickSheet />` aux côtés de `SlotSessionSheet` / `SlotFormSheet` / `OverrideFormSheet`.
+
+4. **Bonus — intégration parallèle dans `CoachSlotCalendar.tsx`** (code orphelin §85, non rendu par `CoachWeekView` mais conservé) : même feature (banner au-dessus des slots par jour, quick sheet, fetch competitions). Pas visible en production mais aligne les deux implémentations au cas où le fichier serait réactivé.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/CompetitionDayBanner.tsx` | **Nouveau** (56 LOC) |
+| `src/components/coach/CompetitionQuickSheet.tsx` | **Nouveau** (91 LOC) |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Fetch + map competitionsByDate, state/handlers, banner mobile (dot + carte), banner desktop (row), CompetitionQuickSheet |
+| `src/pages/coach/CoachSlotCalendar.tsx` | Même intégration (code orphelin, alignement) |
+
+**Tests :**
+- `npx tsc --noEmit` : clean (zéro nouvelle erreur)
+- Smoke test visuel mobile + desktop à faire au prochain dev run (créer une compétition du jour, vérifier dot + banner + sheet + lien détail)
+
+**Décisions prises :**
+- **Option A retenue** (bandeau au-dessus des créneaux, pas remplacement) — un coach peut toujours planifier une séance le jour J (échauffement, récup, décrassage). La compétition est une info contextuelle, pas un blocage.
+- **Numérotation multi-jours "Jour X/Y" répétée chaque jour** plutôt que "→ jusqu'au samedi" uniquement J1 — un coach qui scrolle au mercredi d'un meeting voit immédiatement "Jour 2/3" sans chercher le début.
+- **Toutes les compétitions club-wide**, pas filtrage par `coach_assignments` — un coach qui voit des athlètes d'un autre coach absents doit comprendre pourquoi sans croiser plusieurs écrans.
+- **Routage via `window.location.hash`** côté parent profond (pas de prop à threader) — `CoachTrainingSlotsScreen` est lazy-loadé et déjà très paramétré, ajouter une prop `onOpenCompetitions` aurait impacté `CoachWeekView` sans bénéfice.
+- **Rose/orange accent** pour se distinguer sans ambiguïté des états draft (amber) et published (emerald) — cohérent avec la sémantique "événement chaud/compétitif".
+
+**Limites / dette :**
+- Pas de tests unitaires ajoutés (composants purs, logique testable = `diffDaysInclusive` / `iterateDatesInclusive` qui sont trivialement correctes).
+- Le desktop timeline utilise un layout absolu avec `gridTemplateColumns: "2.5rem repeat(7, 1fr)"` : la nouvelle ligne banner s'insère naturellement (elle consomme 1 row de la grid implicite) mais on suppose que l'export html2canvas intègre cette row — à vérifier au premier export réel.
+- Pas de filtrage coach/groupe sur les compétitions (décision C rejetée par l'utilisateur).
