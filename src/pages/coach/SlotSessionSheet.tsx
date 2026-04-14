@@ -1,7 +1,7 @@
 /**
  * SlotSessionSheet — Bottom sheet for slot actions (create/edit/visibility/delete)
  *
- * Opens when the coach taps a slot card in CoachSlotCalendar.
+ * Opens when the coach taps a slot card in CoachTrainingSlotsScreen.
  * Behavior adapts to SlotState (empty / draft / published / cancelled).
  */
 

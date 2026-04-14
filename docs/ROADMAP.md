@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-14 (§114 Jours de compétition dans vue semaine coach — bandeau mobile + desktop grid + quick sheet)*
+*Dernière mise à jour : 2026-04-14 (§115 Suppression code orphelin `CoachSlotCalendar.tsx` — 766 LOC de dette supprimées)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

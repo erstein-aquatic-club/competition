@@ -8262,3 +8262,33 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 - Pas de tests unitaires ajoutés (composants purs, logique testable = `diffDaysInclusive` / `iterateDatesInclusive` qui sont trivialement correctes).
 - Le desktop timeline utilise un layout absolu avec `gridTemplateColumns: "2.5rem repeat(7, 1fr)"` : la nouvelle ligne banner s'insère naturellement (elle consomme 1 row de la grid implicite) mais on suppose que l'export html2canvas intègre cette row — à vérifier au premier export réel.
 - Pas de filtrage coach/groupe sur les compétitions (décision C rejetée par l'utilisateur).
+
+## §115 — 2026-04-14 — Suppression code orphelin `CoachSlotCalendar.tsx`
+
+**Contexte :** `src/pages/coach/CoachSlotCalendar.tsx` (766 LOC) était du code mort depuis le commit `b298a5b2` (2026-03-01) qui l'avait explicitement remplacé par `CoachTrainingSlotsScreen` dans `Coach.tsx` ("Replace CoachSlotCalendar with CoachTrainingSlotsScreen for swim section"). Le fichier continuait à être maintenu par inadvertance — y compris via le §114 juste avant qui y avait ajouté les bandeaux compétition "au cas où". Aucun import actif dans `src/`, aucun lazy-load, aucun test. Dette pure qui créait de la confusion et dupliquait la logique de slot management.
+
+**Changements réalisés :**
+
+1. **Suppression** de `src/pages/coach/CoachSlotCalendar.tsx` (766 LOC).
+2. **Mise à jour du commentaire** dans `src/pages/coach/SlotSessionSheet.tsx:4` — la docstring référençait encore `CoachSlotCalendar`, remplacé par `CoachTrainingSlotsScreen`.
+3. **Retrait de l'entrée** dans le tableau "Fichiers clés" de `CLAUDE.md`.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/CoachSlotCalendar.tsx` | **Supprimé** (766 LOC) |
+| `src/pages/coach/SlotSessionSheet.tsx` | Docstring mise à jour (CoachSlotCalendar → CoachTrainingSlotsScreen) |
+| `CLAUDE.md` | Entrée "Fichiers clés" retirée |
+
+**Tests :**
+- `npx tsc --noEmit` : clean
+- `npm run build` : clean (198 precache entries, 9.8s build)
+
+**Décisions prises :**
+- Vérification exhaustive avant suppression : `grep -r "CoachSlotCalendar" src/` (4 hits tous dans le fichier lui-même + 1 commentaire) ; historique git (`git log -S`) confirme que le remplacement date de 6 semaines ; aucun `lazy(() => import(...))` ne le cible ; aucun export réutilisé (tous les composants internes non-exportés).
+- Suppression plutôt qu'archivage : git conserve l'historique complet, pas besoin d'un fichier `.archived.tsx`.
+- Le §114 (bandeaux compétition ajoutés "au cas où" sur ce fichier juste avant) est emporté avec la suppression — le même feature vit toujours dans `CoachTrainingSlotsScreen.tsx` qui est la vraie cible active.
+
+**Limites / dette :**
+- Aucune.

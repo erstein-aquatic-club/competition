@@ -91,7 +91,6 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) | ~530 lignes |
 | `src/pages/coach/CoachSmsScreen.tsx` | Écran SMS généraliste coach (groupe/nageur) | ~190 lignes |
 | `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) | ~2839 lignes |
-| `src/pages/coach/CoachSlotCalendar.tsx` | Calendrier semaine créneaux + séances (§85) | ~654 lignes |
 | `src/pages/coach/SlotSessionSheet.tsx` | Bottom sheet actions créneau (créer/modifier/visibilité/supprimer) (§85) | ~1024 lignes |
 | `src/pages/coach/SlotTemplatePicker.tsx` | Picker templates bibliothèque séances (§85) | ~150 lignes |
 | `src/hooks/useSlotCalendar.ts` | Hook matérialisation créneaux récurrents → instances semaine (§85) | ~230 lignes |
@@ -319,6 +318,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 76 | Performance fixes batch (refetchOnWindowFocus, staleTime objectives, découpe useDashboardState, memo coach slots) | Haute | Fait (§112) |
 | 77 | Fix FeedbackDrawer — suppression ressenti (RLS) + distance affichée | Haute | Fait (§113) |
 | 78 | Jours de compétition dans vue semaine coach (bandeau + quick sheet) | Moyenne | Fait (§114) |
+| 79 | Suppression code orphelin `CoachSlotCalendar.tsx` (766 LOC) | Basse | Fait (§115) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
