@@ -225,7 +225,6 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `ffn-sync` | Fonctionnelle (ACTIVE, v53) — cron sync FFN | `supabase/functions/ffn-sync/` |
 | `ffn-performances` | Fonctionnelle (ACTIVE, v62) | `supabase/functions/ffn-performances/` |
 | `import-club-records` | Fonctionnelle (ACTIVE, v73) | `supabase/functions/import-club-records/` |
-| `migrate-gifs` | Fonctionnelle (ACTIVE, v2) — migration one-shot GIF exercices | `supabase/functions/migrate-gifs/` |
 | `push-send` | Fonctionnelle (ACTIVE, v33) | `supabase/functions/push-send/` |
 
 ## Documentation
