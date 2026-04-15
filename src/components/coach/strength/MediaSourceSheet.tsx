@@ -106,3 +106,5 @@ export function MediaSourceSheet({ open, onOpenChange, onMediaReady }: MediaSour
     </Sheet>
   );
 }
+
+export default MediaSourceSheet;

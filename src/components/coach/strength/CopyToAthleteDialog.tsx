@@ -85,3 +85,5 @@ export function CopyToAthleteDialog({
     </Dialog>
   );
 }
+
+export default CopyToAthleteDialog;

@@ -1,4 +1,5 @@
-import { useEffect, useDeferredValue, useMemo, useState } from "react";
+import { Suspense, useEffect, useDeferredValue, useMemo, useState } from "react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Exercise, StrengthCycleType, StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api";
 import type { StrengthSessionInput } from "@/lib/types";
@@ -29,9 +30,17 @@ import { StrengthSessionBuilder } from "@/components/coach/strength/StrengthSess
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { FolderSection } from "@/components/coach/strength/FolderSection";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
-import { CopyToAthleteDialog } from "@/components/coach/strength/CopyToAthleteDialog";
-import { AthletePlansTab } from "@/components/coach/strength/AthletePlansTab";
-import { MediaSourceSheet } from "@/components/coach/strength/MediaSourceSheet";
+// Lazy-loaded children : ne sont rendus qu'à l'ouverture de modals/sheets
+// ou via un onglet (TabsContent). Évite ~1100 LOC dans le bundle initial du wrapper.
+const CopyToAthleteDialog = lazyWithRetry(
+  () => import("@/components/coach/strength/CopyToAthleteDialog"),
+);
+const AthletePlansTab = lazyWithRetry(
+  () => import("@/components/coach/strength/AthletePlansTab"),
+);
+const MediaSourceSheet = lazyWithRetry(
+  () => import("@/components/coach/strength/MediaSourceSheet"),
+);
 
 type ExerciseDraft = Omit<Exercise, "id"> & {
   id?: number;
@@ -1127,14 +1136,15 @@ export default function StrengthCatalog() {
       {deleteExerciseDialog}
 
       {copyDialog && (
-        <CopyToAthleteDialog
+        <Suspense fallback={null}>
+          <CopyToAthleteDialog
           open={!!copyDialog}
-          onOpenChange={(open) => !open && setCopyDialog(null)}
+          onOpenChange={(open: boolean) => !open && setCopyDialog(null)}
           athletes={athletes}
           mode={copyDialog.mode}
           sourceLabel={copyDialog.sourceLabel}
           loading={copyMutation.isPending}
-          onConfirm={(targetAthleteId) =>
+          onConfirm={(targetAthleteId: number) =>
             copyMutation.mutate({
               mode: copyDialog.mode,
               sourceId: copyDialog.sourceId,
@@ -1142,6 +1152,7 @@ export default function StrengthCatalog() {
             })
           }
         />
+        </Suspense>
       )}
 
       {/* GIF enlarge overlay */}
@@ -1311,22 +1322,24 @@ export default function StrengthCatalog() {
 
           {/* === PLANS NAGEURS TAB === */}
           <TabsContent value="plans" className="mt-4">
-            <AthletePlansTab
-              athletes={athletes}
-              selectedAthleteId={planSelectedAthleteId}
-              onSelectedAthleteChange={setPlanSelectedAthleteId}
-              onStartCreateSession={(folderId, context) => {
-                setEditingSessionId(null);
-                setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
-                setPlanCreationContext(context ?? null);
-                setIsCreating(true);
-              }}
-              onStartEditSession={(session, context) => {
-                startEditSession(session);
-                setPlanCreationContext(context ?? null);
-              }}
-              onDeleteSession={(session) => setPendingDeleteSession(session)}
-            />
+            <Suspense fallback={null}>
+              <AthletePlansTab
+                athletes={athletes}
+                selectedAthleteId={planSelectedAthleteId}
+                onSelectedAthleteChange={setPlanSelectedAthleteId}
+                onStartCreateSession={(folderId: number | null, context: unknown) => {
+                  setEditingSessionId(null);
+                  setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
+                  setPlanCreationContext((context as typeof planCreationContext) ?? null);
+                  setIsCreating(true);
+                }}
+                onStartEditSession={(session: StrengthSessionTemplate, context: unknown) => {
+                  startEditSession(session);
+                  setPlanCreationContext((context as typeof planCreationContext) ?? null);
+                }}
+                onDeleteSession={(session: StrengthSessionTemplate) => setPendingDeleteSession(session)}
+              />
+            </Suspense>
           </TabsContent>
 
           {/* === EXERCISES TAB === */}
@@ -1363,22 +1376,26 @@ export default function StrengthCatalog() {
         </Tabs>
       </div>
 
-      <MediaSourceSheet
-        open={mediaSheetTarget !== null}
-        onOpenChange={(v) => { if (!v) setMediaSheetTarget(null); }}
-        onMediaReady={(media, isGif) => {
-          if (mediaSheetTarget === "edit") {
-            handleGifUpload(media, isGif, (url) =>
-              setEditingExercise((prev) => prev ? { ...prev, illustration_gif: url } : prev)
-            );
-          } else if (mediaSheetTarget === "create") {
-            handleGifUpload(media, isGif, (url) =>
-              setNewExercise((prev) => ({ ...prev, illustration_gif: url }))
-            );
-          }
-          setMediaSheetTarget(null);
-        }}
-      />
+      {mediaSheetTarget !== null && (
+        <Suspense fallback={null}>
+          <MediaSourceSheet
+            open={mediaSheetTarget !== null}
+            onOpenChange={(v: boolean) => { if (!v) setMediaSheetTarget(null); }}
+            onMediaReady={(media: Blob | File, isGif: boolean) => {
+              if (mediaSheetTarget === "edit") {
+                handleGifUpload(media, isGif, (url: string) =>
+                  setEditingExercise((prev) => prev ? { ...prev, illustration_gif: url } : prev)
+                );
+              } else if (mediaSheetTarget === "create") {
+                handleGifUpload(media, isGif, (url: string) =>
+                  setNewExercise((prev) => ({ ...prev, illustration_gif: url }))
+                );
+              }
+              setMediaSheetTarget(null);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

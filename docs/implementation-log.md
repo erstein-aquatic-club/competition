@@ -8511,3 +8511,72 @@ Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
 - **Fix 2 (Coach.tsx N+1) reporté** — toujours ~20 calls parallèles par refresh KPI. À traiter en session dédiée avec batch endpoints ou `useQueries`.
 - **Autres pages avec gros monolithes** (`StrengthCatalog` 1384 LOC, `Records` 1376 LOC, `SwimPlanningDemo` 1623 LOC, `Coach` ~969 LOC) : pas touchées dans cette session. Le pattern lazy + Suspense est facilement réplicable maintenant que `lazyWithRetry` est shared.
 - **Pas de mesure runtime** (FCP, LCP, TTI) — seulement bundle size statique. À mesurer en session dédiée si besoin.
+
+## §120 — 2026-04-15 — Session 3bis réplication pattern lazy + migration Coach.tsx vers lazyWithRetry
+
+**Contexte :** Suite directe de §119 (Session 4 frontend perf). Le pattern `lazy + Suspense + guard` extrait dans `lazyWithRetry` est facilement réplicable. Audit des 4 autres gros écrans coach pour identifier des candidats lazy à fort ROI.
+
+**Audit des 4 cibles :**
+
+| Écran | LOC wrapper | Décision |
+|---|---|---|
+| `StrengthCatalog.tsx` | 1384 | ✅ 3 candidats : `AthletePlansTab` (934 LOC, gated par tab "Plans nageurs"), `MediaSourceSheet` (108 LOC, sheet conditionnel), `CopyToAthleteDialog` (87 LOC, dialog conditionnel) |
+| `Coach.tsx` | 969 | 🔧 Migration des 11 `lazy()` existants vers `lazyWithRetry` (cohérence + retry chunk PWA). `CoachChallengesSection` (363 LOC) écarté car rendu **inconditionnellement** sur la home — lazy ferait un flash visible sans gain perçu |
+| `Records.tsx` | 1376 | ⏭️ Aucun import local de composant lourd ; tout le code est inline. Pas de candidat lazy évident |
+| `SwimPlanningDemo.tsx` | 1623 | ⏭️ Pas d'import local de composant lourd (uniquement primitives shadcn). Reporté à investigation séparée |
+
+**Changements réalisés :**
+
+1. **Ajout d'`export default` à 3 composants strength** (en plus du named export existant, pour le rendre lazy-importable simplement) :
+   - `src/components/coach/strength/AthletePlansTab.tsx`
+   - `src/components/coach/strength/CopyToAthleteDialog.tsx`
+   - `src/components/coach/strength/MediaSourceSheet.tsx`
+
+2. **`src/pages/coach/StrengthCatalog.tsx`** :
+   - 3 imports statiques convertis en `lazyWithRetry`
+   - Ajout de l'import `Suspense` et `lazyWithRetry`
+   - 3 usages JSX wrapped dans `<Suspense fallback={null}>` :
+     - `<AthletePlansTab>` à l'intérieur du `<TabsContent value="plans">` — chunk chargé uniquement quand l'utilisateur clique sur l'onglet "Plans nageurs"
+     - `<CopyToAthleteDialog>` derrière le guard `{copyDialog && ...}`
+     - `<MediaSourceSheet>` derrière un nouveau guard `{mediaSheetTarget !== null && ...}` (avant : rendu permanent avec `open={mediaSheetTarget !== null}`)
+   - Annotations de type explicites ajoutées sur les callbacks (le type-system perd les props quand `lazyWithRetry` est typé en `ComponentType<any>`)
+
+3. **`src/pages/Coach.tsx`** :
+   - 11 appels `lazy()` migrés vers `lazyWithRetry()` — bénéficie maintenant du retry automatique en cas de chunk périmé après deploy PWA
+   - Retrait de `lazy` de l'import React, ajout de l'import `lazyWithRetry`
+   - Aucun changement fonctionnel — les composants se comportent identiquement, juste plus résilients
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/StrengthCatalog.tsx` | 3 lazy + 3 Suspense + annotations callback |
+| `src/pages/Coach.tsx` | Migration 11 lazy → lazyWithRetry |
+| `src/components/coach/strength/AthletePlansTab.tsx` | Ajout `export default` |
+| `src/components/coach/strength/CopyToAthleteDialog.tsx` | Ajout `export default` |
+| `src/components/coach/strength/MediaSourceSheet.tsx` | Ajout `export default` |
+
+**Tests / mesures :**
+- ✅ `npx tsc --noEmit` : clean (zéro erreur)
+- ✅ `npm run build` : succès en 15.63 s
+- 📉 **`StrengthCatalog` bundle** : `78.01 kB / gzip 21.16 kB` → **`44.53 kB / gzip 11.14 kB`** (**-43 % / -47 %**, -33.48 kB / -10.02 kB gzip)
+- ✅ **`CoachTrainingSlotsScreen` bundle** : 60.54 kB inchangé (gain §119 préservé)
+- ✅ **`Coach.tsx` bundle** : 31.81 kB inchangé (migration `lazy` → `lazyWithRetry` est purement fonctionnelle)
+- 📊 **Nouveaux chunks lazy créés** :
+  - `AthletePlansTab` : 21.39 kB / gzip 6.17 kB
+  - `MediaSourceSheet` : 14.77 kB / gzip 6.20 kB
+  - `CopyToAthleteDialog` : 1.42 kB / gzip 0.77 kB
+- 📈 **PWA precache** : 201 → 204 entries (+3 chunks lazy nouvellement créés ; 6 nouveaux entries au total avec le previous build)
+
+**Décisions prises :**
+- **Écarter `CoachChallengesSection`** malgré ses 363 LOC : rendu inconditionnellement sur la home coach, donc lazy-loading produirait un flash de loading visible sans gain perçu (le bundle est de toute façon parsé au mount). Lazy n'a de sens que pour du code rendu *conditionnellement*.
+- **Migrer les `lazy()` de Coach.tsx vers `lazyWithRetry`** plutôt que les laisser tels quels : cohérence du codebase + bénéfice du retry chunk-loading qui évite les écrans blancs après deploy quand un PWA a un index.html cached pointant vers d'anciens hashes.
+- **Pas touché à Records.tsx ni SwimPlanningDemo.tsx** : aucun candidat conditionnel évident sans refacto. Préserver "0 régression" en évitant d'inventer des splits artificiels.
+- **`fallback={null}` partout** plutôt qu'un spinner — cohérence avec §119, expérience visuelle plus calme à l'ouverture des modals.
+- **Guards `{open && <X/>}` ajoutés** même quand l'ancien code rendait toujours `<X open={...} />` — vrai lazy à la demande, le chunk n'est pas chargé tant que l'utilisateur n'a pas ouvert le modal une première fois.
+
+**Limites / dette :**
+- **Records.tsx (1376 LOC)** : pas de candidat lazy local. Le coût bundle vient principalement de Recharts (lazy-loadable mais demande un wrapping Suspense pour le graph). Reporté à Session 5 (polish).
+- **SwimPlanningDemo.tsx (1623 LOC)** : aucun import local lourd identifié. Le coût vient probablement de la logique inline (timeline + helpers). Investigation à approfondir si le bundle reste un goulot.
+- **Pas de mesure runtime** des gains de FCP/LCP/TTI — seulement bundle size statique.
+- **Coach.tsx CoachChallengesSection** non lazy : si le besoin d'optimiser la home coach apparaît plus tard, envisager un Intersection Observer pour défer le rendu hors-vue.

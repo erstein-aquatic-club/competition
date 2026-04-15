@@ -323,6 +323,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 81 | Session 2 backend perf (9 index FK, 13 policies RLS auth.uid() initplan wrap) | Haute | Fait (§117) |
 | 82 | Session 3 dead code frontend (12 composants shadcn/ui orphelins + 9 deps npm) | Moyenne | Fait (§118) |
 | 83 | Session 4 frontend perf (lazy-load CoachTrainingSlotsScreen sheets, -26 % bundle wrapper) | Moyenne | Fait (§119) |
+| 84 | Session 3bis réplication lazy (StrengthCatalog -43 % + migration Coach.tsx vers lazyWithRetry) | Moyenne | Fait (§120) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

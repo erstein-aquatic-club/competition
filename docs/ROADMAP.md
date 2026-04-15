@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-15 (§119 Session 4 frontend perf — lazy-load SlotSessionSheet + SlotTemplatePicker dans CoachTrainingSlotsScreen, -26 % bundle wrapper, util `lazyWithRetry` extrait)*
+*Dernière mise à jour : 2026-04-15 (§120 Session 3bis réplication lazy — StrengthCatalog -43 %, migration Coach.tsx vers lazyWithRetry)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

@@ -932,3 +932,5 @@ function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending
     </div>
   );
 }
+
+export default AthletePlansTab;

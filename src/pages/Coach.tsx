@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -22,17 +23,18 @@ import {
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
 import { buildCoachHash, parseCoachHashLocation, type CoachSection } from "./coach/coachRouteState";
-const CoachSwimmersOverview = lazy(() => import("./coach/CoachSwimmersOverview"));
-const CoachGroupsScreen = lazy(() => import("./coach/CoachGroupsScreen"));
-const CoachCompetitionsScreen = lazy(() => import("./coach/CoachCompetitionsScreen"));
-const CoachSwimmerDetail = lazy(() => import("./coach/CoachSwimmerDetail"));
-const CoachWeekView = lazy(() => import("./coach/CoachWeekView"));
-const CoachLibrary = lazy(() => import("./coach/CoachLibrary"));
-const CoachComms = lazy(() => import("./coach/CoachComms"));
-const CoachChronoScreen = lazy(() => import("./coach/CoachChronoScreen"));
-const CoachChronoHistoryScreen = lazy(() => import("./coach/CoachChronoHistoryScreen"));
-const CoachMySwimmersScreen = lazy(() => import("./coach/CoachMySwimmersScreen"));
-const CoachCommentsScreen = lazy(() => import("./coach/CoachCommentsScreen"));
+// Migration vers lazyWithRetry (§120) — gère les chunks périmés après deploy PWA.
+const CoachSwimmersOverview = lazyWithRetry(() => import("./coach/CoachSwimmersOverview"));
+const CoachGroupsScreen = lazyWithRetry(() => import("./coach/CoachGroupsScreen"));
+const CoachCompetitionsScreen = lazyWithRetry(() => import("./coach/CoachCompetitionsScreen"));
+const CoachSwimmerDetail = lazyWithRetry(() => import("./coach/CoachSwimmerDetail"));
+const CoachWeekView = lazyWithRetry(() => import("./coach/CoachWeekView"));
+const CoachLibrary = lazyWithRetry(() => import("./coach/CoachLibrary"));
+const CoachComms = lazyWithRetry(() => import("./coach/CoachComms"));
+const CoachChronoScreen = lazyWithRetry(() => import("./coach/CoachChronoScreen"));
+const CoachChronoHistoryScreen = lazyWithRetry(() => import("./coach/CoachChronoHistoryScreen"));
+const CoachMySwimmersScreen = lazyWithRetry(() => import("./coach/CoachMySwimmersScreen"));
+const CoachCommentsScreen = lazyWithRetry(() => import("./coach/CoachCommentsScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
 type KpiLookbackPeriod = 7 | 30 | 365;
