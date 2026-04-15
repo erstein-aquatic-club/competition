@@ -8334,3 +8334,52 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 - **Cron `LOCALTIME` vs fuseau** : le serveur Supabase tourne en UTC, le code compare `ts.end_time` (typed `time`) à `LOCALTIME` (local UTC). Ça fonctionne parce que les `end_time` des créneaux sont probablement en UTC côté DB, mais si l'app doit un jour supporter plusieurs timezones, remplacer par `(NOW() AT TIME ZONE 'Europe/Paris')::time`. Hors scope Session 1.
 - **Push notifications historiques perdues** : toutes les notifications push émises via le trigger depuis le déploiement §79 sont perdues (elles ont été 401). Pas de rattrapage prévu — elles concernaient des événements passés.
 - **Vérification post-fix différée** : je n'ai pas pu observer le prochain tick cron 21:15 UTC ni un INSERT `notification_targets` en live. À confirmer par l'utilisateur à J+1.
+
+## §117 — 2026-04-15 — Session 2 backend perf (FK indexes + auth.uid() initplan wrap)
+
+**Contexte :** Audit perf backend post-Session 1. Après re-vérification directe des advisors via MCP (sans sous-agent), la réalité s'est avérée plus modeste que le premier rapport :
+- **Multiple permissive policies** : 4 duplications réelles (pas 219), sur `interviews` SELECT/UPDATE et `swim_session_items` / `swim_sessions_catalog` SELECT (ces dernières liées au feature de partage public §57).
+- **auth_rls_initplan** : 13 policies concernées (pas 17). Pattern : `auth.uid()` nu dans un `USING`/`WITH CHECK`, que le planner Postgres réévalue par row. Fix : wrapper en `(SELECT auth.uid())`, transforme l'appel en initplan évalué 1 fois par requête.
+- **Unindexed FK** : 9 confirmés (advisor + requête pg_constraint).
+- **Dead indexes** : 40 petits index (16 kB chacun) à 0 scan, dont la suppression n'offre aucun gain tangible sur des tables quasi-vides.
+
+**Changements réalisés** (migration `00111_perf_fk_indexes_and_auth_uid_initplan_wrap.sql`, appliquée via MCP `apply_migration`) :
+
+1. **9 index FK créés** (préventif, gain futur) :
+   - `idx_user_profiles_approved_by`, `idx_competitions_created_by`, `idx_competition_checklist_checks_checklist_item_id`, `idx_admin_audit_log_actor_id`, `idx_admin_audit_log_target_user_id`, `idx_challenges_coach_id`, `idx_challenges_group_id`, `idx_coach_comment_reads_session_id`, `idx_swim_catalog_folders_created_by`.
+2. **13 policies RLS re-créées** avec `(SELECT auth.uid())` en lieu et place de `auth.uid()` :
+   - `chrono_records`: "Coaches manage own chrono records"
+   - `interviews`: `interviews_coach_delete`, `interviews_coach_select`, `interviews_coach_update`
+   - `objectives`: `objectives_select`, `objectives_write` (USING + WITH CHECK)
+   - `swim_exercise_logs`: "Users manage own exercise logs"
+   - `timesheet_group_labels`: 3 policies (DELETE, INSERT, SELECT)
+   - `timesheet_shift_groups`: 3 policies (DELETE, INSERT, SELECT)
+   
+   Pattern utilisé : `DROP POLICY IF EXISTS` + `CREATE POLICY` atomiques dans la même transaction (ALTER POLICY ne permet pas de modifier USING/WITH CHECK dans PostgreSQL). Si une CREATE échoue, le rollback complet préserve les policies originales.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00111_perf_fk_indexes_and_auth_uid_initplan_wrap.sql` | **Nouveau** (appliqué via MCP) |
+
+**Tests / vérifications :**
+- ✅ `SELECT count(*) FROM pg_indexes WHERE indexname IN (…9 idx…)` = **9** (tous créés).
+- ✅ `SELECT count(*) FROM pg_policies WHERE schemaname='public' AND qual LIKE '%auth.uid()%' AND qual NOT LIKE '%SELECT auth.uid%'` = **0** (toutes wrappées, vérifié après correction du pattern LIKE : PG stocke `( SELECT auth.uid() AS uid)` avec espace et alias).
+- ✅ Les 6 policies timesheet_* toutes en état "wrapped".
+- ✅ Sémantique policies identique (seule la forme syntaxique de `auth.uid()` change).
+- ⚠️ **Client MCP a timeout** pendant l'apply_migration, mais la migration s'est bien commitée côté serveur. Vérifiable via `supabase_migrations.schema_migrations.version = '20260414212450'` + toutes les vérifs structurelles ci-dessus.
+
+**Décisions prises :**
+- **Scope minimal** — séparer "wrap auth.uid()" (pur syntaxique, zéro risque) du "merge permissive policies" (change la structure booléenne, besoin de tests E2E). Les merges sont reportés à une session dédiée avec tests athlete/coach/admin.
+- **Policies `swim_*` anon_shared NON touchées** — ces policies servent le feature de partage public (§57) par token UUID, critique. Un merge mal fait casserait la page `SharedSwimSession.tsx`. À tester manuellement avant refacto.
+- **Policies `timesheet_*` wrapping uniquement, PAS de refacto** — le pattern email-join legacy `(u.email = auth.users.email WHERE id = auth.uid())` aurait pu être remplacé par `app_user_role() IN ('coach','admin')`, mais c'est un changement sémantique. On wrap seulement `auth.uid()` dans le sous-SELECT existant, on ne touche pas la structure.
+- **Pas de drop des 40 index "dead"** — 16 kB chacun = 640 kB total, aucun gain write tangible. Risque non-nul si les volumes croissent (un index aujourd'hui non-scanné deviendra utile à 1000 rows). Le user a fixé la règle "0 régression" → on garde.
+- **`CREATE INDEX` sans `CONCURRENTLY`** — MCP `apply_migration` wrappe dans une transaction, `CONCURRENTLY` est incompatible. Les tables touchées sont toutes petites (< 1000 rows), le lock ACCESS EXCLUSIVE est ~instantané.
+
+**Limites / dette :**
+- **Merge policies `interviews` SELECT/UPDATE** : 2 duplications encore présentes (athlete vs coach), mergeables mais reportées.
+- **Merge policies `swim_session_items` et `swim_sessions_catalog`** : anon_shared + authenticated, critique pour §57, reporté.
+- **Refacto `timesheet_*` vers `app_user_role()`** : nettoyage du pattern legacy email-join, reporté.
+- **Dead indexes** : abandonnés (voir décision ci-dessus).
+- **Multiple permissive policies lints** : l'advisor continuera de les signaler tant que les merges ne sont pas faits. Finding accepté comme connu.

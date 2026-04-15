@@ -319,6 +319,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 78 | Jours de compétition dans vue semaine coach (bandeau + quick sheet) | Moyenne | Fait (§114) |
 | 79 | Suppression code orphelin `CoachSlotCalendar.tsx` (766 LOC) | Basse | Fait (§115) |
 | 80 | Session 1 urgences backend (cron `rec.id`, push-send vault service_role, bucket list policies) | Haute | Fait (§116) |
+| 81 | Session 2 backend perf (9 index FK, 13 policies RLS auth.uid() initplan wrap) | Haute | Fait (§117) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
