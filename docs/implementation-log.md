@@ -8661,3 +8661,56 @@ Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
 - **Config Vitest `fileParallel: false`** : c'est pour éviter les race conditions sur le pool pg partagé. Si on ajoute beaucoup de suites, il faudra soit passer à un pool par fichier, soit serialiser via `singleThread` explicite.
 - **Warning Vitest 4 sur `poolOptions`** supprimé en retirant les options obsolètes, mais il faudra revalider avec chaque upgrade Vitest.
 - **Pas de CI** : un contributeur qui ouvre une PR modifiant une policy sans toucher au test local ne sera pas bloqué automatiquement.
+
+---
+
+## §122 — Simplification RLS `timesheet_shift_groups` / `timesheet_group_labels` (2026-04-15)
+
+**Contexte :** les 6 policies RLS (3 par table × 2 tables) de `timesheet_shift_groups` et `timesheet_group_labels` embarquaient depuis leur création un pattern fragile : triple sous-query imbriquée `auth.users → users (join par email) → role IN ('coach','admin')`, ~327 caractères par policy. La migration 00111 (perf `auth.uid()` initplan wrap) a mécaniquement wrappé `auth.uid()` dans `(SELECT auth.uid())` sans simplifier la logique. Le helper `app_user_role()` existe pourtant depuis 00001 et est utilisé par ~100 autres policies du projet (convention documentée dans CLAUDE.md § "Migrations Supabase").
+
+**Pourquoi c'est un problème :**
+1. **Redondant** — doublon de la logique `app_user_role()` déjà centralisée.
+2. **Fragile** — si un utilisateur change d'email sans re-sync immédiate dans `public.users`, le join casse et l'accès coach/admin est perdu silencieusement. Le reste du projet passe par `app_metadata.app_user_role` dans le JWT (stable au niveau auth).
+3. **Perf** — 4 sub-plans par policy contre 1 `SELECT current_setting(...)` pour `app_user_role()`. Non catastrophique mais mesurable sur pages timesheet chargées.
+4. **Dissonance de maintenabilité** — futur dev cherchant comment vérifier coach/admin risque de copier ce pattern au lieu du standard.
+
+**Investigation avant patch :**
+- `grep` sur `supabase/migrations/*.sql` : seules références aux 2 tables dans 00111 (perf wrap). Les tables elles-mêmes n'ont jamais été créées via migration → dashboard Supabase. Rien à toucher côté DDL des tables.
+- `app_user_role()` confirmé défini en 00001 ligne 482 → le pattern email-join de 00111 est bien une incohérence historique, pas une contrainte technique.
+- Aucune policy UPDATE existante sur ces deux tables → pas d'ajout (YAGNI).
+
+**Changements :**
+
+1. **Nouvelle migration `supabase/migrations/00112_simplify_timesheet_rls.sql` (45 lignes)** :
+   - 6 `DROP POLICY IF EXISTS` suivis de 6 `CREATE POLICY` avec le pattern standard `app_user_role() = ANY (ARRAY['coach'::text, 'admin'::text])`.
+   - Noms, `polcmd`, et cibles (`USING` vs `WITH CHECK`) préservés à l'identique pour garder une diff minimale sur `pg_policy`.
+   - Sémantique strictement inchangée : coach/admin peut read/insert/delete, tout le reste bloqué.
+
+2. **Application via MCP `apply_migration`** (projet `fscnobivsgornxdwqwlk`, convention obligatoire du projet) : succès.
+
+3. **Smoke test SQL via MCP `execute_sql`** :
+   ```sql
+   SELECT polname, polcmd, pg_get_expr(polqual, polrelid), pg_get_expr(polwithcheck, polrelid)
+   FROM pg_policy
+   WHERE polrelid IN ('public.timesheet_shift_groups'::regclass, 'public.timesheet_group_labels'::regclass);
+   ```
+   → 6 policies retournées, toutes avec l'expression unique `(app_user_role() = ANY (ARRAY['coach'::text, 'admin'::text]))`. Aucune policy orpheline, aucun doublon.
+
+**Fichiers créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00112_simplify_timesheet_rls.sql` | **Nouveau** (45 LOC) |
+
+**Tests :**
+- Smoke test SQL OK (6 policies vérifiées, expressions identiques au pattern standard).
+- Tests RLS §121 intentionnellement **non étendus** à timesheet pour ce patch : le changement est purement implémentaire (même sémantique), l'infra existante teste `dim_sessions` pour `§113`, et étendre le schéma hand-crafted `supabase/tests/schema.sql` sortait du scope. À faire en §122+ si on veut verrouiller la non-régression.
+
+**Décisions prises :**
+- **Pas d'étude d'impact code frontend** : le front (`src/lib/api/timesheet.ts`, `src/components/timesheet/*`, `src/pages/Administratif.tsx`) n'interroge pas la structure des policies, seulement leurs effets — et les effets sont identiques. Aucun changement côté JS nécessaire.
+- **Pas d'UPDATE policy ajoutée** : aucune n'existait, aucun appel client ne fait d'update sur ces tables. Ajouter préventivement aurait été du YAGNI.
+- **Pas d'extension des tests RLS §121** : validé avec l'utilisateur avant implémentation. L'infra est prête pour l'extension si une régression se manifeste.
+
+**Limites / dette :**
+- **Aucune couverture de test RLS automatisée** sur `timesheet_shift_groups` et `timesheet_group_labels`. Risque résiduel faible (pattern standard, smoke test manuel OK) mais non nul.
+- **Pas de test fonctionnel UI exécuté dans cette session** (délégué à l'utilisateur en post-déploiement — validation manuelle Administratif côté coach + athlète).

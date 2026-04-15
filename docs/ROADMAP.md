@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-15 (§121 Infrastructure tests RLS intégration — Docker Postgres local, schéma hand-crafted, 13 tests §113 regression coverage)*
+*Dernière mise à jour : 2026-04-15 (§122 Simplification RLS timesheet — remplacement du pattern email-join par `app_user_role()` sur `timesheet_shift_groups` et `timesheet_group_labels`, 6 policies)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

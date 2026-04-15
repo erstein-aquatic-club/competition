@@ -332,6 +332,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 83 | Session 4 frontend perf (lazy-load CoachTrainingSlotsScreen sheets, -26 % bundle wrapper) | Moyenne | Fait (§119) |
 | 84 | Session 3bis réplication lazy (StrengthCatalog -43 % + migration Coach.tsx vers lazyWithRetry) | Moyenne | Fait (§120) |
 | 85 | Infrastructure tests RLS intégration (Docker Postgres + schéma hand-crafted + §113 regression coverage) | Haute | Fait (§121) |
+| 86 | Simplification RLS timesheet (remplacement email-join par `app_user_role()` sur 6 policies) | Basse | Fait (§122) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
