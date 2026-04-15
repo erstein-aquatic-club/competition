@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-15 (§120 Session 3bis réplication lazy — StrengthCatalog -43 %, migration Coach.tsx vers lazyWithRetry)*
+*Dernière mise à jour : 2026-04-15 (§121 Infrastructure tests RLS intégration — Docker Postgres local, schéma hand-crafted, 13 tests §113 regression coverage)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

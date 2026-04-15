@@ -208,6 +208,13 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/hooks/dashboard/useFeedbackDraft.ts` | État draft feedback isolé (§112) | ~109 lignes |
 | `src/components/coach/CompetitionDayBanner.tsx` | Bandeau compétition vue semaine coach (§114) | ~56 lignes |
 | `src/components/coach/CompetitionQuickSheet.tsx` | Quick sheet résumé compétition (§114) | ~91 lignes |
+| `supabase/tests/schema.sql` | Schéma hand-crafted minimal pour tests RLS (§121) | ~110 lignes |
+| `supabase/tests/seed.sql` | Fixtures tests RLS (§121) | ~25 lignes |
+| `supabase/tests/rls/_helpers.ts` | Harness Vitest : pool pg, resetDb, asUser, asServiceRole (§121) | ~90 lignes |
+| `supabase/tests/rls/dim_sessions.test.ts` | Regression tests §113 + coverage CRUD dim_sessions (§121) | ~165 lignes |
+| `vitest.config.rls.ts` | Config Vitest isolée pour tests RLS (§121) | ~20 lignes |
+| `scripts/test-db-bootstrap.sh` | Bootstrap manuel schéma+seed via psql (§121) | ~55 lignes |
+| `docs/rls-testing.md` | Documentation complète tests RLS (§121) | ~250 lignes |
 | `src/hooks/useMonthlyReport.ts` | Hook rapport mensuel | ~479 lignes |
 | `src/hooks/useAttendancePerformance.ts` | Hook assiduité/perf | ~270 lignes |
 | `src/hooks/useSwimAnalytics.ts` | Hook analytics natation | ~258 lignes |
@@ -324,6 +331,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 82 | Session 3 dead code frontend (12 composants shadcn/ui orphelins + 9 deps npm) | Moyenne | Fait (§118) |
 | 83 | Session 4 frontend perf (lazy-load CoachTrainingSlotsScreen sheets, -26 % bundle wrapper) | Moyenne | Fait (§119) |
 | 84 | Session 3bis réplication lazy (StrengthCatalog -43 % + migration Coach.tsx vers lazyWithRetry) | Moyenne | Fait (§120) |
+| 85 | Infrastructure tests RLS intégration (Docker Postgres + schéma hand-crafted + §113 regression coverage) | Haute | Fait (§121) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
@@ -410,5 +418,16 @@ npm install          # Installation
 npm run dev          # Dev server (localhost:8080)
 npm run build        # Build production
 npm test             # Tests Vitest
+npm run test:rls     # Tests RLS intégration (nécessite Docker + supabase start — voir docs/rls-testing.md)
 npx tsc --noEmit     # Type check
 ```
+
+## Tests RLS intégration (§121)
+
+Tests contre un Postgres local pour attraper les régressions de policies silencieuses (type §113 : DELETE no-op pris pour un succès). Harness complet dans `supabase/tests/rls/` avec schéma hand-crafted minimal (pas de replay des 108 migrations prod — schema drift trop important).
+
+**Setup** (une fois) : Docker Desktop + `brew install supabase/tap/supabase libpq`, puis `supabase start`.
+
+**Workflow débuggage** : si tu soupçonnes un bug RLS, reproduis-le dans un test dans `supabase/tests/rls/*.test.ts`, run `npm run test:rls`, et fix la policy (migration prod via MCP + update de `supabase/tests/schema.sql` dans le même commit).
+
+**Documentation complète** : `docs/rls-testing.md` (setup, API du harness, ajout d'un test, pièges fréquents, relation avec migrations prod).

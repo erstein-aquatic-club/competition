@@ -8580,3 +8580,84 @@ Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
 - **SwimPlanningDemo.tsx (1623 LOC)** : aucun import local lourd identifié. Le coût vient probablement de la logique inline (timeline + helpers). Investigation à approfondir si le bundle reste un goulot.
 - **Pas de mesure runtime** des gains de FCP/LCP/TTI — seulement bundle size statique.
 - **Coach.tsx CoachChallengesSection** non lazy : si le besoin d'optimiser la home coach apparaît plus tard, envisager un Intersection Observer pour défer le rendu hors-vue.
+
+## §121 — 2026-04-15 — Infrastructure tests RLS intégration (Docker Postgres local)
+
+**Contexte :** Après §113 (fix silent DELETE `dim_sessions` par défaut de policy), l'équipe avait identifié qu'un test unitaire avec Supabase mocké **n'aurait pas attrapé le bug**, car le mock reproduit l'API JS et non la sémantique des policies Postgres. Objectif : mettre en place une infra de tests d'intégration RLS réelle (local Postgres via Docker), avec couverture minimum viable sur la regression §113.
+
+**Contraintes découvertes pendant le chantier :**
+
+1. **Replay des 108 migrations en local impossible** : 6 paires de versions dupliquées (`00007`, `00021`, `00025`, `00045`, `00059`, `00086`), dépendances croisées (00034 référence `competitions` créée en 00050), bug du parser CLI sur `$$`-quoted bodies multi-statements, et schema drift (colonnes ajoutées via MCP sans backfill migration).
+2. **Plan A (schema dump prod via `supabase db dump`) impossible** : nécessite le mot de passe DB prod que l'utilisateur n'a pas.
+3. **Plan B (schema dump via MCP `execute_sql` introspection)** : faisable mais coûteux (65 tables × plusieurs queries chacune).
+
+**Décision finale : schéma hand-crafted minimal.** Au lieu de répliquer 65 tables, on crée uniquement les tables nécessaires au test scope courant (ici `users` + `dim_sessions`) avec les vraies policies prod. On étend incrémentalement à chaque nouveau scope de test.
+
+**Changements réalisés :**
+
+1. **Infrastructure locale** :
+   - `supabase init` (génère `supabase/config.toml`) avec **`[db.migrations] enabled = false`** : le CLI ne tente plus de rejouer les migrations au démarrage (puisque impossible, cf. contraintes). Source de vérité prod reste `supabase/migrations/` + MCP.
+   - `brew install libpq` pour `psql` client natif.
+   - `npm install -D pg @types/pg`.
+
+2. **Schéma et fixtures** (`supabase/tests/`) :
+   - `schema.sql` — crée `public`, les helpers `app_user_id()` / `app_user_role()` (introspectés via MCP, identiques à prod), les tables `users` + `dim_sessions`, et les 4 policies RLS `dim_sessions_{select,insert,update,delete}` (miroir exact de la migration §113 / 00108).
+   - `seed.sql` — 4 users déterministes (Alice/Bob athletes, Carol coach, Diana admin) + 3 dim_sessions fixtures (Alice owns 2, Bob owns 1).
+
+3. **Harness Vitest** (`supabase/tests/rls/`) :
+   - `_helpers.ts` (~90 LOC) — `pg.Pool` partagé, `resetDb()` qui re-applique schema + seed, `asUser(claims, fn)` qui ouvre une transaction avec `SET LOCAL ROLE authenticated` + `SET LOCAL "request.jwt.claims"` puis **rollback systématique** (isolation), `asServiceRole(fn)` pour les vérifications hors-RLS.
+   - `dim_sessions.test.ts` (~165 LOC) — 13 tests couvrant les 4 policies : SELECT (athlete own/other/coach/admin), DELETE (regression §113 explicite : assert que `DELETE WHERE id=X RETURNING id` retourne `[]` quand RLS filtre), UPDATE, INSERT (avec cas `WITH CHECK` violation), et un test sanity de l'isolation transactionnelle.
+
+4. **Config Vitest + script npm** :
+   - `vitest.config.rls.ts` — config isolée (pas de jsdom, `environment: "node"`, `fileParallel: false` pour que les tests ne se piétinent pas sur le pool).
+   - `package.json` — script `test:rls: vitest run --config vitest.config.rls.ts`.
+
+5. **Script de debug manuel** (`scripts/test-db-bootstrap.sh`) :
+   - Applique schema+seed via `psql` en standalone, pour explorer la DB à la main sans passer par Vitest. Vérifie les pré-requis (Docker running, psql installé, supabase containers up).
+
+6. **Documentation complète** (`docs/rls-testing.md`, ~250 lignes) :
+   - **Pourquoi** : reproduction textuelle du bug §113 et explication de pourquoi les mocks ne l'attrapent pas.
+   - **Architecture** + justification du schéma hand-crafted vs dump prod.
+   - **Setup initial** : Docker Desktop, Supabase CLI, libpq (commandes brew exactes).
+   - **Écrire un nouveau test** : 4 étapes avec SQL queries MCP prêtes à l'emploi pour extraire les policies et les définitions de table depuis prod.
+   - **API du harness** : `resetDb`, `asUser`, `asServiceRole`, `pool`.
+   - **Débugger** : pattern de logging JWT claims, connexion psql directe, comparaison policy prod vs test schema.
+   - **Pièges fréquents** : 6 cas (SET LOCAL hors transaction, commit dans test, pool non fermé, ports occupés, Docker suspendu, schema.sql pas reload).
+   - **Relation avec migrations prod** : tableau "action prod → action ici" pour maintenir la sync.
+   - **Évolutions futures** : CI GitHub Actions, couverture élargie, tests Edge Functions (hors scope), dump automatisé depuis prod.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/config.toml` | **Nouveau** (via `supabase init`) avec `[db.migrations] enabled = false` + dé-gitignoré |
+| `supabase/.gitignore` | **Nouveau** (auto) |
+| `supabase/tests/schema.sql` | **Nouveau** (110 LOC) — schéma + helpers + policies |
+| `supabase/tests/seed.sql` | **Nouveau** (25 LOC) — fixtures déterministes |
+| `supabase/tests/rls/_helpers.ts` | **Nouveau** (90 LOC) — harness Vitest pg |
+| `supabase/tests/rls/dim_sessions.test.ts` | **Nouveau** (165 LOC) — 13 tests §113 regression |
+| `vitest.config.rls.ts` | **Nouveau** (20 LOC) |
+| `scripts/test-db-bootstrap.sh` | **Nouveau** (55 LOC) — debug manuel |
+| `docs/rls-testing.md` | **Nouveau** (250 LOC) — doc complète |
+| `package.json` | Script `test:rls` + deps `pg`, `@types/pg` |
+| `.gitignore` | Dé-ignore `supabase/config.toml` (commit requis pour partager la config) |
+| `CLAUDE.md` | Section "Tests RLS intégration" + commande `npm run test:rls` + fichiers clés + chantier 85 |
+
+**Tests :**
+- `npm run test:rls` : **13/13 tests passent** en ~150ms
+- `npx tsc --noEmit` : clean (les fichiers `supabase/tests/**/*` sont hors du tsconfig include `src/**/*`, gérés par Vitest en runtime)
+
+**Décisions prises :**
+- **Schéma hand-crafted vs replay/dump** : accepté la contrainte de maintenir le schéma de test en sync manuellement. Trade-off explicite dans `docs/rls-testing.md` avec règle d'or : toute modif de policy en prod (via MCP `apply_migration`) doit être répercutée dans `supabase/tests/schema.sql` **dans le même commit**, sinon le test donne une fausse sécurité.
+- **Isolation par rollback** (plutôt que par drop/recreate entre chaque test) : beaucoup plus rapide (13 tests en 150ms), seed stable, mais les tests ne peuvent pas asserter sur du state persisté — pour ça utiliser `asServiceRole` en setup séparé.
+- **pg client direct** (plutôt que `@supabase/supabase-js`) : pour RLS testing, on veut contrôler exactement la `SET ROLE` + JWT claims, ce qui est plus direct que de passer par le client SDK (qui fait de l'auth via JWT réel). Le test est alors plus proche de ce que fait PostgREST en interne.
+- **`[db.migrations] enabled = false`** : seule façon propre de faire cohabiter les 108 migrations prod (source de vérité pour MCP) avec un `supabase start` local qui ne les rejoue pas. Sinon conflit des doublons de versions au démarrage.
+- **Couverture minimum viable** : uniquement `dim_sessions` (§113). Le plan initial (6 policies : dim_sessions DELETE/UPDATE, slot_assignments RLS, training_slots visibility, coach session assignment, coach CRUD training_slots) est reporté en §122+ pour garder ce commit focalisé sur la livraison de l'infra. Ajouter une policy = ajouter une entrée dans `schema.sql` + un fichier `*.test.ts`, trivial à faire une fois l'infra en place.
+- **Pas de CI GitHub Actions** : local-only pour ce premier livrable, comme convenu avec l'utilisateur (validé explicitement avant démarrage). À ajouter quand le volume de tests justifie le temps CI (~3-5 min par PR).
+
+**Limites / dette :**
+- **Seules les policies de `dim_sessions` sont couvertes.** Les 5 policies additionnelles prévues au plan initial (slot_assignments, training_slots, coach assignments, training_slots CRUD coach, dim_sessions UPDATE detail) sont à ajouter en §122+.
+- **Maintenance manuelle du schéma de test** : risque de drift si on oublie de propager une modif de policy prod. Mitigation partielle : test de parité via MCP est possible (query `pg_get_expr(polqual, polrelid)` en prod vs local) mais non automatisé. À envisager comme pre-commit hook dans un chantier ultérieur.
+- **Config Vitest `fileParallel: false`** : c'est pour éviter les race conditions sur le pool pg partagé. Si on ajoute beaucoup de suites, il faudra soit passer à un pool par fichier, soit serialiser via `singleThread` explicite.
+- **Warning Vitest 4 sur `poolOptions`** supprimé en retirant les options obsolètes, mais il faudra revalider avec chaque upgrade Vitest.
+- **Pas de CI** : un contributeur qui ouvre une PR modifiant une policy sans toucher au test local ne sera pas bloqué automatiquement.

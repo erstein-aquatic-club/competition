@@ -19,7 +19,7 @@ dist-ssr
 
 # Supabase auto-generated
 src/integrations/
-supabase/config.toml
+# supabase/config.toml — committed to share disabled-migration setup (§117 RLS testing)
 
 # Editor directories and files
 .vscode/*
