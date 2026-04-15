@@ -102,6 +102,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/lib/api/swimmer-slots.ts` | CRUD créneaux personnalisés par nageur | ~160 lignes |
 | `src/components/coach/SwimmerSlotsTab.tsx` | Onglet Créneaux dans fiche nageur coach | ~374 lignes |
 | `src/lib/pwaHelpers.ts` | Détection plateforme, gate PWA | ~30 lignes |
+| `src/lib/lazyWithRetry.ts` | Util partagé `lazy()` avec retry chunk-loading PWA (§119) | ~30 lignes |
 | `src/lib/push.ts` | Subscription push, helpers VAPID | ~77 lignes |
 | `src/lib/pushHelpers.ts` | Fonctions pures push (urlBase64ToUint8Array) | ~37 lignes |
 | `src/lib/pushConfig.ts` | VAPID public key config | ~1 ligne |
@@ -321,6 +322,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 80 | Session 1 urgences backend (cron `rec.id`, push-send vault service_role, bucket list policies) | Haute | Fait (§116) |
 | 81 | Session 2 backend perf (9 index FK, 13 policies RLS auth.uid() initplan wrap) | Haute | Fait (§117) |
 | 82 | Session 3 dead code frontend (12 composants shadcn/ui orphelins + 9 deps npm) | Moyenne | Fait (§118) |
+| 83 | Session 4 frontend perf (lazy-load CoachTrainingSlotsScreen sheets, -26 % bundle wrapper) | Moyenne | Fait (§119) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

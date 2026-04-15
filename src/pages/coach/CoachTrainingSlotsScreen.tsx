@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
@@ -13,9 +13,13 @@ import { deriveScheduledSlot } from "@/lib/api/assignments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
-import SlotSessionSheet from "./SlotSessionSheet";
-import { SlotTemplatePicker } from "./SlotTemplatePicker";
+// Lazy-loaded sheets : ces deux composants ne sont rendus qu'à l'ouverture
+// des modals correspondants (clic sur slot ou sur "ajouter depuis bibliothèque").
+// Lazy split → réduit le bundle initial du wrapper de ~1410 LOC.
+const SlotSessionSheet = lazyWithRetry(() => import("./SlotSessionSheet"));
+const SlotTemplatePicker = lazyWithRetry(() => import("./SlotTemplatePicker"));
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
 import { getCompetitions } from "@/lib/api/competitions";
 import type { Competition } from "@/lib/api/types";
@@ -2929,16 +2933,20 @@ const CoachTrainingSlotsScreen = ({
         onViewDetail={handleViewCompetitionDetail}
       />
 
-      <SlotSessionSheet
-        instance={selectedInstance}
-        open={showSessionSheet}
-        onOpenChange={setShowSessionSheet}
-        onCreateNew={handleCreateNewSession}
-        onEditSession={handleEditSession}
-        onPickTemplate={handlePickTemplate}
-        onEditSlot={handleEditSlot}
-        onManageOverride={handleManageOverride}
-      />
+      <Suspense fallback={null}>
+        {showSessionSheet && (
+          <SlotSessionSheet
+            instance={selectedInstance}
+            open={showSessionSheet}
+            onOpenChange={setShowSessionSheet}
+            onCreateNew={handleCreateNewSession}
+            onEditSession={handleEditSession}
+            onPickTemplate={handlePickTemplate}
+            onEditSlot={handleEditSlot}
+            onManageOverride={handleManageOverride}
+          />
+        )}
+      </Suspense>
 
       {/* Slot Form Sheet */}
       <SlotFormSheet
@@ -2958,19 +2966,23 @@ const CoachTrainingSlotsScreen = ({
         coaches={coachesForForm}
       />
 
-      <SlotTemplatePicker
-        open={templatePickerOpen}
-        onOpenChange={(open) => {
-          setTemplatePickerOpen(open);
-          if (!open) {
-            setTemplateTargetInstance(null);
-            setTemplateSelectedGroups([]);
-            setTemplateVisibleFrom("");
-          }
-        }}
-        onSelect={(catalogId, _sessionName) => handleTemplateSelect(catalogId)}
-        isAssigning={assignTemplateMutation.isPending}
-      />
+      <Suspense fallback={null}>
+        {templatePickerOpen && (
+          <SlotTemplatePicker
+            open={templatePickerOpen}
+            onOpenChange={(open: boolean) => {
+              setTemplatePickerOpen(open);
+              if (!open) {
+                setTemplateTargetInstance(null);
+                setTemplateSelectedGroups([]);
+                setTemplateVisibleFrom("");
+              }
+            }}
+            onSelect={(catalogId: number, _sessionName: string) => handleTemplateSelect(catalogId)}
+            isAssigning={assignTemplateMutation.isPending}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

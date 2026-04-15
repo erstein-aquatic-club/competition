@@ -384,3 +384,5 @@ function SessionCard({
     </div>
   );
 }
+
+export default SlotTemplatePicker;

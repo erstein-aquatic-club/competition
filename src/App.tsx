@@ -1,5 +1,5 @@
 
-import React, { Suspense, lazy, useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { Switch, Route, Redirect, Router } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -20,27 +20,7 @@ import { PWAInstallGate } from "@/components/shared/PWAInstallGate";
 import { PushPermissionBanner } from "@/components/shared/PushPermissionBanner";
 import { requiresApprovalForRole } from "@/lib/authRules";
 import { OfflineMutationSync } from "@/components/shared/OfflineMutationSync";
-
-// Retry wrapper for lazy imports — handles stale chunk filenames after deployments
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
-  return lazy(() =>
-    factory().catch((err: unknown) => {
-      // If chunk loading fails (e.g. stale cache pointing to old filename),
-      // try a full page reload once to get fresh index.html
-      const hasReloaded = sessionStorage.getItem('chunk_reload');
-      if (!hasReloaded) {
-        sessionStorage.setItem('chunk_reload', '1');
-        window.location.reload();
-        // Return a never-resolving promise to prevent rendering while reloading
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return new Promise<{ default: React.ComponentType<any> }>(() => {});
-      }
-      sessionStorage.removeItem('chunk_reload');
-      throw err;
-    })
-  );
-}
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
 // Clear the reload flag on successful app load
 sessionStorage.removeItem('chunk_reload');

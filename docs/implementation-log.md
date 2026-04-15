@@ -8448,3 +8448,66 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
   - **`node_modules`** : ~2 MB d'install de moins (9 packages)
   - **Surface d'audit** : moins de faux positifs pour les futures scans
 - Les storybook `.stories.tsx` évoqués dans le rapport initial du sous-agent (52 fichiers tests "obsolètes") **n'ont PAS été touchés** — claim non re-vérifié, hors scope.
+
+## §119 — 2026-04-15 — Session 4 frontend perf (lazy-load CoachTrainingSlotsScreen sheets)
+
+**Contexte :** Audit perf frontend post-Session 3. Le wrapper `CoachTrainingSlotsScreen.tsx` (2978 LOC) importait statiquement deux composants lourds — `SlotSessionSheet` (1024 LOC) et `SlotTemplatePicker` (386 LOC) — qui ne s'affichent qu'à l'ouverture de modals (clic utilisateur sur un slot ou sur "ajouter depuis bibliothèque"). Le bundle initial du wrapper portait donc 1410 LOC inutiles au premier rendu.
+
+**⚠️ Décisions de scope révisées par rapport au plan initial :**
+
+Le plan d'audit initial prévoyait 3 fixes frontend perf :
+1. **Changement `queryClient.ts` defaults** (`staleTime: Infinity` → `5min`, ajout `gcTime: 10min`)
+2. **Refacto N+1 `Coach.tsx:710`** (boucle Promise.all sur topAthletes pour KPIs)
+3. **Lazy-load des sheets de `CoachTrainingSlotsScreen`**
+
+Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
+
+- **Fix 1 annulé** : 261 queries (74 % des 347 `useQuery` du projet) reposent sur le défaut global `staleTime: Infinity`. Un commentaire explicite dans `SwimPlanningAthleteView.tsx:250-255` documente que le pattern est **intentionnel**, et qu'une régression "blank render" (§109) avait précédemment été causée par la combinaison short-stale + `refetchOnMount`. Modifier le défaut risquerait de réintroduire le bug §109 dans d'autres pages. Par ailleurs, la justification "fuite mémoire" du rapport d'audit était incorrecte : React Query v5 garbage-collecte les queries non-référencées après 5 min par défaut, il n'y a pas de leak réel.
+
+- **Fix 2 reporté** : la boucle `Promise.all(topAthletes.map(async))` produit ~20 calls parallèles par refresh KPI, mais n'est rafraîchie que sur changement de `kpiPeriod` ou de la liste `topAthletes` — donc rare en pratique. Le gain "60 % de latence" annoncé était spéculatif. Le fix nécessite soit de nouveaux endpoints batch (touche `api/strength.ts` + `api/swim.ts`), soit `useQueries` avec restructuration de la logique de calcul KPI. Trop complexe pour "0 régression" sans tests E2E — reporté à une session dédiée.
+
+**Changements réalisés (Fix 3 uniquement) :**
+
+1. **Nouveau util `src/lib/lazyWithRetry.ts`** (~30 LOC) — extraction du wrapper `lazy()` avec retry chunk-loading qui était précédemment inlined dans `App.tsx`. Permet la réutilisation depuis n'importe quel composant lourd lazy-loadé.
+
+2. **`src/App.tsx` mis à jour** :
+   - Suppression de la copie locale de `lazyWithRetry` (~20 LOC dans App.tsx)
+   - Import depuis `@/lib/lazyWithRetry`
+   - Suppression de `lazy` non-utilisé dans l'import React
+
+3. **`src/pages/coach/CoachTrainingSlotsScreen.tsx`** :
+   - `SlotSessionSheet` et `SlotTemplatePicker` convertis en imports lazy via `lazyWithRetry`
+   - JSX wrapped dans `<Suspense fallback={null}>` avec un guard `{open && <Component .../>}` pour ne charger le chunk qu'à la première ouverture du modal
+   - Annotations de type ajoutées sur les callbacks `onOpenChange` et `onSelect` (le type-system perd les props quand `lazy` est typé en `ComponentType<any>`)
+
+4. **`src/pages/coach/SlotTemplatePicker.tsx`** :
+   - Ajout d'`export default SlotTemplatePicker` à la fin du fichier (en plus du named export existant) pour permettre `import("./SlotTemplatePicker")` sans wrapper `.then(m => ({ default: m.X }))`
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/lazyWithRetry.ts` | **Nouveau** (~30 LOC, util partagé) |
+| `src/App.tsx` | Refacto : utilise le nouvel util au lieu de la copie locale |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Imports `SlotSessionSheet` + `SlotTemplatePicker` en lazy, Suspense + guards |
+| `src/pages/coach/SlotTemplatePicker.tsx` | Ajout de `export default` |
+
+**Tests / mesures :**
+- ✅ `npx tsc --noEmit` : clean
+- ✅ `npm run build` : succès en 17.92 s
+- 📉 **`CoachTrainingSlotsScreen` bundle** : `82.42 kB / gzip 22.51 kB` → **`60.54 kB / gzip 17.46 kB`** (**-26 %**, -21.88 kB / -5.05 kB gzip)
+- 📈 **PWA precache** : 198 → 201 entries (+3 chunks créés : `SlotSessionSheet`, `SlotTemplatePicker`, `lazyWithRetry`)
+- ✅ Comportement utilisateur : à la première ouverture d'un modal sheet, brève latence (~50-200 ms selon réseau) le temps de fetch du chunk. Subsequent opens = instant (cache).
+
+**Décisions prises :**
+- **Extraction `lazyWithRetry` dans un util partagé** plutôt que duplication locale — refacto architectural propre, justifié par le besoin de réutilisation immédiate et future.
+- **`fallback={null}`** pour les Suspense plutôt qu'un spinner — quand l'utilisateur clique pour ouvrir un modal, il s'attend à un délai bref ; un flash de spinner serait plus visuellement perturbant que rien.
+- **Guard `{open && <Component .../>}`** plutôt que rendu permanent — évite que le chunk soit chargé tant que l'utilisateur n'a pas ouvert le sheet une première fois (vrai lazy-load à la demande).
+- **`lazyWithRetry` reste typé en `ComponentType<any>`** — le rendre générique cassait la compatibilité avec les routes Wouter (`<Route component={LazyComp} />` qui veut `RouteComponentProps`). Les annotations de type inline dans `CoachTrainingSlotsScreen.tsx` compensent.
+- **`export default` ajouté à `SlotTemplatePicker`** — petit changement permettant le pattern `lazyWithRetry(() => import("./X"))` sans wrapper `.then()`. Le named export existant est conservé pour ne pas casser le code (mais il n'est plus utilisé après cette migration — seul l'usage dans `CoachTrainingSlotsScreen` existait).
+
+**Limites / dette :**
+- **Fix 1 (queryClient defaults) abandonné** — les 261 queries qui dépendent de `staleTime: Infinity` continueront de ne jamais refetch automatiquement. C'est le comportement souhaité par l'équipe.
+- **Fix 2 (Coach.tsx N+1) reporté** — toujours ~20 calls parallèles par refresh KPI. À traiter en session dédiée avec batch endpoints ou `useQueries`.
+- **Autres pages avec gros monolithes** (`StrengthCatalog` 1384 LOC, `Records` 1376 LOC, `SwimPlanningDemo` 1623 LOC, `Coach` ~969 LOC) : pas touchées dans cette session. Le pattern lazy + Suspense est facilement réplicable maintenant que `lazyWithRetry` est shared.
+- **Pas de mesure runtime** (FCP, LCP, TTI) — seulement bundle size statique. À mesurer en session dédiée si besoin.
