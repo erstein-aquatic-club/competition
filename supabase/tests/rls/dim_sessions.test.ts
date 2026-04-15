@@ -13,8 +13,8 @@
  *   - dim_sessions: Alice owns id=1, id=2 — Bob owns id=3
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { asUser, asServiceRole, resetDb, pool } from "./_helpers";
+import { describe, it, expect, beforeAll } from "vitest";
+import { asUser, asServiceRole, resetDb } from "./_helpers";
 
 const ALICE = { appUserId: 1, appUserRole: "athlete" } as const;
 const BOB = { appUserId: 2, appUserRole: "athlete" } as const;
@@ -23,10 +23,6 @@ const DIANA = { appUserId: 4, appUserRole: "admin" } as const;
 
 beforeAll(async () => {
   await resetDb();
-});
-
-afterAll(async () => {
-  await pool.end();
 });
 
 describe("dim_sessions RLS", () => {

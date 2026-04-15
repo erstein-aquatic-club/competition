@@ -12,6 +12,7 @@ export default defineConfig({
     globals: false,
     include: ["supabase/tests/rls/**/*.test.ts"],
     testTimeout: 30000,
-    fileParallel: false,
+    fileParallelism: false,
+    isolate: false,
   },
 });

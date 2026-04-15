@@ -211,7 +211,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `supabase/tests/schema.sql` | Schéma hand-crafted minimal pour tests RLS (§121) | ~110 lignes |
 | `supabase/tests/seed.sql` | Fixtures tests RLS (§121) | ~25 lignes |
 | `supabase/tests/rls/_helpers.ts` | Harness Vitest : pool pg, resetDb, asUser, asServiceRole (§121) | ~90 lignes |
-| `supabase/tests/rls/dim_sessions.test.ts` | Regression tests §113 + coverage CRUD dim_sessions (§121) | ~165 lignes |
+| `supabase/tests/rls/dim_sessions.test.ts` | Regression tests §113 + coverage CRUD dim_sessions (§121) | ~160 lignes |
+| `supabase/tests/rls/interviews.test.ts` | Tests RLS 6 policies stateful §74-§75 (§123) | ~285 lignes |
 | `vitest.config.rls.ts` | Config Vitest isolée pour tests RLS (§121) | ~20 lignes |
 | `scripts/test-db-bootstrap.sh` | Bootstrap manuel schéma+seed via psql (§121) | ~55 lignes |
 | `docs/rls-testing.md` | Documentation complète tests RLS (§121) | ~250 lignes |
@@ -333,6 +334,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 84 | Session 3bis réplication lazy (StrengthCatalog -43 % + migration Coach.tsx vers lazyWithRetry) | Moyenne | Fait (§120) |
 | 85 | Infrastructure tests RLS intégration (Docker Postgres + schéma hand-crafted + §113 regression coverage) | Haute | Fait (§121) |
 | 86 | Simplification RLS timesheet (remplacement email-join par `app_user_role()` sur 6 policies) | Basse | Fait (§122) |
+| 87 | Tests RLS `interviews` (6 policies stateful + 17 assertions) | Haute | Fait (§123) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

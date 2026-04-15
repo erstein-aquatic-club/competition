@@ -25,6 +25,23 @@ const DB_URL =
 
 export const pool = new Pool({ connectionString: DB_URL, max: 4 });
 
+// Make sure the pool is released when Vitest exits. Individual test files
+// should NOT call `pool.end()` in their afterAll — since the pool is
+// module-level and shared across suites (isolate: false), the first suite
+// to call end() would break the rest. Process exit is safe.
+let cleanupRegistered = false;
+export function registerPoolCleanup(): void {
+  if (cleanupRegistered) return;
+  cleanupRegistered = true;
+  const cleanup = () => {
+    pool.end().catch(() => {});
+  };
+  process.once("beforeExit", cleanup);
+  process.once("SIGINT", cleanup);
+  process.once("SIGTERM", cleanup);
+}
+registerPoolCleanup();
+
 /** Reset schema + reseed. Call once per suite via `beforeAll`. */
 export async function resetDb(): Promise<void> {
   const schema = readFileSync(SCHEMA_PATH, "utf8");
@@ -42,6 +59,14 @@ export async function resetDb(): Promise<void> {
 export interface AuthClaims {
   appUserId: number;
   appUserRole: "athlete" | "coach" | "admin";
+  /**
+   * Optional UUID to populate the `sub` claim, which `auth.uid()` reads.
+   * Only needed when the policy under test uses `auth.uid()` directly
+   * (e.g. `interviews_coach_select` with `created_by = (SELECT auth.uid())`).
+   * Convention: use deterministic UUIDs like `00000000-0000-0000-0000-000000000003`
+   * (last segment = user id) for readability in seed data.
+   */
+  authUid?: string;
 }
 
 /**
@@ -62,6 +87,7 @@ export async function asUser<T>(
     await client.query("BEGIN");
     await client.query("SET LOCAL ROLE authenticated");
     const claimsJson = JSON.stringify({
+      sub: claims.authUid ?? "00000000-0000-0000-0000-000000000000",
       app_metadata: {
         app_user_id: claims.appUserId,
         app_user_role: claims.appUserRole,

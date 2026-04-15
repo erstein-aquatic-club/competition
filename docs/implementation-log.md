@@ -8714,3 +8714,65 @@ Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
 **Limites / dette :**
 - **Aucune couverture de test RLS automatisée** sur `timesheet_shift_groups` et `timesheet_group_labels`. Risque résiduel faible (pattern standard, smoke test manuel OK) mais non nul.
 - **Pas de test fonctionnel UI exécuté dans cette session** (délégué à l'utilisateur en post-déploiement — validation manuelle Administratif côté coach + athlète).
+
+## §123 — 2026-04-15 — Tests RLS : couverture `interviews` (6 policies stateful)
+
+**Contexte :** Après livraison de l'infra §121 (harness RLS intégration), audit de priorisation pour étendre la couverture. `interviews` identifié comme priorité n°1 : 6 policies avec state machine, subquery cross-table sur `coach_swimmer_assignments`, asymétrie `USING` vs `WITH CHECK`, et usage direct de `auth.uid()` — la plus grande surface d'attaque RLS du projet.
+
+**Changements réalisés :**
+
+1. **Extension `supabase/tests/schema.sql`** : ajout de 2 tables (`coach_swimmer_assignments` §98 + `interviews` §74-§75) et 10 policies :
+   - `csa_{select,insert,update,delete}` (4 policies simples, dépendance pour la subquery interviews)
+   - `interviews_athlete_{select,update}` (2 policies avec status gate)
+   - `interviews_coach_{select,update,insert,delete}` (4 policies avec `auth.uid()` + subquery)
+   - **Asymétrie explicite** de `interviews_athlete_update` : USING filtre sur `status IN ('draft_athlete','sent')`, WITH CHECK autorise la transition vers `('draft_athlete','draft_coach','sent','signed')`. Miroir exact de la prod.
+
+2. **Extension `supabase/tests/seed.sql`** :
+   - Ajout Eve (coach id=5, sans assignments CSA — contrôle de l'isolation)
+   - `coach_swimmer_assignments` : Carol (3) → Alice (1), assignée par Diana (4)
+   - 4 interviews fixtures couvrant toutes les combinaisons (Carol creator, Eve creator, athlete valid/invalid status, athlete assigned/unassigned)
+   - UUIDs déterministes `00000000-0000-0000-0000-00000000000N` où N = user.id (lisibles en debug)
+
+3. **Extension `_helpers.ts::AuthClaims`** : ajout d'un champ optionnel `authUid?: string` pour les policies qui utilisent `auth.uid()` directement (vs celles qui utilisent seulement `app_user_id()`). Le harness peuple `sub` dans `request.jwt.claims` pour que `auth.uid()` le lise correctement.
+
+4. **Nouveau test `interviews.test.ts`** (285 LOC, **17 assertions**) :
+   - **SELECT athlete status gate** (4 tests) : Alice voit ses interviews en status valide, ne voit pas ceux de Bob, Bob ne voit PAS son interview en `archived` (status gate bloque), Bob voit en `sent`.
+   - **SELECT coach created_by + assigned branch** (5 tests) : Carol voit ce qu'elle a créé, voit les interviews d'Alice créés par Eve via CSA, ne voit PAS ceux de Bob (pas de CSA), Eve voit ses propres créations, Eve ne voit PAS i1 (pas CSA avec Alice), Diana (admin) voit tout.
+   - **UPDATE athlete USING vs WITH CHECK** (4 tests) : Alice peut passer i3 `sent` → `signed` (USING ok, CHECK ok), ne peut PAS update i1 en `draft_coach` (USING exclut), ne peut PAS passer i3 vers `archived` (WITH CHECK rejette — **ERROR explicite**, pas no-op silencieux), Bob ne peut PAS update l'interview d'Alice.
+   - **DELETE coach created_by** (3 tests) : Carol supprime ses propres interviews, ne peut PAS supprimer ceux d'Eve même pour un swimmer assigné (policy delete asymétrique — SELECT/UPDATE vérifient CSA, DELETE ne vérifie QUE created_by), Diana (admin) supprime tout.
+   - **Re-seed via `beforeEach` pour les tests mutatifs** : `reseedInterviews()` fait un `TRUNCATE + INSERT` via `asServiceRole` entre les tests UPDATE/DELETE pour garantir l'indépendance.
+
+5. **Config Vitest** :
+   - `vitest.config.rls.ts` : passage de `fileParallel: false` (option inexistante — silencieusement ignorée) à `fileParallelism: false` (nom correct Vitest 4) + `isolate: false` pour partager le module `_helpers.ts` (donc le `pool`) entre les suites.
+   - `_helpers.ts` : nouvelle fonction `registerPoolCleanup()` qui installe des hooks `process.on('beforeExit' | 'SIGINT' | 'SIGTERM')` pour fermer le pool à la sortie, au lieu d'un `afterAll(pool.end())` dans chaque suite (qui cassait la 2e suite avec "Called end on pool more than once").
+   - Suppression de `afterAll` dans les 2 fichiers de test.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/tests/schema.sql` | +130 LOC (coach_swimmer_assignments + interviews + 10 policies) |
+| `supabase/tests/seed.sql` | +20 LOC (Eve user + CSA + 4 interviews fixtures) |
+| `supabase/tests/rls/_helpers.ts` | `authUid` optional + `sub` dans JWT claims + cleanup process hooks |
+| `supabase/tests/rls/interviews.test.ts` | **Nouveau** (285 LOC, 17 tests) |
+| `supabase/tests/rls/dim_sessions.test.ts` | Retrait `afterAll(pool.end)` (cleanup centralisé) |
+| `vitest.config.rls.ts` | `fileParallelism: false` + `isolate: false` |
+
+**Tests :**
+- `npm run test:rls` : **30/30 passent** (13 dim_sessions + 17 interviews) en ~700 ms
+- Vérification manuelle : `npx tsc --noEmit` clean (les fichiers `supabase/tests/**/*` sont hors tsconfig include)
+
+**Décisions prises :**
+- **Policy delete asymétrique attestée** : le test `Carol CANNOT delete Eve's interview, even for an assigned swimmer` documente explicitement que `interviews_coach_delete` ne vérifie QUE `created_by`, contrairement à `interviews_coach_select`/`update` qui vérifient aussi `coach_swimmer_assignments`. C'est une décision de design prod (le coach créateur est responsable de ses propres créations) et le test sanctuarise ce comportement.
+- **Status gate athlete comme regression test** : le test `Bob does NOT see his interview in 'archived' status` vérifie que le filtre de status fonctionne. Si un futur refactor simplifie la policy en dropant cette clause, le test casse immédiatement. C'est LA raison d'être du chantier §121/§122.
+- **USING vs WITH CHECK split** : testé séparément (no-op silencieux pour USING, exception pour WITH CHECK). Ces deux modes d'échec sont très différents côté JS (le premier est un bug §113-like, le second remonte une erreur visible).
+- **Pas de test pour `interviews_coach_insert`** : la policy est triviale (`app_user_role() IN ('admin','coach')`). Testée indirectement par les fixtures (si l'INSERT échouait, `reseedInterviews()` ne passerait pas).
+- **Re-seed via `beforeEach`** (vs rollback-only comme dim_sessions) : nécessaire parce que les tests d'UPDATE modifient des rows qui doivent ensuite être re-testées dans d'autres assertions. Le rollback de `asUser` suffit pour dim_sessions où chaque test est indépendant, mais les tests interviews ont des dépendances implicites sur le seed (un UPDATE qui change status casse le test suivant).
+- **Pool cleanup process-level** : meilleur que `afterAll` parce que le pool est partagé entre suites via le module `_helpers.ts`. `afterAll` first-to-call gagne et les autres suites cassent avec "Called end on pool more than once". Les hooks `process.on('exit')` sont safe parce qu'ils ne se déclenchent qu'une fois et au bon moment.
+
+**Limites / dette :**
+- **Pas de test pour `interviews_coach_insert`** (policy triviale, skippée volontairement).
+- **Pas de couverture de la matrice status × actor complète** : 17 tests couvrent ~60% des combinaisons possibles. Le reste apporterait peu de valeur marginale.
+- **`coach_swimmer_assignments`** a ses policies dans schema.sql mais pas encore de fichier test dédié. À ajouter si un bug est soupçonné ou lors du prochain patch qui touche §98.
+- **Drift risk** : si quelqu'un modifie une policy `interviews_*` en prod sans mettre à jour `schema.sql`, le test continue à valider l'ancienne version. Mitigation : règle d'or dans `docs/rls-testing.md` et dans les commit hooks futurs.
+- **4 tables critiques restantes** au plan d'audit : `session_assignments`, `notification_targets`, `strength_set_logs`, `competition_checklist_checks`. À traiter dans §123+.
