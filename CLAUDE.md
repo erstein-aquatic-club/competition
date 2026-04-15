@@ -428,6 +428,32 @@ Tests contre un Postgres local pour attraper les régressions de policies silenc
 
 **Setup** (une fois) : Docker Desktop + `brew install supabase/tap/supabase libpq`, puis `supabase start`.
 
-**Workflow débuggage** : si tu soupçonnes un bug RLS, reproduis-le dans un test dans `supabase/tests/rls/*.test.ts`, run `npm run test:rls`, et fix la policy (migration prod via MCP + update de `supabase/tests/schema.sql` dans le même commit).
-
 **Documentation complète** : `docs/rls-testing.md` (setup, API du harness, ajout d'un test, pièges fréquents, relation avec migrations prod).
+
+### Règles d'usage pour Claude (obligatoire)
+
+**Quand lancer `npm run test:rls` :** uniquement si le patch touche à **au moins un** des éléments suivants :
+
+1. **Migration SQL** qui modifie une policy RLS (`CREATE/ALTER/DROP POLICY`) ou une table sous RLS (`ALTER TABLE ... ENABLE/DISABLE ROW LEVEL SECURITY`).
+2. **Helpers auth** : `app_user_id()`, `app_user_role()`, `auth.uid()` ou équivalents (toute fonction SQL qui alimente les clauses `USING`/`WITH CHECK`).
+3. **Wrapper API JS** dans `src/lib/api/*.ts` qui ajoute/modifie un appel Supabase pour une table sous RLS, **si la nouvelle logique peut dépendre du rôle appelant** (ex: nouveau CRUD coach/athlète, nouveau `.select()` qui suppose filtrage serveur).
+4. **Schéma de test** lui-même : modification de `supabase/tests/schema.sql` ou `seed.sql`.
+5. **Debug ciblé** : l'utilisateur soupçonne une régression RLS sur une feature existante et demande explicitement de reproduire.
+
+**Quand NE PAS lancer :**
+
+- Modifications purement UI/UX (composants React, Tailwind, CSS, routing, typage).
+- Ajout/modif de helpers purs (`src/lib/*.ts` non-API).
+- Fix de bug JS sans relation avec les permissions (mémoïsation, effet, state).
+- Refactor interne d'un module API qui **ne change pas** la logique d'autorisation.
+- Tests `npm test`, `npm run test:e2e`, type check — qui tournent vite et n'ont pas besoin de Docker.
+
+**Docker n'est pas démarré par Claude automatiquement.** Avant de lancer `supabase start` ou `npm run test:rls`, Claude doit :
+
+1. Vérifier si Docker tourne : `docker ps` (silencieux si OK, erreur sinon).
+2. **Si Docker n'est pas lancé**, **demander à l'utilisateur** de lancer Docker Desktop manuellement et **attendre confirmation** avant de continuer. Ne pas tenter `open -a Docker` sans permission explicite — le user contrôle ses ressources système.
+3. Si Docker tourne mais `supabase start` n'a pas été exécuté, lancer `supabase start` directement (zéro risque, juste du démarrage de containers).
+
+**Coût des tests RLS :** ~2 min au premier démarrage (pull Docker images), ~10 s ensuite (containers en route) + ~200 ms d'exécution. À l'échelle d'une session de dev, c'est cheap — mais c'est gaspillé si on lance pour rien. Vérifier la pertinence AVANT.
+
+**Si un test échoue :** ne pas commit, diagnostiquer via `docs/rls-testing.md § Débugger`.
