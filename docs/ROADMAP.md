@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-15 (§123 Tests RLS `interviews` — 17 assertions sur 6 policies stateful, couverture state machine + created_by + coach_swimmer_assignments subquery)*
+*Dernière mise à jour : 2026-04-15 (§124 Audit perf/UX complet + wrap 4 dernières policies `auth_rls_initplan` — advisor passé de 4 à 0)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

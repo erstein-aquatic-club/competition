@@ -335,6 +335,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 85 | Infrastructure tests RLS intégration (Docker Postgres + schéma hand-crafted + §113 regression coverage) | Haute | Fait (§121) |
 | 86 | Simplification RLS timesheet (remplacement email-join par `app_user_role()` sur 6 policies) | Basse | Fait (§122) |
 | 87 | Tests RLS `interviews` (6 policies stateful + 17 assertions) | Haute | Fait (§123) |
+| 88 | Audit perf/UX complet + wrap 4 dernières policies `auth_rls_initplan` (advisor 4 → 0) | Haute | Fait (§124) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

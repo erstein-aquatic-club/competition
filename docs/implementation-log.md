@@ -8776,3 +8776,36 @@ Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
 - **`coach_swimmer_assignments`** a ses policies dans schema.sql mais pas encore de fichier test dédié. À ajouter si un bug est soupçonné ou lors du prochain patch qui touche §98.
 - **Drift risk** : si quelqu'un modifie une policy `interviews_*` en prod sans mettre à jour `schema.sql`, le test continue à valider l'ancienne version. Mitigation : règle d'or dans `docs/rls-testing.md` et dans les commit hooks futurs.
 - **4 tables critiques restantes** au plan d'audit : `session_assignments`, `notification_targets`, `strength_set_logs`, `competition_checklist_checks`. À traiter dans §123+.
+
+## §124 — 2026-04-15 — Audit perf/UX + wrap 4 dernières policies initplan
+
+**Contexte :** Audit complet de l'app (frontend, backend Supabase, UI/UX) lancé en parallèle via 3 agents. Synthèse : backend globalement sain après §116-117, mais advisor `auth_rls_initplan` signalait encore 4 policies non-wrappées. Audit frontend a remonté plusieurs pistes (lazy PDF/recharts, skeletons, staleTime granulaire) + quelques hallucinations écartées après vérification (html2canvas déjà lazy, `Records.tsx` a bien ses `invalidateQueries`, `PullToRefresh.tsx` n'existe pas malgré entrée stale CLAUDE.md). Seul le chantier "wrap policies" a été exécuté dans cette session — zéro risque, pattern identique à §117.
+
+**Changements réalisés :**
+
+1. **Migration `00113_wrap_remaining_initplan_policies.sql`** — 4 policies re-créées avec `(select …)` wrap :
+   - `push_subscriptions / Service role full access` : `auth.role()` → `(select auth.role())`
+   - `admin_audit_log / Staff can view audit log` : `current_setting('request.jwt.claims', true)` → `(select current_setting(...))`
+   - `notification_log / Coaches can view their notification history` : idem
+   - `notification_log / Coaches can insert notification log` : idem (sur `WITH CHECK`)
+2. Application via `mcp__plugin_supabase_supabase__apply_migration` (convention projet) + fichier local miroir pour traçabilité.
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00113_wrap_remaining_initplan_policies.sql` | **Nouveau** (~35 LOC) |
+
+**Tests :**
+- `get_advisors` post-migration : `auth_rls_initplan` passe de **4 → 0**. `multiple_permissive_policies` (224) et `unused_index` (59) inchangés (hors scope).
+- Pas de `npm run test:rls` — les 4 policies touchées ne sont pas couvertes par le harness (push_subscriptions / admin_audit_log / notification_log pas dans `schema.sql`), et le wrap est sémantiquement identique (pattern §117 déjà validé 13×).
+
+**Décisions prises :**
+- **#4 "invalidateQueries Records.tsx" annulé** — faux positif d'audit. Vérifié : 6 `useMutation` + 6 `invalidateQueries`. L'agent frontend avait halluciné un grep count de 0.
+- **#1 (fusion policies permissives) reporté** — gros chantier (224 lints, hot path `groups`/`swim_exercise_logs`) avec risque réel de régression RLS. Doit être précédé d'une extension du harness §121 sur les 4 tables concernées avant toute migration.
+- **Leaked Password Protection (`auth_leaked_password_protection` WARN)** — non exécuté, nécessite toggle manuel console Auth par l'utilisateur.
+
+**Limites / dette :**
+- Audit perf frontend produit un rapport mais aucun chantier code n'a été exécuté. Top priorités restantes : lazy `export-records-pdf.ts` (jspdf + jspdf-autotable, ~140 kB gzip), lazy recharts (9 fichiers, ~117 kB gzip), skeletons sur `CoachTrainingSlotsScreen`, `staleTime` granulaire.
+- Audit UI/UX : design tokens leakés (70+ `bg-red-500/10` hardcodés), 72 `style={{}}` inline, animations `src/lib/animations.ts` sous-utilisées, zéro `PullToRefresh` (à créer from scratch, entrée CLAUDE.md périmée).
+- **224 multiple_permissive_policies** — plus gros cluster backend non traité. Prochain gros chantier perf DB, bloqué sur extension tests RLS.
