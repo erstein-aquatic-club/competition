@@ -8383,3 +8383,68 @@ Un coach a signalé que le bouton "Créer" restait grisé lors de l'ajout d'un c
 - **Refacto `timesheet_*` vers `app_user_role()`** : nettoyage du pattern legacy email-join, reporté.
 - **Dead indexes** : abandonnés (voir décision ci-dessus).
 - **Multiple permissive policies lints** : l'advisor continuera de les signaler tant que les merges ne sont pas faits. Finding accepté comme connu.
+
+## §118 — 2026-04-15 — Session 3 suppression 12 composants UI shadcn orphelins
+
+**Contexte :** Audit dead code frontend (Session 3) confirme que 12 primitives shadcn/ui installées par défaut lors du scaffold du projet n'ont **jamais** été importées ailleurs que par leur propre fichier. Vérification par grep cross-repo : 0 import externe pour chacun des 12 composants.
+
+**⚠️ Pièges évités lors de la re-vérification :**
+- `lovable-tagger` (signalée suspecte par l'audit initial sous-agent) est **en réalité utilisée** dans `vite.config.ts:7` (`import { componentTagger } from "lovable-tagger"`) — plugin Vite dev. **Conservée.**
+- `tw-animate-css` est **en réalité utilisée** dans `src/index.css:2` (`@import "tw-animate-css"`) — import CSS global. **Conservée.**
+- Le mot "carousel" dans CLAUDE.md référençait une description UI, pas un import du composant shadcn.
+
+**Changements réalisés :**
+
+1. **Suppression de 12 composants UI** (`src/components/ui/`) :
+   - `aspect-ratio.tsx` (5 L)
+   - `button-group.tsx` (83 L)
+   - `carousel.tsx` (260 L)
+   - `context-menu.tsx` (198 L)
+   - `hover-card.tsx` (27 L)
+   - `input-group.tsx` (168 L)
+   - `input-otp.tsx` (71 L)
+   - `menubar.tsx` (254 L)
+   - `navigation-menu.tsx` (128 L)
+   - `resizable.tsx` (45 L)
+   - `scroll-area.tsx` (46 L)
+   - `spinner.tsx` (16 L)
+
+   **Total : 1301 LOC supprimées.**
+
+2. **9 dépendances npm désinstallées** (après vérification `grep -rn` : 0 référence dans `src/`) :
+   - `embla-carousel-react` (seul usage = carousel.tsx orphelin)
+   - `@radix-ui/react-aspect-ratio`
+   - `@radix-ui/react-context-menu`
+   - `@radix-ui/react-hover-card`
+   - `@radix-ui/react-menubar`
+   - `@radix-ui/react-navigation-menu`
+   - `@radix-ui/react-scroll-area`
+   - `input-otp`
+   - `react-resizable-panels`
+
+**Fichiers modifiés/créés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/ui/*.tsx` (12 fichiers) | **Supprimés** (1301 LOC) |
+| `package.json` | 9 dépendances retirées |
+| `package-lock.json` | Régénéré (363 lignes de moins) |
+
+**Tests :**
+- ✅ `npx tsc --noEmit` : clean (zéro erreur)
+- ✅ `npm run build` : succès en 10.26 s
+- ✅ 198 PWA precache entries (inchangé — les bundles lazy-loadés ne bougent pas)
+- ✅ Bundle main : 475.95 kB (gzip 140.94 kB)
+
+**Décisions prises :**
+- **Vérification individuelle fichier par fichier** avant suppression : loop bash qui grep `ui/<name>` hors du fichier lui-même. 0 hit confirmé pour les 12.
+- **Re-vérif des deps "suspectes"** `lovable-tagger` et `tw-animate-css` : correction d'un faux positif de l'audit initial. Toutes deux sont utilisées et conservées.
+- **Désinstallation des Radix parents** : aucun des 8 packages Radix n'était importé ailleurs, toutes désinstallables sans effet.
+- **Pas touché aux 7 migrations renommées** (`00007`, `00021`, `00025`, `00045`, `00050`, `00059`, `00086` → `000070_`, `000210_`, etc.) visibles dans `git status` : ces renames proviennent d'un autre outil/process et sortent du scope §118. Laissés non-stagés pour éviter de mélanger.
+
+**Limites / dette :**
+- Aucun gain bundle mesurable sur le build production : les composants orphelins ne figuraient dans aucun chunk (ils n'étaient importés nulle part, donc Vite tree-shaking les excluait déjà). Le gain réel est :
+  - **Code source** : -1301 LOC de dette morte
+  - **`node_modules`** : ~2 MB d'install de moins (9 packages)
+  - **Surface d'audit** : moins de faux positifs pour les futures scans
+- Les storybook `.stories.tsx` évoqués dans le rapport initial du sous-agent (52 fichiers tests "obsolètes") **n'ont PAS été touchés** — claim non re-vérifié, hors scope.

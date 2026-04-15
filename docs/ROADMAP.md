@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-15 (§117 Session 2 backend perf — 9 index FK, 13 policies RLS avec auth.uid() wrappé en initplan)*
+*Dernière mise à jour : 2026-04-15 (§118 Session 3 dead code frontend — 12 composants shadcn/ui orphelins supprimés, 9 deps npm désinstallées, 1301 LOC)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

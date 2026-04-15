@@ -320,6 +320,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 79 | Suppression code orphelin `CoachSlotCalendar.tsx` (766 LOC) | Basse | Fait (§115) |
 | 80 | Session 1 urgences backend (cron `rec.id`, push-send vault service_role, bucket list policies) | Haute | Fait (§116) |
 | 81 | Session 2 backend perf (9 index FK, 13 policies RLS auth.uid() initplan wrap) | Haute | Fait (§117) |
+| 82 | Session 3 dead code frontend (12 composants shadcn/ui orphelins + 9 deps npm) | Moyenne | Fait (§118) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
