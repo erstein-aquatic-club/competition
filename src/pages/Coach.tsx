@@ -23,6 +23,15 @@ import {
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
 import { buildCoachHash, parseCoachHashLocation, type CoachSection } from "./coach/coachRouteState";
+
+// Route guard: only sync routeState when the current hash path is exactly "/coach".
+// Sub-paths like "/coach/swim-planning" or sibling routes ("/profile", "/records-admin")
+// must not drive Coach's local routeState, otherwise the [routeState] effect replaces
+// the hash back to "#/coach" and swallows the navigation.
+const isCoachRouteHash = (hash: string): boolean => {
+  const [path] = hash.replace(/^#/, "").split("?");
+  return path === "/coach";
+};
 // Migration vers lazyWithRetry (§120) — gère les chunks périmés après deploy PWA.
 const CoachSwimmersOverview = lazyWithRetry(() => import("./coach/CoachSwimmersOverview"));
 const CoachGroupsScreen = lazyWithRetry(() => import("./coach/CoachGroupsScreen"));
@@ -595,6 +604,10 @@ export default function Coach() {
   // Keep local route state aligned with browser hash changes and deep links.
   useEffect(() => {
     const syncFromHash = () => {
+      // Ignore hashchanges that leave /coach — otherwise navigating to
+      // /profile, /records-admin, /coach/swim-planning… would re-fire the
+      // [routeState] effect below and replaceState back to "#/coach".
+      if (!isCoachRouteHash(window.location.hash)) return;
       setRouteState(parseCoachHashLocation(window.location.hash));
     };
     window.addEventListener("hashchange", syncFromHash);
@@ -603,6 +616,7 @@ export default function Coach() {
 
   // Sync local route state → URL (replaceState to avoid extra history entries)
   useEffect(() => {
+    if (!isCoachRouteHash(window.location.hash)) return;
     const target = buildCoachHash(routeState, window.location.hash);
     if (window.location.hash !== target) {
       window.history.replaceState(null, "", target);
