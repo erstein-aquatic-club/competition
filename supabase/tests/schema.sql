@@ -237,3 +237,120 @@ CREATE POLICY interviews_coach_delete ON public.interviews
       AND created_by = (SELECT auth.uid())
     )
   );
+
+-- =============================================================================
+-- groups + group_members — dependency for session_assignments + notification_targets
+-- =============================================================================
+
+CREATE TABLE public.groups (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.group_members (
+  id SERIAL PRIMARY KEY,
+  group_id INTEGER NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  role_in_group TEXT,
+  joined_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY group_members_select ON public.group_members
+  FOR SELECT USING (true);
+
+CREATE POLICY group_members_write ON public.group_members
+  FOR ALL USING (app_user_role() = ANY (ARRAY['admin','coach']));
+
+-- =============================================================================
+-- session_assignments (§85, §101) — hot path: every assigned swim/strength session
+-- 2 policies, SELECT is the complex one (326 chars, 4 branches + visible_from gate)
+-- =============================================================================
+
+CREATE TABLE public.session_assignments (
+  id SERIAL PRIMARY KEY,
+  assignment_type TEXT NOT NULL,
+  swim_catalog_id INTEGER,
+  strength_session_id INTEGER,
+  target_user_id INTEGER REFERENCES public.users(id),
+  target_group_id INTEGER REFERENCES public.groups(id),
+  assigned_by INTEGER REFERENCES public.users(id),
+  scheduled_date DATE,
+  status TEXT NOT NULL DEFAULT 'assigned',
+  scheduled_slot TEXT,
+  visible_from DATE,
+  training_slot_id UUID,
+  target_subgroup_id INTEGER,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.session_assignments ENABLE ROW LEVEL SECURITY;
+
+-- SELECT: coach/admin bypass | creator sees own | athlete direct + visible_from gate | athlete group + visible_from gate
+CREATE POLICY assignments_select ON public.session_assignments
+  FOR SELECT USING (
+    (app_user_role() = ANY (ARRAY['admin','coach']))
+    OR (assigned_by = app_user_id())
+    OR (
+      ((visible_from IS NULL) OR (visible_from <= CURRENT_DATE))
+      AND (
+        (target_user_id = app_user_id())
+        OR (target_group_id IN (
+          SELECT group_id FROM group_members WHERE user_id = app_user_id()
+        ))
+      )
+    )
+  );
+
+-- WRITE (INSERT/UPDATE/DELETE): coach/admin only
+CREATE POLICY assignments_write ON public.session_assignments
+  FOR ALL USING (app_user_role() = ANY (ARRAY['admin','coach']));
+
+-- =============================================================================
+-- notifications + notification_targets (§16 fix, §79 push)
+-- notification_targets has an asymmetry: SELECT includes group branch, UPDATE does NOT.
+-- =============================================================================
+
+CREATE TABLE public.notifications (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT,
+  type TEXT NOT NULL,
+  created_by INTEGER REFERENCES public.users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.notification_targets (
+  id SERIAL PRIMARY KEY,
+  notification_id INTEGER NOT NULL REFERENCES public.notifications(id) ON DELETE CASCADE,
+  target_user_id INTEGER REFERENCES public.users(id),
+  target_group_id INTEGER REFERENCES public.groups(id),
+  read_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.notification_targets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY notification_targets_select ON public.notification_targets
+  FOR SELECT USING (
+    (target_user_id = app_user_id())
+    OR (target_group_id IN (
+      SELECT group_id FROM group_members WHERE user_id = app_user_id()
+    ))
+    OR (app_user_role() = ANY (ARRAY['admin','coach']))
+  );
+
+-- NOTE: UPDATE intentionally does NOT include the group_members branch.
+-- An athlete can mark-read their direct notifications, but NOT group notifications.
+CREATE POLICY notification_targets_update ON public.notification_targets
+  FOR UPDATE USING (
+    (target_user_id = app_user_id())
+    OR (app_user_role() = ANY (ARRAY['admin','coach']))
+  );
+
+CREATE POLICY notification_targets_insert ON public.notification_targets
+  FOR INSERT WITH CHECK (
+    app_user_role() = ANY (ARRAY['admin','coach'])
+  );
