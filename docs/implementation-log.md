@@ -8809,3 +8809,64 @@ Les fixes 1 et 2 ont été **annulés après audit en profondeur** :
 - Audit perf frontend produit un rapport mais aucun chantier code n'a été exécuté. Top priorités restantes : lazy `export-records-pdf.ts` (jspdf + jspdf-autotable, ~140 kB gzip), lazy recharts (9 fichiers, ~117 kB gzip), skeletons sur `CoachTrainingSlotsScreen`, `staleTime` granulaire.
 - Audit UI/UX : design tokens leakés (70+ `bg-red-500/10` hardcodés), 72 `style={{}}` inline, animations `src/lib/animations.ts` sous-utilisées, zéro `PullToRefresh` (à créer from scratch, entrée CLAUDE.md périmée).
 - **224 multiple_permissive_policies** — plus gros cluster backend non traité. Prochain gros chantier perf DB, bloqué sur extension tests RLS.
+
+## §125 — 2026-04-16 — Unification FolderCard + SessionRow (nageur/coach)
+
+**Branche :** `main`
+**Chantier ROADMAP :** §125 — Cohérence UI/UX dossiers muscu
+
+### Contexte — Pourquoi ce patch
+
+Audit UI/UX global ayant identifié 5+ incohérences majeures entre les espaces nageur et coach. Le déclencheur principal : la visualisation des dossiers de musculation utilisait deux implémentations divergentes — `CommonFolderList` côté nageur (Radix Collapsible, border, bg-card, icône FolderOpen, sous-dossiers 2 niveaux) vs `FolderSection` côté coach (custom state toggle, pas de border/bg, Popover menu, flat only). Design doc validé : `docs/plans/2026-04-16-folder-session-unification-design.md`.
+
+### Changements réalisés
+
+1. **Composants partagés créés** :
+   - `src/components/shared/FolderCard.tsx` — Radix Collapsible, variant root/nested, slot `actions`
+   - `src/components/shared/SessionRow.tsx` — ligne de séance avec slots `badge` et `trailing`
+
+2. **Migration nageur** :
+   - `SessionBrowser.tsx` — remplace `CommonFolderList` par `FolderCard` + `SessionRow` inline (local `FolderListSection`)
+   - `UnfiledSessionList.tsx` — refactoré pour utiliser `SessionRow` (garde wrapper motion)
+
+3. **Migration coach** :
+   - `StrengthCatalog.tsx` — remplace `FolderSection` par `FolderCard` + `FolderDropdown` (DropdownMenu Radix, rename via prompt). SessionListView conservé à l'intérieur des dossiers (actions complexes hors scope)
+
+4. **Quick wins cohérence** :
+   - `SessionListView.tsx` — `rounded-2xl` → `rounded-xl` (skeleton, Card), empty state via `ui/empty.tsx`
+   - `SessionBrowser.tsx` — empty state search via `ui/empty.tsx`
+
+5. **Fichiers supprimés** :
+   - `CommonFolderList.tsx` (135 LOC)
+   - `FolderSection.tsx` (155 LOC)
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/shared/FolderCard.tsx` | **Nouveau** (61 LOC) |
+| `src/components/shared/SessionRow.tsx` | **Nouveau** (49 LOC) |
+| `src/components/strength/SessionBrowser.tsx` | **Modifié** (309 → 397 LOC) |
+| `src/components/strength/UnfiledSessionList.tsx` | **Modifié** (91 → 80 LOC) |
+| `src/pages/coach/StrengthCatalog.tsx` | **Modifié** (~1384 → 1463 LOC) |
+| `src/components/coach/shared/SessionListView.tsx` | **Modifié** (190 → 193 LOC) |
+| `src/components/strength/CommonFolderList.tsx` | **Supprimé** (135 LOC) |
+| `src/components/coach/strength/FolderSection.tsx` | **Supprimé** (155 LOC) |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreurs
+- `npm test -- --run` : 196 tests, 0 fail
+- Pas de test:rls nécessaire (aucune migration SQL, aucune policy RLS touchée)
+
+### Décisions prises
+
+- **Rename via `window.prompt`** côté coach (remplace l'inline editing ad-hoc de FolderSection). Plus robuste et pas de conflit blur/click. Si inline editing souhaité ultérieurement, c'est un chantier séparé.
+- **SessionListView conservé** à l'intérieur des dossiers coach — ses actions complexes (edit, move, share, archive, delete) ne sont pas encore migrées vers SessionRow. Seul le wrapper dossier a été unifié.
+- **Exécution en 2 vagues d'agents parallèles** : vague 1 (création composants), vague 2 (5 migrations/quick wins simultanées sur fichiers différents).
+
+### Limites / dette
+
+- SessionListView coach utilise encore `rounded-xl Card` + DropdownMenu complet. Unification complète des lignes de séances coach (SessionListView → SessionRow + trailing DropdownMenu) = chantier suivant.
+- Le badge "Coach" dans UnfiledSessionList est encore un `<span>` inline — à terme, migrer vers un composant `ui/badge` variant.
+- Design tokens : les couleurs hardcodées (bg-red-500/10 etc.) identifiées dans l'audit §124 ne sont pas traitées ici.

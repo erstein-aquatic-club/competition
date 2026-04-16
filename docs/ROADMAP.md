@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-15 (§124 Audit perf/UX complet + wrap 4 dernières policies `auth_rls_initplan` — advisor passé de 4 à 0)*
+*Dernière mise à jour : 2026-04-16 (§125 Unification FolderCard + SessionRow — cohérence dossiers nageur/coach)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -71,6 +71,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 63 | Historique Chronos + Éditeur Splits | Haute | Moyenne | Fait (§98) |
 | 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Haute | Fait (§102) |
 | 67 | Restructuration vue "Mon suivi" (hub + drill-down) | Haute | Haute | Fait (§103) |
+| 89 | Unification FolderCard + SessionRow (cohérence dossiers nageur/coach) | Moyenne | Faible | Fait (§125) |
 
 ---
 

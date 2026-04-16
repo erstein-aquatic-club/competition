@@ -64,7 +64,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/Dashboard.tsx` | Calendrier natation nageur (ex-Accueil, route /natation) | ~1055 lignes |
 | `src/pages/Strength.tsx` | Module musculation nageur | ~921 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
-| `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1384 lignes |
+| `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
 | `src/pages/Records.tsx` | Records personnels + FFN sync | ~1376 lignes |
 | `src/pages/RecordsClub.tsx` | Records club (sections nage, drill-down progressif) | ~840 lignes |
 | `src/pages/RecordsAdmin.tsx` | Admin records + gestion nageurs | ~300 lignes |
@@ -85,6 +85,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/coach/SwimmerPlanningTab.tsx` | Onglet planification fiche nageur (timeline cycles) | ~844 lignes |
 | `src/pages/coach/SwimmerInterviewsTab.tsx` | Onglet entretiens fiche nageur (workflow multi-phases) | ~1193 lignes |
 | `src/components/profile/AthleteInterviewsSection.tsx` | Entretiens côté nageur (formulaire, signature, historique) | ~320 lignes |
+| `src/components/shared/FolderCard.tsx` | Composant partagé dossiers (Radix Collapsible, variant root/nested, slot actions) (§125) | ~61 lignes |
+| `src/components/shared/SessionRow.tsx` | Composant partagé ligne de séance (slots badge/trailing) (§125) | ~49 lignes |
 | `src/components/shared/ObjectiveCard.tsx` | Composant partagé objectifs (ring SVG, grid 2x2, compact) | ~260 lignes |
 | `src/lib/objectiveHelpers.ts` | Helpers partagés objectifs (FFN_EVENTS, formatTime) | ~40 lignes |
 | `src/lib/imageUtils.ts` | Compression image Canvas (avatar upload, WebP/JPEG ≤200KB) | ~95 lignes |
@@ -127,9 +129,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) | |
 | `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur (lecture cycles + lancement séance) | ~158 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
-| `src/components/coach/strength/FolderSection.tsx` | Dossiers hiérarchiques 2 niveaux bibliothèque muscu (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |
-| `src/components/strength/CommonFolderList.tsx` | Accordéons dossiers globaux muscu (§93) | |
 | `src/components/strength/TeamPlansSection.tsx` | Plans d'équipe visibles entre nageurs (§93) | |
 | `src/lib/strengthHistoryUtils.ts` | Helpers calcul historique muscu (tonnage, sRPE, groupByExercise) | ~80 lignes |
 | `src/components/strength/RunDetailSheet.tsx` | Bottom sheet détail séance musculation (KPIs, exercices, ressenti) | ~170 lignes |
@@ -336,6 +336,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 86 | Simplification RLS timesheet (remplacement email-join par `app_user_role()` sur 6 policies) | Basse | Fait (§122) |
 | 87 | Tests RLS `interviews` (6 policies stateful + 17 assertions) | Haute | Fait (§123) |
 | 88 | Audit perf/UX complet + wrap 4 dernières policies `auth_rls_initplan` (advisor 4 → 0) | Haute | Fait (§124) |
+| 89 | Unification FolderCard + SessionRow (cohérence dossiers nageur/coach) | Moyenne | Fait (§125) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
@@ -414,6 +415,15 @@ L'application est servie sur GitHub Pages avec les meta tags `apple-mobile-web-a
 - Un trigger PostgreSQL (`handle_new_auth_user`) crée automatiquement les entrées `users`, `user_profiles`, `group_members` à l'inscription
 - Les migrations sont dans `supabase/migrations/`
 - Le fallback localStorage est activé quand Supabase n'est pas disponible
+
+## Agents & coût — règles anti-hallucination
+
+Un agent spawné coûte **~20x plus** qu'un Grep/Glob direct (contexte dupliqué + appels internes cumulés). Règles :
+
+- **Grep/Glob/Read directs** pour toute recherche simple (fichier, symbole, signature). Agents = recherches multi-étapes uniquement.
+- **Prompts d'agents** : donner des **chemins précis**, demander **fichier + ligne** en retour, **scope étroit**.
+- **Vérifier avant d'agir** : avant d'éditer ou de rapporter un fait précis à l'utilisateur, confirmer avec un Read/Grep que le fichier/symbole existe réellement. Ne pas re-vérifier ce qui est déjà connu (tableau "Fichiers clés", info non actionnable).
+- **Résultats contradictoires** entre agents → trancher dans le code source directement.
 
 ## Commandes
 
