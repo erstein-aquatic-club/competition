@@ -19,6 +19,7 @@ import {
   Share2,
   Trash2,
 } from "lucide-react";
+import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 
 interface SessionListViewProps<T extends { id: number }> {
@@ -59,7 +60,7 @@ export function SessionListView<T extends { id: number }>({
     return (
       <div className="space-y-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={`skeleton-${i}`} className="rounded-2xl border border-border p-3">
+          <div key={`skeleton-${i}`} className="rounded-xl border border-border p-3">
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <Skeleton className="h-4 w-3/4 mb-1.5" />
@@ -87,9 +88,11 @@ export function SessionListView<T extends { id: number }>({
 
   if (sessions.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
-        Aucune séance trouvée.
-      </div>
+      <Empty className="py-6 border-0 bg-muted rounded-xl">
+        <EmptyHeader>
+          <EmptyDescription>Aucune séance trouvée.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
@@ -101,7 +104,7 @@ export function SessionListView<T extends { id: number }>({
         return (
           <Card
             key={session.id}
-            className="rounded-2xl border-border transition-colors active:bg-muted/50"
+            className="rounded-xl border-border transition-colors active:bg-muted/50"
           >
             <div className="flex items-center gap-2 p-3">
               {/* Tap area: preview on click */}

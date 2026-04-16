@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy } from "lucide-react";
+import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getStrengthSessionsPaginated } from "@/lib/api/strength";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +28,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StrengthSessionBuilder } from "@/components/coach/strength/StrengthSessionBuilder";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
-import { FolderSection } from "@/components/coach/strength/FolderSection";
+import { FolderCard } from "@/components/shared/FolderCard";
+import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
 // Lazy-loaded children : ne sont rendus qu'à l'ouverture de modals/sheets
 // ou via un onglet (TabsContent). Évite ~1100 LOC dans le bundle initial du wrapper.
@@ -284,6 +292,46 @@ const WarmupFields = ({
     </div>
   );
 };
+
+function FolderDropdown({
+  name,
+  onRename,
+  onDelete,
+}: {
+  name: string;
+  onRename: (newName: string) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+          aria-label="Actions dossier"
+        >
+          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem onClick={() => {
+          const newName = window.prompt("Renommer le dossier", name);
+          if (newName?.trim() && newName.trim() !== name) {
+            onRename(newName.trim());
+          }
+        }}>
+          <Pencil className="h-4 w-4" />
+          Renommer
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+          <Trash2 className="h-4 w-4" />
+          Supprimer
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function StrengthCatalog() {
   const { toast } = useToast();
@@ -1273,12 +1321,17 @@ export default function StrengthCatalog() {
               {sessionFolders.map((folder) => {
                 const folderSessions = sessionsByFolder.get(folder.id) ?? [];
                 return (
-                  <FolderSection
+                  <FolderCard
                     key={folder.id}
                     name={folder.name}
                     count={folderSessions.length}
-                    onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
-                    onDelete={() => deleteFolderMut.mutate(folder.id)}
+                    actions={
+                      <FolderDropdown
+                        name={folder.name}
+                        onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
+                        onDelete={() => deleteFolderMut.mutate(folder.id)}
+                      />
+                    }
                   >
                     {folderSessions.length > 0 ? (
                       <SessionListView
@@ -1299,11 +1352,13 @@ export default function StrengthCatalog() {
                         isDeleting={deleteSession.isPending}
                       />
                     ) : (
-                      <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                        Dossier vide
-                      </div>
+                      <Empty className="py-4 border-0">
+                        <EmptyHeader>
+                          <EmptyDescription>Dossier vide</EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     )}
-                  </FolderSection>
+                  </FolderCard>
                 );
               })}
 
@@ -1353,23 +1408,30 @@ export default function StrengthCatalog() {
             {exerciseFolders?.map((folder) => {
               const folderExercises = exercisesByFolder.get(folder.id) ?? [];
               return (
-                <FolderSection
+                <FolderCard
                   key={folder.id}
                   name={folder.name}
                   count={folderExercises.length}
-                  onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
-                  onDelete={() => deleteFolderMut.mutate(folder.id)}
+                  actions={
+                    <FolderDropdown
+                      name={folder.name}
+                      onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
+                      onDelete={() => deleteFolderMut.mutate(folder.id)}
+                    />
+                  }
                 >
                   {folderExercises.length > 0 ? (
                     <div className="space-y-1">
                       {folderExercises.map(renderExerciseRow)}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                      Dossier vide
-                    </div>
+                    <Empty className="py-4 border-0">
+                      <EmptyHeader>
+                        <EmptyDescription>Dossier vide</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   )}
-                </FolderSection>
+                </FolderCard>
               );
             })}
           </TabsContent>

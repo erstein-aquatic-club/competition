@@ -1,13 +1,15 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, StrengthCycleType, StrengthSessionTemplate, Assignment } from "@/lib/api";
+import { api, StrengthCycleType, StrengthSessionTemplate, StrengthFolder, Assignment } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Dumbbell, Search, X } from "lucide-react";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import { stripAccents } from "@/lib/utils";
 import { CycleSelector } from "@/components/strength/CycleSelector";
 import { InProgressCard } from "@/components/strength/InProgressCard";
 import { UnfiledSessionList, DisplaySession } from "@/components/strength/UnfiledSessionList";
-import { CommonFolderList } from "@/components/strength/CommonFolderList";
+import { FolderCard } from "@/components/shared/FolderCard";
+import { SessionRow } from "@/components/shared/SessionRow";
 import { TeamPlansSection } from "@/components/strength/TeamPlansSection";
 import { SaveState } from "@/components/shared/BottomActionBar";
 
@@ -278,7 +280,7 @@ export function SessionBrowser({
 
       {/* ── Global folders (hidden during search) ── */}
       {!isSearching && (
-        <CommonFolderList
+        <FolderListSection
           folders={allGlobalFolders}
           allSessions={strengthCatalog ?? []}
           onStartCatalog={onStartCatalog}
@@ -295,14 +297,101 @@ export function SessionBrowser({
 
       {/* ── Empty state ── */}
       {isSearching && totalUnfiled === 0 && (
-        <div className="flex flex-col items-center justify-center py-14 text-center">
-          <Dumbbell className="h-8 w-8 mb-3 text-muted-foreground/25" />
-          <p className="text-sm font-medium text-muted-foreground">Aucune séance trouvée</p>
-          <p className="text-[11px] text-muted-foreground/50 mt-1 max-w-[220px]">
-            Changez de cycle ou modifiez votre recherche.
-          </p>
-        </div>
+        <Empty className="py-14 border-0">
+          <EmptyHeader>
+            <EmptyMedia><Dumbbell className="h-8 w-8 text-muted-foreground/25" /></EmptyMedia>
+            <EmptyTitle className="text-sm">Aucune séance trouvée</EmptyTitle>
+            <EmptyDescription className="text-[11px]">Changez de cycle ou modifiez votre recherche.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
+    </div>
+  );
+}
+
+// ── Inline folder list (replaces CommonFolderList) ──────────────────────────
+
+interface FolderListSectionProps {
+  folders: StrengthFolder[];
+  allSessions: StrengthSessionTemplate[];
+  onStartCatalog: (session: StrengthSessionTemplate) => void;
+}
+
+function FolderListSection({ folders, allSessions, onStartCatalog }: FolderListSectionProps) {
+  const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
+
+  const subFoldersMap = useMemo(() => {
+    const map = new Map<number, StrengthFolder[]>();
+    for (const f of folders) {
+      if (f.parent_id) {
+        const arr = map.get(f.parent_id) ?? [];
+        arr.push(f);
+        map.set(f.parent_id, arr);
+      }
+    }
+    return map;
+  }, [folders]);
+
+  const sessionsByFolder = useMemo(() => {
+    const folderIds = new Set(folders.map((f) => f.id));
+    const map = new Map<number, StrengthSessionTemplate[]>();
+    for (const s of allSessions) {
+      if (s.folder_id && folderIds.has(s.folder_id)) {
+        const arr = map.get(s.folder_id) ?? [];
+        arr.push(s);
+        map.set(s.folder_id, arr);
+      }
+    }
+    return map;
+  }, [folders, allSessions]);
+
+  if (rootFolders.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 pt-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Bibliothèque</span>
+        <div className="flex-1 h-px bg-border/40" />
+      </div>
+
+      {rootFolders.map((root) => {
+        const subs = subFoldersMap.get(root.id) ?? [];
+        const directSessions = sessionsByFolder.get(root.id) ?? [];
+        const allFolderSessions = [
+          ...directSessions,
+          ...subs.flatMap((sub) => sessionsByFolder.get(sub.id) ?? []),
+        ];
+        if (allFolderSessions.length === 0) return null;
+
+        return (
+          <FolderCard key={root.id} name={root.name} count={allFolderSessions.length}>
+            {directSessions.map((s) => (
+              <SessionRow
+                key={s.id}
+                title={s.title ?? s.name ?? "Sans titre"}
+                subtitle={`${s.items?.length ?? 0} ex.`}
+                onClick={() => onStartCatalog(s)}
+              />
+            ))}
+            {subs.map((sub) => {
+              const sessions = sessionsByFolder.get(sub.id) ?? [];
+              if (sessions.length === 0) return null;
+              return (
+                <FolderCard key={sub.id} name={sub.name} count={sessions.length} variant="nested">
+                  {sessions.map((s) => (
+                    <SessionRow
+                      key={s.id}
+                      title={s.title ?? s.name ?? "Sans titre"}
+                      subtitle={`${s.items?.length ?? 0} ex.`}
+                      onClick={() => onStartCatalog(s)}
+                    />
+                  ))}
+                </FolderCard>
+              );
+            })}
+          </FolderCard>
+        );
+      })}
     </div>
   );
 }
