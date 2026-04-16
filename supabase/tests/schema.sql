@@ -354,3 +354,131 @@ CREATE POLICY notification_targets_insert ON public.notification_targets
   FOR INSERT WITH CHECK (
     app_user_role() = ANY (ARRAY['admin','coach'])
   );
+
+-- =============================================================================
+-- strength_session_runs + strength_set_logs — parent-child with EXISTS subquery
+-- Asymmetry: runs_delete is admin-only (coach excluded), insert/update includes coach.
+-- set_logs uses EXISTS on runs for all ops (no direct athlete_id column).
+-- =============================================================================
+
+CREATE TABLE public.strength_session_runs (
+  id SERIAL PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'in_progress',
+  session_id INTEGER,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  fatigue INTEGER,
+  comments TEXT
+);
+
+ALTER TABLE public.strength_session_runs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY runs_select ON public.strength_session_runs
+  FOR SELECT USING (athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['admin','coach']));
+
+CREATE POLICY runs_insert ON public.strength_session_runs
+  FOR INSERT WITH CHECK (athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['admin','coach']));
+
+CREATE POLICY runs_update ON public.strength_session_runs
+  FOR UPDATE USING (athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['admin','coach']));
+
+-- NOTE: coach EXCLUDED from delete — only athlete + admin
+CREATE POLICY runs_delete ON public.strength_session_runs
+  FOR DELETE USING (athlete_id = app_user_id() OR app_user_role() = 'admin');
+
+CREATE TABLE public.strength_set_logs (
+  id SERIAL PRIMARY KEY,
+  run_id INTEGER NOT NULL REFERENCES public.strength_session_runs(id) ON DELETE CASCADE,
+  exercise_id INTEGER NOT NULL,
+  set_index INTEGER,
+  reps INTEGER,
+  weight DOUBLE PRECISION,
+  rpe INTEGER,
+  notes TEXT,
+  completed_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.strength_set_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY set_logs_select ON public.strength_set_logs
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM strength_session_runs r
+            WHERE r.id = strength_set_logs.run_id
+              AND (r.athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['admin','coach'])))
+  );
+
+CREATE POLICY set_logs_write ON public.strength_set_logs
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM strength_session_runs r
+            WHERE r.id = strength_set_logs.run_id
+              AND (r.athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['admin','coach'])))
+  );
+
+-- =============================================================================
+-- competition_checklists + competition_checklist_checks (§87)
+-- Parent-child: checks → checklists → competitions
+-- insert/update on checks: athlete-only (coach excluded from mutation)
+-- =============================================================================
+
+CREATE TABLE public.competitions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  date DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.competition_checklists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  competition_id UUID NOT NULL REFERENCES public.competitions(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  checklist_template_id UUID NOT NULL
+);
+
+ALTER TABLE public.competition_checklists ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY competition_checklists_select ON public.competition_checklists
+  FOR SELECT USING (athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['coach','admin']));
+
+CREATE POLICY competition_checklists_own_insert ON public.competition_checklists
+  FOR INSERT WITH CHECK (athlete_id = app_user_id());
+
+CREATE POLICY competition_checklists_own_delete ON public.competition_checklists
+  FOR DELETE USING (athlete_id = app_user_id());
+
+CREATE TABLE public.competition_checklist_checks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  competition_checklist_id UUID NOT NULL REFERENCES public.competition_checklists(id) ON DELETE CASCADE,
+  checklist_item_id UUID NOT NULL,
+  checked BOOLEAN NOT NULL DEFAULT FALSE,
+  checked_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.competition_checklist_checks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY competition_checklist_checks_select ON public.competition_checklist_checks
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM competition_checklists cc
+            WHERE cc.id = competition_checklist_checks.competition_checklist_id
+              AND (cc.athlete_id = app_user_id() OR app_user_role() = ANY (ARRAY['coach','admin'])))
+  );
+
+CREATE POLICY competition_checklist_checks_own_insert ON public.competition_checklist_checks
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM competition_checklists cc
+            WHERE cc.id = competition_checklist_checks.competition_checklist_id
+              AND cc.athlete_id = app_user_id())
+  );
+
+CREATE POLICY competition_checklist_checks_own_update ON public.competition_checklist_checks
+  FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM competition_checklists cc
+            WHERE cc.id = competition_checklist_checks.competition_checklist_id
+              AND cc.athlete_id = app_user_id())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM competition_checklists cc
+            WHERE cc.id = competition_checklist_checks.competition_checklist_id
+              AND cc.athlete_id = app_user_id())
+  );

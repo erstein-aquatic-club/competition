@@ -80,3 +80,28 @@ INSERT INTO public.notification_targets (id, notification_id, target_user_id, ta
   (3, 1, NULL, 2),
   (4, 1, 2,    NULL);
 SELECT setval('public.notification_targets_id_seq', 100, false);
+
+-- ── Strength session runs + set logs ─────────────────
+INSERT INTO public.strength_session_runs (id, athlete_id, status) VALUES
+  (1, 1, 'completed'),   -- Alice's run
+  (2, 2, 'completed');   -- Bob's run
+SELECT setval('public.strength_session_runs_id_seq', 100, false);
+
+INSERT INTO public.strength_set_logs (id, run_id, exercise_id, set_index, reps, weight) VALUES
+  (1, 1, 10, 1, 8, 40.0),   -- log in Alice's run
+  (2, 1, 10, 2, 8, 42.5),   -- log in Alice's run
+  (3, 2, 10, 1, 10, 35.0);  -- log in Bob's run
+SELECT setval('public.strength_set_logs_id_seq', 100, false);
+
+-- ── Competition checklists + checks ──────────────────
+INSERT INTO public.competitions (id, name, date) VALUES
+  ('20000000-0000-0000-0000-000000000001', 'Meeting Printemps', '2026-05-01');
+
+INSERT INTO public.competition_checklists (id, competition_id, athlete_id, checklist_template_id) VALUES
+  ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 1, '40000000-0000-0000-0000-000000000001'),
+  ('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000001', 2, '40000000-0000-0000-0000-000000000001');
+
+INSERT INTO public.competition_checklist_checks (id, competition_checklist_id, checklist_item_id, checked) VALUES
+  ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', false),
+  ('50000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', true),
+  ('50000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000001', false);
