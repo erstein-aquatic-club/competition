@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import type { ChronoState, SplitRecord } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
-import { formatTime, formatLap } from "../../hooks/useChronoTimer";
+import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
 import { WAVE_COLORS } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
 import {
@@ -234,6 +234,11 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
           </Button>
         </div>
       </div>
+
+      {/* ── Precision caption ── */}
+      <p className="text-[10px] text-muted-foreground text-center -mt-2" title={CHRONO_PRECISION.tooltip}>
+        {CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}
+      </p>
 
       {/* ── Results by lane ── */}
       {sortedLanes.map((lane) => (

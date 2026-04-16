@@ -1,7 +1,8 @@
 import { useRef, useCallback, useEffect } from "react";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
-import { formatTime, formatLap } from "../../hooks/useChronoTimer";
+import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
+import { Info } from "lucide-react";
 import { WAVE_COLORS } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
 import {
@@ -503,6 +504,14 @@ export default function ChronoRace({
             </AlertDialog>
           </div>
         </div>
+      </div>
+
+      {/* Precision badge */}
+      <div className="flex items-center justify-center gap-1.5 py-1.5 bg-amber-500/5 border-b border-amber-500/20">
+        <Info className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+        <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300" title={CHRONO_PRECISION.tooltip}>
+          {CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}
+        </span>
       </div>
 
       {/* Lane grid — full width */}
