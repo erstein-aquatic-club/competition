@@ -468,6 +468,20 @@ Tests contre un Postgres local pour attraper les régressions de policies silenc
 2. **Si Docker n'est pas lancé**, **demander à l'utilisateur** de lancer Docker Desktop manuellement et **attendre confirmation** avant de continuer. Ne pas tenter `open -a Docker` sans permission explicite — le user contrôle ses ressources système.
 3. Si Docker tourne mais `supabase start` n'a pas été exécuté, lancer `supabase start` directement (zéro risque, juste du démarrage de containers).
 
-**Coût des tests RLS :** ~2 min au premier démarrage (pull Docker images), ~10 s ensuite (containers en route) + ~200 ms d'exécution. À l'échelle d'une session de dev, c'est cheap — mais c'est gaspillé si on lance pour rien. Vérifier la pertinence AVANT.
-
 **Si un test échoue :** ne pas commit, diagnostiquer via `docs/rls-testing.md § Débugger`.
+
+### Économie de tokens (obligatoire)
+
+Coûts mesurés — chaque token gaspillé est un token en moins pour le raisonnement :
+
+| Action | Tokens (~) | Règle |
+|---|---|---|
+| `docker ps` | 690 | **1× par session max.** Si déjà vérifié et OK, ne pas re-vérifier. Retenir le résultat. |
+| `npm run test:rls` output | 300 | OK si critères ci-dessus remplis. **Jamais "pour vérifier" sur un patch UI.** |
+| `supabase start` | 750 | **1× par session.** Si containers déjà up (docker ps OK), ne pas relancer. |
+| Lire 1 fichier test (~170 LOC) | 1 700 | **Uniquement si on le modifie.** Ne pas lire "pour comprendre" si on ne touche pas aux tests. |
+| Lire TOUS les fichiers test | 23 000 | **INTERDIT** sauf demande explicite de l'utilisateur ou audit global. Lire uniquement le fichier ciblé. |
+| Lire `docs/rls-testing.md` | 2 600 | **Uniquement pour debug** d'un test qui échoue ou ajout d'un nouveau test. Pas pour un simple run. |
+| Lire `supabase/tests/schema.sql` | 4 800 | **Uniquement si on ajoute une table/policy au schéma de test.** Pas pour un simple run. |
+
+**Règle générale** : le workflow normal (patch RLS → run tests → commit) coûte **~990 tokens** (docker ps + test output). Toute lecture de fichier test supplémentaire doit être justifiée par un besoin concret (modification, debug, ajout).
