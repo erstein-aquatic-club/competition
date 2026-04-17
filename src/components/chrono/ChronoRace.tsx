@@ -26,190 +26,176 @@ interface ChronoRaceProps {
   getTimestamp: () => number;
 }
 
-// ── Wave Bar ────────────────────────────────────────────────────────
+// ── Wave Header Cell (matrix column header) ─────────────────────────
+// Renders 1 of 3 states in a fixed-width column cell :
+//   1) Not launched  → GO button (cyan/orange/…, pulses)
+//   2) Between reps  → recovery countdown + GO button (stack)
+//   3) Racing        → recovery countdown (if interval) + wave status card
+// The cell's vertical footprint grows with state, but its horizontal
+// span is locked to the matrix column → all swimmer cards of the same
+// wave remain perfectly aligned below.
 
-function WaveBar({
-  waves,
+function WaveHeaderCell({
+  wave,
   now,
   dispatch,
   getTimestamp,
   seriesCount,
 }: {
-  waves: ChronoState["waves"];
+  wave: ChronoState["waves"][number];
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
   seriesCount: number;
 }) {
+  const wc = WAVE_COLORS[wave.wave - 1] ?? WAVE_COLORS[0];
+  const launched = wave.startedAt !== null;
+  const betweenReps = launched && wave.lastFinishedAt !== null;
 
+  // ── Case 1: never launched yet ──
+  if (!launched) {
+    return (
+      <button
+        aria-label={`Lancer la vague ${wc.label}`}
+        onClick={() =>
+          dispatch({
+            type: "LAUNCH_WAVE",
+            wave: wave.wave,
+            timestamp: getTimestamp(),
+          })
+        }
+        className={`flex flex-col items-center justify-center rounded-md ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
+      >
+        <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
+          {wc.label}{wave.currentRep > 0 ? ` S${wave.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
+        </span>
+        <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
+          <Play className="h-3 w-3 fill-current" /> GO
+        </span>
+      </button>
+    );
+  }
+
+  // Shared: departure countdown
+  const elapsed = now - (wave.startedAt as number);
+  const intervalMs = wave.departureIntervalSec * 1000;
+  const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
+  const urgent = remainingMs >= 0 && remainingMs <= 15000;
+  const overdue = remainingMs <= 0;
+
+  // ── Case 2: between reps — countdown + GO ──
+  if (betweenReps) {
+    const recoveryElapsed = now - (wave.lastFinishedAt as number);
+    return (
+      <div className="flex flex-col gap-0 w-full">
+        {intervalMs > 0 ? (
+          <div
+            role="timer"
+            aria-label={
+              overdue
+                ? `Récupération dépassée de ${formatTime(-remainingMs)}`
+                : `Récupération restante ${formatTime(remainingMs)}`
+            }
+            className={`flex items-center justify-center gap-1 rounded-t-md px-2 py-1 font-mono tabular-nums font-black transition-colors ${
+              overdue
+                ? "bg-destructive text-destructive-foreground"
+                : urgent
+                  ? "bg-destructive/90 text-destructive-foreground animate-pulse"
+                  : "bg-muted text-foreground"
+            }`}
+          >
+            <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
+              Récup
+            </span>
+            <span className={`text-sm leading-none ${urgent || overdue ? "text-base" : ""}`}>
+              {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
+            </span>
+          </div>
+        ) : (
+          <div
+            role="timer"
+            aria-label={`Récupération en cours ${formatTime(recoveryElapsed)}`}
+            className="flex items-center justify-center gap-1 rounded-t-md px-2 py-1 font-mono tabular-nums font-black bg-muted text-foreground"
+          >
+            <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
+              Récup
+            </span>
+            <span className="text-sm leading-none">{formatTime(recoveryElapsed)}</span>
+          </div>
+        )}
+        <button
+          aria-label={`Lancer la vague ${wc.label}`}
+          onClick={() =>
+            dispatch({
+              type: "LAUNCH_WAVE",
+              wave: wave.wave,
+              timestamp: getTimestamp(),
+            })
+          }
+          className={`flex flex-col items-center justify-center rounded-b-md ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
+        >
+          <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
+            {wc.label} S{wave.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
+          </span>
+          <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
+            <Play className="h-3 w-3 fill-current" /> GO
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  // ── Case 3: actively racing ──
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2 items-stretch">
-      {[...waves]
-        .sort((a, b) => a.wave - b.wave)
-        .map((w) => {
-          const wc = WAVE_COLORS[w.wave - 1] ?? WAVE_COLORS[0];
-          const launched = w.startedAt !== null;
-          const betweenReps = launched && w.lastFinishedAt !== null;
-
-          // ── Case 1: never launched yet ──
-          if (!launched) {
-            return (
-              <div key={w.wave} className="flex flex-col justify-end h-full flex-[1_1_130px] min-w-[130px] max-w-[220px]">
-                <button
-                  aria-label={`Lancer la vague ${wc.label}`}
-                  onClick={() =>
-                    dispatch({
-                      type: "LAUNCH_WAVE",
-                      wave: w.wave,
-                      timestamp: getTimestamp(),
-                    })
-                  }
-                  className={`flex flex-col items-center justify-center rounded-lg ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
-                >
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
-                    {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
-                    <Play className="h-3 w-3 fill-current" /> GO
-                  </span>
-                </button>
-              </div>
-            );
+    <div className="flex flex-col gap-0 w-full">
+      {intervalMs > 0 && (
+        <div
+          role="timer"
+          aria-label={
+            overdue
+              ? `Récupération dépassée de ${formatTime(-remainingMs)}`
+              : `Récupération restante ${formatTime(remainingMs)}`
           }
-
-          // ── Shared: departure countdown from startedAt ──
-          const elapsed = now - (w.startedAt as number);
-          const intervalMs = w.departureIntervalSec * 1000;
-          const remainingMs = intervalMs > 0 ? intervalMs - elapsed : -1;
-          const urgent = remainingMs >= 0 && remainingMs <= 15000;
-          const overdue = remainingMs <= 0;
-
-          // ── Case 2: between reps — countdown keeps running + GO button ──
-          if (betweenReps) {
-            const recoveryElapsed = now - (w.lastFinishedAt as number);
-
-            return (
-              <div key={w.wave} className="flex flex-col gap-0 h-full justify-end flex-[1_1_130px] min-w-[130px] max-w-[220px]">
-                {/* Departure countdown — keeps ticking between reps */}
-                {intervalMs > 0 ? (
-                  <div
-                    role="timer"
-                    aria-label={
-                      overdue
-                        ? `Récupération dépassée de ${formatTime(-remainingMs)}`
-                        : `Récupération restante ${formatTime(remainingMs)}`
-                    }
-                    className={`flex items-center justify-center gap-1 rounded-t-lg px-2 py-1 font-mono tabular-nums font-black transition-colors ${
-                      overdue
-                        ? "bg-destructive text-destructive-foreground"
-                        : urgent
-                          ? "bg-destructive/90 text-destructive-foreground animate-pulse"
-                          : "bg-muted text-foreground"
-                    }`}
-                  >
-                    <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
-                      Récup
-                    </span>
-                    <span className={`text-sm leading-none ${urgent || overdue ? "text-base" : ""}`}>
-                      {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
-                    </span>
-                  </div>
-                ) : (
-                  <div
-                    role="timer"
-                    aria-label={`Récupération en cours ${formatTime(recoveryElapsed)}`}
-                    className="flex items-center justify-center gap-1 rounded-t-lg px-2 py-1 font-mono tabular-nums font-black bg-muted text-foreground"
-                  >
-                    <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
-                      Récup
-                    </span>
-                    <span className="text-sm leading-none">
-                      {formatTime(recoveryElapsed)}
-                    </span>
-                  </div>
-                )}
-                <button
-                  aria-label={`Lancer la vague ${wc.label}`}
-                  onClick={() =>
-                    dispatch({
-                      type: "LAUNCH_WAVE",
-                      wave: w.wave,
-                      timestamp: getTimestamp(),
-                    })
-                  }
-                  className={`flex flex-col items-center justify-center rounded-b-lg ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
-                >
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
-                    {wc.label} S{w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
-                    <Play className="h-3 w-3 fill-current" /> GO
-                  </span>
-                </button>
-              </div>
-            );
-          }
-
-          // ── Case 3: actively racing ──
-          return (
-            <div key={w.wave} className="flex flex-col gap-0 h-full justify-end flex-[1_1_130px] min-w-[130px] max-w-[220px]">
-              {/* Recovery countdown — above the card */}
-              {intervalMs > 0 && (
-                <div
-                  role="timer"
-                  aria-label={
-                    overdue
-                      ? `Récupération dépassée de ${formatTime(-remainingMs)}`
-                      : `Récupération restante ${formatTime(remainingMs)}`
-                  }
-                  className={`flex items-center justify-center gap-1 rounded-t-lg px-2 py-0.5 font-mono tabular-nums font-black transition-colors ${
-                    overdue
-                      ? "bg-destructive text-destructive-foreground"
-                      : urgent
-                        ? "bg-destructive/90 text-destructive-foreground animate-pulse"
-                        : "bg-muted text-foreground"
-                  }`}
-                >
-                  <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
-                    Récup
-                  </span>
-                  <span className="text-sm leading-none">
-                    {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
-                  </span>
-                </div>
-              )}
-
-              {/* Wave card — compact */}
-              <div
-                className={`flex items-center gap-2 ${intervalMs > 0 ? "rounded-b-lg" : "rounded-lg"} border ${wc.border} bg-card overflow-hidden px-2 py-1.5`}
-              >
-                {/* Left: wave chip + series */}
-                <div className="flex flex-col items-start gap-0.5 shrink-0">
-                  <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white leading-none ${wc.dot}`}>
-                    {wc.label}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Série suivante"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dispatch({ type: "NEXT_REP", wave: w.wave });
-                    }}
-                    className="rounded px-1 py-0.5 text-[8px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation leading-none"
-                    title="Série suivante"
-                  >
-                    S{w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""} ↻
-                  </button>
-                </div>
-
-                {/* Right: elapsed chrono */}
-                <span className={`font-mono tabular-nums font-bold tracking-tight ml-auto ${intervalMs > 0 ? "text-sm text-muted-foreground" : "text-base text-foreground"}`}>
-                  {formatTime(elapsed)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+          className={`flex items-center justify-center gap-1 rounded-t-md px-2 py-0.5 font-mono tabular-nums font-black transition-colors ${
+            overdue
+              ? "bg-destructive text-destructive-foreground"
+              : urgent
+                ? "bg-destructive/90 text-destructive-foreground animate-pulse"
+                : "bg-muted text-foreground"
+          }`}
+        >
+          <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
+            Récup
+          </span>
+          <span className="text-sm leading-none">
+            {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
+          </span>
+        </div>
+      )}
+      <div
+        className={`flex items-center gap-2 ${intervalMs > 0 ? "rounded-b-md" : "rounded-md"} border ${wc.border} bg-card overflow-hidden px-2 py-1.5`}
+      >
+        <div className="flex flex-col items-start gap-0.5 shrink-0">
+          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white leading-none ${wc.dot}`}>
+            {wc.label}
+          </span>
+          <button
+            type="button"
+            aria-label="Série suivante"
+            onClick={(e) => {
+              e.stopPropagation();
+              dispatch({ type: "NEXT_REP", wave: wave.wave });
+            }}
+            className="rounded px-1 py-0.5 text-[8px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation leading-none"
+            title="Série suivante"
+          >
+            S{wave.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""} ↻
+          </button>
+        </div>
+        <span className={`font-mono tabular-nums font-bold tracking-tight ml-auto ${intervalMs > 0 ? "text-sm text-muted-foreground" : "text-base text-foreground"}`}>
+          {formatTime(elapsed)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -315,14 +301,14 @@ function SwimmerCard({
       tabIndex={active ? 0 : -1}
       onClick={handleTap}
       onKeyDown={(e) => { if (active && (e.key === " " || e.key === "Enter")) { e.preventDefault(); handleTap(); } }}
-      className={`relative rounded-lg border-l-[3px] ${wc.border} overflow-hidden touch-manipulation transition-all ${
+      className={`relative rounded-lg border-l-[3px] ${wc.border} overflow-hidden touch-manipulation transition-all min-h-[116px] ${
         stopped
           ? "bg-muted opacity-60 border border-border"
           : shouldPromptStop
             ? "bg-card border border-destructive ring-1 ring-destructive/40 shadow-destructive/10 shadow"
             : active
               ? "bg-card border border-border shadow-sm active:scale-[0.98] cursor-pointer"
-              : "bg-muted/50 opacity-25 pointer-events-none border border-border"
+              : "bg-muted/30 border border-border/60"
       }`}
     >
       {/* Flash overlay on split tap */}
@@ -369,78 +355,75 @@ function SwimmerCard({
       <div className="px-2 pt-0 pb-0.5">
         <div
           className={`font-mono tabular-nums font-black leading-none tracking-tight text-2xl ${
-            stopped ? "text-muted-foreground" : shouldPromptStop ? "text-destructive" : "text-foreground"
+            stopped ? "text-muted-foreground" : shouldPromptStop ? "text-destructive" : launched ? "text-foreground" : "text-muted-foreground/50"
           }`}
         >
           {launched ? formatTime(elapsed) : "--:--.--"}
         </div>
       </div>
 
-      {/* ── Row 3 : progress bar + counter ── */}
-      {launched && (
-        <div className="flex items-center gap-2 px-2 pt-1 pb-0.5">
-          <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-[width] duration-300 ${
-                finishedDistance
-                  ? "bg-destructive"
-                  : shouldPromptStop
-                    ? "bg-destructive/80"
-                    : wc.dot
-              }`}
-              style={{
-                width: expectedSplits > 0
+      {/* ── Row 3 : progress bar + counter (always rendered — placeholder when not launched) ── */}
+      <div className="flex items-center gap-2 px-2 pt-1 pb-0.5">
+        <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-[width] duration-300 ${
+              finishedDistance
+                ? "bg-destructive"
+                : shouldPromptStop
+                  ? "bg-destructive/80"
+                  : launched ? wc.dot : "bg-transparent"
+            }`}
+            style={{
+              width: launched
+                ? expectedSplits > 0
                   ? `${progressPct}%`
                   : recordedSplits > 0
                     ? "100%"
-                    : "0%",
-              }}
-              aria-hidden
-            />
-          </div>
-          <span
-            className={`text-[10px] font-bold tabular-nums shrink-0 leading-none ${
-              shouldPromptStop ? "text-destructive" : "text-muted-foreground"
-            }`}
-          >
-            {expectedSplits > 0 ? `${recordedSplits}/${expectedSplits}` : `#${recordedSplits}`}
-          </span>
+                    : "0%"
+                : "0%",
+            }}
+            aria-hidden
+          />
         </div>
-      )}
+        <span
+          className={`text-[10px] font-bold tabular-nums shrink-0 leading-none ${
+            shouldPromptStop ? "text-destructive" : "text-muted-foreground"
+          }`}
+        >
+          {launched
+            ? expectedSplits > 0 ? `${recordedSplits}/${expectedSplits}` : `#${recordedSplits}`
+            : expectedSplits > 0 ? `0/${expectedSplits}` : "—"}
+        </span>
+      </div>
 
-      {/* ── Row 4 : inline metrics (distance · allure · Δ) ── */}
-      {launched && (
-        <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-0.5 text-[10px] font-mono tabular-nums text-muted-foreground leading-tight">
-          {hasSplitDist && (
-            <>
-              <Flag className={`h-2.5 w-2.5 shrink-0 ${finishedDistance ? "text-destructive" : ""}`} />
-              <span className={`font-semibold ${finishedDistance ? "text-destructive" : "text-foreground/80"}`}>
-                {hasTotalDist
+      {/* ── Row 4 : inline metrics (always rendered — placeholders when not launched) ── */}
+      <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-0.5 text-[10px] font-mono tabular-nums text-muted-foreground leading-tight min-h-[16px]">
+        {hasSplitDist && (
+          <>
+            <Flag className={`h-2.5 w-2.5 shrink-0 ${finishedDistance ? "text-destructive" : ""}`} />
+            <span className={`font-semibold ${
+              finishedDistance ? "text-destructive" : launched ? "text-foreground/80" : "text-muted-foreground/50"
+            }`}>
+              {launched
+                ? hasTotalDist
                   ? `${currentDistM}/${totalDistanceM}m`
-                  : `${currentDistM}m`}
-              </span>
-              <span className="text-muted-foreground/50">·</span>
-            </>
-          )}
-          {instantPacePer100m > 0 ? (
-            <>
-              <Gauge className="h-2.5 w-2.5 shrink-0" />
-              <span className="font-semibold text-foreground/80">{formatPace(instantPacePer100m)}</span>
-              <span className="text-muted-foreground/50">·</span>
-            </>
-          ) : active && hasSplitDist ? (
-            <span className="italic">Tap pour split</span>
-          ) : null}
-          {lastSplit && (
-            <span className="text-muted-foreground">
-              Δ {formatLap(lastSplit.lapMs)}
+                  : `${currentDistM}m`
+                : hasTotalDist
+                  ? `0/${totalDistanceM}m`
+                  : "0m"}
             </span>
-          )}
-          {!lastSplit && !active && !launched && (
-            <span className="italic text-muted-foreground/50">En attente…</span>
-          )}
-        </div>
-      )}
+            <span className="text-muted-foreground/30">·</span>
+          </>
+        )}
+        <Gauge className="h-2.5 w-2.5 shrink-0 text-muted-foreground/60" />
+        <span className={`font-semibold ${instantPacePer100m > 0 ? "text-foreground/80" : "text-muted-foreground/40"}`}>
+          {instantPacePer100m > 0 ? formatPace(instantPacePer100m) : "—"}
+        </span>
+        <span className="text-muted-foreground/30">·</span>
+        <span className="text-muted-foreground">
+          {lastSplit ? `Δ ${formatLap(lastSplit.lapMs)}` : <span className="text-muted-foreground/40">Δ —</span>}
+        </span>
+      </div>
 
       {/* ── STOP emphasis strip when imminent (compact, not full pleine-card) ── */}
       {shouldPromptStop && (
@@ -463,6 +446,7 @@ function LaneWaveMatrix({
   raceData,
   splitDistanceM,
   totalDistanceM,
+  seriesCount,
   now,
   dispatch,
   getTimestamp,
@@ -473,6 +457,7 @@ function LaneWaveMatrix({
   raceData: ChronoState["raceData"];
   splitDistanceM: number;
   totalDistanceM: number;
+  seriesCount: number;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -499,18 +484,23 @@ function LaneWaveMatrix({
 
   return (
     <div className="px-3">
-      <div className="grid gap-x-2 gap-y-1" style={{ gridTemplateColumns: gridTemplate }}>
-        {/* ── Header row : corner + wave labels ── */}
-        <div />
+      <div className="grid gap-x-2 gap-y-1 items-stretch" style={{ gridTemplateColumns: gridTemplate }}>
+        {/* ── Header row : corner + wave GO/status controllers ── */}
+        <div className="flex items-end justify-center pb-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+          Lig.
+        </div>
         {activeWaves.map((w) => {
-          const wc = WAVE_COLORS[w - 1] ?? WAVE_COLORS[0];
+          const waveState = waves.find((wv) => wv.wave === w);
+          if (!waveState) return <div key={`head-${w}`} />;
           return (
-            <div
-              key={`head-${w}`}
-              className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-sm ${wc.dot}`}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
-              {wc.label}
+            <div key={`head-${w}`} className="flex items-end">
+              <WaveHeaderCell
+                wave={waveState}
+                now={now}
+                dispatch={dispatch}
+                getTimestamp={getTimestamp}
+                seriesCount={seriesCount}
+              />
             </div>
           );
         })}
@@ -656,62 +646,45 @@ export default function ChronoRace({
     // Full-bleed : breaks out of the AppLayout container max-w-6xl constraint.
     // The chrono is the only route that needs the full viewport width.
     <div className="flex min-h-dvh flex-col bg-background w-screen relative left-[calc(50%-50vw)] -my-4">
-      {/* Sticky top bar: waves + stop button */}
-      <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 overflow-hidden">
-            <WaveBar
-              waves={state.waves}
-              now={now}
-              dispatch={dispatch}
-              getTimestamp={getTimestamp}
-              seriesCount={state.seriesCount}
-            />
-          </div>
-          <div className="pr-3 shrink-0">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="h-10 gap-1.5 whitespace-nowrap font-bold px-3 shadow-sm"
-                >
-                  <Square className="h-4 w-4 fill-current" />
-                  Terminer
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Terminer la série ?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tous les chronos seront arrêtés.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() =>
-                      dispatch({
-                        type: "STOP_RACE",
-                        timestamp: getTimestamp(),
-                      })
-                    }
-                  >
-                    Confirmer
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+      {/* Slim top bar — precision + terminate action (wave GO buttons moved into matrix header) */}
+      <div className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-background/95 backdrop-blur-sm px-3 py-1">
+        <div className="flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-300" title={CHRONO_PRECISION.tooltip}>
+          <Info className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span>{CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}</span>
         </div>
-      </div>
-
-      {/* Precision badge — compact single line */}
-      <div className="flex items-center justify-center gap-1 py-0.5 bg-amber-500/5 border-b border-amber-500/20">
-        <Info className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
-        <span className="text-[9px] font-medium text-amber-700 dark:text-amber-300" title={CHRONO_PRECISION.tooltip}>
-          {CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}
-        </span>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-9 gap-1.5 whitespace-nowrap font-bold px-3 shadow-sm"
+            >
+              <Square className="h-4 w-4 fill-current" />
+              Terminer
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Terminer la série ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tous les chronos seront arrêtés.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() =>
+                  dispatch({
+                    type: "STOP_RACE",
+                    timestamp: getTimestamp(),
+                  })
+                }
+              >
+                Confirmer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Lane × Wave matrix — overview glanceable on wide screens */}
@@ -723,6 +696,7 @@ export default function ChronoRace({
           raceData={state.raceData}
           splitDistanceM={state.splitDistanceM}
           totalDistanceM={state.totalDistanceM}
+          seriesCount={state.seriesCount}
           now={now}
           dispatch={dispatch}
           getTimestamp={getTimestamp}
