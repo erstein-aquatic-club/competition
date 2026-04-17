@@ -8870,3 +8870,73 @@ Audit UI/UX global ayant identifié 5+ incohérences majeures entre les espaces 
 - SessionListView coach utilise encore `rounded-xl Card` + DropdownMenu complet. Unification complète des lignes de séances coach (SessionListView → SessionRow + trailing DropdownMenu) = chantier suivant.
 - Le badge "Coach" dans UnfiledSessionList est encore un `<span>` inline — à terme, migrer vers un composant `ui/badge` variant.
 - Design tokens : les couleurs hardcodées (bg-red-500/10 etc.) identifiées dans l'audit §124 ne sont pas traitées ici.
+
+---
+
+## §126 — Chrono : nageurs manuels + titre séance + export XLSX
+
+**Date** : 2026-04-17
+**Chantier** : #90
+
+### Contexte
+
+3 manques identifiés dans le module Chrono coach :
+1. Pas possible d'ajouter un nageur sans compte (stagiaire, parent, invité).
+2. Séances sans titre — le label auto (`2×100m`) manque de contexte.
+3. Pas d'export tableur — les coachs saisissent les temps manuellement dans Excel.
+
+### Décisions
+
+- **Clé composite** `a:<athleteId>` / `m:<uuid>` : remplace l'entier `athleteId` dans tout le reducer et les actions. Permet de mixer inscrits et manuels sans collision.
+- **Table `coach_manual_swimmers`** : stockage persistant des nageurs fréquents (stages). RLS stricte par `coach_id = auth.uid()`. Migration et tests RLS délégués à un agent DB séparé.
+- **Tabs Club / Mes manuels / Nouveau** dans le sheet d'ajout : expérience claire poolside tablette.
+- **Titre optionnel** : champ dans Setup + édition inline dans Results + édition ✏️ dans Historique.
+- **xlsx lazy-import** : `await import("xlsx")` dans `exportChronoToXlsx` — le chunk `xlsx` (~400KB) ne charge qu'au clic export, pas d'impact bundle principal.
+- **`buildSheetData` pur** : testable sans SheetJS, norme C/M pour nageurs inscrits/manuels.
+
+### Fichiers créés
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/chronoXlsxExport.ts` | Module export xlsx pur + lazy (83 lignes) |
+| `src/lib/api/coach-manual-swimmers.ts` | API CRUD nageurs manuels (42 lignes) |
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/lib/chrono-types.ts` | Type discriminé + helpers builders + normalizeRecordSwimmer | ~134 lignes |
+| `src/lib/chrono-reducer.ts` | Actions key:string + SET_TITLE + initialState.title | ~320 lignes |
+| `src/lib/api/types.ts` | ChronoRecordSwimmer : athleteId nullable + kind/manualId optionnels | — |
+| `src/components/chrono/ChronoSetup.tsx` | Input titre + tabs Club/Manuels/Nouveau + badge M | ~598 lignes |
+| `src/components/chrono/ChronoResults.tsx` | Titre inline + bouton xlsx + skip manuels exportAll | ~462 lignes |
+| `src/components/chrono/ChronoRace.tsx` | Prop swimmerKey au lieu de athleteId | ~540 lignes |
+| `src/components/chrono/ChronoSplitEditor.tsx` | key fallback manualId | — |
+| `src/pages/coach/CoachChronoScreen.tsx` | deserializeState : merge initialChronoState (backward-compat) | ~167 lignes |
+| `src/pages/coach/CoachChronoHistoryScreen.tsx` | SelectedRecordView + édition label + boutons xlsx | ~344 lignes |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreurs
+- `npm test` : 198 tests, 0 fail (+10 reducer manuels/SET_TITLE, +7 xlsx/sanitize)
+- Tests RLS `coach_manual_swimmers` : 5 tests — **délégués à db-agent** (Docker requis)
+- `npm run build` : OK, `xlsx` en chunk séparé (`xlsx-*.js`)
+
+### Commits
+
+1. `refactor(§126)` — clé composite + title state + backward-compat (10 fichiers)
+2. `feat(§126)` — champ titre Setup/Results/Historique
+3. `feat(§126)` — module chronoXlsxExport + tests
+4. `feat(§126)` — API coach-manual-swimmers + boutons xlsx
+5. `feat(§126)` — sheet tabs Club/Manuels/Nouveau + badge M
+
+### Bundle
+
+`xlsx` (~400KB) isolé dans chunk dynamique `xlsx-*.js`. Le bundle principal (`index-*.js`) ne le contient pas (vérifié via `grep -l xlsx dist/assets/*.js`).
+
+### Limites
+
+- Pas d'export multi-séances (une seule séance par fichier xlsx).
+- Pas d'import xlsx.
+- Nageurs manuels non groupables (pas de "groupes" de nageurs temporaires).
+- Tests RLS à lancer manuellement une fois la migration DB appliquée.

@@ -74,10 +74,11 @@ Tous les feature flags sont activés.
 | Assignation par créneau | ✅ | `SlotSessionSheet.tsx`, `assignments.ts` | Auto-assignation groupes, visible_from, bulk create, delete, visibilité (§85) |
 | Picker templates | ✅ | `SlotTemplatePicker.tsx` | Sélection séance bibliothèque, recherche par nom (§85) |
 | Notifications rappel ressenti | ✅ | `00054_slot_centric_sessions.sql` | pg_cron 15min, push 30min avant fin créneau (§85) |
-| Chrono split timer (tablette/desktop) | ✅ | Coach peut chronométrer les splits par ligne/vague et exporter vers profils nageurs |
+| Chrono split timer (tablette/desktop) | ✅ | `chrono-reducer.ts`, `ChronoSetup.tsx`, `ChronoRace.tsx`, `ChronoResults.tsx` | Coach chronomètre splits par ligne/vague, nageurs club + manuels (badge M), titre séance, export xlsx (§97, §126) |
 | Attribution coach ↔ nageur | ✅ | `coach-assignments.ts`, `CoachMySwimmersScreen.tsx`, `useMySwimmerIds.ts` | 1 coach principal par nageur, écran gestion, filtrage vues, historique (§98) |
 | Commentaires nageurs → push coach | ✅ | `coach-comments.ts`, `CoachCommentsScreen.tsx`, `Coach.tsx` | Push immédiat au coach, badge home 48h, inbox dédié, lu/non-lu (§99) |
-| Historique chronos + éditeur splits | ✅ | `chrono-records.ts`, `CoachChronoHistoryScreen.tsx`, `ChronoSplitEditor.tsx` | Sauvegarde DB, brouillons, édition distances, envoi depuis historique |
+| Historique chronos + éditeur splits | ✅ | `chrono-records.ts`, `CoachChronoHistoryScreen.tsx`, `ChronoSplitEditor.tsx` | Sauvegarde DB, brouillons, édition distances, envoi depuis historique, export xlsx, édition titre inline (§98, §126) |
+| Nageurs manuels chrono | ✅ | `coach-manual-swimmers.ts`, `ChronoSetup.tsx` | Carnet mémorisé par coach, ajout à la volée, badge M dans résultats, exclus de l'envoi profil (§126) |
 
 ### Musculation — Nageur
 

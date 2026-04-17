@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-16 (§125 Unification FolderCard + SessionRow — cohérence dossiers nageur/coach)*
+*Dernière mise à jour : 2026-04-17 (§126 Chrono : nageurs manuels + titre séance + export XLSX)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
