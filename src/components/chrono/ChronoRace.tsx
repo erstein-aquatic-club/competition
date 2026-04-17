@@ -452,10 +452,12 @@ function SwimmerCard({
   );
 }
 
-// ── Lane Grid ───────────────────────────────────────────────────────
+// ── Lane × Wave Matrix ──────────────────────────────────────────────
+// Each row = 1 lane, each column = 1 wave. Swimmers of the same wave are
+// vertically aligned across lanes → easy overview "who is in wave V1?".
 
-function LaneSection({
-  lane,
+function LaneWaveMatrix({
+  lanes,
   swimmers,
   waves,
   raceData,
@@ -465,7 +467,7 @@ function LaneSection({
   dispatch,
   getTimestamp,
 }: {
-  lane: number;
+  lanes: number[];
   swimmers: ChronoState["swimmers"];
   waves: ChronoState["waves"];
   raceData: ChronoState["raceData"];
@@ -475,37 +477,58 @@ function LaneSection({
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
 }) {
-  const laneSwimmers = swimmers.filter((s) => s.lane === lane);
-  if (laneSwimmers.length === 0) return null;
+  // Only waves with at least 1 swimmer, sorted ascending.
+  const activeWaves = Array.from(new Set(swimmers.map((s) => s.wave))).sort(
+    (a, b) => a - b,
+  );
+  // Only lanes containing swimmers (skip empty lanes).
+  const activeLanes = lanes.filter((lane) =>
+    swimmers.some((s) => s.lane === lane),
+  );
+
+  if (activeLanes.length === 0 || activeWaves.length === 0) {
+    return (
+      <p className="text-center py-8 text-sm text-muted-foreground">
+        Aucun nageur dans la série.
+      </p>
+    );
+  }
+
+  // CSS Grid : gutter (56px) + N wave columns (min 220px, stretch 1fr).
+  const gridTemplate = `56px repeat(${activeWaves.length}, minmax(220px, 1fr))`;
 
   return (
-    <div>
-      <div className="flex items-baseline gap-2 px-3 pb-1">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none">
-          Ligne {lane}
-        </h3>
-        <span className="text-[10px] text-muted-foreground/60 leading-none">
-          {laneSwimmers.length} nageur{laneSwimmers.length > 1 ? "s" : ""}
-        </span>
-        <div className="h-px flex-1 bg-border ml-1" />
-      </div>
-      {/* Auto-fit : cards stretch when few swimmers, condense when many. Min 220px target for overview. */}
-      <div
-        className="grid gap-1.5 px-3"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
-      >
-        {laneSwimmers.map((s) => {
-          const waveState = waves.find((w) => w.wave === s.wave);
-          const race = raceData.get(s.key);
+    <div className="px-3">
+      <div className="grid gap-x-2 gap-y-1" style={{ gridTemplateColumns: gridTemplate }}>
+        {/* ── Header row : corner + wave labels ── */}
+        <div />
+        {activeWaves.map((w) => {
+          const wc = WAVE_COLORS[w - 1] ?? WAVE_COLORS[0];
           return (
-            <SwimmerCard
-              key={s.key}
-              swimmerKey={s.key}
-              displayName={s.displayName}
-              wave={s.wave}
-              waveStartedAt={waveState?.startedAt ?? null}
-              currentSplits={race ? race.splitsByRep[race.splitsByRep.length - 1] : []}
-              swimmerStoppedAt={race?.stoppedAt ?? null}
+            <div
+              key={`head-${w}`}
+              className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-sm ${wc.dot}`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
+              {wc.label}
+            </div>
+          );
+        })}
+
+        {/* ── Lane rows ── */}
+        {activeLanes.map((lane, idx) => {
+          const isAlt = idx % 2 === 1;
+          return (
+            // Use a React.Fragment-equivalent via explicit keys on each cell
+            // (fragments can't take style, but we don't need a wrapper — grid auto-flow row handles placement).
+            <LaneRow
+              key={lane}
+              lane={lane}
+              isAlt={isAlt}
+              activeWaves={activeWaves}
+              swimmers={swimmers}
+              waves={waves}
+              raceData={raceData}
               splitDistanceM={splitDistanceM}
               totalDistanceM={totalDistanceM}
               now={now}
@@ -516,6 +539,98 @@ function LaneSection({
         })}
       </div>
     </div>
+  );
+}
+
+// ── Single lane row — rendered as fragments to sit in the parent grid ──
+
+function LaneRow({
+  lane,
+  isAlt,
+  activeWaves,
+  swimmers,
+  waves,
+  raceData,
+  splitDistanceM,
+  totalDistanceM,
+  now,
+  dispatch,
+  getTimestamp,
+}: {
+  lane: number;
+  isAlt: boolean;
+  activeWaves: number[];
+  swimmers: ChronoState["swimmers"];
+  waves: ChronoState["waves"];
+  raceData: ChronoState["raceData"];
+  splitDistanceM: number;
+  totalDistanceM: number;
+  now: number;
+  dispatch: React.Dispatch<ChronoAction>;
+  getTimestamp: () => number;
+}) {
+  // Shared row background class (applied to every cell in the row for contrast).
+  const rowBg = isAlt
+    ? "bg-muted/25 dark:bg-muted/10"
+    : "bg-background";
+  const rowBorder = "border-y border-border/60";
+
+  return (
+    <>
+      {/* Lane gutter — sticky left hint + lane number in a pool-lane-rope inspired badge */}
+      <div
+        className={`flex items-center justify-center rounded-md px-2 py-2 ${rowBg} ${rowBorder} border-l-4 border-l-primary/30`}
+      >
+        <span className="text-xl font-black font-mono text-foreground/80 tabular-nums leading-none">
+          L{lane}
+        </span>
+      </div>
+
+      {/* Wave cells */}
+      {activeWaves.map((w) => {
+        const cellSwimmers = swimmers.filter(
+          (s) => s.lane === lane && s.wave === w,
+        );
+        if (cellSwimmers.length === 0) {
+          return (
+            <div
+              key={`${lane}-${w}`}
+              className={`rounded-md border border-dashed border-border/30 ${rowBg} ${rowBorder}`}
+              aria-hidden
+            />
+          );
+        }
+        return (
+          <div
+            key={`${lane}-${w}`}
+            className={`flex flex-col gap-1 rounded-md p-0.5 ${rowBg} ${rowBorder}`}
+          >
+            {cellSwimmers.map((s) => {
+              const waveState = waves.find((wv) => wv.wave === s.wave);
+              const race = raceData.get(s.key);
+              return (
+                <SwimmerCard
+                  key={s.key}
+                  swimmerKey={s.key}
+                  displayName={s.displayName}
+                  wave={s.wave}
+                  waveStartedAt={waveState?.startedAt ?? null}
+                  currentSplits={
+                    race ? race.splitsByRep[race.splitsByRep.length - 1] : []
+                  }
+                  swimmerStoppedAt={race?.stoppedAt ?? null}
+                  splitDistanceM={splitDistanceM}
+                  totalDistanceM={totalDistanceM}
+                  now={now}
+                  dispatch={dispatch}
+                  getTimestamp={getTimestamp}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -538,7 +653,9 @@ export default function ChronoRace({
   }, []);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    // Full-bleed : breaks out of the AppLayout container max-w-6xl constraint.
+    // The chrono is the only route that needs the full viewport width.
+    <div className="flex min-h-dvh flex-col bg-background w-screen relative left-[calc(50%-50vw)] -my-4">
       {/* Sticky top bar: waves + stop button */}
       <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
@@ -597,22 +714,19 @@ export default function ChronoRace({
         </span>
       </div>
 
-      {/* Lane grid — packed vertically for overview */}
-      <div className="flex-1 space-y-2 py-2">
-        {lanes.map((lane) => (
-          <LaneSection
-            key={lane}
-            lane={lane}
-            swimmers={state.swimmers}
-            waves={state.waves}
-            raceData={state.raceData}
-            splitDistanceM={state.splitDistanceM}
-            totalDistanceM={state.totalDistanceM}
-            now={now}
-            dispatch={dispatch}
-            getTimestamp={getTimestamp}
-          />
-        ))}
+      {/* Lane × Wave matrix — overview glanceable on wide screens */}
+      <div className="flex-1 py-2 overflow-x-auto">
+        <LaneWaveMatrix
+          lanes={lanes}
+          swimmers={state.swimmers}
+          waves={state.waves}
+          raceData={state.raceData}
+          splitDistanceM={state.splitDistanceM}
+          totalDistanceM={state.totalDistanceM}
+          now={now}
+          dispatch={dispatch}
+          getTimestamp={getTimestamp}
+        />
       </div>
     </div>
   );
