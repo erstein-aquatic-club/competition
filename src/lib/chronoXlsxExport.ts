@@ -39,12 +39,14 @@ export interface SheetModelCell {
   ms: number | null;
   /** This cell is a series total (S_n TOT column). */
   isTotal: boolean;
+  /** This cell is an intermediate lap (time between splits). */
+  isLap: boolean;
   /** This cell is THIS swimmer's best series total (only set on isTotal cells). */
   isBest: boolean;
 }
 
 export interface ColumnDef {
-  kind: "meta" | "split" | "total";
+  kind: "meta" | "split-cum" | "split-lap" | "total";
   /** Header label shown in the sheet. */
   label: string;
   /** For total columns : series index (0-based). For split columns : series + split indices. */
@@ -155,20 +157,29 @@ export function buildSheetModel(record: ChronoRecordInputLike): SheetModel {
     { kind: "meta", label: "T.", width: 5 },
   ];
   for (let s = 0; s < nSeries; s++) {
+    const sPrefix = nSeries > 1 ? `S${s + 1} ` : "";
     columnDefs.push({
       kind: "total",
-      label: nSeries > 1 ? `S${s + 1} TOTAL` : "TOTAL",
+      label: `${sPrefix}TOTAL`,
       seriesIdx: s,
       width: 12,
     });
     const nSplits = maxSplitsInSeries(swimmers, s);
     for (let i = 0; i < nSplits; i++) {
+      const dLabel = splitLabel(i);
       columnDefs.push({
-        kind: "split",
-        label: nSeries > 1 ? `S${s + 1} ${splitLabel(i)}` : splitLabel(i),
+        kind: "split-cum",
+        label: `${sPrefix}${dLabel} cumul.`,
         seriesIdx: s,
         splitIdx: i,
-        width: 11,
+        width: 12,
+      });
+      columnDefs.push({
+        kind: "split-lap",
+        label: `${sPrefix}${dLabel} interm.`,
+        seriesIdx: s,
+        splitIdx: i,
+        width: 12,
       });
     }
   }
@@ -183,14 +194,24 @@ export function buildSheetModel(record: ChronoRecordInputLike): SheetModel {
       cells.push({
         ms: total > 0 ? total : null,
         isTotal: true,
+        isLap: false,
         isBest: s === bestIdx && completedSeriesCount > 1 && total > 0,
       });
       const nSplits = maxSplitsInSeries(swimmers, s);
       for (let i = 0; i < nSplits; i++) {
         const split = splits[i];
+        // Cumulative time at this split
         cells.push({
           ms: split ? split.cumulativeMs : null,
           isTotal: false,
+          isLap: false,
+          isBest: false,
+        });
+        // Lap (intermediate) time between previous and current split
+        cells.push({
+          ms: split ? split.lapMs : null,
+          isTotal: false,
+          isLap: true,
           isBest: false,
         });
       }
@@ -348,8 +369,16 @@ export async function exportChronoToXlsx(record: ChronoRecordInputLike): Promise
       xlCell.font = {
         ...fontBase,
         bold: c.isTotal,
+        italic: fontBase.italic || c.isLap,
+        size: c.isLap ? 10 : 11,
         color: {
-          argb: c.isBest ? BEST_TEXT : c.isTotal ? TITLE_TEXT : SUBTITLE_TEXT,
+          argb: c.isBest
+            ? BEST_TEXT
+            : c.isTotal
+            ? TITLE_TEXT
+            : c.isLap
+            ? CAPTION_TEXT
+            : SUBTITLE_TEXT,
         },
       };
       xlCell.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
