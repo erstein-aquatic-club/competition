@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
-import { Play, Plus, Minus, X, Search, Users, Trash2 } from "lucide-react";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { Play, Plus, Minus, X, Search, Users, Trash2, UserRound, BookmarkPlus, Loader2, Pencil } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
@@ -42,6 +42,7 @@ export default function ChronoSetup({
   const [addLane, setAddLane] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [activeTab, setActiveTab] = useState<"club" | "manuals" | "new">("club");
   const displayAthletes = showAll && allAthletes ? allAthletes : athletes;
 
   const assignedKeys = useMemo(
@@ -103,14 +104,18 @@ export default function ChronoSetup({
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      {/* ── Title input ─────────────────────────────────── */}
-      <Input
-        placeholder="Titre de la séance (optionnel)"
-        value={state.title}
-        onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
-        maxLength={120}
-        className="mb-1"
-      />
+      {/* ── Title input — inline, minimalist, borderless ─ */}
+      <label className="group flex items-baseline gap-2 border-b border-border/60 pb-1 focus-within:border-primary/70 transition-colors">
+        <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 group-focus-within:text-primary" />
+        <input
+          type="text"
+          placeholder="Titre de la séance"
+          value={state.title}
+          onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
+          maxLength={120}
+          className="flex-1 bg-transparent text-[15px] font-medium text-foreground placeholder:font-normal placeholder:italic placeholder:text-muted-foreground/60 outline-none"
+        />
+      </label>
 
       {/* ── Header ─────────────────────────────────────── */}
       <div className="flex items-center justify-between">
@@ -308,17 +313,23 @@ export default function ChronoSetup({
                 <div className="flex flex-wrap items-center gap-2">
                   {swimmers.map((s) => {
                     const c = WAVE_COLORS[s.wave - 1];
+                    const isManual = s.kind === "manual";
                     return (
                       <div
                         key={s.key}
-                        className="relative flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1.5 text-sm"
+                        className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm ${
+                          isManual
+                            ? "border border-dashed border-border/80 bg-background/40"
+                            : "border border-border bg-muted"
+                        }`}
+                        title={isManual ? "Nageur manuel (sans compte)" : undefined}
                       >
+                        {isManual && (
+                          <UserRound className="h-3 w-3 shrink-0 text-muted-foreground/70" aria-hidden />
+                        )}
                         <span className="max-w-[7rem] truncate">
                           {s.displayName}
                         </span>
-                        {s.kind === "manual" && (
-                          <span className="inline-flex h-4 items-center rounded px-1 text-[9px] font-semibold bg-muted text-muted-foreground">M</span>
-                        )}
                         {/* Wave chip — tap to cycle */}
                         <button
                           type="button"
@@ -374,6 +385,7 @@ export default function ChronoSetup({
           if (!open) {
             setAddLane(null);
             setSearch("");
+            setActiveTab("club");
           }
         }}
       >
@@ -382,11 +394,20 @@ export default function ChronoSetup({
             <SheetTitle>Ajouter un nageur — Ligne {addLane}</SheetTitle>
           </SheetHeader>
 
-          <Tabs defaultValue="club" className="flex-1 flex flex-col overflow-hidden mt-4">
-            <TabsList className="grid grid-cols-3 w-full">
-              <TabsTrigger value="club">Club</TabsTrigger>
-              <TabsTrigger value="manuals">Mes manuels</TabsTrigger>
-              <TabsTrigger value="new">Nouveau</TabsTrigger>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "club" | "manuals" | "new")} className="flex-1 flex flex-col overflow-hidden mt-4">
+            <TabsList className="grid grid-cols-3 w-full h-auto p-1 gap-0.5">
+              <TabsTrigger value="club" className="gap-1.5 py-2.5 text-xs">
+                <Users className="h-3.5 w-3.5" />
+                Club
+              </TabsTrigger>
+              <TabsTrigger value="manuals" className="gap-1.5 py-2.5 text-xs">
+                <BookmarkPlus className="h-3.5 w-3.5" />
+                Mémorisés
+              </TabsTrigger>
+              <TabsTrigger value="new" className="gap-1.5 py-2.5 text-xs">
+                <Plus className="h-3.5 w-3.5" />
+                Nouveau
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="club" className="flex-1 overflow-y-auto">
@@ -457,17 +478,18 @@ export default function ChronoSetup({
               </div>
             </TabsContent>
 
-            <TabsContent value="manuals" className="flex-1 overflow-y-auto">
+            <TabsContent value="manuals" className="flex-1 overflow-y-auto mt-3">
               {addLane !== null && (
                 <ManualsTabBody
                   addLane={addLane}
                   onAdded={() => { setAddLane(null); }}
+                  onGoToNew={() => setActiveTab("new")}
                   dispatch={dispatch}
                 />
               )}
             </TabsContent>
 
-            <TabsContent value="new" className="flex-1">
+            <TabsContent value="new" className="flex-1 mt-3">
               {addLane !== null && (
                 <NewManualTabBody
                   addLane={addLane}
@@ -486,14 +508,16 @@ export default function ChronoSetup({
 function ManualsTabBody({
   addLane,
   onAdded,
+  onGoToNew,
   dispatch,
 }: {
   addLane: number;
   onAdded: () => void;
+  onGoToNew: () => void;
   dispatch: React.Dispatch<ChronoAction>;
 }) {
   const queryClient = useQueryClient();
-  const { data: manuals = [] } = useQuery({
+  const { data: manuals = [], isLoading } = useQuery({
     queryKey: ["coach_manual_swimmers"],
     queryFn: listManualSwimmers,
   });
@@ -502,17 +526,37 @@ function ManualsTabBody({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["coach_manual_swimmers"] }),
   });
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-10 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+      </div>
+    );
+  }
+
   if (manuals.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        Aucun nageur mémorisé. Utilisez l'onglet Nouveau.
-      </p>
+      <div className="flex flex-col items-center gap-3 py-10 px-4 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <BookmarkPlus className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">Aucun nageur mémorisé</p>
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-[240px]">
+            Les manuels que vous enregistrez depuis l'onglet <span className="font-medium">Nouveau</span> apparaîtront ici.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onGoToNew} className="gap-1.5 mt-1">
+          <Plus className="h-3.5 w-3.5" />
+          Créer un manuel
+        </Button>
+      </div>
     );
   }
   return (
-    <ul className="flex flex-col">
+    <ul className="flex flex-col divide-y divide-border/60">
       {manuals.map(m => (
-        <li key={m.id} className="flex items-center">
+        <li key={m.id} className="flex items-center group">
           <button
             type="button"
             onClick={() => {
@@ -526,14 +570,17 @@ function ManualsTabBody({
               });
               onAdded();
             }}
-            className="flex-1 min-h-[44px] px-3 py-2 text-left text-sm hover:bg-muted"
+            className="flex flex-1 min-h-[48px] items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
           >
-            {m.display_name}
+            <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+            <span className="flex-1 truncate">{m.display_name}</span>
           </button>
           <button
             type="button"
             onClick={() => delMutation.mutate(m.id)}
-            className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-destructive"
+            disabled={delMutation.isPending}
+            className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
+            aria-label={`Supprimer ${m.display_name}`}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -555,6 +602,7 @@ function NewManualTabBody({
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [remember, setRemember] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
   const saveMutation = useMutation({
     mutationFn: createManualSwimmer,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["coach_manual_swimmers"] }),
@@ -579,20 +627,54 @@ function NewManualTabBody({
     onAdded();
   }, [name, remember, saveMutation, dispatch, addLane, onAdded]);
 
+  const busy = saveMutation.isPending;
+  const trimmed = name.trim();
+
   return (
-    <div className="flex flex-col gap-3 pt-4">
-      <Input
-        autoFocus
-        value={name}
-        placeholder="Prénom Nom"
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") submit(); }}
-      />
-      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-        <Switch checked={remember} onCheckedChange={setRemember} />
-        Mémoriser pour plus tard
+    <div className="flex flex-col gap-4 pt-2">
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">
+          Nom du nageur
+        </label>
+        <Input
+          ref={inputRef}
+          autoFocus
+          value={name}
+          placeholder="Ex : Invité Club de Colmar"
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && trimmed) submit(); }}
+          disabled={busy}
+          className="h-11"
+        />
+      </div>
+
+      <label className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/40 p-3 cursor-pointer hover:bg-muted/60 transition-colors">
+        <Switch checked={remember} onCheckedChange={setRemember} disabled={busy} className="mt-0.5" />
+        <div className="flex-1 space-y-0.5">
+          <p className="text-sm font-medium text-foreground">Mémoriser</p>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Retrouvez ce nom dans l'onglet <span className="font-medium">Mémorisés</span> lors de prochaines séances.
+          </p>
+        </div>
       </label>
-      <Button disabled={!name.trim()} onClick={submit}>Ajouter</Button>
+
+      <Button
+        disabled={!trimmed || busy}
+        onClick={submit}
+        className="h-11 gap-1.5"
+      >
+        {busy ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Enregistrement…
+          </>
+        ) : (
+          <>
+            <Plus className="h-4 w-4" />
+            Ajouter à la ligne {addLane}
+          </>
+        )}
+      </Button>
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Trash2, Timer, Pencil, Download } from "lucide-react";
+import { Trash2, Timer, Pencil, Download, Loader2 } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { exportChronoToXlsx } from "../../lib/chronoXlsxExport";
 import { toast } from "sonner";
@@ -218,8 +218,9 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleDownload(r); }}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Exporter en xlsx"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                aria-label={`Télécharger ${r.label || "chrono"} en xlsx`}
+                title="Télécharger xlsx"
               >
                 <Download className="h-4 w-4" />
               </button>
@@ -281,55 +282,84 @@ function SelectedRecordView({
 }) {
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState(record.label ?? "");
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await exportChronoToXlsx(record);
+      toast.success("Fichier téléchargé");
+    } catch (err: any) {
+      toast.error(err?.message || "Échec de l'export");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={onBack} className="shrink-0">
           ← Retour
         </Button>
-        {editingLabel ? (
-          <Input
-            value={labelDraft}
-            autoFocus
-            onChange={(e) => setLabelDraft(e.target.value)}
-            onBlur={async () => {
-              await updateChronoRecord(record.id, { label: labelDraft });
-              queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
-              onRecordChange({ ...record, label: labelDraft });
-              setEditingLabel(false);
-            }}
-            className="max-w-[20rem]"
-          />
-        ) : (
-          <button onClick={() => setEditingLabel(true)} className="flex items-center gap-1 hover:text-primary">
-            <h2 className="text-lg font-semibold">{record.label || "Sans titre"}</h2>
-            <Pencil className="h-3.5 w-3.5 opacity-60" />
-          </button>
-        )}
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-            record.status === "draft"
-              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-              : "bg-green-500/15 text-green-600 dark:text-green-400"
-          }`}
-        >
-          {record.status === "draft" ? "Brouillon" : "Envoyé"}
-        </span>
+
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {editingLabel ? (
+            <Input
+              value={labelDraft}
+              autoFocus
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter") {
+                  await updateChronoRecord(record.id, { label: labelDraft });
+                  queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+                  onRecordChange({ ...record, label: labelDraft });
+                  setEditingLabel(false);
+                } else if (e.key === "Escape") {
+                  setLabelDraft(record.label ?? "");
+                  setEditingLabel(false);
+                }
+              }}
+              onBlur={async () => {
+                await updateChronoRecord(record.id, { label: labelDraft });
+                queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+                onRecordChange({ ...record, label: labelDraft });
+                setEditingLabel(false);
+              }}
+              className="max-w-[20rem] h-8 text-base font-semibold"
+            />
+          ) : (
+            <button
+              onClick={() => setEditingLabel(true)}
+              className="group flex items-center gap-1.5 min-w-0 rounded-md px-2 py-1 -mx-2 hover:bg-muted transition-colors"
+              aria-label="Renommer la séance"
+            >
+              <h2 className="text-lg font-semibold text-foreground truncate">
+                {record.label || <span className="italic text-muted-foreground">Sans titre</span>}
+              </h2>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+            </button>
+          )}
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              record.status === "draft"
+                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                : "bg-green-500/15 text-green-600 dark:text-green-400"
+            }`}
+          >
+            {record.status === "draft" ? "Brouillon" : "Envoyé"}
+          </span>
+        </div>
+
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => {
-            try {
-              await exportChronoToXlsx(record);
-              toast.success("Fichier téléchargé");
-            } catch (err: any) {
-              toast.error(err?.message || "Échec de l'export");
-            }
-          }}
+          onClick={handleDownload}
+          disabled={downloading}
+          className="shrink-0 gap-1.5"
         >
-          <Download className="mr-1.5 h-4 w-4" />
-          xlsx
+          {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Télécharger
         </Button>
       </div>
       <ChronoSplitEditor

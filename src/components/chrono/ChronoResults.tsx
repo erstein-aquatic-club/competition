@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy, Trash2, Download } from "lucide-react";
+import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy, Trash2, Download, Loader2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 import { STORAGE_KEYS } from "../../lib/api/client";
@@ -240,42 +240,71 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
 
   return (
     <div className="flex flex-col gap-5">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Résultats</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={sending || savingDraft || exportingXlsx}>
-            <Clock className="mr-1.5 h-4 w-4" />
+      {/* ── Header — title hero + actions row ── */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-baseline gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Résultats
+          </span>
+          <span className="h-px flex-1 bg-border/60" />
+          <span className="text-[10px] text-muted-foreground tabular-nums" title={CHRONO_PRECISION.tooltip}>
+            {CHRONO_PRECISION.precision}
+          </span>
+        </div>
+
+        {/* Editable title as hero */}
+        <input
+          type="text"
+          placeholder="Nommer cette séance…"
+          value={state.title}
+          onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
+          className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:font-medium placeholder:italic placeholder:text-muted-foreground/50 outline-none focus:placeholder:text-muted-foreground/30 transition-colors"
+          aria-label="Titre de la séance"
+        />
+
+        {/* Action bar — wraps gracefully on narrow screens */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveDraft}
+            disabled={sending || savingDraft || exportingXlsx}
+            className="gap-1.5"
+          >
+            {savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
             Brouillon
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={sending || exportingXlsx}>
-            <Download className="mr-1.5 h-4 w-4" />
-            xlsx
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportXlsx}
+            disabled={sending || exportingXlsx}
+            className="gap-1.5"
+          >
+            {exportingXlsx ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Exporter xlsx
           </Button>
-          <Button variant="outline" size="sm" onClick={() => dispatch({ type: "RESET_FOR_NEW_SERIES" })} disabled={sending}>
-            <RotateCcw className="mr-1.5 h-4 w-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => dispatch({ type: "RESET_FOR_NEW_SERIES" })}
+            disabled={sending}
+            className="gap-1.5"
+          >
+            <RotateCcw className="h-4 w-4" />
             Nouvelle série
           </Button>
-          <Button size="sm" onClick={handleExportAll} disabled={sending}>
-            <Send className="mr-1.5 h-4 w-4" />
+          <Button
+            size="sm"
+            onClick={handleExportAll}
+            disabled={sending}
+            className="ml-auto gap-1.5"
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Envoyer à tous
           </Button>
         </div>
       </div>
-
-      {/* ── Inline title edit ── */}
-      <input
-        type="text"
-        placeholder="Sans titre — cliquer pour nommer"
-        value={state.title}
-        onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
-        className="w-full -mt-3 bg-transparent text-sm italic text-muted-foreground placeholder:italic placeholder:text-muted-foreground/60 focus:not-italic focus:text-foreground outline-none"
-      />
-
-      {/* ── Precision caption ── */}
-      <p className="text-[10px] text-muted-foreground text-center -mt-2" title={CHRONO_PRECISION.tooltip}>
-        {CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}
-      </p>
 
       {/* ── Results by lane ── */}
       {sortedLanes.map((lane) => (
@@ -302,15 +331,23 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
               <div key={swimmer.key} className="rounded-xl border bg-card overflow-hidden">
                 {/* ── Swimmer header ── */}
                 <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-foreground">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {swimmer.kind === "manual" && (
+                      <span
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground/70"
+                        title="Nageur manuel (sans compte)"
+                      >
+                        <UserRound className="h-3 w-3" />
+                      </span>
+                    )}
+                    <span className="text-base font-bold text-foreground truncate">
                       {swimmer.displayName}
                     </span>
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
                       {wc.label}
                     </span>
                   </div>
-                  <ExportStatusBadge status={status} />
+                  <ExportStatusBadge status={status} kind={swimmer.kind} />
                 </div>
 
                 {total === 0 ? (
@@ -436,7 +473,14 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
   );
 }
 
-function ExportStatusBadge({ status }: { status?: ExportStatus }) {
+function ExportStatusBadge({ status, kind }: { status?: ExportStatus; kind?: "registered" | "manual" }) {
+  if (kind === "manual") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 italic">
+        Export fichier uniquement
+      </span>
+    );
+  }
   if (!status || status === "pending") {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
