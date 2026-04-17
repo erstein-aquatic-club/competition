@@ -210,11 +210,12 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/hooks/dashboard/useFeedbackDraft.ts` | État draft feedback isolé (§112) | ~109 lignes |
 | `src/components/coach/CompetitionDayBanner.tsx` | Bandeau compétition vue semaine coach (§114) | ~56 lignes |
 | `src/components/coach/CompetitionQuickSheet.tsx` | Quick sheet résumé compétition (§114) | ~91 lignes |
-| `supabase/tests/schema.sql` | Schéma hand-crafted minimal pour tests RLS (§121) | ~110 lignes |
+| `supabase/tests/schema.sql` | Schéma hand-crafted minimal pour tests RLS (§121, élargi §124/§126) | ~511 lignes |
 | `supabase/tests/seed.sql` | Fixtures tests RLS (§121) | ~25 lignes |
 | `supabase/tests/rls/_helpers.ts` | Harness Vitest : pool pg, resetDb, asUser, asServiceRole (§121) | ~90 lignes |
 | `supabase/tests/rls/dim_sessions.test.ts` | Regression tests §113 + coverage CRUD dim_sessions (§121) | ~160 lignes |
 | `supabase/tests/rls/interviews.test.ts` | Tests RLS 6 policies stateful §74-§75 (§123) | ~285 lignes |
+| `supabase/tests/rls/coach_manual_swimmers.test.ts` | Tests RLS CRUD + isolation inter-coach (§126) | ~110 lignes |
 | `vitest.config.rls.ts` | Config Vitest isolée pour tests RLS (§121) | ~20 lignes |
 | `scripts/test-db-bootstrap.sh` | Bootstrap manuel schéma+seed via psql (§121) | ~55 lignes |
 | `docs/rls-testing.md` | Documentation complète tests RLS (§121) | ~250 lignes |
