@@ -239,6 +239,15 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
         </div>
       </div>
 
+      {/* ── Inline title edit ── */}
+      <input
+        type="text"
+        placeholder="Sans titre — cliquer pour nommer"
+        value={state.title}
+        onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
+        className="w-full -mt-3 bg-transparent text-sm italic text-muted-foreground placeholder:italic placeholder:text-muted-foreground/60 focus:not-italic focus:text-foreground outline-none"
+      />
+
       {/* ── Precision caption ── */}
       <p className="text-[10px] text-muted-foreground text-center -mt-2" title={CHRONO_PRECISION.tooltip}>
         {CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}

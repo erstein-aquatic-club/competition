@@ -96,6 +96,15 @@ export default function ChronoSetup({
 
   return (
     <div className="flex flex-col gap-5 p-4">
+      {/* ── Title input ─────────────────────────────────── */}
+      <Input
+        placeholder="Titre de la séance (optionnel)"
+        value={state.title}
+        onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
+        maxLength={120}
+        className="mb-1"
+      />
+
       {/* ── Header ─────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Préparation</h2>

@@ -17,7 +17,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Trash2, Timer } from "lucide-react";
+import { Trash2, Timer, Pencil } from "lucide-react";
+import { Input } from "../../components/ui/input";
 import { toast } from "sonner";
 import CoachBreadcrumb from "../../components/shared/CoachBreadcrumb";
 
@@ -140,36 +141,15 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
 
   if (selectedRecord) {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedRecord(null)}
-          >
-            ← Retour
-          </Button>
-          <h2 className="text-lg font-semibold">
-            {selectedRecord.label || "Chrono"}
-          </h2>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              selectedRecord.status === "draft"
-                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                : "bg-green-500/15 text-green-600 dark:text-green-400"
-            }`}
-          >
-            {selectedRecord.status === "draft" ? "Brouillon" : "Envoyé"}
-          </span>
-        </div>
-        <ChronoSplitEditor
-          record={selectedRecord}
-          onUpdate={handleUpdate}
-          onSend={handleSend}
-          onDelete={handleDeleteFromEditor}
-          readOnly={selectedRecord.status === "sent"}
-        />
-      </div>
+      <SelectedRecordView
+        record={selectedRecord}
+        onBack={() => setSelectedRecord(null)}
+        onUpdate={handleUpdate}
+        onSend={handleSend}
+        onDelete={handleDeleteFromEditor}
+        onRecordChange={setSelectedRecord}
+        queryClient={queryClient}
+      />
     );
   }
 
@@ -260,6 +240,72 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function SelectedRecordView({
+  record,
+  onBack,
+  onUpdate,
+  onSend,
+  onDelete,
+  onRecordChange,
+  queryClient,
+}: {
+  record: ChronoRecord;
+  onBack: () => void;
+  onUpdate: (swimmers: ChronoRecordSwimmer[]) => Promise<void>;
+  onSend: (swimmerIdx?: number) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onRecordChange: (r: ChronoRecord) => void;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState(record.label ?? "");
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          ← Retour
+        </Button>
+        {editingLabel ? (
+          <Input
+            value={labelDraft}
+            autoFocus
+            onChange={(e) => setLabelDraft(e.target.value)}
+            onBlur={async () => {
+              await updateChronoRecord(record.id, { label: labelDraft });
+              queryClient.invalidateQueries({ queryKey: ["chrono_records"] });
+              onRecordChange({ ...record, label: labelDraft });
+              setEditingLabel(false);
+            }}
+            className="max-w-[20rem]"
+          />
+        ) : (
+          <button onClick={() => setEditingLabel(true)} className="flex items-center gap-1 hover:text-primary">
+            <h2 className="text-lg font-semibold">{record.label || "Sans titre"}</h2>
+            <Pencil className="h-3.5 w-3.5 opacity-60" />
+          </button>
+        )}
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            record.status === "draft"
+              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              : "bg-green-500/15 text-green-600 dark:text-green-400"
+          }`}
+        >
+          {record.status === "draft" ? "Brouillon" : "Envoyé"}
+        </span>
+      </div>
+      <ChronoSplitEditor
+        record={record}
+        onUpdate={onUpdate}
+        onSend={onSend}
+        onDelete={onDelete}
+        readOnly={record.status === "sent"}
+      />
     </div>
   );
 }
