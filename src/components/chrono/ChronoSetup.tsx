@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Play, Plus, Minus, X, Search, Users } from "lucide-react";
+import { Play, Plus, Minus, X, Search, Users, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
@@ -9,10 +9,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../ui/sheet";
-import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS, buildRegisteredSwimmer } from "../../lib/chrono-types";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS, buildRegisteredSwimmer, buildManualSwimmer } from "../../lib/chrono-types";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import type { AthleteSummary } from "../../lib/api/types";
+import {
+  listManualSwimmers,
+  createManualSwimmer,
+  deleteManualSwimmer,
+} from "../../lib/api/coach-manual-swimmers";
 
 interface ChronoSetupProps {
   state: ChronoState;
@@ -309,6 +316,9 @@ export default function ChronoSetup({
                         <span className="max-w-[7rem] truncate">
                           {s.displayName}
                         </span>
+                        {s.kind === "manual" && (
+                          <span className="inline-flex h-4 items-center rounded px-1 text-[9px] font-semibold bg-muted text-muted-foreground">M</span>
+                        )}
                         {/* Wave chip — tap to cycle */}
                         <button
                           type="button"
@@ -367,78 +377,222 @@ export default function ChronoSetup({
           }
         }}
       >
-        <SheetContent side="right" className="w-80 sm:w-96">
+        <SheetContent side="right" className="w-80 sm:w-96 flex flex-col">
           <SheetHeader>
             <SheetTitle>Ajouter un nageur — Ligne {addLane}</SheetTitle>
           </SheetHeader>
 
-          <div className="mt-4 flex flex-col gap-4">
-            {/* Search input */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+          <Tabs defaultValue="club" className="flex-1 flex flex-col overflow-hidden mt-4">
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="club">Club</TabsTrigger>
+              <TabsTrigger value="manuals">Mes manuels</TabsTrigger>
+              <TabsTrigger value="new">Nouveau</TabsTrigger>
+            </TabsList>
 
-            {/* Club-wide toggle */}
-            {allAthletes && allAthletes.length > athletes.length && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch checked={showAll} onCheckedChange={setShowAll} />
-                <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Tout le club</span>
-              </label>
-            )}
+            <TabsContent value="club" className="flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-4 pt-2">
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
 
-            {/* Grouped athlete list */}
-            <div className="flex flex-col gap-4 overflow-y-auto">
-              {Array.from(groupedAthletes.entries()).map(
-                ([group, members]) => (
-                  <div key={group}>
-                    <div className="mb-1 text-xs font-medium text-muted-foreground">
-                      {group}
-                    </div>
-                    <div className="flex flex-col">
-                      {members.map((a) => {
-                        const isAssigned =
-                          a.id != null && assignedKeys.has(`a:${a.id}`);
-                        return (
-                          <button
-                            key={a.id}
-                            type="button"
-                            disabled={isAssigned}
-                            onClick={() => handleAddSwimmer(a)}
-                            className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                              isAssigned
-                                ? "cursor-not-allowed text-muted-foreground/50"
-                                : "hover:bg-muted"
-                            }`}
-                          >
-                            {a.display_name}
-                            {isAssigned && (
-                              <span className="ml-auto text-[10px] text-muted-foreground">
-                                déjà assigné
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ),
+                {/* Club-wide toggle */}
+                {allAthletes && allAthletes.length > athletes.length && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Switch checked={showAll} onCheckedChange={setShowAll} />
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Tout le club</span>
+                  </label>
+                )}
+
+                {/* Grouped athlete list */}
+                <div className="flex flex-col gap-4">
+                  {Array.from(groupedAthletes.entries()).map(
+                    ([group, members]) => (
+                      <div key={group}>
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">
+                          {group}
+                        </div>
+                        <div className="flex flex-col">
+                          {members.map((a) => {
+                            const isAssigned =
+                              a.id != null && assignedKeys.has(`a:${a.id}`);
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                disabled={isAssigned}
+                                onClick={() => handleAddSwimmer(a)}
+                                className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                                  isAssigned
+                                    ? "cursor-not-allowed text-muted-foreground/50"
+                                    : "hover:bg-muted"
+                                }`}
+                              >
+                                {a.display_name}
+                                {isAssigned && (
+                                  <span className="ml-auto text-[10px] text-muted-foreground">
+                                    déjà assigné
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  {groupedAthletes.size === 0 && (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      Aucun nageur trouvé
+                    </p>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="manuals" className="flex-1 overflow-y-auto">
+              {addLane !== null && (
+                <ManualsTabBody
+                  addLane={addLane}
+                  onAdded={() => { setAddLane(null); }}
+                  dispatch={dispatch}
+                />
               )}
-              {groupedAthletes.size === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Aucun nageur trouvé
-                </p>
+            </TabsContent>
+
+            <TabsContent value="new" className="flex-1">
+              {addLane !== null && (
+                <NewManualTabBody
+                  addLane={addLane}
+                  onAdded={() => { setAddLane(null); }}
+                  dispatch={dispatch}
+                />
               )}
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+function ManualsTabBody({
+  addLane,
+  onAdded,
+  dispatch,
+}: {
+  addLane: number;
+  onAdded: () => void;
+  dispatch: React.Dispatch<ChronoAction>;
+}) {
+  const queryClient = useQueryClient();
+  const { data: manuals = [] } = useQuery({
+    queryKey: ["coach_manual_swimmers"],
+    queryFn: listManualSwimmers,
+  });
+  const delMutation = useMutation({
+    mutationFn: deleteManualSwimmer,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["coach_manual_swimmers"] }),
+  });
+
+  if (manuals.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        Aucun nageur mémorisé. Utilisez l'onglet Nouveau.
+      </p>
+    );
+  }
+  return (
+    <ul className="flex flex-col">
+      {manuals.map(m => (
+        <li key={m.id} className="flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({
+                type: "ADD_SWIMMER",
+                swimmer: buildManualSwimmer({
+                  manualId: crypto.randomUUID(),
+                  displayName: m.display_name,
+                  lane: addLane,
+                }),
+              });
+              onAdded();
+            }}
+            className="flex-1 min-h-[44px] px-3 py-2 text-left text-sm hover:bg-muted"
+          >
+            {m.display_name}
+          </button>
+          <button
+            type="button"
+            onClick={() => delMutation.mutate(m.id)}
+            className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function NewManualTabBody({
+  addLane,
+  onAdded,
+  dispatch,
+}: {
+  addLane: number;
+  onAdded: () => void;
+  dispatch: React.Dispatch<ChronoAction>;
+}) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [remember, setRemember] = useState(true);
+  const saveMutation = useMutation({
+    mutationFn: createManualSwimmer,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["coach_manual_swimmers"] }),
+  });
+
+  const submit = useCallback(async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (remember) {
+      try { await saveMutation.mutateAsync(trimmed); }
+      catch { /* offline: add as volatile */ }
+    }
+    dispatch({
+      type: "ADD_SWIMMER",
+      swimmer: buildManualSwimmer({
+        manualId: crypto.randomUUID(),
+        displayName: trimmed,
+        lane: addLane,
+      }),
+    });
+    setName("");
+    onAdded();
+  }, [name, remember, saveMutation, dispatch, addLane, onAdded]);
+
+  return (
+    <div className="flex flex-col gap-3 pt-4">
+      <Input
+        autoFocus
+        value={name}
+        placeholder="Prénom Nom"
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") submit(); }}
+      />
+      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+        <Switch checked={remember} onCheckedChange={setRemember} />
+        Mémoriser pour plus tard
+      </label>
+      <Button disabled={!name.trim()} onClick={submit}>Ajouter</Button>
     </div>
   );
 }
