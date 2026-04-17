@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
-import { Play, Plus, Minus, X, Search, Users, Trash2, UserRound, BookmarkPlus, Loader2, Pencil } from "lucide-react";
+import { Play, Plus, Minus, X, Search, Users, Trash2, UserRound, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
@@ -78,8 +78,15 @@ export default function ChronoSetup({
     return groups;
   }, [displayAthletes, search]);
 
+  /** Count of swimmers currently in the target lane (for limit display). */
+  const laneCount = useMemo(
+    () => (addLane == null ? 0 : state.swimmers.filter((s) => s.lane === addLane).length),
+    [addLane, state.swimmers],
+  );
+  const laneFull = addLane != null && laneCount >= maxSwimmersPerLane;
+
   const handleAddSwimmer = (a: AthleteSummary) => {
-    if (a.id == null || addLane == null) return;
+    if (a.id == null || addLane == null || laneFull) return;
     dispatch({
       type: "ADD_SWIMMER",
       swimmer: buildRegisteredSwimmer({
@@ -90,8 +97,13 @@ export default function ChronoSetup({
         lane: addLane,
       }),
     });
+    // Keep sheet open for batch-add.
+  };
+
+  const closeAddSheet = () => {
     setAddLane(null);
     setSearch("");
+    setActiveTab("club");
   };
 
   const cycleWave = (key: string, currentWave: number) => {
@@ -382,17 +394,31 @@ export default function ChronoSetup({
       <Sheet
         open={addLane !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setAddLane(null);
-            setSearch("");
-            setActiveTab("club");
-          }
+          if (!open) closeAddSheet();
         }}
       >
         <SheetContent side="right" className="w-80 sm:w-96 flex flex-col">
           <SheetHeader>
-            <SheetTitle>Ajouter un nageur — Ligne {addLane}</SheetTitle>
+            <SheetTitle className="flex items-baseline gap-2">
+              <span>Ligne {addLane}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {laneCount === 0
+                  ? "Aucun nageur"
+                  : `${laneCount} nageur${laneCount > 1 ? "s" : ""}${
+                      maxSwimmersPerLane !== Infinity ? ` / ${maxSwimmersPerLane}` : ""
+                    }`}
+              </span>
+            </SheetTitle>
           </SheetHeader>
+
+          {laneFull && (
+            <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Ligne pleine ({maxSwimmersPerLane}). Fermez ce panneau et changez de ligne pour continuer.
+              </span>
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "club" | "manuals" | "new")} className="flex-1 flex flex-col overflow-hidden mt-4">
             <TabsList className="grid grid-cols-3 w-full h-auto p-1 gap-0.5">
@@ -444,22 +470,30 @@ export default function ChronoSetup({
                           {members.map((a) => {
                             const isAssigned =
                               a.id != null && assignedKeys.has(`a:${a.id}`);
+                            const disabled = isAssigned || laneFull;
                             return (
                               <button
                                 key={a.id}
                                 type="button"
-                                disabled={isAssigned}
+                                disabled={disabled}
                                 onClick={() => handleAddSwimmer(a)}
                                 className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                                  disabled
+                                    ? "cursor-not-allowed"
+                                    : "hover:bg-muted active:bg-muted/60"
+                                } ${
                                   isAssigned
-                                    ? "cursor-not-allowed text-muted-foreground/50"
-                                    : "hover:bg-muted"
+                                    ? "text-muted-foreground"
+                                    : disabled
+                                    ? "text-muted-foreground/50"
+                                    : "text-foreground"
                                 }`}
                               >
-                                {a.display_name}
+                                <span className="flex-1 truncate">{a.display_name}</span>
                                 {isAssigned && (
-                                  <span className="ml-auto text-[10px] text-muted-foreground">
-                                    déjà assigné
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0">
+                                    <Check className="h-3 w-3" />
+                                    ajouté
                                   </span>
                                 )}
                               </button>
@@ -482,7 +516,7 @@ export default function ChronoSetup({
               {addLane !== null && (
                 <ManualsTabBody
                   addLane={addLane}
-                  onAdded={() => { setAddLane(null); }}
+                  laneFull={laneFull}
                   onGoToNew={() => setActiveTab("new")}
                   dispatch={dispatch}
                 />
@@ -493,12 +527,32 @@ export default function ChronoSetup({
               {addLane !== null && (
                 <NewManualTabBody
                   addLane={addLane}
-                  onAdded={() => { setAddLane(null); }}
+                  laneFull={laneFull}
                   dispatch={dispatch}
                 />
               )}
             </TabsContent>
           </Tabs>
+
+          {/* ── Sticky footer — batch-add summary + close ── */}
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 -mx-6 px-6">
+            <p className="text-xs text-muted-foreground">
+              {laneCount > 0 ? (
+                <>
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {laneCount}
+                  </span>{" "}
+                  nageur{laneCount > 1 ? "s" : ""} dans la ligne
+                </>
+              ) : (
+                "Sélectionnez un ou plusieurs nageurs"
+              )}
+            </p>
+            <Button size="sm" onClick={closeAddSheet} className="gap-1.5 shrink-0">
+              <Check className="h-4 w-4" />
+              Terminé
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
     </div>
@@ -507,12 +561,12 @@ export default function ChronoSetup({
 
 function ManualsTabBody({
   addLane,
-  onAdded,
+  laneFull,
   onGoToNew,
   dispatch,
 }: {
   addLane: number;
-  onAdded: () => void;
+  laneFull: boolean;
   onGoToNew: () => void;
   dispatch: React.Dispatch<ChronoAction>;
 }) {
@@ -525,6 +579,8 @@ function ManualsTabBody({
     mutationFn: deleteManualSwimmer,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["coach_manual_swimmers"] }),
   });
+  // Local pulse feedback : which manual was added last (for a brief "✓ ajouté" tag).
+  const [justAdded, setJustAdded] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -555,53 +611,70 @@ function ManualsTabBody({
   }
   return (
     <ul className="flex flex-col divide-y divide-border/60">
-      {manuals.map(m => (
-        <li key={m.id} className="flex items-center group">
-          <button
-            type="button"
-            onClick={() => {
-              dispatch({
-                type: "ADD_SWIMMER",
-                swimmer: buildManualSwimmer({
-                  manualId: crypto.randomUUID(),
-                  displayName: m.display_name,
-                  lane: addLane,
-                }),
-              });
-              onAdded();
-            }}
-            className="flex flex-1 min-h-[48px] items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
-          >
-            <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-            <span className="flex-1 truncate">{m.display_name}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => delMutation.mutate(m.id)}
-            disabled={delMutation.isPending}
-            className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
-            aria-label={`Supprimer ${m.display_name}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </li>
-      ))}
+      {manuals.map(m => {
+        const pulse = justAdded === m.id;
+        return (
+          <li key={m.id} className="flex items-center group">
+            <button
+              type="button"
+              disabled={laneFull}
+              onClick={() => {
+                dispatch({
+                  type: "ADD_SWIMMER",
+                  swimmer: buildManualSwimmer({
+                    manualId: crypto.randomUUID(),
+                    displayName: m.display_name,
+                    lane: addLane,
+                  }),
+                });
+                setJustAdded(m.id);
+                // Reset the "just added" pulse after a beat — purely visual feedback.
+                setTimeout(() => setJustAdded((curr) => (curr === m.id ? null : curr)), 900);
+              }}
+              className={`flex flex-1 min-h-[48px] items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                laneFull
+                  ? "cursor-not-allowed text-muted-foreground/40"
+                  : "hover:bg-muted active:bg-muted/60"
+              }`}
+            >
+              <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+              <span className="flex-1 truncate">{m.display_name}</span>
+              {pulse && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0 animate-in fade-in slide-in-from-right-1 duration-300">
+                  <Check className="h-3 w-3" />
+                  ajouté
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => delMutation.mutate(m.id)}
+              disabled={delMutation.isPending}
+              className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
+              aria-label={`Supprimer ${m.display_name}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
 function NewManualTabBody({
   addLane,
-  onAdded,
+  laneFull,
   dispatch,
 }: {
   addLane: number;
-  onAdded: () => void;
+  laneFull: boolean;
   dispatch: React.Dispatch<ChronoAction>;
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [remember, setRemember] = useState(true);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const saveMutation = useMutation({
     mutationFn: createManualSwimmer,
@@ -610,7 +683,7 @@ function NewManualTabBody({
 
   const submit = useCallback(async () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed || laneFull) return;
     if (remember) {
       try { await saveMutation.mutateAsync(trimmed); }
       catch { /* offline: add as volatile */ }
@@ -623,12 +696,16 @@ function NewManualTabBody({
         lane: addLane,
       }),
     });
+    // Batch-add : reset + refocus, keep sheet open.
+    setJustAdded(trimmed);
     setName("");
-    onAdded();
-  }, [name, remember, saveMutation, dispatch, addLane, onAdded]);
+    inputRef.current?.focus();
+    setTimeout(() => setJustAdded((curr) => (curr === trimmed ? null : curr)), 1600);
+  }, [name, remember, saveMutation, dispatch, addLane, laneFull]);
 
   const busy = saveMutation.isPending;
   const trimmed = name.trim();
+  const disabled = !trimmed || busy || laneFull;
 
   return (
     <div className="flex flex-col gap-4 pt-2">
@@ -642,7 +719,7 @@ function NewManualTabBody({
           value={name}
           placeholder="Ex : Invité Club de Colmar"
           onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && trimmed) submit(); }}
+          onKeyDown={e => { if (e.key === "Enter" && !disabled) submit(); }}
           disabled={busy}
           className="h-11"
         />
@@ -659,7 +736,7 @@ function NewManualTabBody({
       </label>
 
       <Button
-        disabled={!trimmed || busy}
+        disabled={disabled}
         onClick={submit}
         className="h-11 gap-1.5"
       >
@@ -675,6 +752,15 @@ function NewManualTabBody({
           </>
         )}
       </Button>
+
+      {justAdded && (
+        <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 animate-in fade-in slide-in-from-bottom-1 duration-300">
+          <Check className="h-3.5 w-3.5" />
+          <span>
+            <span className="font-semibold">{justAdded}</span> ajouté. Entrez le suivant.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
