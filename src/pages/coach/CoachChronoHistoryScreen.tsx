@@ -86,6 +86,10 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
         : selectedRecord.swimmers;
 
     for (const sw of swimmers) {
+      if (sw.athleteId == null) {
+        toast.info(`${sw.displayName} (manuel) ignoré`);
+        continue;
+      }
       const authUid = await resolveAuthUid(sw.athleteId);
       if (!authUid) {
         toast.error(`UUID introuvable pour ${sw.displayName}`);

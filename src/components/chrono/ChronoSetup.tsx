@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../ui/sheet";
-import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS } from "../../lib/chrono-types";
+import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS, buildRegisteredSwimmer } from "../../lib/chrono-types";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import type { AthleteSummary } from "../../lib/api/types";
@@ -37,8 +37,8 @@ export default function ChronoSetup({
   const [showAll, setShowAll] = useState(false);
   const displayAthletes = showAll && allAthletes ? allAthletes : athletes;
 
-  const assignedIds = useMemo(
-    () => new Set(state.swimmers.map((s) => s.athleteId)),
+  const assignedKeys = useMemo(
+    () => new Set(state.swimmers.map((s) => s.key)),
     [state.swimmers],
   );
 
@@ -74,22 +74,22 @@ export default function ChronoSetup({
     if (a.id == null || addLane == null) return;
     dispatch({
       type: "ADD_SWIMMER",
-      swimmer: {
+      swimmer: buildRegisteredSwimmer({
         athleteId: a.id,
         displayName: a.display_name,
         avatarUrl: a.avatar_url ?? null,
         wave: 1,
         lane: addLane,
-      },
+      }),
     });
     setAddLane(null);
     setSearch("");
   };
 
-  const cycleWave = (athleteId: number, currentWave: number) => {
+  const cycleWave = (key: string, currentWave: number) => {
     dispatch({
       type: "SET_WAVE",
-      athleteId,
+      key,
       wave: (currentWave % maxWaves) + 1,
     });
   };
@@ -294,7 +294,7 @@ export default function ChronoSetup({
                     const c = WAVE_COLORS[s.wave - 1];
                     return (
                       <div
-                        key={s.athleteId}
+                        key={s.key}
                         className="relative flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1.5 text-sm"
                       >
                         <span className="max-w-[7rem] truncate">
@@ -303,7 +303,7 @@ export default function ChronoSetup({
                         {/* Wave chip — tap to cycle */}
                         <button
                           type="button"
-                          onClick={() => cycleWave(s.athleteId, s.wave)}
+                          onClick={() => cycleWave(s.key, s.wave)}
                           className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}
                         >
                           <span
@@ -317,7 +317,7 @@ export default function ChronoSetup({
                           onClick={() =>
                             dispatch({
                               type: "REMOVE_SWIMMER",
-                              athleteId: s.athleteId,
+                              key: s.key,
                             })
                           }
                           className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
@@ -395,7 +395,7 @@ export default function ChronoSetup({
                     <div className="flex flex-col">
                       {members.map((a) => {
                         const isAssigned =
-                          a.id != null && assignedIds.has(a.id);
+                          a.id != null && assignedKeys.has(`a:${a.id}`);
                         return (
                           <button
                             key={a.id}

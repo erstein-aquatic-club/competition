@@ -961,7 +961,9 @@ export interface ChronoRecordSplit {
 }
 
 export interface ChronoRecordSwimmer {
-  athleteId: number;
+  kind?: "registered" | "manual";     // optional (backward-compat)
+  athleteId: number | null;           // nullable for manual swimmers
+  manualId?: string | null;           // new for manual swimmers
   displayName: string;
   lane: number;
   wave: number;

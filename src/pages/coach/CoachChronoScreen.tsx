@@ -30,7 +30,8 @@ function serializeState(state: ChronoState): string {
 function deserializeState(raw: string): ChronoState | null {
   try {
     const parsed = JSON.parse(raw);
-    return { ...parsed, raceData: new Map(parsed.raceData) };
+    // Merge with initialChronoState to fill fields added in later versions (title, kind, etc.)
+    return { ...initialChronoState, ...parsed, raceData: new Map(parsed.raceData) };
   } catch {
     return null;
   }

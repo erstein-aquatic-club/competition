@@ -57,8 +57,9 @@ function totalSplitCount(splitsByRep: SplitRecord[][]): number {
   return splitsByRep.reduce((sum, rep) => sum + rep.length, 0);
 }
 
-/** Build a label from chrono state config */
+/** Build a label from chrono state — prefer explicit title, fallback to config */
 function buildLabel(state: ChronoState): string {
+  if (state.title.trim()) return state.title.trim();
   const parts: string[] = [];
   if (state.seriesCount > 0) parts.push(`${state.seriesCount}×`);
   if (state.totalDistanceM > 0) parts.push(`${state.totalDistanceM}m`);
@@ -79,7 +80,9 @@ function buildChronoRecordInput(state: ChronoState, status: "draft" | "sent"): C
       laneCount: state.laneCount,
     },
     swimmers: raceEntries.map((rs) => ({
+      kind: rs.swimmer.kind,
       athleteId: rs.swimmer.athleteId,
+      manualId: rs.swimmer.manualId,
       displayName: rs.swimmer.displayName,
       lane: rs.swimmer.lane,
       wave: rs.swimmer.wave,
@@ -115,7 +118,7 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
 }
 
 export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft, onDiscard }: ChronoResultsProps) {
-  const [exportStatuses, setExportStatuses] = useState<Map<number, ExportStatus>>(new Map());
+  const [exportStatuses, setExportStatuses] = useState<Map<string, ExportStatus>>(new Map());
   const [exporting, setExporting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -155,7 +158,8 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
 
   const handleExportAll = useCallback(async () => {
     setExporting(true);
-    const swimmers = raceEntries.filter((e) => totalSplitCount(e.splitsByRep) > 0);
+    // Skip manual swimmers — they have no auth account to push logs to
+    const swimmers = raceEntries.filter((e) => e.swimmer.kind === "registered" && totalSplitCount(e.splitsByRep) > 0);
 
     if (swimmers.length === 0) {
       toast.error("Aucun split à exporter");
@@ -168,7 +172,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
         const { swimmer, splitsByRep } = raceState;
 
         // Resolve auth UUID from public.users integer ID
-        const authUid = await resolveAuthUid(swimmer.athleteId);
+        const authUid = await resolveAuthUid(swimmer.athleteId!);
         if (!authUid) throw new Error(`UUID introuvable pour ${swimmer.displayName}`);
 
         const repCount = splitsByRep.filter((s) => s.length > 0).length;
@@ -178,7 +182,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
           notes: `Série chrono — Ligne ${swimmer.lane}${repCount > 1 ? ` — ${repCount} séries` : ""}`,
         };
         await createStandaloneSwimLog(authUid, log);
-        return swimmer.athleteId;
+        return swimmer.key;
       }),
     );
 
@@ -188,12 +192,12 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const athleteId = swimmers[i].swimmer.athleteId;
+      const key = swimmers[i].swimmer.key;
       if (result.status === "fulfilled") {
-        newStatuses.set(athleteId, "sent");
+        newStatuses.set(key, "sent");
         successCount++;
       } else {
-        newStatuses.set(athleteId, "error");
+        newStatuses.set(key, "error");
         errorCount++;
       }
     }
@@ -254,15 +258,15 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
           {byLane.get(lane)!.map((raceState) => {
             const { swimmer, splitsByRep } = raceState;
             const wc = WAVE_COLORS[(swimmer.wave - 1) % WAVE_COLORS.length];
-            const status = exportStatuses.get(swimmer.athleteId);
+            const status = exportStatuses.get(swimmer.key);
             const total = totalSplitCount(splitsByRep);
             const bestSeriesIdx = findBestSeriesIdx(splitsByRep);
             const completedSeries = splitsByRep.filter((s) => s.length > 0);
-            const cardKey = `${swimmer.athleteId}`;
+            const cardKey = swimmer.key;
             const isExpanded = expandedCards.has(cardKey);
 
             return (
-              <div key={swimmer.athleteId} className="rounded-xl border bg-card overflow-hidden">
+              <div key={swimmer.key} className="rounded-xl border bg-card overflow-hidden">
                 {/* ── Swimmer header ── */}
                 <div className="flex items-center justify-between px-4 pt-3 pb-2">
                   <div className="flex items-center gap-2">

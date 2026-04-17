@@ -4,18 +4,21 @@ import {
   initialChronoState,
   computeWaves,
 } from "../chrono-reducer";
+import {
+  buildRegisteredSwimmer,
+  buildManualSwimmer,
+  normalizeRecordSwimmer,
+} from "../chrono-types";
 import type { ChronoState } from "../chrono-types";
 import { formatTime, formatLap } from "../../hooks/useChronoTimer";
 
 // ── Helpers ─────────────────────────────────────────────────
 
-const swimmer = (id: number, wave = 1, lane = 1) => ({
-  athleteId: id,
-  displayName: `Swimmer ${id}`,
-  avatarUrl: null,
-  wave,
-  lane,
-});
+const reg = (id: number, wave = 1, lane = 1) =>
+  buildRegisteredSwimmer({ athleteId: id, displayName: `Swimmer ${id}`, wave, lane });
+
+const manual = (uuid: string, name: string, wave = 1, lane = 1) =>
+  buildManualSwimmer({ manualId: uuid, displayName: name, wave, lane });
 
 function reduce(
   state: ChronoState,
@@ -76,7 +79,7 @@ describe("formatLap (centièmes)", () => {
 
 describe("computeWaves", () => {
   it("creates waves from swimmer wave numbers", () => {
-    const swimmers = [swimmer(1, 1), swimmer(2, 2), swimmer(3, 1)];
+    const swimmers = [reg(1, 1), reg(2, 2), reg(3, 1)];
     const waves = computeWaves(swimmers);
     expect(waves).toHaveLength(2);
     expect(waves[0].wave).toBe(1);
@@ -87,7 +90,7 @@ describe("computeWaves", () => {
     const existing = [
       { wave: 1, startedAt: 1000, stopped: false, currentRep: 2, departureIntervalSec: 10, lastFinishedAt: null },
     ];
-    const swimmers = [swimmer(1, 1), swimmer(2, 1)];
+    const swimmers = [reg(1, 1), reg(2, 1)];
     const waves = computeWaves(swimmers, existing);
     expect(waves[0].startedAt).toBe(1000);
     expect(waves[0].currentRep).toBe(2);
@@ -112,8 +115,8 @@ describe("setup actions", () => {
     expect(chronoReducer(initialChronoState, { type: "SET_TOTAL_DISTANCE", meters: 200 }).totalDistanceM).toBe(200);
   });
 
-  it("ADD_SWIMMER deduplicates by athleteId", () => {
-    const s1 = swimmer(1);
+  it("ADD_SWIMMER deduplicates by key", () => {
+    const s1 = reg(1);
     const state1 = chronoReducer(initialChronoState, { type: "ADD_SWIMMER", swimmer: s1 });
     const state2 = chronoReducer(state1, { type: "ADD_SWIMMER", swimmer: s1 });
     expect(state2.swimmers).toHaveLength(1);
@@ -122,9 +125,9 @@ describe("setup actions", () => {
   it("REMOVE_SWIMMER updates waves", () => {
     const s = reduce(
       initialChronoState,
-      { type: "ADD_SWIMMER", swimmer: swimmer(1, 1) },
-      { type: "ADD_SWIMMER", swimmer: swimmer(2, 2) },
-      { type: "REMOVE_SWIMMER", athleteId: 2 },
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "ADD_SWIMMER", swimmer: reg(2, 2) },
+      { type: "REMOVE_SWIMMER", key: "a:2" },
     );
     expect(s.swimmers).toHaveLength(1);
     expect(s.waves).toHaveLength(1);
@@ -134,11 +137,11 @@ describe("setup actions", () => {
   it("SET_WAVE moves swimmer and rebuilds waves", () => {
     const s = reduce(
       initialChronoState,
-      { type: "ADD_SWIMMER", swimmer: swimmer(1, 1) },
-      { type: "ADD_SWIMMER", swimmer: swimmer(2, 1) },
-      { type: "SET_WAVE", athleteId: 2, wave: 2 },
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "ADD_SWIMMER", swimmer: reg(2, 1) },
+      { type: "SET_WAVE", key: "a:2", wave: 2 },
     );
-    expect(s.swimmers.find((sw) => sw.athleteId === 2)?.wave).toBe(2);
+    expect(s.swimmers.find((sw) => sw.key === "a:2")?.wave).toBe(2);
     expect(s.waves).toHaveLength(2);
   });
 });
@@ -150,15 +153,15 @@ describe("race flow", () => {
     initialChronoState,
     { type: "SET_TOTAL_DISTANCE", meters: 100 },
     { type: "SET_SPLIT_DISTANCE", meters: 50 },
-    { type: "ADD_SWIMMER", swimmer: swimmer(1, 1, 1) },
-    { type: "ADD_SWIMMER", swimmer: swimmer(2, 1, 2) },
+    { type: "ADD_SWIMMER", swimmer: reg(1, 1, 1) },
+    { type: "ADD_SWIMMER", swimmer: reg(2, 1, 2) },
   );
 
   it("START_RACE transitions to racing phase", () => {
     const s = chronoReducer(raceReady, { type: "START_RACE" });
     expect(s.phase).toBe("racing");
     expect(s.raceData.size).toBe(2);
-    expect(s.raceData.get(1)?.splitsByRep).toEqual([[]]);
+    expect(s.raceData.get("a:1")?.splitsByRep).toEqual([[]]);
   });
 
   it("LAUNCH_WAVE sets startedAt timestamp", () => {
@@ -171,10 +174,10 @@ describe("race flow", () => {
       raceReady,
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 31500 }, // 30.5s cumul
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 65320 }, // 64.32s cumul
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 31500 }, // 30.5s cumul
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 65320 }, // 64.32s cumul
     );
-    const splits = s.raceData.get(1)!.splitsByRep[0];
+    const splits = s.raceData.get("a:1")!.splitsByRep[0];
     expect(splits).toHaveLength(2);
     expect(splits[0].cumulativeMs).toBe(30500);
     expect(splits[0].lapMs).toBe(30500);
@@ -187,11 +190,11 @@ describe("race flow", () => {
       raceReady,
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
-      { type: "STOP_SWIMMER", athleteId: 1, timestamp: 31000 },
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 35000 },
+      { type: "STOP_SWIMMER", key: "a:1", timestamp: 31000 },
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 35000 },
     );
     // Only the auto-recorded split from STOP_SWIMMER, no extra from RECORD_SPLIT
-    expect(s.raceData.get(1)!.splitsByRep[0]).toHaveLength(1);
+    expect(s.raceData.get("a:1")!.splitsByRep[0]).toHaveLength(1);
   });
 
   it("UNDO_SPLIT removes the last split", () => {
@@ -199,11 +202,11 @@ describe("race flow", () => {
       raceReady,
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 31000 },
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 62000 },
-      { type: "UNDO_SPLIT", athleteId: 1 },
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 31000 },
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 62000 },
+      { type: "UNDO_SPLIT", key: "a:1" },
     );
-    expect(s.raceData.get(1)!.splitsByRep[0]).toHaveLength(1);
+    expect(s.raceData.get("a:1")!.splitsByRep[0]).toHaveLength(1);
   });
 
   it("STOP_SWIMMER auto-records final split and marks stoppedAt", () => {
@@ -211,10 +214,10 @@ describe("race flow", () => {
       raceReady,
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 31000 }, // 50m split at 30s
-      { type: "STOP_SWIMMER", athleteId: 1, timestamp: 62500 }, // finish at 61.5s
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 31000 }, // 50m split at 30s
+      { type: "STOP_SWIMMER", key: "a:1", timestamp: 62500 }, // finish at 61.5s
     );
-    const rs = s.raceData.get(1)!;
+    const rs = s.raceData.get("a:1")!;
     expect(rs.stoppedAt).toBe(62500);
     expect(rs.splitsByRep[0]).toHaveLength(2); // manual + auto
     expect(rs.splitsByRep[0][1].cumulativeMs).toBe(61500); // 62500 - 1000
@@ -225,8 +228,8 @@ describe("race flow", () => {
       raceReady,
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
-      { type: "STOP_SWIMMER", athleteId: 1, timestamp: 62000 },
-      { type: "STOP_SWIMMER", athleteId: 2, timestamp: 63000 },
+      { type: "STOP_SWIMMER", key: "a:1", timestamp: 62000 },
+      { type: "STOP_SWIMMER", key: "a:2", timestamp: 63000 },
     );
     expect(s.waves[0].lastFinishedAt).toBe(63000);
   });
@@ -236,14 +239,14 @@ describe("race flow", () => {
       raceReady,
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
-      { type: "RECORD_SPLIT", athleteId: 1, timestamp: 31000 },
+      { type: "RECORD_SPLIT", key: "a:1", timestamp: 31000 },
       { type: "STOP_RACE", timestamp: 65000 },
     );
     expect(s.phase).toBe("results");
     expect(s.stoppedAt).toBe(65000);
     // Both swimmers should have stoppedAt set
-    expect(s.raceData.get(1)!.stoppedAt).toBe(65000);
-    expect(s.raceData.get(2)!.stoppedAt).toBe(65000);
+    expect(s.raceData.get("a:1")!.stoppedAt).toBe(65000);
+    expect(s.raceData.get("a:2")!.stoppedAt).toBe(65000);
   });
 
   it("RESET_FOR_NEW_SERIES goes back to setup with swimmers preserved", () => {
@@ -258,5 +261,96 @@ describe("race flow", () => {
     expect(s.raceData.size).toBe(0);
     expect(s.swimmers).toHaveLength(2); // preserved
     expect(s.waves[0].startedAt).toBeNull();
+  });
+});
+
+// ── Manual swimmers ─────────────────────────────────────────
+
+describe("manual swimmers", () => {
+  it("adds a manual swimmer with composite key m:<uuid>", () => {
+    const s = manual("uuid-1", "Invité 1");
+    const next = chronoReducer(initialChronoState, { type: "ADD_SWIMMER", swimmer: s });
+    expect(next.swimmers).toHaveLength(1);
+    expect(next.swimmers[0].key).toBe("m:uuid-1");
+    expect(next.swimmers[0].kind).toBe("manual");
+    expect(next.swimmers[0].athleteId).toBeNull();
+  });
+
+  it("allows mixing registered and manual in the same lane/wave", () => {
+    const next = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(10, 1, 2) },
+      { type: "ADD_SWIMMER", swimmer: manual("u1", "X", 1, 2) },
+    );
+    expect(next.swimmers).toHaveLength(2);
+    expect(next.swimmers.map(s => s.key)).toEqual(["a:10", "m:u1"]);
+  });
+
+  it("REMOVE_SWIMMER by key works for manual", () => {
+    const s = manual("u1", "X");
+    const next = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: s },
+      { type: "REMOVE_SWIMMER", key: "m:u1" },
+    );
+    expect(next.swimmers).toHaveLength(0);
+  });
+
+  it("START_RACE keys raceData by swimmer key (including manual)", () => {
+    const next = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(10, 1, 1) },
+      { type: "ADD_SWIMMER", swimmer: manual("u1", "X", 1, 1) },
+      { type: "START_RACE" },
+    );
+    expect(next.raceData.has("a:10")).toBe(true);
+    expect(next.raceData.has("m:u1")).toBe(true);
+  });
+
+  it("RECORD_SPLIT works with manual key", () => {
+    const s: ChronoState = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: manual("u1", "X", 1, 1) },
+      { type: "START_RACE" },
+      { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
+      { type: "RECORD_SPLIT", key: "m:u1", timestamp: 2000 },
+    );
+    const race = s.raceData.get("m:u1");
+    expect(race?.splitsByRep[0]).toHaveLength(1);
+    expect(race?.splitsByRep[0][0].cumulativeMs).toBe(1000);
+  });
+});
+
+// ── SET_TITLE ───────────────────────────────────────────────
+
+describe("SET_TITLE", () => {
+  it("updates title without touching swimmers", () => {
+    const s = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(10) },
+      { type: "SET_TITLE", title: "Stage Pâques — 100m NL" },
+    );
+    expect(s.title).toBe("Stage Pâques — 100m NL");
+    expect(s.swimmers).toHaveLength(1);
+  });
+
+  it("allows clearing title to empty string", () => {
+    const s = reduce(initialChronoState,
+      { type: "SET_TITLE", title: "X" },
+      { type: "SET_TITLE", title: "" },
+    );
+    expect(s.title).toBe("");
+  });
+});
+
+// ── normalizeRecordSwimmer ──────────────────────────────────
+
+describe("normalizeRecordSwimmer", () => {
+  it("infers kind=registered for legacy records without kind", () => {
+    const sw = { athleteId: 42, displayName: "X", lane: 1, wave: 1, splitsByRep: [] };
+    expect(normalizeRecordSwimmer(sw).kind).toBe("registered");
+  });
+  it("infers kind=manual when athleteId is null", () => {
+    const sw = { athleteId: null, displayName: "X", lane: 1, wave: 1, splitsByRep: [] };
+    expect(normalizeRecordSwimmer(sw).kind).toBe("manual");
+  });
+  it("preserves explicit kind", () => {
+    const sw = { kind: "manual" as const, athleteId: null, manualId: "u1", displayName: "X", lane: 1, wave: 1, splitsByRep: [] };
+    expect(normalizeRecordSwimmer(sw).manualId).toBe("u1");
   });
 });

@@ -85,7 +85,7 @@ export default function ChronoSplitEditor({
           const wc = WAVE_COLORS[(sw.wave - 1) % WAVE_COLORS.length];
           return (
             <button
-              key={sw.athleteId}
+              key={sw.athleteId ?? sw.manualId ?? `idx-${idx}`}
               onClick={() => { setSelectedSwimmer(idx); setSelectedSeries(0); }}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
                 idx === selectedSwimmer

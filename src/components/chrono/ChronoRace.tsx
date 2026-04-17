@@ -230,7 +230,7 @@ function WaveBar({
 // ── Swimmer Split Card ──────────────────────────────────────────────
 
 function SwimmerCard({
-  athleteId,
+  swimmerKey,
   displayName,
   wave,
   waveStartedAt,
@@ -242,7 +242,7 @@ function SwimmerCard({
   dispatch,
   getTimestamp,
 }: {
-  athleteId: number;
+  swimmerKey: string;
   displayName: string;
   wave: number;
   waveStartedAt: number | null;
@@ -269,13 +269,13 @@ function SwimmerCard({
     lastTapRef.current = tapTime;
 
     if (gap < 300 && gap > 0) {
-      dispatch({ type: "UNDO_SPLIT", athleteId });
+      dispatch({ type: "UNDO_SPLIT", key: swimmerKey });
       toast("Split annulé", { duration: 1500 });
       lastTapRef.current = 0;
       return;
     }
 
-    dispatch({ type: "RECORD_SPLIT", athleteId, timestamp: getTimestamp() });
+    dispatch({ type: "RECORD_SPLIT", key: swimmerKey, timestamp: getTimestamp() });
     navigator.vibrate?.(50);
 
     const el = flashRef.current;
@@ -287,14 +287,14 @@ function SwimmerCard({
         }, 100);
       });
     }
-  }, [active, dispatch, athleteId, getTimestamp]);
+  }, [active, dispatch, swimmerKey, getTimestamp]);
 
   const handleStop = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatch({ type: "STOP_SWIMMER", athleteId, timestamp: getTimestamp() });
+    dispatch({ type: "STOP_SWIMMER", key: swimmerKey, timestamp: getTimestamp() });
     navigator.vibrate?.([50, 30, 50]);
     toast(`${displayName} — Stoppé`, { duration: 2000 });
-  }, [dispatch, athleteId, getTimestamp, displayName]);
+  }, [dispatch, swimmerKey, getTimestamp, displayName]);
 
   const elapsed = launched
     ? (stopped ? swimmerStoppedAt : now) - waveStartedAt
@@ -413,11 +413,11 @@ function LaneSection({
       <div className="grid grid-cols-1 gap-3 px-4 md:grid-cols-2 xl:grid-cols-3">
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
-          const race = raceData.get(s.athleteId);
+          const race = raceData.get(s.key);
           return (
             <SwimmerCard
-              key={s.athleteId}
-              athleteId={s.athleteId}
+              key={s.key}
+              swimmerKey={s.key}
               displayName={s.displayName}
               wave={s.wave}
               waveStartedAt={waveState?.startedAt ?? null}

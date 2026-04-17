@@ -13,16 +13,17 @@ type ChronoAction =
   | { type: "SET_TOTAL_DISTANCE"; meters: number }
   | { type: "SET_SPLIT_DISTANCE"; meters: number }
   | { type: "SET_SERIES_COUNT"; count: number }
+  | { type: "SET_TITLE"; title: string }
   | { type: "SET_WAVE_INTERVAL"; wave: number; seconds: number }
   | { type: "ADD_SWIMMER"; swimmer: ChronoSwimmer }
-  | { type: "REMOVE_SWIMMER"; athleteId: number }
-  | { type: "MOVE_SWIMMER"; athleteId: number; lane: number }
-  | { type: "SET_WAVE"; athleteId: number; wave: number }
+  | { type: "REMOVE_SWIMMER"; key: string }
+  | { type: "MOVE_SWIMMER"; key: string; lane: number }
+  | { type: "SET_WAVE"; key: string; wave: number }
   | { type: "START_RACE" }
   | { type: "LAUNCH_WAVE"; wave: number; timestamp: number }
-  | { type: "RECORD_SPLIT"; athleteId: number; timestamp: number }
-  | { type: "UNDO_SPLIT"; athleteId: number }
-  | { type: "STOP_SWIMMER"; athleteId: number; timestamp: number }
+  | { type: "RECORD_SPLIT"; key: string; timestamp: number }
+  | { type: "UNDO_SPLIT"; key: string }
+  | { type: "STOP_SWIMMER"; key: string; timestamp: number }
   | { type: "NEXT_REP"; wave: number }
   | { type: "STOP_RACE"; timestamp: number }
   | { type: "RESET_FOR_NEW_SERIES" }
@@ -58,6 +59,7 @@ export const initialChronoState: ChronoState = {
   totalDistanceM: 0,
   splitDistanceM: 50,
   seriesCount: 0,
+  title: "",
 };
 
 // ── Reducer ──────────────────────────────────────────────────────────
@@ -84,6 +86,10 @@ export function chronoReducer(
       return { ...state, seriesCount: Math.max(0, action.count) };
     }
 
+    case "SET_TITLE": {
+      return { ...state, title: action.title };
+    }
+
     case "SET_WAVE_INTERVAL": {
       const waves = state.waves.map((w) =>
         w.wave === action.wave
@@ -94,7 +100,7 @@ export function chronoReducer(
     }
 
     case "ADD_SWIMMER": {
-      if (state.swimmers.some((s) => s.athleteId === action.swimmer.athleteId)) {
+      if (state.swimmers.some((s) => s.key === action.swimmer.key)) {
         return state;
       }
       const swimmers = [...state.swimmers, action.swimmer];
@@ -103,29 +109,29 @@ export function chronoReducer(
 
     case "REMOVE_SWIMMER": {
       const swimmers = state.swimmers.filter(
-        (s) => s.athleteId !== action.athleteId,
+        (s) => s.key !== action.key,
       );
       return { ...state, swimmers, waves: computeWaves(swimmers, state.waves) };
     }
 
     case "MOVE_SWIMMER": {
       const swimmers = state.swimmers.map((s) =>
-        s.athleteId === action.athleteId ? { ...s, lane: action.lane } : s,
+        s.key === action.key ? { ...s, lane: action.lane } : s,
       );
       return { ...state, swimmers };
     }
 
     case "SET_WAVE": {
       const swimmers = state.swimmers.map((s) =>
-        s.athleteId === action.athleteId ? { ...s, wave: action.wave } : s,
+        s.key === action.key ? { ...s, wave: action.wave } : s,
       );
       return { ...state, swimmers, waves: computeWaves(swimmers, state.waves) };
     }
 
     case "START_RACE": {
-      const raceData = new Map<number, SwimmerRaceState>();
+      const raceData = new Map<string, SwimmerRaceState>();
       for (const swimmer of state.swimmers) {
-        raceData.set(swimmer.athleteId, {
+        raceData.set(swimmer.key, {
           swimmer,
           splitsByRep: [[]],
           stoppedAt: null,
@@ -153,9 +159,9 @@ export function chronoReducer(
       let raceData = state.raceData;
       if (wasFinished) {
         raceData = new Map(state.raceData);
-        for (const [id, rs] of raceData) {
+        for (const [key, rs] of raceData) {
           if (rs.swimmer.wave === action.wave) {
-            raceData.set(id, {
+            raceData.set(key, {
               ...rs,
               splitsByRep: [...rs.splitsByRep, []],
               stoppedAt: null,
@@ -167,7 +173,7 @@ export function chronoReducer(
     }
 
     case "RECORD_SPLIT": {
-      const raceState = state.raceData.get(action.athleteId);
+      const raceState = state.raceData.get(action.key);
       if (!raceState || raceState.stoppedAt) return state;
 
       const swimmer = raceState.swimmer;
@@ -186,7 +192,7 @@ export function chronoReducer(
       newSplitsByRep[newSplitsByRep.length - 1] = [...currentSplits, newSplit];
 
       const newRaceData = new Map(state.raceData);
-      newRaceData.set(action.athleteId, {
+      newRaceData.set(action.key, {
         ...raceState,
         splitsByRep: newSplitsByRep,
       });
@@ -195,7 +201,7 @@ export function chronoReducer(
     }
 
     case "UNDO_SPLIT": {
-      const raceState = state.raceData.get(action.athleteId);
+      const raceState = state.raceData.get(action.key);
       if (!raceState) return state;
       const currentSplits = raceState.splitsByRep[raceState.splitsByRep.length - 1];
       if (currentSplits.length === 0) return state;
@@ -204,7 +210,7 @@ export function chronoReducer(
       newSplitsByRep[newSplitsByRep.length - 1] = currentSplits.slice(0, -1);
 
       const newRaceData = new Map(state.raceData);
-      newRaceData.set(action.athleteId, {
+      newRaceData.set(action.key, {
         ...raceState,
         splitsByRep: newSplitsByRep,
       });
@@ -213,7 +219,7 @@ export function chronoReducer(
     }
 
     case "STOP_SWIMMER": {
-      const raceState = state.raceData.get(action.athleteId);
+      const raceState = state.raceData.get(action.key);
       if (!raceState || raceState.stoppedAt) return state;
 
       // Auto-record a final split at stop time
@@ -230,7 +236,7 @@ export function chronoReducer(
       }
 
       const newRaceData = new Map(state.raceData);
-      newRaceData.set(action.athleteId, updatedRaceState);
+      newRaceData.set(action.key, updatedRaceState);
 
       // Check if all swimmers in this wave are now stopped → auto NEXT_REP
       const waveNum = raceState.swimmer.wave;
@@ -266,7 +272,7 @@ export function chronoReducer(
       const waves = state.waves.map((w) => ({ ...w, stopped: true }));
       // Auto-record final split for all active swimmers
       const newRaceData = new Map(state.raceData);
-      for (const [id, rs] of newRaceData) {
+      for (const [key, rs] of newRaceData) {
         if (rs.stoppedAt) continue; // already stopped
         const swimmerWave = state.waves.find((w) => w.wave === rs.swimmer.wave);
         if (!swimmerWave?.startedAt) continue;
@@ -276,7 +282,7 @@ export function chronoReducer(
         const lapMs = prevSplit ? cumulativeMs - prevSplit.cumulativeMs : cumulativeMs;
         const newSplitsByRep = [...rs.splitsByRep];
         newSplitsByRep[newSplitsByRep.length - 1] = [...currentSplits, { cumulativeMs, lapMs }];
-        newRaceData.set(id, { ...rs, splitsByRep: newSplitsByRep, stoppedAt: action.timestamp });
+        newRaceData.set(key, { ...rs, splitsByRep: newSplitsByRep, stoppedAt: action.timestamp });
       }
       return {
         ...state,
