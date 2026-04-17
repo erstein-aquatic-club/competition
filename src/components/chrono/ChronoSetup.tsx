@@ -717,7 +717,7 @@ function NewManualTabBody({
           ref={inputRef}
           autoFocus
           value={name}
-          placeholder="Ex : Invité Club de Colmar"
+          placeholder="Prénom Nom"
           onChange={e => setName(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && !disabled) submit(); }}
           disabled={busy}
