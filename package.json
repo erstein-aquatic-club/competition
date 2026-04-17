@@ -45,6 +45,7 @@
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.0",
+    "exceljs": "^4.4.0",
     "framer-motion": "^12.23.24",
     "gifenc": "^1.0.3",
     "html2canvas": "^1.4.1",
@@ -66,7 +67,6 @@
     "vaul": "^1.1.2",
     "vite": "^7.1.9",
     "wouter": "^3.3.5",
-    "xlsx": "^0.18.5",
     "zod": "^3.25.76",
     "zod-validation-error": "^3.4.0",
     "zustand": "^5.0.9"
