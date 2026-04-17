@@ -1,8 +1,8 @@
 import { useRef, useCallback, useEffect } from "react";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
-import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
-import { Info } from "lucide-react";
+import { formatTime, formatLap, formatPace, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
+import { Info, Gauge, Flag } from "lucide-react";
 import { WAVE_COLORS } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
 import {
@@ -237,8 +237,8 @@ function SwimmerCard({
   waveStartedAt,
   currentSplits,
   swimmerStoppedAt,
-  totalReps,
   splitDistanceM,
+  totalDistanceM,
   now,
   dispatch,
   getTimestamp,
@@ -249,8 +249,8 @@ function SwimmerCard({
   waveStartedAt: number | null;
   currentSplits: { cumulativeMs: number; lapMs: number }[];
   swimmerStoppedAt: number | null;
-  totalReps: number;
   splitDistanceM: number;
+  totalDistanceM: number;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -290,90 +290,244 @@ function SwimmerCard({
     }
   }, [active, dispatch, swimmerKey, getTimestamp]);
 
-  const handleStop = useCallback((e: React.MouseEvent) => {
+  const handleStop = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     dispatch({ type: "STOP_SWIMMER", key: swimmerKey, timestamp: getTimestamp() });
     navigator.vibrate?.([50, 30, 50]);
     toast(`${displayName} — Stoppé`, { duration: 2000 });
   }, [dispatch, swimmerKey, getTimestamp, displayName]);
 
+  // ── Telemetry computations ─────────────────────────────────────
   const elapsed = launched
-    ? (stopped ? swimmerStoppedAt : now) - waveStartedAt
+    ? (stopped ? (swimmerStoppedAt as number) : now) - (waveStartedAt as number)
     : 0;
   const lastSplit = currentSplits.length > 0 ? currentSplits[currentSplits.length - 1] : null;
+  const recordedSplits = currentSplits.length;
+
+  const hasSplitDist = splitDistanceM > 0;
+  const hasTotalDist = totalDistanceM > 0 && hasSplitDist;
+
+  const expectedSplits = hasTotalDist ? Math.max(1, Math.ceil(totalDistanceM / splitDistanceM)) : 0;
+  const currentDistM = hasSplitDist ? recordedSplits * splitDistanceM : 0;
+
+  const progressPct = expectedSplits > 0
+    ? Math.min(100, (recordedSplits / expectedSplits) * 100)
+    : 0;
+
+  // Instant pace : last lap (ms/100m)
+  const instantPacePer100m = lastSplit && hasSplitDist && lastSplit.lapMs > 0
+    ? (lastSplit.lapMs / splitDistanceM) * 100
+    : 0;
+  // Average pace : overall cumul / distance (ms/100m)
+  const avgPacePer100m = lastSplit && hasSplitDist && currentDistM > 0
+    ? (lastSplit.cumulativeMs / currentDistM) * 100
+    : 0;
+
+  // Stop emphasis : when next tap would reach/exceed the total distance.
+  const shouldPromptStop = active && expectedSplits > 0 && recordedSplits + 1 >= expectedSplits;
+  const finishedDistance = active && expectedSplits > 0 && recordedSplits >= expectedSplits;
 
   return (
     <div
       role="button"
       tabIndex={active ? 0 : -1}
       onClick={handleTap}
-      className={`relative rounded-xl border-l-4 ${wc.border} border border-border overflow-hidden touch-manipulation ${
+      onKeyDown={(e) => { if (active && (e.key === " " || e.key === "Enter")) { e.preventDefault(); handleTap(); } }}
+      className={`relative rounded-xl border-l-4 ${wc.border} overflow-hidden touch-manipulation transition-all ${
         stopped
-          ? "bg-muted opacity-60"
-          : active
-            ? "bg-card active:scale-[0.97] cursor-pointer shadow transition-transform"
-            : "bg-muted/50 opacity-25 pointer-events-none"
+          ? "bg-muted opacity-60 border border-border"
+          : shouldPromptStop
+            ? "bg-card border-2 border-destructive shadow-lg shadow-destructive/20 ring-2 ring-destructive/15"
+            : active
+              ? "bg-card border border-border shadow-sm active:scale-[0.98] cursor-pointer"
+              : "bg-muted/50 opacity-25 pointer-events-none border border-border"
       }`}
     >
-      {/* Flash overlay */}
+      {/* Flash overlay on split tap */}
       <div
         ref={flashRef}
         className="pointer-events-none absolute inset-0 bg-primary opacity-0 transition-opacity duration-100"
       />
 
-      {/* ── Row 1: Name ── */}
-      <div className="flex items-center gap-2 px-3 pt-3 pb-0.5">
+      {/* ── Header : wave + name + corner stop ── */}
+      <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+        <span
+          className={`inline-flex h-6 min-w-[2rem] items-center justify-center rounded-full px-2 text-[11px] font-black text-white ${wc.dot}`}
+          aria-label={`Vague ${wc.label}`}
+        >
+          {wc.label}
+        </span>
         <span className={`text-base font-bold leading-snug min-w-0 truncate ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
           {displayName}
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          {active && (
+          {stopped && (
+            <span className="rounded bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
+              Stop
+            </span>
+          )}
+          {active && !shouldPromptStop && (
             <button
               type="button"
               onClick={handleStop}
               aria-label={`Stopper ${displayName}`}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive/30 hover:bg-destructive/90 hover:ring-destructive/50 active:scale-90 transition-all"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive/30 hover:bg-destructive/90 hover:ring-destructive/50 active:scale-90 transition-all"
             >
-              <CircleStop className="h-6 w-6" strokeWidth={2.5} />
+              <CircleStop className="h-5 w-5" strokeWidth={2.5} />
             </button>
           )}
-          {stopped && (
-            <span className="rounded bg-destructive px-1.5 py-0.5 text-[9px] font-bold uppercase text-destructive-foreground">
-              Stop
-            </span>
-          )}
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
-            {wc.label}
-          </span>
         </div>
       </div>
 
-      {/* ── Row 2: Chrono ── */}
-      <div className="px-3 py-1.5">
-        <span className={`font-mono tabular-nums text-3xl font-black leading-none tracking-tight ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
+      {/* ── Hero chrono ── */}
+      <div className="px-3 pt-1 pb-2">
+        <div
+          className={`font-mono tabular-nums font-black leading-[0.95] tracking-tight text-[clamp(2.25rem,6vw,3.5rem)] ${
+            stopped ? "text-muted-foreground" : "text-foreground"
+          }`}
+        >
           {launched ? formatTime(elapsed) : "--:--.--"}
-        </span>
+        </div>
       </div>
 
-      {/* ── Row 3: Split info ── */}
-      <div className="px-3 pb-3 pt-0.5">
-        {launched && lastSplit ? (
-          <div className="flex items-baseline gap-2">
-            <span className={`text-xs font-bold text-white rounded px-1 py-0.5 ${wc.dot}`}>
-              {splitDistanceM > 0 ? `${currentSplits.length * splitDistanceM}m` : `#${currentSplits.length}`}
-            </span>
-            <span className="font-mono tabular-nums text-sm font-semibold text-foreground">
-              {formatTime(lastSplit.cumulativeMs)}
-            </span>
-            <span className="font-mono tabular-nums text-xs text-muted-foreground">
-              ({formatLap(lastSplit.lapMs)})
+      {/* ── Progress bar + split counter ── */}
+      {launched && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-[width] duration-300 ${
+                  finishedDistance
+                    ? "bg-destructive"
+                    : shouldPromptStop
+                      ? "bg-destructive/80"
+                      : wc.dot
+                }`}
+                style={{
+                  width: expectedSplits > 0
+                    ? `${progressPct}%`
+                    : recordedSplits > 0
+                      ? "100%"
+                      : "0%",
+                }}
+                aria-hidden
+              />
+            </div>
+            <span
+              className={`text-[11px] font-bold tabular-nums shrink-0 ${
+                shouldPromptStop ? "text-destructive" : "text-muted-foreground"
+              }`}
+              aria-label={
+                expectedSplits > 0
+                  ? `${recordedSplits} splits sur ${expectedSplits}`
+                  : `${recordedSplits} splits`
+              }
+            >
+              {expectedSplits > 0 ? `${recordedSplits}/${expectedSplits}` : `#${recordedSplits}`}
             </span>
           </div>
-        ) : active ? (
-          <span className="text-sm text-muted-foreground">Tap pour split</span>
-        ) : !launched ? (
-          <span className="text-xs text-muted-foreground/50">En attente</span>
-        ) : null}
+        </div>
+      )}
+
+      {/* ── Telemetry triplet : distance / pace / avg ── */}
+      {launched && (
+        <div className="grid grid-cols-3 gap-1 px-3 pb-2">
+          <TelemetryCell
+            icon={<Flag className="h-3 w-3" />}
+            label="Distance"
+            value={
+              hasTotalDist
+                ? `${currentDistM}/${totalDistanceM}m`
+                : currentDistM > 0
+                  ? `${currentDistM}m`
+                  : "—"
+            }
+            highlight={finishedDistance}
+          />
+          <TelemetryCell
+            icon={<Gauge className="h-3 w-3" />}
+            label="Allure"
+            value={instantPacePer100m > 0 ? `${formatPace(instantPacePer100m)}` : "—"}
+            suffix={instantPacePer100m > 0 ? "/100m" : undefined}
+          />
+          <TelemetryCell
+            label="Moyenne"
+            value={avgPacePer100m > 0 ? `${formatPace(avgPacePer100m)}` : "—"}
+            suffix={avgPacePer100m > 0 ? "/100m" : undefined}
+          />
+        </div>
+      )}
+
+      {/* ── Last split detail ── */}
+      {launched && lastSplit ? (
+        <div className="flex items-baseline gap-2 px-3 pb-2 text-xs">
+          <span className={`font-bold text-white rounded px-1.5 py-0.5 ${wc.dot}`}>
+            {hasSplitDist ? `${recordedSplits * splitDistanceM} m` : `#${recordedSplits}`}
+          </span>
+          <span className="font-mono tabular-nums font-semibold text-foreground">
+            {formatTime(lastSplit.cumulativeMs)}
+          </span>
+          <span className="font-mono tabular-nums text-muted-foreground">
+            (Δ {formatLap(lastSplit.lapMs)})
+          </span>
+        </div>
+      ) : active ? (
+        <div className="px-3 pb-2 text-xs text-muted-foreground">Tap pour split · double-tap pour annuler</div>
+      ) : !launched ? (
+        <div className="px-3 pb-2 text-xs text-muted-foreground/50">En attente du GO…</div>
+      ) : null}
+
+      {/* ── STOP zone — full-width dominant when next tap finishes ── */}
+      {shouldPromptStop && (
+        <button
+          type="button"
+          onClick={handleStop}
+          aria-label={`Stopper ${displayName} — arrivée au prochain split`}
+          className="flex w-full items-center justify-center gap-2 border-t-2 border-destructive bg-destructive py-3 text-destructive-foreground shadow-[0_-4px_12px_rgba(239,68,68,0.2)] animate-pulse font-bold text-sm uppercase tracking-wide active:scale-[0.98] transition-transform hover:bg-destructive/90"
+        >
+          <CircleStop className="h-5 w-5" strokeWidth={3} />
+          <span>
+            {finishedDistance
+              ? `Stopper — Distance atteinte`
+              : "Stopper — Arrivée au prochain split"}
+          </span>
+          <CircleStop className="h-5 w-5" strokeWidth={3} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Telemetry cell — compact metric with label/value/icon ──────────
+
+function TelemetryCell({
+  icon,
+  label,
+  value,
+  suffix,
+  highlight,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  suffix?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={`flex flex-col items-start rounded-md px-2 py-1.5 ${highlight ? "bg-destructive/10" : "bg-muted/60"}`}>
+      <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-1 flex items-baseline gap-0.5">
+        <span className={`font-mono tabular-nums text-sm font-bold leading-none ${highlight ? "text-destructive" : "text-foreground"}`}>
+          {value}
+        </span>
+        {suffix && (
+          <span className="text-[9px] text-muted-foreground leading-none">
+            {suffix}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -387,6 +541,7 @@ function LaneSection({
   waves,
   raceData,
   splitDistanceM,
+  totalDistanceM,
   now,
   dispatch,
   getTimestamp,
@@ -396,6 +551,7 @@ function LaneSection({
   waves: ChronoState["waves"];
   raceData: ChronoState["raceData"];
   splitDistanceM: number;
+  totalDistanceM: number;
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -412,7 +568,11 @@ function LaneSection({
         </h3>
         <div className="h-px flex-1 bg-border" />
       </div>
-      <div className="grid grid-cols-1 gap-3 px-4 md:grid-cols-2 xl:grid-cols-3">
+      {/* Auto-fit : cards stretch when few swimmers, condense when many. Min-300px target for legibility. */}
+      <div
+        className="grid gap-3 px-4"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}
+      >
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
           const race = raceData.get(s.key);
@@ -425,8 +585,8 @@ function LaneSection({
               waveStartedAt={waveState?.startedAt ?? null}
               currentSplits={race ? race.splitsByRep[race.splitsByRep.length - 1] : []}
               swimmerStoppedAt={race?.stoppedAt ?? null}
-              totalReps={race?.splitsByRep.length ?? 1}
               splitDistanceM={splitDistanceM}
+              totalDistanceM={totalDistanceM}
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
@@ -526,6 +686,7 @@ export default function ChronoRace({
             waves={state.waves}
             raceData={state.raceData}
             splitDistanceM={state.splitDistanceM}
+            totalDistanceM={state.totalDistanceM}
             now={now}
             dispatch={dispatch}
             getTimestamp={getTimestamp}

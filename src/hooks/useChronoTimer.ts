@@ -44,6 +44,20 @@ export function formatLap(ms: number): string {
   return seconds.toFixed(2);
 }
 
+/**
+ * Pace in ms per 100m, formatted as m:ss (no decimals — pace is
+ * typically scanned, not measured precisely).
+ */
+export function formatPace(msPer100m: number): string {
+  if (!Number.isFinite(msPer100m) || msPer100m <= 0) return "—";
+  const totalSec = msPer100m / 1000;
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = Math.round(totalSec - minutes * 60);
+  // Guard rollover (e.g. 59.8s → "1:00" instead of "0:60")
+  if (seconds === 60) return `${minutes + 1}:00`;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 /** Precision metadata for UI display */
 export const CHRONO_PRECISION = {
   label: "Chronométrage manuel",
