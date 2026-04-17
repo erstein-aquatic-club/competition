@@ -45,9 +45,10 @@ describe("buildSheetModel", () => {
     const m = buildSheetModel(fakeRecord({ label: "Vide", swimmers: [] }));
     expect(m.title).toBe("Vide");
     expect(m.rows).toEqual([]);
-    // With 0 swimmers, maxSeriesCount returns 0 → only 4 meta columns
+    // With 0 swimmers, maxSeriesCount returns 0 → only 4 meta columns, no super-header.
     expect(m.columnDefs).toHaveLength(4);
     expect(m.columnDefs.map((c) => c.kind)).toEqual(["meta", "meta", "meta", "meta"]);
+    expect(m.seriesGroups).toEqual([]);
   });
 
   it("includes registered + manual swimmers and preserves kind", () => {
@@ -87,7 +88,7 @@ describe("buildSheetModel", () => {
     expect(m.columnDefs[8].label).toBe("100 m interm.");
   });
 
-  it("prefixes series index in labels when multiple series", () => {
+  it("labels stay short (no series prefix) — super-header groups identify series", () => {
     const m = buildSheetModel(fakeRecord({
       swimmers: [{
         athleteId: 1, displayName: "A", lane: 1, wave: 1,
@@ -98,11 +99,38 @@ describe("buildSheetModel", () => {
       }],
     }));
     const labels = m.columnDefs.slice(4).map((c) => c.label);
-    // Per series: TOTAL, <d> cumul., <d> interm.
+    // Labels repeat per series — disambiguation via super-header row.
     expect(labels).toEqual([
-      "S1 TOTAL", "S1 50 m cumul.", "S1 50 m interm.",
-      "S2 TOTAL", "S2 50 m cumul.", "S2 50 m interm.",
+      "TOTAL", "50 m cumul.", "50 m interm.",
+      "TOTAL", "50 m cumul.", "50 m interm.",
     ]);
+  });
+
+  it("builds seriesGroups with col spans when nSeries > 1", () => {
+    const m = buildSheetModel(fakeRecord({
+      swimmers: [{
+        athleteId: 1, displayName: "A", lane: 1, wave: 1,
+        splitsByRep: [
+          [{ distanceM: 50, cumulativeMs: 30000, lapMs: 30000 }],
+          [{ distanceM: 50, cumulativeMs: 32000, lapMs: 32000 }],
+        ],
+      }],
+    }));
+    expect(m.seriesGroups).toEqual([
+      { seriesIdx: 0, startCol: 5, endCol: 7, label: "SÉRIE 1" },
+      { seriesIdx: 1, startCol: 8, endCol: 10, label: "SÉRIE 2" },
+    ]);
+  });
+
+  it("seriesGroups is empty when nSeries = 1 (1-row header suffices)", () => {
+    const m = buildSheetModel(fakeRecord({
+      config: { totalDistanceM: 50, splitDistanceM: 50, seriesCount: 1, laneCount: 1 },
+      swimmers: [{
+        athleteId: 1, displayName: "A", lane: 1, wave: 1,
+        splitsByRep: [[{ distanceM: 50, cumulativeMs: 30000, lapMs: 30000 }]],
+      }],
+    }));
+    expect(m.seriesGroups).toEqual([]);
   });
 
   it("cells expose both cumul and lap per split", () => {

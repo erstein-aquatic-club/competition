@@ -4,6 +4,7 @@ import { normalizeRecordSwimmer } from "./chrono-types";
 // ── Constants (brand + semantic colors, ARGB hex for ExcelJS) ────────
 
 const BRAND_CYAN = "FF0891B2";         // Header fill (cyan-600)
+const BRAND_CYAN_DARK = "FF0E7490";    // Super-header fill (cyan-700) — visually anchors series group
 const HEADER_TEXT = "FFFFFFFF";        // White on brand
 const TITLE_TEXT = "FF0F172A";         // slate-900
 const SUBTITLE_TEXT = "FF475569";      // slate-600
@@ -13,6 +14,7 @@ const BEST_TEXT = "FF15803D";          // green-700
 const MANUAL_TEXT = "FF64748B";        // slate-500
 const ALT_ROW_FILL = "FFF8FAFC";       // slate-50
 const BORDER_COLOR = "FFE2E8F0";       // slate-200
+const GROUP_BORDER = "FFCBD5E1";       // slate-300 (series group divider)
 const TOTAL_COL_FILL = "FFF1F5F9";     // slate-100 (S_n total column emphasis)
 
 const EXCEL_TIME_FORMAT = "[mm]:ss.00"; // centièmes, resilient to >60 min
@@ -56,12 +58,23 @@ export interface ColumnDef {
   width: number;
 }
 
+/** Super-header group spanning multiple columns (merged in Excel). */
+export interface SeriesGroup {
+  seriesIdx: number;
+  /** 1-indexed inclusive col boundaries within columnDefs. */
+  startCol: number;
+  endCol: number;
+  label: string; // "SÉRIE 1", "SÉRIE 2", …
+}
+
 export interface SheetModel {
   clubName: string;
   title: string;
   subtitle: string;
   generatedAt: string;
   columnDefs: ColumnDef[];
+  /** Non-empty when nSeries > 1 (1-row header suffices for single-series). */
+  seriesGroups: SeriesGroup[];
   rows: SheetModelRow[];
 }
 
@@ -157,10 +170,9 @@ export function buildSheetModel(record: ChronoRecordInputLike): SheetModel {
     { kind: "meta", label: "T.", width: 5 },
   ];
   for (let s = 0; s < nSeries; s++) {
-    const sPrefix = nSeries > 1 ? `S${s + 1} ` : "";
     columnDefs.push({
       kind: "total",
-      label: `${sPrefix}TOTAL`,
+      label: "TOTAL",
       seriesIdx: s,
       width: 12,
     });
@@ -169,14 +181,14 @@ export function buildSheetModel(record: ChronoRecordInputLike): SheetModel {
       const dLabel = splitLabel(i);
       columnDefs.push({
         kind: "split-cum",
-        label: `${sPrefix}${dLabel} cumul.`,
+        label: `${dLabel} cumul.`,
         seriesIdx: s,
         splitIdx: i,
         width: 12,
       });
       columnDefs.push({
         kind: "split-lap",
-        label: `${sPrefix}${dLabel} interm.`,
+        label: `${dLabel} interm.`,
         seriesIdx: s,
         splitIdx: i,
         width: 12,
@@ -225,12 +237,36 @@ export function buildSheetModel(record: ChronoRecordInputLike): SheetModel {
     };
   });
 
+  // Build series super-header groups (only when > 1 series — otherwise 1 row header is enough).
+  const seriesGroups: SeriesGroup[] = [];
+  if (nSeries > 1) {
+    for (let s = 0; s < nSeries; s++) {
+      let startCol = -1;
+      let endCol = -1;
+      columnDefs.forEach((def, idx) => {
+        if (def.seriesIdx !== s) return;
+        const col1 = idx + 1;
+        if (startCol < 0) startCol = col1;
+        endCol = col1;
+      });
+      if (startCol > 0) {
+        seriesGroups.push({
+          seriesIdx: s,
+          startCol,
+          endCol,
+          label: `SÉRIE ${s + 1}`,
+        });
+      }
+    }
+  }
+
   return {
     clubName: "Erstein Aquatic Club",
     title: (record.label || "Chrono").trim() || "Chrono",
     subtitle: buildSubtitle(record),
     generatedAt: buildGeneratedAt(),
     columnDefs,
+    seriesGroups,
     rows,
   };
 }
@@ -303,18 +339,67 @@ export async function exportChronoToXlsx(record: ChronoRecordInputLike): Promise
   // ── Row 5 — blank spacer
   ws.getRow(5).height = 10;
 
-  // ── Row 6 — Headers
-  const HEADER_ROW = 6;
+  // ── Headers (1 row for single-series, 2 rows with super-header for multi-series) ─
+  const hasSuperHeader = model.seriesGroups.length > 0;
+  const SUPER_HEADER_ROW = 6;
+  const HEADER_ROW = hasSuperHeader ? 7 : 6;
+
+  // Super-header row (SÉRIE 1, SÉRIE 2, …)
+  if (hasSuperHeader) {
+    ws.getRow(SUPER_HEADER_ROW).height = 22;
+    // Merge meta cols vertically (rows 6-7) so "Nageur / Lig. / Vag. / T." spans both header rows.
+    for (let c = 1; c <= 4; c++) {
+      ws.mergeCells(SUPER_HEADER_ROW, c, HEADER_ROW, c);
+    }
+    // Super-header cells for each series group
+    for (const group of model.seriesGroups) {
+      ws.mergeCells(SUPER_HEADER_ROW, group.startCol, SUPER_HEADER_ROW, group.endCol);
+      const cell = ws.getCell(SUPER_HEADER_ROW, group.startCol);
+      cell.value = group.label;
+      cell.font = {
+        name: "Calibri",
+        size: 11,
+        bold: true,
+        color: { argb: HEADER_TEXT },
+      };
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: false,
+      };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND_CYAN_DARK } };
+      cell.border = {
+        right: { style: "medium", color: { argb: GROUP_BORDER } },
+      };
+    }
+  }
+
   const headerRow = ws.getRow(HEADER_ROW);
-  headerRow.height = 26;
+  headerRow.height = hasSuperHeader ? 24 : 26;
   model.columnDefs.forEach((def, i) => {
-    const cell = headerRow.getCell(i + 1);
+    const colIdx = i + 1;
+    // Meta cols are merged vertically — only set style on top (row 6) when super-header present.
+    if (hasSuperHeader && def.kind === "meta") {
+      const metaCell = ws.getCell(SUPER_HEADER_ROW, colIdx);
+      metaCell.value = def.label;
+      metaCell.font = { name: "Calibri", size: 10, bold: true, color: { argb: HEADER_TEXT } };
+      metaCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      metaCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND_CYAN_DARK } };
+      metaCell.border = {
+        right: colIdx === 4 ? { style: "medium", color: { argb: GROUP_BORDER } } : undefined,
+      };
+      return;
+    }
+    const cell = headerRow.getCell(colIdx);
     cell.value = def.label;
     cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: HEADER_TEXT } };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND_CYAN } };
+    // Bottom border on header row, right border at series group boundaries.
+    const isGroupEnd = model.seriesGroups.some((g) => g.endCol === colIdx);
     cell.border = {
       bottom: { style: "medium", color: { argb: BRAND_CYAN } },
+      right: isGroupEnd ? { style: "medium", color: { argb: GROUP_BORDER } } : undefined,
     };
   });
 
@@ -387,7 +472,6 @@ export async function exportChronoToXlsx(record: ChronoRecordInputLike): Promise
     // Row fills (manual > alt > total-column emphasis)
     for (let col = 1; col <= nCols; col++) {
       const cell = xlRow.getCell(col);
-      // Existing fill from "best" takes highest priority — apply last
       const def = model.columnDefs[col - 1];
       if (col > 4 && def.kind === "total") {
         const dataIdx = col - 5;
@@ -402,8 +486,12 @@ export async function exportChronoToXlsx(record: ChronoRecordInputLike): Promise
       } else if (isAlt) {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW_FILL } };
       }
+      // Meta/series group divider column
+      const isMetaEnd = col === 4 && hasSuperHeader;
+      const isGroupEnd = model.seriesGroups.some((g) => g.endCol === col);
       cell.border = {
         bottom: { style: "thin", color: { argb: BORDER_COLOR } },
+        right: isMetaEnd || isGroupEnd ? { style: "thin", color: { argb: GROUP_BORDER } } : undefined,
       };
     }
 
@@ -431,8 +519,9 @@ export async function exportChronoToXlsx(record: ChronoRecordInputLike): Promise
   // ── Freeze header
   ws.views = [{ state: "frozen", ySplit: HEADER_ROW, xSplit: 1 }];
 
-  // ── Print titles (repeat header row on each printed page)
-  ws.pageSetup.printTitlesRow = `${HEADER_ROW}:${HEADER_ROW}`;
+  // ── Print titles (repeat header rows on each printed page)
+  const firstHeaderRow = hasSuperHeader ? SUPER_HEADER_ROW : HEADER_ROW;
+  ws.pageSetup.printTitlesRow = `${firstHeaderRow}:${HEADER_ROW}`;
 
   // ── Footer — generated-at caption
   const footerRow = rowIdx + 1;
