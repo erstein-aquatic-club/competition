@@ -416,6 +416,33 @@ CREATE POLICY set_logs_write ON public.strength_set_logs
   );
 
 -- =============================================================================
+-- coach_manual_swimmers (§126) — nageurs sans compte pour chrono coach
+-- Keep in sync with migration 00114_coach_manual_swimmers.sql
+-- Note: no FK to auth.users here (no auth schema in test env) — coach_id is plain UUID
+-- =============================================================================
+
+CREATE TABLE public.coach_manual_swimmers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id uuid NOT NULL,
+  display_name text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.coach_manual_swimmers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "coach_manual_swimmers_select_own"
+  ON public.coach_manual_swimmers FOR SELECT
+  USING (coach_id = (SELECT auth.uid()));
+
+CREATE POLICY "coach_manual_swimmers_insert_own"
+  ON public.coach_manual_swimmers FOR INSERT
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+
+CREATE POLICY "coach_manual_swimmers_delete_own"
+  ON public.coach_manual_swimmers FOR DELETE
+  USING (coach_id = (SELECT auth.uid()));
+
+-- =============================================================================
 -- competition_checklists + competition_checklist_checks (§87)
 -- Parent-child: checks → checklists → competitions
 -- insert/update on checks: athlete-only (coach excluded from mutation)
