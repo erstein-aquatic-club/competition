@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
-import { Play, Plus, Minus, X, Search, Users, Trash2, UserRound, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle } from "lucide-react";
+import { Play, Plus, Minus, X, Search, Users, Trash2, UserRound, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS, buildRegisteredSwimmer, buildManualSwimmer } from "../../lib/chrono-types";
 import type { ChronoState } from "../../lib/chrono-types";
@@ -104,14 +105,6 @@ export default function ChronoSetup({
     setAddLane(null);
     setSearch("");
     setActiveTab("club");
-  };
-
-  const cycleWave = (key: string, currentWave: number) => {
-    dispatch({
-      type: "SET_WAVE",
-      key,
-      wave: (currentWave % maxWaves) + 1,
-    });
   };
 
   return (
@@ -323,52 +316,17 @@ export default function ChronoSetup({
                   Ligne {lane}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {swimmers.map((s) => {
-                    const c = WAVE_COLORS[s.wave - 1];
-                    const isManual = s.kind === "manual";
-                    return (
-                      <div
-                        key={s.key}
-                        className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm ${
-                          isManual
-                            ? "border border-dashed border-border/80 bg-background/40"
-                            : "border border-border bg-muted"
-                        }`}
-                        title={isManual ? "Nageur manuel (sans compte)" : undefined}
-                      >
-                        {isManual && (
-                          <UserRound className="h-3 w-3 shrink-0 text-muted-foreground/70" aria-hidden />
-                        )}
-                        <span className="max-w-[7rem] truncate">
-                          {s.displayName}
-                        </span>
-                        {/* Wave chip — tap to cycle */}
-                        <button
-                          type="button"
-                          onClick={() => cycleWave(s.key, s.wave)}
-                          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${c.dot}`}
-                          />
-                          {c.label}
-                        </button>
-                        {/* Remove button */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            dispatch({
-                              type: "REMOVE_SWIMMER",
-                              key: s.key,
-                            })
-                          }
-                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                  {swimmers.map((s) => (
+                    <SwimmerChip
+                      key={s.key}
+                      swimmer={s}
+                      laneCount={state.laneCount}
+                      maxSwimmersPerLane={maxSwimmersPerLane}
+                      allSwimmers={state.swimmers}
+                      maxWaves={maxWaves}
+                      dispatch={dispatch}
+                    />
+                  ))}
 
                   {/* Add swimmer button — hidden when lane is full on mobile */}
                   {swimmers.length < maxSwimmersPerLane && (
@@ -762,5 +720,158 @@ function NewManualTabBody({
         </div>
       )}
     </div>
+  );
+}
+
+// ── SwimmerChip — tap name to open move/wave/remove menu ────────────
+
+function SwimmerChip({
+  swimmer,
+  laneCount,
+  maxSwimmersPerLane,
+  allSwimmers,
+  maxWaves,
+  dispatch,
+}: {
+  swimmer: import("../../lib/chrono-types").ChronoSwimmer;
+  laneCount: number;
+  maxSwimmersPerLane: number;
+  allSwimmers: import("../../lib/chrono-types").ChronoSwimmer[];
+  maxWaves: number;
+  dispatch: React.Dispatch<ChronoAction>;
+}) {
+  const [open, setOpen] = useState(false);
+  const c = WAVE_COLORS[swimmer.wave - 1];
+  const isManual = swimmer.kind === "manual";
+
+  const laneFillCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const s of allSwimmers) {
+      counts.set(s.lane, (counts.get(s.lane) ?? 0) + 1);
+    }
+    return counts;
+  }, [allSwimmers]);
+
+  const handleMove = (lane: number) => {
+    if (lane === swimmer.lane) return;
+    dispatch({ type: "MOVE_SWIMMER", key: swimmer.key, lane });
+    setOpen(false);
+  };
+
+  const handleCycleWave = () => {
+    dispatch({
+      type: "SET_WAVE",
+      key: swimmer.key,
+      wave: (swimmer.wave % maxWaves) + 1,
+    });
+  };
+
+  const handleRemove = () => {
+    dispatch({ type: "REMOVE_SWIMMER", key: swimmer.key });
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <div
+        className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm ${
+          isManual
+            ? "border border-dashed border-border/80 bg-background/40"
+            : "border border-border bg-muted"
+        }`}
+      >
+        {isManual && (
+          <UserRound className="h-3 w-3 shrink-0 text-muted-foreground/70" aria-hidden />
+        )}
+
+        {/* Name = popover trigger */}
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="max-w-[8rem] truncate text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            title="Déplacer, changer de vague, supprimer"
+          >
+            {swimmer.displayName}
+          </button>
+        </PopoverTrigger>
+
+        {/* Wave chip — tap to cycle (unchanged for muscle memory) */}
+        <button
+          type="button"
+          onClick={handleCycleWave}
+          aria-label={`Vague ${c.label} — changer`}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+          {c.label}
+        </button>
+      </div>
+
+      <PopoverContent align="start" side="top" className="w-auto min-w-[14rem] p-3">
+        <div className="flex flex-col gap-3">
+          {/* Move to lane */}
+          <div className="space-y-1.5">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <ArrowLeftRight className="h-3 w-3" />
+              Déplacer vers
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from({ length: laneCount }, (_, i) => i + 1).map((lane) => {
+                const isCurrent = lane === swimmer.lane;
+                const fillOther = (laneFillCounts.get(lane) ?? 0);
+                const targetFull = !isCurrent && fillOther >= maxSwimmersPerLane;
+                return (
+                  <button
+                    key={lane}
+                    type="button"
+                    disabled={isCurrent || targetFull}
+                    onClick={() => handleMove(lane)}
+                    className={`h-9 min-w-[2.5rem] rounded-md border px-2 text-sm font-semibold tabular-nums transition-colors ${
+                      isCurrent
+                        ? "border-primary/40 bg-primary/10 text-primary cursor-default"
+                        : targetFull
+                        ? "border-border/40 bg-muted/40 text-muted-foreground/40 cursor-not-allowed"
+                        : "border-border bg-background hover:bg-muted active:bg-muted/70 text-foreground"
+                    }`}
+                    title={targetFull ? `Ligne ${lane} pleine` : undefined}
+                  >
+                    {lane}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Wave shortcut */}
+          <button
+            type="button"
+            onClick={() => {
+              handleCycleWave();
+              // Keep popover open so the coach can cycle multiple times without reopening.
+            }}
+            className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Waves className="h-3.5 w-3.5 text-muted-foreground" />
+              Vague suivante
+            </span>
+            <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+              {c.label}
+            </span>
+          </button>
+
+          {/* Remove */}
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Retirer de la séance
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
