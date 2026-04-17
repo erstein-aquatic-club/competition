@@ -43,7 +43,7 @@ function WaveBar({
 }) {
 
   return (
-    <div className="grid grid-cols-1 gap-1.5 px-4 py-3 md:grid-cols-2 xl:grid-cols-3 items-stretch">
+    <div className="flex flex-wrap gap-1.5 px-3 py-2 items-stretch">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
@@ -54,7 +54,7 @@ function WaveBar({
           // ── Case 1: never launched yet ──
           if (!launched) {
             return (
-              <div key={w.wave} className="flex flex-col justify-end h-full">
+              <div key={w.wave} className="flex flex-col justify-end h-full flex-[1_1_130px] min-w-[130px] max-w-[220px]">
                 <button
                   aria-label={`Lancer la vague ${wc.label}`}
                   onClick={() =>
@@ -64,13 +64,13 @@ function WaveBar({
                       timestamp: getTimestamp(),
                     })
                   }
-                  className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
+                  className={`flex flex-col items-center justify-center rounded-lg ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
                 >
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
                     {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
                   </span>
-                  <span className="flex items-center gap-1.5 text-lg font-black text-white">
-                    <Play className="h-4 w-4 fill-current" /> GO
+                  <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
+                    <Play className="h-3 w-3 fill-current" /> GO
                   </span>
                 </button>
               </div>
@@ -89,7 +89,7 @@ function WaveBar({
             const recoveryElapsed = now - (w.lastFinishedAt as number);
 
             return (
-              <div key={w.wave} className="flex flex-col gap-0 h-full justify-end">
+              <div key={w.wave} className="flex flex-col gap-0 h-full justify-end flex-[1_1_130px] min-w-[130px] max-w-[220px]">
                 {/* Departure countdown — keeps ticking between reps */}
                 {intervalMs > 0 ? (
                   <div
@@ -99,7 +99,7 @@ function WaveBar({
                         ? `Récupération dépassée de ${formatTime(-remainingMs)}`
                         : `Récupération restante ${formatTime(remainingMs)}`
                     }
-                    className={`flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black transition-colors ${
+                    className={`flex items-center justify-center gap-1 rounded-t-lg px-2 py-1 font-mono tabular-nums font-black transition-colors ${
                       overdue
                         ? "bg-destructive text-destructive-foreground"
                         : urgent
@@ -107,28 +107,23 @@ function WaveBar({
                           : "bg-muted text-foreground"
                     }`}
                   >
-                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
                       Récup
                     </span>
-                    <span className={`text-xl leading-none ${urgent || overdue ? "text-2xl" : ""}`}>
+                    <span className={`text-sm leading-none ${urgent || overdue ? "text-base" : ""}`}>
                       {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
                     </span>
-                    {overdue && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
-                        DÉPASSÉE
-                      </span>
-                    )}
                   </div>
                 ) : (
                   <div
                     role="timer"
                     aria-label={`Récupération en cours ${formatTime(recoveryElapsed)}`}
-                    className="flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black bg-muted text-foreground"
+                    className="flex items-center justify-center gap-1 rounded-t-lg px-2 py-1 font-mono tabular-nums font-black bg-muted text-foreground"
                   >
-                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
                       Récup
                     </span>
-                    <span className="text-xl leading-none">
+                    <span className="text-sm leading-none">
                       {formatTime(recoveryElapsed)}
                     </span>
                   </div>
@@ -142,13 +137,13 @@ function WaveBar({
                       timestamp: getTimestamp(),
                     })
                   }
-                  className={`flex flex-col items-center justify-center rounded-b-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
+                  className={`flex flex-col items-center justify-center rounded-b-lg ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
                 >
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
                     {wc.label} S{w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
                   </span>
-                  <span className="flex items-center gap-1.5 text-lg font-black text-white">
-                    <Play className="h-4 w-4 fill-current" /> GO
+                  <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
+                    <Play className="h-3 w-3 fill-current" /> GO
                   </span>
                 </button>
               </div>
@@ -157,7 +152,7 @@ function WaveBar({
 
           // ── Case 3: actively racing ──
           return (
-            <div key={w.wave} className="flex flex-col gap-0 h-full justify-end">
+            <div key={w.wave} className="flex flex-col gap-0 h-full justify-end flex-[1_1_130px] min-w-[130px] max-w-[220px]">
               {/* Recovery countdown — above the card */}
               {intervalMs > 0 && (
                 <div
@@ -167,7 +162,7 @@ function WaveBar({
                       ? `Récupération dépassée de ${formatTime(-remainingMs)}`
                       : `Récupération restante ${formatTime(remainingMs)}`
                   }
-                  className={`flex items-center justify-center gap-1.5 rounded-t-xl px-3 py-1.5 font-mono tabular-nums font-black transition-colors ${
+                  className={`flex items-center justify-center gap-1 rounded-t-lg px-2 py-0.5 font-mono tabular-nums font-black transition-colors ${
                     overdue
                       ? "bg-destructive text-destructive-foreground"
                       : urgent
@@ -175,31 +170,23 @@ function WaveBar({
                         : "bg-muted text-foreground"
                   }`}
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
                     Récup
                   </span>
-                  <span className={`text-xl leading-none ${urgent || overdue ? "text-2xl" : ""}`}>
+                  <span className="text-sm leading-none">
                     {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
                   </span>
-                  {overdue && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      DÉPASSÉE
-                    </span>
-                  )}
                 </div>
               )}
 
-              {/* Wave card */}
+              {/* Wave card — compact */}
               <div
-                className={`flex items-center gap-3 ${intervalMs > 0 ? "rounded-b-xl" : "rounded-xl"} border-2 ${wc.border} bg-card overflow-hidden px-4 py-2`}
+                className={`flex items-center gap-2 ${intervalMs > 0 ? "rounded-b-lg" : "rounded-lg"} border ${wc.border} bg-card overflow-hidden px-2 py-1.5`}
               >
-                {/* Left: wave info */}
-                <div className="flex flex-col items-center gap-0.5 shrink-0">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
+                {/* Left: wave chip + series */}
+                <div className="flex flex-col items-start gap-0.5 shrink-0">
+                  <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white leading-none ${wc.dot}`}>
                     {wc.label}
-                  </span>
-                  <span className="text-[10px] font-medium text-muted-foreground">
-                    Série {w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
                   </span>
                   <button
                     type="button"
@@ -208,18 +195,17 @@ function WaveBar({
                       e.stopPropagation();
                       dispatch({ type: "NEXT_REP", wave: w.wave });
                     }}
-                    className="mt-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
+                    className="rounded px-1 py-0.5 text-[8px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation leading-none"
+                    title="Série suivante"
                   >
-                    Série suiv.
+                    S{w.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""} ↻
                   </button>
                 </div>
 
                 {/* Right: elapsed chrono */}
-                <div className="flex flex-col items-end ml-auto">
-                  <span className={`font-mono tabular-nums font-bold tracking-tight ${intervalMs > 0 ? "text-base text-muted-foreground" : "text-xl text-foreground"}`}>
-                    {formatTime(elapsed)}
-                  </span>
-                </div>
+                <span className={`font-mono tabular-nums font-bold tracking-tight ml-auto ${intervalMs > 0 ? "text-sm text-muted-foreground" : "text-base text-foreground"}`}>
+                  {formatTime(elapsed)}
+                </span>
               </div>
             </div>
           );
@@ -314,13 +300,9 @@ function SwimmerCard({
     ? Math.min(100, (recordedSplits / expectedSplits) * 100)
     : 0;
 
-  // Instant pace : last lap (ms/100m)
+  // Instant pace : last lap (ms/100m) — shown inline in compact metrics row.
   const instantPacePer100m = lastSplit && hasSplitDist && lastSplit.lapMs > 0
     ? (lastSplit.lapMs / splitDistanceM) * 100
-    : 0;
-  // Average pace : overall cumul / distance (ms/100m)
-  const avgPacePer100m = lastSplit && hasSplitDist && currentDistM > 0
-    ? (lastSplit.cumulativeMs / currentDistM) * 100
     : 0;
 
   // Stop emphasis : when next tap would reach/exceed the total distance.
@@ -333,11 +315,11 @@ function SwimmerCard({
       tabIndex={active ? 0 : -1}
       onClick={handleTap}
       onKeyDown={(e) => { if (active && (e.key === " " || e.key === "Enter")) { e.preventDefault(); handleTap(); } }}
-      className={`relative rounded-xl border-l-4 ${wc.border} overflow-hidden touch-manipulation transition-all ${
+      className={`relative rounded-lg border-l-[3px] ${wc.border} overflow-hidden touch-manipulation transition-all ${
         stopped
           ? "bg-muted opacity-60 border border-border"
           : shouldPromptStop
-            ? "bg-card border-2 border-destructive shadow-lg shadow-destructive/20 ring-2 ring-destructive/15"
+            ? "bg-card border border-destructive ring-1 ring-destructive/40 shadow-destructive/10 shadow"
             : active
               ? "bg-card border border-border shadow-sm active:scale-[0.98] cursor-pointer"
               : "bg-muted/50 opacity-25 pointer-events-none border border-border"
@@ -349,186 +331,123 @@ function SwimmerCard({
         className="pointer-events-none absolute inset-0 bg-primary opacity-0 transition-opacity duration-100"
       />
 
-      {/* ── Header : wave + name + corner stop ── */}
-      <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+      {/* ── Row 1 : wave chip + name + stop ── */}
+      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-0.5">
         <span
-          className={`inline-flex h-6 min-w-[2rem] items-center justify-center rounded-full px-2 text-[11px] font-black text-white ${wc.dot}`}
+          className={`inline-flex h-4 min-w-[1.5rem] items-center justify-center rounded px-1 text-[9px] font-black text-white leading-none ${wc.dot}`}
           aria-label={`Vague ${wc.label}`}
         >
           {wc.label}
         </span>
-        <span className={`text-base font-bold leading-snug min-w-0 truncate ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
+        <span className={`text-[13px] font-semibold leading-tight min-w-0 truncate ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
           {displayName}
         </span>
-        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+        <div className="ml-auto flex items-center gap-1 shrink-0">
           {stopped && (
-            <span className="rounded bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
+            <span className="rounded bg-destructive px-1.5 py-0.5 text-[9px] font-bold uppercase text-destructive-foreground leading-none">
               Stop
             </span>
           )}
-          {active && !shouldPromptStop && (
+          {active && (
             <button
               type="button"
               onClick={handleStop}
               aria-label={`Stopper ${displayName}`}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive/30 hover:bg-destructive/90 hover:ring-destructive/50 active:scale-90 transition-all"
+              className={`flex items-center justify-center rounded-full transition-all ${
+                shouldPromptStop
+                  ? "h-9 w-9 bg-destructive text-destructive-foreground ring-2 ring-destructive/60 animate-pulse shadow-md"
+                  : "h-7 w-7 bg-destructive/15 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              }`}
             >
-              <CircleStop className="h-5 w-5" strokeWidth={2.5} />
+              <CircleStop className={shouldPromptStop ? "h-5 w-5" : "h-3.5 w-3.5"} strokeWidth={shouldPromptStop ? 3 : 2.5} />
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Hero chrono ── */}
-      <div className="px-3 pt-1 pb-2">
+      {/* ── Row 2 : chrono (2xl, compact) ── */}
+      <div className="px-2 pt-0 pb-0.5">
         <div
-          className={`font-mono tabular-nums font-black leading-[0.95] tracking-tight text-[clamp(2.25rem,6vw,3.5rem)] ${
-            stopped ? "text-muted-foreground" : "text-foreground"
+          className={`font-mono tabular-nums font-black leading-none tracking-tight text-2xl ${
+            stopped ? "text-muted-foreground" : shouldPromptStop ? "text-destructive" : "text-foreground"
           }`}
         >
           {launched ? formatTime(elapsed) : "--:--.--"}
         </div>
       </div>
 
-      {/* ── Progress bar + split counter ── */}
+      {/* ── Row 3 : progress bar + counter ── */}
       {launched && (
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-[width] duration-300 ${
-                  finishedDistance
-                    ? "bg-destructive"
-                    : shouldPromptStop
-                      ? "bg-destructive/80"
-                      : wc.dot
-                }`}
-                style={{
-                  width: expectedSplits > 0
-                    ? `${progressPct}%`
-                    : recordedSplits > 0
-                      ? "100%"
-                      : "0%",
-                }}
-                aria-hidden
-              />
-            </div>
-            <span
-              className={`text-[11px] font-bold tabular-nums shrink-0 ${
-                shouldPromptStop ? "text-destructive" : "text-muted-foreground"
+        <div className="flex items-center gap-2 px-2 pt-1 pb-0.5">
+          <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-[width] duration-300 ${
+                finishedDistance
+                  ? "bg-destructive"
+                  : shouldPromptStop
+                    ? "bg-destructive/80"
+                    : wc.dot
               }`}
-              aria-label={
-                expectedSplits > 0
-                  ? `${recordedSplits} splits sur ${expectedSplits}`
-                  : `${recordedSplits} splits`
-              }
-            >
-              {expectedSplits > 0 ? `${recordedSplits}/${expectedSplits}` : `#${recordedSplits}`}
-            </span>
+              style={{
+                width: expectedSplits > 0
+                  ? `${progressPct}%`
+                  : recordedSplits > 0
+                    ? "100%"
+                    : "0%",
+              }}
+              aria-hidden
+            />
           </div>
+          <span
+            className={`text-[10px] font-bold tabular-nums shrink-0 leading-none ${
+              shouldPromptStop ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {expectedSplits > 0 ? `${recordedSplits}/${expectedSplits}` : `#${recordedSplits}`}
+          </span>
         </div>
       )}
 
-      {/* ── Telemetry triplet : distance / pace / avg ── */}
+      {/* ── Row 4 : inline metrics (distance · allure · Δ) ── */}
       {launched && (
-        <div className="grid grid-cols-3 gap-1 px-3 pb-2">
-          <TelemetryCell
-            icon={<Flag className="h-3 w-3" />}
-            label="Distance"
-            value={
-              hasTotalDist
-                ? `${currentDistM}/${totalDistanceM}m`
-                : currentDistM > 0
-                  ? `${currentDistM}m`
-                  : "—"
-            }
-            highlight={finishedDistance}
-          />
-          <TelemetryCell
-            icon={<Gauge className="h-3 w-3" />}
-            label="Allure"
-            value={instantPacePer100m > 0 ? `${formatPace(instantPacePer100m)}` : "—"}
-            suffix={instantPacePer100m > 0 ? "/100m" : undefined}
-          />
-          <TelemetryCell
-            label="Moyenne"
-            value={avgPacePer100m > 0 ? `${formatPace(avgPacePer100m)}` : "—"}
-            suffix={avgPacePer100m > 0 ? "/100m" : undefined}
-          />
+        <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-0.5 text-[10px] font-mono tabular-nums text-muted-foreground leading-tight">
+          {hasSplitDist && (
+            <>
+              <Flag className={`h-2.5 w-2.5 shrink-0 ${finishedDistance ? "text-destructive" : ""}`} />
+              <span className={`font-semibold ${finishedDistance ? "text-destructive" : "text-foreground/80"}`}>
+                {hasTotalDist
+                  ? `${currentDistM}/${totalDistanceM}m`
+                  : `${currentDistM}m`}
+              </span>
+              <span className="text-muted-foreground/50">·</span>
+            </>
+          )}
+          {instantPacePer100m > 0 ? (
+            <>
+              <Gauge className="h-2.5 w-2.5 shrink-0" />
+              <span className="font-semibold text-foreground/80">{formatPace(instantPacePer100m)}</span>
+              <span className="text-muted-foreground/50">·</span>
+            </>
+          ) : active && hasSplitDist ? (
+            <span className="italic">Tap pour split</span>
+          ) : null}
+          {lastSplit && (
+            <span className="text-muted-foreground">
+              Δ {formatLap(lastSplit.lapMs)}
+            </span>
+          )}
+          {!lastSplit && !active && !launched && (
+            <span className="italic text-muted-foreground/50">En attente…</span>
+          )}
         </div>
       )}
 
-      {/* ── Last split detail ── */}
-      {launched && lastSplit ? (
-        <div className="flex items-baseline gap-2 px-3 pb-2 text-xs">
-          <span className={`font-bold text-white rounded px-1.5 py-0.5 ${wc.dot}`}>
-            {hasSplitDist ? `${recordedSplits * splitDistanceM} m` : `#${recordedSplits}`}
-          </span>
-          <span className="font-mono tabular-nums font-semibold text-foreground">
-            {formatTime(lastSplit.cumulativeMs)}
-          </span>
-          <span className="font-mono tabular-nums text-muted-foreground">
-            (Δ {formatLap(lastSplit.lapMs)})
-          </span>
-        </div>
-      ) : active ? (
-        <div className="px-3 pb-2 text-xs text-muted-foreground">Tap pour split · double-tap pour annuler</div>
-      ) : !launched ? (
-        <div className="px-3 pb-2 text-xs text-muted-foreground/50">En attente du GO…</div>
-      ) : null}
-
-      {/* ── STOP zone — full-width dominant when next tap finishes ── */}
+      {/* ── STOP emphasis strip when imminent (compact, not full pleine-card) ── */}
       {shouldPromptStop && (
-        <button
-          type="button"
-          onClick={handleStop}
-          aria-label={`Stopper ${displayName} — arrivée au prochain split`}
-          className="flex w-full items-center justify-center gap-2 border-t-2 border-destructive bg-destructive py-3 text-destructive-foreground shadow-[0_-4px_12px_rgba(239,68,68,0.2)] animate-pulse font-bold text-sm uppercase tracking-wide active:scale-[0.98] transition-transform hover:bg-destructive/90"
-        >
-          <CircleStop className="h-5 w-5" strokeWidth={3} />
-          <span>
-            {finishedDistance
-              ? `Stopper — Distance atteinte`
-              : "Stopper — Arrivée au prochain split"}
-          </span>
-          <CircleStop className="h-5 w-5" strokeWidth={3} />
-        </button>
+        <div className="border-t border-destructive/40 bg-destructive/8 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-destructive text-center leading-none">
+          {finishedDistance ? "Distance atteinte — stopper" : "Prochain split = arrivée"}
+        </div>
       )}
-    </div>
-  );
-}
-
-// ── Telemetry cell — compact metric with label/value/icon ──────────
-
-function TelemetryCell({
-  icon,
-  label,
-  value,
-  suffix,
-  highlight,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  value: string;
-  suffix?: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className={`flex flex-col items-start rounded-md px-2 py-1.5 ${highlight ? "bg-destructive/10" : "bg-muted/60"}`}>
-      <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="mt-1 flex items-baseline gap-0.5">
-        <span className={`font-mono tabular-nums text-sm font-bold leading-none ${highlight ? "text-destructive" : "text-foreground"}`}>
-          {value}
-        </span>
-        {suffix && (
-          <span className="text-[9px] text-muted-foreground leading-none">
-            {suffix}
-          </span>
-        )}
-      </div>
     </div>
   );
 }
@@ -560,18 +479,20 @@ function LaneSection({
   if (laneSwimmers.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3 px-4">
-        <div className="h-px flex-1 bg-border" />
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+    <div>
+      <div className="flex items-baseline gap-2 px-3 pb-1">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none">
           Ligne {lane}
         </h3>
-        <div className="h-px flex-1 bg-border" />
+        <span className="text-[10px] text-muted-foreground/60 leading-none">
+          {laneSwimmers.length} nageur{laneSwimmers.length > 1 ? "s" : ""}
+        </span>
+        <div className="h-px flex-1 bg-border ml-1" />
       </div>
-      {/* Auto-fit : cards stretch when few swimmers, condense when many. Min-300px target for legibility. */}
+      {/* Auto-fit : cards stretch when few swimmers, condense when many. Min 220px target for overview. */}
       <div
-        className="grid gap-3 px-4"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}
+        className="grid gap-1.5 px-3"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
       >
         {laneSwimmers.map((s) => {
           const waveState = waves.find((w) => w.wave === s.wave);
@@ -630,15 +551,15 @@ export default function ChronoRace({
               seriesCount={state.seriesCount}
             />
           </div>
-          <div className="pr-4 shrink-0">
+          <div className="pr-3 shrink-0">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   variant="destructive"
-                  size="lg"
-                  className="h-12 gap-2 whitespace-nowrap font-bold px-5 shadow-md ring-2 ring-destructive/30 hover:ring-destructive/50"
+                  size="sm"
+                  className="h-10 gap-1.5 whitespace-nowrap font-bold px-3 shadow-sm"
                 >
-                  <Square className="h-5 w-5 fill-current" />
+                  <Square className="h-4 w-4 fill-current" />
                   Terminer
                 </Button>
               </AlertDialogTrigger>
@@ -668,16 +589,16 @@ export default function ChronoRace({
         </div>
       </div>
 
-      {/* Precision badge */}
-      <div className="flex items-center justify-center gap-1.5 py-1.5 bg-amber-500/5 border-b border-amber-500/20">
-        <Info className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
-        <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300" title={CHRONO_PRECISION.tooltip}>
+      {/* Precision badge — compact single line */}
+      <div className="flex items-center justify-center gap-1 py-0.5 bg-amber-500/5 border-b border-amber-500/20">
+        <Info className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <span className="text-[9px] font-medium text-amber-700 dark:text-amber-300" title={CHRONO_PRECISION.tooltip}>
           {CHRONO_PRECISION.label} · {CHRONO_PRECISION.precision}
         </span>
       </div>
 
-      {/* Lane grid — full width */}
-      <div className="flex-1 space-y-4 py-4">
+      {/* Lane grid — packed vertically for overview */}
+      <div className="flex-1 space-y-2 py-2">
         {lanes.map((lane) => (
           <LaneSection
             key={lane}
