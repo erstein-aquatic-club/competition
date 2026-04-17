@@ -43,7 +43,7 @@ function WaveBar({
 }) {
 
   return (
-    <div className="grid grid-cols-1 gap-1.5 px-4 py-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-1.5 px-4 py-3 md:grid-cols-2 xl:grid-cols-3 items-stretch">
       {[...waves]
         .sort((a, b) => a.wave - b.wave)
         .map((w) => {
@@ -54,25 +54,26 @@ function WaveBar({
           // ── Case 1: never launched yet ──
           if (!launched) {
             return (
-              <button
-                key={w.wave}
-                aria-label={`Lancer la vague ${wc.label}`}
-                onClick={() =>
-                  dispatch({
-                    type: "LAUNCH_WAVE",
-                    wave: w.wave,
-                    timestamp: getTimestamp(),
-                  })
-                }
-                className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
-              >
-                <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-                  {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
-                </span>
-                <span className="flex items-center gap-1.5 text-lg font-black text-white">
-                  <Play className="h-4 w-4 fill-current" /> GO
-                </span>
-              </button>
+              <div key={w.wave} className="flex flex-col justify-end h-full">
+                <button
+                  aria-label={`Lancer la vague ${wc.label}`}
+                  onClick={() =>
+                    dispatch({
+                      type: "LAUNCH_WAVE",
+                      wave: w.wave,
+                      timestamp: getTimestamp(),
+                    })
+                  }
+                  className={`flex flex-col items-center justify-center rounded-xl ${wc.dot} min-w-[110px] h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-md`}
+                >
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+                    {wc.label}{w.currentRep > 0 ? ` S${w.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-lg font-black text-white">
+                    <Play className="h-4 w-4 fill-current" /> GO
+                  </span>
+                </button>
+              </div>
             );
           }
 
@@ -88,7 +89,7 @@ function WaveBar({
             const recoveryElapsed = now - (w.lastFinishedAt as number);
 
             return (
-              <div key={w.wave} className="flex flex-col gap-0">
+              <div key={w.wave} className="flex flex-col gap-0 h-full justify-end">
                 {/* Departure countdown — keeps ticking between reps */}
                 {intervalMs > 0 ? (
                   <div
@@ -156,7 +157,7 @@ function WaveBar({
 
           // ── Case 3: actively racing ──
           return (
-            <div key={w.wave} className="flex flex-col gap-0">
+            <div key={w.wave} className="flex flex-col gap-0 h-full justify-end">
               {/* Recovery countdown — above the card */}
               {intervalMs > 0 && (
                 <div
@@ -330,9 +331,10 @@ function SwimmerCard({
             <button
               type="button"
               onClick={handleStop}
-              className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive/15 text-destructive hover:bg-destructive/30 active:scale-90 transition-all"
+              aria-label={`Stopper ${displayName}`}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md ring-2 ring-destructive/30 hover:bg-destructive/90 hover:ring-destructive/50 active:scale-90 transition-all"
             >
-              <CircleStop className="h-3.5 w-3.5" />
+              <CircleStop className="h-6 w-6" strokeWidth={2.5} />
             </button>
           )}
           {stopped && (
@@ -473,10 +475,10 @@ export default function ChronoRace({
               <AlertDialogTrigger asChild>
                 <Button
                   variant="destructive"
-                  size="sm"
-                  className="gap-1.5 whitespace-nowrap font-semibold"
+                  size="lg"
+                  className="h-12 gap-2 whitespace-nowrap font-bold px-5 shadow-md ring-2 ring-destructive/30 hover:ring-destructive/50"
                 >
-                  <Square className="h-4 w-4 fill-current" />
+                  <Square className="h-5 w-5 fill-current" />
                   Terminer
                 </Button>
               </AlertDialogTrigger>
