@@ -15,13 +15,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy, Trash2 } from "lucide-react";
+import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 import { STORAGE_KEYS } from "../../lib/api/client";
 import { createStandaloneSwimLog } from "../../lib/api/swim-logs";
 import type { SwimExerciseLogInput, ChronoRecordInput } from "../../lib/api/types";
 import { createChronoRecord } from "../../lib/api/chrono-records";
+import { exportChronoToXlsx } from "../../lib/chronoXlsxExport";
 
 /** Resolve public.users integer ID → auth.users UUID */
 async function resolveAuthUid(athleteId: number): Promise<string | null> {
@@ -119,7 +120,8 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
 
 export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft, onDiscard }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<string, ExportStatus>>(new Map());
-  const [exporting, setExporting] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
@@ -146,6 +148,24 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
     }
   }, [state, onSaveDraft, savingDraft]);
 
+  const handleExportXlsx = useCallback(async () => {
+    setExportingXlsx(true);
+    try {
+      const input = buildChronoRecordInput(state, "draft");
+      await exportChronoToXlsx({
+        label: input.label,
+        config: input.config,
+        swimmers: input.swimmers,
+        created_at: new Date().toISOString(),
+      });
+      toast.success("Fichier téléchargé");
+    } catch (err: any) {
+      toast.error(err?.message || "Échec de l'export");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }, [state]);
+
   const raceEntries = Array.from(state.raceData.values());
   const byLane = new Map<number, typeof raceEntries>();
   for (const entry of raceEntries) {
@@ -157,13 +177,13 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
   const sortedLanes = Array.from(byLane.keys()).sort((a, b) => a - b);
 
   const handleExportAll = useCallback(async () => {
-    setExporting(true);
+    setSending(true);
     // Skip manual swimmers — they have no auth account to push logs to
     const swimmers = raceEntries.filter((e) => e.swimmer.kind === "registered" && totalSplitCount(e.splitsByRep) > 0);
 
     if (swimmers.length === 0) {
       toast.error("Aucun split à exporter");
-      setExporting(false);
+      setSending(false);
       return;
     }
 
@@ -203,7 +223,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
     }
 
     setExportStatuses(newStatuses);
-    setExporting(false);
+    setSending(false);
 
     // Save chrono record as "sent" for history
     try {
@@ -224,15 +244,19 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Résultats</h2>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={exporting || savingDraft}>
+          <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={sending || savingDraft || exportingXlsx}>
             <Clock className="mr-1.5 h-4 w-4" />
             Brouillon
           </Button>
-          <Button variant="outline" size="sm" onClick={() => dispatch({ type: "RESET_FOR_NEW_SERIES" })} disabled={exporting}>
+          <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={sending || exportingXlsx}>
+            <Download className="mr-1.5 h-4 w-4" />
+            xlsx
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => dispatch({ type: "RESET_FOR_NEW_SERIES" })} disabled={sending}>
             <RotateCcw className="mr-1.5 h-4 w-4" />
             Nouvelle série
           </Button>
-          <Button size="sm" onClick={handleExportAll} disabled={exporting}>
+          <Button size="sm" onClick={handleExportAll} disabled={sending}>
             <Send className="mr-1.5 h-4 w-4" />
             Envoyer à tous
           </Button>
@@ -379,7 +403,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
       <div className="flex justify-center pt-2 pb-4">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5" disabled={exporting}>
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5" disabled={sending}>
               <Trash2 className="h-4 w-4" />
               Supprimer
             </Button>

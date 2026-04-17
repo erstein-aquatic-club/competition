@@ -17,8 +17,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Trash2, Timer, Pencil } from "lucide-react";
+import { Trash2, Timer, Pencil, Download } from "lucide-react";
 import { Input } from "../../components/ui/input";
+import { exportChronoToXlsx } from "../../lib/chronoXlsxExport";
 import { toast } from "sonner";
 import CoachBreadcrumb from "../../components/shared/CoachBreadcrumb";
 
@@ -129,6 +130,15 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
     toast.success("Chrono supprimé");
   };
 
+  const handleDownload = async (record: ChronoRecord) => {
+    try {
+      await exportChronoToXlsx(record);
+      toast.success("Fichier téléchargé");
+    } catch (err: any) {
+      toast.error(err?.message || "Échec de l'export");
+    }
+  };
+
   const breadcrumbSegments = useMemo(
     () => [
       { label: 'Chrono', href: '#/coach?section=chrono' },
@@ -205,6 +215,14 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
                   </span>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleDownload(r); }}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Exporter en xlsx"
+              >
+                <Download className="h-4 w-4" />
+              </button>
               {r.status === "draft" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -298,6 +316,21 @@ function SelectedRecordView({
         >
           {record.status === "draft" ? "Brouillon" : "Envoyé"}
         </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            try {
+              await exportChronoToXlsx(record);
+              toast.success("Fichier téléchargé");
+            } catch (err: any) {
+              toast.error(err?.message || "Échec de l'export");
+            }
+          }}
+        >
+          <Download className="mr-1.5 h-4 w-4" />
+          xlsx
+        </Button>
       </div>
       <ChronoSplitEditor
         record={record}
