@@ -1030,6 +1030,9 @@ export default function Dashboard() {
               deleteMutation.mutate(Number(existing.id));
               setActiveSessionId(null);
               setDetailsOpen(false);
+              setTimeout(() => {
+                setDrawerOpen(false);
+              }, 400);
             }
           }}
           onDraftStateChange={setDraftState}
