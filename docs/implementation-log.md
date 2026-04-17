@@ -8929,6 +8929,7 @@ Audit UI/UX global ayant identifié 5+ incohérences majeures entre les espaces 
 3. `feat(§126)` — module chronoXlsxExport + tests
 4. `feat(§126)` — API coach-manual-swimmers + boutons xlsx
 5. `feat(§126)` — sheet tabs Club/Manuels/Nouveau + badge M
+6. `style(§126)` — polish UI unifié (frontend-design pass 1+2+3) : titre hero éditable, chip manuel dashed + icône UserRound, tabs Mémorisés renommé + état vide inviting, form Nouveau contextualisé, loading spinners xlsx, badge "Export fichier uniquement" pour manuels
 
 ### Bundle
 
