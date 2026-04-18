@@ -29,6 +29,7 @@ import { getCompetitions } from "@/lib/api/competitions";
 import type { Competition } from "@/lib/api/types";
 import { CompetitionDayBanner } from "@/components/coach/CompetitionDayBanner";
 import { CompetitionQuickSheet } from "@/components/coach/CompetitionQuickSheet";
+import { buildCoachHash } from "./coachRouteState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1839,7 +1840,10 @@ const CoachTrainingSlotsScreen = ({
 
   const handleViewCompetitionDetail = useCallback(() => {
     setCompSheetOpen(false);
-    window.location.hash = "#/coach/competitions";
+    window.location.hash = buildCoachHash(
+      { section: "competitions" },
+      window.location.hash,
+    );
   }, []);
 
   const prevWeek = () =>

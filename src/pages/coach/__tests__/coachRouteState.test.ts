@@ -36,3 +36,12 @@ test("buildCoachHash removes comms-only params when leaving the section", () => 
 
   assert.equal(hash, "#/coach?section=swimmers");
 });
+
+test("buildCoachHash creates the competitions section hash used by coach screens", () => {
+  const hash = buildCoachHash(
+    { section: "competitions" },
+    "#/coach?section=week",
+  );
+
+  assert.equal(hash, "#/coach?section=competitions");
+});
