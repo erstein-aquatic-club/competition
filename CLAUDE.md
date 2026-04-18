@@ -44,7 +44,8 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/lib/api/audit.ts` | Logs d'audit | ~32 lignes |
 | `src/lib/api/notificationLog.ts` | Logs notifications envoyées | ~26 lignes |
 | `src/lib/api/swim-planning.ts` | Planification séances natation | ~44 lignes |
-| `src/lib/api/swim-filieres.ts` | Gestion filières natation | ~27 lignes |
+| `src/lib/api/swim-filieres.ts` | CRUD filières : patch partiel + `resetSwimFiliere` (§134) | ~65 lignes |
+| `src/pages/coach/FilieresEditor.tsx` | Overlay liste → détail plein écran (15 champs + jauges + reset + aperçu nageur live) (§134) | ~1087 lignes |
 | `src/components/swim/ExerciseLogInline.tsx` | Formulaire inline saisie technique par exercice (§58) | ~294 lignes |
 | `src/pages/SharedSwimSession.tsx` | Page publique séance partagée (token UUID) | ~130 lignes |
 | `src/lib/api/swim-logs.ts` | Notes techniques exercices natation | ~90 lignes |
@@ -176,7 +177,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/SwimSessionView.tsx` | Vue détail séance natation | ~500 lignes |
 | `src/pages/SwimNotes.tsx` | Notes techniques nage | ~306 lignes |
 | `src/pages/coach/SwimPlanningAthleteView.tsx` | Vue planning athlète (coach) | ~914 lignes |
-| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation | ~1623 lignes |
+| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation (éditeur filières extrait en composant lazy §134) | ~1462 lignes |
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach | ~264 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
@@ -353,6 +354,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 95 | Refonte "Ma semaine" coach : matrice matin/aprèm × 7 jours | Moyenne | Fait (§131) |
 | 96 | Fix ressenti sur séance groupe hors créneaux nageur (getLogForSession + fallback 42P10) | Haute | Fait (§132) |
 | 97 | Menu partage unifié WhatsApp + Clipboard (coach macOS) | Moyenne | Fait (§133) |
+| 98 | Éditeur filières plein écran : 15 champs configurables + reset + aperçu nageur live | Moyenne | Fait (§134) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

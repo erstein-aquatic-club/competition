@@ -675,7 +675,14 @@ export default function SwimPlanningAthleteView({
                 )}
               >
                 {GAUGE_METRICS.map(({ key, label, icon: Icon, scale }) => {
-                  const value = selectedFiliereData.levels[key];
+                  // Prefer coach-configured DB value, fallback to hardcoded constant.
+                  const dbKey = `level_${key}` as
+                    | "level_intensity"
+                    | "level_duration"
+                    | "level_recovery"
+                    | "level_lactate";
+                  const dbVal = selectedFiliereDb?.[dbKey];
+                  const value = dbVal !== undefined ? dbVal ?? null : selectedFiliereData.levels[key];
                   return (
                     <div key={key} className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
                       <div className="flex items-center gap-1.5 min-w-[92px]">
@@ -753,7 +760,19 @@ export default function SwimPlanningAthleteView({
                     >
                       <div className="grid grid-cols-2 gap-2 pt-2 pb-1">
                         {TECHNICAL_LABELS.map(({ key, label, unit, icon: Icon, full }) => {
-                          const val = selectedFiliereData.technicals[key];
+                          // Prefer coach-configured DB value, fallback to hardcoded constant.
+                          const dbKey: keyof SwimFiliere =
+                            key === "heartRate"
+                              ? "heart_rate"
+                              : key === "workType"
+                                ? "work_type"
+                                : (key as keyof SwimFiliere);
+                          const rawDb = selectedFiliereDb?.[dbKey];
+                          const dbVal = typeof rawDb === "string" ? rawDb : null;
+                          const val =
+                            dbVal && dbVal.length > 0
+                              ? dbVal
+                              : selectedFiliereData.technicals[key];
                           return (
                             <div
                               key={key}

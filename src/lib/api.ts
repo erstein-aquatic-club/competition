@@ -269,6 +269,7 @@ import {
 import {
   getSwimFilieres as _getSwimFilieres,
   updateSwimFiliere as _updateSwimFiliere,
+  resetSwimFiliere as _resetSwimFiliere,
 } from "./api/swim-filieres";
 
 import {
@@ -894,6 +895,7 @@ export const api = {
   // ══════════════════════════════════════════════════════════════════
   async getSwimFilieres() { return _getSwimFilieres(); },
   async updateSwimFiliere(input: Parameters<typeof _updateSwimFiliere>[0]) { return _updateSwimFiliere(input); },
+  async resetSwimFiliere(id: string) { return _resetSwimFiliere(id); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Coach Swimmer Assignments

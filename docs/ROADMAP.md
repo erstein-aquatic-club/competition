@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-18 (§133 Menu partage unifié WhatsApp + Clipboard coach macOS)*
+*Dernière mise à jour : 2026-04-18 (§134 Éditeur filières plein écran — 15 champs configurables + reset)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -80,6 +80,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 95 | Refonte "Ma semaine" coach : matrice matin/aprèm × 7 jours | Moyenne | Moyenne | Fait (§131) |
 | 96 | Fix ressenti sur séance groupe hors créneaux nageur (getLogForSession + fallback 42P10) | Haute | Haute | Fait (§132) |
 | 97 | Menu partage unifié WhatsApp + Clipboard (coach macOS) | Moyenne | Moyenne | Fait (§133) |
+| 98 | Éditeur filières plein écran : 15 champs configurables + reset + aperçu nageur live | Moyenne | Moyenne | Fait (§134) |
 
 ---
 

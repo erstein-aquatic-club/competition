@@ -9342,3 +9342,92 @@ Au second save, l'INSERT de `api.syncSession` échoue sur l'index partiel `idx_d
 | `src/hooks/useDashboardState.ts` | propagation `otherGroupSessions` | ~261 lignes |
 | `src/lib/api.ts` | fix fallback 23505 (SELECT + UPDATE, plus d'upsert 42P10) | ~914 lignes |
 
+## §134 — Éditeur filières plein écran : 15 champs configurables + reset (2026-04-18)
+
+### Contexte
+
+Avant ce patch, `FiliereEditorOverlay` (inline dans `SwimPlanningDemo.tsx`, ~163 lignes) n'éditait que 2 champs : `description` et `examples`. Tous les autres éléments visibles par les nageurs depuis la sheet filière (FC, lactate, effort, durée, distance, reps, intensité, récup, type de travail, et les 4 jauges 1-5 intensité/durée/récup/lactate) étaient codés en dur dans `src/lib/swimFilieres.ts` — donc non configurables par le coach.
+
+Objectif : rendre éditable l'ensemble des champs visibles par les nageurs, avec une UX épurée (inspiration iOS Settings / Linear / Things 3). Layout liste → détail plein écran, sauvegarde explicite, reset par filière, aperçu nageur live.
+
+### Changements
+
+**1. Data model — 13 colonnes nullable ajoutées à `swim_filieres`**
+
+Migration `00115_swim_filieres_full_edit.sql` ajoute `heart_rate`, `lactate`, `effort`, `duration`, `distance`, `reps`, `intensity`, `recovery`, `work_type` (text nullable) + `level_intensity`, `level_duration`, `level_recovery`, `level_lactate` (smallint 1-5 nullable, CHECK `BETWEEN 1 AND 5`). Backfill depuis les constantes `swimFilieres.ts` pour les 8 lignes existantes, sauf `technique` qui garde ses levels à NULL (rendu "Variable" côté nageur). RLS existantes (`swim_filieres_write` coach/admin) couvrent les nouvelles colonnes sans changement.
+
+**2. API — diff partiel + reset**
+
+- `updateSwimFiliere(input)` : n'envoie plus qu'un patch des clés présentes dans l'input (évite d'écraser des champs concurremment modifiés). Liste blanche des 15 colonnes éditables.
+- `resetSwimFiliere(id)` : nouveau. `UPDATE ... SET <15 cols> = NULL WHERE id = $1`. La vue nageur retombe sur les constantes via fallback `??`.
+
+**3. UI — `FilieresEditor.tsx` (nouveau, 1087 lignes)**
+
+Overlay slide-up plein écran contenant deux "écrans" avec transition horizontale framer-motion (`AnimatePresence mode="wait"`) :
+
+- **Écran A (liste)** : header sticky + baseline d'1 phrase + card listant les 8 filières avec dot couleur + nom + badge "Personnalisé" si un champ diffère des constantes + chevron. Touch targets 56px min, séparateurs subtils, micro-label "8 filières — Standard EAC" en haut.
+- **Écran B (détail)** : barre 3px teintée en haut (identité chromatique par filière), header sticky avec dot + nom + pastille dirty. Body structuré en sections tracked-uppercase :
+  1. **Aperçu nageur** (card, mime la sheet qu'un nageur voit quand il tape une chip — chip teintée + 4 mini-jauges progressives + extraits description/exemples, update live sur chaque frappe)
+  2. **Description** (Textarea + compteur 500 chars discret)
+  3. **Exemples d'exercices** (Textarea 5 rows, font-mono pour les puces)
+  4. **Type de travail** (Input, placeholder = valeur constante en gris)
+  5. **Spécifications techniques** (grid 2 col, 8 inputs avec micro-label + hint d'unité ; placeholder = constante par défaut)
+  6. **Jauges nageur** (4 rangées 1-5 : 5 boutons segments cliquables remplis de la couleur filière + switch "Variable" qui force NULL et désature)
+  7. **Zone dangereuse** : lien "Restaurer les valeurs par défaut" avec confirm AlertDialog nommant la filière
+- Footer sticky : bouton pleine largeur "Enregistrer" h-12, disabled si `!isDirty`, état loading avec Loader2.
+- Dirty guard sur back/close via `AlertDialog` "Abandonner les modifications ?".
+- Tout respecte `prefers-reduced-motion` (`useReducedMotion` framer-motion + classes `motion-reduce:`).
+- Lazy-loaded via `lazyWithRetry` (cohérent §119/§120) → chunk séparé 21 KB / ~6 KB gzip.
+
+**4. Vue nageur branchée sur DB**
+
+`SwimPlanningAthleteView.tsx` : les `GAUGE_METRICS` et `TECHNICAL_LABELS` lisent désormais la DB en priorité, fallback sur `FILIERE_MAP` si le champ est `NULL`. Les constantes deviennent les "défauts physiologiques" restaurés par un reset coach.
+
+**5. Nettoyage**
+
+Suppression du `FiliereEditorOverlay` inline (163 lignes) dans `SwimPlanningDemo.tsx` — remplacé par un import `React.lazy` + `<Suspense>` dans la section "Filières Editor Overlay".
+
+### Décisions
+
+- **Pattern liste → détail plein écran** plutôt qu'accordéon inline : 15 champs par filière rendent l'inline illisible ; le full-screen isole visuellement l'édition et respire sur mobile.
+- **Save explicite, pas d'auto-save** : les coaches ne modifient pas ces valeurs quotidiennement ; un bouton explicite donne confiance sur la persistance et évite les sauvegardes accidentelles.
+- **Backfill DB** plutôt que de laisser les colonnes NULL et lire les constantes côté client : les coaches voient d'entrée les valeurs prêtes à éditer (pas d'écrans vides). Le reset remet à NULL pour retomber sur les constantes dynamiquement.
+- **Aperçu nageur live** directement dans l'écran détail plutôt qu'un bouton "Prévisualiser" : feedback visuel immédiat, pas de context switch, et rend concrète la cascade des 4 jauges → intensité/durée/récup/lactate.
+- **Diff partiel côté client** (`buildDiff`) : n'envoie au serveur que les colonnes qui ont changé — évite d'écraser silencieusement des modifs concurrentes d'un autre coach, et garde les logs d'audit plus lisibles si un jour on ajoute un historique.
+- **`isPersonalized` comparé aux constantes** (pas juste "colonnes NULL") : la DB étant backfillée, une logique "colonne non-null ⇒ personnalisé" marquerait les 8 filières comme personnalisées d'entrée. On compare donc à `FILIERE_MAP` pour détecter une vraie divergence.
+
+### Tests
+
+- `npx tsc --noEmit` : clean.
+- `npm run build` : clean, chunk `FilieresEditor-*.js` 21 KB généré.
+- `npm test` : 211 tests passent, 0 régression.
+- Migration appliquée via MCP Supabase (`apply_migration`) + vérifiée par `execute_sql` : les 8 lignes ont bien les colonnes remplies, `technique` garde ses `level_*` à NULL.
+- RLS non modifiée (pas de changement de policy, juste ajout de colonnes couvertes par les policies existantes) → `npm run test:rls` non requis (règles CLAUDE.md).
+- Tests manuels à faire côté coach : ouverture overlay, navigation list↔detail, édition texte + jauges + switch Variable, save, reset avec confirm, dirty guard sur back.
+
+### Limites / dette
+
+- Pas de test unitaire sur `buildDiff` / `isPersonalized` / `isDraftDirty` : fonctions pures triviales, mais couvertes implicitement par l'intégration UI seulement.
+- Pas de swipe-back gestuel (bonus mentionné dans le brief mais pas prioritaire ; le bouton back couvre le cas).
+- Pas d'historique des modifications. Si un coach casse une filière par erreur, le reset permet de restaurer les défauts mais pas une ancienne personnalisation.
+- Pas de customisation de `color`, `short_name` ni d'ajout/suppression/réordonnancement de filières (hors scope explicite).
+- Le chunk `FilieresEditor` embarque `framer-motion` qui reste gros (shared vendor chunk déjà présent, donc pas d'impact réel).
+
+### Fichiers créés
+
+| Fichier | Rôle | Taille |
+|---|---|---|
+| `src/pages/coach/FilieresEditor.tsx` | Overlay plein écran liste → détail, 15 champs + reset + aperçu live | ~1087 lignes |
+| `supabase/migrations/00115_swim_filieres_full_edit.sql` | 13 colonnes ajoutées + backfill depuis constantes | ~140 lignes |
+| `docs/plans/2026-04-18-filieres-editor-design.md` | Design doc (data model, flow, interactions) | ~198 lignes |
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/lib/api/types.ts` | `SwimFiliere` + `SwimFiliereInput` étendus (15 champs) | ~1030 lignes |
+| `src/lib/api/swim-filieres.ts` | `updateSwimFiliere` en patch partiel + nouveau `resetSwimFiliere` | ~65 lignes |
+| `src/lib/api/index.ts` | ré-export `resetSwimFiliere` | ~417 lignes |
+| `src/lib/api.ts` | stub `api.resetSwimFiliere` | ~916 lignes |
+| `src/pages/coach/SwimPlanningDemo.tsx` | suppression `FiliereEditorOverlay` inline (-163 LOC), import lazy du nouveau composant | ~1462 lignes |
+| `src/pages/coach/SwimPlanningAthleteView.tsx` | jauges + technicals lisent DB avec fallback constantes | ~944 lignes |

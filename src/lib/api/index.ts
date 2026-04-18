@@ -352,6 +352,7 @@ export {
 export {
   getSwimFilieres,
   updateSwimFiliere,
+  resetSwimFiliere,
 } from './swim-filieres';
 
 // Coach assignments

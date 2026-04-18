@@ -943,6 +943,21 @@ export interface SwimFiliere {
   color: string;
   description?: string | null;
   examples?: string | null;
+  // Technical specs visible to swimmers (free text — "120-150", "70-85% VMA"…)
+  heart_rate?: string | null;
+  lactate?: string | null;
+  effort?: string | null;
+  duration?: string | null;
+  distance?: string | null;
+  reps?: string | null;
+  intensity?: string | null;
+  recovery?: string | null;
+  work_type?: string | null;
+  // Normalized 1-5 gauges shown to swimmers (null = "Variable")
+  level_intensity?: number | null;
+  level_duration?: number | null;
+  level_recovery?: number | null;
+  level_lactate?: number | null;
   sort_order: number;
 }
 
@@ -950,6 +965,19 @@ export interface SwimFiliereInput {
   id: string;
   description?: string | null;
   examples?: string | null;
+  heart_rate?: string | null;
+  lactate?: string | null;
+  effort?: string | null;
+  duration?: string | null;
+  distance?: string | null;
+  reps?: string | null;
+  intensity?: string | null;
+  recovery?: string | null;
+  work_type?: string | null;
+  level_intensity?: number | null;
+  level_duration?: number | null;
+  level_recovery?: number | null;
+  level_lactate?: number | null;
 }
 
 // ── Chrono Records ──────────────────────────────────────────────────
