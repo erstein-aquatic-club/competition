@@ -140,6 +140,8 @@ interface RankingRow {
   bestSplits: SplitRecord[];
   bestTotalMs: number;
   completedSeriesCount: number;
+  isCustomWave: boolean;
+  resolved: { seriesCount: number; totalDistanceM: number; splitDistanceM: number };
 }
 
 function rankPodium(idx: number): string {
@@ -171,6 +173,9 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
         const bestSplits = rs.splitsByRep[bestIdx] ?? [];
         const bestTotalMs = seriesTotalMs(bestSplits);
         const completedSeriesCount = rs.splitsByRep.filter((s) => s.length > 0).length;
+        const waveState = state.waves.find((w) => w.wave === rs.swimmer.wave);
+        const isCustomWave = waveState?.overrides != null;
+        const resolved = resolveWaveConfig(state, rs.swimmer.wave);
         return {
           key: rs.swimmer.key,
           displayName: rs.swimmer.displayName,
@@ -180,10 +185,12 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
           bestSplits,
           bestTotalMs,
           completedSeriesCount,
+          isCustomWave,
+          resolved,
         };
       })
       .sort((a, b) => a.bestTotalMs - b.bestTotalMs);
-  }, [raceEntries]);
+  }, [raceEntries, state]);
 
   const maxSplits = useMemo(
     () => Math.max(0, ...ranking.map((r) => r.bestSplits.length)),
@@ -495,6 +502,18 @@ function RankRow({
   const diffMs = row.bestTotalMs - leaderMs;
   const isManual = row.kind === "manual";
 
+  // Build the "Personnalisée : …" label only for customized waves.
+  const customLabelParts: string[] = [];
+  if (row.isCustomWave) {
+    if (row.resolved.seriesCount > 0) customLabelParts.push(`${row.resolved.seriesCount}×`);
+    if (row.resolved.totalDistanceM > 0) customLabelParts.push(`${row.resolved.totalDistanceM}m`);
+  }
+  const customHead = customLabelParts.join("");
+  const customLabel = row.isCustomWave
+    ? (customHead ? customHead : "") +
+      (row.resolved.splitDistanceM > 0 ? ` splits ${row.resolved.splitDistanceM}m` : "")
+    : "";
+
   return (
     <div
       className={`grid items-center gap-3 border-b border-border/50 px-3 py-2 transition-colors last:border-b-0 ${
@@ -522,6 +541,14 @@ function RankRow({
             {row.displayName}
           </span>
         </div>
+        {row.isCustomWave && (
+          <span
+            className={`mt-0.5 inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${wc.bg} ${wc.text}`}
+          >
+            <Check className="h-2.5 w-2.5" />
+            Personnalisée{customLabel ? ` : ${customLabel.trim()}` : ""}
+          </span>
+        )}
         {row.completedSeriesCount > 1 && (
           <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
             Meilleure · série {row.bestSeriesIdx + 1} sur {row.completedSeriesCount}
