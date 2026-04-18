@@ -95,7 +95,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) | ~2839 lignes |
 | `src/pages/coach/SlotSessionSheet.tsx` | Bottom sheet actions créneau (créer/modifier/visibilité/supprimer) (§85) | ~1024 lignes |
 | `src/pages/coach/SlotTemplatePicker.tsx` | Picker templates bibliothèque séances (§85) | ~150 lignes |
-| `src/hooks/useSlotCalendar.ts` | Hook matérialisation créneaux récurrents → instances semaine (§85) | ~230 lignes |
+| `src/hooks/useSlotCalendar.ts` | Hook matérialisation créneaux récurrents → instances semaine (§85) | ~358 lignes |
 | `src/lib/neurotype-quiz-data.ts` | 30 questions quiz + 5 profils neurotype + couleurs | ~450 lignes |
 | `src/lib/neurotype-scoring.ts` | Calcul scores neurotype (points/maxPoints) + niveaux | ~40 lignes |
 | `src/components/neurotype/NeurotypQuiz.tsx` | Quiz 30 questions avec carousel + progress bar | ~250 lignes |
@@ -343,6 +343,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 90 | Chrono : nageurs manuels + titre séance + export XLSX | Moyenne | Fait (§126) |
 | 91 | Fix overflow `FiliereEditorOverlay` (vue planification natation coach) | Faible | Fait (§127) |
 | 92 | Bouton partage preview séance vue créneaux | Faible | Fait (§128) |
+| 93 | Récapitulatif volume assigné vue créneaux coach | Faible | Fait (§129) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

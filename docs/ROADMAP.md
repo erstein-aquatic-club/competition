@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-18 (§128 Bouton partage preview séance vue créneaux)*
+*Dernière mise à jour : 2026-04-18 (§129 Récapitulatif volume assigné vue créneaux coach)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -75,6 +75,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 90 | Chrono : nageurs manuels + titre séance + export XLSX | Moyenne | Moyenne | Fait (§126) |
 | 91 | Fix overflow `FiliereEditorOverlay` (vue planification natation coach) | Faible | Faible | Fait (§127) |
 | 92 | Bouton partage preview séance vue créneaux | Faible | Faible | Fait (§128) |
+| 93 | Récapitulatif volume assigné (km) vue créneaux coach | Faible | Faible | Fait (§129) |
 
 ---
 

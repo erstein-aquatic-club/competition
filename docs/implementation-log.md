@@ -9023,3 +9023,54 @@ Depuis la vue créneaux coach (`CoachTrainingSlotsScreen`), tap sur un créneau 
 | Fichier | Changement | Taille |
 |---|---|---|
 | `src/pages/coach/SlotSessionSheet.tsx` | bouton partage header preview (handler + JSX) | ~1075 lignes |
+
+---
+
+## §129 — Récapitulatif volume assigné vue créneaux coach (2026-04-18)
+
+**Chantier** : #93
+
+### Contexte
+
+Demande utilisateur : afficher un **récapitulatif du volume global assigné** sur la vue créneaux coach (`CoachTrainingSlotsScreen`), pour que le coach voie d'un coup d'œil le kilométrage total distribué dans les créneaux de la semaine affichée. Design acté dans `docs/plans/2026-04-18-coach-slots-week-volume-design.md`.
+
+### Changements
+
+3 fichiers modifiés, 5 commits atomiques :
+
+1. `92818a25` — `feat(slots): sumAssignedDistance helper (draft+published, cancelled excluded)`
+2. `389d7953` — `feat(slots): expose weekTotalDistance from useSlotCalendar`
+3. `62a62bd4` — `chore(slots): add formatAssignedKm helper`
+4. `eb512e0a` — `feat(slots): show weekly assigned volume badge (desktop)`
+5. `f438ddfd` — `feat(slots): show weekly assigned volume badge (mobile)`
+
+- Helper pur `sumAssignedDistance(instances)` dans `src/hooks/useSlotCalendar.ts` — couvert par 5 tests unitaires (draft+published additionnés, cancelled/empty exclus, instances sans assignation ignorées, liste vide → 0, distances nulles ignorées).
+- Hook `useSlotCalendar` expose désormais `weekTotalDistance` (pipe de `sumAssignedDistance` sur la matérialisation interne).
+- `CoachTrainingSlotsScreen` ajoute un helper de module `formatAssignedKm` + un `useMemo` local qui réutilise `sumAssignedDistance` exporté sur son `slotInstancesById` inline (voir § Décisions). Badges desktop et mobile posés en tête de la barre de navigation semaine.
+
+### Décisions
+
+- **Compter draft + published**, exclure `cancelled` et `empty` → reflète l'intention de charge, pas seulement ce qui est publié.
+- **Badge masqué si 0 km** — évite le bruit visuel les semaines creuses.
+- **Format FR** : entier sans décimale si valeur entière, sinon 1 décimale virgule (`24,5 km` / `10 km`).
+- **Déviation acceptée vs plan** : Task 4 demandait de destructurer `weekTotalDistance` depuis `useSlotCalendar()` dans le screen. Or `CoachTrainingSlotsScreen` ne consomme pas ce hook — il matérialise ses propres instances dans un `slotInstancesById: Map<string, SlotInstance>` inline (~L1956). Chemin minimal-diff retenu : réutiliser le helper `sumAssignedDistance` exporté sur `Array.from(slotInstancesById.values())` dans un `useMemo` local. Même sémantique que la valeur retournée par le hook (mêmes instances, même pipeline).
+
+### Limites
+
+- Pas de **répartition par groupe** (un seul chiffre global pour la semaine).
+- Pas de **total mensuel** / rolling 4 semaines.
+- Pas de **ratio slots remplis / slots totaux** ni d'indicateur de drafts non publiés.
+- Pas de **test UI dédié** : couverture unitaire uniquement sur le helper. Le rendu badge reste un wrapper thin.
+
+### Tests
+
+- `npm test` : **199 tests pass, 0 fail** (+5 nouveaux sur `sumAssignedDistance`).
+- `npx tsc --noEmit` : 0 nouvelle erreur.
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/hooks/useSlotCalendar.ts` | Helper `sumAssignedDistance` + retour `weekTotalDistance` | ~358 lignes |
+| `src/hooks/__tests__/useSlotCalendar.test.ts` | +5 tests helper `sumAssignedDistance` | +82 lignes |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | `formatAssignedKm` + `useMemo` weekTotalDistance + badges desktop/mobile | ~3019 lignes |
