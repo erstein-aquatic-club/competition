@@ -106,6 +106,21 @@ export function useDashboardSessions({ sessions, assignments, userId, swimmerSlo
 
       if (slotId === "AM" || slotId === "PM") return undefined;
 
+      // Synthetic IDs from otherGroupSessions: `${iso}__group_${assignmentId}`
+      // Match any log on the same day that carries this assignment_id.
+      if (slotId.startsWith("group_")) {
+        const assignmentId = Number(slotId.slice(6));
+        if (Number.isFinite(assignmentId) && assignmentId > 0) {
+          const datePrefix = `${iso}__`;
+          for (const [key, log] of Object.entries(logsBySessionId)) {
+            if (key.startsWith(datePrefix) && (log as any).assignment_id === assignmentId) {
+              return log;
+            }
+          }
+        }
+        return undefined;
+      }
+
       const planned = sessionsCacheRef.current.get(iso);
       const session = planned?.find((s) => s.swimmerSlotId === slotId);
       const assignmentId = session?.assignmentId;

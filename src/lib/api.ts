@@ -393,15 +393,36 @@ export const api = {
       const dbPayload = mapToDbSession(session);
       const { data, error } = await supabase.from("dim_sessions").insert(dbPayload).select("id").single();
       if (error) {
-        // Handle unique constraint violation — fallback to upsert
+        // Handle unique constraint violation — resolve via targeted UPDATE matching
+        // the same partial index that rejected the INSERT. A plain .upsert() would
+        // fail with 42P10 because both dedupe indexes (idx_v2 on assignment_id,
+        // idx_legacy on time_slot) are partial.
         if (error.code === '23505') {
-          const { data: updated, error: updateErr } = await supabase
+          const athleteId = dbPayload.athlete_id;
+          const sessionDate = dbPayload.session_date;
+          const assignmentId = dbPayload.assignment_id ?? null;
+          if (athleteId == null || !sessionDate) throw new Error(error.message);
+
+          let findQuery = supabase
             .from("dim_sessions")
-            .upsert(dbPayload, { onConflict: 'athlete_id,session_date,time_slot' })
             .select("id")
-            .single();
-          if (updateErr) throw new Error(updateErr.message);
-          return { status: "ok", sessionId: updated.id };
+            .eq("athlete_id", Number(athleteId))
+            .eq("session_date", String(sessionDate));
+          if (assignmentId != null) {
+            findQuery = findQuery.eq("assignment_id", Number(assignmentId));
+          } else {
+            findQuery = findQuery.is("assignment_id", null).eq("time_slot", String(dbPayload.time_slot ?? ""));
+          }
+          const { data: existing, error: findErr } = await findQuery.maybeSingle();
+          if (findErr) throw new Error(findErr.message);
+          if (!existing?.id) throw new Error(error.message);
+
+          const { error: updErr } = await supabase
+            .from("dim_sessions")
+            .update(dbPayload)
+            .eq("id", existing.id);
+          if (updErr) throw new Error(updErr.message);
+          return { status: "ok", sessionId: existing.id as number };
         }
         throw new Error(error.message);
       }

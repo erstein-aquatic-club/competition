@@ -180,6 +180,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
   const { draftState, setDraftState } = useFeedbackDraft({
     activeSessionId,
     sessionsForSelectedDay,
+    otherGroupSessions,
     assignments,
     getLogForSession,
   });

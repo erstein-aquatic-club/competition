@@ -12,6 +12,7 @@ import {
 interface Params {
   activeSessionId: string | null;
   sessionsForSelectedDay: PlannedSession[];
+  otherGroupSessions?: PlannedSession[];
   assignments: Assignment[] | undefined;
   getLogForSession: (sessionId: string) => Session | undefined;
 }
@@ -24,6 +25,7 @@ interface Params {
 export function useFeedbackDraft({
   activeSessionId,
   sessionsForSelectedDay,
+  otherGroupSessions,
   assignments,
   getLogForSession,
 }: Params) {
@@ -70,7 +72,9 @@ export function useFeedbackDraft({
   }));
 
   useEffect(() => {
-    const activeSession = sessionsForSelectedDay.find((s) => s.id === activeSessionId);
+    const activeSession =
+      sessionsForSelectedDay.find((s) => s.id === activeSessionId)
+      ?? otherGroupSessions?.find((s) => s.id === activeSessionId);
     if (activeSession) {
       const plannedMeters = activeSession.km != null ? kmToMeters(activeSession.km) : 5000;
 
@@ -103,7 +107,7 @@ export function useFeedbackDraft({
       return;
     }
     setDraftState((prev) => ({ ...prev, ...feedbackDraft }));
-  }, [feedbackDraft, activeSessionId, sessionsForSelectedDay, assignments]);
+  }, [feedbackDraft, activeSessionId, sessionsForSelectedDay, otherGroupSessions, assignments]);
 
   return { draftState, setDraftState };
 }
