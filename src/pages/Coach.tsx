@@ -190,7 +190,13 @@ function getSundayOfWeek(monday: Date): Date {
 }
 
 function formatDateIso(d: Date): string {
-  return d.toISOString().split("T")[0];
+  // Use local date parts — toISOString() shifts to UTC, which rolls the date
+  // back one day for any local midnight Date at a positive UTC offset
+  // (Europe/Paris in DST = +02:00 → local Monday 00:00 becomes UTC Sunday 22:00).
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatRelativeTime(isoDate: string): string {
