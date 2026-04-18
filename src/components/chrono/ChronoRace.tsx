@@ -64,13 +64,13 @@ function WaveHeaderCell({
             timestamp: getTimestamp(),
           })
         }
-        className={`flex flex-col items-center justify-center rounded-md ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
+        className={`flex flex-col items-center justify-center rounded-md ${wc.dot} w-full h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
       >
-        <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-white/90 leading-none mb-1">
           {wc.label}{wave.currentRep > 0 ? ` S${wave.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
         </span>
-        <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
-          <Play className="h-3 w-3 fill-current" /> GO
+        <span className="flex items-center gap-1.5 text-xl font-black text-white leading-none tracking-wide">
+          <Play className="h-5 w-5 fill-current" /> GO
         </span>
       </button>
     );
@@ -132,13 +132,13 @@ function WaveHeaderCell({
               timestamp: getTimestamp(),
             })
           }
-          className={`flex flex-col items-center justify-center rounded-b-md ${wc.dot} w-full h-12 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
+          className={`flex flex-col items-center justify-center rounded-b-md ${wc.dot} w-full h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
         >
-          <span className="text-[9px] font-bold uppercase tracking-widest text-white/80 leading-none mb-0.5">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-white/90 leading-none mb-1">
             {wc.label} S{wave.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
           </span>
-          <span className="flex items-center gap-1 text-sm font-black text-white leading-none">
-            <Play className="h-3 w-3 fill-current" /> GO
+          <span className="flex items-center gap-1.5 text-xl font-black text-white leading-none tracking-wide">
+            <Play className="h-5 w-5 fill-current" /> GO
           </span>
         </button>
       </div>
@@ -295,19 +295,21 @@ function SwimmerCard({
   const shouldPromptStop = active && expectedSplits > 0 && recordedSplits + 1 >= expectedSplits;
   const finishedDistance = active && expectedSplits > 0 && recordedSplits >= expectedSplits;
 
+  // Distance display values (factored out for KPI cells)
+  const distLabel = launched
+    ? hasTotalDist ? `${currentDistM}/${totalDistanceM}` : `${currentDistM}`
+    : hasTotalDist ? `0/${totalDistanceM}` : "0";
+  const distSuffix = hasSplitDist ? "m" : "";
+
   return (
     <div
-      role="button"
-      tabIndex={active ? 0 : -1}
-      onClick={handleTap}
-      onKeyDown={(e) => { if (active && (e.key === " " || e.key === "Enter")) { e.preventDefault(); handleTap(); } }}
-      className={`relative rounded-lg border-l-[3px] ${wc.border} overflow-hidden touch-manipulation transition-all min-h-[116px] ${
+      className={`relative flex rounded-lg border-l-[3px] ${wc.border} overflow-hidden touch-manipulation transition-all min-h-[116px] ${
         stopped
-          ? "bg-muted opacity-60 border border-border"
+          ? "bg-muted opacity-70 border border-border"
           : shouldPromptStop
-            ? "bg-card border border-destructive ring-1 ring-destructive/40 shadow-destructive/10 shadow"
+            ? "bg-card border border-destructive ring-1 ring-destructive/40 shadow shadow-destructive/10"
             : active
-              ? "bg-card border border-border shadow-sm active:scale-[0.98] cursor-pointer"
+              ? "bg-card border border-border shadow-sm"
               : "bg-muted/30 border border-border/60"
       }`}
     >
@@ -317,120 +319,199 @@ function SwimmerCard({
         className="pointer-events-none absolute inset-0 bg-primary opacity-0 transition-opacity duration-100"
       />
 
-      {/* ── Row 1 : wave chip + name + stop ── */}
-      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-0.5">
-        <span
-          className={`inline-flex h-4 min-w-[1.5rem] items-center justify-center rounded px-1 text-[9px] font-black text-white leading-none ${wc.dot}`}
-          aria-label={`Vague ${wc.label}`}
-        >
-          {wc.label}
-        </span>
-        <span className={`text-[13px] font-semibold leading-tight min-w-0 truncate ${stopped ? "text-muted-foreground" : "text-foreground"}`}>
-          {displayName}
-        </span>
-        <div className="ml-auto flex items-center gap-1 shrink-0">
-          {stopped && (
-            <span className="rounded bg-destructive px-1.5 py-0.5 text-[9px] font-bold uppercase text-destructive-foreground leading-none">
-              Stop
-            </span>
-          )}
-          {active && (
-            <button
-              type="button"
-              onClick={handleStop}
-              aria-label={`Stopper ${displayName}`}
-              className={`flex items-center justify-center rounded-full transition-all ${
-                shouldPromptStop
-                  ? "h-9 w-9 bg-destructive text-destructive-foreground ring-2 ring-destructive/60 animate-pulse shadow-md"
-                  : "h-7 w-7 bg-destructive/15 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-              }`}
-            >
-              <CircleStop className={shouldPromptStop ? "h-5 w-5" : "h-3.5 w-3.5"} strokeWidth={shouldPromptStop ? 3 : 2.5} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 2 : chrono (2xl, compact) ── */}
-      <div className="px-2 pt-0 pb-0.5">
-        <div
-          className={`font-mono tabular-nums font-black leading-none tracking-tight text-2xl ${
-            stopped ? "text-muted-foreground" : shouldPromptStop ? "text-destructive" : launched ? "text-foreground" : "text-muted-foreground/50"
-          }`}
-        >
-          {launched ? formatTime(elapsed) : "--:--.--"}
-        </div>
-      </div>
-
-      {/* ── Row 3 : progress bar + counter (always rendered — placeholder when not launched) ── */}
-      <div className="flex items-center gap-2 px-2 pt-1 pb-0.5">
-        <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-[width] duration-300 ${
-              finishedDistance
-                ? "bg-destructive"
-                : shouldPromptStop
-                  ? "bg-destructive/80"
-                  : launched ? wc.dot : "bg-transparent"
+      {/* ── Left : content + tap zone for split ── */}
+      <div
+        role="button"
+        tabIndex={active ? 0 : -1}
+        onClick={handleTap}
+        onKeyDown={(e) => {
+          if (active && (e.key === " " || e.key === "Enter")) {
+            e.preventDefault();
+            handleTap();
+          }
+        }}
+        className={`flex-1 flex flex-col min-w-0 ${
+          active ? "cursor-pointer active:bg-muted/30" : ""
+        }`}
+      >
+        {/* Row 1 : wave chip + name */}
+        <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-0.5">
+          <span
+            className={`inline-flex h-5 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-[10px] font-black text-white leading-none ${wc.dot}`}
+            aria-label={`Vague ${wc.label}`}
+          >
+            {wc.label}
+          </span>
+          <span
+            className={`text-sm font-semibold leading-tight min-w-0 truncate ${
+              stopped ? "text-muted-foreground line-through" : "text-foreground"
             }`}
-            style={{
-              width: launched
-                ? expectedSplits > 0
-                  ? `${progressPct}%`
-                  : recordedSplits > 0
-                    ? "100%"
-                    : "0%"
-                : "0%",
-            }}
-            aria-hidden
+          >
+            {displayName}
+          </span>
+        </div>
+
+        {/* Row 2 : chrono */}
+        <div className="px-2.5 pt-0 pb-0.5">
+          <div
+            className={`font-mono tabular-nums font-black leading-none tracking-tight text-2xl ${
+              stopped
+                ? "text-muted-foreground"
+                : shouldPromptStop
+                  ? "text-destructive"
+                  : launched
+                    ? "text-foreground"
+                    : "text-muted-foreground/50"
+            }`}
+          >
+            {launched ? formatTime(elapsed) : "--:--.--"}
+          </div>
+        </div>
+
+        {/* Row 3 : progress bar + counter */}
+        <div className="flex items-center gap-2 px-2.5 pt-1 pb-1">
+          <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-[width] duration-300 ${
+                finishedDistance
+                  ? "bg-destructive"
+                  : shouldPromptStop
+                    ? "bg-destructive/80"
+                    : launched
+                      ? wc.dot
+                      : "bg-transparent"
+              }`}
+              style={{
+                width: launched
+                  ? expectedSplits > 0
+                    ? `${progressPct}%`
+                    : recordedSplits > 0
+                      ? "100%"
+                      : "0%"
+                  : "0%",
+              }}
+              aria-hidden
+            />
+          </div>
+          <span
+            className={`text-[11px] font-bold tabular-nums shrink-0 leading-none ${
+              shouldPromptStop ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {launched
+              ? expectedSplits > 0
+                ? `${recordedSplits}/${expectedSplits}`
+                : `#${recordedSplits}`
+              : expectedSplits > 0
+                ? `0/${expectedSplits}`
+                : "—"}
+          </span>
+        </div>
+
+        {/* Row 4 : KPI grid (3 cells, always rendered) */}
+        <div className="grid grid-cols-3 gap-1 px-2.5 pb-2 mt-auto">
+          <KPICell
+            icon={<Flag className="h-3 w-3" />}
+            label="Dist."
+            value={distLabel}
+            suffix={distSuffix}
+            highlight={finishedDistance}
+            muted={!launched}
+          />
+          <KPICell
+            icon={<Gauge className="h-3 w-3" />}
+            label="Allure"
+            value={instantPacePer100m > 0 ? formatPace(instantPacePer100m) : "—"}
+            suffix={instantPacePer100m > 0 ? "/100m" : ""}
+            muted={!launched || instantPacePer100m === 0}
+          />
+          <KPICell
+            label="Δ dernier"
+            value={lastSplit ? formatLap(lastSplit.lapMs) : "—"}
+            suffix={lastSplit ? "s" : ""}
+            muted={!lastSplit}
           />
         </div>
-        <span
-          className={`text-[10px] font-bold tabular-nums shrink-0 leading-none ${
-            shouldPromptStop ? "text-destructive" : "text-muted-foreground"
+      </div>
+
+      {/* ── Right : full-height stop button ── */}
+      {active ? (
+        <button
+          type="button"
+          onClick={handleStop}
+          aria-label={`Stopper ${displayName}`}
+          className={`shrink-0 w-16 flex flex-col items-center justify-center gap-1 transition-all touch-manipulation border-l-2 ${
+            shouldPromptStop
+              ? "bg-destructive text-destructive-foreground border-destructive animate-pulse ring-inset ring-2 ring-white/30 shadow-inner"
+              : "bg-destructive/90 hover:bg-destructive active:scale-95 text-destructive-foreground border-destructive/70"
           }`}
         >
-          {launched
-            ? expectedSplits > 0 ? `${recordedSplits}/${expectedSplits}` : `#${recordedSplits}`
-            : expectedSplits > 0 ? `0/${expectedSplits}` : "—"}
-        </span>
-      </div>
-
-      {/* ── Row 4 : inline metrics (always rendered — placeholders when not launched) ── */}
-      <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-0.5 text-[10px] font-mono tabular-nums text-muted-foreground leading-tight min-h-[16px]">
-        {hasSplitDist && (
-          <>
-            <Flag className={`h-2.5 w-2.5 shrink-0 ${finishedDistance ? "text-destructive" : ""}`} />
-            <span className={`font-semibold ${
-              finishedDistance ? "text-destructive" : launched ? "text-foreground/80" : "text-muted-foreground/50"
-            }`}>
-              {launched
-                ? hasTotalDist
-                  ? `${currentDistM}/${totalDistanceM}m`
-                  : `${currentDistM}m`
-                : hasTotalDist
-                  ? `0/${totalDistanceM}m`
-                  : "0m"}
-            </span>
-            <span className="text-muted-foreground/30">·</span>
-          </>
-        )}
-        <Gauge className="h-2.5 w-2.5 shrink-0 text-muted-foreground/60" />
-        <span className={`font-semibold ${instantPacePer100m > 0 ? "text-foreground/80" : "text-muted-foreground/40"}`}>
-          {instantPacePer100m > 0 ? formatPace(instantPacePer100m) : "—"}
-        </span>
-        <span className="text-muted-foreground/30">·</span>
-        <span className="text-muted-foreground">
-          {lastSplit ? `Δ ${formatLap(lastSplit.lapMs)}` : <span className="text-muted-foreground/40">Δ —</span>}
-        </span>
-      </div>
-
-      {/* ── STOP emphasis strip when imminent (compact, not full pleine-card) ── */}
-      {shouldPromptStop && (
-        <div className="border-t border-destructive/40 bg-destructive/8 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-destructive text-center leading-none">
-          {finishedDistance ? "Distance atteinte — stopper" : "Prochain split = arrivée"}
+          <CircleStop
+            className={shouldPromptStop ? "h-8 w-8" : "h-7 w-7"}
+            strokeWidth={2.5}
+          />
+          <span className="text-[11px] font-black uppercase tracking-[0.15em] leading-none">
+            {shouldPromptStop ? "Stop!" : "Stop"}
+          </span>
+        </button>
+      ) : stopped ? (
+        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 bg-muted border-l border-border">
+          <CircleStop className="h-5 w-5 text-muted-foreground" strokeWidth={2.5} />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
+            Stoppé
+          </span>
         </div>
+      ) : (
+        // Not launched : keep the card geometry stable with a transparent shim.
+        <div className="shrink-0 w-16 bg-muted/20 border-l border-dashed border-border/30" aria-hidden />
       )}
+    </div>
+  );
+}
+
+// ── KPI Cell — compact metric block (label + value + optional suffix) ──
+
+function KPICell({
+  icon,
+  label,
+  value,
+  suffix,
+  highlight,
+  muted,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  suffix?: string;
+  highlight?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-0.5 rounded px-1.5 py-1 min-w-0 ${
+        highlight ? "bg-destructive/10" : muted ? "bg-muted/40" : "bg-muted/70"
+      }`}
+    >
+      <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80 leading-none">
+        {icon}
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="flex items-baseline gap-0.5 font-mono tabular-nums leading-none">
+        <span
+          className={`text-sm font-black truncate ${
+            highlight
+              ? "text-destructive"
+              : muted
+                ? "text-muted-foreground/60"
+                : "text-foreground"
+          }`}
+        >
+          {value}
+        </span>
+        {suffix && (
+          <span className="text-[9px] text-muted-foreground/70">{suffix}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -479,8 +560,8 @@ function LaneWaveMatrix({
     );
   }
 
-  // CSS Grid : gutter (56px) + N wave columns (min 220px, stretch 1fr).
-  const gridTemplate = `56px repeat(${activeWaves.length}, minmax(220px, 1fr))`;
+  // CSS Grid : gutter (56px) + N wave columns (min 260px, stretch 1fr).
+  const gridTemplate = `56px repeat(${activeWaves.length}, minmax(260px, 1fr))`;
 
   return (
     <div className="px-3">
