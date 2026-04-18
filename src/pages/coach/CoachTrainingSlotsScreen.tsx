@@ -93,8 +93,8 @@ type WeekVolumeChipProps = {
 };
 
 /**
- * Stat chip showing the weekly assigned swim volume.
- * Used in the coach training-slots screen header.
+ * Typography-first weekly volume indicator.
+ * No container chrome — relies on hierarchy (display font, tracking, color) alone.
  */
 function WeekVolumeChip({ distanceMeters, variant }: WeekVolumeChipProps) {
   const parts = formatAssignedKmParts(distanceMeters);
@@ -103,17 +103,17 @@ function WeekVolumeChip({ distanceMeters, variant }: WeekVolumeChipProps) {
   if (variant === "mobile") {
     return (
       <div
-        className="flex items-center justify-between rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.06] to-primary/[0.12] px-4 py-2.5"
+        className="flex items-baseline justify-between border-t border-b border-border/50 py-2.5"
         title="Volume total assigné (brouillons + publiés) pour la semaine"
       >
-        <span className="font-display text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="font-display text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
           Volume semaine
         </span>
-        <span className="flex items-baseline gap-1">
-          <span className="font-display text-2xl font-bold leading-none text-primary tabular-nums">
+        <span className="flex items-baseline gap-1.5">
+          <span className="font-display text-[26px] font-bold leading-none text-primary tabular-nums tracking-tight">
             {parts.value}
           </span>
-          <span className="text-xs font-semibold text-primary/70">
+          <span className="text-[11px] font-medium text-muted-foreground lowercase">
             {parts.unit}
           </span>
         </span>
@@ -123,18 +123,17 @@ function WeekVolumeChip({ distanceMeters, variant }: WeekVolumeChipProps) {
 
   return (
     <div
-      className="inline-flex items-center gap-3 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.05] to-primary/[0.12] px-3.5 py-1.5 shadow-sm shadow-primary/5"
+      className="inline-flex items-baseline gap-2.5"
       title="Volume total assigné (brouillons + publiés) pour la semaine"
     >
-      <span className="font-display text-[9px] uppercase tracking-[0.18em] text-muted-foreground leading-none">
-        Volume<br />semaine
+      <span className="font-display text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
+        Volume
       </span>
-      <span className="h-6 w-px bg-primary/20" aria-hidden />
       <span className="flex items-baseline gap-1">
-        <span className="font-display text-lg font-bold leading-none text-primary tabular-nums">
+        <span className="font-display text-xl font-bold leading-none text-primary tabular-nums tracking-tight">
           {parts.value}
         </span>
-        <span className="text-[11px] font-semibold text-primary/70">
+        <span className="text-[11px] font-medium text-muted-foreground lowercase">
           {parts.unit}
         </span>
       </span>
