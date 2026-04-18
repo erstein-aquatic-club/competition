@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { ShareMenu } from "@/components/shared/ShareMenu";
+import type { SharePayload } from "@/lib/share/types";
 
 // Lazy-loaded sheets : ces deux composants ne sont rendus qu'à l'ouverture
 // des modals correspondants (clic sur slot ou sur "ajouter depuis bibliothèque").
@@ -2168,28 +2170,6 @@ const CoachTrainingSlotsScreen = ({
   // ── Export image ───────────────────────────────────────
   const [exporting, setExporting] = useState(false);
 
-  const shareOrDownloadPng = useCallback(async (blob: Blob, fileName: string) => {
-    if (navigator.share && navigator.canShare) {
-      const file = new File([blob], fileName, { type: "image/png" });
-      const shareData = { files: [file] };
-      try {
-        if (navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          return;
-        }
-      } catch {
-        // User cancelled or share failed — fall through to download
-      }
-    }
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
-
   const buildFallbackWeekPng = useCallback(async (): Promise<Blob> => {
     const width = 2400;
     const padX = 40;
@@ -2540,9 +2520,9 @@ const CoachTrainingSlotsScreen = ({
     return blob;
   }, [slotsByDay, slotInstancesById, weekDates, weekNumber]);
 
-  const handleExportImage = useCallback(async () => {
+  const preparePayloadForShare = useCallback(async (): Promise<SharePayload> => {
     const el = exportContentRef.current;
-    if (!el || exporting) return;
+    if (!el) throw new Error("Export container not ready");
     setExporting(true);
     let cleanupCapture = () => {};
     try {
@@ -2574,14 +2554,16 @@ const CoachTrainingSlotsScreen = ({
         }
       }
 
-      await shareOrDownloadPng(blob, fileName);
-    } catch (err) {
-      toast({ title: "Erreur export", description: String(err), variant: "destructive" });
+      return {
+        imageBlob: blob,
+        imageFileName: fileName,
+        title: "Créneaux semaine",
+      };
     } finally {
       cleanupCapture();
       setExporting(false);
     }
-  }, [buildFallbackWeekPng, exporting, shareOrDownloadPng, toast, weekMondayIso]);
+  }, [buildFallbackWeekPng, weekMondayIso]);
 
   return (
     <div className="space-y-4 pb-24">
@@ -2606,15 +2588,19 @@ const CoachTrainingSlotsScreen = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="flex items-center justify-center h-9 w-9 rounded-full border border-border bg-card text-muted-foreground active:scale-90 transition-all disabled:opacity-50"
-              onClick={handleExportImage}
-              disabled={exporting || slotsLoading}
-              aria-label="Exporter en image"
-            >
-              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-            </button>
+            <ShareMenu
+              onOpen={preparePayloadForShare}
+              trigger={
+                <button
+                  type="button"
+                  className="flex items-center justify-center h-9 w-9 rounded-full border border-border bg-card text-muted-foreground active:scale-90 transition-all disabled:opacity-50"
+                  disabled={exporting || slotsLoading}
+                  aria-label="Exporter en image"
+                >
+                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+                </button>
+              }
+            />
             {onOpenLibrary && (
               <button
                 type="button"
@@ -2691,15 +2677,19 @@ const CoachTrainingSlotsScreen = ({
           </SelectContent>
         </Select>
         <div className="flex-1" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground"
-          onClick={handleExportImage}
-          disabled={exporting || slotsLoading}
-        >
-          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
-        </Button>
+        <ShareMenu
+          onOpen={preparePayloadForShare}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground"
+              disabled={exporting || slotsLoading}
+            >
+              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+            </Button>
+          }
+        />
         {onOpenLibrary && (
           <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
