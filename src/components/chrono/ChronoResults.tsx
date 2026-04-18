@@ -503,16 +503,16 @@ function RankRow({
   const isManual = row.kind === "manual";
 
   // Build the "Personnalisée : …" label only for customized waves.
-  const customLabelParts: string[] = [];
+  let customLabel = "";
   if (row.isCustomWave) {
-    if (row.resolved.seriesCount > 0) customLabelParts.push(`${row.resolved.seriesCount}×`);
-    if (row.resolved.totalDistanceM > 0) customLabelParts.push(`${row.resolved.totalDistanceM}m`);
+    const head: string[] = [];
+    if (row.resolved.seriesCount > 0) head.push(`${row.resolved.seriesCount}×`);
+    if (row.resolved.totalDistanceM > 0) head.push(`${row.resolved.totalDistanceM}m`);
+    const parts: string[] = [];
+    if (head.length > 0) parts.push(head.join(""));
+    if (row.resolved.splitDistanceM > 0) parts.push(`splits ${row.resolved.splitDistanceM}m`);
+    customLabel = parts.join(" ");
   }
-  const customHead = customLabelParts.join("");
-  const customLabel = row.isCustomWave
-    ? (customHead ? customHead : "") +
-      (row.resolved.splitDistanceM > 0 ? ` splits ${row.resolved.splitDistanceM}m` : "")
-    : "";
 
   return (
     <div
@@ -546,7 +546,7 @@ function RankRow({
             className={`mt-0.5 inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${wc.bg} ${wc.text}`}
           >
             <Check className="h-2.5 w-2.5" />
-            Personnalisée{customLabel ? ` : ${customLabel.trim()}` : ""}
+            Personnalisée{customLabel ? ` : ${customLabel}` : ""}
           </span>
         )}
         {row.completedSeriesCount > 1 && (
