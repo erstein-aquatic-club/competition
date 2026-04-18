@@ -16,6 +16,8 @@ import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 import type { SharePayload } from "@/lib/share/types";
+import { fetchUserGroupIdsWithContext } from "@/lib/api/client";
+import { filterCoachTrainingSlots } from "./coachTrainingSlotsFilter";
 
 // Lazy-loaded sheets : ces deux composants ne sont rendus qu'à l'ouverture
 // des modals correspondants (clic sur slot ou sur "ajouter depuis bibliothèque").
@@ -1898,6 +1900,12 @@ const CoachTrainingSlotsScreen = ({
     enabled: swimmerFilterId != null,
   });
 
+  const { data: swimmerGroupContext } = useQuery({
+    queryKey: ["athlete-group-context", swimmerFilterId],
+    queryFn: () => fetchUserGroupIdsWithContext(swimmerFilterId),
+    enabled: swimmerFilterId != null,
+  });
+
   // Convert swimmer slots to TrainingSlot shape for timeline display
   const swimmerSlotsAsTraining = useMemo((): TrainingSlot[] => {
     if (!swimmerSlots) return [];
@@ -1920,35 +1928,24 @@ const CoachTrainingSlotsScreen = ({
 
   // Filter slots
   const filteredSlots = useMemo(() => {
-    if (filterValue === "all") return slots;
-    if (filterValue.startsWith("group:")) {
-      const gid = Number(filterValue.split(":")[1]);
-      return slots.filter((s) =>
-        s.assignments.some((a) => a.group_id === gid),
-      );
-    }
-    if (filterValue.startsWith("coach:")) {
-      const cid = Number(filterValue.split(":")[1]);
-      return slots.filter((s) =>
-        (s.coaches ?? []).some((c) => c.coach_id === cid),
-      );
-    }
-    if (filterValue.startsWith("swimmer:")) {
-      // When a swimmer has custom slots, show those; otherwise show group slots
-      if (swimmerHasCustom && swimmerSlotsAsTraining.length > 0) {
-        return swimmerSlotsAsTraining;
-      }
-      // Fallback: show slots for the swimmer's group
-      const athlete = athletes.find((a) => a.id === swimmerFilterId);
-      if (athlete?.group_id) {
-        return slots.filter((s) =>
-          s.assignments.some((a) => a.group_id === athlete.group_id),
-        );
-      }
-      return slots;
-    }
-    return slots;
-  }, [slots, filterValue, swimmerHasCustom, swimmerSlotsAsTraining, athletes, swimmerFilterId]);
+    return filterCoachTrainingSlots({
+      slots,
+      filterValue,
+      athletes,
+      swimmerFilterId,
+      swimmerHasCustom,
+      swimmerSlotsAsTraining,
+      swimmerGroupContext,
+    });
+  }, [
+    slots,
+    filterValue,
+    athletes,
+    swimmerFilterId,
+    swimmerHasCustom,
+    swimmerSlotsAsTraining,
+    swimmerGroupContext,
+  ]);
 
   // Overrides scoped to the selected week
   const weekMondayIso = toIsoDate(weekMonday);
