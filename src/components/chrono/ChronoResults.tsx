@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import type { ChronoState, SplitRecord } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
-import { WAVE_COLORS } from "../../lib/chrono-types";
+import { WAVE_COLORS, resolveWaveConfig } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
 import {
   AlertDialog,
@@ -71,6 +71,14 @@ function buildLabel(state: ChronoState): string {
 /** Convert race state to ChronoRecordInput for DB persistence */
 function buildChronoRecordInput(state: ChronoState, status: "draft" | "sent"): ChronoRecordInput {
   const raceEntries = Array.from(state.raceData.values());
+
+  // Collect per-wave overrides for the config payload (only non-null ones).
+  const waveOverrides: Record<number, { seriesCount?: number; totalDistanceM?: number; splitDistanceM?: number }> = {};
+  for (const w of state.waves) {
+    if (w.overrides) waveOverrides[w.wave] = { ...w.overrides };
+  }
+  const hasOverrides = Object.keys(waveOverrides).length > 0;
+
   return {
     status,
     label: buildLabel(state),
@@ -79,22 +87,26 @@ function buildChronoRecordInput(state: ChronoState, status: "draft" | "sent"): C
       splitDistanceM: state.splitDistanceM,
       seriesCount: state.seriesCount,
       laneCount: state.laneCount,
+      ...(hasOverrides ? { waveOverrides } : {}),
     },
-    swimmers: raceEntries.map((rs) => ({
-      kind: rs.swimmer.kind,
-      athleteId: rs.swimmer.athleteId,
-      manualId: rs.swimmer.manualId,
-      displayName: rs.swimmer.displayName,
-      lane: rs.swimmer.lane,
-      wave: rs.swimmer.wave,
-      splitsByRep: rs.splitsByRep.map((rep) =>
-        rep.map((s, i) => ({
-          distanceM: state.splitDistanceM > 0 ? (i + 1) * state.splitDistanceM : 0,
-          cumulativeMs: s.cumulativeMs,
-          lapMs: s.lapMs,
-        })),
-      ),
-    })),
+    swimmers: raceEntries.map((rs) => {
+      const resolved = resolveWaveConfig(state, rs.swimmer.wave);
+      return {
+        kind: rs.swimmer.kind,
+        athleteId: rs.swimmer.athleteId,
+        manualId: rs.swimmer.manualId,
+        displayName: rs.swimmer.displayName,
+        lane: rs.swimmer.lane,
+        wave: rs.swimmer.wave,
+        splitsByRep: rs.splitsByRep.map((rep) =>
+          rep.map((s, i) => ({
+            distanceM: resolved.splitDistanceM > 0 ? (i + 1) * resolved.splitDistanceM : 0,
+            cumulativeMs: s.cumulativeMs,
+            lapMs: s.lapMs,
+          })),
+        ),
+      };
+    }),
   };
 }
 
