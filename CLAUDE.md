@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §135 (fix triple-comptage km Progress + logs extras invisibles Dashboard).
+Dernière entrée en date : §136 (restructuration CLAUDE.md — annuaire fichiers externalisé, -56% tokens).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-18 (§134 Éditeur filières plein écran — 15 champs configurables + reset)*
+*Dernière mise à jour : 2026-04-18 (§136 Restructuration CLAUDE.md — annuaire fichiers externalisé, -56% tokens)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -81,6 +81,8 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 96 | Fix ressenti sur séance groupe hors créneaux nageur (getLogForSession + fallback 42P10) | Haute | Haute | Fait (§132) |
 | 97 | Menu partage unifié WhatsApp + Clipboard (coach macOS) | Moyenne | Moyenne | Fait (§133) |
 | 98 | Éditeur filières plein écran : 15 champs configurables + reset + aperçu nageur live | Moyenne | Moyenne | Fait (§134) |
+| 99 | Fix triple-comptage km Progress + logs extras invisibles Dashboard (index UNIQUE unifié) | Haute | Moyenne | Fait (§135) |
+| 100 | Restructuration CLAUDE.md — annuaire fichiers externalisé, -56% tokens au démarrage | Basse | Faible | Fait (§136) |
 
 ---
 

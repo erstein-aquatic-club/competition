@@ -9431,3 +9431,137 @@ Suppression du `FiliereEditorOverlay` inline (163 lignes) dans `SwimPlanningDemo
 | `src/lib/api.ts` | stub `api.resetSwimFiliere` | ~916 lignes |
 | `src/pages/coach/SwimPlanningDemo.tsx` | suppression `FiliereEditorOverlay` inline (-163 LOC), import lazy du nouveau composant | ~1462 lignes |
 | `src/pages/coach/SwimPlanningAthleteView.tsx` | jauges + technicals lisent DB avec fallback constantes | ~944 lignes |
+
+## §135 — Fix triple-comptage km + logs extras invisibles sur le Dashboard (2026-04-18)
+
+### Contexte
+
+Stellio HASAPIS (id=7) a remonté deux bugs sur `Ma progression` et `Dashboard calendrier` :
+
+1. Le 6 avril 2026 affichait **18 km** alors qu'il n'avait fait qu'une séance de 6 km — comme si le système comptait la séance 3×.
+2. Quand il ajoutait une séance "en plus" un jour, le total km du jour ne se mettait pas à jour dans le calendrier et le calendrier n'affichait pas les 2 séances. Mais `Mon suivi` (SuiviSemaine) affichait bien les 10 séances de la semaine — incohérence entre les deux vues.
+
+Investigation via `mcp__plugin_supabase_supabase__execute_sql` : Stellio avait **3 rows** dans `dim_sessions` pour le 6 avril, tous à 6 100 m. 6100 × 3 = 18 300 m = 18 km — triple-comptage confirmé.
+
+### Root cause #1 — Index UNIQUE partiels disjoints
+
+La migration `00086_assignment_inheritance.sql` avait introduit deux index UNIQUE *partiels* non chevauchants :
+- `idx_dim_sessions_dedupe_v2` sur `(athlete_id, session_date, assignment_id)` WHERE `assignment_id IS NOT NULL`
+- `idx_dim_sessions_dedupe_legacy` sur `(athlete_id, session_date, time_slot)` WHERE `assignment_id IS NULL`
+
+Les deux partitions (`assignment_id NULL` vs `NOT NULL`) sont disjointes : rien n'empêche un row legacy et un row lié à une assignment de coexister pour le même créneau physique. Scénario réel : nageur saisit manuellement (`assignment_id=NULL`) → coach crée une assignment plus tard → nageur re-saisit via la nouvelle UI (`assignment_id=X`) → 2 rows pour le même (athlete, date, time_slot). Puis `Progress.tsx` somme naïvement → double/triple comptage. Pour Stellio, un 3e row existait sur le Soir (assignment séparé), d'où × 3.
+
+Audit : **1 seule paire** legacy↔new en prod (237 rows, 236 paires distinctes). Problème localisé mais prévention indispensable car le scénario se reproduira.
+
+### Root cause #2 — Dashboard n'agrège que les logs matchés à un planned
+
+`useDayMetrics.dayKm` et `useCompletionStatus.completionByISO` itéraient uniquement sur les `planned` sessions (issues des créneaux personnalisés `swimmer_training_slots` + assignments matchés). Si un nageur log sur un slot hors de son planning perso (ex. Stellio a un créneau lundi Soir uniquement, mais nage aussi le lundi Matin), le log n'est rattaché à aucun planned et **disparaît** de `dayKm` et du compteur du calendrier. `SuiviSemaine.tsx` au contraire itère directement sur `sessions`, d'où la divergence.
+
+### Changements
+
+**1. Migration `00116_dim_sessions_dedupe_unified.sql` — fusion + index unifié**
+
+- Drop des 2 index partiels (sinon le UPDATE de fusion viole `idx_dim_sessions_dedupe_v2` pendant que le row new existe encore).
+- Fusion : pour chaque paire legacy↔new, copier `assignment_id` + données de feedback depuis le row new vers le row legacy (qui conserve son `created_at` d'origine), puis DELETE le row new.
+- Création de l'index unifié : `CREATE UNIQUE INDEX idx_dim_sessions_unique ON dim_sessions (athlete_id, session_date, time_slot) WHERE athlete_id IS NOT NULL`. Plus de split legacy/new — un seul log par (nageur, date, créneau), point final.
+
+**2. `src/lib/api.ts` — `syncSession` adapté à l'index unifié**
+
+Le gestionnaire de 23505 cherchait par `assignment_id` quand fourni, sinon par `time_slot` + `assignment_id IS NULL`. Avec l'index unifié, la recherche se fait désormais uniquement par `(athlete_id, session_date, time_slot)`. Le `assignment_id` sur le UPDATE utilise le `??` : si le payload n'en apporte pas (saisie via UI legacy), on **préserve** celui déjà lié sur le row existant — évite de casser une liaison coach ↔ log.
+
+**3. `src/hooks/dashboard/useDayMetrics.ts` — orphelins pris en compte dans `dayKm`**
+
+Après la boucle sur les planned, on tracke les `log.id` déjà comptés puis on ajoute les logs du jour sélectionné dont l'id n'est pas dans ce set. Le total inclut donc désormais les séances extras que le nageur aurait loggées hors planning. Import de `toISODate` ajouté.
+
+**4. `src/hooks/dashboard/useCompletionStatus.ts` — orphelins dans `completionByISO`**
+
+Nouveau param `sessions` pré-indexé par ISO date (Map) pour un lookup O(1) par cellule de grille. Après la boucle planned, on ajoute un slot "virtuel" (`expected: true, completed: true`) pour chaque log orphelin. Le calendrier affiche désormais le même décompte que `SuiviSemaine` sans divergence.
+
+**5. `src/hooks/useDashboardState.ts` — branche `sessions` vers `useCompletionStatus`**
+
+Une ligne, passage du param.
+
+### Impact data post-migration
+
+Stellio 6 avril : **2 rows** au lieu de 3 — row 151 (Matin, désormais lié à assignment 232, distance 6100) + row 213 (Soir, assignment 255, distance 6100). Progress.tsx affichera 12,2 km. Si Stellio pense n'avoir fait qu'une seule séance (« 6 km »), il peut maintenant supprimer via l'UI le row qu'il n'a pas fait — la migration n'a pas tranché à sa place parce que seul l'utilisateur sait ce qu'il a réellement nagé.
+
+### Prévention du scénario futur
+
+Séquence désormais verrouillée :
+1. Nageur saisit manuellement → row created, `assignment_id=NULL`.
+2. Coach crée une assignment pour le même (nageur, date, slot) → aucun conflit (les assignments vivent dans `session_assignments`, séparée).
+3. Nageur re-saisit via la nouvelle UI → INSERT déclenche `23505` → fallback UPDATE du row existant avec `assignment_id` complété. Pas de doublon possible.
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `supabase/migrations/00116_dim_sessions_dedupe_unified.sql` | nouveau, merge legacy↔new + index UNIQUE unifié | ~73 lignes |
+| `src/lib/api.ts` | `syncSession` : résolution 23505 par (athlete, date, slot) + préservation `assignment_id` existant | ~919 lignes |
+| `src/hooks/dashboard/useDayMetrics.ts` | `dayKm` agrège aussi les logs orphelins de la date sélectionnée | ~94 lignes |
+| `src/hooks/dashboard/useCompletionStatus.ts` | `completionByISO` indexe `sessions` par ISO et compte les orphelins | ~135 lignes |
+| `src/hooks/useDashboardState.ts` | passe `sessions` à `useCompletionStatus` | ~262 lignes |
+
+### Tests
+
+- `npm test -- --run` → 211/211 ✅
+- `npx tsc --noEmit` → exit 0 ✅
+- Pas de test RLS (aucune policy touchée — juste un index UNIQUE et un UPDATE/DELETE de data).
+
+### Limites
+
+- La migration ne tranche pas entre rows Matin/Soir quand ils ne sont pas des doublons objectifs (créneaux physiquement différents). Si un nageur loggue par erreur sur un mauvais slot, il doit supprimer le row via l'UI.
+- `otherGroupSessions` (dashboard state) continue d'ajouter les assignments non-matchés au drawer pour permettre leur saisie. Si le nageur saisit sur un tel assignment, le log aura `assignment_id` renseigné — les deux passes (planned match par `group_XX` et orphan pass par id) sont complémentaires et n'entrent pas en conflit (même `usedLogIds`).
+
+## §136 — Restructuration CLAUDE.md : annuaire fichiers externalisé, -56% tokens (2026-04-18)
+
+### Contexte
+
+CLAUDE.md avait atteint 506 lignes / ~42 Ko, dont ~215 lignes de tableau "Fichiers clés" et ~100 lignes de tableau "Chantiers futurs (ROADMAP)". Ces deux tableaux sont chargés à **chaque démarrage de contexte**, consommant la majorité du budget token avant même d'aborder le code. L'historique des chantiers est redondant avec `docs/ROADMAP.md` + `docs/implementation-log.md` qui font déjà autorité.
+
+### Changements
+
+**1. Création de `docs/claude/files-map.md`**
+
+Annuaire complet (140+ fichiers) extrait de CLAUDE.md, avec en-tête explicatif. Chargé uniquement à la demande ("quel fichier fait X ?"). Convention colonnes préservée : chemin, rôle 1 phrase, taille mesurée via `wc -l`.
+
+**2. Allègement de CLAUDE.md — section "Fichiers clés"**
+
+Le tableau de 215 lignes remplacé par :
+- Un lien vers `docs/claude/files-map.md`
+- Un tableau compact "Hubs & orchestrateurs critiques" (16 entrées) pour les fichiers centraux nécessaires sans recherche
+
+**3. Allègement de CLAUDE.md — section "Chantiers futurs (ROADMAP)"**
+
+Les 100 lignes de tableau remplacées par 4 lignes pointant vers `docs/ROADMAP.md` + `docs/implementation-log.md`, avec mention de la dernière entrée (§135).
+
+**4. Mise à jour des règles dans "Règles de mise à jour de CLAUDE.md"**
+
+- Règle 1 : pointer vers `docs/claude/files-map.md` au lieu du tableau CLAUDE.md
+- Règle 2 : indiquer d'ajouter les entrées dans `docs/ROADMAP.md` uniquement (plus dans CLAUDE.md), et de mettre à jour la phrase "Dernière entrée : §N"
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `docs/claude/files-map.md` | nouveau — annuaire détaillé 140+ fichiers | ~224 lignes |
+| `CLAUDE.md` | tableau "Fichiers clés" → compact, tableau "Chantiers futurs" → 4 lignes, règles adaptées | 506 → 221 lignes |
+
+### Tests
+
+Aucun test à lancer — modification documentation uniquement, aucun code source touché.
+
+Vérification règles critiques :
+- `grep -ci "JAMAIS déployer" CLAUDE.md` → 1 ✅
+- `grep -c "mcp__plugin_supabase" CLAUDE.md` → 1 ✅
+- `grep -c "test:rls" CLAUDE.md` → 4 ✅
+
+### Décisions
+
+- Ne pas supprimer la section "Edge Functions Supabase" (utile sans lookup externe).
+- Conserver dans CLAUDE.md le tableau compact "Hubs & orchestrateurs critiques" pour les 16 fichiers centraux les plus souvent référencés.
+- L'annuaire complet reste dans le repo (pas dans un système externe) pour cohérence avec le workflow de commit.
+
+### Limites
+
+- Les tailles dans `docs/claude/files-map.md` sont celles copiées depuis CLAUDE.md au moment de la migration (2026-04-18) — certaines peuvent avoir légèrement dérivé depuis la dernière mise à jour. Aucune re-mesure systématique faite pour ne pas alourdir cette session.
