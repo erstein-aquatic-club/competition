@@ -109,6 +109,7 @@ export {
   uploadAvatar,
   deleteAvatar,
   getRecentSessionsAllAthletes,
+  getFeedbackRatesAllAthletes,
 } from './users';
 
 export {

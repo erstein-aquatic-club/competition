@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { getAthletesPaginated } from "@/lib/api/users";
+import { getAthletesPaginated, getFeedbackRatesAllAthletes } from "@/lib/api/users";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -137,6 +137,23 @@ function LastSeenLabel({ dateStr }: { dateStr: string | null }) {
   );
 }
 
+function FeedbackRateBadge({ feedback, assigned }: { feedback: number; assigned: number }) {
+  const ratio = feedback / assigned;
+  const pct = Math.min(100, Math.round(ratio * 100));
+  const colorClass =
+    ratio >= 0.75
+      ? "text-emerald-600 dark:text-emerald-400"
+      : ratio >= 0.4
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-red-600 dark:text-red-400";
+  return (
+    <span className={`text-[11px] font-bold tabular-nums ${colorClass}`}>
+      {feedback}/{assigned}
+      <span className="ml-1 font-normal text-muted-foreground">({pct}%)</span>
+    </span>
+  );
+}
+
 // --- Component ---
 
 interface Props {
@@ -209,6 +226,13 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
   const { data: objectiveCounts } = useQuery({
     queryKey: ["objectives-counts-by-user"],
     queryFn: () => api.getObjectivesCountsByUser(),
+    enabled: athletes.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: feedbackRates } = useQuery({
+    queryKey: ["feedback-rates-all-athletes", 30],
+    queryFn: () => getFeedbackRatesAllAthletes(30),
     enabled: athletes.length > 0,
     staleTime: 5 * 60 * 1000,
   });
@@ -520,6 +544,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
               const isLowForme = formScore !== null && formScore < 2.5;
               const readiness = athlete.id != null ? wellnessByUser.get(athlete.id) ?? null : null;
               const isDeclining = athlete.id != null && decliningUsers.has(athlete.id);
+              const feedbackRate = athlete.id != null ? feedbackRates?.get(athlete.id) : null;
 
               return (
                 <button
@@ -619,6 +644,19 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                       </div>
                       <SparkBar value={sessionsCount} max={maxSessions30d} />
                     </div>
+
+                    {/* Feedback rate */}
+                    {feedbackRate != null && feedbackRate.assigned > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Ressentis 30j
+                        </span>
+                        <FeedbackRateBadge
+                          feedback={feedbackRate.feedback}
+                          assigned={feedbackRate.assigned}
+                        />
+                      </div>
+                    )}
 
                     {/* Last seen */}
                     <div className="flex items-center justify-between border-t border-border/40 pt-2">

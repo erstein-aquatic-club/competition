@@ -448,3 +448,21 @@ export async function getRecentSessionsAllAthletes(days = 30): Promise<
     fatigue: safeOptionalInt(row.fatigue),
   }));
 }
+
+export async function getFeedbackRatesAllAthletes(
+  daysBack = 30,
+): Promise<Map<number, { assigned: number; feedback: number }>> {
+  if (!canUseSupabase()) return new Map();
+  const { data, error } = await supabase.rpc("get_feedback_rates_all_athletes", {
+    days_back: daysBack,
+  });
+  if (error) throw new Error(error.message);
+  const map = new Map<number, { assigned: number; feedback: number }>();
+  for (const row of data ?? []) {
+    map.set(Number(row.athlete_id), {
+      assigned: Number(row.assigned_count),
+      feedback: Number(row.feedback_count),
+    });
+  }
+  return map;
+}
