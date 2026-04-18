@@ -355,8 +355,15 @@ const CoachHome = ({
 
     const morning = matrix.map((row) => row[0]);
     const afternoon = matrix.map((row) => row[1]);
-    const totalSlots = activeSlots.length;
-    const assignedSlots = activeSlots.filter((s) => slotHasSession.has(s.id)).length;
+    // Sum from the matrix so the footer can never diverge from the tiles.
+    let totalSlots = 0;
+    let assignedSlots = 0;
+    for (const row of matrix) {
+      for (const cell of row) {
+        totalSlots += cell.total;
+        assignedSlots += cell.assigned;
+      }
+    }
     const emptyCount = totalSlots - assignedSlots;
 
     return { morning, afternoon, totalSlots, assignedSlots, emptyCount };
