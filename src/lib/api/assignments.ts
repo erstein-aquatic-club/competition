@@ -388,6 +388,12 @@ export async function bulkCreateSlotAssignments(params: {
 export async function getSlotAssignments(params: {
   from: string;
   to: string;
+  /**
+   * Include rows with status="completed". The planning views drop them by
+   * default (noise), but the "Ma semaine" widget needs them — otherwise past
+   * sessions whose swimmers have all submitted feedback look unassigned.
+   */
+  includeCompleted?: boolean;
 }): Promise<Array<{
   id: number;
   swim_catalog_id: number | null;
@@ -403,7 +409,7 @@ export async function getSlotAssignments(params: {
 }>> {
   if (!canUseSupabase()) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("session_assignments")
     .select(`
       id, swim_catalog_id, training_slot_id, target_group_id,
@@ -413,8 +419,13 @@ export async function getSlotAssignments(params: {
     .eq("assignment_type", "swim")
     .gte("scheduled_date", params.from)
     .lte("scheduled_date", params.to)
-    .neq("status", "completed")
     .order("scheduled_date");
+
+  if (!params.includeCompleted) {
+    query = query.neq("status", "completed");
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 

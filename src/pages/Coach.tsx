@@ -241,7 +241,12 @@ const CoachHome = ({
 
   const { data: slotAssignments = [] } = useQuery({
     queryKey: ["slot-assignments-week", formatDateIso(monday), formatDateIso(sunday)],
-    queryFn: () => api.getSlotAssignments({ from: formatDateIso(monday), to: formatDateIso(sunday) }),
+    queryFn: () =>
+      api.getSlotAssignments({
+        from: formatDateIso(monday),
+        to: formatDateIso(sunday),
+        includeCompleted: true,
+      }),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -257,10 +262,30 @@ const CoachHome = ({
       return s.scheduled_date >= mondayIso && s.scheduled_date <= sundayIso;
     });
 
-    // Slot IDs that have at least one session assignment this week
+    // Half-day bucketing — align with the convention used elsewhere in the
+    // codebase: hour < 13 = morning, otherwise afternoon.
+    const slotHalf = (slot: typeof weekSlots[number]) =>
+      parseInt(slot.start_time.split(":")[0] ?? "0", 10) < 13 ? 0 : 1;
+
+    // Mark slot IDs that have at least one session assignment this week.
+    // Fallback: assignments without training_slot_id but with scheduled_date +
+    // scheduled_slot light up every slot matching that (day, half-day).
     const slotHasSession = new Set<string>();
     for (const a of slotAssignments) {
-      if (a.training_slot_id) slotHasSession.add(a.training_slot_id);
+      if (a.training_slot_id) {
+        slotHasSession.add(a.training_slot_id);
+        continue;
+      }
+      if (a.scheduled_date && a.scheduled_slot) {
+        const jsDay = new Date(a.scheduled_date + "T00:00:00").getDay();
+        const dow = jsDay === 0 ? 6 : jsDay - 1;
+        const targetHalf = a.scheduled_slot === "morning" ? 0 : 1;
+        for (const slot of weekSlots) {
+          if (slot.day_of_week === dow && slotHalf(slot) === targetHalf) {
+            slotHasSession.add(slot.id);
+          }
+        }
+      }
     }
 
     // 7 days × 2 halves (0 = matin, 1 = aprèm)
@@ -270,8 +295,7 @@ const CoachHome = ({
     ]);
 
     for (const slot of weekSlots) {
-      const halfIdx = parseInt(slot.start_time.split(":")[0] ?? "0", 10) < 12 ? 0 : 1;
-      const cell = matrix[slot.day_of_week][halfIdx];
+      const cell = matrix[slot.day_of_week][slotHalf(slot)];
       cell.total += 1;
       if (slotHasSession.has(slot.id)) cell.assigned += 1;
     }
