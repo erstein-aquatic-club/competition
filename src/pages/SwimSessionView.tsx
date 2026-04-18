@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { generateShareToken } from "@/lib/api/swim";
 import { supabase } from "@/lib/supabase";
+import { ShareMenu } from "@/components/shared/ShareMenu";
 
 const statusLabels: Record<string, string> = {
   assigned: "Assignée",
@@ -266,22 +267,6 @@ export default function SwimSessionView() {
     },
   });
 
-  const handleShare = async () => {
-    if (!assignment) return;
-    try {
-      const token = await generateShareToken(assignment.session_id);
-      const url = `${window.location.origin}${window.location.pathname}#/s/${token}`;
-      if (navigator.share) {
-        await navigator.share({ title: assignment.title, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast({ title: "Lien copié !", description: "Le lien de partage a été copié dans le presse-papier." });
-      }
-    } catch (err) {
-      toast({ title: "Erreur", description: "Impossible de générer le lien de partage.", variant: "destructive" });
-    }
-  };
-
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
@@ -314,9 +299,18 @@ export default function SwimSessionView() {
         </div>
         <div className="flex items-center gap-2">
           {assignment ? (
-            <Button variant="ghost" size="icon" onClick={handleShare} aria-label="Partager la séance">
-              <Share2 className="h-5 w-5" />
-            </Button>
+            <ShareMenu
+              onOpen={async () => {
+                const token = await generateShareToken(assignment.session_id);
+                const url = `${window.location.origin}${window.location.pathname}#/s/${token}`;
+                return { url, title: assignment.title };
+              }}
+              trigger={
+                <Button variant="ghost" size="icon" aria-label="Partager la séance">
+                  <Share2 className="h-5 w-5" />
+                </Button>
+              }
+            />
           ) : null}
           {assignment ? (
             <Badge variant="secondary" className="text-xs">
