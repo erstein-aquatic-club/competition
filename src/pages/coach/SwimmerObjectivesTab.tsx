@@ -41,6 +41,7 @@ import {
   parseTime,
 } from "@/lib/objectiveHelpers";
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
+import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -420,6 +421,7 @@ const ObjectiveFormSheet = ({
 const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) => {
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
+  const [progressionObj, setProgressionObj] = useState<Objective | null>(null);
 
   // Resolve the auth UUID for the athlete
   const { data: athleteAuthId, isLoading: authIdLoading } = useQuery({
@@ -547,7 +549,13 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
         <div className="space-y-2">
           <ObjectiveGrid>
             {objectives.map((obj) => (
-              <ObjectiveCard key={obj.id} objective={obj} performances={performances} onClick={() => handleEdit(obj)} />
+              <ObjectiveCard
+                key={obj.id}
+                objective={obj}
+                performances={performances}
+                onClick={obj.event_code ? () => setProgressionObj(obj) : () => handleEdit(obj)}
+                onEdit={obj.event_code ? () => handleEdit(obj) : undefined}
+              />
             ))}
           </ObjectiveGrid>
           <p className="text-[10px] text-muted-foreground/60 italic text-center pt-1">
@@ -565,6 +573,19 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
           athleteName={athleteName}
           athleteAuthId={athleteAuthId}
           competitions={competitions}
+        />
+      )}
+
+      {/* Progression sheet */}
+      {progressionObj?.event_code && (
+        <EventProgressionSheet
+          open={!!progressionObj}
+          onOpenChange={(open) => { if (!open) setProgressionObj(null); }}
+          eventCode={progressionObj.event_code}
+          poolLength={(progressionObj.pool_length === 50 ? 50 : 25) as 25 | 50}
+          iuf={athleteIuf}
+          targetTime={progressionObj.target_time_seconds}
+          athleteName={athleteName}
         />
       )}
     </div>

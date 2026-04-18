@@ -9,6 +9,7 @@
  */
 
 import type { ReactNode } from "react";
+import { Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Objective } from "@/lib/api";
 import {
@@ -138,6 +139,7 @@ export type ObjectiveCardProps = {
   objective: Objective;
   performances?: Performance[];
   onClick?: () => void;
+  onEdit?: () => void;
   compact?: boolean;
   showCoachBadge?: boolean;
 };
@@ -148,6 +150,7 @@ export function ObjectiveCard({
   objective,
   performances = [],
   onClick,
+  onEdit,
   compact = false,
   showCoachBadge = false,
 }: ObjectiveCardProps) {
@@ -221,7 +224,7 @@ export function ObjectiveCard({
       onClick={onClick}
     >
       <div className="px-3 pt-3 pb-2.5 space-y-2">
-        {/* Header: event name + badge */}
+        {/* Header: event name + badge + edit */}
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate leading-tight">
@@ -231,11 +234,23 @@ export function ObjectiveCard({
               <p className="text-[10px] text-muted-foreground/50 mt-0.5">{objective.pool_length}m</p>
             )}
           </div>
-          {showCoachBadge && (
-            <Badge variant="secondary" className="text-[9px] px-1 py-0 leading-tight shrink-0">
-              Coach
-            </Badge>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {showCoachBadge && (
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 leading-tight">
+                Coach
+              </Badge>
+            )}
+            {onEdit && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                className="p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground transition-colors"
+                aria-label="Modifier l'objectif"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Text objective */}

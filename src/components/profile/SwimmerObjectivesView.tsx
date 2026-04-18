@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Objective, ObjectiveInput } from "@/lib/api";
@@ -52,6 +53,7 @@ type ObjectiveType = "chrono" | "texte" | "both";
 export default function SwimmerObjectivesView({ onBack, embedded = false }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
@@ -180,6 +182,12 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
       toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
+  const navigateToProgression = (obj: Objective) => {
+    if (!obj.event_code) return;
+    const pool = obj.pool_length ?? 25;
+    navigate(`/records?event=${encodeURIComponent(obj.event_code)}&pool=${pool}`);
+  };
+
   const showChrono = objType === "chrono" || objType === "both";
   const showText = objType === "texte" || objType === "both";
   const isPending = createMut.isPending || updateMut.isPending;
@@ -287,10 +295,22 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
       {(coachObjectives.length > 0 || personalObjectives.length > 0) && (
         <ObjectiveGrid>
           {coachObjectives.map((obj) => (
-            <ObjectiveCard key={obj.id} objective={obj} performances={performances} showCoachBadge />
+            <ObjectiveCard
+              key={obj.id}
+              objective={obj}
+              performances={performances}
+              showCoachBadge
+              onClick={obj.event_code ? () => navigateToProgression(obj) : undefined}
+            />
           ))}
           {personalObjectives.map((obj) => (
-            <ObjectiveCard key={obj.id} objective={obj} performances={performances} onClick={() => openEdit(obj)} />
+            <ObjectiveCard
+              key={obj.id}
+              objective={obj}
+              performances={performances}
+              onClick={obj.event_code ? () => navigateToProgression(obj) : () => openEdit(obj)}
+              onEdit={obj.event_code ? () => openEdit(obj) : undefined}
+            />
           ))}
         </ObjectiveGrid>
       )}

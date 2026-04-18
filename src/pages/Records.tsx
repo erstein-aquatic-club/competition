@@ -19,7 +19,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { eventCodeFromFfnName, FFN_EVENTS, eventLabel } from "@/lib/objectiveHelpers";
+import { eventCodeFromFfnName, ffnNamesFromEventCode, FFN_EVENTS, eventLabel } from "@/lib/objectiveHelpers";
 
 type OneRmRecord = {
   exercise_id: number;
@@ -169,8 +169,22 @@ export default function Records() {
   const [noteDraft, setNoteDraft] = useState<string>("");
 
   // History tab state
-  const [histPoolLen, setHistPoolLen] = useState<25 | 50>(25);
+  const [histPoolLen, setHistPoolLen] = useState<25 | 50>(() => {
+    const hash = window.location.hash;
+    const qIdx = hash.indexOf("?");
+    if (qIdx >= 0) {
+      const pool = new URLSearchParams(hash.substring(qIdx)).get("pool");
+      if (pool === "50") return 50;
+    }
+    return 25;
+  });
   const [histExpandedEvent, setHistExpandedEvent] = useState<string | null>(null);
+  const [pendingEventCode, setPendingEventCode] = useState<string | null>(() => {
+    const hash = window.location.hash;
+    const qIdx = hash.indexOf("?");
+    if (qIdx === -1) return null;
+    return new URLSearchParams(hash.substring(qIdx)).get("event");
+  });
   const [importSuccess, setImportSuccess] = useState<boolean>(false);
   const [histDays, setHistDays] = useState<number | null>(360); // null = all time
   const [histComparePool, setHistComparePool] = useState(false);
@@ -328,6 +342,18 @@ export default function Records() {
         return distance(a.eventCode) - distance(b.eventCode);
       });
   }, [performances]);
+
+  // Auto-open progression sheet when deep-linking from an objective card
+  useEffect(() => {
+    if (!pendingEventCode || groupedPerformances.length === 0) return;
+    const names = ffnNamesFromEventCode(pendingEventCode).map((n) => n.toLowerCase());
+    const group = groupedPerformances.find((g) => names.includes(g.eventCode.toLowerCase()));
+    if (group) {
+      setSwimMode("comp");
+      setHistExpandedEvent(group.eventCode);
+      setPendingEventCode(null);
+    }
+  }, [pendingEventCode, groupedPerformances]);
 
   // Chart data for expanded event (ascending date order)
   const chartData = useMemo(() => {

@@ -62,6 +62,14 @@ const EVENT_CODE_TO_NAMES: Record<string, string[]> = {
 };
 
 /**
+ * Forward lookup: given a compact event_code (e.g. "50NL"), return the list of
+ * FFN display names (e.g. ["50 NL", "50 Nage Libre"]) used in swimmer_performances.
+ */
+export function ffnNamesFromEventCode(code: string): string[] {
+  return EVENT_CODE_TO_NAMES[code] ?? [];
+}
+
+/**
  * Reverse lookup: given a FFN display name (e.g. "100 NL", "50 Pap."),
  * return the compact objective event_code (e.g. "100NL", "50PAP") or null.
  */
