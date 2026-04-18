@@ -29,6 +29,7 @@ export interface SwimmerRaceState {
   stoppedAt: number | null;
 }
 
+/** Per-wave override of the global config. Missing key = inherit from global. */
 export interface WaveConfigOverrides {
   seriesCount?: number;
   totalDistanceM?: number;
