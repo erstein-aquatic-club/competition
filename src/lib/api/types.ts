@@ -975,6 +975,12 @@ export interface ChronoRecordConfig {
   splitDistanceM: number;
   seriesCount: number;
   laneCount: number;
+  /** Optional per-wave overrides keyed by wave number. Missing wave = all-global. */
+  waveOverrides?: Record<number, {
+    seriesCount?: number;
+    totalDistanceM?: number;
+    splitDistanceM?: number;
+  }>;
 }
 
 export interface ChronoRecord {
