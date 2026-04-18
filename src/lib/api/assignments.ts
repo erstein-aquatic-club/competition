@@ -407,7 +407,7 @@ export async function getSlotAssignments(params: {
     .select(`
       id, swim_catalog_id, training_slot_id, target_group_id,
       scheduled_date, scheduled_slot, visible_from, notified_at, status,
-      swim_sessions_catalog(name)
+      swim_sessions_catalog(name, total_distance)
     `)
     .eq("assignment_type", "swim")
     .gte("scheduled_date", params.from)
@@ -428,7 +428,7 @@ export async function getSlotAssignments(params: {
     notified_at: row.notified_at,
     status: row.status,
     session_name: row.swim_sessions_catalog?.name ?? null,
-    session_distance: null,
+    session_distance: row.swim_sessions_catalog?.total_distance ?? null,
   }));
 }
 
