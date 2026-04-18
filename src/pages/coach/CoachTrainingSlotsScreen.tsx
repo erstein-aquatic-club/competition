@@ -75,6 +75,14 @@ import {
   Trophy,
 } from "lucide-react";
 
+/** Format a meter value as a short French-locale km label, or null if ≤ 0. */
+function formatAssignedKm(distanceMeters: number): string | null {
+  if (!distanceMeters || distanceMeters <= 0) return null;
+  const km = Math.round(distanceMeters / 100) / 10;
+  const label = Number.isInteger(km) ? `${km}` : km.toString().replace(".", ",");
+  return `${label} km`;
+}
+
 // ── Competition types (week overlay) ─────────────────────────────
 interface CompetitionDayEntry {
   competition: Competition;
