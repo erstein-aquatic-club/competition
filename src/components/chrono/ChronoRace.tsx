@@ -431,29 +431,40 @@ function SwimmerCard({
         <button
           type="button"
           onClick={handleStop}
-          aria-label={`Stopper ${displayName}`}
+          aria-label={`Stopper ${displayName}${shouldPromptStop ? " — arrivée" : ""}`}
           className={`shrink-0 w-24 flex flex-col items-stretch justify-between gap-1 py-1.5 transition-all touch-manipulation border-l-2 ${
             shouldPromptStop
-              ? "bg-destructive text-destructive-foreground border-destructive animate-pulse ring-inset ring-2 ring-white/30 shadow-inner"
-              : "bg-destructive/90 hover:bg-destructive active:scale-95 text-destructive-foreground border-destructive/70"
+              ? "bg-destructive text-destructive-foreground border-amber-300 animate-pulse ring-inset ring-2 ring-amber-300 shadow-lg shadow-destructive/40"
+              : "bg-slate-700 hover:bg-slate-800 active:scale-95 text-white border-slate-900/40 dark:bg-slate-600 dark:hover:bg-slate-700"
           }`}
         >
-          {/* Top : Δ lap live — the coach's key decision data */}
-          <div className="flex flex-col items-center gap-0 px-1">
-            <span className="text-[8px] font-bold uppercase tracking-[0.12em] opacity-80 leading-none">
-              Δ lap
-            </span>
-            <span className="font-mono tabular-nums text-base font-black leading-none mt-0.5">
-              {lastSplit ? formatLap(lastSplit.lapMs) : "—"}
-            </span>
-          </div>
+          {/* Top : arrival alert (if imminent) OR Δ lap live */}
+          {shouldPromptStop ? (
+            <div className="flex flex-col items-center gap-0.5 px-1">
+              <Flag className="h-5 w-5 fill-current" strokeWidth={2.5} />
+              <span className="text-[10px] font-black uppercase tracking-[0.15em] leading-none">
+                Arrivée
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-0 px-1">
+              <span className="text-[8px] font-bold uppercase tracking-[0.12em] opacity-70 leading-none">
+                Δ lap
+              </span>
+              <span className="font-mono tabular-nums text-base font-black leading-none mt-0.5">
+                {lastSplit ? formatLap(lastSplit.lapMs) : "—"}
+              </span>
+            </div>
+          )}
           {/* Bottom : STOP action */}
           <div className="flex flex-col items-center gap-0.5 px-1">
             <CircleStop
-              className={shouldPromptStop ? "h-6 w-6" : "h-5 w-5"}
-              strokeWidth={2.5}
+              className={shouldPromptStop ? "h-7 w-7" : "h-5 w-5"}
+              strokeWidth={shouldPromptStop ? 3 : 2.5}
             />
-            <span className="text-[10px] font-black uppercase tracking-[0.15em] leading-none">
+            <span className={`font-black uppercase tracking-[0.15em] leading-none ${
+              shouldPromptStop ? "text-xs" : "text-[10px]"
+            }`}>
               {shouldPromptStop ? "Stop !" : "Stop"}
             </span>
           </div>
