@@ -407,7 +407,7 @@ export async function getSlotAssignments(params: {
     .select(`
       id, swim_catalog_id, training_slot_id, target_group_id,
       scheduled_date, scheduled_slot, visible_from, notified_at, status,
-      swim_sessions_catalog(name, total_distance)
+      swim_sessions_catalog(name, total_distance, swim_session_items(distance))
     `)
     .eq("assignment_type", "swim")
     .gte("scheduled_date", params.from)
@@ -417,19 +417,30 @@ export async function getSlotAssignments(params: {
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    swim_catalog_id: row.swim_catalog_id,
-    training_slot_id: row.training_slot_id,
-    target_group_id: row.target_group_id,
-    scheduled_date: row.scheduled_date,
-    scheduled_slot: row.scheduled_slot,
-    visible_from: row.visible_from,
-    notified_at: row.notified_at,
-    status: row.status,
-    session_name: row.swim_sessions_catalog?.name ?? null,
-    session_distance: row.swim_sessions_catalog?.total_distance ?? null,
-  }));
+  return (data ?? []).map((row: any) => {
+    const catalog = row.swim_sessions_catalog;
+    const storedDistance: number | null = catalog?.total_distance ?? null;
+    const itemsSum: number | null = Array.isArray(catalog?.swim_session_items)
+      ? catalog.swim_session_items.reduce(
+          (acc: number, item: { distance: number | null }) =>
+            acc + (item.distance ?? 0),
+          0,
+        )
+      : null;
+    return {
+      id: row.id,
+      swim_catalog_id: row.swim_catalog_id,
+      training_slot_id: row.training_slot_id,
+      target_group_id: row.target_group_id,
+      scheduled_date: row.scheduled_date,
+      scheduled_slot: row.scheduled_slot,
+      visible_from: row.visible_from,
+      notified_at: row.notified_at,
+      status: row.status,
+      session_name: catalog?.name ?? null,
+      session_distance: storedDistance ?? itemsSum,
+    };
+  });
 }
 
 /**
