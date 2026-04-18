@@ -36,21 +36,37 @@ class FakeClipboardItem {
   }
 }
 
-test("openWhatsAppLink — calls window.open with encoded wa.me URL, _blank, noopener,noreferrer", () => {
-  const openSpy = mock.fn();
-  const restoreWindow = defineGlobal("window", { open: openSpy });
+type FakeAnchor = { href: string; click: ReturnType<typeof mock.fn> };
+
+function mockDocumentWithAnchor(): {
+  fakeAnchor: FakeAnchor;
+  createElementSpy: ReturnType<typeof mock.fn>;
+  restore: Restorer;
+} {
+  const fakeAnchor: FakeAnchor = { href: "", click: mock.fn() };
+  const createElementSpy = mock.fn((tag: string) =>
+    tag === "a" ? fakeAnchor : ({} as unknown),
+  );
+  const restore = defineGlobal("document", {
+    createElement: createElementSpy,
+    body: { appendChild: mock.fn(), removeChild: mock.fn() },
+  });
+  return { fakeAnchor, createElementSpy, restore };
+}
+
+test("openWhatsAppLink — triggers whatsapp:// scheme via anchor click with encoded text", () => {
+  const { fakeAnchor, createElementSpy, restore } = mockDocumentWithAnchor();
   try {
     openWhatsAppLink("https://eac.app/s/abc?k=1&x=é");
-    assert.strictEqual(openSpy.mock.callCount(), 1);
-    const [urlArg, targetArg, featuresArg] = openSpy.mock.calls[0].arguments;
+    assert.strictEqual(createElementSpy.mock.callCount(), 1);
+    assert.strictEqual(createElementSpy.mock.calls[0].arguments[0], "a");
     assert.strictEqual(
-      urlArg,
-      "https://wa.me/?text=https%3A%2F%2Feac.app%2Fs%2Fabc%3Fk%3D1%26x%3D%C3%A9",
+      fakeAnchor.href,
+      "whatsapp://send?text=https%3A%2F%2Feac.app%2Fs%2Fabc%3Fk%3D1%26x%3D%C3%A9",
     );
-    assert.strictEqual(targetArg, "_blank");
-    assert.strictEqual(featuresArg, "noopener,noreferrer");
+    assert.strictEqual(fakeAnchor.click.mock.callCount(), 1);
   } finally {
-    restoreWindow();
+    restore();
   }
 });
 
@@ -89,25 +105,21 @@ test("copyImage — constructs ClipboardItem({'image/png': blob}) and passes [it
   }
 });
 
-test("openWhatsAppWithImage — calls navigator.clipboard.write AND window.open(https://web.whatsapp.com, ...)", async () => {
+test("openWhatsAppWithImage — copies image then triggers whatsapp:// scheme via anchor click", async () => {
   const writeSpy = mock.fn(() => Promise.resolve());
-  const openSpy = mock.fn();
   const restoreNav = defineGlobal("navigator", {
     clipboard: { write: writeSpy },
   });
   const restoreCI = defineGlobal("ClipboardItem", FakeClipboardItem);
-  const restoreWindow = defineGlobal("window", { open: openSpy });
+  const { fakeAnchor, restore: restoreDoc } = mockDocumentWithAnchor();
   try {
     const blob = new Blob(["x"], { type: "image/png" });
     await openWhatsAppWithImage(blob);
     assert.strictEqual(writeSpy.mock.callCount(), 1);
-    assert.strictEqual(openSpy.mock.callCount(), 1);
-    const [urlArg, targetArg, featuresArg] = openSpy.mock.calls[0].arguments;
-    assert.strictEqual(urlArg, "https://web.whatsapp.com");
-    assert.strictEqual(targetArg, "_blank");
-    assert.strictEqual(featuresArg, "noopener,noreferrer");
+    assert.strictEqual(fakeAnchor.href, "whatsapp://");
+    assert.strictEqual(fakeAnchor.click.mock.callCount(), 1);
   } finally {
-    restoreWindow();
+    restoreDoc();
     restoreCI();
     restoreNav();
   }

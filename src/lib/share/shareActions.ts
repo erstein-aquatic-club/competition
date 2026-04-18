@@ -1,8 +1,18 @@
 import type { SharePayload } from "./types";
 
+// Invoque un scheme URL (ex: whatsapp://) via un click programmatique sur <a>.
+// Contrairement à window.open, ça préserve l'onglet courant et déclenche le
+// handler OS (WhatsApp Desktop) sans ouvrir de tab intermédiaire.
+export function triggerUrlScheme(href: string): void {
+  const a = document.createElement("a");
+  a.href = href;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export function openWhatsAppLink(url: string): void {
-  const wa = `https://wa.me/?text=${encodeURIComponent(url)}`;
-  window.open(wa, "_blank", "noopener,noreferrer");
+  triggerUrlScheme(`whatsapp://send?text=${encodeURIComponent(url)}`);
 }
 
 export async function copyText(text: string): Promise<void> {
@@ -16,7 +26,7 @@ export async function copyImage(blob: Blob): Promise<void> {
 
 export async function openWhatsAppWithImage(blob: Blob): Promise<void> {
   await copyImage(blob);
-  window.open("https://web.whatsapp.com", "_blank", "noopener,noreferrer");
+  triggerUrlScheme("whatsapp://");
 }
 
 export function downloadImage(blob: Blob, fileName: string): void {
