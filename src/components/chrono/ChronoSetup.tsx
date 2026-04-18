@@ -183,49 +183,30 @@ export default function ChronoSetup({
         )}
       </div>
 
-      {/* ── Departure intervals per wave ──────────────── */}
+      {/* ── Per-wave config cards (interval + optional overrides) ── */}
       {activeWaves.length > 0 && (
         <div className="flex flex-col gap-2">
-          <span className="text-sm text-muted-foreground">Départ toutes les :</span>
-          <div className="flex flex-wrap items-center gap-3">
-            {activeWaves.map((w) => {
-              const c = WAVE_COLORS[w - 1];
-              const waveState = state.waves.find((ws) => ws.wave === w);
-              const totalSec = waveState?.departureIntervalSec ?? 0;
-              const minutes = Math.floor(totalSec / 60);
-              const seconds = totalSec % 60;
-              const updateInterval = (min: number, sec: number) => {
-                dispatch({ type: "SET_WAVE_INTERVAL", wave: w, seconds: min * 60 + sec });
-              };
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-muted-foreground">Par vague</span>
+            {(() => {
+              const customCount = state.waves.filter((w) => w.overrides !== null).length;
+              if (customCount === 0) return null;
               return (
-                <div key={w} className="flex items-center gap-1.5">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${c.dot}`}>
-                    {c.label}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={minutes || ""}
-                    placeholder="0"
-                    onChange={(e) => updateInterval(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
-                    className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-                  />
-                  <span className="text-xs text-muted-foreground">min</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={seconds || ""}
-                    placeholder="0"
-                    onChange={(e) => {
-                      const val = Number(e.target.value.replace(/\D/g, "")) || 0;
-                      updateInterval(minutes, Math.min(59, val));
-                    }}
-                    className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-                  />
-                  <span className="text-xs text-muted-foreground">sec</span>
-                </div>
+                <span className="text-[10px] text-muted-foreground/70 italic">
+                  {customCount} personnalisée{customCount > 1 ? "s" : ""}
+                </span>
               );
-            })}
+            })()}
+          </div>
+          <div className="flex flex-col gap-2">
+            {activeWaves.map((w) => (
+              <WaveConfigCard
+                key={w}
+                wave={w}
+                state={state}
+                dispatch={dispatch}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -719,6 +700,189 @@ function NewManualTabBody({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── WaveConfigCard — per-wave interval + optional override ──
+// Compact by default (chip + interval inputs + Personnaliser button).
+// Expands to show seriesCount / totalDistanceM / splitDistanceM overrides.
+
+function WaveConfigCard({
+  wave,
+  state,
+  dispatch,
+}: {
+  wave: number;
+  state: ChronoState;
+  dispatch: React.Dispatch<ChronoAction>;
+}) {
+  const c = WAVE_COLORS[wave - 1];
+  const waveState = state.waves.find((ws) => ws.wave === wave);
+  if (!waveState) return null;
+
+  const totalSec = waveState.departureIntervalSec;
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  const isCustom = waveState.overrides !== null;
+
+  const updateInterval = (min: number, sec: number) => {
+    dispatch({ type: "SET_WAVE_INTERVAL", wave, seconds: min * 60 + sec });
+  };
+
+  const activatePersonalize = () => {
+    dispatch({
+      type: "SET_WAVE_OVERRIDES",
+      wave,
+      overrides: {
+        seriesCount: state.seriesCount,
+        totalDistanceM: state.totalDistanceM,
+        splitDistanceM: state.splitDistanceM,
+      },
+    });
+  };
+
+  const resetPersonalize = () => {
+    dispatch({ type: "SET_WAVE_OVERRIDES", wave, overrides: null });
+  };
+
+  return (
+    <div
+      className={`rounded-lg border p-3 transition-colors ${
+        isCustom ? `${c.border} bg-card` : "border-border bg-card/50"
+      }`}
+    >
+      {/* Header row : chip + status + action */}
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${c.dot}`}>
+          {c.label}
+        </span>
+        {isCustom ? (
+          <>
+            <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}>
+              <Check className="h-2.5 w-2.5" />
+              Personnalisée
+            </span>
+            <button
+              type="button"
+              onClick={resetPersonalize}
+              className="ml-auto text-[11px] text-muted-foreground hover:text-destructive hover:underline transition-colors"
+            >
+              Réinitialiser
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={activatePersonalize}
+            className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Pencil className="h-3 w-3" />
+            Personnaliser
+          </button>
+        )}
+      </div>
+
+      {/* Interval row — always visible */}
+      <div className="mt-2 flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Départ toutes les</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={minutes || ""}
+          placeholder="0"
+          onChange={(e) => updateInterval(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
+          className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+        />
+        <span className="text-xs text-muted-foreground">min</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={seconds || ""}
+          placeholder="0"
+          onChange={(e) => {
+            const val = Number(e.target.value.replace(/\D/g, "")) || 0;
+            updateInterval(minutes, Math.min(59, val));
+          }}
+          className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+        />
+        <span className="text-xs text-muted-foreground">sec</span>
+      </div>
+
+      {/* Override row — visible only when personalized */}
+      {isCustom && waveState.overrides && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+          <WaveOverrideField
+            wave={wave}
+            field="seriesCount"
+            value={waveState.overrides.seriesCount ?? state.seriesCount}
+            placeholder="∞"
+            width="w-10"
+            suffix="×"
+            dispatch={dispatch}
+          />
+          <WaveOverrideField
+            wave={wave}
+            field="totalDistanceM"
+            value={waveState.overrides.totalDistanceM ?? state.totalDistanceM}
+            placeholder="—"
+            width="w-16"
+            suffix="m"
+            dispatch={dispatch}
+          />
+          <span className="text-xs text-muted-foreground">splits à</span>
+          <WaveOverrideField
+            wave={wave}
+            field="splitDistanceM"
+            value={waveState.overrides.splitDistanceM ?? state.splitDistanceM}
+            placeholder="50"
+            width="w-14"
+            suffix="m"
+            dispatch={dispatch}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Single override field (unitary SET_WAVE_OVERRIDE_FIELD dispatcher) ──
+
+function WaveOverrideField({
+  wave,
+  field,
+  value,
+  placeholder,
+  width,
+  suffix,
+  dispatch,
+}: {
+  wave: number;
+  field: "seriesCount" | "totalDistanceM" | "splitDistanceM";
+  value: number;
+  placeholder: string;
+  width: string;
+  suffix: string;
+  dispatch: React.Dispatch<ChronoAction>;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value || ""}
+        placeholder={placeholder}
+        onChange={(e) =>
+          dispatch({
+            type: "SET_WAVE_OVERRIDE_FIELD",
+            wave,
+            field,
+            value: Number(e.target.value.replace(/\D/g, "")) || 0,
+          })
+        }
+        className={`${width} text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary`}
+      />
+      <span className="text-xs text-muted-foreground">{suffix}</span>
     </div>
   );
 }
