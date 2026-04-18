@@ -9,7 +9,7 @@ import type {
 } from "@/lib/api/types";
 import type { SlotInstance } from "@/hooks/useSlotCalendar";
 import { computeSlotState, resolveSlotAssignment, sumAssignedDistance } from "@/hooks/useSlotCalendar";
-import { deriveScheduledSlot } from "@/lib/api/assignments";
+import { deriveScheduledSlot, resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
@@ -1986,6 +1986,47 @@ const CoachTrainingSlotsScreen = ({
       }),
   });
 
+  // When a swimmer with custom slots is selected, his swimmer_training_slots IDs
+  // don't match session_assignments.training_slot_id (which points to the group's
+  // training_slot). Reuse the swimmer-side resolver to map each custom slot to
+  // the assignment it inherits via source_assignment_id + group membership.
+  const weekIsoDates = useMemo(
+    () => weekDates.map((d) => toIsoDate(d)),
+    [weekDates],
+  );
+
+  const { data: resolvedSwimmerAssignments } = useQuery({
+    queryKey: [
+      "coach-resolved-swimmer-assignments",
+      swimmerFilterId,
+      weekMondayIso,
+    ],
+    queryFn: () =>
+      resolveSwimmerAssignmentsBatch(swimmerFilterId!, weekIsoDates),
+    enabled: swimmerFilterId != null && swimmerHasCustom === true,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // "swimmerSlotId:YYYY-MM-DD" → assignmentId
+  const swimmerAssignmentIdByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!resolvedSwimmerAssignments) return map;
+    for (const [iso, list] of resolvedSwimmerAssignments.entries()) {
+      for (const r of list) {
+        if (r.assignmentId != null) {
+          map.set(`${r.swimmerSlotId}:${iso}`, r.assignmentId);
+        }
+      }
+    }
+    return map;
+  }, [resolvedSwimmerAssignments]);
+
+  const slotAssignmentById = useMemo(() => {
+    const map = new Map<number, typeof slotAssignments[number]>();
+    for (const a of slotAssignments) map.set(a.id, a);
+    return map;
+  }, [slotAssignments]);
+
   const weekOverrides = useMemo(() => {
     return allOverrides.filter(
       (o) => o.override_date >= weekMondayIso && o.override_date <= weekSundayIso,
@@ -2015,6 +2056,8 @@ const CoachTrainingSlotsScreen = ({
   const slotInstancesById = useMemo(() => {
     const map = new Map<string, SlotInstance>();
     const today = todayIso();
+    const useSwimmerResolution =
+      swimmerFilterId != null && swimmerHasCustom === true;
 
     for (const slot of weekFilteredSlots) {
       const slotDate = weekDates[slot.day_of_week - 1];
@@ -2026,7 +2069,17 @@ const CoachTrainingSlotsScreen = ({
           item.slot_id === slot.id &&
           item.override_date === scheduledDate,
       );
-      const assignment = resolveSlotAssignment(slot, scheduledDate, slotAssignments);
+
+      let assignment;
+      if (useSwimmerResolution) {
+        const assignmentId = swimmerAssignmentIdByKey.get(
+          `${slot.id}:${scheduledDate}`,
+        );
+        assignment =
+          assignmentId != null ? slotAssignmentById.get(assignmentId) : undefined;
+      } else {
+        assignment = resolveSlotAssignment(slot, scheduledDate, slotAssignments);
+      }
 
       const state =
         override?.status === "cancelled"
@@ -2044,7 +2097,16 @@ const CoachTrainingSlotsScreen = ({
     }
 
     return map;
-  }, [weekFilteredSlots, slotAssignments, weekDates, weekOverrides]);
+  }, [
+    weekFilteredSlots,
+    slotAssignments,
+    weekDates,
+    weekOverrides,
+    swimmerFilterId,
+    swimmerHasCustom,
+    swimmerAssignmentIdByKey,
+    slotAssignmentById,
+  ]);
 
   const weekTotalDistance = useMemo(
     () => sumAssignedDistance(Array.from(slotInstancesById.values())),

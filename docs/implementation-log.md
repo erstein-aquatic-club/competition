@@ -9565,3 +9565,48 @@ Vérification règles critiques :
 ### Limites
 
 - Les tailles dans `docs/claude/files-map.md` sont celles copiées depuis CLAUDE.md au moment de la migration (2026-04-18) — certaines peuvent avoir légèrement dérivé depuis la dernière mise à jour. Aucune re-mesure systématique faite pour ne pas alourdir cette session.
+
+## §137 — Fix vue semaine coach : assignations invisibles pour nageur à créneaux personnalisés (2026-04-18)
+
+### Contexte
+
+Dans la vue "semaine" coach (`CoachTrainingSlotsScreen`), filtrer par un nageur ayant des créneaux personnalisés (ex. François WAGNER) affichait tous ses slots "vides" alors même que les séances assignées au groupe sont bien reçues dans son calendrier nageur.
+
+### Root cause
+
+Quand `filterCoachTrainingSlots` détecte un nageur avec custom slots, il remplace les `training_slots` par les `swimmer_training_slots` convertis — donc `slot.id` devient un UUID de `swimmer_training_slots` (au lieu de `training_slots`). Ensuite, `resolveSlotAssignment` (`src/hooks/useSlotCalendar.ts:117`) tente `assignment.training_slot_id === slot.id` : ça ne matche jamais, car les `session_assignments` pointent vers l'ID du `training_slot` du groupe, pas vers celui du swimmer-slot. Les fallbacks échouent aussi (`assignments: []` sur les slots convertis + `training_slot_id` non nul sur les assignations).
+
+Côté nageur, `resolveSwimmerAssignmentsBatch` (`src/lib/api/assignments.ts:526`) fait la résolution : `swimmer_slot.source_assignment_id` → `training_slot_assignments.slot_id` → matche `session_assignments.training_slot_id`. Le coach view n'utilisait pas cette logique.
+
+### Changements
+
+Ajout dans `CoachTrainingSlotsScreen.tsx` :
+
+1. Import de `resolveSwimmerAssignmentsBatch`.
+2. Query `coach-resolved-swimmer-assignments` activée uniquement quand `swimmerFilterId != null && swimmerHasCustom`, sur les 7 dates de la semaine.
+3. Map `"swimmerSlotId:YYYY-MM-DD" → assignmentId` construite depuis le batch résolu.
+4. Map `assignmentId → SlotAssignment` construite depuis `slotAssignments` (déjà fetché) pour récupérer les métadonnées (`session_name`, `session_distance`, etc.).
+5. Dans `slotInstancesById`, branche spécifique quand `useSwimmerResolution === true` : lookup via les deux maps au lieu de `resolveSlotAssignment`.
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | import + 2 maps + branche dans `slotInstancesById` | ~3119 lignes (vs ~3060 avant) |
+
+### Tests
+
+- `npx tsc --noEmit` → 0 erreur.
+- `node src/pages/coach/__tests__/coachTrainingSlotsFilter.test.ts` (via vitest run) → 4 pass, 0 fail (logique du filtre inchangée).
+- Tests RLS non lancés : le patch ne touche ni migration ni policy ni helper auth.
+
+### Décisions
+
+- **Réutilisation de `resolveSwimmerAssignmentsBatch`** plutôt que nouvelle logique : la fonction est déjà testée en prod (dashboard nageur) et encapsule individual / subgroup / group / timing fallback. Éviter le drift entre les deux vues.
+- **Branche conditionnelle** dans `slotInstancesById` plutôt que transformer `swimmerSlotsAsTraining` pour imiter un `training_slot` : les IDs swimmer-slot restent nécessaires pour les autres features de l'écran (override, cancellation, visibilité).
+- **Pas de nouvelle requête réseau** quand le filtre n'est pas "swimmer" : `enabled` de la query est conditionnel.
+
+### Limites
+
+- Les assignations avec `status = "completed"` restent masquées (cohérent avec le comportement pour les filtres groupe/all — `getSlotAssignments` les filtre par défaut).
+- Si un nageur a un swimmer-slot dont `source_assignment_id` référence une `training_slot_assignments` supprimée, la résolution retombe sur le timing match (morning/evening) + group membership, comportement identique à la vue nageur.
