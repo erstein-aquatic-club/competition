@@ -40,17 +40,28 @@ function WaveHeaderCell({
   now,
   dispatch,
   getTimestamp,
-  seriesCount,
+  resolvedConfig,
 }: {
   wave: ChronoState["waves"][number];
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
-  seriesCount: number;
+  resolvedConfig: { seriesCount: number; totalDistanceM: number; splitDistanceM: number };
 }) {
   const wc = WAVE_COLORS[wave.wave - 1] ?? WAVE_COLORS[0];
   const launched = wave.startedAt !== null;
   const betweenReps = launched && wave.lastFinishedAt !== null;
+
+  const configLabel = (() => {
+    const parts: string[] = [];
+    if (resolvedConfig.seriesCount > 0) parts.push(`${resolvedConfig.seriesCount}×`);
+    if (resolvedConfig.totalDistanceM > 0) parts.push(`${resolvedConfig.totalDistanceM}m`);
+    const main = parts.join("");
+    if (resolvedConfig.splitDistanceM > 0) {
+      return main ? `${main} · splits ${resolvedConfig.splitDistanceM}m` : `splits ${resolvedConfig.splitDistanceM}m`;
+    }
+    return main;
+  })();
 
   // ── Case 1: never launched yet ──
   if (!launched) {
@@ -66,9 +77,14 @@ function WaveHeaderCell({
         }
         className={`flex flex-col items-center justify-center rounded-md ${wc.dot} w-full h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
       >
-        <span className="text-[11px] font-bold uppercase tracking-widest text-white/90 leading-none mb-1">
-          {wc.label}{wave.currentRep > 0 ? ` S${wave.currentRep + 1}${seriesCount > 0 ? `/${seriesCount}` : ""}` : ""}
+        <span className="text-[11px] font-bold uppercase tracking-widest text-white/90 leading-none mb-0.5">
+          {wc.label}{wave.currentRep > 0 ? ` S${wave.currentRep + 1}${resolvedConfig.seriesCount > 0 ? `/${resolvedConfig.seriesCount}` : ""}` : ""}
         </span>
+        {configLabel && (
+          <span className="text-[9px] font-medium text-white/70 leading-none mb-1 tabular-nums">
+            {configLabel}
+          </span>
+        )}
         <span className="flex items-center gap-1.5 text-xl font-black text-white leading-none tracking-wide">
           <Play className="h-5 w-5 fill-current" /> GO
         </span>
@@ -134,9 +150,14 @@ function WaveHeaderCell({
           }
           className={`flex flex-col items-center justify-center rounded-b-md ${wc.dot} w-full h-16 animate-pulse active:scale-95 transition-transform cursor-pointer touch-manipulation shadow-sm`}
         >
-          <span className="text-[11px] font-bold uppercase tracking-widest text-white/90 leading-none mb-1">
-            {wc.label} S{wave.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""}
+          <span className="text-[11px] font-bold uppercase tracking-widest text-white/90 leading-none mb-0.5">
+            {wc.label} S{wave.currentRep + 1}{resolvedConfig.seriesCount > 0 ? `/${resolvedConfig.seriesCount}` : ""}
           </span>
+          {configLabel && (
+            <span className="text-[9px] font-medium text-white/70 leading-none mb-1 tabular-nums">
+              {configLabel}
+            </span>
+          )}
           <span className="flex items-center gap-1.5 text-xl font-black text-white leading-none tracking-wide">
             <Play className="h-5 w-5 fill-current" /> GO
           </span>
@@ -189,12 +210,19 @@ function WaveHeaderCell({
             className="rounded px-1 py-0.5 text-[8px] font-bold uppercase border border-border text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation leading-none"
             title="Série suivante"
           >
-            S{wave.currentRep + 1}{seriesCount > 0 ? `/${seriesCount}` : ""} ↻
+            S{wave.currentRep + 1}{resolvedConfig.seriesCount > 0 ? `/${resolvedConfig.seriesCount}` : ""} ↻
           </button>
         </div>
-        <span className={`font-mono tabular-nums font-bold tracking-tight ml-auto ${intervalMs > 0 ? "text-sm text-muted-foreground" : "text-base text-foreground"}`}>
-          {formatTime(elapsed)}
-        </span>
+        <div className="flex flex-col items-end gap-0 ml-auto">
+          <span className={`font-mono tabular-nums font-bold tracking-tight ${intervalMs > 0 ? "text-sm text-muted-foreground" : "text-base text-foreground"}`}>
+            {formatTime(elapsed)}
+          </span>
+          {configLabel && (
+            <span className="text-[9px] font-medium text-muted-foreground/70 leading-none tabular-nums">
+              {configLabel}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -591,7 +619,7 @@ function LaneWaveMatrix({
                 now={now}
                 dispatch={dispatch}
                 getTimestamp={getTimestamp}
-                seriesCount={globalConfig.seriesCount}
+                resolvedConfig={resolveWaveConfig({ ...globalConfig, waves }, w)}
               />
             </div>
           );
