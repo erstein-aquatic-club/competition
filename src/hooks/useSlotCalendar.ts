@@ -321,6 +321,11 @@ export function useSlotCalendar() {
     [slots, assignments, overrides, mondayIso],
   );
 
+  const weekTotalDistance = useMemo(
+    () => sumAssignedDistance(instances),
+    [instances],
+  );
+
   // Group by date
   const instancesByDate = useMemo(() => {
     const map = new Map<string, SlotInstance[]>();
@@ -348,5 +353,6 @@ export function useSlotCalendar() {
     navigateToday,
     prevWeek,
     nextWeek,
+    weekTotalDistance,
   };
 }
