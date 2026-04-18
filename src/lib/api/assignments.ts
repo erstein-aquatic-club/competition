@@ -17,6 +17,7 @@ import { localStorageGet, localStorageSave } from './localStorage';
 import { getSwimCatalog } from './swim';
 import { getStrengthSessions } from './strength';
 import { getSwimmerSlots } from './swimmer-slots';
+import { calculateSwimTotalDistance } from '@/lib/swimSessionUtils';
 
 
 export async function getAssignmentsForCoach(): Promise<Assignment[] | null> {
@@ -407,7 +408,7 @@ export async function getSlotAssignments(params: {
     .select(`
       id, swim_catalog_id, training_slot_id, target_group_id,
       scheduled_date, scheduled_slot, visible_from, notified_at, status,
-      swim_sessions_catalog(name, total_distance, swim_session_items(distance))
+      swim_sessions_catalog(name, total_distance, swim_session_items(distance, raw_payload))
     `)
     .eq("assignment_type", "swim")
     .gte("scheduled_date", params.from)
@@ -420,12 +421,8 @@ export async function getSlotAssignments(params: {
   return (data ?? []).map((row: any) => {
     const catalog = row.swim_sessions_catalog;
     const storedDistance: number | null = catalog?.total_distance ?? null;
-    const itemsSum: number | null = Array.isArray(catalog?.swim_session_items)
-      ? catalog.swim_session_items.reduce(
-          (acc: number, item: { distance: number | null }) =>
-            acc + (item.distance ?? 0),
-          0,
-        )
+    const computedDistance: number | null = Array.isArray(catalog?.swim_session_items)
+      ? calculateSwimTotalDistance(catalog.swim_session_items)
       : null;
     return {
       id: row.id,
@@ -438,7 +435,7 @@ export async function getSlotAssignments(params: {
       notified_at: row.notified_at,
       status: row.status,
       session_name: catalog?.name ?? null,
-      session_distance: storedDistance ?? itemsSum,
+      session_distance: storedDistance ?? computedDistance,
     };
   });
 }
