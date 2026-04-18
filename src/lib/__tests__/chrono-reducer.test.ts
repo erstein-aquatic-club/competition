@@ -354,3 +354,40 @@ describe("normalizeRecordSwimmer", () => {
     expect(normalizeRecordSwimmer(sw).manualId).toBe("u1");
   });
 });
+
+describe("SET_WAVE_OVERRIDES", () => {
+  it("sets the full override object on the target wave", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "ADD_SWIMMER", swimmer: reg(2, 2) },
+    );
+    const s1 = chronoReducer(s0, {
+      type: "SET_WAVE_OVERRIDES",
+      wave: 2,
+      overrides: { seriesCount: 6, totalDistanceM: 100, splitDistanceM: 25 },
+    });
+    expect(s1.waves.find((w) => w.wave === 2)?.overrides).toEqual({
+      seriesCount: 6, totalDistanceM: 100, splitDistanceM: 25,
+    });
+    expect(s1.waves.find((w) => w.wave === 1)?.overrides).toBeNull();
+  });
+
+  it("resets the override when null is passed", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "SET_WAVE_OVERRIDES", wave: 1, overrides: { seriesCount: 4 } },
+    );
+    const s1 = chronoReducer(s0, { type: "SET_WAVE_OVERRIDES", wave: 1, overrides: null });
+    expect(s1.waves.find((w) => w.wave === 1)?.overrides).toBeNull();
+  });
+
+  it("no-op on non-existent wave", () => {
+    const s0 = reduce(initialChronoState, { type: "ADD_SWIMMER", swimmer: reg(1, 1) });
+    const s1 = chronoReducer(s0, {
+      type: "SET_WAVE_OVERRIDES",
+      wave: 99,
+      overrides: { seriesCount: 6 },
+    });
+    expect(s1.waves).toEqual(s0.waves);
+  });
+});

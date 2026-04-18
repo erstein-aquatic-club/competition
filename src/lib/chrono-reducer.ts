@@ -4,6 +4,7 @@ import type {
   SplitRecord,
   SwimmerRaceState,
   WaveState,
+  WaveConfigOverrides,
 } from "./chrono-types";
 
 // ── Actions ──────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ type ChronoAction =
   | { type: "SET_SERIES_COUNT"; count: number }
   | { type: "SET_TITLE"; title: string }
   | { type: "SET_WAVE_INTERVAL"; wave: number; seconds: number }
+  | { type: "SET_WAVE_OVERRIDES"; wave: number; overrides: WaveConfigOverrides | null }
   | { type: "ADD_SWIMMER"; swimmer: ChronoSwimmer }
   | { type: "REMOVE_SWIMMER"; key: string }
   | { type: "MOVE_SWIMMER"; key: string; lane: number }
@@ -95,6 +97,15 @@ export function chronoReducer(
         w.wave === action.wave
           ? { ...w, departureIntervalSec: Math.max(0, action.seconds) }
           : w,
+      );
+      return { ...state, waves };
+    }
+
+    case "SET_WAVE_OVERRIDES": {
+      const target = state.waves.find((w) => w.wave === action.wave);
+      if (!target) return state;
+      const waves = state.waves.map((w) =>
+        w.wave === action.wave ? { ...w, overrides: action.overrides } : w,
       );
       return { ...state, waves };
     }
