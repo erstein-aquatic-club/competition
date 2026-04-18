@@ -96,7 +96,7 @@ function WaveHeaderCell({
                 ? `Récupération dépassée de ${formatTime(-remainingMs)}`
                 : `Récupération restante ${formatTime(remainingMs)}`
             }
-            className={`flex items-center justify-center gap-1 rounded-t-md px-2 py-1 font-mono tabular-nums font-black transition-colors ${
+            className={`flex items-center justify-between gap-2 rounded-t-md px-3 py-2 font-mono tabular-nums font-black transition-colors ${
               overdue
                 ? "bg-destructive text-destructive-foreground"
                 : urgent
@@ -104,10 +104,10 @@ function WaveHeaderCell({
                   : "bg-muted text-foreground"
             }`}
           >
-            <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 leading-none">
               Récup
             </span>
-            <span className={`text-sm leading-none ${urgent || overdue ? "text-base" : ""}`}>
+            <span className={`font-black leading-none tracking-tight ${urgent || overdue ? "text-2xl" : "text-xl"}`}>
               {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
             </span>
           </div>
@@ -115,12 +115,12 @@ function WaveHeaderCell({
           <div
             role="timer"
             aria-label={`Récupération en cours ${formatTime(recoveryElapsed)}`}
-            className="flex items-center justify-center gap-1 rounded-t-md px-2 py-1 font-mono tabular-nums font-black bg-muted text-foreground"
+            className="flex items-center justify-between gap-2 rounded-t-md px-3 py-2 font-mono tabular-nums font-black bg-muted text-foreground"
           >
-            <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 leading-none">
               Récup
             </span>
-            <span className="text-sm leading-none">{formatTime(recoveryElapsed)}</span>
+            <span className="text-xl font-black leading-none tracking-tight">{formatTime(recoveryElapsed)}</span>
           </div>
         )}
         <button
@@ -156,7 +156,7 @@ function WaveHeaderCell({
               ? `Récupération dépassée de ${formatTime(-remainingMs)}`
               : `Récupération restante ${formatTime(remainingMs)}`
           }
-          className={`flex items-center justify-center gap-1 rounded-t-md px-2 py-0.5 font-mono tabular-nums font-black transition-colors ${
+          className={`flex items-center justify-between gap-2 rounded-t-md px-3 py-1.5 font-mono tabular-nums font-black transition-colors ${
             overdue
               ? "bg-destructive text-destructive-foreground"
               : urgent
@@ -164,10 +164,10 @@ function WaveHeaderCell({
                 : "bg-muted text-foreground"
           }`}
         >
-          <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70 leading-none">
+          <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 leading-none">
             Récup
           </span>
-          <span className="text-sm leading-none">
+          <span className={`font-black leading-none tracking-tight ${urgent || overdue ? "text-xl" : "text-lg"}`}>
             {overdue ? `+${formatTime(-remainingMs)}` : formatTime(remainingMs)}
           </span>
         </div>
@@ -351,17 +351,15 @@ function SwimmerCard({
           </span>
         </div>
 
-        {/* Row 2 : chrono */}
+        {/* Row 2 : chrono (always text-foreground when launched — destructive is reserved for the STOP column) */}
         <div className="px-2.5 pt-0 pb-0.5">
           <div
             className={`font-mono tabular-nums font-black leading-none tracking-tight text-2xl ${
               stopped
                 ? "text-muted-foreground"
-                : shouldPromptStop
-                  ? "text-destructive"
-                  : launched
-                    ? "text-foreground"
-                    : "text-muted-foreground/50"
+                : launched
+                  ? "text-foreground"
+                  : "text-muted-foreground/50"
             }`}
           >
             {launched ? formatTime(elapsed) : "--:--.--"}
@@ -408,11 +406,11 @@ function SwimmerCard({
           </span>
         </div>
 
-        {/* Row 4 : KPI grid (3 cells, always rendered) */}
-        <div className="grid grid-cols-3 gap-1 px-2.5 pb-2 mt-auto">
+        {/* Row 4 : KPI grid (2 cells — Δ lap moved to the STOP column) */}
+        <div className="grid grid-cols-2 gap-1 px-2.5 pb-2 mt-auto">
           <KPICell
             icon={<Flag className="h-3 w-3" />}
-            label="Dist."
+            label="Distance"
             value={distLabel}
             suffix={distSuffix}
             highlight={finishedDistance}
@@ -425,34 +423,40 @@ function SwimmerCard({
             suffix={instantPacePer100m > 0 ? "/100m" : ""}
             muted={!launched || instantPacePer100m === 0}
           />
-          <KPICell
-            label="Δ dernier"
-            value={lastSplit ? formatLap(lastSplit.lapMs) : "—"}
-            suffix={lastSplit ? "s" : ""}
-            muted={!lastSplit}
-          />
         </div>
       </div>
 
-      {/* ── Right : full-height stop button ── */}
+      {/* ── Right : full-height stop button (Δ lap top · STOP bottom) ── */}
       {active ? (
         <button
           type="button"
           onClick={handleStop}
           aria-label={`Stopper ${displayName}`}
-          className={`shrink-0 w-16 flex flex-col items-center justify-center gap-1 transition-all touch-manipulation border-l-2 ${
+          className={`shrink-0 w-16 flex flex-col items-stretch justify-between gap-1 py-1.5 transition-all touch-manipulation border-l-2 ${
             shouldPromptStop
               ? "bg-destructive text-destructive-foreground border-destructive animate-pulse ring-inset ring-2 ring-white/30 shadow-inner"
               : "bg-destructive/90 hover:bg-destructive active:scale-95 text-destructive-foreground border-destructive/70"
           }`}
         >
-          <CircleStop
-            className={shouldPromptStop ? "h-8 w-8" : "h-7 w-7"}
-            strokeWidth={2.5}
-          />
-          <span className="text-[11px] font-black uppercase tracking-[0.15em] leading-none">
-            {shouldPromptStop ? "Stop!" : "Stop"}
-          </span>
+          {/* Top : Δ lap live — the coach's key decision data */}
+          <div className="flex flex-col items-center gap-0 px-1">
+            <span className="text-[8px] font-bold uppercase tracking-[0.12em] opacity-80 leading-none">
+              Δ lap
+            </span>
+            <span className="font-mono tabular-nums text-base font-black leading-none mt-0.5">
+              {lastSplit ? formatLap(lastSplit.lapMs) : "—"}
+            </span>
+          </div>
+          {/* Bottom : STOP action */}
+          <div className="flex flex-col items-center gap-0.5 px-1">
+            <CircleStop
+              className={shouldPromptStop ? "h-6 w-6" : "h-5 w-5"}
+              strokeWidth={2.5}
+            />
+            <span className="text-[10px] font-black uppercase tracking-[0.15em] leading-none">
+              {shouldPromptStop ? "Stop !" : "Stop"}
+            </span>
+          </div>
         </button>
       ) : stopped ? (
         <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 bg-muted border-l border-border">
