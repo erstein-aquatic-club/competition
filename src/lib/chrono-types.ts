@@ -141,3 +141,15 @@ export function normalizeRecordSwimmer(sw: ChronoRecordSwimmer): NormalizedChron
     manualId: sw.manualId ?? null,
   };
 }
+
+export function resolveWaveConfig(
+  state: Pick<ChronoState, "seriesCount" | "totalDistanceM" | "splitDistanceM" | "waves">,
+  wave: number,
+): { seriesCount: number; totalDistanceM: number; splitDistanceM: number } {
+  const w = state.waves.find((w) => w.wave === wave);
+  return {
+    seriesCount:    w?.overrides?.seriesCount    ?? state.seriesCount,
+    totalDistanceM: w?.overrides?.totalDistanceM ?? state.totalDistanceM,
+    splitDistanceM: w?.overrides?.splitDistanceM ?? state.splitDistanceM,
+  };
+}
