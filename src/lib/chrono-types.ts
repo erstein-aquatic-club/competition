@@ -29,6 +29,12 @@ export interface SwimmerRaceState {
   stoppedAt: number | null;
 }
 
+export interface WaveConfigOverrides {
+  seriesCount?: number;
+  totalDistanceM?: number;
+  splitDistanceM?: number;
+}
+
 export interface WaveState {
   wave: number;
   startedAt: number | null; // Date.now() timestamp
@@ -39,6 +45,8 @@ export interface WaveState {
   departureIntervalSec: number;
   /** Timestamp when all swimmers in the wave finished (for recovery timer) */
   lastFinishedAt: number | null;
+  /** Per-wave config overrides (null = inherit from global) */
+  overrides: WaveConfigOverrides | null;
 }
 
 export type ChronoPhase = "setup" | "racing" | "results";

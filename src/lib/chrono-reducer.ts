@@ -43,7 +43,7 @@ export function computeWaves(
 
   return sorted.map((wave) => {
     const existing = existingMap.get(wave);
-    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 0, lastFinishedAt: null };
+    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 0, lastFinishedAt: null, overrides: null };
   });
 }
 
