@@ -256,14 +256,23 @@ const CoachHome = ({
     const mondayIso = formatDateIso(monday);
     const sundayIso = formatDateIso(sunday);
 
-    // Filter out one-off slots outside this week (recurring slots kept regardless)
+    // Only swim slots count — strength sessions are handled separately and
+    // shouldn't clutter the swim-assignment overview.
+    // Filter out one-off slots outside this week (recurring slots kept regardless).
     const weekSlots = slots.filter((s) => {
+      if (s.session_type !== "swim") return false;
       if (!s.scheduled_date) return true;
       return s.scheduled_date >= mondayIso && s.scheduled_date <= sundayIso;
     });
 
+    // Normalize day_of_week to 0=Mon..6=Sun matrix index. DB uses ISO 1-7
+    // (see CoachTrainingSlotsScreen.tsx:848 — `jsDay === 0 ? 7 : jsDay`),
+    // but older rows may already be 0-6, so accept both.
+    const dayIdx = (dow: number) =>
+      dow >= 1 && dow <= 7 ? dow - 1 : dow;
+
     // Half-day bucketing — align with the convention used elsewhere in the
-    // codebase: hour < 13 = morning, otherwise afternoon.
+    // codebase (useSlotCalendar.getSlotScheduleBucket): hour < 13 = morning.
     const slotHalf = (slot: typeof weekSlots[number]) =>
       parseInt(slot.start_time.split(":")[0] ?? "0", 10) < 13 ? 0 : 1;
 
@@ -281,7 +290,7 @@ const CoachHome = ({
         const dow = jsDay === 0 ? 6 : jsDay - 1;
         const targetHalf = a.scheduled_slot === "morning" ? 0 : 1;
         for (const slot of weekSlots) {
-          if (slot.day_of_week === dow && slotHalf(slot) === targetHalf) {
+          if (dayIdx(slot.day_of_week) === dow && slotHalf(slot) === targetHalf) {
             slotHasSession.add(slot.id);
           }
         }
@@ -295,7 +304,9 @@ const CoachHome = ({
     ]);
 
     for (const slot of weekSlots) {
-      const cell = matrix[slot.day_of_week][slotHalf(slot)];
+      const rowIdx = dayIdx(slot.day_of_week);
+      if (rowIdx < 0 || rowIdx > 6) continue;
+      const cell = matrix[rowIdx][slotHalf(slot)];
       cell.total += 1;
       if (slotHasSession.has(slot.id)) cell.assigned += 1;
     }
