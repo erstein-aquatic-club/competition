@@ -1,77 +1,111 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
 import { buildShareOptions } from "../buildShareOptions";
 
-describe("buildShareOptions", () => {
-  const originalNavigator = globalThis.navigator;
-  const originalClipboardItem = globalThis.ClipboardItem;
-
-  afterEach(() => {
-    globalThis.navigator = originalNavigator;
-    globalThis.ClipboardItem = originalClipboardItem;
+function defineNavigator(value: Navigator | undefined): void {
+  Object.defineProperty(globalThis, "navigator", {
+    value,
+    configurable: true,
+    writable: true,
   });
+}
 
-  function mockEnv(opts: { canShare?: boolean | null; clipboardItem?: boolean }) {
-    const nav: Partial<Navigator> = {};
-    if (opts.canShare === true) {
-      nav.share = vi.fn();
-      nav.canShare = vi.fn(() => true) as Navigator["canShare"];
-    } else if (opts.canShare === false) {
-      nav.share = vi.fn();
-      nav.canShare = vi.fn(() => false) as Navigator["canShare"];
-    }
-    // canShare === null → navigator.share absent
-    globalThis.navigator = nav as Navigator;
-    if (opts.clipboardItem === false) {
-      // @ts-expect-error - suppression volontaire
-      delete globalThis.ClipboardItem;
-    } else {
-      globalThis.ClipboardItem = class {} as typeof ClipboardItem;
-    }
+function withMockedEnv<T>(
+  opts: { canShare: "yes" | "no" | "absent"; clipboardItem: boolean },
+  fn: () => T,
+): T {
+  const origNavDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const origCI = globalThis.ClipboardItem;
+
+  const nav: Partial<Navigator> = {};
+  if (opts.canShare === "yes") {
+    nav.share = (() => Promise.resolve()) as Navigator["share"];
+    nav.canShare = (() => true) as Navigator["canShare"];
+  } else if (opts.canShare === "no") {
+    nav.share = (() => Promise.resolve()) as Navigator["share"];
+    nav.canShare = (() => false) as Navigator["canShare"];
+  }
+  // "absent" → navigator.share stays undefined
+
+  defineNavigator(nav as Navigator);
+
+  if (opts.clipboardItem) {
+    globalThis.ClipboardItem = class {} as typeof ClipboardItem;
+  } else {
+    // @ts-expect-error — test mutation
+    delete globalThis.ClipboardItem;
   }
 
-  it("URL payload → WhatsApp + Copier + Partager (if canShare)", () => {
-    mockEnv({ canShare: true, clipboardItem: true });
+  try {
+    return fn();
+  } finally {
+    if (origNavDescriptor) {
+      Object.defineProperty(globalThis, "navigator", origNavDescriptor);
+    } else {
+      // @ts-expect-error — restore
+      delete globalThis.navigator;
+    }
+    globalThis.ClipboardItem = origCI;
+  }
+}
+
+test("buildShareOptions — URL payload + canShare=true + ClipboardItem → whatsapp-link + copy-link + native-share", () => {
+  withMockedEnv({ canShare: "yes", clipboardItem: true }, () => {
     const options = buildShareOptions({ url: "https://example.com", title: "t" });
-    expect(options.map((o) => o.id)).toEqual([
-      "whatsapp-link",
-      "copy-link",
-      "native-share",
-    ]);
+    assert.deepStrictEqual(
+      options.map((o) => o.id),
+      ["whatsapp-link", "copy-link", "native-share"],
+    );
   });
+});
 
-  it("URL payload, canShare=false → pas de Partager natif", () => {
-    mockEnv({ canShare: false, clipboardItem: true });
+test("buildShareOptions — URL payload + canShare=false → no native-share", () => {
+  withMockedEnv({ canShare: "no", clipboardItem: true }, () => {
     const options = buildShareOptions({ url: "https://example.com" });
-    expect(options.map((o) => o.id)).toEqual(["whatsapp-link", "copy-link"]);
+    assert.deepStrictEqual(
+      options.map((o) => o.id),
+      ["whatsapp-link", "copy-link"],
+    );
   });
+});
 
-  it("URL payload, navigator.share absent → pas de Partager natif", () => {
-    mockEnv({ canShare: null, clipboardItem: true });
+test("buildShareOptions — URL payload + navigator.share absent → no native-share", () => {
+  withMockedEnv({ canShare: "absent", clipboardItem: true }, () => {
     const options = buildShareOptions({ url: "https://example.com" });
-    expect(options.map((o) => o.id)).toEqual(["whatsapp-link", "copy-link"]);
+    assert.deepStrictEqual(
+      options.map((o) => o.id),
+      ["whatsapp-link", "copy-link"],
+    );
   });
+});
 
-  it("Image payload → WhatsApp(image) + Copier image + Télécharger + Partager", () => {
-    mockEnv({ canShare: true, clipboardItem: true });
+test("buildShareOptions — Image payload + canShare=true + ClipboardItem → whatsapp-image + copy-image + download-image + native-share", () => {
+  withMockedEnv({ canShare: "yes", clipboardItem: true }, () => {
     const blob = new Blob([""], { type: "image/png" });
     const options = buildShareOptions({ imageBlob: blob, imageFileName: "week.png" });
-    expect(options.map((o) => o.id)).toEqual([
-      "whatsapp-image",
-      "copy-image",
-      "download-image",
-      "native-share",
-    ]);
+    assert.deepStrictEqual(
+      options.map((o) => o.id),
+      ["whatsapp-image", "copy-image", "download-image", "native-share"],
+    );
   });
+});
 
-  it("Image payload, ClipboardItem absent → pas de WhatsApp ni Copier image", () => {
-    mockEnv({ canShare: true, clipboardItem: false });
+test("buildShareOptions — Image payload + ClipboardItem absent → no whatsapp-image nor copy-image", () => {
+  withMockedEnv({ canShare: "yes", clipboardItem: false }, () => {
     const blob = new Blob([""], { type: "image/png" });
     const options = buildShareOptions({ imageBlob: blob, imageFileName: "week.png" });
-    expect(options.map((o) => o.id)).toEqual(["download-image", "native-share"]);
+    assert.deepStrictEqual(
+      options.map((o) => o.id),
+      ["download-image", "native-share"],
+    );
   });
+});
 
-  it("Payload vide → aucune option", () => {
-    mockEnv({ canShare: true, clipboardItem: true });
-    expect(buildShareOptions({})).toEqual([]);
+test("buildShareOptions — empty payload → no options", () => {
+  // When there is no content to share, native share should also be absent.
+  // Using canShare="absent" models the realistic case (no URL/text/blob → nothing to invoke share with).
+  withMockedEnv({ canShare: "absent", clipboardItem: true }, () => {
+    assert.deepStrictEqual(buildShareOptions({}), []);
   });
 });
