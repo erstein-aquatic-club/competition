@@ -81,7 +81,7 @@ function WaveHeaderCell({
           {wc.label}{wave.currentRep > 0 ? ` S${wave.currentRep + 1}${resolvedConfig.seriesCount > 0 ? `/${resolvedConfig.seriesCount}` : ""}` : ""}
         </span>
         {configLabel && (
-          <span className="text-[9px] font-medium text-white/70 leading-none mb-1 tabular-nums">
+          <span className="text-[9px] font-medium text-white/70 leading-none mb-1 tabular-nums whitespace-nowrap">
             {configLabel}
           </span>
         )}
@@ -154,7 +154,7 @@ function WaveHeaderCell({
             {wc.label} S{wave.currentRep + 1}{resolvedConfig.seriesCount > 0 ? `/${resolvedConfig.seriesCount}` : ""}
           </span>
           {configLabel && (
-            <span className="text-[9px] font-medium text-white/70 leading-none mb-1 tabular-nums">
+            <span className="text-[9px] font-medium text-white/70 leading-none mb-1 tabular-nums whitespace-nowrap">
               {configLabel}
             </span>
           )}
@@ -218,7 +218,7 @@ function WaveHeaderCell({
             {formatTime(elapsed)}
           </span>
           {configLabel && (
-            <span className="text-[9px] font-medium text-muted-foreground/70 leading-none tabular-nums">
+            <span className="text-[9px] font-medium text-muted-foreground/70 leading-none tabular-nums whitespace-nowrap">
               {configLabel}
             </span>
           )}
