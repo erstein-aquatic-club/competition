@@ -54,10 +54,15 @@ function mockDocumentWithAnchor(): {
   return { fakeAnchor, createElementSpy, restore };
 }
 
-test("openWhatsAppLink — triggers whatsapp:// scheme via anchor click with encoded text", () => {
-  const { fakeAnchor, createElementSpy, restore } = mockDocumentWithAnchor();
+test("openWhatsAppLink — triggers whatsapp:// scheme via anchor click AND copies URL to clipboard as fallback", () => {
+  const { fakeAnchor, createElementSpy, restore: restoreDoc } = mockDocumentWithAnchor();
+  const writeTextSpy = mock.fn(() => Promise.resolve());
+  const restoreNav = defineGlobal("navigator", {
+    clipboard: { writeText: writeTextSpy },
+  });
   try {
-    openWhatsAppLink("https://eac.app/s/abc?k=1&x=é");
+    const url = "https://eac.app/s/abc?k=1&x=é";
+    openWhatsAppLink(url);
     assert.strictEqual(createElementSpy.mock.callCount(), 1);
     assert.strictEqual(createElementSpy.mock.calls[0].arguments[0], "a");
     assert.strictEqual(
@@ -65,8 +70,11 @@ test("openWhatsAppLink — triggers whatsapp:// scheme via anchor click with enc
       "whatsapp://send?text=https%3A%2F%2Feac.app%2Fs%2Fabc%3Fk%3D1%26x%3D%C3%A9",
     );
     assert.strictEqual(fakeAnchor.click.mock.callCount(), 1);
+    assert.strictEqual(writeTextSpy.mock.callCount(), 1);
+    assert.strictEqual(writeTextSpy.mock.calls[0].arguments[0], url);
   } finally {
-    restore();
+    restoreNav();
+    restoreDoc();
   }
 });
 
@@ -105,7 +113,7 @@ test("copyImage — constructs ClipboardItem({'image/png': blob}) and passes [it
   }
 });
 
-test("openWhatsAppWithImage — copies image then triggers whatsapp:// scheme via anchor click", async () => {
+test("openWhatsAppWithImage — copies image then triggers whatsapp://send via anchor click", async () => {
   const writeSpy = mock.fn(() => Promise.resolve());
   const restoreNav = defineGlobal("navigator", {
     clipboard: { write: writeSpy },
@@ -116,7 +124,7 @@ test("openWhatsAppWithImage — copies image then triggers whatsapp:// scheme vi
     const blob = new Blob(["x"], { type: "image/png" });
     await openWhatsAppWithImage(blob);
     assert.strictEqual(writeSpy.mock.callCount(), 1);
-    assert.strictEqual(fakeAnchor.href, "whatsapp://");
+    assert.strictEqual(fakeAnchor.href, "whatsapp://send");
     assert.strictEqual(fakeAnchor.click.mock.callCount(), 1);
   } finally {
     restoreDoc();

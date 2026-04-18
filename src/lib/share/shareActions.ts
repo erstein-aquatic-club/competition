@@ -12,6 +12,12 @@ export function triggerUrlScheme(href: string): void {
 }
 
 export function openWhatsAppLink(url: string): void {
+  // Copie aussi dans le clipboard comme filet de sécurité : certaines versions
+  // de WhatsApp Desktop ignorent silencieusement le paramètre text du scheme,
+  // l'utilisateur peut alors coller manuellement (⌘+V).
+  void navigator.clipboard.writeText(url).catch(() => {
+    // Silent — le clipboard peut échouer (permissions Safari strict), on ne bloque pas l'ouverture de WA.
+  });
   triggerUrlScheme(`whatsapp://send?text=${encodeURIComponent(url)}`);
 }
 
@@ -26,7 +32,9 @@ export async function copyImage(blob: Blob): Promise<void> {
 
 export async function openWhatsAppWithImage(blob: Blob): Promise<void> {
   await copyImage(blob);
-  triggerUrlScheme("whatsapp://");
+  // "whatsapp://send" a de meilleures chances d'ouvrir le picker "nouveau chat"
+  // sur les versions récentes de WhatsApp Desktop que "whatsapp://" seul.
+  triggerUrlScheme("whatsapp://send");
 }
 
 export function downloadImage(blob: Blob, fileName: string): void {

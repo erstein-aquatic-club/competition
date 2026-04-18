@@ -43,13 +43,17 @@ export function useShareActions(resolvedPayload: SharePayload | null) {
         switch (id) {
           case "whatsapp-link":
             openWhatsAppLink(resolvedPayload.url ?? resolvedPayload.text ?? "");
+            toast({
+              title: "WhatsApp ouvert",
+              description: "Lien aussi copié — collez avec ⌘+V si besoin.",
+            });
             break;
           case "whatsapp-image":
             if (!resolvedPayload.imageBlob) return;
             await openWhatsAppWithImage(resolvedPayload.imageBlob);
             toast({
               title: "Image copiée",
-              description: "Collez dans la conversation (⌘+V).",
+              description: "Sélectionnez un contact puis collez avec ⌘+V.",
             });
             break;
           case "copy-link":
