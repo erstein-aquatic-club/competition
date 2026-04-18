@@ -29,12 +29,36 @@ type ChronoAction =
   | { type: "STOP_SWIMMER"; key: string; timestamp: number }
   | { type: "NEXT_REP"; wave: number }
   | { type: "STOP_RACE"; timestamp: number }
-  | { type: "RESET_FOR_NEW_SERIES" }
+  | { type: "RESET_FOR_NEW_SERIES"; title?: string }
   | { type: "RESTORE_STATE"; state: ChronoState };
 
 export type { ChronoAction };
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+export function createChronoDefaultTitle(date = new Date()): string {
+  const formattedDate = date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `Chrono coach — ${formattedDate}`;
+}
+
+export function createInitialChronoState(date = new Date()): ChronoState {
+  return {
+    phase: "setup",
+    laneCount: 3,
+    swimmers: [],
+    waves: [],
+    raceData: new Map(),
+    stoppedAt: null,
+    totalDistanceM: 0,
+    splitDistanceM: 50,
+    seriesCount: 0,
+    title: createChronoDefaultTitle(date),
+  };
+}
 
 export function computeWaves(
   swimmers: ChronoSwimmer[],
@@ -330,6 +354,7 @@ export function chronoReducer(
         raceData: new Map(),
         waves,
         stoppedAt: null,
+        title: action.title ?? state.title,
       };
     }
 

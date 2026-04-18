@@ -3,6 +3,8 @@ import {
   chronoReducer,
   initialChronoState,
   computeWaves,
+  createChronoDefaultTitle,
+  createInitialChronoState,
 } from "../chrono-reducer";
 import {
   buildRegisteredSwimmer,
@@ -104,6 +106,11 @@ describe("computeWaves", () => {
 // ── Setup phase actions ─────────────────────────────────────
 
 describe("setup actions", () => {
+  it("createInitialChronoState seeds a dated default title", () => {
+    const state = createInitialChronoState(new Date("2026-04-18T09:30:00"));
+    expect(state.title).toBe("Chrono coach — 18/04/2026");
+  });
+
   it("SET_LANE_COUNT clamps to [1, 8]", () => {
     expect(chronoReducer(initialChronoState, { type: "SET_LANE_COUNT", count: 0 }).laneCount).toBe(1);
     expect(chronoReducer(initialChronoState, { type: "SET_LANE_COUNT", count: 10 }).laneCount).toBe(8);
@@ -255,12 +262,13 @@ describe("race flow", () => {
       { type: "START_RACE" },
       { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
       { type: "STOP_RACE", timestamp: 65000 },
-      { type: "RESET_FOR_NEW_SERIES" },
+      { type: "RESET_FOR_NEW_SERIES", title: createChronoDefaultTitle(new Date("2026-04-18T09:30:00")) },
     );
     expect(s.phase).toBe("setup");
     expect(s.raceData.size).toBe(0);
     expect(s.swimmers).toHaveLength(2); // preserved
     expect(s.waves[0].startedAt).toBeNull();
+    expect(s.title).toBe("Chrono coach — 18/04/2026");
   });
 });
 
