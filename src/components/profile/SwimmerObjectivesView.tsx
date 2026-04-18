@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Objective, ObjectiveInput } from "@/lib/api";
@@ -43,6 +42,7 @@ import {
   parseTime,
 } from "@/lib/objectiveHelpers";
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
+import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
 
 type Props = {
   onBack?: () => void;
@@ -53,11 +53,11 @@ type ObjectiveType = "chrono" | "texte" | "both";
 export default function SwimmerObjectivesView({ onBack, embedded = false }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, navigate] = useLocation();
 
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Objective | null>(null);
+  const [progressionObj, setProgressionObj] = useState<Objective | null>(null);
 
   // Get current auth user UUID
   const { data: authUser } = useQuery({
@@ -182,12 +182,6 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
       toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  const navigateToProgression = (obj: Objective) => {
-    if (!obj.event_code) return;
-    const pool = obj.pool_length ?? 25;
-    navigate(`/records?event=${encodeURIComponent(obj.event_code)}&pool=${pool}`);
-  };
-
   const showChrono = objType === "chrono" || objType === "both";
   const showText = objType === "texte" || objType === "both";
   const isPending = createMut.isPending || updateMut.isPending;
@@ -300,7 +294,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
               objective={obj}
               performances={performances}
               showCoachBadge
-              onClick={obj.event_code ? () => navigateToProgression(obj) : undefined}
+              onClick={obj.event_code ? () => setProgressionObj(obj) : undefined}
             />
           ))}
           {personalObjectives.map((obj) => (
@@ -308,7 +302,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
               key={obj.id}
               objective={obj}
               performances={performances}
-              onClick={obj.event_code ? () => navigateToProgression(obj) : () => openEdit(obj)}
+              onClick={obj.event_code ? () => setProgressionObj(obj) : () => openEdit(obj)}
               onEdit={obj.event_code ? () => openEdit(obj) : undefined}
             />
           ))}
@@ -464,6 +458,18 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Progression sheet */}
+      {progressionObj?.event_code && (
+        <EventProgressionSheet
+          open={!!progressionObj}
+          onOpenChange={(open) => { if (!open) setProgressionObj(null); }}
+          eventCode={progressionObj.event_code}
+          poolLength={(progressionObj.pool_length === 50 ? 50 : 25) as 25 | 50}
+          iuf={iuf}
+          targetTime={progressionObj.target_time_seconds}
+        />
+      )}
     </div>
   );
 }
