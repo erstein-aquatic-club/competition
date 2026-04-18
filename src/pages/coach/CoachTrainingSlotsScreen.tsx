@@ -8,7 +8,7 @@ import type {
   TrainingSlotOverrideInput,
 } from "@/lib/api/types";
 import type { SlotInstance } from "@/hooks/useSlotCalendar";
-import { computeSlotState, resolveSlotAssignment } from "@/hooks/useSlotCalendar";
+import { computeSlotState, resolveSlotAssignment, sumAssignedDistance } from "@/hooks/useSlotCalendar";
 import { deriveScheduledSlot } from "@/lib/api/assignments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -1987,6 +1987,11 @@ const CoachTrainingSlotsScreen = ({
     return map;
   }, [weekFilteredSlots, slotAssignments, weekDates, weekOverrides]);
 
+  const weekTotalDistance = useMemo(
+    () => sumAssignedDistance(Array.from(slotInstancesById.values())),
+    [slotInstancesById],
+  );
+
   // ── Adaptive timeline range (desktop) ─────────────────────
   const timelineRange = useMemo(() => {
     let minH = 22;
@@ -2720,6 +2725,14 @@ const CoachTrainingSlotsScreen = ({
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={nextWeek}>
           <ChevronRight className="h-4 w-4" />
         </Button>
+        {formatAssignedKm(weekTotalDistance) && (
+          <span
+            className="ml-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+            title="Volume total assigné (brouillons + publiés) pour la semaine"
+          >
+            {formatAssignedKm(weekTotalDistance)}
+          </span>
+        )}
       </div>
 
       {/* ── Content ── */}
