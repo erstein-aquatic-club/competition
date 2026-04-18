@@ -1322,6 +1322,7 @@ type MobileViewProps = {
   onPrevWeek: () => void;
   onNextWeek: () => void;
   weekNumber: number;
+  weekTotalDistance: number;
   competitionsByDate: Map<string, CompetitionDayEntry[]>;
   onOpenCompetition: (competition: Competition) => void;
 };
@@ -1347,6 +1348,7 @@ const MobileView = ({
   onPrevWeek,
   onNextWeek,
   weekNumber,
+  weekTotalDistance,
   competitionsByDate,
   onOpenCompetition,
 }: MobileViewProps) => {
@@ -1401,6 +1403,11 @@ const MobileView = ({
           <span className="text-[11px] text-muted-foreground">
             {formatDayMonth(weekDates[0])} – {formatDayMonth(weekDates[6])}
           </span>
+          {formatAssignedKm(weekTotalDistance) && (
+            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              {formatAssignedKm(weekTotalDistance)}
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -2820,6 +2827,7 @@ const CoachTrainingSlotsScreen = ({
               onPrevWeek={prevWeek}
               onNextWeek={nextWeek}
               weekNumber={weekNumber}
+              weekTotalDistance={weekTotalDistance}
               competitionsByDate={competitionsByDate}
               onOpenCompetition={handleOpenCompetition}
             />
