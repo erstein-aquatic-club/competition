@@ -131,7 +131,7 @@ export default function SwimmerFeedbackTab({
   const [, navigate] = useLocation();
   const { setSelectedAthlete } = useAuth();
   const [limit, setLimit] = useState(20);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   const { data: sessions = [], isLoading } = useQuery({
@@ -187,12 +187,22 @@ export default function SwimmerFeedbackTab({
       ) : null}
 
       {displayed.map((session) => {
-        const isExpanded = expandedId === session.id;
+        const hasText = !!(session.comments || session.coach_notes);
+        const isExpanded = hasText && !collapsedIds.has(session.id);
         return (
           <button
             key={session.id}
             type="button"
-            onClick={() => { setActiveTooltip(null); setExpandedId(isExpanded ? null : session.id); }}
+            onClick={() => {
+              setActiveTooltip(null);
+              if (!hasText) return;
+              setCollapsedIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(session.id)) next.delete(session.id);
+                else next.add(session.id);
+                return next;
+              });
+            }}
             className="w-full rounded-2xl border bg-card p-3 text-left hover:border-primary/20 transition-all"
           >
             <div className="flex items-center justify-between gap-2">
