@@ -250,11 +250,30 @@ const CoachHome = ({
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: slotOverrides = [] } = useQuery({
+    queryKey: ["slot-overrides-week", formatDateIso(monday)],
+    queryFn: () => api.getSlotOverrides({ fromDate: formatDateIso(monday) }),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Build 7×2 grid: morning/afternoon per day, tracking assigned vs. empty slots.
   // The coach sees at a glance which half-day slots are unplanned for their groups.
   const weekGrid = useMemo(() => {
     const mondayIso = formatDateIso(monday);
     const sundayIso = formatDateIso(sunday);
+
+    // Slot instances cancelled for a specific date this week (via overrides).
+    // Key format: `${slot_id}|${YYYY-MM-DD}`.
+    const cancelledSlotInstances = new Set<string>();
+    for (const ov of slotOverrides) {
+      if (
+        ov.status === "cancelled" &&
+        ov.override_date >= mondayIso &&
+        ov.override_date <= sundayIso
+      ) {
+        cancelledSlotInstances.add(`${ov.slot_id}|${ov.override_date}`);
+      }
+    }
 
     // Only swim slots count — strength sessions are handled separately and
     // shouldn't clutter the swim-assignment overview.
@@ -276,11 +295,24 @@ const CoachHome = ({
     const slotHalf = (slot: typeof weekSlots[number]) =>
       parseInt(slot.start_time.split(":")[0] ?? "0", 10) < 13 ? 0 : 1;
 
-    // Mark slot IDs that have at least one session assignment this week.
+    // ISO date for a recurring slot on its day-of-week this week
+    const slotDateIso = (slot: typeof weekSlots[number]) => {
+      if (slot.scheduled_date) return slot.scheduled_date;
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + dayIdx(slot.day_of_week));
+      return formatDateIso(d);
+    };
+
+    // A slot is cancelled for this week if an override says so on its date.
+    const isSlotCancelled = (slot: typeof weekSlots[number]) =>
+      cancelledSlotInstances.has(`${slot.id}|${slotDateIso(slot)}`);
+
+    // Active slot IDs that have at least one non-cancelled session assignment.
     // Fallback: assignments without training_slot_id but with scheduled_date +
     // scheduled_slot light up every slot matching that (day, half-day).
     const slotHasSession = new Set<string>();
     for (const a of slotAssignments) {
+      if (a.status === "cancelled") continue;
       if (a.training_slot_id) {
         slotHasSession.add(a.training_slot_id);
         continue;
@@ -304,6 +336,7 @@ const CoachHome = ({
     ]);
 
     for (const slot of weekSlots) {
+      if (isSlotCancelled(slot)) continue;
       const rowIdx = dayIdx(slot.day_of_week);
       if (rowIdx < 0 || rowIdx > 6) continue;
       const cell = matrix[rowIdx][slotHalf(slot)];
@@ -328,7 +361,7 @@ const CoachHome = ({
     const emptyCount = totalSlots - assignedSlots;
 
     return { morning, afternoon, totalSlots, assignedSlots, emptyCount };
-  }, [slots, slotAssignments, monday, sunday]);
+  }, [slots, slotAssignments, slotOverrides, monday, sunday]);
 
   // ── Section C: Fatigue alerts (max 3) ──────────────────────
   const topAlerts = useMemo(() => fatigueAlerts.slice(0, 3), [fatigueAlerts]);
