@@ -50,6 +50,7 @@ const CoachChronoHistoryScreen = lazyWithRetry(() => import("./coach/CoachChrono
 const CoachMySwimmersScreen = lazyWithRetry(() => import("./coach/CoachMySwimmersScreen"));
 const CoachCommentsScreen = lazyWithRetry(() => import("./coach/CoachCommentsScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
+import { materializeSlots, type SlotAssignment } from "@/hooks/useSlotCalendar";
 import type { LocalStrengthRun } from "@/lib/types";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
@@ -257,77 +258,28 @@ const CoachHome = ({
   });
 
   // Build 7×2 grid: morning/afternoon per day, tracking assigned vs. empty slots.
-  // The coach sees at a glance which half-day slots are unplanned for their groups.
+  // Uses materializeSlots (same logic as CoachTrainingSlotsScreen / week view)
+  // so the widget stays consistent with the canonical slot-calendar view.
   const weekGrid = useMemo(() => {
     const mondayIso = formatDateIso(monday);
-    const sundayIso = formatDateIso(sunday);
 
-    // Slot instances cancelled for a specific date this week (via overrides).
-    // Key format: `${slot_id}|${YYYY-MM-DD}`.
-    const cancelledSlotInstances = new Set<string>();
-    for (const ov of slotOverrides) {
-      if (
-        ov.status === "cancelled" &&
-        ov.override_date >= mondayIso &&
-        ov.override_date <= sundayIso
-      ) {
-        cancelledSlotInstances.add(`${ov.slot_id}|${ov.override_date}`);
-      }
-    }
+    // Drop cancelled assignments so resolveSlotAssignment inside materializeSlots
+    // doesn't treat them as active. The API doesn't filter these out.
+    const activeAssignments: SlotAssignment[] = slotAssignments.filter(
+      (a) => a.status !== "cancelled",
+    );
 
-    // Only swim slots count — strength sessions are handled separately and
-    // shouldn't clutter the swim-assignment overview.
-    // Filter out one-off slots outside this week (recurring slots kept regardless).
-    const weekSlots = slots.filter((s) => {
-      if (s.session_type !== "swim") return false;
-      if (!s.scheduled_date) return true;
-      return s.scheduled_date >= mondayIso && s.scheduled_date <= sundayIso;
-    });
+    const instances = materializeSlots(
+      slots,
+      activeAssignments,
+      slotOverrides,
+      mondayIso,
+    );
 
-    // Normalize day_of_week to 0=Mon..6=Sun matrix index. DB uses ISO 1-7
-    // (see CoachTrainingSlotsScreen.tsx:848 — `jsDay === 0 ? 7 : jsDay`),
-    // but older rows may already be 0-6, so accept both.
-    const dayIdx = (dow: number) =>
-      dow >= 1 && dow <= 7 ? dow - 1 : dow;
-
-    // Half-day bucketing — align with the convention used elsewhere in the
-    // codebase (useSlotCalendar.getSlotScheduleBucket): hour < 13 = morning.
-    const slotHalf = (slot: typeof weekSlots[number]) =>
-      parseInt(slot.start_time.split(":")[0] ?? "0", 10) < 13 ? 0 : 1;
-
-    // ISO date for a recurring slot on its day-of-week this week
-    const slotDateIso = (slot: typeof weekSlots[number]) => {
-      if (slot.scheduled_date) return slot.scheduled_date;
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + dayIdx(slot.day_of_week));
-      return formatDateIso(d);
-    };
-
-    // A slot is cancelled for this week if an override says so on its date.
-    const isSlotCancelled = (slot: typeof weekSlots[number]) =>
-      cancelledSlotInstances.has(`${slot.id}|${slotDateIso(slot)}`);
-
-    // Active slot IDs that have at least one non-cancelled session assignment.
-    // Fallback: assignments without training_slot_id but with scheduled_date +
-    // scheduled_slot light up every slot matching that (day, half-day).
-    const slotHasSession = new Set<string>();
-    for (const a of slotAssignments) {
-      if (a.status === "cancelled") continue;
-      if (a.training_slot_id) {
-        slotHasSession.add(a.training_slot_id);
-        continue;
-      }
-      if (a.scheduled_date && a.scheduled_slot) {
-        const jsDay = new Date(a.scheduled_date + "T00:00:00").getDay();
-        const dow = jsDay === 0 ? 6 : jsDay - 1;
-        const targetHalf = a.scheduled_slot === "morning" ? 0 : 1;
-        for (const slot of weekSlots) {
-          if (dayIdx(slot.day_of_week) === dow && slotHalf(slot) === targetHalf) {
-            slotHasSession.add(slot.id);
-          }
-        }
-      }
-    }
+    // Keep only active swim instances: exclude cancelled overrides + strength.
+    const activeInstances = instances.filter(
+      (inst) => inst.state !== "cancelled" && inst.slot.session_type === "swim",
+    );
 
     // 7 days × 2 halves (0 = matin, 1 = aprèm)
     const matrix: Array<[CellInfo, CellInfo]> = Array.from({ length: 7 }, () => [
@@ -335,16 +287,16 @@ const CoachHome = ({
       { state: "none", total: 0, assigned: 0 },
     ]);
 
-    for (const slot of weekSlots) {
-      if (isSlotCancelled(slot)) continue;
-      const rowIdx = dayIdx(slot.day_of_week);
-      if (rowIdx < 0 || rowIdx > 6) continue;
-      const cell = matrix[rowIdx][slotHalf(slot)];
+    for (const inst of activeInstances) {
+      const jsDay = new Date(inst.date + "T00:00:00").getDay();
+      const rowIdx = jsDay === 0 ? 6 : jsDay - 1;
+      const halfIdx =
+        parseInt(inst.slot.start_time.split(":")[0] ?? "0", 10) < 13 ? 0 : 1;
+      const cell = matrix[rowIdx][halfIdx];
       cell.total += 1;
-      if (slotHasSession.has(slot.id)) cell.assigned += 1;
+      if (inst.assignment) cell.assigned += 1;
     }
 
-    // Derive state from counts
     for (const row of matrix) {
       for (const cell of row) {
         if (cell.total === 0) cell.state = "none";
@@ -356,12 +308,12 @@ const CoachHome = ({
 
     const morning = matrix.map((row) => row[0]);
     const afternoon = matrix.map((row) => row[1]);
-    const totalSlots = weekSlots.length;
-    const assignedSlots = weekSlots.filter((s) => slotHasSession.has(s.id)).length;
+    const totalSlots = activeInstances.length;
+    const assignedSlots = activeInstances.filter((inst) => inst.assignment).length;
     const emptyCount = totalSlots - assignedSlots;
 
     return { morning, afternoon, totalSlots, assignedSlots, emptyCount };
-  }, [slots, slotAssignments, slotOverrides, monday, sunday]);
+  }, [slots, slotAssignments, slotOverrides, monday]);
 
   // ── Section C: Fatigue alerts (max 3) ──────────────────────
   const topAlerts = useMemo(() => fatigueAlerts.slice(0, 3), [fatigueAlerts]);
