@@ -3,7 +3,7 @@ import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap, formatPace, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
 import { Info, Gauge, Flag } from "lucide-react";
-import { WAVE_COLORS } from "../../lib/chrono-types";
+import { WAVE_COLORS, resolveWaveConfig } from "../../lib/chrono-types";
 import { Button } from "../../components/ui/button";
 import {
   AlertDialog,
@@ -540,9 +540,7 @@ function LaneWaveMatrix({
   swimmers,
   waves,
   raceData,
-  splitDistanceM,
-  totalDistanceM,
-  seriesCount,
+  globalConfig,
   now,
   dispatch,
   getTimestamp,
@@ -551,9 +549,7 @@ function LaneWaveMatrix({
   swimmers: ChronoState["swimmers"];
   waves: ChronoState["waves"];
   raceData: ChronoState["raceData"];
-  splitDistanceM: number;
-  totalDistanceM: number;
-  seriesCount: number;
+  globalConfig: { seriesCount: number; totalDistanceM: number; splitDistanceM: number };
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -595,7 +591,7 @@ function LaneWaveMatrix({
                 now={now}
                 dispatch={dispatch}
                 getTimestamp={getTimestamp}
-                seriesCount={seriesCount}
+                seriesCount={globalConfig.seriesCount}
               />
             </div>
           );
@@ -615,8 +611,7 @@ function LaneWaveMatrix({
               swimmers={swimmers}
               waves={waves}
               raceData={raceData}
-              splitDistanceM={splitDistanceM}
-              totalDistanceM={totalDistanceM}
+              globalConfig={globalConfig}
               now={now}
               dispatch={dispatch}
               getTimestamp={getTimestamp}
@@ -637,8 +632,7 @@ function LaneRow({
   swimmers,
   waves,
   raceData,
-  splitDistanceM,
-  totalDistanceM,
+  globalConfig,
   now,
   dispatch,
   getTimestamp,
@@ -649,8 +643,7 @@ function LaneRow({
   swimmers: ChronoState["swimmers"];
   waves: ChronoState["waves"];
   raceData: ChronoState["raceData"];
-  splitDistanceM: number;
-  totalDistanceM: number;
+  globalConfig: { seriesCount: number; totalDistanceM: number; splitDistanceM: number };
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
@@ -677,6 +670,7 @@ function LaneRow({
         const cellSwimmers = swimmers.filter(
           (s) => s.lane === lane && s.wave === w,
         );
+        const resolved = resolveWaveConfig({ ...globalConfig, waves }, w);
         if (cellSwimmers.length === 0) {
           return (
             <div
@@ -705,8 +699,8 @@ function LaneRow({
                     race ? race.splitsByRep[race.splitsByRep.length - 1] : []
                   }
                   swimmerStoppedAt={race?.stoppedAt ?? null}
-                  splitDistanceM={splitDistanceM}
-                  totalDistanceM={totalDistanceM}
+                  splitDistanceM={resolved.splitDistanceM}
+                  totalDistanceM={resolved.totalDistanceM}
                   now={now}
                   dispatch={dispatch}
                   getTimestamp={getTimestamp}
@@ -790,9 +784,11 @@ export default function ChronoRace({
           swimmers={state.swimmers}
           waves={state.waves}
           raceData={state.raceData}
-          splitDistanceM={state.splitDistanceM}
-          totalDistanceM={state.totalDistanceM}
-          seriesCount={state.seriesCount}
+          globalConfig={{
+            seriesCount: state.seriesCount,
+            totalDistanceM: state.totalDistanceM,
+            splitDistanceM: state.splitDistanceM,
+          }}
           now={now}
           dispatch={dispatch}
           getTimestamp={getTimestamp}
