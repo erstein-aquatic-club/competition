@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { ChronoState, SplitRecord } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Send, RotateCcw, Check, AlertCircle, Clock, ChevronDown, Trophy, Trash2, Download, Loader2, UserRound } from "lucide-react";
+import { Send, RotateCcw, Check, AlertCircle, Clock, Trash2, Download, Loader2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 import { STORAGE_KEYS } from "../../lib/api/client";
@@ -103,7 +103,7 @@ function seriesTotalMs(splits: SplitRecord[]): number {
   return splits.length > 0 ? splits[splits.length - 1].cumulativeMs : 0;
 }
 
-/** Find the index of the best (fastest) series */
+/** Find the index of the best (fastest) completed series */
 function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
   let bestIdx = -1;
   let bestMs = Infinity;
@@ -118,21 +118,79 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
   return bestIdx;
 }
 
+/** Build the final ranking rows — one per swimmer, using their best series. */
+interface RankingRow {
+  key: string;
+  displayName: string;
+  wave: number;
+  kind: "registered" | "manual";
+  bestSeriesIdx: number;
+  bestSplits: SplitRecord[];
+  bestTotalMs: number;
+  completedSeriesCount: number;
+}
+
+function rankPodium(idx: number): string {
+  if (idx === 0) return "🥇";
+  if (idx === 1) return "🥈";
+  if (idx === 2) return "🥉";
+  return String(idx + 1);
+}
+
+function formatDiff(diffMs: number): string {
+  if (diffMs <= 0) return "—";
+  return `+${formatLap(diffMs)}`;
+}
+
 export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft, onDiscard }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<string, ExportStatus>>(new Map());
   const [sending, setSending] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
-  const toggleExpand = (key: string) => {
-    setExpandedCards((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
+  const raceEntries = useMemo(() => Array.from(state.raceData.values()), [state.raceData]);
+
+  // Ranking : 1 row per swimmer sorted by best total time ascending.
+  const ranking = useMemo<RankingRow[]>(() => {
+    return raceEntries
+      .filter((e) => totalSplitCount(e.splitsByRep) > 0)
+      .map((rs) => {
+        const bestIdx = findBestSeriesIdx(rs.splitsByRep);
+        const bestSplits = rs.splitsByRep[bestIdx] ?? [];
+        const bestTotalMs = seriesTotalMs(bestSplits);
+        const completedSeriesCount = rs.splitsByRep.filter((s) => s.length > 0).length;
+        return {
+          key: rs.swimmer.key,
+          displayName: rs.swimmer.displayName,
+          wave: rs.swimmer.wave,
+          kind: rs.swimmer.kind,
+          bestSeriesIdx: bestIdx,
+          bestSplits,
+          bestTotalMs,
+          completedSeriesCount,
+        };
+      })
+      .sort((a, b) => a.bestTotalMs - b.bestTotalMs);
+  }, [raceEntries]);
+
+  const maxSplits = useMemo(
+    () => Math.max(0, ...ranking.map((r) => r.bestSplits.length)),
+    [ranking],
+  );
+
+  const swimmersWithoutSplits = raceEntries.length - ranking.length;
+  const leaderMs = ranking[0]?.bestTotalMs ?? 0;
+
+  // Config summary caption : "5 nageurs · 100 m · splits 50 m"
+  const configSummary = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(`${ranking.length} nageur${ranking.length > 1 ? "s" : ""}`);
+    if (state.totalDistanceM > 0) {
+      parts.push(`${state.seriesCount > 0 ? `${state.seriesCount} × ` : ""}${state.totalDistanceM} m`);
+    }
+    if (state.splitDistanceM > 0) parts.push(`splits ${state.splitDistanceM} m`);
+    return parts.join(" · ");
+  }, [ranking.length, state.totalDistanceM, state.splitDistanceM, state.seriesCount]);
 
   const handleSaveDraft = useCallback(async () => {
     if (savingDraft) return;
@@ -166,20 +224,12 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
     }
   }, [state]);
 
-  const raceEntries = Array.from(state.raceData.values());
-  const byLane = new Map<number, typeof raceEntries>();
-  for (const entry of raceEntries) {
-    const lane = entry.swimmer.lane;
-    const list = byLane.get(lane) ?? [];
-    list.push(entry);
-    byLane.set(lane, list);
-  }
-  const sortedLanes = Array.from(byLane.keys()).sort((a, b) => a - b);
-
   const handleExportAll = useCallback(async () => {
     setSending(true);
     // Skip manual swimmers — they have no auth account to push logs to
-    const swimmers = raceEntries.filter((e) => e.swimmer.kind === "registered" && totalSplitCount(e.splitsByRep) > 0);
+    const swimmers = raceEntries.filter(
+      (e) => e.swimmer.kind === "registered" && totalSplitCount(e.splitsByRep) > 0,
+    );
 
     if (swimmers.length === 0) {
       toast.error("Aucun split à exporter");
@@ -190,8 +240,6 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
     const results = await Promise.allSettled(
       swimmers.map(async (raceState) => {
         const { swimmer, splitsByRep } = raceState;
-
-        // Resolve auth UUID from public.users integer ID
         const authUid = await resolveAuthUid(swimmer.athleteId!);
         if (!authUid) throw new Error(`UUID introuvable pour ${swimmer.displayName}`);
 
@@ -225,10 +273,9 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
     setExportStatuses(newStatuses);
     setSending(false);
 
-    // Save chrono record as "sent" for history
     try {
       await createChronoRecord(buildChronoRecordInput(state, "sent"));
-    } catch { /* non-blocking — history save failure shouldn't block export */ }
+    } catch { /* non-blocking */ }
 
     if (errorCount === 0) {
       toast.success(`${successCount} résultat${successCount > 1 ? "s" : ""} envoyé${successCount > 1 ? "s" : ""}`);
@@ -238,31 +285,51 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
     }
   }, [raceEntries, exportStatuses, onExportComplete, state]);
 
+  // Grid columns definition — keep fixed widths for alignment stability.
+  // [Rank] [Name] [Wave] [Total] [splits...] [Δ 1er] [Status]
+  const splitLabels = useMemo(() => {
+    if (maxSplits === 0) return [] as string[];
+    if (state.splitDistanceM > 0) {
+      return Array.from({ length: maxSplits }, (_, i) => `${(i + 1) * state.splitDistanceM} m`);
+    }
+    return Array.from({ length: maxSplits }, (_, i) => `#${i + 1}`);
+  }, [maxSplits, state.splitDistanceM]);
+
+  const showDiff = ranking.length > 1;
+  const gridTemplate = [
+    "48px",                              // rank
+    "minmax(160px, 1.4fr)",              // name
+    "48px",                              // wave
+    "minmax(96px, auto)",                // total
+    ...splitLabels.map(() => "minmax(72px, auto)"),
+    ...(showDiff ? ["minmax(72px, auto)"] : []),
+    "minmax(110px, auto)",               // status
+  ].join(" ");
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* ── Header — title hero + actions row ── */}
-      <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      {/* ── Header — title + meta + actions ── */}
+      <section className="flex flex-col gap-3">
         <div className="flex items-baseline gap-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/80">
             Résultats
           </span>
+          <span className="text-[11px] text-muted-foreground">{configSummary}</span>
           <span className="h-px flex-1 bg-border/60" />
-          <span className="text-[10px] text-muted-foreground tabular-nums" title={CHRONO_PRECISION.tooltip}>
+          <span className="text-[10px] text-muted-foreground/80 tabular-nums" title={CHRONO_PRECISION.tooltip}>
             {CHRONO_PRECISION.precision}
           </span>
         </div>
 
-        {/* Editable title as hero */}
         <input
           type="text"
           placeholder="Nommer cette séance…"
           value={state.title}
           onChange={(e) => dispatch({ type: "SET_TITLE", title: e.target.value })}
-          className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:font-medium placeholder:italic placeholder:text-muted-foreground/50 outline-none focus:placeholder:text-muted-foreground/30 transition-colors"
+          className="w-full bg-transparent text-2xl font-black tracking-tight text-foreground placeholder:font-semibold placeholder:italic placeholder:text-muted-foreground/50 outline-none focus:placeholder:text-muted-foreground/30 transition-colors"
           aria-label="Titre de la séance"
         />
 
-        {/* Action bar — wraps gracefully on narrow screens */}
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
@@ -297,152 +364,71 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
           <Button
             size="sm"
             onClick={handleExportAll}
-            disabled={sending}
+            disabled={sending || ranking.length === 0}
             className="ml-auto gap-1.5"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Envoyer à tous
           </Button>
         </div>
-      </div>
+      </section>
 
-      {/* ── Results by lane ── */}
-      {sortedLanes.map((lane) => (
-        <div key={lane} className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Ligne {lane}
-            </h3>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          {byLane.get(lane)!.map((raceState) => {
-            const { swimmer, splitsByRep } = raceState;
-            const wc = WAVE_COLORS[(swimmer.wave - 1) % WAVE_COLORS.length];
-            const status = exportStatuses.get(swimmer.key);
-            const total = totalSplitCount(splitsByRep);
-            const bestSeriesIdx = findBestSeriesIdx(splitsByRep);
-            const completedSeries = splitsByRep.filter((s) => s.length > 0);
-            const cardKey = swimmer.key;
-            const isExpanded = expandedCards.has(cardKey);
-
-            return (
-              <div key={swimmer.key} className="rounded-xl border bg-card overflow-hidden">
-                {/* ── Swimmer header ── */}
-                <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {swimmer.kind === "manual" && (
-                      <span
-                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground/70"
-                        title="Nageur manuel (sans compte)"
-                      >
-                        <UserRound className="h-3 w-3" />
-                      </span>
-                    )}
-                    <span className="text-base font-bold text-foreground truncate">
-                      {swimmer.displayName}
-                    </span>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${wc.dot}`}>
-                      {wc.label}
-                    </span>
-                  </div>
-                  <ExportStatusBadge status={status} kind={swimmer.kind} />
-                </div>
-
-                {total === 0 ? (
-                  <div className="px-4 pb-3">
-                    <p className="text-sm text-muted-foreground italic">Aucun temps enregistré</p>
-                  </div>
-                ) : (
-                  <>
-                    {/* ── Series totals — horizontal row ── */}
-                    <div className="px-4 pb-2">
-                      <div className="flex flex-wrap gap-2">
-                        {splitsByRep.map((splits, idx) => {
-                          if (splits.length === 0) return null;
-                          const totalMs = seriesTotalMs(splits);
-                          const isBest = idx === bestSeriesIdx && completedSeries.length > 1;
-                          return (
-                            <div
-                              key={idx}
-                              className={`rounded-lg border px-3 py-1.5 ${
-                                isBest
-                                  ? "border-green-500/50 bg-green-500/10"
-                                  : "border-border bg-muted/50"
-                              }`}
-                            >
-                              <div className="flex items-center gap-1.5">
-                                {isBest && <Trophy className="h-3 w-3 text-green-500" />}
-                                <span className="text-[10px] font-medium text-muted-foreground">
-                                  S{idx + 1}
-                                </span>
-                              </div>
-                              <span className={`font-mono tabular-nums text-lg font-black leading-tight ${
-                                isBest ? "text-green-600 dark:text-green-400" : "text-foreground"
-                              }`}>
-                                {formatTime(totalMs)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* ── Expand/collapse splits ── */}
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(cardKey)}
-                      className="flex w-full items-center justify-center gap-1 border-t py-1.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                      {isExpanded ? "Masquer les splits" : "Voir les splits"}
-                    </button>
-
-                    {/* ── Splits detail (collapsible) ── */}
-                    {isExpanded && (
-                      <div className="border-t px-4 py-3 flex flex-col gap-3">
-                        {splitsByRep.map((splits, repIdx) => {
-                          if (splits.length === 0) return null;
-                          const isBest = repIdx === bestSeriesIdx && completedSeries.length > 1;
-                          return (
-                            <div key={repIdx}>
-                              {completedSeries.length > 1 && (
-                                <div className={`text-xs font-semibold mb-1 ${isBest ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                  {isBest && "★ "}Série {repIdx + 1}
-                                </div>
-                              )}
-                              <div className="flex flex-col gap-0.5">
-                                {splits.map((split, i) => (
-                                  <div key={i} className="flex items-center gap-3 font-mono tabular-nums text-sm text-foreground">
-                                    <span className="w-12 text-right text-xs text-muted-foreground">
-                                      {state.splitDistanceM > 0 ? `${(i + 1) * state.splitDistanceM}m` : `#${i + 1}`}
-                                    </span>
-                                    <span className="w-20">{formatTime(split.cumulativeMs)}</span>
-                                    <span className="text-muted-foreground">({formatLap(split.lapMs)})</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            );
-          })}
+      {/* ── Ranking table ── */}
+      {ranking.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
+          Aucun temps enregistré.
         </div>
-      ))}
+      ) : (
+        <div className="rounded-xl border bg-card overflow-x-auto">
+          <div className="min-w-full">
+            {/* Header row */}
+            <div
+              className="grid items-center gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+              style={{ gridTemplateColumns: gridTemplate }}
+            >
+              <div className="text-center">#</div>
+              <div>Nageur</div>
+              <div className="text-center">V.</div>
+              <div className="text-right">Total</div>
+              {splitLabels.map((lbl, i) => (
+                <div key={`h-${i}`} className="text-right tabular-nums">
+                  {lbl}
+                </div>
+              ))}
+              {showDiff && <div className="text-right">Δ 1er</div>}
+              <div className="text-right">Statut</div>
+            </div>
+
+            {/* Data rows */}
+            {ranking.map((r, idx) => (
+              <RankRow
+                key={r.key}
+                row={r}
+                idx={idx}
+                leaderMs={leaderMs}
+                gridTemplate={gridTemplate}
+                splitLabels={splitLabels}
+                showDiff={showDiff}
+                status={exportStatuses.get(r.key)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {swimmersWithoutSplits > 0 && (
+        <p className="text-center text-[11px] italic text-muted-foreground">
+          {swimmersWithoutSplits} nageur{swimmersWithoutSplits > 1 ? "s sans temps enregistré — ignoré" : " sans temps enregistré — ignoré"}{swimmersWithoutSplits > 1 ? "s" : ""}.
+        </p>
+      )}
 
       {/* ── Discard button ── */}
-      <div className="flex justify-center pt-2 pb-4">
+      <div className="flex justify-center pt-1 pb-4">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5" disabled={sending}>
               <Trash2 className="h-4 w-4" />
-              Supprimer
+              Supprimer les résultats
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -473,11 +459,132 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
   );
 }
 
+// ── Ranking row ──────────────────────────────────────────────────────
+
+function RankRow({
+  row,
+  idx,
+  leaderMs,
+  gridTemplate,
+  splitLabels,
+  showDiff,
+  status,
+}: {
+  row: RankingRow;
+  idx: number;
+  leaderMs: number;
+  gridTemplate: string;
+  splitLabels: string[];
+  showDiff: boolean;
+  status?: ExportStatus;
+}) {
+  const wc = WAVE_COLORS[(row.wave - 1) % WAVE_COLORS.length];
+  const isLeader = idx === 0;
+  const diffMs = row.bestTotalMs - leaderMs;
+  const isManual = row.kind === "manual";
+
+  return (
+    <div
+      className={`grid items-center gap-3 border-b border-border/50 px-3 py-2 transition-colors last:border-b-0 ${
+        isLeader ? "bg-amber-500/5" : "hover:bg-muted/30"
+      }`}
+      style={{ gridTemplateColumns: gridTemplate }}
+    >
+      {/* Rank */}
+      <div
+        className={`flex items-center justify-center text-lg ${
+          idx < 3 ? "" : "text-sm font-bold text-muted-foreground tabular-nums"
+        }`}
+        title={`Rang ${idx + 1}`}
+      >
+        {rankPodium(idx)}
+      </div>
+
+      {/* Name + meta */}
+      <div className="flex flex-col min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isManual && (
+            <UserRound className="h-3 w-3 shrink-0 text-muted-foreground/70" aria-label="Nageur manuel" />
+          )}
+          <span className={`truncate text-sm font-semibold ${isLeader ? "text-foreground" : "text-foreground"}`}>
+            {row.displayName}
+          </span>
+        </div>
+        {row.completedSeriesCount > 1 && (
+          <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+            Meilleure · série {row.bestSeriesIdx + 1} sur {row.completedSeriesCount}
+          </span>
+        )}
+        {isManual && (
+          <span className="text-[10px] italic text-muted-foreground/70 leading-tight mt-0.5">
+            Manuel
+          </span>
+        )}
+      </div>
+
+      {/* Wave chip */}
+      <div className="flex justify-center">
+        <span
+          className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black text-white tabular-nums ${wc.dot}`}
+        >
+          {wc.label}
+        </span>
+      </div>
+
+      {/* Total — hero time */}
+      <div
+        className={`text-right font-mono tabular-nums text-lg font-black leading-tight ${
+          isLeader ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+        }`}
+      >
+        {formatTime(row.bestTotalMs)}
+      </div>
+
+      {/* Split columns */}
+      {splitLabels.map((_, i) => {
+        const split = row.bestSplits[i];
+        return (
+          <div
+            key={`c-${i}`}
+            className="text-right font-mono tabular-nums text-sm text-muted-foreground leading-tight"
+          >
+            {split ? formatTime(split.cumulativeMs) : <span className="text-muted-foreground/30">—</span>}
+          </div>
+        );
+      })}
+
+      {/* Δ 1er */}
+      {showDiff && (
+        <div
+          className={`text-right font-mono tabular-nums text-sm font-semibold leading-tight ${
+            isLeader
+              ? "text-muted-foreground/40"
+              : diffMs <= 1000
+                ? "text-green-600 dark:text-green-400"
+                : diffMs <= 3000
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-muted-foreground"
+          }`}
+        >
+          {formatDiff(diffMs)}
+        </div>
+      )}
+
+      {/* Status */}
+      <div className="flex justify-end">
+        <ExportStatusBadge status={status} kind={row.kind} />
+      </div>
+    </div>
+  );
+}
+
+// ── Export status badge ──────────────────────────────────────────────
+
 function ExportStatusBadge({ status, kind }: { status?: ExportStatus; kind?: "registered" | "manual" }) {
   if (kind === "manual") {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 italic">
-        Export fichier uniquement
+        Fichier seul
       </span>
     );
   }

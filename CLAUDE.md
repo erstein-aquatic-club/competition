@@ -147,7 +147,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/hooks/useChronoTimer.ts` | Hook RAF chrono 60fps + formatters | ~45 lignes |
 | `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono (tabs Club/Manuels/Nouveau, titre) (§126) | ~598 lignes |
 | `src/components/chrono/ChronoRace.tsx` | Phase course chrono — matrice lane × wave + full-bleed, overview align vagues/lanes (§126) | ~733 lignes |
-| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono (splits, export xlsx, titre inline) (§126) | ~462 lignes |
+| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono — tableau classement (podium, Δ 1er, splits inline, export xlsx) (§126) | ~613 lignes |
 | `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage | ~167 lignes |
 | `src/lib/api/chrono-records.ts` | CRUD chrono records (historique coach) | ~80 lignes |
 | `src/pages/coach/CoachChronoHistoryScreen.tsx` | Historique chronos + éditeur + export xlsx (§126) | ~344 lignes |
