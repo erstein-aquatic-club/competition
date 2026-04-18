@@ -52,6 +52,7 @@ import {
   AlertTriangle,
   ChevronRight,
   ArrowLeft,
+  Share2,
 } from "lucide-react";
 import {
   updateSlotVisibility,
@@ -60,7 +61,7 @@ import {
 import { supabase, canUseSupabase } from "@/lib/api/client";
 import type { SlotInstance, SlotState } from "@/hooks/useSlotCalendar";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
-import { getSwimSessionById } from "@/lib/api/swim";
+import { getSwimSessionById, generateShareToken } from "@/lib/api/swim";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -146,6 +147,7 @@ export default function SlotSessionSheet({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuMode, setMenuMode] = useState<MenuMode>("session");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   // Fetch session details for preview
   const previewCatalogId = instance?.assignment?.swim_catalog_id ?? null;
@@ -185,6 +187,7 @@ export default function SlotSessionSheet({
     setDeleteConfirmOpen(false);
     setMenuMode(instance.state === "cancelled" ? "slot" : "session");
     setPreviewOpen(false);
+    setIsSharing(false);
   }, [instance]);
 
   // ── Mutations ────────────────────────────────────────────
@@ -273,6 +276,38 @@ export default function SlotSessionSheet({
     onOpenChange(isOpen);
   }, [onOpenChange]);
 
+  const handleShare = useCallback(async () => {
+    const catalogId = instance?.assignment?.swim_catalog_id;
+    if (catalogId == null || isSharing) return;
+    setIsSharing(true);
+    try {
+      const token = await generateShareToken(catalogId);
+      const url = `${window.location.origin}${window.location.pathname}#/s/${token}`;
+      if (navigator.share) {
+        await navigator.share({
+          title: instance?.assignment?.session_name ?? "Séance",
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast({
+          title: "Lien copié !",
+          description: "Le lien de partage a été copié dans le presse-papier.",
+        });
+      }
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") {
+        toast({
+          title: "Erreur",
+          description: "Impossible de générer le lien de partage.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  }, [instance, isSharing, toast]);
+
   // ── Guard ────────────────────────────────────────────────
   if (!instance) return null;
 
@@ -301,15 +336,31 @@ export default function SlotSessionSheet({
                   type="button"
                   onClick={() => setPreviewOpen(false)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:scale-95 transition-transform"
+                  aria-label="Retour"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
                 <h3
-                  className="text-base font-bold tracking-tight uppercase"
+                  className="flex-1 text-base font-bold tracking-tight uppercase truncate"
                   style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}
                 >
                   {assignment?.session_name ?? "Séance"}
                 </h3>
+                {assignment?.swim_catalog_id != null && (
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    disabled={isSharing}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:scale-95 transition-transform disabled:opacity-50"
+                    aria-label="Partager la séance"
+                  >
+                    {isSharing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Share2 className="h-4 w-4" />
+                    )}
+                  </button>
+                )}
               </div>
               {previewLoading ? (
                 <div className="flex items-center justify-center py-12">
