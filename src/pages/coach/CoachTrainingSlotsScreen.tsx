@@ -77,12 +77,69 @@ import {
   Trophy,
 } from "lucide-react";
 
-/** Format a meter value as a short French-locale km label, or null if ≤ 0. */
-function formatAssignedKm(distanceMeters: number): string | null {
+/** Split meters into a French-locale km value + unit, or null if ≤ 0. */
+function formatAssignedKmParts(
+  distanceMeters: number,
+): { value: string; unit: string } | null {
   if (!distanceMeters || distanceMeters <= 0) return null;
   const km = Math.round(distanceMeters / 100) / 10;
-  const label = Number.isInteger(km) ? `${km}` : km.toString().replace(".", ",");
-  return `${label} km`;
+  const value = Number.isInteger(km) ? `${km}` : km.toString().replace(".", ",");
+  return { value, unit: "km" };
+}
+
+type WeekVolumeChipProps = {
+  distanceMeters: number;
+  variant: "desktop" | "mobile";
+};
+
+/**
+ * Stat chip showing the weekly assigned swim volume.
+ * Used in the coach training-slots screen header.
+ */
+function WeekVolumeChip({ distanceMeters, variant }: WeekVolumeChipProps) {
+  const parts = formatAssignedKmParts(distanceMeters);
+  if (!parts) return null;
+
+  if (variant === "mobile") {
+    return (
+      <div
+        className="flex items-center justify-between rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.06] to-primary/[0.12] px-4 py-2.5"
+        title="Volume total assigné (brouillons + publiés) pour la semaine"
+      >
+        <span className="font-display text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+          Volume semaine
+        </span>
+        <span className="flex items-baseline gap-1">
+          <span className="font-display text-2xl font-bold leading-none text-primary tabular-nums">
+            {parts.value}
+          </span>
+          <span className="text-xs font-semibold text-primary/70">
+            {parts.unit}
+          </span>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="inline-flex items-center gap-3 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.05] to-primary/[0.12] px-3.5 py-1.5 shadow-sm shadow-primary/5"
+      title="Volume total assigné (brouillons + publiés) pour la semaine"
+    >
+      <span className="font-display text-[9px] uppercase tracking-[0.18em] text-muted-foreground leading-none">
+        Volume<br />semaine
+      </span>
+      <span className="h-6 w-px bg-primary/20" aria-hidden />
+      <span className="flex items-baseline gap-1">
+        <span className="font-display text-lg font-bold leading-none text-primary tabular-nums">
+          {parts.value}
+        </span>
+        <span className="text-[11px] font-semibold text-primary/70">
+          {parts.unit}
+        </span>
+      </span>
+    </div>
+  );
 }
 
 // ── Competition types (week overlay) ─────────────────────────────
@@ -1324,7 +1381,6 @@ type MobileViewProps = {
   onPrevWeek: () => void;
   onNextWeek: () => void;
   weekNumber: number;
-  weekTotalDistance: number;
   competitionsByDate: Map<string, CompetitionDayEntry[]>;
   onOpenCompetition: (competition: Competition) => void;
 };
@@ -1350,7 +1406,6 @@ const MobileView = ({
   onPrevWeek,
   onNextWeek,
   weekNumber,
-  weekTotalDistance,
   competitionsByDate,
   onOpenCompetition,
 }: MobileViewProps) => {
@@ -1405,11 +1460,6 @@ const MobileView = ({
           <span className="text-[11px] text-muted-foreground">
             {formatDayMonth(weekDates[0])} – {formatDayMonth(weekDates[6])}
           </span>
-          {formatAssignedKm(weekTotalDistance) && (
-            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-              {formatAssignedKm(weekTotalDistance)}
-            </span>
-          )}
         </div>
         <button
           type="button"
@@ -2622,6 +2672,11 @@ const CoachTrainingSlotsScreen = ({
         </div>
       </div>
 
+      {/* ── Mobile volume chip ── */}
+      <div className="sm:hidden">
+        <WeekVolumeChip distanceMeters={weekTotalDistance} variant="mobile" />
+      </div>
+
       {/* ── Mobile filter ── */}
       {!slotsLoading && slots.length > 0 && (
         <div className="sm:hidden">
@@ -2677,6 +2732,8 @@ const CoachTrainingSlotsScreen = ({
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        <WeekVolumeChip distanceMeters={weekTotalDistance} variant="desktop" />
+        <div className="flex-1" />
         <ShareMenu
           onOpen={preparePayloadForShare}
           trigger={
@@ -2722,14 +2779,6 @@ const CoachTrainingSlotsScreen = ({
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={nextWeek}>
           <ChevronRight className="h-4 w-4" />
         </Button>
-        {formatAssignedKm(weekTotalDistance) && (
-          <span
-            className="ml-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
-            title="Volume total assigné (brouillons + publiés) pour la semaine"
-          >
-            {formatAssignedKm(weekTotalDistance)}
-          </span>
-        )}
       </div>
 
       {/* ── Content ── */}
@@ -2817,7 +2866,6 @@ const CoachTrainingSlotsScreen = ({
               onPrevWeek={prevWeek}
               onNextWeek={nextWeek}
               weekNumber={weekNumber}
-              weekTotalDistance={weekTotalDistance}
               competitionsByDate={competitionsByDate}
               onOpenCompetition={handleOpenCompetition}
             />
