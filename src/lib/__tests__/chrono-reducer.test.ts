@@ -421,3 +421,30 @@ describe("SET_WAVE_OVERRIDE_FIELD", () => {
     expect(s0.waves[0].overrides).toBeNull();
   });
 });
+
+describe("overrides persistence", () => {
+  it("computeWaves preserves overrides when recomputed after ADD/REMOVE", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "ADD_SWIMMER", swimmer: reg(2, 2) },
+      { type: "SET_WAVE_OVERRIDES", wave: 2, overrides: { seriesCount: 6 } },
+      { type: "ADD_SWIMMER", swimmer: reg(3, 2) }, // triggers computeWaves
+    );
+    expect(s0.waves.find((w) => w.wave === 2)?.overrides).toEqual({ seriesCount: 6 });
+  });
+
+  it("RESET_FOR_NEW_SERIES preserves overrides", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "SET_WAVE_OVERRIDES", wave: 1, overrides: { seriesCount: 4, totalDistanceM: 100 } },
+      { type: "START_RACE" },
+      { type: "LAUNCH_WAVE", wave: 1, timestamp: 1000 },
+      { type: "STOP_RACE", timestamp: 5000 },
+      { type: "RESET_FOR_NEW_SERIES" },
+    );
+    expect(s0.phase).toBe("setup");
+    expect(s0.waves[0].overrides).toEqual({ seriesCount: 4, totalDistanceM: 100 });
+    expect(s0.waves[0].startedAt).toBeNull();
+    expect(s0.waves[0].currentRep).toBe(0);
+  });
+});
