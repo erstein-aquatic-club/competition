@@ -432,7 +432,7 @@ function SwimmerCard({
           type="button"
           onClick={handleStop}
           aria-label={`Stopper ${displayName}`}
-          className={`shrink-0 w-16 flex flex-col items-stretch justify-between gap-1 py-1.5 transition-all touch-manipulation border-l-2 ${
+          className={`shrink-0 w-24 flex flex-col items-stretch justify-between gap-1 py-1.5 transition-all touch-manipulation border-l-2 ${
             shouldPromptStop
               ? "bg-destructive text-destructive-foreground border-destructive animate-pulse ring-inset ring-2 ring-white/30 shadow-inner"
               : "bg-destructive/90 hover:bg-destructive active:scale-95 text-destructive-foreground border-destructive/70"
@@ -459,7 +459,7 @@ function SwimmerCard({
           </div>
         </button>
       ) : stopped ? (
-        <div className="shrink-0 w-16 flex flex-col items-center justify-center gap-1 bg-muted border-l border-border">
+        <div className="shrink-0 w-24 flex flex-col items-center justify-center gap-1 bg-muted border-l border-border">
           <CircleStop className="h-5 w-5 text-muted-foreground" strokeWidth={2.5} />
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
             Stoppé
@@ -467,7 +467,7 @@ function SwimmerCard({
         </div>
       ) : (
         // Not launched : keep the card geometry stable with a transparent shim.
-        <div className="shrink-0 w-16 bg-muted/20 border-l border-dashed border-border/30" aria-hidden />
+        <div className="shrink-0 w-24 bg-muted/20 border-l border-dashed border-border/30" aria-hidden />
       )}
     </div>
   );
@@ -564,8 +564,8 @@ function LaneWaveMatrix({
     );
   }
 
-  // CSS Grid : gutter (56px) + N wave columns (min 260px, stretch 1fr).
-  const gridTemplate = `56px repeat(${activeWaves.length}, minmax(260px, 1fr))`;
+  // CSS Grid : gutter (56px) + N wave columns (min 280px, stretch 1fr).
+  const gridTemplate = `56px repeat(${activeWaves.length}, minmax(280px, 1fr))`;
 
   return (
     <div className="px-3">
