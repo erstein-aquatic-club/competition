@@ -342,6 +342,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 89 | Unification FolderCard + SessionRow (cohérence dossiers nageur/coach) | Moyenne | Fait (§125) |
 | 90 | Chrono : nageurs manuels + titre séance + export XLSX | Moyenne | Fait (§126) |
 | 91 | Fix overflow `FiliereEditorOverlay` (vue planification natation coach) | Faible | Fait (§127) |
+| 92 | Bouton partage preview séance vue créneaux | Faible | Fait (§128) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

@@ -8981,3 +8981,45 @@ Conversion en flex column (élimine tous les calculs codés en dur) :
 | Fichier | Changement | Taille |
 |---|---|---|
 | `src/pages/coach/SwimPlanningDemo.tsx` | flex layout overlay filières (3 lignes className) | ~1623 lignes |
+
+---
+
+## §128 — Bouton partage preview séance vue créneaux (2026-04-18)
+
+**Chantier** : #92
+
+### Contexte
+
+Depuis la vue créneaux coach (`CoachTrainingSlotsScreen`), tap sur un créneau publié/brouillon → `SlotSessionSheet` → tap sur la carte de la séance → mode preview avec `SwimSessionTimeline` complète. Aucun moyen jusqu'ici de partager le lien public de la séance depuis cet endroit. Le partage existait déjà dans le catalogue (`SwimCatalog.tsx:569`) via `generateShareToken` + Web Share API.
+
+### Changements
+
+`src/pages/coach/SlotSessionSheet.tsx` (1 fichier modifié) :
+
+1. Import `Share2` (lucide) + `generateShareToken` (`@/lib/api/swim`).
+2. State local `isSharing` (désactive le bouton pendant la génération du token, reset au changement d'instance).
+3. Handler `handleShare` (mémoïsé) : récupère le token, ouvre `navigator.share` si dispo, sinon copie dans le presse-papier + toast "Lien copié !". `AbortError` (annulation native) silencieux.
+4. Header de la preview restructuré en 3 colonnes : retour à gauche, titre `flex-1 truncate` au centre, bouton partage à droite. `aria-label` ajouté aux deux boutons. Loader pendant le sharing.
+
+### Décisions
+
+- **Réutilisation stricte** du pattern `SwimCatalog.tsx:569` pour cohérence (même fonction API, même fallback clipboard).
+- **`AbortError` silencieux** : c'est la seule déviation vs `SwimCatalog.tsx`. Quand l'utilisateur ferme la sheet de partage native, l'API throws `AbortError` ; afficher un toast d'erreur dans ce cas est un mini-bug UX. Non propagé à `SwimCatalog.tsx` (out of scope).
+- **Bouton conditionné** sur `assignment?.swim_catalog_id != null` (redondant avec le gating de la preview mais robuste).
+
+### Limites
+
+- Pas appliqué à la liste d'actions du `FilledBody` (l'utilisateur a explicitement demandé "depuis la preview").
+- Pas appliqué à `SwimCatalog.tsx` (le fix `AbortError` reste local).
+- Pas de tests automatisés : wrapper UI thin autour d'une API déjà shippée.
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur (l'erreur `ChronoSetup.tsx` est pré-existante, non liée).
+- Vérification manuelle attendue côté user : tap séance → preview → bouton visible → clic → partage natif (mobile) ou clipboard + toast (desktop).
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/SlotSessionSheet.tsx` | bouton partage header preview (handler + JSX) | ~1075 lignes |
