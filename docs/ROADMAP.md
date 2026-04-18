@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-18 (§131 Refonte "Ma semaine" coach — matrice matin/aprèm)*
+*Dernière mise à jour : 2026-04-18 (§133 Menu partage unifié WhatsApp + Clipboard coach macOS)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -77,6 +77,9 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 92 | Bouton partage preview séance vue créneaux | Faible | Faible | Fait (§128) |
 | 93 | Récapitulatif volume assigné (km) vue créneaux coach | Faible | Faible | Fait (§129) |
 | 94 | Chrono : exercices différents par vague (séries/distances/splits par vague + override global) | Moyenne | Moyenne | Fait (§130) |
+| 95 | Refonte "Ma semaine" coach : matrice matin/aprèm × 7 jours | Moyenne | Moyenne | Fait (§131) |
+| 96 | Fix ressenti sur séance groupe hors créneaux nageur (getLogForSession + fallback 42P10) | Haute | Haute | Fait (§132) |
+| 97 | Menu partage unifié WhatsApp + Clipboard (coach macOS) | Moyenne | Moyenne | Fait (§133) |
 
 ---
 

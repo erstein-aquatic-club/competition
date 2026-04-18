@@ -368,20 +368,13 @@ const CoachHome = ({
         <button
           type="button"
           onClick={() => onNavigate("week")}
-          className="group relative w-full overflow-hidden rounded-2xl border bg-card p-4 text-left transition-colors active:bg-muted"
+          className="block w-full rounded-2xl border bg-card p-4 text-left transition-colors active:bg-muted"
         >
           <div
-            className="grid gap-y-1 gap-x-1 relative"
-            style={{ gridTemplateColumns: "2.75rem repeat(7, minmax(0, 1fr))" }}
+            className="grid items-center gap-y-1.5"
+            style={{ gridTemplateColumns: "3.25rem repeat(7, minmax(0, 1fr))" }}
           >
-            {/* Today column tint — spans header + 2 data rows */}
-            <div
-              className="pointer-events-none rounded-xl bg-primary/[0.06] dark:bg-primary/10 -mx-0.5"
-              style={{ gridColumn: `${todayIndex + 2}`, gridRow: "1 / span 3" }}
-              aria-hidden
-            />
-
-            {/* Header row: day letter + date */}
+            {/* Header row: day letter + date + today marker */}
             <div aria-hidden />
             {DAY_LABELS.map((label, i) => {
               const dayDate = new Date(monday);
@@ -390,7 +383,7 @@ const CoachHome = ({
               return (
                 <div
                   key={`h-${i}`}
-                  className="relative flex flex-col items-center pb-2 leading-none"
+                  className="flex flex-col items-center gap-0.5 pb-1 leading-none"
                 >
                   <span
                     className={[
@@ -402,20 +395,27 @@ const CoachHome = ({
                   </span>
                   <span
                     className={[
-                      "mt-1 text-[11px] tabular-nums",
+                      "text-[11px] tabular-nums",
                       isToday ? "font-black text-primary" : "font-semibold text-muted-foreground/50",
                     ].join(" ")}
                   >
                     {dayDate.getDate()}
                   </span>
+                  <span
+                    className={[
+                      "h-[2px] w-4 rounded-full",
+                      isToday ? "bg-primary" : "bg-transparent",
+                    ].join(" ")}
+                    aria-hidden
+                  />
                 </div>
               );
             })}
 
-            {/* Matin row */}
-            <div className="relative flex items-center justify-end gap-1.5 pr-1.5">
-              <Sunrise className="h-3 w-3 text-amber-500/80" />
-              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            {/* Matin row label */}
+            <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
+              <Sunrise className="h-3 w-3 shrink-0 text-amber-500/80" />
+              <span className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
                 Matin
               </span>
             </div>
@@ -423,10 +423,10 @@ const CoachHome = ({
               <SlotCell key={`m-${i}`} info={cell} isToday={i === todayIndex} />
             ))}
 
-            {/* Aprèm row */}
-            <div className="relative flex items-center justify-end gap-1.5 pr-1.5">
-              <Sunset className="h-3 w-3 text-rose-400/90" />
-              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            {/* Aprèm row label */}
+            <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
+              <Sunset className="h-3 w-3 shrink-0 text-rose-400/90" />
+              <span className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
                 Aprèm
               </span>
             </div>

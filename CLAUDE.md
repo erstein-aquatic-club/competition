@@ -87,6 +87,11 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/profile/AthleteInterviewsSection.tsx` | Entretiens côté nageur (formulaire, signature, historique) | ~320 lignes |
 | `src/components/shared/FolderCard.tsx` | Composant partagé dossiers (Radix Collapsible, variant root/nested, slot actions) (§125) | ~61 lignes |
 | `src/components/shared/SessionRow.tsx` | Composant partagé ligne de séance (slots badge/trailing) (§125) | ~49 lignes |
+| `src/components/shared/ShareMenu.tsx` | Dropdown partage unifié (WhatsApp + Copier + Partager natif) + `ShareMenuInline` (§133) | ~183 lignes |
+| `src/components/shared/icons/WhatsAppIcon.tsx` | Icône WhatsApp SVG inline (#25D366) (§133) | ~15 lignes |
+| `src/lib/share/types.ts` | Types partage (`SharePayload`, `ShareOptionId`, `ShareOption`) (§133) | ~20 lignes |
+| `src/lib/share/buildShareOptions.ts` | Fonction pure options partage selon payload + capacités navigateur (§133) | ~38 lignes |
+| `src/lib/share/shareActions.ts` | Side-effects partage (WhatsApp, clipboard, native, download) (§133) | ~47 lignes |
 | `src/components/shared/ObjectiveCard.tsx` | Composant partagé objectifs (ring SVG, grid 2x2, compact) | ~260 lignes |
 | `src/lib/objectiveHelpers.ts` | Helpers partagés objectifs (FFN_EVENTS, formatTime) | ~40 lignes |
 | `src/lib/imageUtils.ts` | Compression image Canvas (avatar upload, WebP/JPEG ≤200KB) | ~95 lignes |
@@ -346,6 +351,8 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 93 | Récapitulatif volume assigné vue créneaux coach | Faible | Fait (§129) |
 | 94 | Chrono : exercices différents par vague (séries/distances/splits + override global) | Moyenne | Fait (§130) |
 | 95 | Refonte "Ma semaine" coach : matrice matin/aprèm × 7 jours | Moyenne | Fait (§131) |
+| 96 | Fix ressenti sur séance groupe hors créneaux nageur (getLogForSession + fallback 42P10) | Haute | Fait (§132) |
+| 97 | Menu partage unifié WhatsApp + Clipboard (coach macOS) | Moyenne | Fait (§133) |
 
 Détail complet dans `docs/ROADMAP.md`.
 

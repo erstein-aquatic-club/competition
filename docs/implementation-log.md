@@ -9203,3 +9203,142 @@ Le widget "Ma semaine" du home coach affichait une ligne unique de 7 jours avec 
 |---|---|---|
 | `src/pages/Coach.tsx` | refonte Ma semaine : matrice matin/aprèm + SlotCell | ~1114 lignes |
 
+## §133 — Menu partage unifié WhatsApp + Clipboard (coach macOS) (2026-04-18)
+
+**Chantier** : #97
+
+### Contexte
+
+Le coach utilise l'app sur macbook avec WhatsApp Desktop installé, mais les 4 boutons "Partager" existants (`navigator.share()`) ouvrent la feuille système macOS — laquelle n'inclut pas WhatsApp par défaut (extension à activer manuellement dans Réglages → Extensions). Résultat : friction, le coach n'utilise pas le partage. Demandes explicites : (1) partage WhatsApp natif en 1 clic, (2) option "Copier dans le presse-papier".
+
+### Points de partage concernés (4)
+
+| Fichier | Type | Contenu |
+|---|---|---|
+| `src/pages/coach/SlotSessionSheet.tsx` | URL | Lien séance (token) |
+| `src/pages/SwimSessionView.tsx` | URL | Lien séance courante |
+| `src/pages/coach/SwimCatalog.tsx` | URL | Lien séance catalogue |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Image PNG | Export semaine |
+
+### Architecture
+
+**Module pur `src/lib/share/`** :
+- `types.ts` — `SharePayload` (url/text/title/imageBlob/imageFileName), `ShareOptionId` (union 6 valeurs), `ShareOption`.
+- `buildShareOptions.ts` — fonction pure qui détermine les options à afficher selon le payload + les capacités du navigateur (`navigator.share`, `navigator.canShare(data)`, `typeof ClipboardItem`).
+- `shareActions.ts` — 6 side-effects : `openWhatsAppLink`, `copyText`, `copyImage`, `openWhatsAppWithImage` (two-step : clipboard + open WA Web), `downloadImage`, `nativeShare` (swallows AbortError).
+
+**Composants `src/components/shared/`** :
+- `icons/WhatsAppIcon.tsx` — SVG inline couleur `#25D366`.
+- `ShareMenu.tsx` — wrapper `DropdownMenu` Radix. Accepte soit `payload` eager, soit `onOpen: () => Promise<SharePayload>` (résolution lazy à l'ouverture, ex: génération de token de partage à la demande). Hook interne `useShareActions(payload)` qui dispatche vers les actions + toasts.
+- `ShareMenuInline` — variante rendue sans wrapper `DropdownMenu`, pour imbrication dans un `DropdownMenuSubContent` (sous-menu Radix). Chargement lazy via `useEffect`.
+
+### Options proposées
+
+- **WhatsApp (lien)** : `window.open('https://wa.me/?text=<encoded_url>')` — ouvre WhatsApp Desktop/Web avec URL préremplie.
+- **WhatsApp (image)** : two-step — copie blob dans `clipboard.write([new ClipboardItem({'image/png': blob})])` + ouvre `web.whatsapp.com` + toast "Image copiée. Collez dans la conversation (⌘+V)."
+- **Copier le lien** / **Copier l'image** : `clipboard.writeText` / `clipboard.write` + toast.
+- **Télécharger** (image seulement) : synthétique `<a download>` + revoke.
+- **Partager…** (natif) : dernière option, conditionnelle à `navigator.canShare(data) === true` — conserve l'accès AirDrop/iMessage/Mail sur macOS/iOS.
+
+### Décisions
+
+- **Menu partout** (desktop + mobile) plutôt que détection d'appareil : cohérent, 1 code path, l'option native reste dispo.
+- **URL seule dans le texte WhatsApp** (pas titre+URL) : demande utilisateur validée, plus court en prévisualisation WhatsApp.
+- **Two-step clipboard+ouvrir WA Web pour l'image** : `wa.me` ne supporte pas les pièces jointes ; alternative serait 3 étapes (télécharger → ouvrir WA → glisser), le two-step en fait 1 clic + 1 collage.
+- **Tests en `node:test`** (pas vitest) : le runner `npm test` du projet est `node --test`, pas Vitest. Les fichiers qui importent `from "vitest"` sont chargés mais leurs `describe/it` ne tournent pas (pré-existant, 5 fichiers affectés hors scope). Les 12 nouveaux tests (6 pour `buildShareOptions`, 6 pour `shareActions`) utilisent `node:test` + `node:assert/strict` + `mock.fn()`, preuve réelle d'exécution via failure injection.
+- **Pas de tests pour `ShareMenu`** : composant React avec Radix dropdown + portals + state. Le projet n'a pas d'environnement jsdom configuré pour `npm test` (les tests React existants utilisent `renderToStaticMarkup`, qui ne rend pas l'intérieur du dropdown). Couverture via tests manuels aux 4 points d'intégration.
+- **Sous-menu Radix pour SwimCatalog** : le parent (`SessionListView`) rend déjà un `DropdownMenu` d'actions (Aperçu/Modifier/Partager/Déplacer…). Remplacement de l'item Partager par `DropdownMenuSub` + `ShareMenuInline`. Prop `onShare(session)` renommée en `buildSharePayload(session): Promise<SharePayload>`.
+- **Génération lazy de token** : tous les call sites qui nécessitent un token (3 sur 4) passent par `onOpen` — le token n'est créé qu'au clic sur le trigger, pas au montage.
+
+### Limites / dette
+
+- Sur Firefox desktop, `ClipboardItem` images n'est pas toujours supporté → les options "Copier l'image" et "WhatsApp (image)" sont masquées (`buildShareOptions` le détecte), les autres options restent fonctionnelles.
+- Les erreurs html2canvas (export PNG semaine) remontent désormais comme toast générique "Impossible de préparer le partage" au lieu de "Erreur export / \<msg\>" spécifique. Debug = console logs désormais. Acceptable pour MVP.
+- Trigger `DropdownMenuTrigger asChild disabled={loading}` fonctionne uniquement si le child supporte `disabled` (boutons natifs/shadcn `<Button>` OK — c'est le cas pour les 4 call sites).
+
+### Tests
+
+- `npm test` : 211 → 211 passés (7 suites, 0 fail). +12 tests effectivement exécutés (`buildShareOptions` ×6, `shareActions` ×6).
+- Failure injection confirmée : assertion flipée → `✖` affiché, revertie → retour à `✔`.
+- `npx tsc --noEmit` : clean.
+- Tests manuels restants : les 4 points d'intégration (SlotSessionSheet aperçu, SwimSessionView séance nageur, SwimCatalog catalogue coach, CoachTrainingSlotsScreen semaine) sur Chrome macOS principalement.
+
+### Fichiers créés
+
+| Fichier | Rôle | Taille |
+|---|---|---|
+| `src/lib/share/types.ts` | `SharePayload`, `ShareOptionId`, `ShareOption` | ~20 lignes |
+| `src/lib/share/buildShareOptions.ts` | Fonction pure options selon payload + capacités navigateur | ~38 lignes |
+| `src/lib/share/shareActions.ts` | 6 side-effects (WhatsApp, clipboard, native, download) | ~47 lignes |
+| `src/lib/share/__tests__/buildShareOptions.test.ts` | 6 tests node:test | ~111 lignes |
+| `src/lib/share/__tests__/shareActions.test.ts` | 6 tests node:test | ~140 lignes |
+| `src/components/shared/ShareMenu.tsx` | `ShareMenu` + `ShareMenuInline` + hook `useShareActions` | ~183 lignes |
+| `src/components/shared/icons/WhatsAppIcon.tsx` | SVG inline WhatsApp | ~15 lignes |
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/SlotSessionSheet.tsx` | migration vers `ShareMenu` (suppression `handleShare` + `isSharing`) | ~1045 lignes |
+| `src/pages/SwimSessionView.tsx` | migration vers `ShareMenu` (lazy token) | ~494 lignes |
+| `src/pages/coach/SwimCatalog.tsx` | prop `onShare` → `buildSharePayload` | ~996 lignes |
+| `src/components/coach/shared/SessionListView.tsx` | sous-menu Radix pour l'item Partager | ~203 lignes |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | `shareOrDownloadPng` supprimé, `handleExportImage` → `preparePayloadForShare` pour `ShareMenu` | ~3066 lignes |
+
+## §132 — Fix ressenti sur séance groupe hors créneaux nageur (2026-04-18)
+
+### Contexte
+
+Remonté par un coach : Stellio Hasapis (id=7, groupe Elite) rapporte un toast d'erreur "Impossible d'enregistrer la séance" sur les matins 13/04 (lundi) et 17/04 (vendredi) — séances pour lesquelles il n'a pas de créneau dans ses `swimmer_training_slots` (pas de créneau matin le lundi ni le vendredi), mais dont le coach a créé une assignation sur le groupe Elite.
+
+En base les séances 194 (13/04 AM) et 220 (17/04 AM) sont bien présentes, liées aux assignations groupe 246 et 271 respectivement. Le ressenti a donc été persisté au premier clic, mais l'UI prétend "rien n'a été sauvé" et un second save lève l'erreur.
+
+### Cause racine — deux bugs combinés
+
+**Bug #1 (UX) — prefill perdu sur re-ouverture**
+
+Les séances groupe non appariées à un créneau personnel apparaissent dans le calendrier via `otherGroupSessions` avec un id synthétique `${iso}__group_${assignmentId}`. Or :
+
+- `getLogForSession` (`src/hooks/dashboard/useDashboardSessions.ts:99`) ne reconnaît que les formats `iso__AM/PM` ou un UUID de créneau personnel. Il renvoie `undefined` pour `iso__group_X`, même si la session existe en base sous la clé `iso__AM`.
+- `useFeedbackDraft` (`src/hooks/dashboard/useFeedbackDraft.ts:73`) cherche `activeSession` uniquement dans `sessionsForSelectedDay`, pas dans `otherGroupSessions` → pas de prefill planifié (km, stroke_distances), draft vide.
+
+Conséquence : après un save réussi, rouvrir la carte groupe affiche un formulaire vide — l'utilisateur croit avoir perdu ses données et resauvegarde.
+
+**Bug #2 (backend) — fallback 23505 cassé**
+
+Au second save, l'INSERT de `api.syncSession` échoue sur l'index partiel `idx_dim_sessions_dedupe_v2 (athlete_id, session_date, assignment_id) WHERE assignment_id IS NOT NULL` (23505). Le fallback `.upsert(dbPayload, { onConflict: 'athlete_id,session_date,time_slot' })` pointe vers des colonnes qui ne matchent qu'un index partiel `idx_dim_sessions_dedupe_legacy` (`WHERE assignment_id IS NULL`) — Postgres lève **42P10 "no unique or exclusion constraint matching the ON CONFLICT specification"** (reproduit directement en SQL sur la prod). Le mutationFn throw, `onError` affiche "Impossible d'enregistrer la séance".
+
+### Changements
+
+1. `src/hooks/dashboard/useDashboardSessions.ts` — `getLogForSession` reconnaît les IDs `iso__group_<assignmentId>` et retourne le log dont `assignment_id` correspond, par scan de `logsBySessionId`.
+2. `src/hooks/dashboard/useFeedbackDraft.ts` — prop `otherGroupSessions?` ajoutée, fallback sur cette liste quand `activeSession` est introuvable dans `sessionsForSelectedDay` (prefill km + strokes planifiés).
+3. `src/hooks/useDashboardState.ts` — propage `otherGroupSessions` vers `useFeedbackDraft`.
+4. `src/lib/api.ts` — branche 23505 réécrite : SELECT ciblé sur la même clé partielle (`(athlete_id, session_date, assignment_id)` si `assignment_id` non-null, sinon `(athlete_id, session_date, time_slot)` avec `assignment_id IS NULL`), puis UPDATE par `id`. Plus de chemin `.upsert()` bancal.
+
+### Décisions
+
+- **Ne pas toucher aux index** : la contrainte partielle elle-même est saine (permet plusieurs ressentis le même jour si assignment_id différent) ; c'est la logique client qui était mal alignée.
+- **Garder le chemin fallback** plutôt que de réécrire l'API pour faire systématiquement un `UPSERT RETURNING` : la majorité des saves passent par INSERT pur, le fallback n'est hit qu'en cas de re-save — pas d'intérêt à changer le happy path.
+- **Bug #1 d'abord** : même sans Bug #2, Bug #1 seul casserait l'expérience (prefill vide) ; Bug #2 seul ne se déclencherait jamais si Bug #1 n'amenait pas à un re-save inutile. Les deux se corrigent indépendamment mais le fix UI est prioritaire car il empêche le re-save.
+
+### Tests
+
+- `npx tsc --noEmit` : clean sur les fichiers touchés.
+- `npm test -- --run src/hooks/dashboard` : pas de nouvelle régression (1 échec pré-existant non lié — `ERR_MODULE_NOT_FOUND` sur index.json).
+- RLS non touché (pas de modif SQL, pas de helper d'auth) → `npm run test:rls` non requis (règles CLAUDE.md).
+- Erreur 42P10 reproduite puis confirmée non-reproductible après fix (manuellement en SQL direct).
+
+### Limites / dette
+
+- Aucune regression test ajoutée côté client pour `otherGroupSessions` — les hooks dashboard ne sont testés que pour leur simple présence d'export (`dashboard-hooks.test.tsx`), et monter un harness React Query pour tester `getLogForSession` sortait du scope ponctuel de ce fix.
+- La convention `${iso}__group_${assignmentId}` reste magique. Un futur refactor pourrait introduire un type discriminé (`PlannedSessionRef`) pour éviter la reconstitution par parsing.
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/hooks/dashboard/useDashboardSessions.ts` | résolution IDs `iso__group_X` dans `getLogForSession` | ~298 lignes |
+| `src/hooks/dashboard/useFeedbackDraft.ts` | prefill depuis `otherGroupSessions` | ~113 lignes |
+| `src/hooks/useDashboardState.ts` | propagation `otherGroupSessions` | ~261 lignes |
+| `src/lib/api.ts` | fix fallback 23505 (SELECT + UPDATE, plus d'upsert 42P10) | ~914 lignes |
+
