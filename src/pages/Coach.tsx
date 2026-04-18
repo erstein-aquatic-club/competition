@@ -8,11 +8,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useMySwimmerIds, filterByAssignment } from "@/hooks/useMySwimmerIds";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  AlertCircle,
   BellRing,
   CalendarDays,
+  Check,
+  CheckCircle2,
   ChevronRight,
   MessageSquareText,
   ShieldCheck,
+  Sunrise,
+  Sunset,
   Trophy,
   UserCheck,
   Users,
@@ -82,6 +87,82 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
         {children}
       </span>
       <div className="flex-1 h-px bg-border/50" />
+    </div>
+  );
+}
+
+// ── "Ma semaine" cell state: one half-day for one day ──────────────────────
+type CellState = "none" | "empty" | "partial" | "full";
+type CellInfo = { state: CellState; total: number; assigned: number };
+
+function SlotCell({ info, isToday }: { info: CellInfo; isToday: boolean }) {
+  const { state, total, assigned } = info;
+  const ringClass = isToday ? "ring-1 ring-primary/30 ring-offset-1 ring-offset-card" : "";
+
+  if (state === "none") {
+    return (
+      <div className="flex h-9 items-center justify-center">
+        <span className="h-1 w-1 rounded-full bg-muted-foreground/20" aria-hidden />
+        <span className="sr-only">Aucun créneau</span>
+      </div>
+    );
+  }
+
+  if (state === "full") {
+    const showCount = total > 1;
+    return (
+      <div className="flex h-9 items-center justify-center">
+        <div
+          className={[
+            "flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 dark:bg-emerald-500/90",
+            ringClass,
+          ].join(" ")}
+          aria-label={showCount ? `${assigned} séances assignées` : "Séance assignée"}
+        >
+          {showCount ? (
+            <span className="text-[10px] font-black tabular-nums leading-none">{assigned}</span>
+          ) : (
+            <Check className="h-3.5 w-3.5 stroke-[3]" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "empty") {
+    return (
+      <div className="flex h-9 items-center justify-center">
+        <div
+          className={[
+            "relative flex h-7 w-7 items-center justify-center rounded-[10px] border-[1.5px] border-dashed border-amber-400 bg-amber-50/80 dark:border-amber-500/60 dark:bg-amber-950/30",
+            ringClass,
+          ].join(" ")}
+          aria-label={`${total} créneau${total > 1 ? "x" : ""} sans séance`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // partial: some slots assigned, some empty
+  return (
+    <div className="flex h-9 items-center justify-center">
+      <div
+        className={[
+          "relative flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-500 text-white shadow-sm shadow-emerald-500/30",
+          ringClass,
+        ].join(" ")}
+        aria-label={`${assigned} sur ${total} séances assignées`}
+      >
+        <span className="text-[9px] font-black tabular-nums leading-none">
+          {assigned}/{total}
+        </span>
+        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-card" />
+      </div>
     </div>
   );
 }
@@ -164,45 +245,54 @@ const CoachHome = ({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Build per-day info: which days have slots, which have sessions
-  const weekDays = useMemo(() => {
+  // Build 7×2 grid: morning/afternoon per day, tracking assigned vs. empty slots.
+  // The coach sees at a glance which half-day slots are unplanned for their groups.
+  const weekGrid = useMemo(() => {
     const mondayIso = formatDateIso(monday);
     const sundayIso = formatDateIso(sunday);
-    // Set of day_of_week values that have at least one slot (filter out one-off slots outside this week)
+
+    // Filter out one-off slots outside this week (recurring slots kept regardless)
     const weekSlots = slots.filter((s) => {
       if (!s.scheduled_date) return true;
       return s.scheduled_date >= mondayIso && s.scheduled_date <= sundayIso;
     });
-    const daysWithSlots = new Set(weekSlots.map((s) => s.day_of_week));
-    // Set of day_of_week values that have at least one session assignment this week
-    const daysWithSessions = new Set<number>();
+
+    // Slot IDs that have at least one session assignment this week
+    const slotHasSession = new Set<string>();
     for (const a of slotAssignments) {
-      if (a.training_slot_id) {
-        // Find the slot to get its day_of_week
-        const slot = slots.find((s) => s.id === a.training_slot_id);
-        if (slot != null) {
-          daysWithSessions.add(slot.day_of_week);
-        }
-      } else if (a.scheduled_date) {
-        // Fallback: derive day_of_week from scheduled_date
-        const d = new Date(a.scheduled_date + "T00:00:00");
-        const jsDay = d.getDay(); // 0=Sun
-        const dow = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon
-        daysWithSessions.add(dow);
+      if (a.training_slot_id) slotHasSession.add(a.training_slot_id);
+    }
+
+    // 7 days × 2 halves (0 = matin, 1 = aprèm)
+    const matrix: Array<[CellInfo, CellInfo]> = Array.from({ length: 7 }, () => [
+      { state: "none", total: 0, assigned: 0 },
+      { state: "none", total: 0, assigned: 0 },
+    ]);
+
+    for (const slot of weekSlots) {
+      const halfIdx = parseInt(slot.start_time.split(":")[0] ?? "0", 10) < 12 ? 0 : 1;
+      const cell = matrix[slot.day_of_week][halfIdx];
+      cell.total += 1;
+      if (slotHasSession.has(slot.id)) cell.assigned += 1;
+    }
+
+    // Derive state from counts
+    for (const row of matrix) {
+      for (const cell of row) {
+        if (cell.total === 0) cell.state = "none";
+        else if (cell.assigned === 0) cell.state = "empty";
+        else if (cell.assigned >= cell.total) cell.state = "full";
+        else cell.state = "partial";
       }
     }
 
+    const morning = matrix.map((row) => row[0]);
+    const afternoon = matrix.map((row) => row[1]);
     const totalSlots = weekSlots.length;
-    const slotsWithSession = weekSlots.filter((s) => daysWithSessions.has(s.day_of_week)).length;
-    const emptySlotsCount = totalSlots - slotsWithSession;
+    const assignedSlots = weekSlots.filter((s) => slotHasSession.has(s.id)).length;
+    const emptyCount = totalSlots - assignedSlots;
 
-    return {
-      daysWithSlots,
-      daysWithSessions,
-      totalSlots,
-      slotsWithSession,
-      emptySlotsCount,
-    };
+    return { morning, afternoon, totalSlots, assignedSlots, emptyCount };
   }, [slots, slotAssignments, monday, sunday]);
 
   // ── Section C: Fatigue alerts (max 3) ──────────────────────
@@ -271,64 +361,103 @@ const CoachHome = ({
       {/* ── Pending approvals banner ── */}
       <PendingApprovals compact />
 
-      {/* ── Section B: Ma semaine (mini-grille 7 jours) ── */}
+      {/* ── Section B: Ma semaine — matrice matin/aprèm × 7 jours ── */}
       <section className="space-y-2.5">
         <SectionLabel>Ma semaine</SectionLabel>
 
         <button
           type="button"
           onClick={() => onNavigate("week")}
-          className="w-full rounded-2xl border bg-card p-4 text-left transition-colors active:bg-muted"
+          className="group relative w-full overflow-hidden rounded-2xl border bg-card p-4 text-left transition-colors active:bg-muted"
         >
-          {/* 7-column day grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div
+            className="grid gap-y-1 gap-x-1 relative"
+            style={{ gridTemplateColumns: "2.75rem repeat(7, minmax(0, 1fr))" }}
+          >
+            {/* Today column tint — spans header + 2 data rows */}
+            <div
+              className="pointer-events-none rounded-xl bg-primary/[0.06] dark:bg-primary/10 -mx-0.5"
+              style={{ gridColumn: `${todayIndex + 2}`, gridRow: "1 / span 3" }}
+              aria-hidden
+            />
+
+            {/* Header row: day letter + date */}
+            <div aria-hidden />
             {DAY_LABELS.map((label, i) => {
-              const hasSlot = weekDays.daysWithSlots.has(i);
-              const hasSession = weekDays.daysWithSessions.has(i);
-              const isToday = i === todayIndex;
               const dayDate = new Date(monday);
               dayDate.setDate(monday.getDate() + i);
-              const dayNum = dayDate.getDate();
+              const isToday = i === todayIndex;
               return (
-                <div key={i} className="flex flex-col items-center gap-1">
-                  <span className={[
-                    "text-[9px] font-bold uppercase",
-                    isToday ? "text-primary" : "text-muted-foreground",
-                  ].join(" ")}>
+                <div
+                  key={`h-${i}`}
+                  className="relative flex flex-col items-center pb-2 leading-none"
+                >
+                  <span
+                    className={[
+                      "text-[9px] font-black uppercase tracking-[0.18em]",
+                      isToday ? "text-primary" : "text-muted-foreground/60",
+                    ].join(" ")}
+                  >
                     {label}
-                  </span>
-                  <span className={[
-                    "text-[10px]",
-                    isToday ? "font-bold text-primary" : "text-muted-foreground/60",
-                  ].join(" ")}>
-                    {dayNum}
                   </span>
                   <span
                     className={[
-                      "flex h-8 w-8 items-center justify-center rounded-xl text-sm font-semibold transition-colors",
-                      isToday ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : "",
-                      hasSession
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                        : hasSlot
-                          ? "bg-muted text-muted-foreground"
-                          : "text-muted-foreground/30",
+                      "mt-1 text-[11px] tabular-nums",
+                      isToday ? "font-black text-primary" : "font-semibold text-muted-foreground/50",
                     ].join(" ")}
                   >
-                    {hasSession ? "\u2713" : hasSlot ? "\u25CB" : "\u00B7"}
+                    {dayDate.getDate()}
                   </span>
                 </div>
               );
             })}
+
+            {/* Matin row */}
+            <div className="relative flex items-center justify-end gap-1.5 pr-1.5">
+              <Sunrise className="h-3 w-3 text-amber-500/80" />
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                Matin
+              </span>
+            </div>
+            {weekGrid.morning.map((cell, i) => (
+              <SlotCell key={`m-${i}`} info={cell} isToday={i === todayIndex} />
+            ))}
+
+            {/* Aprèm row */}
+            <div className="relative flex items-center justify-end gap-1.5 pr-1.5">
+              <Sunset className="h-3 w-3 text-rose-400/90" />
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                Aprèm
+              </span>
+            </div>
+            {weekGrid.afternoon.map((cell, i) => (
+              <SlotCell key={`a-${i}`} info={cell} isToday={i === todayIndex} />
+            ))}
           </div>
 
-          {/* Summary label */}
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-[11px] text-muted-foreground">
-              {weekDays.slotsWithSession}/{weekDays.totalSlots} créneaux planifiés
-            </p>
-            {weekDays.emptySlotsCount > 0 && (
-              <span className="text-[11px] font-semibold text-primary">
-                {weekDays.emptySlotsCount} sans séance
+          {/* Footer — stats + verdict */}
+          <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-black tabular-nums leading-none">
+                {weekGrid.assignedSlots}
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
+                / {weekGrid.totalSlots} créneaux planifiés
+              </span>
+            </div>
+            {weekGrid.totalSlots === 0 ? (
+              <span className="text-[11px] italic text-muted-foreground">
+                Aucun créneau configuré
+              </span>
+            ) : weekGrid.emptyCount > 0 ? (
+              <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {weekGrid.emptyCount} à compléter
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Semaine complète
               </span>
             )}
           </div>

@@ -9152,3 +9152,54 @@ Jusqu'ici, la configuration d'un chrono coach (`seriesCount`, `totalDistanceM`, 
 | `src/lib/chronoXlsxExport.ts` | subtitle liste vagues custom (tri numérique) | ~562 lignes |
 | `src/lib/__tests__/chrono-types.test.ts` | 4 tests resolveWaveConfig (nouveau fichier) | ~47 lignes |
 | `src/lib/__tests__/chrono-reducer.test.ts` | + 8 tests overrides (3 SET + 3 FIELD + 2 persistence) | ~423 lignes |
+
+## §131 — Refonte "Ma semaine" coach : matrice matin/aprèm × 7 jours (2026-04-18)
+
+**Chantier** : #95
+
+### Contexte
+
+Le widget "Ma semaine" du home coach affichait une ligne unique de 7 jours avec un simple glyphe (✓/○/·) par jour. Problème pour le coach : impossible de distinguer d'un coup d'œil si un créneau **matin** ou **après-midi** a bien une séance assignée pour son groupe — un jour avec créneau matin assigné + aprèm vide apparaissait simplement vert. Demande utilisateur : deux lignes (matin + aprèm), avec état explicite par demi-journée.
+
+### Changements
+
+**`src/pages/Coach.tsx`** :
+- Remplacement du `weekDays` useMemo (flat 7 jours, sets booléens) par `weekGrid` : matrice `[matin, aprèm]` × 7 jours avec par cellule `{state, total, assigned}`. State dérivé des comptes : `none` (0 créneau), `empty` (créneaux présents, 0 assigné), `partial` (partiel), `full` (tout assigné).
+- Découpe matin/aprèm par la première composante horaire de `slot.start_time` (`< 12h` = matin).
+- Nouveau sous-composant `SlotCell` : tuile 28×28 arrondie, encode l'état par couleur/forme :
+  - `full` → tuile emerald pleine + `Check` (ou compteur si >1 créneau)
+  - `empty` → tuile amber dashed + dot pulse animé (signal visuel pour action)
+  - `partial` → tuile emerald + badge amber en corner + compteur `assigned/total`
+  - `none` → dot neutre 1px
+- Layout CSS grid `2.75rem repeat(7, 1fr)` : colonne label (icône Sunrise/Sunset + "Matin"/"Aprèm" en tracking caps) + 7 colonnes équidistantes.
+- Highlight colonne "aujourd'hui" via grid placement (`gridColumn: todayIndex+2, gridRow: 1/span 3`) avec tint `bg-primary/[0.06]`.
+- Footer enrichi : compteur `assignés / total créneaux planifiés` + verdict contextuel (`Semaine complète` vert, `N à compléter` amber, `Aucun créneau configuré` si 0 slot).
+- Import lucide : `Sunrise`, `Sunset`, `Check`, `AlertCircle`, `CheckCircle2`.
+
+### Décisions
+
+- **Encoder l'état par couleur+forme** plutôt que par texte/emoji : scanable à 1 seconde, distingue les 4 états sans lecture.
+- **Dashed border + dot pulse** pour `empty` : le créneau est "en attente", l'animation rappelle doucement qu'il manque quelque chose sans crier.
+- **Badge corner sur `partial`** plutôt que split visuel emerald/amber : le split gradient était confus, le badge communique "quelque chose manque encore" de façon claire.
+- **Filtrage par coach non ajouté** : `slots` query retourne tous les créneaux. Filtrer par `slot.coaches.some(c => c.coach_id === coachUserId)` ferait sens mais change la sémantique (admins verraient différemment). Hors scope du redesign visuel — à faire en §suivant si l'utilisateur le demande.
+- **Grid `gridColumn/gridRow` pour le highlight today** (plutôt qu'absolute positioning) : se positionne automatiquement avec les cellules, pas de calcul manuel.
+- **Tap → week view** inchangé : le widget est un résumé, les détails (horaires, groupes) sont dans la vue semaine.
+
+### Limites / dette
+
+- Slots one-off sans `scheduled_date` traités comme récurrents (filter existant conservé).
+- Assignations ad-hoc sans `training_slot_id` non attribuées à matin/aprèm (elles comptent uniquement au jour, via `scheduled_slot` non exploité ici).
+- Pas de test visuel automatisé — vérification manuelle attendue (créer quelques créneaux matin + aprèm avec/sans assignation, ouvrir `/#/coach`).
+- Requête `getSlotAssignments` actuelle filtre `.neq("status", "completed")` → sessions terminées non comptées comme "assignées". Bug latent hors scope.
+
+### Tests
+
+- `npx tsc --noEmit` : clean.
+- Aucun test unitaire ajouté (refonte visuelle, logique déplacée dans un useMemo testable mais hors scope).
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/Coach.tsx` | refonte Ma semaine : matrice matin/aprèm + SlotCell | ~1114 lignes |
+

@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-18 (§130 Chrono — exercices différents par vague)*
+*Dernière mise à jour : 2026-04-18 (§131 Refonte "Ma semaine" coach — matrice matin/aprèm)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

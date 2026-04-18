@@ -163,7 +163,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/Profile.tsx` | Page profil nageur (hub) | ~920 lignes |
 | `src/pages/Progress.tsx` | Page progression nageur (graphes, santé) | ~1150 lignes |
 | `src/pages/HallOfFame.tsx` | Hall of Fame club | ~366 lignes |
-| `src/pages/Coach.tsx` | Hub coach (home, KPIs) | ~969 lignes |
+| `src/pages/Coach.tsx` | Hub coach (home, KPIs, Ma semaine matrice matin/aprèm §131) | ~1114 lignes |
 | `src/pages/Admin.tsx` | Hub admin (utilisateurs, configuration) | ~970 lignes |
 | `src/pages/Administratif.tsx` | Vue administrative (timesheet, exports) | ~978 lignes |
 | `src/pages/SuiviSaison.tsx` | Vue saison (suivi long terme) | ~797 lignes |
@@ -345,6 +345,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 92 | Bouton partage preview séance vue créneaux | Faible | Fait (§128) |
 | 93 | Récapitulatif volume assigné vue créneaux coach | Faible | Fait (§129) |
 | 94 | Chrono : exercices différents par vague (séries/distances/splits + override global) | Moyenne | Fait (§130) |
+| 95 | Refonte "Ma semaine" coach : matrice matin/aprèm × 7 jours | Moyenne | Fait (§131) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
