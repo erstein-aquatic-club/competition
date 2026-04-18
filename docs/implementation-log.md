@@ -9074,3 +9074,81 @@ Demande utilisateur : afficher un **récapitulatif du volume global assigné** s
 | `src/hooks/useSlotCalendar.ts` | Helper `sumAssignedDistance` + retour `weekTotalDistance` | ~358 lignes |
 | `src/hooks/__tests__/useSlotCalendar.test.ts` | +5 tests helper `sumAssignedDistance` | +82 lignes |
 | `src/pages/coach/CoachTrainingSlotsScreen.tsx` | `formatAssignedKm` + `useMemo` weekTotalDistance + badges desktop/mobile | ~3019 lignes |
+
+## §130 — Chrono : exercices différents par vague (2026-04-18)
+
+**Chantier** : #94
+
+### Contexte
+
+Jusqu'ici, la configuration d'un chrono coach (`seriesCount`, `totalDistanceM`, `splitDistanceM`) était unique et partagée par toutes les vagues. Seule la récupération entre départs (`departureIntervalSec`) pouvait varier. Sur le terrain, le coach a régulièrement besoin de faire tourner deux vagues en parallèle avec des exercices différents (ex. V1 = `4×200m splits 50m`, V2 = `6×100m splits 25m`) — il devait lancer deux chronos successifs, cassant la cadence.
+
+### Changements
+
+**Modèle de données (`src/lib/chrono-types.ts`)** :
+- Nouveau type `WaveConfigOverrides` (3 champs optionnels : `seriesCount`, `totalDistanceM`, `splitDistanceM`). Missing key = inherit global.
+- Champ `WaveState.overrides: WaveConfigOverrides | null` — `null` = vague en mode "globale".
+- Helper pur `resolveWaveConfig(state, wave)` : source unique de vérité (`override ?? global`).
+
+**Reducer (`src/lib/chrono-reducer.ts`)** :
+- 2 nouvelles actions : `SET_WAVE_OVERRIDES` (activation/reset complet, payload `overrides | null`) et `SET_WAVE_OVERRIDE_FIELD` (édition unitaire avec clamp `Math.max(0, value)`).
+- `computeWaves()` initialise `overrides: null` pour les nouvelles vagues, préserve l'override pour les existantes.
+- `RESET_FOR_NEW_SERIES` préserve les overrides.
+
+**API (`src/lib/api/types.ts`)** :
+- `ChronoRecordConfig.waveOverrides?: Record<number, {...}>` — champ optionnel dans la colonne `jsonb` existante, **aucune migration requise**.
+
+**UI Setup (`src/components/chrono/ChronoSetup.tsx`)** :
+- Nouveaux composants `WaveConfigCard` (par vague, toggle "Personnaliser" / "Réinitialiser", pré-remplissage depuis la globale) et `WaveOverrideField` (édition unitaire).
+- Indicateur "N personnalisée(s)" dans l'en-tête du bloc.
+- Badge "✓ Personnalisée" avec border-color de la vague.
+
+**UI Race (`src/components/chrono/ChronoRace.tsx`)** :
+- `LaneWaveMatrix` et `LaneRow` reçoivent un objet groupé `globalConfig` (remplace 3 props individuels).
+- `LaneRow` résout la config **par cellule vague** (via `resolveWaveConfig`) et passe à `SwimmerCard`.
+- `WaveHeaderCell` reçoit `resolvedConfig` et affiche sous GO un sous-titre `Nx200m · splits 50m` (3 états : non-lancée, between-reps, racing). `whitespace-nowrap` pour éviter le wrap.
+
+**UI Results (`src/components/chrono/ChronoResults.tsx`)** :
+- `buildChronoRecordInput` utilise `resolveWaveConfig(state, swimmer.wave)` pour `distanceM` par split — chaque nageur voit ses vrais splits selon la config de sa vague.
+- `waveOverrides` injecté dans le payload `config` (optionnel, absent si aucune vague personnalisée).
+- `RankingRow` enrichi avec `isCustomWave` + `resolved`. `RankRow` affiche un badge "Personnalisée : 6× 100m splits 25m" sous le nom.
+
+**XLSX (`src/lib/chronoXlsxExport.ts`)** :
+- `buildSubtitle` liste les vagues personnalisées (ex. "… · V2 personnalisée" ou "V2, V3 personnalisées"). Tri numérique, dédup des traversals.
+- Layout tabulaire inchangé (hors scope).
+
+### Décisions
+
+- **Modèle sous-objet `overrides` (vs champs à plat)** : flag `overrides !== null` direct pour le badge UI, groupement logique, rétrocompat immédiate (clé absente → `undefined` → fallback global).
+- **Mode global par défaut + override explicite** : zéro friction sur le cas simple, rétrocompat totale des backups existants.
+- **Récup toujours affichée par vague** : différenciation quasi-systématique, pas cachée derrière le toggle Personnaliser.
+- **`RESET_FOR_NEW_SERIES` préserve les overrides** : le coach relance typiquement la même structure d'exo.
+- **Pas de migration DB** : champ dans `jsonb` existant.
+- **Groupage `globalConfig`** dans les props Race : évite l'explosion de signatures.
+
+### Limites / dette
+
+- L'XLSX n'a pas encore de colonnes distinctes par vague (en-têtes utilisent `splitDistanceM` global). Chaque split embarque sa `distanceM` résolue dans le payload → info disponible pour enrichissement futur. Les vagues personnalisées sont signalées dans le sous-titre.
+- Override au niveau vague uniquement (pas par nageur). Non demandé.
+- Pas de tests E2E visuels — vérification manuelle attendue côté user (ouvrir `/#/coach/chrono`, créer 2 nageurs V1/V2, personnaliser V2).
+- Tests RLS non applicables.
+
+### Tests
+
+- `npx tsc --noEmit` : clean.
+- `npx vitest run` sur les 3 fichiers chrono : **68/68 verts** (4 `chrono-types` + 45 `chrono-reducer` + 19 `chronoXlsxExport`).
+- Nouveaux tests : +9 cas (4 `resolveWaveConfig` + 3 `SET_WAVE_OVERRIDES` + 3 `SET_WAVE_OVERRIDE_FIELD` + 2 persistence).
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/lib/chrono-types.ts` | + WaveConfigOverrides, + resolveWaveConfig, WaveState.overrides | ~155 lignes |
+| `src/lib/chrono-reducer.ts` | + 2 actions, init overrides:null dans computeWaves | ~343 lignes |
+| `src/lib/api/types.ts` | + waveOverrides optionnel dans ChronoRecordConfig | ~1002 lignes |
+| `src/components/chrono/ChronoSetup.tsx` | + WaveConfigCard + WaveOverrideField, refonte bloc vagues | ~1041 lignes |
+| `src/components/chrono/ChronoRace.tsx` | résolution per-wave + affichage config sous GO | ~827 lignes |
+| `src/components/chrono/ChronoResults.tsx` | badge Personnalisée + resolveWaveConfig dans buildChronoRecordInput | ~652 lignes |
+| `src/lib/chronoXlsxExport.ts` | subtitle liste vagues custom (tri numérique) | ~562 lignes |
+| `src/lib/__tests__/chrono-types.test.ts` | 4 tests resolveWaveConfig (nouveau fichier) | ~47 lignes |
+| `src/lib/__tests__/chrono-reducer.test.ts` | + 8 tests overrides (3 SET + 3 FIELD + 2 persistence) | ~423 lignes |

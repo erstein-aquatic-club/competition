@@ -140,14 +140,14 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/components/strength/RestExerciseTab.tsx` | Tab exercice (GIF, prescription, muscles, notes) (§94) | ~95 lignes |
 | `src/components/strength/RestSessionTab.tsx` | Tab progression séance (barre, volume, liste) (§94) | ~130 lignes |
 | `src/components/strength/RestPerfsTab.tsx` | Tab performances (1RM, cible, intensité) (§94) | ~140 lignes |
-| `src/lib/chrono-types.ts` | Types chrono discriminés (registered/manual), builders, normalizeRecordSwimmer (§126) | ~134 lignes |
-| `src/lib/chrono-reducer.ts` | State machine reducer chrono (key:string, SET_TITLE) (§126) | ~320 lignes |
-| `src/lib/chronoXlsxExport.ts` | Export xlsx lazy (buildSheetData pur + sanitizeFilename) (§126) | ~83 lignes |
+| `src/lib/chrono-types.ts` | Types chrono (registered/manual) + WaveConfigOverrides + resolveWaveConfig (§130) | ~155 lignes |
+| `src/lib/chrono-reducer.ts` | State machine chrono + SET_WAVE_OVERRIDES/SET_WAVE_OVERRIDE_FIELD (§130) | ~343 lignes |
+| `src/lib/chronoXlsxExport.ts` | Export xlsx lazy + subtitle vagues personnalisées (§130) | ~562 lignes |
 | `src/lib/api/coach-manual-swimmers.ts` | API CRUD nageurs manuels coach (§126) | ~42 lignes |
 | `src/hooks/useChronoTimer.ts` | Hook RAF chrono 60fps + formatters | ~45 lignes |
-| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono (tabs Club/Manuels/Nouveau, titre) (§126) | ~598 lignes |
-| `src/components/chrono/ChronoRace.tsx` | Phase course chrono — matrice lane × wave + full-bleed, overview align vagues/lanes (§126) | ~733 lignes |
-| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono — tableau classement (podium, Δ 1er, splits inline, export xlsx) (§126) | ~613 lignes |
+| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard par vague + Personnaliser (§130) | ~1041 lignes |
+| `src/components/chrono/ChronoRace.tsx` | Phase course chrono — résolution per-wave + affichage config sous GO (§130) | ~827 lignes |
+| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono + badge Personnalisée sur ranking rows (§130) | ~652 lignes |
 | `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage | ~167 lignes |
 | `src/lib/api/chrono-records.ts` | CRUD chrono records (historique coach) | ~80 lignes |
 | `src/pages/coach/CoachChronoHistoryScreen.tsx` | Historique chronos + éditeur + export xlsx (§126) | ~344 lignes |
@@ -344,6 +344,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 91 | Fix overflow `FiliereEditorOverlay` (vue planification natation coach) | Faible | Fait (§127) |
 | 92 | Bouton partage preview séance vue créneaux | Faible | Fait (§128) |
 | 93 | Récapitulatif volume assigné vue créneaux coach | Faible | Fait (§129) |
+| 94 | Chrono : exercices différents par vague (séries/distances/splits + override global) | Moyenne | Fait (§130) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
