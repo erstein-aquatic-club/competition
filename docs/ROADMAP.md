@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-17 (§126 Chrono : nageurs manuels + titre séance + export XLSX)*
+*Dernière mise à jour : 2026-04-18 (§127 Fix overflow `FiliereEditorOverlay` vue planification natation coach)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -72,6 +72,8 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 66 | Refonte interface nageur (Home + Dock + Suivi 3 horizons) | Haute | Haute | Fait (§102) |
 | 67 | Restructuration vue "Mon suivi" (hub + drill-down) | Haute | Haute | Fait (§103) |
 | 89 | Unification FolderCard + SessionRow (cohérence dossiers nageur/coach) | Moyenne | Faible | Fait (§125) |
+| 90 | Chrono : nageurs manuels + titre séance + export XLSX | Moyenne | Moyenne | Fait (§126) |
+| 91 | Fix overflow `FiliereEditorOverlay` (vue planification natation coach) | Faible | Faible | Fait (§127) |
 
 ---
 

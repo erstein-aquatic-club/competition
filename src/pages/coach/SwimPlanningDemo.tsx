@@ -1504,14 +1504,14 @@ function FiliereEditorOverlay({ open, onClose }: { open: boolean; onClose: () =>
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 bg-background"
+          className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden"
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 28, stiffness: 300 }}
         >
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl border-b border-border/50">
+          <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border/50">
             <div className="flex items-center gap-2 px-4 py-3">
               <button
                 type="button"
@@ -1528,7 +1528,7 @@ function FiliereEditorOverlay({ open, onClose }: { open: boolean; onClose: () =>
           </div>
 
           {/* Content */}
-          <div className="overflow-y-auto h-[calc(100dvh-52px)] pb-16">
+          <div className="flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+4rem)]">
             {isLoading ? (
               <div className="px-4 pt-4 space-y-3">
                 {[1, 2, 3, 4].map((i) => (

@@ -8941,3 +8941,43 @@ Audit UI/UX global ayant identifié 5+ incohérences majeures entre les espaces 
 - Pas d'import xlsx.
 - Nageurs manuels non groupables (pas de "groupes" de nageurs temporaires).
 - Tests RLS à lancer manuellement une fois la migration DB appliquée.
+
+---
+
+## §127 — Fix overflow `FiliereEditorOverlay` (vue planification natation coach) (2026-04-18)
+
+**Chantier** : #91
+
+### Contexte
+
+L'overlay "Filières de travail" (bouton ⚙️ depuis la vue planification natation coach, `SwimPlanningDemo`) débordait verticalement sous le viewport. Sur PWA iOS, le bas de la liste passait derrière la home indicator.
+
+### Cause racine
+
+Dans `FiliereEditorOverlay` (`src/pages/coach/SwimPlanningDemo.tsx:1503-1622`) :
+
+1. **Hauteur header codée en dur** : zone scrollable = `h-[calc(100dvh-52px)]` (ligne 1531), suppose un header de 52 px. Header réel = `py-3` (24 px) + bouton `h-10` (40 px) + border 1 px ≈ **65 px** → débordement de ~13 px sous le viewport.
+2. **Parent `fixed` sans `overflow-hidden`** (ligne 1507) → enfants visiblement débordants.
+3. **`sticky top-0`** sur header inerte : le conteneur scroll est le sibling, pas un ancêtre — sticky se replie en `relative`.
+4. Pas de `env(safe-area-inset-bottom)` → contenu masqué derrière la home indicator iOS PWA.
+
+### Fix
+
+Conversion en flex column (élimine tous les calculs codés en dur) :
+
+| Élément | Avant | Après |
+|---|---|---|
+| Parent (motion.div) | `fixed inset-0 z-50 bg-background` | `+ flex flex-col overflow-hidden` |
+| Header | `sticky top-0 z-10 bg-background/90 ...` | `shrink-0 bg-background/90 ...` |
+| Contenu | `overflow-y-auto h-[calc(100dvh-52px)] pb-16` | `flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+4rem)]` |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur
+- Vérification visuelle attendue côté user (PWA iOS + desktop)
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/SwimPlanningDemo.tsx` | flex layout overlay filières (3 lignes className) | ~1623 lignes |

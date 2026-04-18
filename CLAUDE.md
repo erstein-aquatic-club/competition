@@ -171,7 +171,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 | `src/pages/SwimSessionView.tsx` | Vue détail séance natation | ~500 lignes |
 | `src/pages/SwimNotes.tsx` | Notes techniques nage | ~306 lignes |
 | `src/pages/coach/SwimPlanningAthleteView.tsx` | Vue planning athlète (coach) | ~914 lignes |
-| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation | ~1392 lignes |
+| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation | ~1623 lignes |
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach | ~264 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
@@ -341,6 +341,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 | 88 | Audit perf/UX complet + wrap 4 dernières policies `auth_rls_initplan` (advisor 4 → 0) | Haute | Fait (§124) |
 | 89 | Unification FolderCard + SessionRow (cohérence dossiers nageur/coach) | Moyenne | Fait (§125) |
 | 90 | Chrono : nageurs manuels + titre séance + export XLSX | Moyenne | Fait (§126) |
+| 91 | Fix overflow `FiliereEditorOverlay` (vue planification natation coach) | Faible | Fait (§127) |
 
 Détail complet dans `docs/ROADMAP.md`.
 
