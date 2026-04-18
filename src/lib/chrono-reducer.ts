@@ -17,6 +17,7 @@ type ChronoAction =
   | { type: "SET_TITLE"; title: string }
   | { type: "SET_WAVE_INTERVAL"; wave: number; seconds: number }
   | { type: "SET_WAVE_OVERRIDES"; wave: number; overrides: WaveConfigOverrides | null }
+  | { type: "SET_WAVE_OVERRIDE_FIELD"; wave: number; field: keyof WaveConfigOverrides; value: number }
   | { type: "ADD_SWIMMER"; swimmer: ChronoSwimmer }
   | { type: "REMOVE_SWIMMER"; key: string }
   | { type: "MOVE_SWIMMER"; key: string; lane: number }
@@ -106,6 +107,17 @@ export function chronoReducer(
       if (!target) return state;
       const waves = state.waves.map((w) =>
         w.wave === action.wave ? { ...w, overrides: action.overrides } : w,
+      );
+      return { ...state, waves };
+    }
+
+    case "SET_WAVE_OVERRIDE_FIELD": {
+      const target = state.waves.find((w) => w.wave === action.wave);
+      if (!target || !target.overrides) return state;
+      const clamped = Math.max(0, action.value);
+      const newOverrides: WaveConfigOverrides = { ...target.overrides, [action.field]: clamped };
+      const waves = state.waves.map((w) =>
+        w.wave === action.wave ? { ...w, overrides: newOverrides } : w,
       );
       return { ...state, waves };
     }

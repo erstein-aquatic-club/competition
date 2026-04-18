@@ -391,3 +391,33 @@ describe("SET_WAVE_OVERRIDES", () => {
     expect(s1.waves).toEqual(s0.waves);
   });
 });
+
+describe("SET_WAVE_OVERRIDE_FIELD", () => {
+  it("updates a single field, leaving others untouched", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "SET_WAVE_OVERRIDES", wave: 1, overrides: { seriesCount: 3, totalDistanceM: 200, splitDistanceM: 50 } },
+      { type: "SET_WAVE_OVERRIDE_FIELD", wave: 1, field: "seriesCount", value: 6 },
+    );
+    expect(s0.waves[0].overrides).toEqual({
+      seriesCount: 6, totalDistanceM: 200, splitDistanceM: 50,
+    });
+  });
+
+  it("clamps negative values to 0", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "SET_WAVE_OVERRIDES", wave: 1, overrides: { seriesCount: 3 } },
+      { type: "SET_WAVE_OVERRIDE_FIELD", wave: 1, field: "seriesCount", value: -5 },
+    );
+    expect(s0.waves[0].overrides?.seriesCount).toBe(0);
+  });
+
+  it("no-op if overrides is null (coach must activate Personnaliser first)", () => {
+    const s0 = reduce(initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1) },
+      { type: "SET_WAVE_OVERRIDE_FIELD", wave: 1, field: "seriesCount", value: 6 },
+    );
+    expect(s0.waves[0].overrides).toBeNull();
+  });
+});
