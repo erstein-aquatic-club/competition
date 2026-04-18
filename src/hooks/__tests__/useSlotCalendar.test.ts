@@ -5,7 +5,10 @@ import {
   computeSlotState,
   getSlotScheduleBucket,
   resolveSlotAssignment,
+  sumAssignedDistance,
 } from "../useSlotCalendar";
+import type { SlotAssignment, SlotInstance, SlotState } from "../useSlotCalendar";
+import type { TrainingSlot } from "@/lib/api/types";
 
 describe("getMondayOfWeek", () => {
   it("returns the Monday for offset 0 (current week)", () => {
@@ -178,5 +181,84 @@ describe("computeSlotState", () => {
   });
   it("returns 'draft' when visible_from > today", () => {
     expect(computeSlotState({ visible_from: "2026-03-05" } as any, today)).toBe("draft");
+  });
+});
+
+describe("sumAssignedDistance", () => {
+  const baseSlot: TrainingSlot = {
+    id: "slot-x",
+    day_of_week: 1,
+    start_time: "08:00",
+    end_time: "09:30",
+    location: "Piscine A",
+    is_active: true,
+    created_by: null,
+    created_at: "",
+    assignments: [],
+  };
+
+  function mkInstance(
+    state: SlotState,
+    distance: number | null | undefined,
+  ): SlotInstance {
+    const assignment: SlotAssignment | undefined =
+      distance === undefined
+        ? undefined
+        : {
+            id: 0,
+            swim_catalog_id: null,
+            training_slot_id: baseSlot.id,
+            target_group_id: null,
+            scheduled_date: "2026-03-02",
+            scheduled_slot: null,
+            visible_from: null,
+            notified_at: null,
+            status: "assigned",
+            session_name: null,
+            session_distance: distance,
+          };
+    return {
+      date: "2026-03-02",
+      slot: baseSlot,
+      groups: [],
+      state,
+      assignment,
+    };
+  }
+
+  it("sums distances across published and draft instances", () => {
+    const instances = [
+      mkInstance("published", 3000),
+      mkInstance("draft", 2500),
+    ];
+    expect(sumAssignedDistance(instances)).toBe(5500);
+  });
+
+  it("excludes empty instances with no assignment", () => {
+    const instances = [
+      mkInstance("published", 2000),
+      mkInstance("empty", undefined),
+    ];
+    expect(sumAssignedDistance(instances)).toBe(2000);
+  });
+
+  it("excludes cancelled instances even when an assignment is attached", () => {
+    const instances = [
+      mkInstance("published", 1500),
+      mkInstance("cancelled", 4000),
+    ];
+    expect(sumAssignedDistance(instances)).toBe(1500);
+  });
+
+  it("treats null/undefined session_distance as 0", () => {
+    const instances = [
+      mkInstance("published", null),
+      mkInstance("draft", 1000),
+    ];
+    expect(sumAssignedDistance(instances)).toBe(1000);
+  });
+
+  it("returns 0 for empty input", () => {
+    expect(sumAssignedDistance([])).toBe(0);
   });
 });

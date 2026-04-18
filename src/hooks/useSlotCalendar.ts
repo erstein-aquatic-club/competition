@@ -246,6 +246,15 @@ export function materializeSlots(
   return instances;
 }
 
+/** Sum assignment.session_distance (meters) over instances; excludes cancelled instances and instances without an assignment; treats null/undefined distance as 0. */
+export function sumAssignedDistance(instances: SlotInstance[]): number {
+  return instances.reduce((sum, inst) => {
+    if (inst.state === "cancelled") return sum;
+    if (!inst.assignment) return sum;
+    return sum + (inst.assignment.session_distance ?? 0);
+  }, 0);
+}
+
 // ── React Hook ───────────────────────────────────────────────
 
 function getSundayIso(mondayIso: string): string {
