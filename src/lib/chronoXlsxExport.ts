@@ -145,12 +145,14 @@ function buildSubtitle(record: ChronoRecordInputLike): string {
   }
   if (cfg.splitDistanceM > 0) parts.push(`Splits ${cfg.splitDistanceM} m`);
   parts.push(`${cfg.laneCount} ligne${cfg.laneCount > 1 ? "s" : ""}`);
-  if (cfg.waveOverrides && Object.keys(cfg.waveOverrides).length > 0) {
-    const customCount = Object.keys(cfg.waveOverrides).length;
-    const customLabels = Object.keys(cfg.waveOverrides)
-      .map((n) => `V${n}`)
-      .join(", ");
-    parts.push(`${customLabels} personnalisée${customCount > 1 ? "s" : ""}`);
+  if (cfg.waveOverrides) {
+    const customWaves = Object.keys(cfg.waveOverrides)
+      .map(Number)
+      .sort((a, b) => a - b);
+    if (customWaves.length > 0) {
+      const customLabels = customWaves.map((n) => `V${n}`).join(", ");
+      parts.push(`${customLabels} personnalisée${customWaves.length > 1 ? "s" : ""}`);
+    }
   }
   return parts.join(" · ");
 }
