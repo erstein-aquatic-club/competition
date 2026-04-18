@@ -309,6 +309,13 @@ type SlotFormSheetProps = {
   slot?: TrainingSlot | null;
   groups: Array<{ id: number | string; name: string }>;
   coaches: Array<{ id: number; display_name: string }>;
+  /**
+   * When set, the slot being edited is a `swimmer_training_slots` row
+   * (displayed via the swimmer filter), not a `training_slots` row.
+   * Mutations are routed to the swimmer-slot APIs and group/coach/lane
+   * fields are hidden (they don't apply to swimmer slots).
+   */
+  swimmerContext?: { swimmerUserId: number } | null;
 };
 
 const SlotFormSheet = ({
@@ -317,10 +324,13 @@ const SlotFormSheet = ({
   slot,
   groups,
   coaches,
+  swimmerContext,
 }: SlotFormSheetProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { userId: coachUserId } = useAuth();
   const isEdit = !!slot;
+  const isSwimmerSlot = swimmerContext != null;
 
   const [slotMode, setSlotMode] = useState<"recurring" | "oneoff">("recurring");
   const [dayOfWeek, setDayOfWeek] = useState("1");
@@ -412,14 +422,46 @@ const SlotFormSheet = ({
     };
   };
 
+  const invalidateAfterSlotMutation = () => {
+    void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
+    void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+    void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
+    void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
+    if (swimmerContext) {
+      void queryClient.invalidateQueries({
+        queryKey: ["swimmer-slots", swimmerContext.swimmerUserId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["swimmer-slots-exists", swimmerContext.swimmerUserId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["coach-resolved-swimmer-assignments"],
+      });
+    }
+  };
+
   const createMutation = useMutation({
-    mutationFn: (input: TrainingSlotInput) => api.createTrainingSlot(input),
+    mutationFn: async (input: TrainingSlotInput): Promise<void> => {
+      if (isSwimmerSlot) {
+        if (!coachUserId) throw new Error("Coach non authentifié");
+        await api.createSwimmerSlot(
+          {
+            user_id: swimmerContext!.swimmerUserId,
+            day_of_week: input.day_of_week,
+            start_time: input.start_time,
+            end_time: input.end_time,
+            location: input.location,
+            session_type: input.session_type,
+          },
+          coachUserId,
+        );
+        return;
+      }
+      await api.createTrainingSlot(input);
+    },
     onSuccess: () => {
       toast({ title: "Creneau cree" });
-      void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
-      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
-      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
-      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
+      invalidateAfterSlotMutation();
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -432,14 +474,22 @@ const SlotFormSheet = ({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (input: TrainingSlotInput) =>
-      api.updateTrainingSlot(slot!.id, input),
+    mutationFn: async (input: TrainingSlotInput): Promise<void> => {
+      if (isSwimmerSlot) {
+        await api.updateSwimmerSlot(slot!.id, {
+          day_of_week: input.day_of_week,
+          start_time: input.start_time,
+          end_time: input.end_time,
+          location: input.location,
+          session_type: input.session_type,
+        });
+        return;
+      }
+      await api.updateTrainingSlot(slot!.id, input);
+    },
     onSuccess: () => {
       toast({ title: "Creneau mis a jour" });
-      void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
-      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
-      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
-      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
+      invalidateAfterSlotMutation();
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -452,13 +502,16 @@ const SlotFormSheet = ({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteTrainingSlot(slot!.id),
+    mutationFn: async (): Promise<void> => {
+      if (isSwimmerSlot) {
+        await api.deleteSwimmerSlot(slot!.id);
+        return;
+      }
+      await api.deleteTrainingSlot(slot!.id);
+    },
     onSuccess: () => {
       toast({ title: "Creneau supprime" });
-      void queryClient.invalidateQueries({ queryKey: ["training-slots"] });
-      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
-      void queryClient.invalidateQueries({ queryKey: ["slot-overrides"] });
-      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
+      invalidateAfterSlotMutation();
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -555,8 +608,8 @@ const SlotFormSheet = ({
               </div>
             </div>
 
-            {/* Recurring / One-off toggle */}
-            {!isEdit && (
+            {/* Recurring / One-off toggle (n/a for swimmer slots — always recurring) */}
+            {!isEdit && !isSwimmerSlot && (
               <div className="flex gap-1 rounded-xl border bg-muted/30 p-0.5">
                 <button type="button" onClick={() => setSlotMode("recurring")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${slotMode === "recurring" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Récurrent</button>
                 <button type="button" onClick={() => setSlotMode("oneoff")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${slotMode === "oneoff" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Ponctuel</button>
@@ -614,9 +667,16 @@ const SlotFormSheet = ({
               />
             </div>
 
-            <Separator />
+            {!isSwimmerSlot && <Separator />}
 
-            {/* Groups multi-select */}
+            {isSwimmerSlot && (
+              <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-muted-foreground">
+                Créneau personnalisé d'un nageur. Les modifications s'appliquent uniquement à ce nageur.
+              </div>
+            )}
+
+            {/* Groups multi-select (n/a for swimmer slots) */}
+            {!isSwimmerSlot && (
             <div className="space-y-2">
               <Label>Groupes</Label>
               <div className="flex flex-wrap gap-2">
@@ -653,8 +713,11 @@ const SlotFormSheet = ({
                 </p>
               )}
             </div>
+            )}
 
-            {/* Lane count */}
+            {/* Lane count + Coaches (n/a for swimmer slots) */}
+            {!isSwimmerSlot && (
+            <>
             <div className="space-y-2">
               <Label htmlFor="slot-lanes">Lignes d'eau</Label>
               <Input
@@ -668,7 +731,6 @@ const SlotFormSheet = ({
               />
             </div>
 
-            {/* Coaches multi-select */}
             <div className="space-y-2">
               <Label>Coachs</Label>
               <div className="flex flex-wrap gap-2">
@@ -705,6 +767,8 @@ const SlotFormSheet = ({
                 </p>
               )}
             </div>
+            </>
+            )}
 
             {/* Actions */}
             <div className="space-y-2 pt-2">
@@ -2072,11 +2136,21 @@ const CoachTrainingSlotsScreen = ({
 
       let assignment;
       if (useSwimmerResolution) {
-        const assignmentId = swimmerAssignmentIdByKey.get(
-          `${slot.id}:${scheduledDate}`,
-        );
-        assignment =
-          assignmentId != null ? slotAssignmentById.get(assignmentId) : undefined;
+        // slotAssignments only carries swim session_assignments, so strength
+        // (salle) swimmer-slots must stay empty — otherwise the timing-bucket
+        // fallback inside resolveSwimmerAssignmentsBatch can match a swim
+        // assignment to a salle slot.
+        if (slot.session_type === "swim") {
+          const assignmentId = swimmerAssignmentIdByKey.get(
+            `${slot.id}:${scheduledDate}`,
+          );
+          assignment =
+            assignmentId != null
+              ? slotAssignmentById.get(assignmentId)
+              : undefined;
+        } else {
+          assignment = undefined;
+        }
       } else {
         assignment = resolveSlotAssignment(slot, scheduledDate, slotAssignments);
       }
@@ -3084,6 +3158,11 @@ const CoachTrainingSlotsScreen = ({
         slot={editingSlot}
         groups={groups}
         coaches={coachesForForm}
+        swimmerContext={
+          swimmerFilterId != null && swimmerHasCustom === true
+            ? { swimmerUserId: swimmerFilterId }
+            : null
+        }
       />
 
       {/* Override Form Sheet */}

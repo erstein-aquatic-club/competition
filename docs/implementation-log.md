@@ -9610,3 +9610,52 @@ Ajout dans `CoachTrainingSlotsScreen.tsx` :
 
 - Les assignations avec `status = "completed"` restent masquées (cohérent avec le comportement pour les filtres groupe/all — `getSlotAssignments` les filtre par défaut).
 - Si un nageur a un swimmer-slot dont `source_assignment_id` référence une `training_slot_assignments` supprimée, la résolution retombe sur le timing match (morning/evening) + group membership, comportement identique à la vue nageur.
+
+## §138 — Vue semaine coach : ne pas hériter de séances nage sur créneaux salle + éditer swimmer_slots en place (2026-04-18)
+
+### Contexte
+
+Suite au §137, deux problèmes UX restants signalés sur le filtre nageur de la vue semaine coach :
+
+1. Un créneau typé "salle" (session_type = strength) affichait une séance de natation (timing fallback de `resolveSwimmerAssignmentsBatch` matchait une assignation nage au slot salle).
+2. Modifier un swimmer-slot (ex. changer session_type en "Musculation") échouait avec **"Modification refusée (aucune ligne affectée) — permissions insuffisantes."** — parce que `SlotFormSheet` appelait `updateTrainingSlot(slot.id)` sur un UUID appartenant à `swimmer_training_slots`, pas à `training_slots` → 0 ligne modifiée → erreur lancée par le garde-fou de `training-slots.ts:174`.
+
+### Changements
+
+**1. Fix bug 1 — filtrage session_type dans la résolution**
+
+Dans `slotInstancesById` (`CoachTrainingSlotsScreen.tsx`), la branche swimmer ne résout désormais l'assignation que si `slot.session_type === "swim"`. Les créneaux salle restent vides (cohérent avec `slotAssignments` qui ne contient que des swim session_assignments).
+
+**2. Fix bug 2 — routage des mutations sur swimmer_training_slots**
+
+- Ajout d'une prop `swimmerContext?: { swimmerUserId: number } | null` sur `SlotFormSheet`.
+- Les 3 mutations (create/update/delete) branchent selon `isSwimmerSlot` :
+  - `updateSwimmerSlot(slotId, { day_of_week, start_time, end_time, location, session_type })` au lieu de `updateTrainingSlot`.
+  - `deleteSwimmerSlot(slotId)` au lieu de `deleteTrainingSlot`.
+  - `createSwimmerSlot({ user_id, ... }, createdBy)` au lieu de `createTrainingSlot` (scénario rare mais supporté).
+- Invalidation après mutation : ajoute `["swimmer-slots", userId]`, `["swimmer-slots-exists", userId]`, `["coach-resolved-swimmer-assignments"]` en plus des clés training_slots habituelles.
+- UI masquée en mode swimmer-slot : toggle récurrent/ponctuel, groupes, lignes d'eau, coachs. Ajout d'un callout explicatif : "Créneau personnalisé d'un nageur. Les modifications s'appliquent uniquement à ce nageur."
+- `useAuth()` ajouté dans `SlotFormSheet` pour récupérer `coachUserId` (nécessaire pour `createSwimmerSlot`).
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | skip résolution pour strength slot + routage mutations swimmer_slot + UI conditionnelle | ~3198 lignes (vs ~3119 avant) |
+
+### Tests
+
+- `npx tsc --noEmit` → 0 erreur.
+- `node coachTrainingSlotsFilter.test.ts` → 4 pass, 0 fail (filtre inchangé).
+- Tests RLS non lancés : aucune migration, aucune policy, aucun helper auth modifié. Les policies RLS de `swimmer_training_slots` existent déjà depuis §45 (`app_user_role() IN ('coach', 'admin')` pour UPDATE/DELETE/INSERT).
+
+### Décisions
+
+- **Skip strength slots plutôt que filtrer dans `resolveSwimmerAssignmentsBatch`** : le resolver est partagé avec la vue nageur qui filtre déjà les slots salle upstream (`useDashboardSessions.ts:52-58`). Ne pas perturber ce contrat.
+- **Créer depuis la vue swimmer-filter crée un `swimmer_slot`** : scénario rare (le coach a normalement son filtre sur "All" pour créer un training_slot de groupe), mais cohérent : si l'utilisateur est dans le contexte "Francois WAGNER" et appuie sur "Créer", le nouveau créneau lui est propre.
+- **Pas de `.select()` ajouté à `deleteSwimmerSlot`** : les policies RLS autorisent déjà coach/admin à DELETE (update soft). Si besoin d'un garde-fou silent-failure, à traiter dans un chantier dédié (mêmes raisons qu'à §82 pour training_slots).
+
+### Limites
+
+- La page "fiche nageur" (onglet Créneaux, `SwimmerSlotsTab`) reste le point d'entrée canonique pour gérer les swimmer_slots d'un athlète. La vue semaine coach propose maintenant un raccourci éditorial pour les cas de customisation rapide.
+- Le create via cette voie n'expose pas le choix du `source_assignment_id` — les slots créés sont "libres" (sans miroir d'une assignation de groupe). Acceptable pour un slot vraiment personnel ; si l'utilisateur veut hériter d'un créneau groupe, passer par `resetSwimmerSlots` (fiche nageur).
