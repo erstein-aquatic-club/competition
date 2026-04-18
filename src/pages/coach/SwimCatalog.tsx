@@ -566,21 +566,6 @@ export default function SwimCatalog({
     moveMutation.mutate({ sessionId: pendingMoveSession.id, folder });
   };
 
-  const handleShare = async (session: SwimSessionTemplate) => {
-    try {
-      const token = await generateShareToken(session.id);
-      const url = `${window.location.origin}${window.location.pathname}#/s/${token}`;
-      if (navigator.share) {
-        await navigator.share({ title: session.name, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast({ title: "Lien copié !", description: "Le lien de partage a été copié dans le presse-papier." });
-      }
-    } catch (err) {
-      toast({ title: "Erreur", description: "Impossible de générer le lien de partage.", variant: "destructive" });
-    }
-  };
-
   /** Parse "Séance du DD/MM - Créneau" or "Séance du DD/MM/YYYY - Créneau" into structured parts */
   const parseSessionTitle = (name: string) => {
     const match = name.match(/^Séance du (\d{2}\/\d{2}(?:\/\d{4})?) - (.+)$/);
@@ -834,7 +819,15 @@ export default function SwimCatalog({
             canDelete={(sessionId) => canDeleteSwimCatalog(sessionId, assignments ?? null)}
             isDeleting={deleteSession.isPending}
             onMove={showArchive ? undefined : (session) => setPendingMoveSession(session)}
-            onShare={showArchive ? undefined : handleShare}
+            buildSharePayload={
+              showArchive
+                ? undefined
+                : async (session: SwimSessionTemplate) => {
+                    const token = await generateShareToken(session.id);
+                    const url = `${window.location.origin}${window.location.pathname}#/s/${token}`;
+                    return { url, title: session.name };
+                  }
+            }
             archiveMode={showArchive ? "restore" : "archive"}
           />
           )}

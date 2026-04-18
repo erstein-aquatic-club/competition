@@ -6,6 +6,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -21,6 +24,8 @@ import {
 } from "lucide-react";
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
+import { ShareMenuInline } from "@/components/shared/ShareMenu";
+import type { SharePayload } from "@/lib/share/types";
 
 interface SessionListViewProps<T extends { id: number }> {
   sessions: T[];
@@ -36,7 +41,7 @@ interface SessionListViewProps<T extends { id: number }> {
   canDelete: (sessionId: number) => boolean;
   isDeleting?: boolean;
   onMove?: (session: T) => void;
-  onShare?: (session: T) => void;
+  buildSharePayload?: (session: T) => Promise<SharePayload>;
   archiveMode?: "archive" | "restore";
 }
 
@@ -53,7 +58,7 @@ export function SessionListView<T extends { id: number }>({
   canDelete,
   isDeleting,
   onMove,
-  onShare,
+  buildSharePayload,
   archiveMode = "archive",
 }: SessionListViewProps<T>) {
   if (isLoading) {
@@ -151,11 +156,16 @@ export function SessionListView<T extends { id: number }>({
                     <Pencil className="h-4 w-4" />
                     Modifier
                   </DropdownMenuItem>
-                  {onShare && (
-                    <DropdownMenuItem onClick={() => onShare(session)}>
-                      <Share2 className="h-4 w-4" />
-                      Partager
-                    </DropdownMenuItem>
+                  {buildSharePayload && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Share2 className="h-4 w-4" />
+                        Partager
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <ShareMenuInline onOpen={() => buildSharePayload(session)} />
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                   )}
                   {onMove && (
                     <DropdownMenuItem onClick={() => onMove(session)}>
