@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CalendarDays, Plus, Trophy, Users, ChevronDown } from "lucide-react";
+import { getTimelineEventEndDate, isTimelineEventPast } from "./competitionTimeline";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -524,7 +525,7 @@ const EventsTimeline = ({
     let todayInserted = false;
 
     for (const ev of sorted) {
-      const isPast = ev.date < todayStr;
+      const isPast = isTimelineEventPast(ev, todayStr);
       const days = daysUntil(ev.date);
       const evMonth = ev.date.slice(0, 7);
       const isNewMonth = evMonth !== prevMonth;
@@ -548,7 +549,7 @@ const EventsTimeline = ({
       }
 
       result.push({ kind: "event", event: ev, isPast, days, isNewMonth, monthLabel });
-      prevEnd = ev.end_date || ev.date;
+      prevEnd = getTimelineEventEndDate(ev);
       prevMonth = evMonth;
     }
 
