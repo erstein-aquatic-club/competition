@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useRef } from "react";
-import { Play, Plus, Minus, X, Search, Users, Trash2, UserRound, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves } from "lucide-react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { Play, Plus, Minus, X, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
@@ -21,6 +21,8 @@ import {
   createManualSwimmer,
   deleteManualSwimmer,
 } from "../../lib/api/coach-manual-swimmers";
+import { fetchAvatarAsDataUrl } from "../../lib/chrono-avatar-cache";
+import { SwimmerAvatar } from "./SwimmerAvatar";
 
 interface ChronoSetupProps {
   state: ChronoState;
@@ -60,6 +62,25 @@ export default function ChronoSetup({
     (lane: number) => state.swimmers.filter((s) => s.lane === lane),
     [state.swimmers],
   );
+
+  // Pre-cache avatars to base64 dataURL so the race phase survives offline.
+  useEffect(() => {
+    const pending = state.swimmers.filter(
+      (s) => s.kind === "registered" && s.avatarUrl && !s.avatarUrl.startsWith("data:"),
+    );
+    if (pending.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const s of pending) {
+        const url = s.avatarUrl;
+        if (!url) continue;
+        const dataUrl = await fetchAvatarAsDataUrl(url);
+        if (cancelled || !dataUrl) continue;
+        dispatch({ type: "UPDATE_SWIMMER_AVATAR", key: s.key, avatarUrl: dataUrl });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [state.swimmers, dispatch]);
 
   // Group athletes by group_label for the picker
   const groupedAthletes = useMemo(() => {
@@ -428,6 +449,11 @@ export default function ChronoSetup({
                                     : "text-foreground"
                                 }`}
                               >
+                                <SwimmerAvatar
+                                  swimmer={{ displayName: a.display_name, avatarUrl: a.avatar_url ?? null }}
+                                  size="sm"
+                                  className="mr-2 shrink-0"
+                                />
                                 <span className="flex-1 truncate">{a.display_name}</span>
                                 {isAssigned && (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0">
@@ -576,7 +602,11 @@ function ManualsTabBody({
                   : "hover:bg-muted active:bg-muted/60"
               }`}
             >
-              <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+              <SwimmerAvatar
+                swimmer={{ displayName: m.display_name, avatarUrl: null }}
+                size="sm"
+                className="shrink-0"
+              />
               <span className="flex-1 truncate">{m.display_name}</span>
               {pulse && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0 animate-in fade-in slide-in-from-right-1 duration-300">
@@ -944,9 +974,11 @@ function SwimmerChip({
             : "border border-border bg-muted"
         }`}
       >
-        {isManual && (
-          <UserRound className="h-3 w-3 shrink-0 text-muted-foreground/70" aria-hidden />
-        )}
+        <SwimmerAvatar
+          swimmer={{ displayName: swimmer.displayName, avatarUrl: swimmer.avatarUrl }}
+          size="xs"
+          className="shrink-0"
+        />
 
         {/* Name = popover trigger */}
         <PopoverTrigger asChild>
