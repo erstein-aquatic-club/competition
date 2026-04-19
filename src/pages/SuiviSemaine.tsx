@@ -27,7 +27,7 @@ import { api } from "@/lib/api";
 import type { Session, PlannedAbsence, Assignment } from "@/lib/api";
 import type { ResolvedSlotAssignment } from "@/lib/api/types";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
-import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
+import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import { getWellnessForDate } from "@/lib/api/wellness";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -415,11 +415,15 @@ export default function SuiviSemaine() {
     enabled: !!userId,
   });
 
-  // Resolved assignments for the week
-  const { data: assignmentsMap } = useQuery({
-    queryKey: ["swimmer-assignments-batch", userId, weekISOs[0]],
-    queryFn: () => resolveSwimmerAssignmentsBatch(userId!, weekISOs),
-    enabled: !!userId && weekISOs.length > 0,
+  // Resolved swimmer sessions for the week — unified via get_swimmer_sessions
+  // RPC (§144). Returns a flat array (one row per expected slot per day),
+  // adapted below into a Map<iso, ResolvedSlotAssignment[]> so downstream
+  // timeline loops stay unchanged.
+  const { data: swimmerSessionsRaw } = useQuery({
+    queryKey: ["swimmer-sessions-week", userId, weekISOs[0], weekISOs[6]],
+    queryFn: () =>
+      getSwimmerSessions(userId!, weekISOs[0]!, weekISOs[6]!, false),
+    enabled: !!userId && weekISOs.length === 7,
   });
 
   const { data: assignments = [] } = useQuery({
@@ -427,6 +431,42 @@ export default function SuiviSemaine() {
     queryFn: () => api.getAssignments(user ?? "", userId),
     enabled: !!userId && !!user,
   });
+
+  const assignmentsById = useMemo(() => {
+    const map = new Map<number, Assignment>();
+    for (const a of assignments) {
+      const id = Number(a?.id);
+      if (Number.isFinite(id)) map.set(id, a);
+    }
+    return map;
+  }, [assignments]);
+
+  const assignmentsMap = useMemo(() => {
+    const map = new Map<string, ResolvedSlotAssignment[]>();
+    if (!swimmerSessionsRaw) return map;
+    for (const row of swimmerSessionsRaw) {
+      if (!row.swimmer_slot_id) continue;
+      const list = map.get(row.scheduled_date) ?? [];
+      const startHHMM = row.slot_start_time.slice(0, 5);
+      const endHHMM = row.slot_end_time.slice(0, 5);
+      list.push({
+        swimmerSlotId: row.swimmer_slot_id,
+        slotTime: `${startHHMM}-${endHHMM}`,
+        slotLocation: row.slot_location ?? "",
+        slotSessionType: row.slot_session_type,
+        sourceTrainingSlotId: row.training_slot_id,
+        assignment:
+          row.assignment_id != null
+            ? (assignmentsById.get(row.assignment_id) ?? null)
+            : null,
+        assignmentId: row.assignment_id,
+        source: row.assignment_source,
+        alternatives: [],
+      });
+      map.set(row.scheduled_date, list);
+    }
+    return map;
+  }, [swimmerSessionsRaw, assignmentsById]);
 
   // Swim sessions (ressentis)
   const { data: allSessions = [] } = useQuery({
