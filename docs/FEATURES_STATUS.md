@@ -223,16 +223,17 @@ Tous les feature flags sont activés.
 | Quiz neurotype (profil entraînement) | ✅ | `NeurotypQuiz.tsx`, `NeurotypResult.tsx`, `neurotype-quiz-data.ts`, `neurotype-scoring.ts` | 30 questions, 5 profils, scoring client-side, résultat JSONB dans user_profiles (§71) |
 | Entretiens nageur | ✅ | `AthleteInterviewsSection.tsx`, `Profile.tsx` | Formulaire 4 sections en draft_athlete, lecture seule + signature en sent, historique en signed (§74) |
 
-### Planification (macro-cycles)
+### Planification natation (granularité nageur, §153 — remplace macro-cycles)
 
 | Fonctionnalité | Statut | Fichiers | Notes |
 |----------------|--------|----------|-------|
-| CRUD macro-cycles coach | ✅ | `SwimmerPlanningTab.tsx`, `planning.ts` | Bloc entre 2 compétitions, nom libre, notes (§74) |
-| Semaines auto-générées | ✅ | `SwimmerPlanningTab.tsx`, `planning.ts` | bulkUpsert des lundis entre start et end competition (§74) |
-| Typage semaines (libre) | ✅ | `SwimmerPlanningTab.tsx` | Texte libre avec autocomplétion datalist des types existants (§74) |
-| Couleur type par hash | ✅ | `SwimmerPlanningTab.tsx` | Palette automatique cohérente par nom de type (§74) |
-| Héritage groupe → individuel | ✅ | `SwimmerPlanningTab.tsx`, `planning.ts` | Badge "Planification groupe", bouton "Personnaliser" copie en individuel (§74) |
-| Timeline semaines | ✅ | `SwimmerPlanningTab.tsx` | Timeline verticale, semaine courante surbrillance, compétitions bornes (§74) |
+| Sélecteur "nageur" sur `/coach/swim-planning` | ✅ | `SwimPlanningDemo.tsx`, `useSwimPlanningAthleteMode.ts` | Dropdown à côté du groupe, URL `?athlete=<id>`, bandeau avec avatar + "Retour plan groupe" (§153) |
+| Override filière par nageur (slot) | ✅ | `swim_planning_slot_overrides`, `mergeSlots` | Ring dashed + icône User sur la chip ; remplace l'edit direct en mode athlete (§153) |
+| Override week_type + notes par nageur | ✅ | `swim_planning_week_overrides`, `mergeWeekMeta` | Source `"athlete"` identifiée via `mergeWeekMeta` (§153) |
+| Week meta groupe persistée en DB | ✅ | `swim_planning_week_meta` | Remplace l'ancien localStorage `swim-plan-meta-*` (§153) |
+| Panneau inline nageur sur fiche coach | ✅ | `SwimmerPlanningPanel.tsx`, `SwimPlanningTimeline readOnly` | 7 semaines, lien "Plein écran" → `/coach/swim-planning?athlete=<id>` (§153, remplace `SwimmerPlanningTab`) |
+| Vue côté nageur — merge + badge "Perso" | ✅ | `SwimPlanningAthleteView.tsx` | Merge `mergeSlots` + `mergeWeekMeta`, badge outline primary sur chip et header, tooltip "Personnalisé par ton coach" (§153) |
+| Macro-cycles (training_cycles/training_weeks) | 🗄️ Retiré | `SwimmerPlanningTab.tsx` supprimé (§153) | Tables conservées pour rollback, drop prévu §T10 après validation prod |
 
 ### Entretiens individuels (coach)
 

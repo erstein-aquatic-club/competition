@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §152 (Coach QuickView — mode dépannage pour coaches non-titulaires : briefing RPC SECURITY DEFINER + enregistrement présence/commentaire/séance avec `recorded_by` ; dispatcher thin `CoachSwimmerDetail` ; 4 composants KPI swimmer-kpis).
+Dernière entrée en date : §153 (Planification natation — granularité par nageur : nouvelles tables `swim_planning_slot_overrides`, `swim_planning_week_overrides`, `swim_planning_week_meta` ; hook `useSwimPlanningAthleteMode` ; timeline présentationnel `SwimPlanningTimeline` + `readOnly` ; `SwimmerPlanningPanel` remplace `SwimmerPlanningTab` ; badge "Perso" côté nageur).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

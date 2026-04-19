@@ -30,7 +30,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/painReports.ts` | CRUD pain reports | ~69 lignes |
 | `src/lib/api/audit.ts` | Logs d'audit | ~32 lignes |
 | `src/lib/api/notificationLog.ts` | Logs notifications envoyées | ~26 lignes |
-| `src/lib/api/swim-planning.ts` | Planification séances natation | ~44 lignes |
+| `src/lib/api/swim-planning.ts` | Planification séances natation + overrides par nageur (slot, week_meta, week_overrides) | ~169 lignes |
+| `src/lib/swimPlanningMerge.ts` | Pur — `mergeSlots` / `mergeWeekMeta` (group + athlete) pour planning natation (§153) | ~112 lignes |
+| `src/hooks/coach/useSwimPlanningAthleteMode.ts` | Hook coach — sélection nageur + URL sync + queries overrides + merge + mutations routées (§153) | ~449 lignes |
 | `src/lib/api/swim-filieres.ts` | CRUD filières : patch partiel + `resetSwimFiliere` (§134) | ~65 lignes |
 | `src/pages/coach/FilieresEditor.tsx` | Overlay liste → détail plein écran (15 champs + jauges + reset + aperçu nageur live) (§134) | ~1087 lignes |
 | `src/components/swim/ExerciseLogInline.tsx` | Formulaire inline saisie technique par exercice (§58) | ~294 lignes |
@@ -80,7 +82,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/CoachComms.tsx` | Wrapper tabs notifications/SMS (§92) | ~60 lignes |
 | `src/lib/api/planning.ts` | CRUD macro-cycles + semaines | ~200 lignes |
 | `src/lib/api/interviews.ts` | CRUD entretiens + transitions multi-phases | ~200 lignes |
-| `src/pages/coach/SwimmerPlanningTab.tsx` | Onglet planification fiche nageur (timeline cycles) | ~844 lignes |
+| `src/pages/coach/SwimmerPlanningPanel.tsx` | Panneau inline planning nageur sur fiche (read-only, 7 semaines, Plein écran vers /coach/swim-planning) — remplace `SwimmerPlanningTab` (§153) | ~170 lignes |
 | `src/pages/coach/SwimmerInterviewsTab.tsx` | Onglet entretiens fiche nageur (workflow multi-phases) | ~1193 lignes |
 | `src/components/profile/AthleteInterviewsSection.tsx` | Entretiens côté nageur (formulaire, signature, historique) | ~320 lignes |
 | `src/components/shared/FolderCard.tsx` | Composant partagé dossiers (Radix Collapsible, variant root/nested, slot actions) (§125) | ~61 lignes |
@@ -172,9 +174,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/MonthlyReport.tsx` | Rapport mensuel généré | ~462 lignes |
 | `src/pages/SwimSessionView.tsx` | Vue détail séance natation | ~500 lignes |
 | `src/pages/SwimNotes.tsx` | Notes techniques nage | ~306 lignes |
-| `src/pages/coach/SwimPlanningAthleteView.tsx` | Vue planning athlète (coach) | ~914 lignes |
-| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation (éditeur filières extrait en composant lazy §134 ; timeline extraite dans `SwimPlanningTimeline` Task 5) | ~907 lignes |
-| `src/components/coach/swim/SwimPlanningTimeline.tsx` | Timeline semaines + micro-grille jour × créneau + chips filière + edit-meta inline + compétitions (présentationnel, partagé coach/nageur) | ~691 lignes |
+| `src/pages/coach/SwimPlanningAthleteView.tsx` | Vue planning athlète (côté nageur) — merge overrides perso + badge "Perso" (§153) | ~1007 lignes |
+| `src/pages/coach/SwimPlanningDemo.tsx` | Planning natation coach — sélecteur nageur/groupe + override mode (§153), consomme `useSwimPlanningAthleteMode` | ~1034 lignes |
+| `src/components/coach/swim/SwimPlanningTimeline.tsx` | Timeline semaines + micro-grille jour × créneau + chips filière (présentationnel, partagé coach/nageur) — ring+icon override, opacity inherited, `readOnly` (§153) | ~780 lignes |
 | `src/components/coach/swim/swimPlanningShared.ts` | Helpers/constantes partagés timeline swim (WeekInfo, DAY_ROWS, getMonday, generateWeeks, fmtDD_MM, isCurrentWeek) | ~75 lignes |
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach | ~264 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |

@@ -10452,3 +10452,104 @@ Quand un coach substituant cliquait sur la fiche d'un nageur qu'il ne gérait pa
 - **Task 14 (attribution badges)** non implémentée : `session_attendance` et `session_comments` sont de nouvelles tables sans affichage existant dans `SwimmerFeedbackTab` / `SwimmerSlotsTab`. Les badges d'attribution seront ajoutés dans un §dédié une fois l'affichage de ces données construit.
 - **RLS tests** (Task 13) nécessitent Docker Desktop — à valider avant merge.
 - **`assignSessionToSlotAsSub`** : le `slotId` passé est `assignment_id` (id de session_assignments), pas l'id d'un slot vide — la mise à jour `swim_planning_slot_overrides.recorded_by` est best-effort (silent fail si pas de match).
+
+---
+
+## §153 — Planification natation : granularité par nageur + retrait macro-cycles (2026-04-19)
+
+### Contexte
+
+Jusqu'ici, `/coach/swim-planning` gérait le plan d'entraînement au niveau du groupe (une grille filière × jour × créneau par semaine, partagée par tous les nageurs du groupe). Pour personnaliser un nageur (différer sa filière un jour donné ou lui attribuer un week_type spécifique), il fallait passer par l'ancien système de macro-cycles `training_cycles` / `training_weeks` (`SwimmerPlanningTab.tsx` 844 L). Ce système était orthogonal au nouveau timeline hebdomadaire, peu utilisé, et stockait le week_type en localStorage côté coach.
+
+§153 unifie les deux : le coach garde la grille groupe comme base, mais peut sélectionner un nageur dans le header et écrire des overrides ciblés dans trois nouvelles tables. Le nageur voit automatiquement ses overrides fusionnés dans sa propre vue, avec un badge "Perso" pour les différencier du plan groupe.
+
+Exécution : plan de 10 tâches (voir `docs/plans/2026-04-18-coach-individual-swim-planning-plan.md`) + `docs/plans/2026-04-18-coach-individual-swim-planning-design.md`, dispatché via la skill `superpowers:subagent-driven-development` (implementer → spec reviewer → code-quality reviewer par tâche).
+
+### Changements
+
+**Migrations SQL (1 fichier, appliqué via MCP) :**
+
+- `00131_swim_planning_overrides.sql` (numéro décalé à 00131 après collision avec les migrations QuickView) : crée 3 tables RLS-protégées :
+  - `swim_planning_slot_overrides` (id UUID, athlete_id INT, week_start date, day_of_week 0-5, time_slot IN morning/evening, filiere TEXT, session_id NULLABLE, UNIQUE athlete+week+day+slot).
+  - `swim_planning_week_meta` (id UUID, group_id INT, week_start, week_type NULLABLE, notes NULLABLE, updated_at — promu depuis localStorage).
+  - `swim_planning_week_overrides` (mêmes colonnes, clé sur athlete_id + week_start).
+  - Policies : lecture `authenticated` partout, écriture coach/admin via `(SELECT app_user_role())` pour éviter `auth_rls_initplan` (pattern §124).
+
+**Tests RLS (Task 2) :** 14 cas dans `supabase/tests/rls/swim_planning_overrides.test.ts` couvrant SELECT/INSERT/UPDATE/DELETE pour les 3 tables par rôle, avec `assert_rows_returned` sur les INSERT pour attraper les policies silencieuses (§113-style). Validé via `npm run test:rls`.
+
+**API module (Task 3) :**
+
+- `src/lib/api/swim-planning.ts` (44 L → 169 L) : ajoute `getSwimPlanningSlotOverrides`, `upsertSwimPlanningSlotOverride`, `deleteSwimPlanningSlotOverride` (avec `.select()` pour détecter no-op §113), `getSwimPlanningWeekMeta`, `upsertSwimPlanningWeekMeta`, `getSwimPlanningWeekOverrides`, `upsertSwimPlanningWeekOverride`. Toutes re-exportées via `src/lib/api/index.ts` et `src/lib/api.ts` (facade).
+- Types dans `src/lib/api/types.ts` : `SwimPlanningSlotOverride(Input)`, `SwimPlanningWeekMeta(Input)`, `SwimPlanningWeekOverride(Input)`.
+
+**Merge helper pur (Task 4) :**
+
+- `src/lib/swimPlanningMerge.ts` (112 L) : `mergeSlots(groupSlots, athleteOverrides)` → `EffectiveSlot[]` (superset structurel de `SwimPlanningSlot` avec `overridden?`, `overrideId?`) ; `mergeWeekMeta(groupMeta, athleteOverride)` → `EffectiveWeekMeta` avec `source: "group" | "athlete" | "none"`.
+- `src/lib/__tests__/swimPlanningMerge.test.ts` (129 L) : 9 tests Vitest TDD (override remplace group, override-only, coexistence, week meta prior athlete, etc.).
+
+**Timeline extraction (Task 5, refactor non-fonctionnel + hardening) :**
+
+- `src/components/coach/swim/SwimPlanningTimeline.tsx` (780 L) : composant présentationnel extrait de `SwimPlanningDemo` (1462 L → 907 L à ce stade). Générique `<S extends EffectiveSlot>`, prop `readOnly` (§153 Task 7), override visual = dashed ring + icône `User` + opacity-70 sur slots hérités en mode athlete. Consomme `sessionNameMap` pour aria-label du bouton session picker.
+- `src/components/coach/swim/swimPlanningShared.ts` (75 L) : helpers partagés `WeekInfo`, `DAY_ROWS`, `getMonday`, `generateWeeks`, `fmtDD_MM`, `isCurrentWeek`, `getISOWeekNumber`.
+
+**Hook d'extraction coach (Task 6 + refactor pré-Task 7) :**
+
+- `src/hooks/coach/useSwimPlanningAthleteMode.ts` (449 L) : groupe la sélection nageur + 3 queries overrides + `effectiveSlotsByWeek` memo + `getEffectiveWeekMeta` + 6 mutations routées (slot upsert/delete × athlete/group, week meta upsert × athlete/group). Option `syncUrl` (défaut `true`) pour `/coach/swim-planning` ; désactivée dans `SwimmerPlanningPanel` pour ne pas polluer l'URL de la fiche nageur.
+- `src/pages/coach/SwimPlanningDemo.tsx` (907 L → 1034 L) : consomme le hook, ajoute le dropdown `Select` nageur (+ sentinel `"__group__"`), bandeau avec `Avatar` + bouton "Retour plan groupe" (design via skill `frontend-design`), URL sync `?athlete=<id>`, handlers `handleSelectFiliere`/`handleDeleteSlot`/`handleLinkSession`/`handleUnlinkSession`/`handleSaveMeta` branchent sur `selectedAthleteId`. Suppression du localStorage week_meta + `metaVersion`.
+
+**Remplacement `SwimmerPlanningTab` (Task 7) :**
+
+- `src/pages/coach/SwimmerPlanningPanel.tsx` (170 L, NEW) : panneau inline read-only sur `CoachSwimmerFullView`. Fenêtre compacte 7 semaines, lien "Plein écran" vers `/coach/swim-planning?athlete=<id>`. Consomme le hook avec `syncUrl: false` et force `setSelectedAthleteId(athleteId)` sur mount.
+- `src/pages/coach/SwimmerPlanningTab.tsx` **supprimé** (844 L). Section title dans `CoachSwimmerFullView.tsx` : "Macro-cycles" → "Planification natation".
+
+**Vue nageur (Task 8) :**
+
+- `src/pages/coach/SwimPlanningAthleteView.tsx` (914 L → 1007 L) : 3 queries (`slotOverrides`, `groupWeekMeta`, `myWeekOverrides`), `effectiveSlotsByWeek` + `getEffectiveWeekMeta`, badge "Perso" `border-primary/40 text-primary` avec tooltip `title="Personnalisé par ton coach"` sur chip filière (position absolue `-top-1 -left-1`, adapté à la chip 36px) et à côté du `week_type` dans le header. Type du chip widensé de `SwimPlanningSlot` → `EffectiveSlot`. Suppression de l'ancien helper localStorage `getWeekMeta(groupId, weekKey)`.
+
+**Docs (Task 9) — ce §.**
+
+### Fichiers modifiés
+
+| Fichier | LOC |
+|---|---|
+| `supabase/migrations/00131_swim_planning_overrides.sql` (NEW) | ~80 |
+| `supabase/tests/rls/swim_planning_overrides.test.ts` (NEW) | ~280 |
+| `src/lib/api/swim-planning.ts` | 169 (+125) |
+| `src/lib/api/types.ts` | +60 (types overrides) |
+| `src/lib/api.ts` / `src/lib/api/index.ts` | +15 (facade + index re-exports) |
+| `src/lib/swimPlanningMerge.ts` (NEW) | 112 |
+| `src/lib/__tests__/swimPlanningMerge.test.ts` (NEW) | 129 |
+| `src/components/coach/swim/SwimPlanningTimeline.tsx` (NEW) | 780 |
+| `src/components/coach/swim/swimPlanningShared.ts` (NEW) | 75 |
+| `src/hooks/coach/useSwimPlanningAthleteMode.ts` (NEW) | 449 |
+| `src/pages/coach/SwimPlanningDemo.tsx` | 1034 (−428 de l'extraction timeline/hook, +carbone athlete mode) |
+| `src/pages/coach/SwimmerPlanningPanel.tsx` (NEW) | 170 |
+| `src/pages/coach/SwimmerPlanningTab.tsx` (DELETED) | −844 |
+| `src/pages/coach/SwimPlanningAthleteView.tsx` | 1007 (+93) |
+| `src/pages/coach/CoachSwimmerFullView.tsx` | +3/−3 (import + title) |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur.
+- `npm test -- --run src/lib/__tests__/swimPlanningMerge.test.ts` : 9/9 pass. Full suite : 262/262.
+- `npm run test:rls` : 14/14 pass sur `swim_planning_overrides.test.ts`.
+
+### Décisions
+
+- **Tables dédiées plutôt qu'extension de `swim_planning_slots`** : un override n'est pas un slot avec un `athlete_id` optionnel — la sémantique de clé (group_id vs athlete_id) diverge et forcer les deux dans la même table aurait complexifié les policies RLS + l'unique constraint.
+- **`training_cycles` / `training_weeks` conservés pour rollback** : drop planifié en Task 10 après 1-2 semaines de validation prod (pas de regression report). Voir `docs/plans/2026-04-18-coach-individual-swim-planning-plan.md` lines 1612-1624.
+- **`EffectiveSlot` comme superset structurel** plutôt que discriminated union : permet au coach-mode de passer `SwimPlanningSlot[]` sans cast (via prop générique `S extends EffectiveSlot`). La discriminated union aurait cascadé des changements jusque dans `WeekCard`/`MicroGrid`/`SlotCell` — coût > bénéfice à ce stade.
+- **Hook extrait avant Task 7** : sans le hook, `SwimmerPlanningPanel` aurait dupliqué ~200 L de queries + mutations + URL sync. Le refactor préventif a ramené `SwimPlanningDemo` de 1323 à 1034 L et rendu Task 7 trivial (160 L de panel).
+- **`syncUrl: false` en option sur le hook** : plutôt qu'un cleanup unmount qui aurait couplé le hook au cycle de vie du consommateur, le panneau inline opt-out explicitement — aucune pollution d'URL sur `/#/coach/swimmers/<id>/...`.
+- **Panneau `SwimmerPlanningPanel` read-only** (Task 7 simplification) : évite de dupliquer tout le `FiliereSheet` + `SessionPicker` + toasts dans le panneau inline. Le coach clique "Plein écran" pour éditer — cohérent avec le pattern "aperçu inline + drill vers pleine page" déjà présent ailleurs (ex: Suivi hub §103).
+- **`readOnly` réintroduit sur `SwimPlanningTimeline`** (flagué par code-quality review) : empty cells deviennent `<div>` au lieu de `<button>`, pas de `Plus` ni de `Link2` ni de pencil edit — élimine les affordances trompeuses en mode panneau lecture.
+- **Merge helper pur côté client plutôt que RPC SQL** : la taille des jeux de données (quelques semaines × quelques slots × 1 nageur) ne justifie pas un aller-retour DB ; les tests Vitest isolent la logique sans infra Supabase, les queries restent simples (SELECT par clé).
+
+### Limites
+
+- **Week meta localStorage orphan** : les clés `swim-plan-meta-<group>-<week>` encore présentes côté coach avant le switch restent dans `localStorage`. Pas de balayage de cleanup — les nouvelles écritures vont en DB, les anciennes sont ignorées. Impact négligeable (storage orphelin, pas de dérive fonctionnelle).
+- **Stages / groupes temporaires** non couverts : un nageur en stage chez un autre groupe n'a pas de mécanisme propre pour hériter du plan du groupe d'accueil sur une plage de dates. Cas limite à traiter dans un §futur si le besoin remonte.
+- **Panneau inline `SwimmerPlanningPanel` ne wire ni `sessionNameMap` ni `competitionsByWeek`** (passe `new Map()` pour les deux) : les noms de séance et les chips compétitions ne s'affichent pas dans le panneau. Acceptable vu que l'ancien `SwimmerPlanningTab` ne les affichait pas non plus ; à envisager dans une itération si feedback nageur.
+- **Skeleton loading non propagé** dans `SwimmerPlanningPanel` : le hook n'expose pas d'`isLoading` composite (uniquement `isPending` pour les mutations). Le panneau affiche 7 semaines vides durant le fetch. Suivi : ajouter `queriesLoading` au hook et wirer le skeleton `<SwimPlanningTimeline isLoading>` existant.
+- **Follow-up refacto** (flagué par code-quality review Task 8) : extraire `buildEffectiveSlotsByWeek(visibleWeekKeys, groupSlotsByWeek, overrides)` dans `swimPlanningMerge.ts` pour que le hook coach ET `SwimPlanningAthleteView` appellent le même pur. ~25 L de duplication aujourd'hui, faible risque de drift.
+- **Drop des tables `training_cycles` / `training_weeks`** : Task 10 du plan, non exécuté ce §. À faire après validation prod (1-2 semaines sans regression report).
