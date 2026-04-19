@@ -45,3 +45,35 @@ test("buildCoachHash creates the competitions section hash used by coach screens
 
   assert.equal(hash, "#/coach?section=competitions");
 });
+
+test("parseCoachHashLocation parses weekDate when section=week", () => {
+  const state = parseCoachHashLocation("#/coach?section=week&weekDate=2026-04-14");
+  assert.equal(state.section, "week");
+  assert.equal(state.weekDate, "2026-04-14");
+});
+
+test("parseCoachHashLocation ignores weekDate when section is not week", () => {
+  const state = parseCoachHashLocation("#/coach?section=swimmers&weekDate=2026-04-14");
+  assert.equal(state.weekDate, undefined);
+});
+
+test("parseCoachHashLocation ignores invalid weekDate format", () => {
+  const state = parseCoachHashLocation("#/coach?section=week&weekDate=not-a-date");
+  assert.equal(state.weekDate, undefined);
+});
+
+test("buildCoachHash round-trips weekDate through build", () => {
+  const hash = buildCoachHash({ section: "week", weekDate: "2026-04-14" });
+  assert.ok(hash.includes("section=week"), "should contain section=week");
+  assert.ok(hash.includes("weekDate=2026-04-14"), "should contain weekDate=2026-04-14");
+});
+
+test("buildCoachHash omits weekDate from hash when undefined", () => {
+  const hash = buildCoachHash({ section: "week" });
+  assert.ok(!hash.includes("weekDate"), "should not contain weekDate");
+});
+
+test("buildCoachHash strips weekDate when section changes away from week", () => {
+  const hash = buildCoachHash({ section: "swimmers" }, "#/coach?section=week&weekDate=2026-04-14");
+  assert.ok(!hash.includes("weekDate"), "should not contain weekDate");
+});

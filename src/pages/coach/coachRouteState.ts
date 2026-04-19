@@ -22,6 +22,7 @@ export type CoachRouteState = {
   section: CoachSection;
   tab?: CoachCommsTab;
   athleteId?: number | null;
+  weekDate?: string; // YYYY-MM-DD, only for section="week"
 };
 
 function isCoachSection(value: string | null): value is CoachSection {
@@ -43,6 +44,8 @@ export function parseCoachHashLocation(hash: string): CoachRouteState {
   const section = isCoachSection(rawSection) ? rawSection : "home";
   const rawAthleteId = params.get("athleteId");
   const parsedAthleteId = rawAthleteId ? Number(rawAthleteId) : null;
+  const rawWeekDate = params.get("weekDate");
+  const weekDateValid = rawWeekDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(rawWeekDate);
 
   return {
     section,
@@ -51,6 +54,7 @@ export function parseCoachHashLocation(hash: string): CoachRouteState {
       section === "comms" && parsedAthleteId !== null && Number.isFinite(parsedAthleteId) && parsedAthleteId > 0
         ? parsedAthleteId
         : null,
+    weekDate: section === "week" && weekDateValid ? rawWeekDate! : undefined,
   };
 }
 
@@ -78,6 +82,16 @@ export function buildCoachHash(nextState: CoachRouteState, currentHash = "#/coac
   } else {
     params.delete("tab");
     params.delete("athleteId");
+  }
+
+  if (nextState.section === "week") {
+    if (nextState.weekDate && /^\d{4}-\d{2}-\d{2}$/.test(nextState.weekDate)) {
+      params.set("weekDate", nextState.weekDate);
+    } else {
+      params.delete("weekDate");
+    }
+  } else {
+    params.delete("weekDate");
   }
 
   const query = params.toString();
