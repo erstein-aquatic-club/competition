@@ -50,6 +50,13 @@ export type SlotInstance = {
   assignment?: SlotAssignment;
   /** The override for this slot+date, if any */
   override?: TrainingSlotOverride;
+  /**
+   * How the assignment was resolved for the currently viewed swimmer.
+   * Populated only when the swimmer filter is active and get_swimmer_sessions
+   * returned a row for this slot. Allows the UI to mark individual swim
+   * assignments with a "Perso" badge (§144).
+   */
+  assignment_source?: "individual" | "subgroup" | "group" | "none";
 };
 
 // ── Pure helpers ─────────────────────────────────────────────

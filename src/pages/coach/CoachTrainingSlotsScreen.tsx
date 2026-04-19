@@ -36,6 +36,7 @@ import { getCompetitions } from "@/lib/api/competitions";
 import type { Competition } from "@/lib/api/types";
 import { CompetitionDayBanner } from "@/components/coach/CompetitionDayBanner";
 import { CompetitionQuickSheet } from "@/components/coach/CompetitionQuickSheet";
+import IndividualAssignmentBadge from "@/components/coach/IndividualAssignmentBadge";
 import { buildCoachHash } from "./coachRouteState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1313,15 +1314,20 @@ const TimelineSlot = ({
         )}
 
         {!isShort && hasAssignment && (
-          <span
-            className={`text-[9px] truncate ${
-              isDraft
-                ? "text-amber-700 dark:text-amber-300"
-                : "text-emerald-700 dark:text-emerald-300"
-            }`}
-          >
-            {instance?.assignment?.session_name ?? "Séance"}
-          </span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span
+              className={`text-[9px] truncate ${
+                isDraft
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-emerald-700 dark:text-emerald-300"
+              }`}
+            >
+              {instance?.assignment?.session_name ?? "Séance"}
+            </span>
+            {instance?.assignment_source === "individual" && (
+              <IndividualAssignmentBadge size="sm" />
+            )}
+          </div>
         )}
       </div>
     </button>
@@ -1425,15 +1431,20 @@ function TimelineSlotInlineImpl({
         )}
 
         {!isShort && hasAssignment && (
-          <span
-            className={`text-[9px] truncate ${
-              isDraft
-                ? "text-amber-700 dark:text-amber-300"
-                : "text-emerald-700 dark:text-emerald-300"
-            }`}
-          >
-            {instance?.assignment?.session_name ?? "Séance"}
-          </span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span
+              className={`text-[9px] truncate ${
+                isDraft
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-emerald-700 dark:text-emerald-300"
+              }`}
+            >
+              {instance?.assignment?.session_name ?? "Séance"}
+            </span>
+            {instance?.assignment_source === "individual" && (
+              <IndividualAssignmentBadge size="sm" />
+            )}
+          </div>
         )}
       </div>
     </button>
@@ -1769,6 +1780,9 @@ const MobileView = ({
                           <span className="truncate text-xs font-medium text-foreground">
                             {instance.assignment.session_name}
                           </span>
+                          {instance?.assignment_source === "individual" && (
+                            <IndividualAssignmentBadge size="md" />
+                          )}
                         </div>
                       )}
 
@@ -2140,6 +2154,7 @@ const CoachTrainingSlotsScreen = ({
       );
 
       let assignment;
+      let assignmentSource: SlotInstance["assignment_source"];
       if (useSwimmerResolution) {
         // Strength (salle) slots don't carry swim assignments. Keep empty.
         if (slot.session_type !== "swim") {
@@ -2148,6 +2163,7 @@ const CoachTrainingSlotsScreen = ({
           const row = swimmerSessionsByKey?.get(`${slot.id}:${scheduledDate}`);
           if (row?.assignment_id != null) {
             assignment = slotAssignments.find((a) => a.id === row.assignment_id);
+            assignmentSource = row.assignment_source;
           } else {
             assignment = undefined;
           }
@@ -2168,6 +2184,7 @@ const CoachTrainingSlotsScreen = ({
         state,
         assignment,
         override,
+        assignment_source: assignmentSource,
       });
     }
 
