@@ -246,6 +246,7 @@ CREATE TABLE public.groups (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  is_temporary BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -509,3 +510,241 @@ CREATE POLICY competition_checklist_checks_own_update ON public.competition_chec
             WHERE cc.id = competition_checklist_checks.competition_checklist_id
               AND cc.athlete_id = app_user_id())
   );
+
+-- =============================================================================
+-- Swim inheritance resolver (§144) — training_slots, swimmer_training_slots,
+-- training_slot_assignments, swim_sessions_catalog, planned_absences, and the
+-- get_swimmer_sessions RPC. Keep in sync with migrations 00128+00129+00130.
+-- =============================================================================
+
+CREATE TABLE public.training_slots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  day_of_week SMALLINT NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  location TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  session_type TEXT NOT NULL DEFAULT 'swim',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.training_slot_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slot_id UUID NOT NULL REFERENCES public.training_slots(id) ON DELETE CASCADE,
+  group_id INTEGER NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.swimmer_training_slots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  source_assignment_id UUID REFERENCES public.training_slot_assignments(id) ON DELETE SET NULL,
+  day_of_week SMALLINT NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  location TEXT,
+  session_type TEXT NOT NULL DEFAULT 'swim',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.swim_sessions_catalog (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  total_distance INTEGER,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.planned_absences (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  reason TEXT,
+  scheduled_slot TEXT CHECK (scheduled_slot IN ('morning', 'evening')),
+  training_slot_id UUID REFERENCES public.training_slots(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX planned_absences_user_date_slot_unique
+  ON public.planned_absences(user_id, date, COALESCE(scheduled_slot, 'all'));
+
+-- RPC get_swimmer_sessions — verbatim body from 00129 migration
+CREATE OR REPLACE FUNCTION public.get_swimmer_sessions(
+  p_user_id integer,
+  p_from date,
+  p_to date,
+  p_include_drafts boolean DEFAULT false
+)
+RETURNS TABLE (
+  swimmer_slot_id uuid,
+  scheduled_date date,
+  day_of_week int,
+  bucket text,
+  slot_start_time time,
+  slot_end_time time,
+  slot_location text,
+  slot_session_type text,
+  assignment_id integer,
+  assignment_source text,
+  assignment_title text,
+  assignment_total_km numeric,
+  swim_catalog_id integer,
+  strength_session_id integer,
+  training_slot_id uuid,
+  is_absent boolean,
+  absence_reason text,
+  log_session_id uuid
+)
+LANGUAGE plpgsql STABLE SECURITY INVOKER
+AS $$
+DECLARE
+  v_has_custom boolean;
+  v_group_ids int[];
+BEGIN
+  SELECT array_agg(DISTINCT gm.group_id)
+  INTO v_group_ids
+  FROM group_members gm
+  JOIN groups g ON g.id = gm.group_id
+  WHERE gm.user_id = p_user_id
+    AND (NOT g.is_temporary OR g.is_active);
+
+  SELECT EXISTS(
+    SELECT 1 FROM swimmer_training_slots
+    WHERE user_id = p_user_id AND is_active = true
+  ) INTO v_has_custom;
+
+  RETURN QUERY
+  WITH
+  date_series AS (
+    SELECT d::date AS sched_date,
+           EXTRACT(ISODOW FROM d)::int AS dow
+    FROM generate_series(p_from, p_to, '1 day') d
+  ),
+  expected_slots AS (
+    SELECT
+      CASE WHEN v_has_custom THEN sts.id ELSE NULL END AS swimmer_slot_id,
+      ds.sched_date,
+      ds.dow,
+      CASE WHEN EXTRACT(HOUR FROM COALESCE(sts.start_time, ts.start_time)) < 13
+           THEN 'morning' ELSE 'evening' END AS bucket,
+      COALESCE(sts.start_time, ts.start_time) AS slot_start_time,
+      COALESCE(sts.end_time, ts.end_time) AS slot_end_time,
+      COALESCE(sts.location, ts.location) AS slot_location,
+      COALESCE(sts.session_type, ts.session_type) AS slot_session_type,
+      sts.source_assignment_id,
+      ts.id AS direct_training_slot_id
+    FROM date_series ds
+    LEFT JOIN swimmer_training_slots sts
+      ON v_has_custom
+     AND sts.user_id = p_user_id
+     AND sts.is_active = true
+     AND sts.day_of_week = ds.dow
+    LEFT JOIN training_slots ts
+      ON (NOT v_has_custom)
+     AND ts.is_active = true
+     AND ts.day_of_week = ds.dow
+     AND EXISTS(
+       SELECT 1 FROM training_slot_assignments tsa
+       WHERE tsa.slot_id = ts.id AND tsa.group_id = ANY(v_group_ids)
+     )
+    WHERE (v_has_custom AND sts.id IS NOT NULL)
+       OR (NOT v_has_custom AND ts.id IS NOT NULL)
+  ),
+  with_source AS (
+    SELECT
+      es.*,
+      COALESCE(
+        (SELECT tsa.slot_id FROM training_slot_assignments tsa
+         WHERE tsa.id = es.source_assignment_id LIMIT 1),
+        (SELECT ts.id FROM training_slots ts
+         JOIN training_slot_assignments tsa ON tsa.slot_id = ts.id
+         WHERE ts.is_active = true
+           AND ts.day_of_week = es.dow
+           AND ts.session_type = es.slot_session_type
+           AND CASE WHEN EXTRACT(HOUR FROM ts.start_time) < 13 THEN 'morning' ELSE 'evening' END = es.bucket
+           AND tsa.group_id = ANY(v_group_ids)
+         ORDER BY ABS(EXTRACT(EPOCH FROM (ts.start_time - es.slot_start_time))) ASC
+         LIMIT 1),
+        es.direct_training_slot_id
+      ) AS resolved_training_slot_id
+    FROM expected_slots es
+  ),
+  candidate_assignments AS (
+    SELECT
+      ws.swimmer_slot_id,
+      ws.sched_date,
+      ws.dow,
+      ws.bucket,
+      ws.slot_start_time,
+      ws.slot_end_time,
+      ws.slot_location,
+      ws.slot_session_type,
+      ws.resolved_training_slot_id,
+      sa.id AS assignment_id,
+      CASE
+        WHEN sa.target_user_id = p_user_id THEN 'individual'
+        WHEN sa.target_subgroup_id = ANY(v_group_ids) THEN 'subgroup'
+        WHEN sa.target_group_id = ANY(v_group_ids) THEN 'group'
+        ELSE 'none'
+      END AS source,
+      CASE
+        WHEN sa.target_user_id = p_user_id THEN 1
+        WHEN sa.target_subgroup_id = ANY(v_group_ids) THEN 2
+        WHEN sa.target_group_id = ANY(v_group_ids) THEN 3
+        ELSE 4
+      END AS priority,
+      sa.swim_catalog_id,
+      sa.strength_session_id,
+      sa.training_slot_id AS sa_training_slot_id,
+      COALESCE(ssc.name, 'Séance') AS title,
+      ssc.total_distance::numeric AS total_km
+    FROM with_source ws
+    LEFT JOIN session_assignments sa
+      ON sa.scheduled_date = ws.sched_date
+     AND sa.status != 'cancelled'
+     AND (p_include_drafts OR sa.visible_from IS NULL OR sa.visible_from <= CURRENT_DATE)
+     AND (
+       sa.target_user_id = p_user_id
+       OR (sa.training_slot_id = ws.resolved_training_slot_id AND (sa.target_group_id = ANY(v_group_ids) OR sa.target_subgroup_id = ANY(v_group_ids)))
+       OR (sa.training_slot_id IS NULL AND sa.scheduled_slot = ws.bucket AND (sa.target_group_id = ANY(v_group_ids) OR sa.target_subgroup_id = ANY(v_group_ids)))
+     )
+    LEFT JOIN swim_sessions_catalog ssc ON ssc.id = sa.swim_catalog_id
+  ),
+  best_assignment AS (
+    SELECT DISTINCT ON (ca.swimmer_slot_id, ca.sched_date, ca.bucket)
+      ca.*
+    FROM candidate_assignments ca
+    ORDER BY ca.swimmer_slot_id, ca.sched_date, ca.bucket, ca.priority ASC, ca.assignment_id DESC
+  )
+  SELECT
+    ba.swimmer_slot_id,
+    ba.sched_date AS scheduled_date,
+    ba.dow AS day_of_week,
+    ba.bucket,
+    ba.slot_start_time,
+    ba.slot_end_time,
+    ba.slot_location,
+    ba.slot_session_type,
+    ba.assignment_id,
+    ba.source AS assignment_source,
+    ba.title AS assignment_title,
+    ba.total_km AS assignment_total_km,
+    ba.swim_catalog_id,
+    ba.strength_session_id,
+    ba.sa_training_slot_id AS training_slot_id,
+    EXISTS(
+      SELECT 1 FROM planned_absences pa
+      WHERE pa.user_id = p_user_id
+        AND pa.date = ba.sched_date
+        AND (pa.scheduled_slot IS NULL OR pa.scheduled_slot = ba.bucket)
+    ) AS is_absent,
+    (SELECT pa.reason FROM planned_absences pa
+     WHERE pa.user_id = p_user_id
+       AND pa.date = ba.sched_date
+       AND (pa.scheduled_slot IS NULL OR pa.scheduled_slot = ba.bucket)
+     LIMIT 1) AS absence_reason,
+    NULL::uuid AS log_session_id
+  FROM best_assignment ba
+  ORDER BY ba.sched_date, ba.slot_start_time;
+END;
+$$;

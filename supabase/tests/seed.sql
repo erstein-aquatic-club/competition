@@ -105,3 +105,93 @@ INSERT INTO public.competition_checklist_checks (id, competition_checklist_id, c
   ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', false),
   ('50000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', true),
   ('50000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000001', false);
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Swim inheritance fixtures (§144) — see get_swimmer_sessions.test.ts
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- Actors:
+--   • Alice (id=1, athlete) — has custom swimmer_training_slots; member of Cadets (group 1)
+--   • Bob   (id=2, athlete) — NO custom slots; member of Juniors (group 2) -> uses group training_slots
+--   • Eve   (id=5, coach)   — we also add athlete-like fixtures with id=5 for "attr fallback"
+
+-- Dates (2026-04-13 = Monday, ISO DOW 1):
+--   • 2026-04-13 Mon (dow=1)
+--   • 2026-04-14 Tue (dow=2)
+--   • 2026-04-15 Wed (dow=3)
+--   • 2026-04-16 Thu (dow=4)
+--   • 2026-04-17 Fri (dow=5)
+
+-- Mark Cadets as permanent (default is is_temporary=false, is_active=true)
+-- + add temp archived group to cover §139 regression: Alice historically was in this temp group.
+INSERT INTO public.groups (id, name, is_active, is_temporary) VALUES
+  (3, 'StageInactive', FALSE, TRUE);
+
+INSERT INTO public.group_members (id, group_id, user_id) VALUES
+  (3, 3, 1);  -- Alice once part of archived temp group (should be filtered out)
+
+-- ── training_slots (group-owned slots) ──────────────────
+-- ts1 Mon 09:00 morning swim (Cadets)  -> Alice's custom slot Mon 09:00 matches exactly
+-- ts2 Tue 18:00 evening swim (Cadets)  -> Alice's custom slot Tue 18:00 matches exactly
+-- ts3 Wed 18:00 evening swim (Cadets)  -> Alice has NO custom slot on Wed (bucket mismatch test)
+-- ts4 Thu 18:00 evening swim (Cadets)  -> Alice has custom slot Thu MORNING (bucket differs)
+-- ts5 Fri 17:00 evening swim (Juniors) -> Bob (no custom) inherits from here
+-- ts6 Mon 09:30 morning swim (Cadets)  -> attribute fallback target for Alice's custom Mon
+INSERT INTO public.training_slots (id, day_of_week, start_time, end_time, location, is_active, session_type) VALUES
+  ('70000000-0000-0000-0000-000000000001', 1, '09:00:00', '10:30:00', 'PiscineA', TRUE, 'swim'),
+  ('70000000-0000-0000-0000-000000000002', 2, '18:00:00', '19:30:00', 'PiscineA', TRUE, 'swim'),
+  ('70000000-0000-0000-0000-000000000003', 3, '18:00:00', '19:30:00', 'PiscineA', TRUE, 'swim'),
+  ('70000000-0000-0000-0000-000000000004', 4, '18:00:00', '19:30:00', 'PiscineA', TRUE, 'swim'),
+  ('70000000-0000-0000-0000-000000000005', 5, '17:00:00', '18:30:00', 'PiscineB', TRUE, 'swim'),
+  ('70000000-0000-0000-0000-000000000006', 1, '09:30:00', '11:00:00', 'PiscineA', TRUE, 'swim');
+
+INSERT INTO public.training_slot_assignments (id, slot_id, group_id) VALUES
+  ('80000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 1),  -- ts1 → Cadets
+  ('80000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000002', 1),  -- ts2 → Cadets
+  ('80000000-0000-0000-0000-000000000003', '70000000-0000-0000-0000-000000000003', 1),  -- ts3 → Cadets
+  ('80000000-0000-0000-0000-000000000004', '70000000-0000-0000-0000-000000000004', 1),  -- ts4 → Cadets
+  ('80000000-0000-0000-0000-000000000005', '70000000-0000-0000-0000-000000000005', 2),  -- ts5 → Juniors
+  ('80000000-0000-0000-0000-000000000006', '70000000-0000-0000-0000-000000000006', 1);  -- ts6 → Cadets
+
+-- ── swimmer_training_slots (Alice's custom) ──────────────
+-- sts1 Mon 09:00 swim → source_assignment_id = tsa1 (exact match)
+-- sts2 Tue 18:00 swim → source_assignment_id = tsa2 (exact match)
+-- sts3 Thu 09:00 swim (MORNING) → no source; group session Thu is EVENING → bucket mismatch
+-- sts4 Mon 09:30 swim → source_assignment_id NULL (attribute fallback to ts6)
+INSERT INTO public.swimmer_training_slots (id, user_id, source_assignment_id, day_of_week, start_time, end_time, location, is_active, session_type) VALUES
+  ('90000000-0000-0000-0000-000000000001', 1, '80000000-0000-0000-0000-000000000001', 1, '09:00:00', '10:30:00', 'PiscineA', TRUE, 'swim'),
+  ('90000000-0000-0000-0000-000000000002', 1, '80000000-0000-0000-0000-000000000002', 2, '18:00:00', '19:30:00', 'PiscineA', TRUE, 'swim'),
+  ('90000000-0000-0000-0000-000000000003', 1, NULL,                                   4, '09:00:00', '10:30:00', 'PiscineA', TRUE, 'swim');
+
+-- ── swim_sessions_catalog ──────────────────────────────
+INSERT INTO public.swim_sessions_catalog (id, name, total_distance) VALUES
+  (10, 'Aerobic 4k',     4000),
+  (11, 'Endurance 3k',   3000),
+  (12, 'Speed Sets',     2500),
+  (13, 'Perso Alice',    3500),
+  (14, 'Subgroup Work',  3200);
+SELECT setval('public.swim_sessions_catalog_id_seq', 100, false);
+
+-- NOTE: session_assignments rows for inheritance tests are inserted at runtime
+-- inside get_swimmer_sessions.test.ts via asServiceRole (see fixtures there).
+-- This keeps the seed stable for session_assignments.test.ts which expects only 5 rows.
+
+-- Add subgroup 10 as a group entry so v_group_ids includes it (RPC logic uses ANY(v_group_ids) for subgroup match).
+-- NOTE: must be inserted BEFORE the group_members row referencing it.
+INSERT INTO public.groups (id, name, is_active, is_temporary) VALUES
+  (10, 'CadetsSubA', TRUE, FALSE);
+
+-- Alice is also member of subgroup 10 (via group_members, row id=10)
+INSERT INTO public.group_members (id, group_id, user_id) VALUES
+  (10, 10, 1);
+
+-- ── planned_absences ──────────────────────────────────
+-- pa1: Alice absent evening only on Tue 2026-04-14 → morning slot not flagged (no morning slot anyway)
+-- pa2: Alice absent whole day on Mon 2026-04-13 (NULL scheduled_slot)
+INSERT INTO public.planned_absences (id, user_id, date, reason, scheduled_slot) VALUES
+  (1, 1, '2026-04-14', 'Doctor',  'evening'),
+  (2, 1, '2026-04-13', 'Trip',    NULL);
+SELECT setval('public.planned_absences_id_seq', 100, false);
+
+-- Extra: Bob has no group_members row for subgroups; no custom slots.
+-- Bob inherits ts5 via group_members (group 2 = Juniors) and sa18 is his group session.
