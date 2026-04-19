@@ -33,6 +33,7 @@ import {
   Pencil,
   Plus,
   Trophy,
+  User,
   X,
 } from "lucide-react";
 
@@ -116,6 +117,7 @@ export default function SwimPlanningTimeline(props: SwimPlanningTimelineProps) {
     onSessionPickerClick,
     onCompetitionClick,
     getDayCompetitions,
+    sessionNameMap,
     sentinelRef,
     isLoading = false,
     isEmpty = false,
@@ -203,6 +205,7 @@ export default function SwimPlanningTimeline(props: SwimPlanningTimelineProps) {
                 );
               }}
               showOverrideBadge={showOverrideBadge}
+              sessionNameMap={sessionNameMap}
             />
           );
         })
@@ -246,6 +249,7 @@ interface WeekCardProps {
   onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
   onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
   showOverrideBadge: boolean;
+  sessionNameMap: Map<string, string>;
 }
 
 function WeekCard({
@@ -272,6 +276,7 @@ function WeekCard({
   onCellTap,
   onLinkTap,
   showOverrideBadge,
+  sessionNameMap,
 }: WeekCardProps) {
   const hasCompetition = weekCompetitions.length > 0;
   const datalistId = `wt-${week.weekKey}`;
@@ -476,6 +481,7 @@ function WeekCard({
                     getDayCompetitions={getDayCompetitions}
                     onSelectCompetition={onSelectCompetition}
                     showOverrideBadge={showOverrideBadge}
+                    sessionNameMap={sessionNameMap}
                   />
                 </motion.div>
               )}
@@ -500,6 +506,7 @@ function MicroGrid({
   getDayCompetitions,
   onSelectCompetition,
   showOverrideBadge,
+  sessionNameMap,
 }: {
   weekKey: string;
   weekMonday: Date;
@@ -513,6 +520,7 @@ function MicroGrid({
   getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
   onSelectCompetition: (c: Competition) => void;
   showOverrideBadge: boolean;
+  sessionNameMap: Map<string, string>;
 }) {
   return (
     <div className="border-t bg-muted/20">
@@ -593,12 +601,14 @@ function MicroGrid({
                     onTap={() => onCellTap(day.index, "morning")}
                     onLinkTap={() => onLinkTap(day.index, "morning")}
                     showOverrideBadge={showOverrideBadge}
+                    sessionNameMap={sessionNameMap}
                   />
                   <SlotCell
                     slot={evening}
                     onTap={() => onCellTap(day.index, "evening")}
                     onLinkTap={() => onLinkTap(day.index, "evening")}
                     showOverrideBadge={showOverrideBadge}
+                    sessionNameMap={sessionNameMap}
                   />
                 </>
               )}
@@ -619,11 +629,13 @@ function SlotCell({
   onTap,
   onLinkTap,
   showOverrideBadge,
+  sessionNameMap,
 }: {
   slot: EffectiveSlot | undefined;
   onTap: () => void;
   onLinkTap: () => void;
   showOverrideBadge: boolean;
+  sessionNameMap: Map<string, string>;
 }) {
   if (!slot) {
     return (
@@ -643,6 +655,14 @@ function SlotCell({
   const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
   const hasSession = !!slot.session_id;
   const overridden = slot.overridden === true && showOverrideBadge;
+  const sessionName = slot.session_id
+    ? sessionNameMap.get(String(slot.session_id))
+    : undefined;
+  const linkLabel = hasSession
+    ? sessionName
+      ? `Modifier la séance liée : ${sessionName}`
+      : "Modifier la séance liée"
+    : "Lier une séance";
 
   return (
     <div className="flex items-center gap-0.5 h-9 w-full">
@@ -650,16 +670,22 @@ function SlotCell({
       <button
         type="button"
         className={cn(
-          "h-full flex-1 min-w-0 rounded-l-lg flex items-center justify-center px-1.5 transition-all active:scale-[0.97]",
+          "relative h-full flex-1 min-w-0 rounded-l-lg flex items-center justify-center px-1.5 transition-all active:scale-[0.97]",
           style.bg,
           overridden && "ring-2 ring-dashed ring-primary/50",
         )}
         onClick={onTap}
-        aria-label={`Modifier: ${filiere?.short ?? slot.filiere}`}
+        aria-label={`Modifier: ${filiere?.short ?? slot.filiere}${overridden ? " (filière individuelle)" : ""}`}
       >
         <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
           {filiere?.short ?? slot.filiere}
         </span>
+        {overridden && (
+          <User
+            aria-label="Filière individuelle"
+            className="absolute -top-0.5 -right-0.5 h-3 w-3 text-primary bg-background rounded-full p-[1px] ring-1 ring-primary/50"
+          />
+        )}
       </button>
 
       {/* Link session button */}
@@ -675,7 +701,8 @@ function SlotCell({
           e.stopPropagation();
           onLinkTap();
         }}
-        aria-label={hasSession ? "Modifier la séance liée" : "Lier une séance"}
+        aria-label={linkLabel}
+        title={sessionName ?? undefined}
       >
         <Link2
           className={cn(
