@@ -11,9 +11,47 @@
 **Design doc:** `docs/plans/2026-04-19-chrono-avatars-offline-design.md`.
 
 **Conventions (from CLAUDE.md):**
-- Every patch must add a §N entry in `docs/implementation-log.md`, update `docs/ROADMAP.md` + `docs/FEATURES_STATUS.md` + `CLAUDE.md § Chantiers` (currently at §145 → new entry = §146).
-- UI/UX refinement (CSS polish) → use `/frontend-design` in Task 7 before final commit.
+- Every patch must add a §N entry in `docs/implementation-log.md`, update `docs/ROADMAP.md` + `docs/FEATURES_STATUS.md` + `CLAUDE.md § Chantiers` (currently at §148 → new entry = **§149**).
+- UI/UX refinement (CSS polish) → use `/frontend-design` in Task 11 before final commit.
 - Run `npx tsc --noEmit` + `npm test` before any commit. **Do NOT** run `npm run test:rls` (no RLS changes).
+
+---
+
+## Progression (session 2026-04-19)
+
+| Task | Statut | Commit |
+|---|---|---|
+| Task 1 — CHRONO_SAVE_QUEUE key | ✅ | `279d11368` |
+| Task 2 — chrono-avatar-cache (TDD) | ✅ | `af2db91d` |
+| Task 3 — chrono-save-queue (TDD) | ✅ | `4c89d9a2b` + `33875f79e` (fix race) |
+| Task 4 — UPDATE_SWIMMER_AVATAR reducer | ✅ | `03223dfa` |
+| Task 5 — SwimmerAvatar component | ✅ | `89b299ee` |
+| Task 6 — Wiring ChronoSetup | ✅ | `47ead2914` |
+| Task 7 — Avatar ChronoRace SwimmerCard | ⏳ TODO | — |
+| Task 8 — Avatar ChronoResults | ⏳ TODO | — |
+| Task 9 — Save queue ChronoResults errors | ⏳ TODO | — |
+| Task 10 — Badge + flush CoachChronoScreen | ⏳ TODO | — |
+| Task 11 — UI polish /frontend-design | ⏳ TODO | — |
+| Task 12 — Validation manuelle | ⏳ TODO | — |
+| Task 13 — Documentation §149 | ⏳ TODO | — |
+
+**HEAD à la reprise :** `c8bc533684819c4d6d522683333d5aa3d82ec6f3`
+
+**Fichiers créés/modifiés (déjà livrés) :**
+- `src/lib/api/client.ts` — `CHRONO_SAVE_QUEUE` dans `STORAGE_KEYS`
+- `src/lib/chrono-avatar-cache.ts` (nouveau)
+- `src/lib/__tests__/chrono-avatar-cache.test.ts` (nouveau)
+- `src/lib/chrono-save-queue.ts` (nouveau)
+- `src/lib/__tests__/chrono-save-queue.test.ts` (nouveau)
+- `src/lib/chrono-reducer.ts` — action `UPDATE_SWIMMER_AVATAR`
+- `src/lib/__tests__/chrono-reducer.test.ts` — 3 nouveaux tests
+- `src/components/chrono/SwimmerAvatar.tsx` (nouveau)
+- `src/components/chrono/ChronoSetup.tsx` — pre-cache effect + avatars dans 3 spots
+
+**Fichiers restant à modifier (Tasks 7-10) :**
+- `src/components/chrono/ChronoRace.tsx` — ajouter `avatarUrl` prop à `SwimmerCard`, `<SwimmerAvatar size="xs">` en row 1
+- `src/components/chrono/ChronoResults.tsx` — avatar ranking + save queue error paths
+- `src/pages/coach/CoachChronoScreen.tsx` — badge pending + flush on online + QuotaExceeded safety net
 
 ---
 
