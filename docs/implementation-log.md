@@ -9708,3 +9708,123 @@ Suppression de l'import `resolveSwimmerAssignmentsBatch` (plus utilisé dans cet
 
 - Un slot personnel sans `source_assignment_id` ne peut pas inherit de session — il n'est pas lié à un créneau groupe. Comportement attendu.
 - Les assignations `target_user_id = userId` (individuelles, sans `training_slot_id`) ne sont pas résolues sur les slots persos par cette approche. `resolveSlotAssignment` les traite uniquement via bucket fallback, et seulement si leur `training_slot_id` est null — pas notre scénario habituel. Cas rare et explicitement hors scope (voir Décisions).
+
+## §140 — Chantier B : quick wins performance frontend (staleTime, queryKey, select ciblés) (2026-04-19)
+
+### Contexte
+
+Audit perf frontend (voir `docs/plans/2026-04-18-audit-docs-perf-design.md`) a identifié 4 quick wins haute-impact / faible-effort sur le chargement perçu :
+- `queryClient.ts` avait `staleTime: Infinity` → aucun refetch auto, données périmées au retour sur l'app
+- `Dashboard.tsx` avait un queryKey qui mutait quand `user` passait de `null` à sa valeur → double refetch au boot
+- Plusieurs requêtes `.select('*')` chargeaient toutes les colonnes (JSON +30-50% inutile)
+
+### Changements
+
+**1. `src/lib/queryClient.ts`** — config globale
+- `staleTime: Infinity` → `5 * 60 * 1000` (5 min)
+- `refetchOnWindowFocus: false` → `true` (refresh opportuniste au retour)
+- `refetchOnReconnect: true` conservé
+
+**2. `src/pages/Dashboard.tsx:171`** — queryKey stabilisé
+- `queryKey: ["assignments", user]` → `queryKey: ["assignments", userId ?? user]` pour s'aligner sur la clé `sessions` et éviter une mutation de clé lors de l'hydratation auth
+
+**3. `src/lib/api/swim-logs.ts`** — 2 `.select('*')` → colonnes ciblées (14 colonnes explicites)
+
+**4. `src/lib/api/wellness.ts`** — 3 `.select('*')` → colonnes ciblées (11 colonnes explicites), applied sur `getWellnessForDate`, `getWellnessRange`, `getGroupWellnessForDate`
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `src/lib/queryClient.ts` | staleTime 5min + refetchOnWindowFocus true |
+| `src/pages/Dashboard.tsx` | queryKey assignments unifié avec sessions |
+| `src/lib/api/swim-logs.ts` | 2 select ciblés |
+| `src/lib/api/wellness.ts` | 3 select ciblés |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 nouvelle erreur (12 erreurs pré-existantes sur modules UI manquants)
+- `npm test -- --run` : 219/219 pass
+
+### Décisions
+
+- **`refetchOnWindowFocus: true` global plutôt qu'opt-in par query** : couvre 100% des pages, les rares data vraiment statiques (catalogue exercices) peuvent override avec `staleTime: Infinity` localement.
+- **Ne pas toucher `CoachTrainingSlotsScreen.tsx`** malgré ses 2839 LOC / 64 hooks : gros refactor, gain incertain, reporté à un chantier dédié si l'usage pousse vers ce besoin.
+- **Colonnes ciblées hardcodées** plutôt qu'inférées via types TS : simple et robuste, TS alerte en cas de colonne manquante au prochain build.
+
+### Limites
+
+- `ExerciseProgressChart.tsx` du plan n'existe plus (supprimé en §118 dead code nettoyage) — task B3 skip sans impact.
+- Le gain réseau du select ciblé est perceptible surtout sur connexion lente ; sur wifi il est dans le bruit.
+
+## §141 — Chantier C : optimisation backend Supabase (index cron, consolidation RLS, drop 11 indexes) (2026-04-19)
+
+### Contexte
+
+Audit backend via Supabase MCP (voir `docs/plans/2026-04-18-audit-docs-perf-design.md`) a révélé :
+- Cron "Séance terminée ?" : 406s cumulés sur 3922 appels (104 ms/call) → scan non-indexé sur `session_assignments`
+- 224 warnings advisor `multiple_permissive_policies` (tables `groups`, `swim_exercise_logs`, `push_subscriptions`, `interviews` top offenders)
+- 57+1 warnings `unused_index`
+- 1 warning security : `leaked_password_protection` désactivé
+
+### Changements
+
+**1. Migration 00120 — index partiel cron notif**
+```sql
+CREATE INDEX idx_session_assignments_notif_pending
+  ON session_assignments (training_slot_id, scheduled_date)
+  WHERE notified_at IS NULL;
+```
+Cron scan limité aux dizaines d'assignments en attente de notification au lieu de la table entière.
+
+**2. Migration 00121 — consolider RLS `push_subscriptions`**
+Fusion de "Service role full access" (cmd=ALL, TO public) avec les user policies → 18 warnings → 0.
+
+**3. Migration 00122 — consolider RLS `groups`, `swim_exercise_logs`, `interviews`**
+- `groups` (24 warnings) : suppression de `groups_write` (ALL) qui overlappait les 4 per-cmd
+- `swim_exercise_logs` (24 warnings) : suppression de "Users manage own exercise logs" (ALL), split en 4 per-cmd (user OR coach via OR)
+- `interviews` (12 warnings) : fusion `athlete_select+coach_select` → `interviews_select` ; fusion `athlete_update+coach_update` → `interviews_update` (asymétrie USING/WITH CHECK préservée, logique stateful §74-§75 intacte)
+
+**4. Migration 00123 — drop 11 safe unused indexes (après audit de classification)**
+
+Audit complet : `docs/plans/2026-04-18-unused-indexes-audit.md`. Sur les 57 indexes flaggés advisors, classification en 3 buckets :
+- **SAFE TO DROP : 11** (timestamps techniques, low cardinality, redondances, colonnes jamais filtrées)
+- **KEEP (FK) : 43** (load-bearing pour JOINs + cascade deletes, même si pg_stat_statements ne les a pas encore vus — l'app est sous-exploitée en prod)
+- **KEEP (feature match) : 3** (`idx_training_slots_scheduled_date`, `idx_timesheet_shifts_date`, `idx_swim_records_date`)
+
+Les 11 droppés :
+- `idx_dim_sessions_created`, `idx_dim_sessions_name_date`
+- `idx_import_logs_status`, `idx_assignments_status`, `idx_sa_visible_from`
+- `idx_training_slots_day`, `idx_training_slots_session_type`
+- `idx_strength_set_logs_completed`, `idx_users_created`
+- `club_record_swimmers_active_idx`, `idx_groups_temporary`
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `supabase/migrations/00120_session_assignments_notif_index.sql` | nouveau — index partiel cron |
+| `supabase/migrations/00121_consolidate_rls_push_subscriptions.sql` | nouveau — consolidation RLS |
+| `supabase/migrations/00122_consolidate_rls_groups_logs_interviews.sql` | nouveau — consolidation RLS |
+| `supabase/migrations/00123_drop_safe_unused_indexes.sql` | nouveau — 11 DROP INDEX |
+| `docs/plans/2026-04-18-unused-indexes-audit.md` | nouveau — classification 57 indexes en 3 buckets (132 lignes) |
+
+### Tests
+
+- Tests RLS : 78/78 pass après chaque consolidation (harness `supabase/tests/rls/`, §121)
+- Advisor `multiple_permissive_policies` : 224 → 146 (-78 warnings, -35 %)
+- Advisor `unused_index` : 58 → 47 (-11)
+- Migrations appliquées via MCP Supabase (project `fscnobivsgornxdwqwlk`), pas de downtime
+
+### Décisions
+
+- **Ne PAS drop les 46 autres indexes "unused"** malgré les advisors : l'app est sous-exploitée en prod, pg_stat_statements sous-estime la valeur réelle. FK indexes accélèrent les JOINs futurs et protègent les cascade deletes. Drop aveugle = risque de régression quand l'usage monte.
+- **Classification 3 buckets** via grep codebase + check `information_schema.table_constraints` (36 FK formellement déclarées + 7 FK sémantiques non déclarées).
+- **Préservation `idx_session_assignments_notif_pending`** (créé dans 00120) : le cron n'a pas encore tourné après sa création, l'advisor le flaggera "unused" mais il est load-bearing par construction.
+- **C5 (leaked_password_protection)** : action Dashboard Supabase → l'utilisateur doit l'activer manuellement sur https://supabase.com/dashboard/project/fscnobivsgornxdwqwlk/auth/providers. Hors scope migration SQL.
+
+### Limites
+
+- Le gain sur le cron "Séance terminée ?" ne sera mesurable qu'après plusieurs exécutions (l'index partiel était absent avant, les stats partent de zéro).
+- 7 "FK sémantiques" (colonnes `*_id`/`created_by` sans contrainte FK déclarée) continueront à apparaître dans les advisors `unused_index` tant que pas de traffic. Amélioration future possible : ajouter les contraintes FK formelles pour l'intégrité données.
+- 146 warnings `multiple_permissive_policies` restent sur les tables non-consolidées. Chantier séparé si besoin.
