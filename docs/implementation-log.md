@@ -9989,3 +9989,59 @@ Stats card, disclosure et CTA restent pleine largeur en dessous.
 
 - Sur iPad portrait (768–820px), les 2 colonnes sont serrées mais lisibles. En dessous, la décision de stacker est intentionnelle.
 
+## §145 — Coach home : créneaux non assignés 30j + deep-link semaine (2026-04-19)
+
+**Branche** : `main`
+**Chantier ROADMAP** : §108
+
+### Contexte
+
+La grille "Ma semaine" sur la home coach (§131) signale les créneaux vides uniquement pour la semaine courante. Dès qu'une semaine passe, les oublis d'assignation disparaissent de la vue — aucun rappel rétrospectif. Demande coach : voir les créneaux non assignés sur les 30 derniers jours, avec navigation directe vers la semaine concernée pour les compléter.
+
+### Changements
+
+Nouvelle section **"Créneaux à compléter"** entre "Ma semaine" et "Alertes" dans `CoachHome` :
+
+1. **RPC Supabase** (§00117) `get_unassigned_slot_instances_30d()` — fenêtre J-30 → J-1 (aujourd'hui exclu, convention alignée sur §00121). Énumère les occurrences ISODOW des `training_slots` actifs `swim`, plus les slots one-off dont `scheduled_date` tombe dans la fenêtre. Anti-joins sur `training_slot_overrides` (status=`cancelled`) et `session_assignments` (status ≠ `cancelled`, `assignment_type=swim`). `SECURITY DEFINER STABLE` + `GRANT EXECUTE ... TO authenticated`.
+2. **Wrapper API** `getUnassignedSlots30d()` dans `src/lib/api/assignments.ts` + re-exports index + façade.
+3. **UI accordéon** dans `CoachHome` :
+   - Carte **verte** si 0 créneau (`✅ Tous les créneaux des 30 derniers jours sont assignés`).
+   - Carte **ambre** sinon : header `⚠️ N créneaux à compléter (30 derniers jours)` cliquable pour plier/déplier, liste groupée par semaine ISO (plus récente en haut), chaque ligne = bouton `Mar. 15 avr. · 18h-20h · Piscine Erstein`.
+4. **Deep-link semaine** : ajout du champ `weekDate?: string` (format `YYYY-MM-DD`) à `CoachRouteState` (parse/serialize avec regex, stripé hors section=`week`). `CoachTrainingSlotsScreen` initialise `weekMonday` depuis la prop `initialWeekDate` + `useEffect` de re-sync si la prop change entre deux renders. Au clic sur une ligne de la section, on pousse `#/coach?section=week&weekDate=<lundi-iso>`.
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `supabase/migrations/00117_unassigned_slot_instances_30d.sql` | Nouvelle RPC + GRANT | 84 lignes (nouveau) |
+| `src/lib/api/assignments.ts` | `getUnassignedSlots30d()` wrapper | 1034 → 1056 lignes |
+| `src/lib/api/index.ts` | Re-export | +1 ligne |
+| `src/lib/api.ts` | Import + façade | +2 lignes |
+| `src/pages/coach/coachRouteState.ts` | Champ `weekDate` (type, parse, build) | 85 → 99 lignes |
+| `src/pages/coach/__tests__/coachRouteState.test.ts` | 6 tests round-trip TDD | nouveau |
+| `src/pages/coach/CoachWeekView.tsx` | Prop `initialWeekDate` traversée | 127 → 130 lignes |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Init `weekMonday` depuis prop + effet re-sync | 3351 → 3362 lignes |
+| `src/pages/Coach.tsx` | Section accordéon + prop `onOpenWeekAt` + transmission `initialWeekDate` | 1194 → 1318 lignes |
+
+### Tests
+
+- **Unit** : 6 cas `coachRouteState.test.ts` (parse, ignore hors section=week, regex invalide, round-trip, strip cross-section) ✅.
+- **RLS intégration** : **skippé** — le harness `supabase/tests/schema.sql` ne contient pas `training_slots`/`training_slot_overrides`/`session_assignments`. La RPC est validée par le smoke-test MCP appliqué à la migration (9 lignes retournées, dates bien dans J-30/J-1). Extension du harness = chantier séparé (coût élevé par rapport au bénéfice pour cette seule RPC).
+- **TypeScript** : `npx tsc --noEmit` → 0 nouvelle erreur (erreurs préexistantes `*.stories.tsx` et `TimesheetHelpers.test.ts` tolérées, cf MEMORY.md).
+
+### Décisions
+
+- **Fenêtre J-30 → J-1** alignée sur `get_feedback_rates_all_athletes` (§00121) : aujourd'hui exclu pour éviter de rapporter comme "non assigné" un créneau qui n'a tout simplement pas encore reçu sa séance du jour.
+- **RPC serveur plutôt que calcul client** : une seule requête, logique qui peut resservir (widget admin, rapport mensuel). Mirrors la structure §00121.
+- **Accordéon replié par défaut** : cohérence avec la densité des autres sections home (swimmer-comments, alertes). Le compteur reste lisible en un coup d'œil sans expand.
+- **Groupage par semaine ISO** côté client : le RPC retourne une liste plate triée desc, le regroupement visuel `Semaine du X avr.` est calculé dans `CoachHome` via `mondayIsoOfDate`. Permet de changer l'UX sans toucher au SQL.
+- **`initialWeekDate` prop + useEffect** plutôt que sync systématique : un coach qui navigue avec les boutons prev/next après le deep-link garde le contrôle local ; seul un changement de prop (nouveau clic depuis la home) re-force le `weekMonday`.
+- **T6+T7 fusionnés en un seul commit** : les deux touchent `Coach.tsx` au même endroit (prop flow outer → inner), séparer créerait un commit intermédiaire qui ne compile pas.
+
+### Limites
+
+- Pas de filtre par groupe/lieu/coach-responsable : la liste est globale à l'instance. Si plusieurs coachs partagent l'app, un coach voit les créneaux non assignés des autres.
+- Pas de persistance de l'état `expanded` entre visites (revient plié à chaque retour sur home). Acceptable vu la faible récurrence de consultation.
+- Pas de notification push quand N franchit un seuil. Le chantier se limite au signal visuel passif.
+- Pas de test RLS intégration (voir ci-dessus). À surveiller si la RPC est modifiée — re-smoke-test manuel via MCP.
+

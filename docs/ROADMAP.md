@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§144 Quick-compose — split texte/blocs côte-à-côte en relecture)*
+*Dernière mise à jour : 2026-04-19 (§145 Coach home — créneaux non assignés 30j + deep-link semaine)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -91,6 +91,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 106 | Vue semaine coach — quick-compose séance sur créneau vide (2 clics vs 8) | Haute | Moyenne | Fait (§142) |
 | 107 | Vue semaine coach — fallback d'attributs pour swimmer_slots sans source | Haute | Faible | Fait (§143) |
 | 106b | Quick-compose — split texte/blocs côte-à-côte en relecture | Faible | Faible | Fait (§144) |
+| 108 | Coach home — créneaux non assignés 30j + deep-link semaine | Moyenne | Moyenne | Fait (§145) |
 
 ---
 

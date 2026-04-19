@@ -73,6 +73,7 @@ Tous les feature flags sont activés.
 | Calendrier créneaux | ✅ | `CoachSlotCalendar.tsx`, `useSlotCalendar.ts` | Vue semaine créneaux récurrents, états (vide/brouillon/publié/annulé), navigation ←→ (§85) |
 | Assignation par créneau | ✅ | `SlotSessionSheet.tsx`, `assignments.ts` | Auto-assignation groupes, visible_from, bulk create, delete, visibilité (§85) |
 | Quick-compose séance sur créneau vide | ✅ | `SlotSessionSheet.tsx` (QuickComposeBody), `CoachTrainingSlotsScreen.tsx` | Onglets texte/bibliothèque inline, parse live, stats, disclosure blocs, mutation chaînée create+assign atomique avec rollback, nommage auto `Jour DD/MM matin\|soir · XXXXm` (§142) |
+| Créneaux non assignés 30j sur home | ✅ | `Coach.tsx` (CoachHome), `src/lib/api/assignments.ts`, `00117_unassigned_slot_instances_30d.sql`, `coachRouteState.ts` | Section accordéon entre "Ma semaine" et "Alertes", RPC serveur J-30 → J-1, click → deep-link `?section=week&weekDate=YYYY-MM-DD` sur la semaine concernée (§145) |
 | Notifications rappel ressenti | ✅ | `00054_slot_centric_sessions.sql` | pg_cron 15min, push 30min avant fin créneau (§85) |
 | Chrono split timer (tablette/desktop) | ✅ | `chrono-reducer.ts`, `ChronoSetup.tsx`, `ChronoRace.tsx`, `ChronoResults.tsx` | Coach chronomètre splits par ligne/vague, nageurs club + manuels (badge M), titre séance, export xlsx (§97, §126) |
 | Attribution coach ↔ nageur | ✅ | `coach-assignments.ts`, `CoachMySwimmersScreen.tsx`, `useMySwimmerIds.ts` | 1 coach principal par nageur, écran gestion, filtrage vues, historique (§98) |
