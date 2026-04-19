@@ -36,8 +36,8 @@ import {
   ChevronRight,
   Coffee,
 } from "lucide-react";
-import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
-import type { SwimmerTrainingSlot } from "@/lib/api/types";
+import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
+import type { SwimmerSession, SwimmerTrainingSlot } from "@/lib/api/types";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -247,13 +247,23 @@ export default function SwimmerHome() {
     });
   }, [assignments, todayDate]);
 
-  // Resolve assignments for today if swimmer has personal slots
-  const { data: resolvedByDate } = useQuery({
-    queryKey: ["resolved-assignments-batch", userId, [todayDate]],
-    queryFn: () => resolveSwimmerAssignmentsBatch(userId!, [todayDate]),
+  // Resolve assignments for today via the unified get_swimmer_sessions RPC.
+  // The RPC returns a flat row per expected slot (and per bucket); we index
+  // by swimmer_slot_id for O(1) lookup below.
+  const { data: todaySwimmerSessions } = useQuery({
+    queryKey: ["swimmer-sessions-today", userId, todayDate],
+    queryFn: () => getSwimmerSessions(userId!, todayDate, todayDate, false),
     enabled: !!userId && hasSwimmerSlots && todayAssignments.length > 0,
     staleTime: 2 * 60 * 1000,
   });
+
+  const todaySessionBySlotId = useMemo(() => {
+    const map = new Map<string, SwimmerSession>();
+    for (const row of todaySwimmerSessions ?? []) {
+      if (row.swimmer_slot_id) map.set(row.swimmer_slot_id, row);
+    }
+    return map;
+  }, [todaySwimmerSessions]);
 
   // Build today's sessions list
   const todaySessions = useMemo((): TodaySession[] => {
@@ -266,27 +276,33 @@ export default function SwimmerHome() {
     const swimSessions: TodaySession[] = [];
 
     if (hasSwimmerSlots && todaySwimSlots.length > 0) {
-      const resolved = resolvedByDate?.get(todayDate);
-
       for (const slot of todaySwimSlots) {
         const hour = parseInt(slot.start_time.split(":")[0], 10);
         const slotKey: SlotKey = hour < 13 ? "AM" : "PM";
         const slotTime = `${slot.start_time.slice(0, 5)}-${slot.end_time.slice(0, 5)}`;
 
-        const match = resolved?.find((r) => r.swimmerSlotId === slot.id);
+        const row = todaySessionBySlotId.get(slot.id);
+        const hydrated =
+          row?.assignment_id != null
+            ? todayAssignments.find((a) => Number(a?.id) === row.assignment_id)
+            : undefined;
 
-        if (match && match.assignment) {
-          const a = match.assignment;
-          const aRecord = a as unknown as Record<string, unknown>;
+        if (row?.assignment_id != null) {
+          const aRecord = (hydrated ?? {}) as unknown as Record<string, unknown>;
+          const plannedKm = hydrated
+            ? assignmentPlannedKm(aRecord)
+            : row.assignment_total_km != null
+              ? Number(row.assignment_total_km)
+              : null;
           swimSessions.push({
             id: `${todayDate}__${slot.id}`,
             slotKey,
-            title: String(a.title ?? "Séance coach"),
-            km: assignmentPlannedKm(aRecord),
+            title: String(hydrated?.title ?? row.assignment_title ?? "Séance coach"),
+            km: plannedKm,
             isEmpty: false,
             slotTime,
             slotLocation: slot.location,
-            assignmentId: match.assignmentId ?? undefined,
+            assignmentId: row.assignment_id,
           });
         } else if (todayAssignments.length > 0) {
           // Fallback: try timing-based match
@@ -372,7 +388,7 @@ export default function SwimmerHome() {
     todayDate,
     hasSwimmerSlots,
     todaySwimSlots,
-    resolvedByDate,
+    todaySessionBySlotId,
     todayAssignments,
     userId,
   ]);
