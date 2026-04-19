@@ -352,6 +352,14 @@ export {
   getSwimPlanningSlots,
   upsertSwimPlanningSlot,
   deleteSwimPlanningSlot,
+  // Overrides
+  getSwimPlanningSlotOverrides,
+  upsertSwimPlanningSlotOverride,
+  deleteSwimPlanningSlotOverride,
+  getSwimPlanningWeekMeta,
+  upsertSwimPlanningWeekMeta,
+  getSwimPlanningWeekOverrides,
+  upsertSwimPlanningWeekOverride,
 } from './swim-planning';
 
 // Swim filières

@@ -934,6 +934,60 @@ export interface SwimPlanningSlotInput {
   session_id?: string | null;
 }
 
+// ── Swim Planning Overrides ──
+
+export interface SwimPlanningSlotOverride {
+  id: string;
+  athlete_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  filiere: string;
+  session_id?: string | null;
+  created_at?: string;
+}
+
+export interface SwimPlanningSlotOverrideInput {
+  athlete_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  filiere: string;
+  session_id?: string | null;
+}
+
+export interface SwimPlanningWeekMeta {
+  id: string;
+  group_id: number;
+  week_start: string;
+  week_type: string | null;
+  notes: string | null;
+  updated_at?: string;
+}
+
+export interface SwimPlanningWeekMetaInput {
+  group_id: number;
+  week_start: string;
+  week_type?: string | null;
+  notes?: string | null;
+}
+
+export interface SwimPlanningWeekOverride {
+  id: string;
+  athlete_id: number;
+  week_start: string;
+  week_type: string | null;
+  notes: string | null;
+  updated_at?: string;
+}
+
+export interface SwimPlanningWeekOverrideInput {
+  athlete_id: number;
+  week_start: string;
+  week_type?: string | null;
+  notes?: string | null;
+}
+
 // ── Swim Filières ──
 
 export interface SwimFiliere {
