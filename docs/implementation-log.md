@@ -9948,3 +9948,44 @@ Tie-breaker : distance minimale entre `start_time` du candidat et du swimmer_slo
 
 - Un swimmer_slot qui ne correspond à aucun training_slot de ses groupes reste vide (correct : rien à hériter).
 - Si le nageur a quitté un groupe, les assignations historiques vers cet ancien groupe ne sont plus inheritées (appartenance groupe actuelle fait foi). Acceptable pour simplicité.
+
+## §144 — Quick-compose : split texte/blocs côte-à-côte en relecture (2026-04-19)
+
+**Branche** : `main`
+**Chantier ROADMAP** : §106 (suite de §142)
+
+### Contexte
+
+Quand le coach ouvre le disclosure "Voir les blocs" dans le quick-compose (§142) pour vérifier que le parser a bien interprété son texte, l'aperçu des blocs se déployait **sous** le textarea. Sur tablette/desktop, cela forçait un scroll pour comparer input et output — exactement le geste que la relecture doit éviter.
+
+### Changements
+
+Dans `QuickComposeBody` (`SlotSessionSheet.tsx`), le conteneur textarea + aperçu passe de `flex-col` à `md:flex-row md:items-stretch` **uniquement** quand `showBlocks && parsedBlocks.length > 0`.
+
+- **Gauche** (md+): textarea `md:flex-1 md:min-h-[340px] md:resize-none` — hauteur fixe pour rester aligné.
+- **Droite** (md+): aperçu `md:flex-1 md:max-h-[420px] md:overflow-y-auto` — scroll interne si séance longue.
+- **Mobile** (< md): stack vertical (comportement §142 inchangé, le bottom sheet est trop étroit pour 2 colonnes lisibles).
+
+Stats card, disclosure et CTA restent pleine largeur en dessous.
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `src/pages/coach/SlotSessionSheet.tsx` | Wrapper flex responsive autour de textarea + preview. |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur ✅
+- `npm test -- --run` : 228/228 ✅
+- Pas de changement d'API/RLS — pas de tests RLS.
+
+### Décisions
+
+- **Breakpoint `md` (768px)** : seuil Tailwind standard, correspond à la transition tablette portrait → desktop. Sous 768px le sheet coach est typiquement étroit (mobile ou iPad portrait divisé).
+- **Hauteur fixe du textarea en mode split** (`min-h-[340px] resize-none`) : évite le "flex alignment dance" quand l'utilisateur tire la poignée de resize — les deux colonnes restent visuellement alignées.
+
+### Limites
+
+- Sur iPad portrait (768–820px), les 2 colonnes sont serrées mais lisibles. En dessous, la décision de stacker est intentionnelle.
+

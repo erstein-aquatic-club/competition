@@ -863,12 +863,35 @@ function QuickComposeBody({
 
       {tab === "text" ? (
         <div className="space-y-3">
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            placeholder={"Collez ou tapez votre séance ici…\n\nEx.\nÉchauffement\n4x100 crawl V1 R30\n\nCorps\n2x(4x100 NL V3)\n6x50 papillon V2"}
-            className="min-h-[200px] w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <div
+            className={cn(
+              "flex flex-col gap-3",
+              showBlocks &&
+                parsedBlocks.length > 0 &&
+                "md:flex-row md:items-stretch",
+            )}
+          >
+            <textarea
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+              placeholder={"Collez ou tapez votre séance ici…\n\nEx.\nÉchauffement\n4x100 crawl V1 R30\n\nCorps\n2x(4x100 NL V3)\n6x50 papillon V2"}
+              className={cn(
+                "min-h-[200px] w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring",
+                showBlocks &&
+                  parsedBlocks.length > 0 &&
+                  "md:flex-1 md:min-h-[340px] md:resize-none",
+              )}
+            />
+            {showBlocks && parsedBlocks.length > 0 && (
+              <div className="md:flex-1 rounded-2xl border border-border/50 bg-muted/10 p-2 md:max-h-[420px] md:overflow-y-auto">
+                <SwimSessionTimeline
+                  title="Prévisualisation"
+                  items={parsedItems}
+                  showHeader={false}
+                />
+              </div>
+            )}
+          </div>
 
           {parsedBlocks.length > 0 ? (
             <>
@@ -900,15 +923,6 @@ function QuickComposeBody({
                   )}
                 />
               </button>
-              {showBlocks && (
-                <div className="rounded-xl border border-border/50 bg-muted/10 p-2">
-                  <SwimSessionTimeline
-                    title="Prévisualisation"
-                    items={parsedItems}
-                    showHeader={false}
-                  />
-                </div>
-              )}
             </>
           ) : (
             rawText.trim().length > 0 && (

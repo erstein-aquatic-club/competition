@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §143 (Vue semaine coach — fallback d'attributs pour swimmer_slots sans source_assignment_id : créneaux persos créés manuellement héritent aussi).
+Dernière entrée en date : §144 (Quick-compose — split texte/blocs côte-à-côte en relecture sur tablette/desktop, stack sur mobile).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
