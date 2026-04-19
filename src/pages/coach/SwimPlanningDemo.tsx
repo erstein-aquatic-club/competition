@@ -208,7 +208,7 @@ export default function SwimPlanningDemo() {
       }
     }
     return map;
-  }, [allCompetitions]);
+  }, [visibleCompetitions]);
 
   const getDayCompetitions = useCallback(
     (weekMonday: Date, dayIndex: number): Competition[] => {
