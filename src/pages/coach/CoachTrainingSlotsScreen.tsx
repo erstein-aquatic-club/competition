@@ -300,6 +300,7 @@ type CoachTrainingSlotsScreenProps = {
   groups: Array<{ id: number | string; name: string }>;
   onOpenLibrary?: (context?: SwimLibraryEntryContext) => void;
   modeToggle?: React.ReactNode;
+  initialWeekDate?: string;
 };
 
 // (AssignmentRow removed — groups and coaches are now independent multi-select lists)
@@ -1833,6 +1834,7 @@ const CoachTrainingSlotsScreen = ({
   groups,
   onOpenLibrary,
   modeToggle,
+  initialWeekDate,
 }: CoachTrainingSlotsScreenProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1847,7 +1849,16 @@ const CoachTrainingSlotsScreen = ({
   const [showSessionSheet, setShowSessionSheet] = useState(false);
 
   // Week navigation state
-  const [weekMonday, setWeekMonday] = useState(() => getMonday(new Date()));
+  const [weekMonday, setWeekMonday] = useState(() =>
+    getMonday(initialWeekDate ? new Date(initialWeekDate + "T00:00:00") : new Date())
+  );
+
+  // Re-align when the deep-link prop changes (home → slot click → week view on a different week)
+  useEffect(() => {
+    if (initialWeekDate) {
+      setWeekMonday(getMonday(new Date(initialWeekDate + "T00:00:00")));
+    }
+  }, [initialWeekDate]);
 
   const weekNumber = useMemo(() => getISOWeek(weekMonday), [weekMonday]);
   const weekSunday = useMemo(() => {

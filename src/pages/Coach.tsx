@@ -1092,6 +1092,7 @@ export default function Coach() {
             athletes={athletes}
             swimSessions={swimSessions}
             strengthSessions={strengthSessions}
+            initialWeekDate={routeState.weekDate}
           />
         </Suspense>
       ) : null}

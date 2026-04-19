@@ -20,6 +20,7 @@ type CoachWeekViewProps = {
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null }>;
   swimSessions?: Array<{ id: number; name: string }>;
   strengthSessions?: Array<{ id: number; title: string }>;
+  initialWeekDate?: string;
 };
 
 export default function CoachWeekView({
@@ -27,6 +28,7 @@ export default function CoachWeekView({
   athletes,
   swimSessions,
   strengthSessions,
+  initialWeekDate,
 }: CoachWeekViewProps) {
   const [mode, setMode] = useState<ViewMode>(readMode);
   const [libraryContext, setLibraryContext] = useState<SwimLibraryEntryContext | null>(null);
@@ -109,6 +111,7 @@ export default function CoachWeekView({
             groups={groups}
             onOpenLibrary={handleOpenLibrary}
             modeToggle={modeToggle}
+            initialWeekDate={initialWeekDate}
           />
         ) : (
           <>
