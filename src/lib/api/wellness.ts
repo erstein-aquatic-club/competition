@@ -53,7 +53,7 @@ export async function getWellnessForDate(
   if (!canUseSupabase()) return null;
   const { data, error } = await supabase
     .from('wellness_checks')
-    .select('*')
+    .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
     .eq('user_id', userId)
     .eq('date', date)
     .maybeSingle();
@@ -69,7 +69,7 @@ export async function getWellnessRange(
   if (!canUseSupabase()) return [];
   const { data, error } = await supabase
     .from('wellness_checks')
-    .select('*')
+    .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
     .eq('user_id', userId)
     .gte('date', startDate)
     .lte('date', endDate)
@@ -84,7 +84,7 @@ export async function getGroupWellnessForDate(
   if (!canUseSupabase()) return [];
   const { data, error } = await supabase
     .from('wellness_checks')
-    .select('*')
+    .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
     .eq('date', date);
   if (error) throw new Error(error.message);
   return (data ?? []) as WellnessCheck[];

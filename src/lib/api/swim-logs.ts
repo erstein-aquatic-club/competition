@@ -10,7 +10,7 @@ export async function getSwimExerciseLogs(sessionId: number): Promise<SwimExerci
 
   const { data, error } = await supabase
     .from('swim_exercise_logs')
-    .select('*')
+    .select('id, session_id, user_id, exercise_label, source_item_id, split_times, tempo, stroke_count, notes, event_code, pool_length, equipment, created_at, updated_at')
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true });
 
@@ -27,7 +27,7 @@ export async function getSwimExerciseLogsHistory(
 
   const { data, error } = await supabase
     .from('swim_exercise_logs')
-    .select('*')
+    .select('id, session_id, user_id, exercise_label, source_item_id, split_times, tempo, stroke_count, notes, event_code, pool_length, equipment, created_at, updated_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit);

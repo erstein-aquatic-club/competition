@@ -168,7 +168,7 @@ export default function Dashboard() {
   });
 
   const { data: assignments, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery({
-    queryKey: ["assignments", user],
+    queryKey: ["assignments", userId ?? user],
     queryFn: () => api.getAssignments(user!, userId),
     enabled: !!user,
   });
