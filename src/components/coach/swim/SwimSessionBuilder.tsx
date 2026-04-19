@@ -112,10 +112,37 @@ export function SwimSessionBuilder({
     [session.blocks],
   );
 
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const backdropRef = React.useRef<HTMLDivElement>(null);
+
+  const syncScroll = React.useCallback(() => {
+    if (backdropRef.current && textareaRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  }, []);
+
   const textWarnings = useMemo<TextWarning[]>(
     () => (editorMode === "text" ? detectTextWarnings(rawText) : []),
     [editorMode, rawText],
   );
+
+  const backdropLines = useMemo(() => {
+    if (textWarnings.length === 0) return null;
+    const warningSet = new Set(textWarnings.map((w) => w.lineIndex));
+    return rawText.split("\n").map((line, i) => (
+      <React.Fragment key={i}>
+        <span
+          className={cn(
+            "text-transparent",
+            warningSet.has(i) && "rounded-[2px] bg-amber-200/70 dark:bg-amber-700/40",
+          )}
+        >
+          {line || "\u200B"}
+        </span>
+        {"\n"}
+      </React.Fragment>
+    ));
+  }, [rawText, textWarnings]);
 
   const nullDistanceCount = useMemo(
     () =>
@@ -296,12 +323,25 @@ export function SwimSessionBuilder({
         {editorMode === "text" ? (
           /* ── Text mode ── */
           <div className="space-y-3">
-            <textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              placeholder={"Collez ou tapez votre séance ici…\n\nExemple :\nÉchauffement\n4x100 crawl V1 R30\n8x50 educ dos V0\n\nCorps de séance\n2x(4x100 NL V3 D1'30)\n6x50 papillon jambes V2 R20\n\nRetour au calme\n200 4N souple"}
-              className="min-h-[280px] w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <div className="relative rounded-2xl border border-border bg-card focus-within:ring-2 focus-within:ring-ring">
+              {backdropLines && (
+                <div
+                  ref={backdropRef}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words"
+                >
+                  {backdropLines}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                onScroll={syncScroll}
+                placeholder={"Collez ou tapez votre séance ici…\n\nExemple :\nÉchauffement\n4x100 crawl V1 R30\n8x50 educ dos V0\n\nCorps de séance\n2x(4x100 NL V3 D1'30)\n6x50 papillon jambes V2 R20\n\nRetour au calme\n200 4N souple"}
+                className="relative min-h-[280px] w-full resize-y bg-transparent px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none"
+              />
+            </div>
             {textWarnings.length > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
                 <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
