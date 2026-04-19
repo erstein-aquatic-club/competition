@@ -72,7 +72,7 @@ import {
   generateShareToken,
   getSwimCatalog,
 } from "@/lib/api/swim";
-import { getAssignedSwimCatalogIds } from "@/lib/api/assignments";
+import { getAssignedSwimCatalogIds, getEverAssignedSwimCatalogIds } from "@/lib/api/assignments";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 import { detectTextWarnings, parseSwimText, type SwimBlock, type TextWarning } from "@/lib/swimTextParser";
 import type { SwimSessionTemplate } from "@/lib/api/types";
@@ -712,8 +712,8 @@ function QuickComposeBody({
   });
 
   const { data: assignedIds } = useQuery({
-    queryKey: ["assigned_swim_catalog_ids"],
-    queryFn: () => getAssignedSwimCatalogIds(),
+    queryKey: ["ever_assigned_swim_catalog_ids"],
+    queryFn: () => getEverAssignedSwimCatalogIds(),
     enabled: tab === "library",
     staleTime: 60_000,
   });
@@ -723,6 +723,7 @@ function QuickComposeBody({
     const q = search.trim().toLowerCase();
     return catalog
       .filter((s) => !s.is_archived)
+      .filter((s) => !assignedIds?.has(s.id))
       .filter(
         (s) =>
           !q ||
@@ -730,7 +731,7 @@ function QuickComposeBody({
           (s.folder ?? "").toLowerCase().includes(q),
       )
       .slice(0, 40);
-  }, [catalog, search]);
+  }, [catalog, search, assignedIds]);
 
   const libraryDisabled = !hasGroup || !isVisibleFromValid || submitting;
 

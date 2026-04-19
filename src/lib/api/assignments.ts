@@ -604,6 +604,25 @@ export async function getAssignedSwimCatalogIds(): Promise<Set<number>> {
   return ids;
 }
 
+/** Get ALL distinct swim_catalog_ids that have EVER been assigned. */
+export async function getEverAssignedSwimCatalogIds(): Promise<Set<number>> {
+  if (!canUseSupabase()) return new Set();
+
+  const { data, error } = await supabase
+    .from("session_assignments")
+    .select("swim_catalog_id")
+    .eq("assignment_type", "swim")
+    .not("swim_catalog_id", "is", null);
+
+  if (error) throw new Error(error.message);
+
+  const ids = new Set<number>();
+  for (const row of data ?? []) {
+    if (row.swim_catalog_id != null) ids.add(row.swim_catalog_id);
+  }
+  return ids;
+}
+
 /** Get unassigned swim slot occurrences over the past 30 days (J-30 → J-1). */
 export async function getUnassignedSlots30d(): Promise<Array<{
   slot_id: string;
