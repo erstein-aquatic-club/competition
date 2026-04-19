@@ -14,7 +14,8 @@ import type {
   Competition,
   AthleteSummary,
 } from "@/lib/api/types";
-import type { EffectiveSlot } from "@/lib/swimPlanningMerge";
+import type { EffectiveSlot, EffectiveWeekMeta } from "@/lib/swimPlanningMerge";
+import { mergeSlots, mergeWeekMeta } from "@/lib/swimPlanningMerge";
 import { FILIERES, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
@@ -233,6 +234,98 @@ export default function SwimPlanningDemo() {
     return map;
   }, [slots]);
 
+  // ── Athlete-mode overrides + per-group week meta (DB-backed) ──
+
+  // Per-athlete slot overrides (only fetched in athlete mode)
+  const { data: slotOverrides = [] } = useQuery({
+    queryKey: [
+      "swim-planning-slot-overrides",
+      selectedAthleteId,
+      visibleWeekKeys,
+    ],
+    queryFn: () =>
+      api.getSwimPlanningSlotOverrides({
+        athleteId: selectedAthleteId!,
+        weekStarts: visibleWeekKeys,
+      }),
+    enabled: selectedAthleteId != null && visibleWeekKeys.length > 0,
+  });
+
+  // Per-group week meta (always fetched — used in both modes)
+  const { data: groupWeekMeta = [] } = useQuery({
+    queryKey: ["swim-planning-week-meta", selectedGroupId, visibleWeekKeys],
+    queryFn: () =>
+      api.getSwimPlanningWeekMeta({
+        groupId: selectedGroupId!,
+        weekStarts: visibleWeekKeys,
+      }),
+    enabled: selectedGroupId != null && visibleWeekKeys.length > 0,
+  });
+
+  // Per-athlete week overrides (only fetched in athlete mode)
+  const { data: athleteWeekOverrides = [] } = useQuery({
+    queryKey: [
+      "swim-planning-week-overrides",
+      selectedAthleteId,
+      visibleWeekKeys,
+    ],
+    queryFn: () =>
+      api.getSwimPlanningWeekOverrides({
+        athleteId: selectedAthleteId!,
+        weekStarts: visibleWeekKeys,
+      }),
+    enabled: selectedAthleteId != null && visibleWeekKeys.length > 0,
+  });
+
+  // ── Effective slots per week (merged in athlete mode) ──
+  const effectiveSlotsByWeek = useMemo(() => {
+    if (selectedAthleteId == null) {
+      // Group mode — slots already match EffectiveSlot shape (overridden is optional).
+      return slotsByWeek as unknown as Map<string, EffectiveSlot[]>;
+    }
+    const overridesByWeek = new Map<
+      string,
+      typeof slotOverrides
+    >();
+    for (const o of slotOverrides) {
+      const arr = overridesByWeek.get(o.week_start) ?? [];
+      arr.push(o);
+      overridesByWeek.set(o.week_start, arr);
+    }
+    const map = new Map<string, EffectiveSlot[]>();
+    for (const weekKey of visibleWeekKeys) {
+      const groupSlots = slotsByWeek.get(weekKey) ?? [];
+      const weekOverrides = overridesByWeek.get(weekKey) ?? [];
+      map.set(weekKey, mergeSlots(groupSlots, weekOverrides));
+    }
+    return map;
+  }, [selectedAthleteId, slotsByWeek, slotOverrides, visibleWeekKeys]);
+
+  // ── Effective week meta per week (merged in athlete mode) ──
+  const groupMetaByWeek = useMemo(() => {
+    const map = new Map<string, (typeof groupWeekMeta)[number]>();
+    for (const m of groupWeekMeta) map.set(m.week_start, m);
+    return map;
+  }, [groupWeekMeta]);
+
+  const athleteOverrideByWeek = useMemo(() => {
+    const map = new Map<string, (typeof athleteWeekOverrides)[number]>();
+    for (const o of athleteWeekOverrides) map.set(o.week_start, o);
+    return map;
+  }, [athleteWeekOverrides]);
+
+  const getEffectiveWeekMeta = useCallback(
+    (weekKey: string): EffectiveWeekMeta => {
+      const g = groupMetaByWeek.get(weekKey) ?? null;
+      const a =
+        selectedAthleteId != null
+          ? athleteOverrideByWeek.get(weekKey) ?? null
+          : null;
+      return mergeWeekMeta(g, a);
+    },
+    [groupMetaByWeek, athleteOverrideByWeek, selectedAthleteId],
+  );
+
   // ── Competitions (context for filière training) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
@@ -342,7 +435,7 @@ export default function SwimPlanningDemo() {
     weekKey: string;
     dayIndex: number;
     timeSlot: "morning" | "evening";
-    existingSlot?: SwimPlanningSlot;
+    existingSlot?: EffectiveSlot;
   } | null>(null);
 
   const upsertMutation = useMutation({
@@ -483,20 +576,20 @@ export default function SwimPlanningDemo() {
     setSessionPickerSlot(null);
   };
 
-  // ── Find slot for a given cell ──
+  // ── Find slot for a given cell (effective — inheriting overrides in athlete mode) ──
   const findSlot = useCallback(
     (
       weekKey: string,
       dayIndex: number,
       timeSlot: "morning" | "evening",
-    ): SwimPlanningSlot | undefined => {
-      const weekSlots = slotsByWeek.get(weekKey);
+    ): EffectiveSlot | undefined => {
+      const weekSlots = effectiveSlotsByWeek.get(weekKey);
       if (!weekSlots) return undefined;
       return weekSlots.find(
         (s) => s.day_of_week === dayIndex && s.time_slot === timeSlot,
       );
     },
-    [slotsByWeek],
+    [effectiveSlotsByWeek],
   );
 
   // ── Loading / empty states ──
@@ -560,9 +653,10 @@ export default function SwimPlanningDemo() {
 
       {/* ── Timeline ── */}
       <SwimPlanningTimeline
-        mode="group"
+        mode={selectedAthleteId != null ? "athlete" : "group"}
+        showOverrideBadge={selectedAthleteId != null}
         weeks={weeks}
-        slotsByWeek={slotsByWeek}
+        slotsByWeek={effectiveSlotsByWeek}
         competitionsByWeek={competitionsByWeek}
         expandedWeekKey={expandedWeekKey}
         onToggleWeek={(weekKey) =>
