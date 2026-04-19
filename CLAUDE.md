@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §139 (vue semaine coach — héritage créneaux persos sur dates antérieures à un stage).
+Dernière entrée en date : §141 (Chantier C — optimisation backend Supabase : index cron, consolidation RLS, drop 11 indexes).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
