@@ -456,3 +456,39 @@ describe("overrides persistence", () => {
     expect(s0.waves[0].currentRep).toBe(0);
   });
 });
+
+describe("UPDATE_SWIMMER_AVATAR", () => {
+  it("replaces avatarUrl of the targeted swimmer", () => {
+    const s = reduce(
+      initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1, 1, 1) },
+      { type: "ADD_SWIMMER", swimmer: reg(2, 1, 2) },
+      { type: "UPDATE_SWIMMER_AVATAR", key: "a:1", avatarUrl: "data:image/webp;base64,AAA" },
+    );
+    expect(s.swimmers.find((x) => x.key === "a:1")?.avatarUrl)
+      .toBe("data:image/webp;base64,AAA");
+    expect(s.swimmers.find((x) => x.key === "a:2")?.avatarUrl).toBeNull();
+  });
+
+  it("is a no-op for unknown key", () => {
+    const before = reduce(
+      initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: reg(1) },
+    );
+    const after = chronoReducer(before, {
+      type: "UPDATE_SWIMMER_AVATAR",
+      key: "a:999",
+      avatarUrl: "data:…",
+    });
+    expect(after.swimmers).toEqual(before.swimmers);
+  });
+
+  it("accepts null to clear avatar", () => {
+    const s = reduce(
+      initialChronoState,
+      { type: "ADD_SWIMMER", swimmer: { ...reg(1), avatarUrl: "data:old" } },
+      { type: "UPDATE_SWIMMER_AVATAR", key: "a:1", avatarUrl: null },
+    );
+    expect(s.swimmers[0].avatarUrl).toBeNull();
+  });
+});

@@ -30,6 +30,7 @@ type ChronoAction =
   | { type: "NEXT_REP"; wave: number }
   | { type: "STOP_RACE"; timestamp: number }
   | { type: "RESET_FOR_NEW_SERIES"; title?: string }
+  | { type: "UPDATE_SWIMMER_AVATAR"; key: string; avatarUrl: string | null }
   | { type: "RESTORE_STATE"; state: ChronoState };
 
 export type { ChronoAction };
@@ -159,6 +160,17 @@ export function chronoReducer(
         (s) => s.key !== action.key,
       );
       return { ...state, swimmers, waves: computeWaves(swimmers, state.waves) };
+    }
+
+    case "UPDATE_SWIMMER_AVATAR": {
+      let changed = false;
+      const swimmers = state.swimmers.map((s) => {
+        if (s.key !== action.key) return s;
+        changed = true;
+        return { ...s, avatarUrl: action.avatarUrl };
+      });
+      if (!changed) return state;
+      return { ...state, swimmers };
     }
 
     case "MOVE_SWIMMER": {
