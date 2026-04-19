@@ -137,20 +137,44 @@ function LastSeenLabel({ dateStr }: { dateStr: string | null }) {
   );
 }
 
-function FeedbackRateBadge({ feedback, assigned }: { feedback: number; assigned: number }) {
-  const ratio = feedback / assigned;
+function FeedbackRateKPI({
+  feedback,
+  assigned,
+  total,
+}: {
+  feedback: number;
+  assigned: number;
+  total: number;
+}) {
+  const coachGap = total - assigned;
+  const ratio = total > 0 ? feedback / total : 0;
   const pct = Math.min(100, Math.round(ratio * 100));
-  const colorClass =
+  const ratioColor =
     ratio >= 0.75
       ? "text-emerald-600 dark:text-emerald-400"
       : ratio >= 0.4
       ? "text-amber-600 dark:text-amber-400"
       : "text-red-600 dark:text-red-400";
+
   return (
-    <span className={`text-[11px] font-bold tabular-nums ${colorClass}`}>
-      {feedback}/{assigned}
-      <span className="ml-1 font-normal text-muted-foreground">({pct}%)</span>
-    </span>
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Ressentis 30j
+        </span>
+        <span className={`text-[11px] font-bold tabular-nums ${ratioColor}`}>
+          {feedback}/{total}
+          <span className="ml-1 font-normal text-[10px] text-muted-foreground">({pct}%)</span>
+        </span>
+      </div>
+      {coachGap > 0 && (
+        <div className="flex justify-end">
+          <span className="inline-flex items-center gap-0.5 rounded-md bg-orange-100 dark:bg-orange-950/30 px-1.5 py-0.5 text-[9px] font-semibold text-orange-700 dark:text-orange-400">
+            ⚠ {coachGap} non planifié{coachGap > 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -646,16 +670,12 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                     </div>
 
                     {/* Feedback rate */}
-                    {feedbackRate != null && feedbackRate.assigned > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Ressentis 30j
-                        </span>
-                        <FeedbackRateBadge
-                          feedback={feedbackRate.feedback}
-                          assigned={feedbackRate.assigned}
-                        />
-                      </div>
+                    {feedbackRate != null && feedbackRate.total > 0 && (
+                      <FeedbackRateKPI
+                        feedback={feedbackRate.feedback}
+                        assigned={feedbackRate.assigned}
+                        total={feedbackRate.total}
+                      />
                     )}
 
                     {/* Last seen */}
