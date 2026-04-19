@@ -6,7 +6,14 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { SwimPlanningSlot, SwimPlanningSlotInput, GroupSummary, SwimSessionTemplate, Competition } from "@/lib/api/types";
+import type {
+  SwimPlanningSlot,
+  SwimPlanningSlotInput,
+  GroupSummary,
+  SwimSessionTemplate,
+  Competition,
+  AthleteSummary,
+} from "@/lib/api/types";
 import type { EffectiveSlot } from "@/lib/swimPlanningMerge";
 import { FILIERES, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -15,6 +22,7 @@ const FilieresEditor = lazyWithRetry(() => import("./FilieresEditor"));
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +41,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
+  ArrowLeft,
   Check,
   Eye,
   Link2,
@@ -41,6 +50,7 @@ import {
   Trash2,
   Trophy,
   Unlink,
+  Users,
   Waves,
 } from "lucide-react";
 import SwimPlanningAthleteView from "./SwimPlanningAthleteView";
@@ -113,6 +123,63 @@ export default function SwimPlanningDemo() {
       setSelectedGroupId(permanentGroups[0].id);
     }
   }, [permanentGroups, selectedGroupId]);
+
+  // ── Athlete selection (athlete mode) ──
+  const { data: allAthletes = [] } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => api.getAthletes(),
+  });
+
+  const groupAthletes = useMemo(
+    () =>
+      allAthletes.filter(
+        (a) => a.id != null && a.group_id === selectedGroupId,
+      ),
+    [allAthletes, selectedGroupId],
+  );
+
+  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(
+    () => {
+      const params = new URLSearchParams(
+        window.location.hash.split("?")[1] ?? "",
+      );
+      const raw = params.get("athlete");
+      const n = raw ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : null;
+    },
+  );
+
+  // Sync athlete id to URL hash query string
+  useEffect(() => {
+    const [path, qs] = window.location.hash.split("?");
+    const params = new URLSearchParams(qs ?? "");
+    if (selectedAthleteId) {
+      params.set("athlete", String(selectedAthleteId));
+    } else {
+      params.delete("athlete");
+    }
+    const next = params.toString();
+    const nextHash = next ? `${path}?${next}` : path;
+    if (nextHash !== window.location.hash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  }, [selectedAthleteId]);
+
+  const selectedAthlete = useMemo(
+    () => groupAthletes.find((a) => a.id === selectedAthleteId) ?? null,
+    [groupAthletes, selectedAthleteId],
+  );
+
+  // Clear dangling athlete selection when the coach switches group or when
+  // the loaded athlete list confirms the id isn't in scope.
+  useEffect(() => {
+    if (selectedAthleteId == null) return;
+    if (allAthletes.length === 0) return; // not loaded yet
+    const stillInGroup = groupAthletes.some(
+      (a) => a.id === selectedAthleteId,
+    );
+    if (!stillInGroup) setSelectedAthleteId(null);
+  }, [allAthletes, groupAthletes, selectedAthleteId, selectedGroupId]);
 
   // ── Week generation (infinite scroll) ──
   const startMonday = useMemo(() => getMonday(new Date()), []);
@@ -483,6 +550,10 @@ export default function SwimPlanningDemo() {
         groups={permanentGroups}
         selectedGroupId={selectedGroupId}
         onSelectGroup={setSelectedGroupId}
+        groupAthletes={groupAthletes}
+        selectedAthleteId={selectedAthleteId}
+        selectedAthlete={selectedAthlete}
+        onSelectAthlete={setSelectedAthleteId}
         onShowAthleteView={() => setShowAthleteView(true)}
         onShowFiliereEditor={() => setShowFiliereEditor(true)}
       />
@@ -827,12 +898,20 @@ function Header({
   groups,
   selectedGroupId,
   onSelectGroup,
+  groupAthletes = [],
+  selectedAthleteId = null,
+  selectedAthlete = null,
+  onSelectAthlete,
   onShowAthleteView,
   onShowFiliereEditor,
 }: {
   groups: GroupSummary[];
   selectedGroupId: number | null;
   onSelectGroup: (id: number) => void;
+  groupAthletes?: AthleteSummary[];
+  selectedAthleteId?: number | null;
+  selectedAthlete?: AthleteSummary | null;
+  onSelectAthlete?: (id: number | null) => void;
   onShowAthleteView?: () => void;
   onShowFiliereEditor?: () => void;
 }) {
@@ -875,8 +954,58 @@ function Header({
           </div>
         </div>
 
+        {/* ── Athlete-mode banner ── */}
+        {selectedAthlete && onSelectAthlete && (
+          <div
+            className="mt-2 flex items-center gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 dark:bg-amber-950/25 dark:border-amber-800/50 pl-2 pr-1.5 py-1.5 relative overflow-hidden"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              aria-hidden
+              className="absolute left-0 top-0 bottom-0 w-[3px] bg-amber-400/80 dark:bg-amber-500/70"
+            />
+            <Avatar className="h-7 w-7 ring-1 ring-amber-200/80 dark:ring-amber-800/60">
+              {selectedAthlete.avatar_url && (
+                <AvatarImage
+                  src={selectedAthlete.avatar_url}
+                  alt={selectedAthlete.display_name}
+                />
+              )}
+              <AvatarFallback className="text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-100">
+                {selectedAthlete.display_name
+                  .split(/\s+/)
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase() || "?"}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="flex-1 min-w-0 leading-tight">
+              <span className="block text-[13px] font-semibold text-amber-900 dark:text-amber-100 truncate">
+                {selectedAthlete.display_name}
+              </span>
+              <span className="block text-[10px] font-medium uppercase tracking-wider text-amber-700/80 dark:text-amber-300/80">
+                Plan individuel
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectAthlete(null)}
+              className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-[11px] font-medium text-amber-800 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100 bg-white/60 hover:bg-white dark:bg-amber-900/40 dark:hover:bg-amber-900/60 border border-amber-200/80 dark:border-amber-800/60 transition-colors active:scale-[0.97]"
+              aria-label="Retour au plan du groupe"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Retour plan groupe
+            </button>
+          </div>
+        )}
+
         {groups.length > 0 && (
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Select
               value={selectedGroupId?.toString() ?? ""}
               onValueChange={(v) => onSelectGroup(Number(v))}
@@ -897,6 +1026,55 @@ function Header({
                 ))}
               </SelectContent>
             </Select>
+
+            {onSelectAthlete && (
+              <>
+                <span
+                  aria-hidden
+                  className="hidden sm:block h-4 w-px bg-border/70"
+                />
+                <Select
+                  value={
+                    selectedAthleteId ? String(selectedAthleteId) : "__group__"
+                  }
+                  onValueChange={(v) =>
+                    onSelectAthlete(v === "__group__" ? null : Number(v))
+                  }
+                  disabled={groupAthletes.length === 0}
+                >
+                  <SelectTrigger
+                    className={cn(
+                      "w-auto min-w-[180px] h-9 text-sm border-muted-foreground/10",
+                      selectedAthleteId
+                        ? "bg-amber-50 text-amber-900 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800/60"
+                        : "bg-muted/40 text-foreground",
+                    )}
+                  >
+                    <SelectValue placeholder="Plan du groupe" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[60dvh]">
+                    <SelectItem value="__group__">
+                      <span className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-medium">Plan du groupe</span>
+                      </span>
+                    </SelectItem>
+                    {groupAthletes.length > 0 && (
+                      <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        Nageurs du groupe
+                      </div>
+                    )}
+                    {groupAthletes.map((a) =>
+                      a.id == null ? null : (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.display_name}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
           </div>
         )}
       </div>
