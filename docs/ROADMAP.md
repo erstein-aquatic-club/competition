@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§151 KPI Ressentis 30j v6 — feedback_count compte les slots attendus matchés, pas le brut de dim_sessions : François passe de 12/13 à 8/13 cohérent avec l'historique)*
+*Dernière mise à jour : 2026-04-19 (§152 Coach QuickView — mode dépannage pour coaches non-titulaires : briefing RPC SECURITY DEFINER + enregistrement présence/commentaire/séance avec recorded_by)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -97,6 +97,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 111 | Cascade annulation bucket swim → slots perso nageurs (get_swimmer_sessions) | Haute | Moyenne | Fait (§149) |
 | 112 | UI coach — label "sans assignation" + historique ressentis étendu avec slots attendus | Moyenne | Faible | Fait (§150) |
 | 113 | KPI Ressentis 30j v6 — feedback_count = slots attendus matchés (alignement avec historique §150) | Haute | Faible | Fait (§151) |
+| 114 | Coach QuickView — mode dépannage pour coaches non-titulaires (briefing RPC SECURITY DEFINER + attendance/comment/assign avec recorded_by) | Haute | Haute | Fait (§152) |
 
 ---
 

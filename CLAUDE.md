@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §151 (KPI Ressentis 30j v6 — `get_feedback_rates_all_athletes` rebasée : `feedback_count` compte désormais les slots attendus ayant au moins un feedback matché, pas le brut de `dim_sessions` ; François passe de 12/13 à 8/13 cohérent avec l'historique coach §150).
+Dernière entrée en date : §152 (Coach QuickView — mode dépannage pour coaches non-titulaires : briefing RPC SECURITY DEFINER + enregistrement présence/commentaire/séance avec `recorded_by` ; dispatcher thin `CoachSwimmerDetail` ; 4 composants KPI swimmer-kpis).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

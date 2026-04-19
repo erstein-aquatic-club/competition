@@ -60,7 +60,17 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/CoachCalendar.tsx` | Calendrier coach (vue mensuelle assignations) | ~266 lignes |
 | `src/hooks/useCoachCalendarState.ts` | Hook état calendrier coach (grille, query, slots) | ~187 lignes |
 | `src/pages/coach/CoachSwimmersOverview.tsx` | Dashboard synthétique nageurs (grille cards, KPIs) | ~648 lignes |
-| `src/pages/coach/CoachSwimmerDetail.tsx` | Page fiche nageur (4 onglets consolidés: Résumé/Planning/Échanges/Comms) (§92) | ~120 lignes |
+| `src/pages/coach/CoachSwimmerDetail.tsx` | Dispatcher thin : route vers CoachSwimmerFullView (titulaire) ou CoachSwimmerQuickView (substituant) selon hasAccess (§152) | 33 lignes |
+| `src/pages/coach/CoachSwimmerFullView.tsx` | Page fiche nageur complète (4 onglets: Résumé/Planning/Échanges/Comms) — ex-CoachSwimmerDetail (§152) | 528 lignes |
+| `src/pages/coach/CoachSwimmerQuickView.tsx` | Mode dépannage substituant : briefing lecture-seule + présence/commentaire/assignation avec recorded_by (§152) | 346 lignes |
+| `src/pages/coach/QuickViewAttendanceDialog.tsx` | Dialog enregistrement présence substituant (Présent/Absent/Retard + commentaire) (§152) | 90 lignes |
+| `src/pages/coach/QuickViewCommentDialog.tsx` | Dialog ajout commentaire séance par substituant (max 500 car.) (§152) | 78 lignes |
+| `src/pages/coach/QuickViewAssignDrawer.tsx` | Sheet assignation séance : onglet Bibliothèque (search + liste) + Nouvelle (ad-hoc) (§152) | 176 lignes |
+| `src/lib/api/coach-quickview.ts` | Module API QuickView : getSwimmerBriefing (RPC), recordAttendanceAsSub, addSessionCommentAsSub, assignSessionToSlotAsSub (§152) | 143 lignes |
+| `src/components/coach/swimmer-kpis/SwimmerFormBadge.tsx` | Badge couleur readiness_score (vert/ambre/rouge) + heure du relevé (§152) | 51 lignes |
+| `src/components/coach/swimmer-kpis/PainIndicator.tsx` | Indicateur douleur : dot couleur selon reports_7d (§152) | 36 lignes |
+| `src/components/coach/swimmer-kpis/LoadMini.tsx` | KPI charge : grille km 7j/28j / séances / RPE moyen (§152) | 34 lignes |
+| `src/components/coach/swimmer-kpis/ObjectiveChips.tsx` | Chips objectifs (event_code + temps) max 4 (§152) | 37 lignes |
 | `src/pages/coach/SwimmerFeedbackTab.tsx` | Onglet ressentis (liste chronologique sessions) | ~120 lignes |
 | `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) | ~574 lignes |
 | `src/pages/coach/CoachGroupsScreen.tsx` | UI gestion groupes temporaires (stages) | ~1012 lignes |
