@@ -13,9 +13,11 @@ Or, le besoin terrain réel existe : **un coach qui remplace un collègue absent
 | Question | Choix |
 |---|---|
 | Cas d'usage principal | **A — Dépannage / remplacement** (animer la séance du jour) |
-| Actions autorisées | **B — Lecture + présence + commentaire de séance** |
+| Actions autorisées | **B — Lecture + présence + commentaire de séance** + **assignation séance si slot vide** (extension validée) |
 | Scope rôles | **A — Coach non-assigné uniquement** (admin/comité inchangés) |
 | Traçabilité | **B — Attribution visible dans la donnée, pas de notification** |
+| Source séance assignable | **Bibliothèque OU séance ad-hoc vierge** |
+| Périmètre assignation | **Slot existant et vide uniquement** — jamais créer un slot si pas de créneau prévu |
 
 ## 3. Architecture
 
@@ -42,8 +44,28 @@ Lecture top-down, une seule colonne scrollable, pas d'onglets.
 | 3 | ⚡ Charge récente | Badge ACWR, volume 7j vs moy 4 sem, séances manquées 30j | RPE détaillé par séance |
 | 4 | 🎯 Objectifs en cours | Chips (titre + horizon), max 4 | Entretiens/commentaires liés |
 | 5 | 🏆 Perf récentes | Rail horizontal 2-3 dernières compét + progression | Historique complet |
-| 6 | 📅 Séance du jour | Titre, contenu, notes **du jour uniquement** | Planning semaine/mois |
+| 6 | 📅 Séance du jour | **3 états** selon le slot (voir §4bis) | Planning semaine/mois |
 | 7 | 🤝 Actions (sticky) | Boutons *Noter la présence* / *Commenter la séance* + note attribution | — |
+
+### §4bis — Trois états du bloc "Séance du jour"
+
+| État du slot | Contenu du bloc | Actions footer |
+|---|---|---|
+| **Slot + séance accrochée** | Titre, contenu, notes du titulaire | Présence + Commenter |
+| **Slot vide (pas de séance)** | CTA primary *"📋 Assigner une séance"* + sous-texte "Créneau prévu 18h — aucune séance accrochée" | Masquées jusqu'à assignation |
+| **Pas de slot** (jour off, groupe en repos) | Message "Pas de séance planifiée aujourd'hui" | Aucune action (décision titulaire respectée) |
+
+### §4ter — Flux d'assignation (slot vide → séance accrochée)
+
+Le clic sur *"Assigner une séance"* ouvre un **drawer shadcn Sheet** à 2 onglets :
+- **Bibliothèque** — liste des séances non-assignées, réutilise le pattern existant `SlotSessionSheet` (filtre déjà implémenté récemment)
+- **Nouvelle séance** — formulaire vierge minimal : titre, contenu texte, distance totale, durée estimée
+
+Après validation :
+1. Insert dans `swim_sessions` (si ad-hoc) avec `recorded_by = remplaçant`
+2. Update du slot pour y accrocher la séance (avec `recorded_by` sur le slot aussi)
+3. Le bloc bascule immédiatement sur l'état *"Slot + séance accrochée"*, les boutons footer apparaissent
+4. Le titulaire, à la réouverture de sa fiche, voit *"séance assignée par Coach Martin • dépannage"*
 
 **Totalement absent** (vs vue complète) : Échanges, Comms, Planning multi-semaines, détail bien-être (cycle, humeur texte), historique RPE/wellness jour par jour.
 
@@ -66,12 +88,20 @@ Lecture top-down, une seule colonne scrollable, pas d'onglets.
 - Modal : textarea max 500 car
 - Écrit dans `session_comments` (table à créer si inexistante) avec `recorded_by`
 
+### Assigner une séance (slot vide uniquement)
+- Drawer Sheet à 2 onglets (Bibliothèque / Nouvelle)
+- Réutilise `SlotSessionSheet` existant en adaptant : mode "non-titulaire" + `recorded_by`
+- INSERT `swim_sessions` (ad-hoc) + UPDATE du slot (accrochage)
+- Toast *"Séance assignée • visible par [titulaire]"* + refresh du bloc
+
 ### Attribution visible
 - **Côté titulaire** (vue complète) : badge gris *"saisi par Coach Martin • dépannage"*
 - **Côté nageur** (feedback perso) : *"Commentaire de Coach Martin (remplaçant)"*
 
 ### NON autorisé depuis QuickView
-Modification séance planifiée, objectifs, entretien, message, profil, groupes, records.
+- Modifier une séance **déjà** accrochée par le titulaire
+- Créer un nouveau slot (si pas de créneau prévu aujourd'hui, pas d'option)
+- Objectifs, entretien, message, profil, groupes, records
 
 ## 6. Data & RLS
 
@@ -82,6 +112,8 @@ Modification séance planifiée, objectifs, entretien, message, profil, groupes,
   ```sql
   id, session_id, athlete_id, author_user_id, recorded_by, body TEXT, created_at
   ```
+- **`swim_sessions`** : ajouter colonne `recorded_by UUID` nullable (pour les séances ad-hoc créées en dépannage)
+- **Table slot** (nom à confirmer — probablement `swim_session_slots` ou équivalent) : ajouter `recorded_by UUID` nullable sur l'accroche séance↔slot
 
 ### Lecture — approche *"fonction SECURITY DEFINER + policies étroites"*
 
@@ -101,6 +133,10 @@ Renvoie uniquement des champs agrégés/autorisés — jamais de texte libre sen
 Policies classiques :
 - `INSERT/UPDATE session_attendance` pour `role='coach'` **si** `recorded_by = app_user_id()`
 - Idem `INSERT session_comments`
+- **`INSERT swim_sessions`** + **UPDATE slot pour accrochage séance** autorisés si :
+  - `role='coach'`
+  - `recorded_by = app_user_id()`
+  - Le slot visé **existe ET n'a pas déjà de séance accrochée** (check côté SQL pour empêcher d'écraser une séance titulaire même en cas de race condition)
 - Aucune autre écriture autorisée depuis le front en mode dépannage
 
 ### API côté JS
@@ -109,6 +145,7 @@ Nouveau module `src/lib/api/coach-quickview.ts` :
 - `getSwimmerBriefing(athleteId)` → RPC
 - `recordAttendanceAsSub({ sessionId, status, comment })`
 - `addSessionCommentAsSub({ sessionId, body })`
+- `assignSessionToSlotAsSub({ slotId, source: 'library' | 'ad-hoc', sessionId?, adHocPayload? })`
 
 ### Perf & cache
 
@@ -125,7 +162,10 @@ Nouveau module `src/lib/api/coach-quickview.ts` :
    - Peut `INSERT session_attendance` avec `recorded_by = self`
    - Ne peut pas `INSERT` avec `recorded_by = autre coach`
    - Ne peut pas `INSERT/UPDATE athlete_objectives`, `athlete_interviews`, `messages`
-   - Titulaire voit bien `recorded_by` sur ses lignes
+   - **Peut `INSERT swim_sessions` + UPDATE slot accrochage si slot existe ET vide**
+   - **Ne peut pas écraser un slot avec séance déjà accrochée** (race condition contrôlée côté SQL)
+   - **Ne peut pas créer un slot** (seulement accrocher à un slot existant)
+   - Titulaire voit bien `recorded_by` sur ses lignes + sur la séance ad-hoc
 4. **E2E manuel avant merge** : scénario dépannage complet
 
 ## 8. Livrables

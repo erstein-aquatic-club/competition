@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coach QuickView — maquette</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Inter','ui-sans-serif','system-ui'] },
+      colors: {
+        border: 'hsl(214 32% 91%)',
+        card:   'hsl(0 0% 100%)',
+        muted:  'hsl(210 40% 96%)',
+        'muted-foreground': 'hsl(215 16% 47%)',
+        foreground: 'hsl(222 47% 11%)',
+        primary: 'hsl(221 83% 53%)',
+        'primary-foreground': 'hsl(0 0% 100%)',
+      },
+      borderRadius: {
+        '2xl': '1rem',
+        '3xl': '1.5rem',
+      }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; background: #e5e7eb; }
+  /* Phone frame */
+  .phone {
+    width: 390px; height: 844px; background: white;
+    border: 12px solid #1f2937; border-radius: 48px;
+    overflow: hidden; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
+  .phone-notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 140px; height: 28px; background: #1f2937;
+    border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
+    z-index: 50;
+  }
+  .phone-scroll {
+    position: absolute; inset: 0; overflow-y: auto;
+    padding: 44px 0 0 0; /* top safe area */
+    scrollbar-width: thin;
+  }
+  .phone-scroll::-webkit-scrollbar { width: 4px; }
+  .phone-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,.2); border-radius: 2px; }
+
+  /* Traffic-light tokens */
+  .dot-green { background: #10b981; }
+  .dot-amber { background: #f59e0b; }
+  .dot-red   { background: #ef4444; }
+
+  /* Amber ribbon animation (subtle) */
+  @keyframes pulse-amber {
+    0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+    50%     { box-shadow: 0 0 0 3px rgba(245,158,11,.15); }
+  }
+  .ribbon-amber { animation: pulse-amber 4s ease-in-out infinite; }
+</style>
+</head>
+<body class="min-h-screen text-foreground">
+
+<header class="px-8 py-8 max-w-7xl mx-auto">
+  <div class="flex items-center gap-3">
+    <div class="h-10 w-10 rounded-2xl bg-white shadow-sm flex items-center justify-center">
+      <i data-lucide="eye" class="h-5 w-5 text-primary"></i>
+    </div>
+    <div>
+      <h1 class="text-xl font-bold text-slate-900">Coach QuickView — Fiche nageur non-assigné</h1>
+      <p class="text-sm text-slate-600">Mode dépannage — briefing 10 secondes avant séance</p>
+    </div>
+  </div>
+</header>
+
+<div class="px-8 pb-16 max-w-[1600px] mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-8 place-items-center">
+
+  <!-- ============================================================== -->
+  <!-- VARIANT 1 — NOMINAL (état standard) -->
+  <!-- ============================================================== -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-xs font-semibold uppercase tracking-wider text-slate-700">Nominal</span>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-scroll">
+
+        <!-- En-tête -->
+        <div class="px-4 pt-4 pb-2">
+          <div class="flex items-center gap-3">
+            <button class="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center">
+              <i data-lucide="arrow-left" class="h-4 w-4"></i>
+            </button>
+            <div class="min-w-0 flex-1">
+              <p class="text-[11px] font-medium text-muted-foreground">Nageurs ›</p>
+              <h1 class="text-base font-bold truncate">Fiche nageur</h1>
+            </div>
+          </div>
+        </div>
+
+        <!-- Amber ribbon "Mode dépannage" -->
+        <div class="mx-4 mt-1 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 flex items-center gap-2 ribbon-amber">
+          <div class="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+            <i data-lucide="shield-alert" class="h-4 w-4 text-amber-700"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-amber-900">Mode dépannage</p>
+            <p class="text-[11px] text-amber-800/80 leading-tight">Ce nageur n'est pas dans vos prises en charge.</p>
+          </div>
+        </div>
+
+        <!-- Identité carte -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-3">
+            <div class="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">L</div>
+            <div class="min-w-0 flex-1">
+              <p class="text-base font-semibold">Léo Dumont</p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Groupe Élite</span>
+                <span class="text-[11px] text-muted-foreground">• 16 ans • H</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 🚨 Bloc Briefing du jour ────────────────── -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="siren" class="h-4 w-4 text-red-500"></i>
+            <p class="text-sm font-semibold">Briefing du jour</p>
+          </div>
+
+          <!-- Forme -->
+          <div class="flex items-center justify-between rounded-xl border bg-muted/30 px-3 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <span class="h-2.5 w-2.5 rounded-full dot-green"></span>
+              <div>
+                <p class="text-xs text-muted-foreground">Forme aujourd'hui</p>
+                <p class="text-sm font-semibold">Bonne — 8/10</p>
+              </div>
+            </div>
+            <span class="text-[11px] text-muted-foreground">saisi 08:14</span>
+          </div>
+
+          <!-- Douleurs -->
+          <div class="flex items-start justify-between rounded-xl border bg-muted/30 px-3 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <span class="h-2.5 w-2.5 rounded-full dot-amber mt-1"></span>
+              <div>
+                <p class="text-xs text-muted-foreground">Douleurs actives</p>
+                <p class="text-sm font-semibold">Épaule G.</p>
+                <p class="text-[11px] text-muted-foreground">2 signalements sur 7j</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Restrictions médicales -->
+          <div class="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
+            <div class="flex items-center gap-2">
+              <i data-lucide="ban" class="h-3.5 w-3.5 text-red-600"></i>
+              <p class="text-xs font-semibold text-red-900">Restriction en cours</p>
+            </div>
+            <p class="text-[11px] text-red-800 mt-1 leading-snug">Éviter papillon haute intensité (médecin, 10/04)</p>
+          </div>
+
+          <!-- Disponibilité -->
+          <div class="flex items-center gap-2.5 rounded-xl border bg-muted/30 px-3 py-2.5">
+            <i data-lucide="calendar-check" class="h-4 w-4 text-emerald-600"></i>
+            <p class="text-xs"><span class="font-semibold">Disponible</span> — séance prévue 18h</p>
+          </div>
+        </div>
+
+        <!-- ── ⚡ Bloc Charge récente ────────────────── -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="activity" class="h-4 w-4 text-blue-500"></i>
+            <p class="text-sm font-semibold">Charge récente</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">ACWR</p>
+              <p class="text-base font-bold mt-0.5">1.12</p>
+              <span class="inline-block mt-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">OK</span>
+            </div>
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">Vol. 7j</p>
+              <p class="text-base font-bold mt-0.5">28 km</p>
+              <p class="text-[9px] text-emerald-600 mt-0.5">+6% vs moy</p>
+            </div>
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">Abs 30j</p>
+              <p class="text-base font-bold mt-0.5">1</p>
+              <p class="text-[9px] text-muted-foreground mt-0.5">séance</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 🎯 Objectifs ────────────────── -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="target" class="h-4 w-4 text-amber-500"></i>
+            <p class="text-sm font-semibold">Objectifs en cours</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">100m 4N &lt; 1:15 · mai</span>
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">200m NL &lt; 2:08 · juin</span>
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">Gainage +1 min</span>
+          </div>
+        </div>
+
+        <!-- ── 🏆 Perf récentes ────────────────── -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="trophy" class="h-4 w-4 text-yellow-500"></i>
+            <p class="text-sm font-semibold">Perf récentes</p>
+          </div>
+          <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <div class="shrink-0 w-28 rounded-xl border bg-muted/30 p-2.5">
+              <p class="text-[10px] text-muted-foreground">12 mars</p>
+              <p class="text-xs font-semibold mt-0.5">100 NL</p>
+              <p class="text-base font-bold mt-1">54.12</p>
+              <p class="text-[10px] text-emerald-600 font-medium">▼ -0.38s</p>
+            </div>
+            <div class="shrink-0 w-28 rounded-xl border bg-muted/30 p-2.5">
+              <p class="text-[10px] text-muted-foreground">12 mars</p>
+              <p class="text-xs font-semibold mt-0.5">200 4N</p>
+              <p class="text-base font-bold mt-1">2:14.88</p>
+              <p class="text-[10px] text-emerald-600 font-medium">▼ -1.21s</p>
+            </div>
+            <div class="shrink-0 w-28 rounded-xl border bg-muted/30 p-2.5">
+              <p class="text-[10px] text-muted-foreground">24 fév</p>
+              <p class="text-xs font-semibold mt-0.5">50 PAP</p>
+              <p class="text-base font-bold mt-1">27.04</p>
+              <p class="text-[10px] text-slate-500 font-medium">≈ stable</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 📅 Séance du jour ────────────────── -->
+        <div class="mx-4 mb-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="clipboard-list" class="h-4 w-4 text-primary"></i>
+              <p class="text-sm font-semibold text-primary">Séance d'aujourd'hui</p>
+            </div>
+            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary text-primary-foreground">18h00</span>
+          </div>
+          <p class="text-sm font-semibold mb-1">Endurance aérobie — 4.2 km</p>
+          <div class="text-xs text-muted-foreground space-y-0.5">
+            <p>• 600 éch. (2× 50 battements + 2× 50 éduc)</p>
+            <p>• 4× 600 NL à 70%, R30''</p>
+            <p>• 8× 50 jambes planche, R20''</p>
+            <p>• 400 souple retour au calme</p>
+          </div>
+          <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5 flex items-start gap-2">
+            <i data-lucide="info" class="h-3.5 w-3.5 text-amber-700 shrink-0 mt-0.5"></i>
+            <p class="text-[11px] text-amber-900 leading-snug"><span class="font-semibold">Note titulaire :</span> éviter papillon, épaule fragile.</p>
+          </div>
+        </div>
+
+        <!-- Spacer pour footer sticky -->
+        <div class="h-24"></div>
+
+        <!-- Actions sticky -->
+        <div class="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-5 bg-gradient-to-t from-white via-white/95 to-white/0 border-t border-border/50">
+          <p class="text-[10px] text-muted-foreground text-center mb-2 leading-tight">
+            Vos saisies seront attribuées à <span class="font-semibold">vous</span> et visibles par le titulaire.
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="rounded-xl border bg-card px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-semibold active:bg-muted">
+              <i data-lucide="check-square" class="h-3.5 w-3.5"></i> Présence
+            </button>
+            <button class="rounded-xl bg-primary text-primary-foreground px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-semibold">
+              <i data-lucide="message-square" class="h-3.5 w-3.5"></i> Commenter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- VARIANT 2 — ALERTE (pain actif fort, forme basse) -->
+  <!-- ============================================================== -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-xs font-semibold uppercase tracking-wider text-red-700">Alerte</span>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-scroll">
+
+        <div class="px-4 pt-4 pb-2">
+          <div class="flex items-center gap-3">
+            <button class="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center">
+              <i data-lucide="arrow-left" class="h-4 w-4"></i>
+            </button>
+            <div class="min-w-0 flex-1">
+              <p class="text-[11px] font-medium text-muted-foreground">Nageurs ›</p>
+              <h1 class="text-base font-bold truncate">Fiche nageur</h1>
+            </div>
+          </div>
+        </div>
+
+        <div class="mx-4 mt-1 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 flex items-center gap-2 ribbon-amber">
+          <div class="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+            <i data-lucide="shield-alert" class="h-4 w-4 text-amber-700"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-amber-900">Mode dépannage</p>
+            <p class="text-[11px] text-amber-800/80 leading-tight">Ce nageur n'est pas dans vos prises en charge.</p>
+          </div>
+        </div>
+
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-3">
+            <div class="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">S</div>
+            <div class="min-w-0 flex-1">
+              <p class="text-base font-semibold">Sarah Moreau</p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Groupe Avenir</span>
+                <span class="text-[11px] text-muted-foreground">• 14 ans • F</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Briefing — alerte rouge -->
+        <div class="mx-4 mb-3 rounded-2xl border-2 border-red-200 bg-red-50/30 p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="siren" class="h-4 w-4 text-red-500"></i>
+            <p class="text-sm font-semibold text-red-900">Briefing du jour</p>
+            <span class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-600 text-white uppercase tracking-wide">Attention</span>
+          </div>
+
+          <div class="flex items-center justify-between rounded-xl border border-red-200 bg-white px-3 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <span class="h-2.5 w-2.5 rounded-full dot-red"></span>
+              <div>
+                <p class="text-xs text-muted-foreground">Forme aujourd'hui</p>
+                <p class="text-sm font-semibold text-red-900">Faible — 3/10</p>
+              </div>
+            </div>
+            <span class="text-[11px] text-muted-foreground">saisi 07:02</span>
+          </div>
+
+          <div class="flex items-start justify-between rounded-xl border border-red-200 bg-white px-3 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <span class="h-2.5 w-2.5 rounded-full dot-red mt-1"></span>
+              <div>
+                <p class="text-xs text-muted-foreground">Douleurs actives</p>
+                <p class="text-sm font-semibold text-red-900">Lombaires · Genou D.</p>
+                <p class="text-[11px] text-red-700">5 signalements sur 7j</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-red-300 bg-red-100 px-3 py-2.5">
+            <div class="flex items-center gap-2">
+              <i data-lucide="ban" class="h-3.5 w-3.5 text-red-700"></i>
+              <p class="text-xs font-semibold text-red-900">Restriction forte</p>
+            </div>
+            <p class="text-[11px] text-red-900 mt-1 leading-snug">Kiné en cours — pas de plongeon, pas de démarrage explosif.</p>
+          </div>
+
+          <div class="flex items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5">
+            <i data-lucide="calendar-check" class="h-4 w-4 text-emerald-600"></i>
+            <p class="text-xs"><span class="font-semibold">Disponible</span> — séance prévue 17h30</p>
+          </div>
+        </div>
+
+        <!-- Charge -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="activity" class="h-4 w-4 text-blue-500"></i>
+            <p class="text-sm font-semibold">Charge récente</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="rounded-xl border border-red-200 bg-red-50 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-red-700 uppercase tracking-wide">ACWR</p>
+              <p class="text-base font-bold mt-0.5 text-red-900">1.48</p>
+              <span class="inline-block mt-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded bg-red-600 text-white">Risque</span>
+            </div>
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">Vol. 7j</p>
+              <p class="text-base font-bold mt-0.5">34 km</p>
+              <p class="text-[9px] text-red-600 mt-0.5">+42% vs moy</p>
+            </div>
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">Abs 30j</p>
+              <p class="text-base font-bold mt-0.5">0</p>
+              <p class="text-[9px] text-muted-foreground mt-0.5">séance</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Objectifs -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="target" class="h-4 w-4 text-amber-500"></i>
+            <p class="text-sm font-semibold">Objectifs en cours</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">50m DOS &lt; 32s · mai</span>
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">Retour compétition · juin</span>
+          </div>
+        </div>
+
+        <!-- Séance du jour -->
+        <div class="mx-4 mb-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="clipboard-list" class="h-4 w-4 text-primary"></i>
+              <p class="text-sm font-semibold text-primary">Séance d'aujourd'hui</p>
+            </div>
+            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary text-primary-foreground">17h30</span>
+          </div>
+          <p class="text-sm font-semibold mb-1">Récup active — 2.5 km</p>
+          <div class="text-xs text-muted-foreground space-y-0.5">
+            <p>• 400 éch. souple technique</p>
+            <p>• 6× 200 NL à 60%, R30''</p>
+            <p>• 400 retour calme</p>
+          </div>
+          <div class="mt-3 rounded-lg bg-red-50 border border-red-200 px-2.5 py-1.5 flex items-start gap-2">
+            <i data-lucide="alert-triangle" class="h-3.5 w-3.5 text-red-700 shrink-0 mt-0.5"></i>
+            <p class="text-[11px] text-red-900 leading-snug"><span class="font-semibold">Note titulaire :</span> surcharge sur 7j, si RPE &gt; 6 stopper. Pas de jambes planche.</p>
+          </div>
+        </div>
+
+        <div class="h-24"></div>
+
+        <div class="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-5 bg-gradient-to-t from-white via-white/95 to-white/0 border-t border-border/50">
+          <p class="text-[10px] text-muted-foreground text-center mb-2 leading-tight">
+            Vos saisies seront attribuées à <span class="font-semibold">vous</span> et visibles par le titulaire.
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="rounded-xl border bg-card px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-semibold active:bg-muted">
+              <i data-lucide="check-square" class="h-3.5 w-3.5"></i> Présence
+            </button>
+            <button class="rounded-xl bg-primary text-primary-foreground px-3 py-2.5 flex items-center justify-center gap-1.5 text-xs font-semibold">
+              <i data-lucide="message-square" class="h-3.5 w-3.5"></i> Commenter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- VARIANT 3 — SLOT VIDE (CTA Assigner une séance) -->
+  <!-- ============================================================== -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-xs font-semibold uppercase tracking-wider text-blue-700">Slot vide → assigner</span>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-scroll">
+
+        <div class="px-4 pt-4 pb-2">
+          <div class="flex items-center gap-3">
+            <button class="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center">
+              <i data-lucide="arrow-left" class="h-4 w-4"></i>
+            </button>
+            <div class="min-w-0 flex-1">
+              <p class="text-[11px] font-medium text-muted-foreground">Nageurs ›</p>
+              <h1 class="text-base font-bold truncate">Fiche nageur</h1>
+            </div>
+          </div>
+        </div>
+
+        <div class="mx-4 mt-1 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 flex items-center gap-2 ribbon-amber">
+          <div class="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+            <i data-lucide="shield-alert" class="h-4 w-4 text-amber-700"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-amber-900">Mode dépannage</p>
+            <p class="text-[11px] text-amber-800/80 leading-tight">Ce nageur n'est pas dans vos prises en charge.</p>
+          </div>
+        </div>
+
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-3">
+            <div class="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">A</div>
+            <div class="min-w-0 flex-1">
+              <p class="text-base font-semibold">Anna Dubois</p>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Groupe Espoir</span>
+                <span class="text-[11px] text-muted-foreground">• 15 ans • F</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Briefing standard -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="siren" class="h-4 w-4 text-red-500"></i>
+            <p class="text-sm font-semibold">Briefing du jour</p>
+          </div>
+          <div class="flex items-center justify-between rounded-xl border bg-muted/30 px-3 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <span class="h-2.5 w-2.5 rounded-full dot-green"></span>
+              <div>
+                <p class="text-xs text-muted-foreground">Forme aujourd'hui</p>
+                <p class="text-sm font-semibold">Correcte — 7/10</p>
+              </div>
+            </div>
+            <span class="text-[11px] text-muted-foreground">saisi 08:40</span>
+          </div>
+          <div class="flex items-center gap-2.5 rounded-xl border bg-emerald-50/40 border-emerald-200 px-3 py-2.5">
+            <i data-lucide="check-circle-2" class="h-4 w-4 text-emerald-600"></i>
+            <p class="text-xs"><span class="font-semibold text-emerald-900">Aucune douleur</span> <span class="text-emerald-800/80">signalée sur 7j</span></p>
+          </div>
+        </div>
+
+        <!-- Charge -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="activity" class="h-4 w-4 text-blue-500"></i>
+            <p class="text-sm font-semibold">Charge récente</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">ACWR</p>
+              <p class="text-base font-bold mt-0.5">0.95</p>
+              <span class="inline-block mt-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">OK</span>
+            </div>
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">Vol. 7j</p>
+              <p class="text-base font-bold mt-0.5">22 km</p>
+              <p class="text-[9px] text-muted-foreground mt-0.5">≈ moy</p>
+            </div>
+            <div class="rounded-xl border bg-muted/30 px-2.5 py-2 text-center">
+              <p class="text-[10px] text-muted-foreground uppercase tracking-wide">Abs 30j</p>
+              <p class="text-base font-bold mt-0.5">0</p>
+              <p class="text-[9px] text-muted-foreground mt-0.5">séance</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ BLOC SÉANCE — SLOT VIDE (CTA ASSIGNER) ★ -->
+        <div class="mx-4 mb-3 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="clipboard-list" class="h-4 w-4 text-primary"></i>
+              <p class="text-sm font-semibold text-primary">Créneau d'aujourd'hui</p>
+            </div>
+            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">18h30</span>
+          </div>
+          <div class="flex items-start gap-2 mb-3">
+            <i data-lucide="info" class="h-3.5 w-3.5 text-primary shrink-0 mt-0.5"></i>
+            <p class="text-xs text-slate-700 leading-snug">Créneau prévu mais <span class="font-semibold">aucune séance accrochée</span> par le coach titulaire.</p>
+          </div>
+          <button class="w-full rounded-xl bg-primary text-primary-foreground px-3 py-2.5 flex items-center justify-center gap-2 text-xs font-semibold shadow-sm">
+            <i data-lucide="plus-circle" class="h-4 w-4"></i>
+            Assigner une séance
+          </button>
+          <p class="mt-2 text-[10px] text-slate-500 text-center leading-tight">
+            Bibliothèque du club ou création ad-hoc — attribution visible par le titulaire.
+          </p>
+        </div>
+
+        <!-- Objectifs -->
+        <div class="mx-4 mb-3 rounded-2xl border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="target" class="h-4 w-4 text-amber-500"></i>
+            <p class="text-sm font-semibold">Objectifs en cours</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">200m DOS &lt; 2:28 · juin</span>
+            <span class="text-[11px] font-medium px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">Gainage +30s</span>
+          </div>
+        </div>
+
+        <div class="h-24"></div>
+
+        <!-- Footer sticky — actions masquées tant que pas de séance -->
+        <div class="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-5 bg-gradient-to-t from-white via-white/95 to-white/0 border-t border-border/50">
+          <div class="rounded-xl border border-dashed bg-muted/30 px-3 py-2.5 flex items-center gap-2">
+            <i data-lucide="lock" class="h-3.5 w-3.5 text-slate-400 shrink-0"></i>
+            <p class="text-[11px] text-muted-foreground leading-tight">
+              Présence et commentaire disponibles <span class="font-semibold">après assignation</span> d'une séance.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- VARIANT 4 — DRAWER D'ASSIGNATION (visible) -->
+  <!-- ============================================================== -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-xs font-semibold uppercase tracking-wider text-indigo-700">Drawer assignation</span>
+    <div class="phone">
+      <div class="phone-notch"></div>
+
+      <!-- Scrim derrière le drawer -->
+      <div class="absolute inset-0 bg-black/40 z-10"></div>
+
+      <!-- Phone content (estompé) -->
+      <div class="phone-scroll opacity-60">
+        <div class="mx-4 mt-10 h-24 rounded-2xl bg-slate-200"></div>
+        <div class="mx-4 mt-3 h-40 rounded-2xl bg-slate-200"></div>
+        <div class="mx-4 mt-3 h-32 rounded-2xl bg-slate-200"></div>
+      </div>
+
+      <!-- Drawer bottom sheet -->
+      <div class="absolute left-0 right-0 bottom-0 z-20 bg-white rounded-t-3xl shadow-2xl max-h-[85%] flex flex-col">
+        <!-- Handle -->
+        <div class="pt-2 pb-1 flex justify-center">
+          <div class="h-1 w-10 rounded-full bg-slate-300"></div>
+        </div>
+        <!-- Header -->
+        <div class="px-4 pt-2 pb-3 border-b border-border">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-base font-semibold">Assigner une séance</p>
+              <p class="text-[11px] text-muted-foreground">Anna Dubois • aujourd'hui 18h30</p>
+            </div>
+            <button class="h-8 w-8 rounded-lg hover:bg-muted flex items-center justify-center">
+              <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Tabs -->
+        <div class="px-4 pt-3 pb-2">
+          <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+            <button class="py-2 text-xs font-semibold rounded-lg bg-white shadow-sm">
+              <i data-lucide="library" class="inline h-3.5 w-3.5 mr-1 -mt-0.5"></i>
+              Bibliothèque
+            </button>
+            <button class="py-2 text-xs font-semibold rounded-lg text-muted-foreground">
+              <i data-lucide="file-plus" class="inline h-3.5 w-3.5 mr-1 -mt-0.5"></i>
+              Nouvelle
+            </button>
+          </div>
+        </div>
+        <!-- Search -->
+        <div class="px-4 pb-2">
+          <div class="relative">
+            <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"></i>
+            <input type="text" placeholder="Rechercher une séance..."
+              class="w-full text-xs rounded-lg border bg-muted/30 pl-8 pr-3 py-2 placeholder:text-muted-foreground" />
+          </div>
+        </div>
+        <!-- Sessions list -->
+        <div class="px-4 overflow-y-auto space-y-2 flex-1 pb-4">
+          <button class="w-full text-left rounded-xl border-2 border-primary bg-primary/5 px-3 py-2.5">
+            <div class="flex items-center justify-between mb-0.5">
+              <p class="text-xs font-semibold">Endurance aérobie</p>
+              <span class="text-[10px] font-medium text-primary">Sélectionné</span>
+            </div>
+            <p class="text-[11px] text-muted-foreground">4.2 km • ~75 min • 5 blocs</p>
+          </button>
+          <button class="w-full text-left rounded-xl border bg-card px-3 py-2.5">
+            <p class="text-xs font-semibold">Vitesse courte 25m</p>
+            <p class="text-[11px] text-muted-foreground mt-0.5">2.8 km • ~60 min • 4 blocs</p>
+          </button>
+          <button class="w-full text-left rounded-xl border bg-card px-3 py-2.5">
+            <p class="text-xs font-semibold">Technique 4 nages</p>
+            <p class="text-[11px] text-muted-foreground mt-0.5">3.5 km • ~70 min • 6 blocs</p>
+          </button>
+          <button class="w-full text-left rounded-xl border bg-card px-3 py-2.5">
+            <p class="text-xs font-semibold">Récup active</p>
+            <p class="text-[11px] text-muted-foreground mt-0.5">2.0 km • ~45 min • 3 blocs</p>
+          </button>
+          <button class="w-full text-left rounded-xl border bg-card px-3 py-2.5">
+            <p class="text-xs font-semibold">Fractionné 100m</p>
+            <p class="text-[11px] text-muted-foreground mt-0.5">3.2 km • ~65 min • 4 blocs</p>
+          </button>
+        </div>
+        <!-- Footer CTA -->
+        <div class="px-4 py-3 border-t border-border bg-white">
+          <button class="w-full rounded-xl bg-primary text-primary-foreground px-3 py-2.5 text-xs font-semibold shadow-sm">
+            Assigner au créneau 18h30
+          </button>
+          <p class="mt-1.5 text-[10px] text-muted-foreground text-center">
+            Attribué à Coach Martin (dépannage) — visible par le titulaire.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Légende -->
+<div class="max-w-4xl mx-auto px-8 pb-12">
+  <div class="rounded-2xl border bg-white p-5">
+    <h2 class="text-sm font-semibold mb-3">Décisions de design — rappel</h2>
+    <ul class="text-xs text-slate-700 space-y-1.5 leading-relaxed">
+      <li><strong class="text-amber-800">Bannière ambre</strong> informative (pas alarmante) — présente en permanence en haut pour rappeler le contexte dépannage.</li>
+      <li><strong class="text-red-700">Bloc briefing</strong> passe en bordure rouge 2px + fond pâle quand forme rouge <em>ou</em> douleur rouge <em>ou</em> restriction forte. Le titre prend un pastille "Attention" majuscule pour attirer l'œil en premier.</li>
+      <li><strong>Feu-tricolore</strong> vert / ambre / rouge sur les puces (forme, douleur) — codage couleur cohérent avec le reste de l'app.</li>
+      <li><strong>Bloc "Séance du jour"</strong> mis en avant avec bordure bleue 2px + fond primary/5 — c'est le pivot actionnable de l'écran.</li>
+      <li><strong>Note du titulaire</strong> toujours visible en ambre (normal) ou rouge (alerte) dans le bloc séance — c'est l'info la plus critique pour un remplaçant.</li>
+      <li><strong>Footer sticky</strong> 2 boutons + rappel d'attribution en texte gris clair (conformité GDPR, responsabilité).</li>
+      <li><strong>Slot vide</strong> → bloc en bordure <em>pointillée</em> primary avec CTA "Assigner une séance". Actions présence/commentaire <strong>verrouillées</strong> tant qu'aucune séance n'est accrochée (message "Présence et commentaire disponibles après assignation").</li>
+      <li><strong>Drawer bottom sheet</strong> (shadcn Sheet) à 2 onglets : Bibliothèque (réutilise `SlotSessionSheet`, déjà filtré sur séances non-assignées) et Nouvelle (form ad-hoc vierge).</li>
+      <li><strong>Si pas de slot du tout</strong> (jour off) → aucun bouton, message court "Pas de séance planifiée" (respect décision titulaire, hors scope dépannage).</li>
+      <li><strong>Icônes Lucide</strong> (déjà utilisées dans le projet), palette shadcn existante, radius <code class="text-[11px] bg-slate-100 px-1">2xl</code> cohérent avec la vue complète.</li>
+    </ul>
+  </div>
+</div>
+
+<script> lucide.createIcons(); </script>
+</body>
+</html>
