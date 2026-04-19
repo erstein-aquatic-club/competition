@@ -750,7 +750,7 @@ END;
 $$;
 
 -- =============================================================================
--- swim_planning_* overrides (§146, migration 00131) — individual planning for nageurs
+-- swim_planning_* overrides (migration 00131) — individual planning for nageurs
 --
 -- Mirrors prod policies from migration 00131: SELECT open to authenticated,
 -- WRITE restricted to coach/admin only. Athletes must NOT be able to INSERT,

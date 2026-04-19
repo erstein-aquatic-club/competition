@@ -47,13 +47,16 @@ describe("swim_planning_slot_overrides RLS", () => {
   });
 
   it("admin CAN insert an override", async () => {
-    await asUser(DIANA, async (c) => {
-      await c.query(
+    const inserted = await asUser(DIANA, async (c) => {
+      const r = await c.query<{ id: string }>(
         `INSERT INTO swim_planning_slot_overrides
            (athlete_id, week_start, day_of_week, time_slot, filiere)
-         VALUES (2, '2026-05-04', 0, 'morning', 'Aerobie')`,
+         VALUES (2, '2026-05-04', 0, 'morning', 'Aerobie')
+         RETURNING id`,
       );
+      return r.rows;
     });
+    expect(inserted).toHaveLength(1);
   });
 
   it("athlete sees all overrides (read is global)", async () => {
@@ -116,6 +119,43 @@ describe("swim_planning_slot_overrides RLS", () => {
     });
     expect(deleted.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("athlete CANNOT update an existing override (§113-style silent no-op)", async () => {
+    // Seed via service role
+    await asServiceRole(async (c) => {
+      await c.query(
+        `INSERT INTO swim_planning_slot_overrides
+           (athlete_id, week_start, day_of_week, time_slot, filiere)
+         VALUES (1, '2026-05-18', 2, 'morning', 'Aerobie')
+         ON CONFLICT DO NOTHING`,
+      );
+    });
+
+    const updated = await asUser(ALICE, async (c) => {
+      const r = await c.query<{ id: string }>(
+        `UPDATE swim_planning_slot_overrides
+           SET filiere = 'VMA'
+           WHERE athlete_id = 1 AND week_start = '2026-05-18'
+           RETURNING id`,
+      );
+      return r.rows;
+    });
+    expect(updated).toEqual([]);
+  });
+
+  it("coach CAN update an existing override", async () => {
+    const updated = await asUser(CAROL, async (c) => {
+      const r = await c.query<{ id: string; filiere: string }>(
+        `UPDATE swim_planning_slot_overrides
+           SET filiere = 'Force'
+           WHERE athlete_id = 1 AND week_start = '2026-05-18'
+           RETURNING id, filiere`,
+      );
+      return r.rows;
+    });
+    expect(updated.length).toBeGreaterThanOrEqual(1);
+    expect(updated[0].filiere).toBe("Force");
+  });
 });
 
 describe("swim_planning_week_overrides RLS", () => {
@@ -147,15 +187,18 @@ describe("swim_planning_week_overrides RLS", () => {
 
 describe("swim_planning_week_meta RLS", () => {
   it("coach CAN upsert group-level week meta", async () => {
-    await asUser(CAROL, async (c) => {
-      await c.query(
+    const inserted = await asUser(CAROL, async (c) => {
+      const r = await c.query<{ id: string }>(
         `INSERT INTO swim_planning_week_meta
            (group_id, week_start, week_type, notes)
          VALUES (1, '2026-05-04', 'Prepa', 'Charge montante')
          ON CONFLICT (group_id, week_start) DO UPDATE
-           SET week_type = excluded.week_type, notes = excluded.notes`,
+           SET week_type = excluded.week_type, notes = excluded.notes
+         RETURNING id`,
       );
+      return r.rows;
     });
+    expect(inserted).toHaveLength(1);
   });
 
   it("athlete CANNOT insert group-level week meta", async () => {
