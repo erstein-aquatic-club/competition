@@ -20,6 +20,7 @@ import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { eventCodeFromFfnName, ffnNamesFromEventCode, FFN_EVENTS, eventLabel } from "@/lib/objectiveHelpers";
+import { useLocation } from "wouter";
 
 type OneRmRecord = {
   exercise_id: number;
@@ -136,6 +137,7 @@ export default function Records() {
   const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
   const role = useAuth((s) => s.role);
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const prefersReducedMotion = useReducedMotion();
@@ -881,7 +883,18 @@ export default function Records() {
                     variant="yellow"
                     icon={<AlertCircle />}
                     label="IUF FFN non renseigné"
-                    sublabel={<>Renseignez votre numéro dans <a href="/#/profile" className="underline font-medium hover:text-foreground">votre profil</a></>}
+                    sublabel={
+                      <>
+                        Renseignez votre numéro dans{" "}
+                        <button
+                          type="button"
+                          onClick={() => navigate("/profile")}
+                          className="underline font-medium hover:text-foreground"
+                        >
+                          votre profil
+                        </button>
+                      </>
+                    }
                     visible={!profileQuery.isError && !userIuf && !profileQuery.isLoading}
                     animate={false}
                   />
