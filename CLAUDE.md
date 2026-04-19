@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §150 (UI coach — label KPI "sans assignation" + historique ressentis étendu : coach voit désormais tous les slots attendus dans l'onglet Ressentis avec badge "Assignée"/"Sans assignation"/"Hors planning" et placeholder "Pas de ressenti complété"; sélecteur fenêtre 30/60/90j).
+Dernière entrée en date : §151 (KPI Ressentis 30j v6 — `get_feedback_rates_all_athletes` rebasée : `feedback_count` compte désormais les slots attendus ayant au moins un feedback matché, pas le brut de `dim_sessions` ; François passe de 12/13 à 8/13 cohérent avec l'historique coach §150).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

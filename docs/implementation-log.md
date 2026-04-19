@@ -104,6 +104,40 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-19 — §151 KPI Ressentis 30j v6 : match expected slots uniquement
+
+**Branche** : `main`
+**Chantier ROADMAP** : §151 — alignement KPI avec historique §150
+
+### Contexte
+
+Après §150, le coach voit dans l'historique les slots attendus + les feedbacks "hors planning" (feedbacks sans slot attendu correspondant — ex: nageur venu un jour annulé/absent). Le KPI v5 comptait `feedback_count` comme le nombre brut de `dim_sessions` dans la fenêtre, ce qui inclut les feedbacks hors planning. Résultat : François affichait 12/13 (92%) alors que seulement 8/13 slots attendus avaient un feedback réel (62%). Incohérent avec ce que le coach voit.
+
+### Changements
+
+- Migration 00133 — `get_feedback_rates_all_athletes` v6 :
+  - `feedback_count` = nombre de slots attendus (swim, non-absent) ayant **au moins un feedback matché**.
+  - Matching identique à `SwimmerFeedbackTab` : priorité `assignment_id` (si les deux existent) > `(date, bucket)` avec mapping FR→EN (`Matin`→`morning`, `Soir`→`evening`).
+  - `assigned_count` et `total_slots` inchangés.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---|---|
+| `supabase/migrations/00133_feedback_rates_rpc_v6.sql` | nouveau — v6 RPC |
+
+### Tests
+
+- [x] `get_feedback_rates_all_athletes(30) WHERE athlete_id = 1` : `{assigned_count: 6, feedback_count: 8, total_slots: 13}` — cohérent avec les 5 "Pas de ressenti complété" de l'historique.
+- [ ] Tests RLS intégration non lancés — migration = fonction SQL SECURITY DEFINER (pas de policy touchée).
+
+### Décisions
+
+- **Dedup sur assignment_id** : pas de dedup explicite — si 2 slots partagent le même assignment_id (très improbable, 1 slot par bucket groupe), le feedback matcherait les 2 et compterait pour les 2. Acceptable pour v6.
+- **Feedbacks hors planning restent visibles** dans l'historique coach (§150) mais n'entrent plus dans le KPI. Si besoin ultérieur : ajouter une colonne `orphan_feedback_count` au RPC.
+
+---
+
 ## 2026-04-19 — §150 UI coach : label "sans assignation" + historique ressentis étendu
 
 **Branche** : `main`
