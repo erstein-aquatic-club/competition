@@ -10,6 +10,12 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SwimPlanningSlot, SwimFiliere, Competition } from "@/lib/api/types";
 import {
+  mergeSlots,
+  mergeWeekMeta,
+  type EffectiveSlot,
+  type EffectiveWeekMeta,
+} from "@/lib/swimPlanningMerge";
+import {
   FILIERES,
   FILIERE_MAP,
   FILIERE_STYLES,
@@ -102,13 +108,6 @@ function isCurrentWeek(weekKey: string): boolean {
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   return today >= monday && today <= sunday;
-}
-
-function getWeekMeta(groupId: number, weekKey: string): { weekType?: string; notes?: string } {
-  try {
-    const raw = localStorage.getItem(`swim-plan-meta-${groupId}-${weekKey}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
 }
 
 const INITIAL_WEEK_COUNT = 13;
@@ -209,6 +208,7 @@ export default function SwimPlanningAthleteView({
 }: SwimPlanningAthleteViewProps) {
   const isVisible = embedded || open;
   const userId = useAuth((s) => s.userId);
+  const me = userId;
 
   // ── Week generation (infinite scroll, same as coach) ──
   const startMonday = useMemo(() => getMonday(new Date()), []);
@@ -270,13 +270,56 @@ export default function SwimPlanningAthleteView({
     return map;
   }, [slots]);
 
+  // ── Per-athlete overrides (slots + week meta) + group week meta ──
+  // The swimmer's own view merges what the coach configured personally for
+  // them on top of the group plan. The swimmer cannot edit — read-only.
+  const { data: myOverrides = [] } = useQuery({
+    queryKey: ["swim-planning-slot-overrides", me, visibleWeekKeys],
+    queryFn: () => api.getSwimPlanningSlotOverrides({ athleteId: me!, weekStarts: visibleWeekKeys }),
+    enabled: isVisible && me != null && visibleWeekKeys.length > 0,
+    staleTime: 15_000,
+  });
+
+  const { data: groupWeekMeta = [] } = useQuery({
+    queryKey: ["swim-planning-week-meta", groupId, visibleWeekKeys],
+    queryFn: () => api.getSwimPlanningWeekMeta({ groupId: groupId!, weekStarts: visibleWeekKeys }),
+    enabled: isVisible && groupId != null && visibleWeekKeys.length > 0,
+    staleTime: 15_000,
+  });
+
+  const { data: myWeekOverrides = [] } = useQuery({
+    queryKey: ["swim-planning-week-overrides", me, visibleWeekKeys],
+    queryFn: () => api.getSwimPlanningWeekOverrides({ athleteId: me!, weekStarts: visibleWeekKeys }),
+    enabled: isVisible && me != null && visibleWeekKeys.length > 0,
+    staleTime: 15_000,
+  });
+
+  const effectiveSlotsByWeek = useMemo(() => {
+    const map = new Map<string, EffectiveSlot[]>();
+    for (const w of visibleWeekKeys) {
+      const groupSlots = slotsByWeek.get(w) ?? [];
+      const overrides = myOverrides.filter((o) => o.week_start === w);
+      map.set(w, mergeSlots(groupSlots, overrides));
+    }
+    return map;
+  }, [slotsByWeek, myOverrides, visibleWeekKeys]);
+
+  const getEffectiveWeekMeta = useCallback(
+    (weekKey: string): EffectiveWeekMeta => {
+      const g = groupWeekMeta.find((m) => m.week_start === weekKey) ?? null;
+      const a = myWeekOverrides.find((o) => o.week_start === weekKey) ?? null;
+      return mergeWeekMeta(g, a);
+    },
+    [groupWeekMeta, myWeekOverrides],
+  );
+
   const findSlot = useCallback(
-    (weekKey: string, dayIndex: number, timeSlot: "morning" | "evening"): SwimPlanningSlot | undefined => {
-      const weekSlots = slotsByWeek.get(weekKey);
+    (weekKey: string, dayIndex: number, timeSlot: "morning" | "evening"): EffectiveSlot | undefined => {
+      const weekSlots = effectiveSlotsByWeek.get(weekKey);
       if (!weekSlots) return undefined;
       return weekSlots.find((s) => s.day_of_week === dayIndex && s.time_slot === timeSlot);
     },
-    [slotsByWeek],
+    [effectiveSlotsByWeek],
   );
 
   // ── DB filières (description, examples) ──
@@ -422,11 +465,12 @@ export default function SwimPlanningAthleteView({
               weeks.map((week) => {
                 const current = isCurrentWeek(week.weekKey);
                 const expanded = expandedWeekKey === week.weekKey;
-                const meta = getWeekMeta(groupId, week.weekKey);
-                const weekSlots = slotsByWeek.get(week.weekKey) ?? [];
+                const meta = getEffectiveWeekMeta(week.weekKey);
+                const weekSlots = effectiveSlotsByWeek.get(week.weekKey) ?? [];
                 const filledCount = weekSlots.length;
                 const weekCompetitions = competitionsByWeek.get(week.weekKey) ?? [];
                 const hasCompetition = weekCompetitions.length > 0;
+                const weekMetaOverridden = meta.source === "athlete";
 
                 return (
                   <div key={week.weekKey} className="relative pl-8 mb-2">
@@ -460,15 +504,24 @@ export default function SwimPlanningAthleteView({
                             <span className="text-[11px] text-muted-foreground">
                               {fmtDD_MM(week.monday)} &ndash; {fmtDD_MM(week.sunday)}
                             </span>
-                            {meta.weekType && (
+                            {meta.week_type && (
                               <Badge
                                 className="text-[10px] px-1.5 py-0 border-0 shrink-0"
                                 style={{
-                                  backgroundColor: weekTypeColor(meta.weekType),
-                                  color: weekTypeTextColor(meta.weekType),
+                                  backgroundColor: weekTypeColor(meta.week_type),
+                                  color: weekTypeTextColor(meta.week_type),
                                 }}
                               >
-                                {meta.weekType}
+                                {meta.week_type}
+                              </Badge>
+                            )}
+                            {weekMetaOverridden && (
+                              <Badge
+                                variant="outline"
+                                className="h-4 px-1 text-[9px] border-primary/40 text-primary shrink-0"
+                                title="Personnalisé par ton coach"
+                              >
+                                Perso
                               </Badge>
                             )}
                             {filledCount > 0 && (
@@ -905,7 +958,7 @@ function ReadOnlySlotCell({
   slot,
   onTap,
 }: {
-  slot: SwimPlanningSlot | undefined;
+  slot: EffectiveSlot | undefined;
   onTap: (filiereId: string, hasSession: boolean) => void;
 }) {
   if (!slot) {
@@ -920,6 +973,7 @@ function ReadOnlySlotCell({
   const color = filiere?.color ?? "sky";
   const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
   const hasSession = !!slot.session_id;
+  const overridden = slot.overridden === true;
 
   return (
     <button
@@ -934,6 +988,15 @@ function ReadOnlySlotCell({
       <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
         {filiere?.short ?? slot.filiere}
       </span>
+      {overridden && (
+        <Badge
+          variant="outline"
+          className="absolute -top-1 -left-1 h-3.5 px-1 text-[8px] leading-none border-primary/40 bg-background text-primary shrink-0"
+          title="Personnalisé par ton coach"
+        >
+          Perso
+        </Badge>
+      )}
       {hasSession && (
         <Link2
           className={cn("absolute top-0.5 right-0.5 h-[10px] w-[10px]", style.text, "opacity-60")}
