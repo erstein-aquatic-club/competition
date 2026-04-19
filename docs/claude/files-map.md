@@ -163,7 +163,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/SwimSessionView.tsx` | Vue détail séance natation | ~500 lignes |
 | `src/pages/SwimNotes.tsx` | Notes techniques nage | ~306 lignes |
 | `src/pages/coach/SwimPlanningAthleteView.tsx` | Vue planning athlète (coach) | ~914 lignes |
-| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation (éditeur filières extrait en composant lazy §134) | ~1462 lignes |
+| `src/pages/coach/SwimPlanningDemo.tsx` | Démo planning natation (éditeur filières extrait en composant lazy §134 ; timeline extraite dans `SwimPlanningTimeline` Task 5) | ~907 lignes |
+| `src/components/coach/swim/SwimPlanningTimeline.tsx` | Timeline semaines + micro-grille jour × créneau + chips filière + edit-meta inline + compétitions (présentationnel, partagé coach/nageur) | ~691 lignes |
+| `src/components/coach/swim/swimPlanningShared.ts` | Helpers/constantes partagés timeline swim (WeekInfo, DAY_ROWS, getMonday, generateWeeks, fmtDD_MM, isCurrentWeek) | ~75 lignes |
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach | ~264 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
