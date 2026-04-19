@@ -48,10 +48,10 @@ import {
    Props
    ═══════════════════════════════════════════════════════════════════ */
 
-export interface SwimPlanningTimelineProps {
+export interface SwimPlanningTimelineProps<S extends EffectiveSlot = EffectiveSlot> {
   mode: "group" | "athlete";
   weeks: WeekInfo[];
-  slotsByWeek: Map<string, EffectiveSlot[]>;
+  slotsByWeek: Map<string, S[]>;
   competitionsByWeek: Map<string, Competition[]>;
   expandedWeekKey: string | null;
   onToggleWeek: (weekKey: string) => void;
@@ -85,7 +85,6 @@ export interface SwimPlanningTimelineProps {
   getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
   sessionNameMap: Map<string, string>;
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
-  readOnly?: boolean;
   showOverrideBadge?: boolean;
   isLoading?: boolean;
   isEmpty?: boolean;
@@ -95,7 +94,9 @@ export interface SwimPlanningTimelineProps {
    Component
    ═══════════════════════════════════════════════════════════════════ */
 
-export default function SwimPlanningTimeline(props: SwimPlanningTimelineProps) {
+export default function SwimPlanningTimeline<S extends EffectiveSlot = EffectiveSlot>(
+  props: SwimPlanningTimelineProps<S>,
+) {
   const {
     mode,
     weeks,
@@ -683,7 +684,7 @@ function SlotCell({
         {overridden && (
           <User
             aria-label="Filière individuelle"
-            className="absolute -top-0.5 -right-0.5 h-3 w-3 text-primary bg-background rounded-full p-[1px] ring-1 ring-primary/50"
+            className="absolute top-0.5 right-0.5 h-3 w-3 text-primary bg-background rounded-full p-[1px] ring-1 ring-primary/50"
           />
         )}
       </button>

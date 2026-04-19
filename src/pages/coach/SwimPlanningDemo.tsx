@@ -491,7 +491,7 @@ export default function SwimPlanningDemo() {
       <SwimPlanningTimeline
         mode="group"
         weeks={weeks}
-        slotsByWeek={slotsByWeek as Map<string, EffectiveSlot[]>}
+        slotsByWeek={slotsByWeek}
         competitionsByWeek={competitionsByWeek}
         expandedWeekKey={expandedWeekKey}
         onToggleWeek={(weekKey) =>
