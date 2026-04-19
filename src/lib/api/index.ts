@@ -150,6 +150,7 @@ export {
   assignments_delete,
   deriveScheduledSlot,
   bulkCreateSlotAssignments,
+  assignIndividualSession,
   getSlotAssignments,
   updateSlotVisibility,
   deleteSlotAssignments,

@@ -426,6 +426,50 @@ export async function bulkCreateSlotAssignments(params: {
   return { created: data?.length ?? 0, preservedIndividuals };
 }
 
+/**
+ * Assign a swim session to a single swimmer on a specific training slot+date.
+ *
+ * Unlike `assignments_create` (generic group/user inserter), this helper is
+ * slot-aware: it writes `training_slot_id` so the session shows up on the
+ * swimmer's personalised calendar (§144). Relies on the unique index
+ * `idx_sa_unique_slot_user_v1` (migration 00130) to prevent duplicates.
+ */
+export async function assignIndividualSession(params: {
+  swimCatalogId: number;
+  trainingSlotId: string;
+  scheduledDate: string;
+  targetUserId: number;
+  scheduledSlot: "morning" | "evening";
+  visibleFrom: string | null;
+  assignedBy: number;
+}): Promise<{ assignmentId: number }> {
+  if (!canUseSupabase()) throw new Error("Connexion indisponible");
+
+  const { data, error } = await supabase
+    .from("session_assignments")
+    .insert({
+      assignment_type: "swim" as const,
+      swim_catalog_id: params.swimCatalogId,
+      target_user_id: params.targetUserId,
+      scheduled_date: params.scheduledDate,
+      scheduled_slot: params.scheduledSlot,
+      training_slot_id: params.trainingSlotId,
+      visible_from: params.visibleFrom,
+      assigned_by: params.assignedBy,
+      status: "assigned",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      throw new Error("Ce nageur a déjà une séance individuelle sur ce créneau");
+    }
+    throw new Error(error.message);
+  }
+  return { assignmentId: (data as { id: number }).id };
+}
+
 /** Get all slot-linked assignments for a date range (coach view) */
 export async function getSlotAssignments(params: {
   from: string;
