@@ -491,7 +491,7 @@ export default function CoachSwimmerDetail({
               <Clock className="h-4 w-4 text-blue-500" />
               <h2 className="text-sm font-semibold">Ressentis séances</h2>
             </div>
-            <SwimmerFeedbackTab athleteId={athleteId} athleteName={displayName} showProgressAction={false} />
+            <SwimmerFeedbackTab athleteId={athleteId} athleteName={displayName} showProgressAction={false} showExpectedSlots />
           </section>
         </TabsContent>
 

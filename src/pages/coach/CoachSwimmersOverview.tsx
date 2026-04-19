@@ -170,7 +170,7 @@ function FeedbackRateKPI({
       {coachGap > 0 && (
         <div className="flex justify-end">
           <span className="inline-flex items-center gap-0.5 rounded-md bg-orange-100 dark:bg-orange-950/30 px-1.5 py-0.5 text-[9px] font-semibold text-orange-700 dark:text-orange-400">
-            ⚠ {coachGap} non planifié{coachGap > 1 ? "s" : ""}
+            ⚠ {coachGap} sans assignation{coachGap > 1 ? "s" : ""}
           </span>
         </div>
       )}

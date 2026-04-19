@@ -104,6 +104,49 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-19 — §150 UI coach : label "sans assignation" + historique ressentis étendu
+
+**Branche** : `main`
+**Chantier ROADMAP** : §150 — polish UI suite §149
+
+### Contexte
+
+Deux améliorations UI côté coach demandées suite à §149 :
+1. Le badge "⚠ N non planifié(s)" sur la card nageur KPI Ressentis 30j prête à confusion (peut laisser croire qu'il s'agit d'absences planifiées). Renommer en "sans assignation".
+2. L'historique des ressentis (onglet Échanges > Ressentis séances, coach view) ne montre que les feedbacks soumis (`dim_sessions`). Le coach veut voir **tous les slots attendus** dans la fenêtre : ceux avec feedback ET ceux sans feedback (placeholder "Pas de ressenti complété") + badge "Assignée" / "Sans assignation" / "Hors planning".
+
+### Changements
+
+1. **Label KPI** : `src/pages/coach/CoachSwimmersOverview.tsx:173` — "non planifié(s)" → "sans assignation(s)".
+
+2. **Historique ressentis étendu** (`src/pages/coach/SwimmerFeedbackTab.tsx`) :
+   - Nouveau prop `showExpectedSlots?: boolean` (default false). Activé uniquement sur coach view (`CoachSwimmerDetail.tsx`).
+   - Nouveau prop `windowDays` state (30/60/90j, default 30). Sélecteur pills en haut du tab.
+   - Quand activé : fetch `getSwimmerSessions(athleteId, window)` + `getSessions(athleteName, athleteId)`, merge par priorité `assignment_id` > `(date, bucket)`.
+   - Feedbacks sans slot attendu (ex : nageur venu un jour non prévu) : affichés à leur date avec badge "Hors planning".
+   - Slots attendus sans feedback : card pointillée avec "Pas de ressenti complété".
+   - Vue nageur (`AthletePerformanceHub`) inchangée — prop non passé.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---|---|
+| `src/pages/coach/CoachSwimmersOverview.tsx` | label KPI |
+| `src/pages/coach/SwimmerFeedbackTab.tsx` | prop `showExpectedSlots`, window selector, merge logic, placeholder render |
+| `src/pages/coach/CoachSwimmerDetail.tsx` | passe `showExpectedSlots` sur le tab Ressentis |
+
+### Tests
+
+- [x] `npx tsc --noEmit` : OK
+- [x] Vérif manuelle UI via browser à faire (François KPI badge + tab Ressentis coach view)
+
+### Limites
+
+- Mapping bucket FR/EN fragile : `dim_sessions.time_slot` stocké en FR ("Matin"/"Soir"), `get_swimmer_sessions.bucket` en EN ("morning"/"evening"). Fonction `mapTimeSlotToBucket` accepte les deux.
+- Pas de pagination sur les merged entries (fenêtre 30j devrait rester lisible ; 90j peut produire ~50-70 entrées pour un nageur actif).
+
+---
+
 ## 2026-04-19 — §149 Cascade annulation bucket swim → slots personnalisés
 
 **Branche** : `main`
