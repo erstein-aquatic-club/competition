@@ -53,6 +53,7 @@ function writePending(items: PendingChronoSave[]): void {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
   } catch {
     // Quota exceeded — drop oldest and retry once
+    console.warn("[chrono-save-queue] quota exceeded, keeping 10 newest");
     localStorage.setItem(QUEUE_KEY, JSON.stringify(items.slice(-10)));
   }
 }
@@ -88,7 +89,11 @@ export async function flush(): Promise<{ succeeded: number; failed: number }> {
     }
   }
 
-  if (retained.length > 0) writePending(retained);
+  // Merge retained with any items enqueued concurrently during replay.
+  // Keep retained first (older) then concurrent (newer) so FIFO-ish order is preserved.
+  const concurrent = getPending();
+  const merged = [...retained, ...concurrent];
+  writePending(merged);
   notifySubscribers();
   return { succeeded, failed };
 }
