@@ -9895,3 +9895,56 @@ L'onglet `Bibliothèque` est inline dans le même sheet (plus de `SlotTemplatePi
 - Le parser (`parseSwimText`) reste dépendant du format attendu ; si le coach colle un texte mal structuré, le feedback est un bandeau "Aucun bloc reconnu" sans indiquer précisément la ligne fautive. La détection plus fine est dans `detectTextWarnings` (déjà utilisée dans le builder complet) — on pourrait la remonter dans le quick-compose plus tard si le besoin émerge.
 - Pas de preview de la durée réelle basée sur allures du nageur — l'estimation `~ XX′` utilise un ratio plat 2 min / 100 m. Suffisant pour un ordre de grandeur.
 - Si le coach colle un texte, clique "Créer & assigner" avec succès, puis ré-ouvre le même créneau et tente une nouvelle compose sur un autre groupe : `bulkCreateSlotAssignments` rejette (unique constraint). Comportement attendu mais l'erreur est affichée via toast générique. Amélioration UX possible : détecter le cas et proposer "Remplacer l'assignation existante".
+
+## §143 — Vue semaine coach : fallback d'attributs pour swimmer_slots sans source (2026-04-19)
+
+### Contexte
+
+Après §139, le bug d'héritage persistait pour François sur jeudi et vendredi. Diagnostic DB :
+
+```
+user_id=1 (François WAGNER), swimmer_training_slots :
+- day 4 (jeudi) 18:00 swim Piscine → source_assignment_id = NULL
+- day 5 (vendredi) 18:00 swim Piscine → source_assignment_id = NULL
+```
+
+Ces deux slots ont été créés manuellement (pas via `initSwimmerSlots` template) donc aucun lien `source_assignment_id → training_slot_id`. Mon §139 retournait `originalSlot = undefined` → slot vide.
+
+Le groupe Elite a pourtant bien des training_slots jeudi 18:00 et vendredi 17:00 avec des session_assignments assignées aux 09/04 et 10/04.
+
+### Changements
+
+Ajout d'un fallback `findGroupTrainingSlotByAttributes` dans `slotInstancesById` :
+
+Si `source_assignment_id` est NULL ou son training_slot_assignment a été supprimé, chercher un `training_slot` qui :
+- a le même `day_of_week` que le swimmer_slot,
+- a le même `session_type`,
+- a la même tranche horaire (morning < 13h / evening ≥ 13h),
+- est assigné à au moins un des groupes (permanents ou temporaires) du nageur.
+
+Tie-breaker : distance minimale entre `start_time` du candidat et du swimmer_slot. Si aucun candidat : slot reste vide (comportement existant).
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | ajout fallback findGroupTrainingSlotByAttributes | ~3351 lignes (vs ~3215 après §139) |
+
+### Tests
+
+- `npx tsc --noEmit` → 0 erreur sur mon fichier.
+- Vérification DB pour François (user_id=1) :
+  - Elite (group_id=1) a `training_slots` :
+    - `f8d0a408-…` jeu 18:00-20:00 swim → matche swimmer_slot jeu 18:00. session_assignment 244 assignée 2026-04-09 evening.
+    - `463e18f8-…` ven 17:00-19:00 swim → matche swimmer_slot ven 18:00 (bucket evening). session_assignment 247 assignée 2026-04-10 evening.
+
+### Décisions
+
+- **Groupes permanents ET temporaires** dans le fallback (pas seulement `visibleGroupIds`) : la vue coach est historique, on veut voir ce que le groupe faisait à la date ciblée, peu importe si le nageur est en stage aujourd'hui.
+- **Filtrer par bucket (morning/evening)** plutôt que par start_time exact : les coaches peuvent changer légèrement les horaires, le bucket reste stable.
+- **Tie-breaker par distance temporelle** : si deux training_slots existent dans le même bucket le même jour, on prend celui dont `start_time` est le plus proche du swimmer_slot.
+
+### Limites
+
+- Un swimmer_slot qui ne correspond à aucun training_slot de ses groupes reste vide (correct : rien à hériter).
+- Si le nageur a quitté un groupe, les assignations historiques vers cet ancien groupe ne sont plus inheritées (appartenance groupe actuelle fait foi). Acceptable pour simplicité.

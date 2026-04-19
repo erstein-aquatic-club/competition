@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§142 Vue semaine coach — quick-compose séance sur créneau vide)*
+*Dernière mise à jour : 2026-04-19 (§143 Vue semaine coach — fallback d'attributs pour swimmer_slots sans source)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -89,6 +89,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 104 | Chantier B — quick wins perf frontend (staleTime, queryKey stable, select ciblés) | Haute | Faible | Fait (§140) |
 | 105 | Chantier C — optimisation backend Supabase (index cron, consolidation RLS, drop 11 indexes) | Haute | Moyenne | Fait (§141) |
 | 106 | Vue semaine coach — quick-compose séance sur créneau vide (2 clics vs 8) | Haute | Moyenne | Fait (§142) |
+| 107 | Vue semaine coach — fallback d'attributs pour swimmer_slots sans source | Haute | Faible | Fait (§143) |
 
 ---
 

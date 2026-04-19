@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §142 (Vue semaine coach — quick-compose séance sur créneau vide : 2 clics au lieu de 8, mutation chaînée create+assign, bibliothèque inline).
+Dernière entrée en date : §143 (Vue semaine coach — fallback d'attributs pour swimmer_slots sans source_assignment_id : créneaux persos créés manuellement héritent aussi).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
