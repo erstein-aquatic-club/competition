@@ -176,10 +176,22 @@ export default function SwimPlanningDemo() {
     queryFn: () => api.getCompetitions(),
   });
 
+  // In athlete mode, filter to only that athlete's assigned competitions.
+  const { data: athleteCompetitionIds = [] } = useQuery({
+    queryKey: ["my-competition-ids", selectedAthleteId],
+    queryFn: () => api.getMyCompetitionIds(selectedAthleteId),
+    enabled: selectedAthleteId != null,
+  });
+
+  const visibleCompetitions = useMemo(() => {
+    if (selectedAthleteId == null) return allCompetitions;
+    return allCompetitions.filter((c) => athleteCompetitionIds.includes(c.id));
+  }, [allCompetitions, athleteCompetitionIds, selectedAthleteId]);
+
   // Group competitions by week key (Monday ISO). Multi-day comps span all weeks they touch.
   const competitionsByWeek = useMemo(() => {
     const map = new Map<string, Competition[]>();
-    for (const c of allCompetitions) {
+    for (const c of visibleCompetitions) {
       if (!c.date) continue;
       const start = new Date(c.date.slice(0, 10) + "T00:00:00");
       const end = c.end_date
@@ -204,7 +216,7 @@ export default function SwimPlanningDemo() {
       d.setDate(weekMonday.getDate() + dayIndex);
       d.setHours(0, 0, 0, 0);
       const t = d.getTime();
-      return allCompetitions.filter((c) => {
+      return visibleCompetitions.filter((c) => {
         if (!c.date) return false;
         const start = new Date(c.date.slice(0, 10) + "T00:00:00").getTime();
         const end = c.end_date
@@ -213,7 +225,7 @@ export default function SwimPlanningDemo() {
         return t >= start && t <= end;
       });
     },
-    [allCompetitions],
+    [visibleCompetitions],
   );
 
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);

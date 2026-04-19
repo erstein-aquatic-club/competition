@@ -12,12 +12,12 @@
  * training_cycles/training_weeks which are deprecated by the
  * swim_planning_slots + overrides model — §149 individual swim planning).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
-import type { SwimPlanningSlot } from "@/lib/api/types";
+import type { SwimPlanningSlot, Competition } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import SwimPlanningTimeline from "@/components/coach/swim/SwimPlanningTimeline";
 import {
@@ -70,6 +70,61 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
     }
     return m;
   }, [groupSlots]);
+
+  // ── Competitions assigned to this athlete ─────────────────────────
+  const { data: allCompetitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: () => api.getCompetitions(),
+  });
+
+  const { data: athleteCompetitionIds = [] } = useQuery({
+    queryKey: ["my-competition-ids", athleteId],
+    queryFn: () => api.getMyCompetitionIds(athleteId),
+  });
+
+  const athleteCompetitions = useMemo(
+    () => allCompetitions.filter((c) => athleteCompetitionIds.includes(c.id)),
+    [allCompetitions, athleteCompetitionIds],
+  );
+
+  const competitionsByWeek = useMemo(() => {
+    const map = new Map<string, Competition[]>();
+    for (const c of athleteCompetitions) {
+      if (!c.date) continue;
+      const start = new Date(c.date.slice(0, 10) + "T00:00:00");
+      const end = c.end_date
+        ? new Date(c.end_date.slice(0, 10) + "T00:00:00")
+        : start;
+      const cursor = getMonday(start);
+      const endMonday = getMonday(end);
+      while (cursor.getTime() <= endMonday.getTime()) {
+        const key = cursor.toISOString().split("T")[0];
+        const arr = map.get(key) ?? [];
+        arr.push(c);
+        map.set(key, arr);
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    }
+    return map;
+  }, [athleteCompetitions]);
+
+  const getDayCompetitions = useCallback(
+    (weekMonday: Date, dayIndex: number): Competition[] => {
+      const d = new Date(weekMonday);
+      d.setDate(weekMonday.getDate() + dayIndex);
+      d.setHours(0, 0, 0, 0);
+      const t = d.getTime();
+      return athleteCompetitions.filter((c) => {
+        if (!c.date) return false;
+        const start = new Date(c.date.slice(0, 10) + "T00:00:00").getTime();
+        const end = c.end_date
+          ? new Date(c.end_date.slice(0, 10) + "T00:00:00").getTime()
+          : start;
+        return t >= start && t <= end;
+      });
+    },
+    [athleteCompetitions],
+  );
 
   // ── Athlete-mode hook: merge group base with per-athlete overrides ─
   // `syncUrl: false` — we don't want this embedded panel to scribble
@@ -138,7 +193,7 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
         readOnly
         weeks={weeks}
         slotsByWeek={mode.effectiveSlotsByWeek}
-        competitionsByWeek={new Map()}
+        competitionsByWeek={competitionsByWeek}
         expandedWeekKey={expandedWeekKey}
         onToggleWeek={toggleWeek}
         getWeekMeta={(weekKey) => {
@@ -161,7 +216,7 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
         onEditTypeChange={() => {}}
         onEditNotesChange={() => {}}
         onSlotClick={() => {}}
-        getDayCompetitions={() => []}
+        getDayCompetitions={getDayCompetitions}
         sessionNameMap={new Map()}
         showOverrideBadge
       />
