@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Session, Assignment } from "@/lib/api";
-import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
-import type { SwimmerTrainingSlot } from "@/lib/api/types";
+import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
+import type { SwimmerSession, SwimmerTrainingSlot } from "@/lib/api/types";
 import {
   assignmentIso,
   assignmentPlannedKm,
@@ -70,15 +70,50 @@ export function useDashboardSessions({ sessions, assignments, userId, swimmerSlo
 
   const datesNeedingResolution = useMemo(() => {
     if (!hasSwimmerSlots || !userId) return [] as string[];
-    return Array.from(assignmentsByIso.keys());
+    return Array.from(assignmentsByIso.keys()).sort();
   }, [hasSwimmerSlots, userId, assignmentsByIso]);
 
-  const { data: resolvedByDate, isLoading: isResolvingAssignments } = useQuery({
-    queryKey: ["resolved-assignments-batch", userId, datesNeedingResolution],
-    queryFn: () => resolveSwimmerAssignmentsBatch(userId!, datesNeedingResolution),
-    enabled: !!userId && datesNeedingResolution.length > 0,
+  const resolutionRange = useMemo(() => {
+    if (datesNeedingResolution.length === 0) return null;
+    return {
+      from: datesNeedingResolution[0]!,
+      to: datesNeedingResolution[datesNeedingResolution.length - 1]!,
+    };
+  }, [datesNeedingResolution]);
+
+  const { data: swimmerSessionsData, isLoading: isResolvingAssignments } = useQuery({
+    queryKey: [
+      "swimmer-sessions",
+      userId,
+      resolutionRange?.from ?? null,
+      resolutionRange?.to ?? null,
+    ],
+    queryFn: () =>
+      getSwimmerSessions(userId!, resolutionRange!.from, resolutionRange!.to, false),
+    enabled: !!userId && resolutionRange != null,
     staleTime: 2 * 60 * 1000,
   });
+
+  // Rebuild a lookup keyed by `${swimmer_slot_id}:${iso}` for per-slot access.
+  const swimmerSessionByKey = useMemo(() => {
+    const map = new Map<string, SwimmerSession>();
+    if (!swimmerSessionsData) return map;
+    for (const row of swimmerSessionsData) {
+      if (!row.swimmer_slot_id) continue;
+      map.set(`${row.swimmer_slot_id}:${row.scheduled_date}`, row);
+    }
+    return map;
+  }, [swimmerSessionsData]);
+
+  // Index assignments by id so we can hydrate full details from the RPC rows.
+  const swimAssignmentsById = useMemo(() => {
+    const map = new Map<number, Assignment>();
+    for (const a of swimAssignments) {
+      const id = Number(a?.id);
+      if (Number.isFinite(id)) map.set(id, a);
+    }
+    return map;
+  }, [swimAssignments]);
 
   const logsBySessionId = useMemo(() => {
     const list = Array.isArray(sessions) ? sessions : [];
@@ -94,7 +129,7 @@ export function useDashboardSessions({ sessions, assignments, userId, swimmerSlo
   const sessionsCacheRef = useRef<Map<string, PlannedSession[]>>(new Map());
   useEffect(() => {
     sessionsCacheRef.current.clear();
-  }, [assignmentsByIso, slotsByDayOfWeek, resolvedByDate]);
+  }, [assignmentsByIso, slotsByDayOfWeek, swimmerSessionByKey]);
 
   const getLogForSession = useCallback(
     (sessionId: string): Session | undefined => {
@@ -165,36 +200,40 @@ export function useDashboardSessions({ sessions, assignments, userId, swimmerSlo
       }
 
       if (hasSwimmerSlots && daySlots && daySlots.length > 0) {
-        const resolved = resolvedByDate?.get(iso);
-
         const list: PlannedSession[] = daySlots.map((slot) => {
           const hour = parseInt(slot.start_time.split(":")[0], 10);
           const slotKey: SlotKey = hour < 13 ? "AM" : "PM";
           const slotTime = `${slot.start_time.slice(0, 5)}-${slot.end_time.slice(0, 5)}`;
 
-          const match = resolved?.find((r) => r.swimmerSlotId === slot.id);
+          const row = swimmerSessionByKey.get(`${slot.id}:${iso}`);
+          const assignmentId = row?.assignment_id ?? null;
+          const hydratedAssignment =
+            assignmentId != null ? swimAssignmentsById.get(assignmentId) : undefined;
 
-          if (match && match.assignment) {
-            const a = match.assignment;
-            const aRecord = a as unknown as Record<string, unknown>;
-            const plannedKm = assignmentPlannedKm(aRecord);
+          if (assignmentId != null) {
+            const a = hydratedAssignment;
+            const aRecord = (a ?? {}) as unknown as Record<string, unknown>;
+            const plannedKm = a
+              ? assignmentPlannedKm(aRecord)
+              : row?.assignment_total_km != null
+                ? Number(row.assignment_total_km)
+                : null;
             const details = Array.isArray(aRecord?.details)
               ? (aRecord.details as string[]).map(String)
-              : safeLinesFromText(a.description);
+              : safeLinesFromText(a?.description);
 
             return {
               id: `${iso}__${slot.id}`,
               iso,
               slotKey,
-              title: String(a.title ?? "Séance coach"),
-              km: plannedKm ?? match.alternatives?.[0]?.km ?? null,
+              title: String(a?.title ?? row?.assignment_title ?? "Séance coach"),
+              km: plannedKm,
               details,
-              assignmentId: match.assignmentId ?? undefined,
+              assignmentId,
               isEmpty: false,
               slotTime,
               slotLocation: slot.location,
-              assignmentSource: match.source,
-              alternatives: match.alternatives.length > 0 ? match.alternatives : undefined,
+              assignmentSource: row?.assignment_source ?? "group",
               swimmerSlotId: slot.id,
             };
           }
@@ -286,7 +325,15 @@ export function useDashboardSessions({ sessions, assignments, userId, swimmerSlo
       cache.set(iso, list);
       return list;
     },
-    [assignmentsByIso, slotsByDayOfWeek, hasSwimmerSlots, userId, resolvedByDate, isResolvingAssignments],
+    [
+      assignmentsByIso,
+      slotsByDayOfWeek,
+      hasSwimmerSlots,
+      userId,
+      swimmerSessionByKey,
+      swimAssignmentsById,
+      isResolvingAssignments,
+    ],
   );
 
   return {
