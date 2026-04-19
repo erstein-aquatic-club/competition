@@ -104,6 +104,64 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-19 — §149 Cascade annulation bucket swim → slots personnalisés
+
+**Branche** : `main`
+**Chantier ROADMAP** : §149 — Cascade bucket cancellation pour slots perso
+
+### Contexte — Pourquoi ce patch
+
+François (id=1) a des `swimmer_training_slots` personnalisés (slots Lun/Mar/Jeu/Ven soir 18h + Sam matin 8h), distincts des slots du groupe. Le système d'overrides (`training_slot_overrides`) n'opère que sur `training_slots` du groupe — jamais sur les slots perso. Résultat : si le coach annule le slot soir du groupe sur une date X (ex: Lundi 17-19 cancelled pour Lundi de Pâques 2026-04-06), le slot perso de François sur cette date reste compté comme attendu dans le KPI "Ressentis 30j" (et dans `get_swimmer_sessions`), alors qu'il n'y a aucune séance prévue.
+
+Cas concret 2026-04-06 (Lundi de Pâques) : override créé le 04-11 avec status=`modified` (tentative de déplacement vers matin). Aujourd'hui, tentative de re-modification → erreur `uq_training_slots_oneoff` car un one-off fantôme existait déjà au 04-06 08-10 Piscine. Au final, François apparaissait toujours comme attendu soir du 06/04 alors qu'il n'y avait pas d'entraînement.
+
+### Changements réalisés
+
+1. **Règle métier** validée : si le coach annule toutes les séances swim du groupe sur un bucket (morning/evening) pour une date D, les slots perso des nageurs du groupe sur ce bucket à D doivent sauter. S'il reste ≥1 slot swim groupe non-annulé, on maintient. Invariant confirmé : 1 seul slot swim par bucket/groupe en pratique.
+
+2. **Migration 00132 — `get_swimmer_sessions` bucket cancel cascade** :
+   - Nouvelle CTE `cancelled_slots` : pairs (slot_id, date) directement annulés via overrides.
+   - Nouvelle CTE `group_swim_on_date` : occurrences (date, bucket) des slots swim du groupe (recurring + one-off) avec flag `is_cancelled`.
+   - Nouvelle CTE `cancelled_buckets` : (date, bucket) où `bool_and(is_cancelled) = true` (tous cancelled, set non-vide).
+   - Filtre `effective_expected_slots` : (a) pour slots perso swim → exclus si bucket cascade ; (b) pour non-custom path → exclus si le training_slot direct est cancelled.
+   - Ajout directive `#variable_conflict use_column` pour lever ambiguïté sur RETURNS TABLE column `bucket`.
+   - Rename interne `bucket` → `time_bucket` dans les CTEs pour clarté.
+   - Strength slots non affectés (cascade swim-only).
+
+3. **Cleanup données 2026-04-06** (debug session) :
+   - Suppression du one-off fantôme `d8e11d05-...` (Mon 08-10 Piscine, zéro assignation).
+   - Mise à jour override `af73ddd2-...` : `status='modified'` → `'cancelled'`, nullify new_start_time/new_end_time/new_location, reason="Jour férié (Lundi de Pâques)".
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---|---|
+| `supabase/migrations/00132_get_swimmer_sessions_bucket_cancel.sql` | nouveau — cascade cancel logic |
+| `docs/implementation-log.md` | entrée §149 |
+| `docs/ROADMAP.md` | §149 ajouté |
+| `CLAUDE.md` | "Dernière entrée en date" mise à jour |
+
+### Tests
+
+- [x] Migration appliquée via MCP sans erreur
+- [x] `get_swimmer_sessions(1, '2026-04-06', '2026-04-06', false)` renvoie désormais uniquement le slot strength 17h (swim 18h cascadé)
+- [x] `get_feedback_rates_all_athletes(30)` pour François : 13/18 → 12/13 (total_slots=13, assigned=6, feedback=12)
+- [x] 4 autres slots cascadés dans la fenêtre 30j : 2026-04-02, 2026-03-31, 2026-03-28, 2026-03-26 (tous avec `status='cancelled'` sur le slot groupe bucket)
+- [ ] Tests RLS intégration non lancés — migration touche uniquement une fonction SQL STABLE SECURITY INVOKER, pas de policy RLS modifiée.
+
+### Décisions prises
+
+- **Filter out vs emit with `is_cancelled` flag** : choisi filter out (rows simplement absentes de l'output) — plus simple, aucun changement côté consumer TypeScript. Trade-off : pas de badge "Annulé par le coach" côté UI nageur. À reconsidérer si UX demande ce feedback explicite.
+- **Status `modified` ne déclenche pas de cascade** : seul `cancelled` trigger. Si le slot est déplacé à un autre bucket via modified+new_start_time, on conserve la logique actuelle (le slot reste présent dans son bucket d'origine). Refinement possible plus tard.
+- **Cascade swim-only** : strength slots indépendants. Un slot perso strength reste si seul le slot swim groupe du même bucket est cancelled.
+
+### Limites / dette
+
+- **Idempotence `createTrainingSlot`** : la contrainte `uq_training_slots_oneoff` peut toujours déclencher une erreur si la même exception (même date, time, location) est re-soumise. Ticket §150 à prévoir.
+- **Overrides pour `swimmer_training_slots`** : aucun système natif — la cascade est la seule voie pour "annuler un slot perso" sans désactiver globalement. Fix structurel possible mais pas pour ce sprint.
+
+---
+
 ## 2026-04-13 — Fix: suppression créneau d'entraînement silencieusement bloquée par RLS
 
 **Branche** : `main`
