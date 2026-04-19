@@ -365,12 +365,31 @@ export function useSwimPlanningAthleteMode({
       opts?: { onSuccess?: () => void; onError?: (err: Error) => void },
     ) => {
       if (selectedAthleteId != null) {
-        // Athlete mode: only delete if the cell is actually an override.
-        if (!slot.overridden || !slot.overrideId) return;
-        deleteOverrideMutation.mutate(slot.overrideId, {
-          onSuccess: () => opts?.onSuccess?.(),
-          onError: (err: Error) => opts?.onError?.(err),
-        });
+        if (slot.overridden && slot.overrideId) {
+          // Remove existing override (reveals underlying group slot, or removes
+          // an athlete-only slot entirely).
+          deleteOverrideMutation.mutate(slot.overrideId, {
+            onSuccess: () => opts?.onSuccess?.(),
+            onError: (err: Error) => opts?.onError?.(err),
+          });
+        } else {
+          // Group slot with no override: suppress it for this athlete by
+          // storing an override with filiere = null.
+          upsertOverrideMutation.mutate(
+            {
+              athlete_id: selectedAthleteId,
+              week_start: slot.week_start,
+              day_of_week: slot.day_of_week,
+              time_slot: slot.time_slot,
+              filiere: null,
+              session_id: null,
+            },
+            {
+              onSuccess: () => opts?.onSuccess?.(),
+              onError: (err: Error) => opts?.onError?.(err),
+            },
+          );
+        }
         return;
       }
       deleteMutation.mutate(slot.id, {
@@ -378,7 +397,7 @@ export function useSwimPlanningAthleteMode({
         onError: (err: Error) => opts?.onError?.(err),
       });
     },
-    [selectedAthleteId, deleteMutation, deleteOverrideMutation],
+    [selectedAthleteId, deleteMutation, deleteOverrideMutation, upsertOverrideMutation],
   );
 
   const writeWeekMeta = useCallback(
