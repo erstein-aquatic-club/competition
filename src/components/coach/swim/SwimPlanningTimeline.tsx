@@ -88,6 +88,15 @@ export interface SwimPlanningTimelineProps<S extends EffectiveSlot = EffectiveSl
   showOverrideBadge?: boolean;
   isLoading?: boolean;
   isEmpty?: boolean;
+  /**
+   * When true, the timeline renders in a purely read-only visual mode:
+   * - week-header edit pencil is hidden,
+   * - empty cells render as quiet `<div>` placeholders (no hover/pointer),
+   * - filled cells drop hover/active states and the session-link button.
+   * Override and inherited-slot affordances stay (they are visual, not interactive).
+   * Default: `false`.
+   */
+  readOnly?: boolean;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -122,6 +131,7 @@ export default function SwimPlanningTimeline<S extends EffectiveSlot = Effective
     sentinelRef,
     isLoading = false,
     isEmpty = false,
+    readOnly = false,
   } = props;
 
   const showOverrideBadge = props.showOverrideBadge ?? mode === "athlete";
@@ -207,6 +217,7 @@ export default function SwimPlanningTimeline<S extends EffectiveSlot = Effective
               }}
               showOverrideBadge={showOverrideBadge}
               sessionNameMap={sessionNameMap}
+              readOnly={readOnly}
             />
           );
         })
@@ -251,6 +262,7 @@ interface WeekCardProps {
   onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
   showOverrideBadge: boolean;
   sessionNameMap: Map<string, string>;
+  readOnly: boolean;
 }
 
 function WeekCard({
@@ -278,6 +290,7 @@ function WeekCard({
   onLinkTap,
   showOverrideBadge,
   sessionNameMap,
+  readOnly,
 }: WeekCardProps) {
   const hasCompetition = weekCompetitions.length > 0;
   const datalistId = `wt-${week.weekKey}`;
@@ -443,15 +456,17 @@ function WeekCard({
                 )}
               </div>
 
-              {/* Edit pencil */}
-              <button
-                type="button"
-                className="p-2 -m-1 rounded-lg hover:bg-muted/60 transition-colors shrink-0"
-                onClick={onStartEditMeta}
-                aria-label="Modifier la semaine"
-              >
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground/50" />
-              </button>
+              {/* Edit pencil (hidden in read-only mode) */}
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="p-2 -m-1 rounded-lg hover:bg-muted/60 transition-colors shrink-0"
+                  onClick={onStartEditMeta}
+                  aria-label="Modifier la semaine"
+                >
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground/50" />
+                </button>
+              )}
 
               {/* Chevron */}
               <motion.span
@@ -483,6 +498,7 @@ function WeekCard({
                     onSelectCompetition={onSelectCompetition}
                     showOverrideBadge={showOverrideBadge}
                     sessionNameMap={sessionNameMap}
+                    readOnly={readOnly}
                   />
                 </motion.div>
               )}
@@ -508,6 +524,7 @@ function MicroGrid({
   onSelectCompetition,
   showOverrideBadge,
   sessionNameMap,
+  readOnly,
 }: {
   weekKey: string;
   weekMonday: Date;
@@ -522,6 +539,7 @@ function MicroGrid({
   onSelectCompetition: (c: Competition) => void;
   showOverrideBadge: boolean;
   sessionNameMap: Map<string, string>;
+  readOnly: boolean;
 }) {
   return (
     <div className="border-t bg-muted/20">
@@ -603,6 +621,7 @@ function MicroGrid({
                     onLinkTap={() => onLinkTap(day.index, "morning")}
                     showOverrideBadge={showOverrideBadge}
                     sessionNameMap={sessionNameMap}
+                    readOnly={readOnly}
                   />
                   <SlotCell
                     slot={evening}
@@ -610,6 +629,7 @@ function MicroGrid({
                     onLinkTap={() => onLinkTap(day.index, "evening")}
                     showOverrideBadge={showOverrideBadge}
                     sessionNameMap={sessionNameMap}
+                    readOnly={readOnly}
                   />
                 </>
               )}
@@ -631,14 +651,25 @@ function SlotCell({
   onLinkTap,
   showOverrideBadge,
   sessionNameMap,
+  readOnly,
 }: {
   slot: EffectiveSlot | undefined;
   onTap: () => void;
   onLinkTap: () => void;
   showOverrideBadge: boolean;
   sessionNameMap: Map<string, string>;
+  readOnly: boolean;
 }) {
   if (!slot) {
+    if (readOnly) {
+      // Quiet empty placeholder — not clickable, no Plus, no hover hints.
+      return (
+        <div
+          aria-hidden
+          className="h-9 w-full rounded-lg border border-dashed border-muted-foreground/15"
+        />
+      );
+    }
     return (
       <button
         type="button"
@@ -667,6 +698,32 @@ function SlotCell({
       ? `Modifier la séance liée : ${sessionName}`
       : "Modifier la séance liée"
     : "Lier une séance";
+
+  if (readOnly) {
+    // Read-only filled cell: full-width chip, no Link2 button, no hover/active
+    // affordances. Override ring + inherited opacity stay (purely visual).
+    return (
+      <div
+        className={cn(
+          "relative h-9 w-full rounded-lg flex items-center justify-center px-1.5 transition-colors",
+          style.bg,
+          overridden && "ring-2 ring-dashed ring-primary/50",
+          inheritedInAthleteMode && "opacity-70",
+        )}
+        aria-label={`Filière : ${filiere?.short ?? slot.filiere}${overridden ? " (filière individuelle)" : ""}`}
+      >
+        <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
+          {filiere?.short ?? slot.filiere}
+        </span>
+        {overridden && (
+          <User
+            aria-label="Filière individuelle"
+            className="absolute top-0.5 right-0.5 h-3 w-3 text-primary bg-background rounded-full p-[1px] ring-1 ring-primary/50"
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-0.5 h-9 w-full">

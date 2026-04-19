@@ -26,6 +26,14 @@ export interface UseSwimPlanningAthleteModeOptions {
   selectedGroupId: number | null;
   visibleWeekKeys: string[];
   groupSlotsByWeek: Map<string, SwimPlanningSlot[]>;
+  /**
+   * When `true` (default), the hook reads the initial `athlete` id from the
+   * URL hash query string and writes it back on every change. The full-page
+   * editor (`/coach/swim-planning`) relies on this. Consumers that embed the
+   * hook in another route (e.g. the swimmer-detail panel) should pass `false`
+   * so their own URL is not mutated.
+   */
+  syncUrl?: boolean;
 }
 
 export interface SwimPlanningSlotWriteInput {
@@ -74,6 +82,7 @@ export function useSwimPlanningAthleteMode({
   selectedGroupId,
   visibleWeekKeys,
   groupSlotsByWeek,
+  syncUrl = true,
 }: UseSwimPlanningAthleteModeOptions): SwimPlanningAthleteModeApi {
   const queryClient = useQueryClient();
 
@@ -91,9 +100,10 @@ export function useSwimPlanningAthleteMode({
     [allAthletes, selectedGroupId],
   );
 
-  // ── Athlete selection (with URL hash ?athlete=<id>) ──
+  // ── Athlete selection (optionally synced to URL hash ?athlete=<id>) ──
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(
     () => {
+      if (!syncUrl) return null;
       const params = new URLSearchParams(
         window.location.hash.split("?")[1] ?? "",
       );
@@ -103,8 +113,9 @@ export function useSwimPlanningAthleteMode({
     },
   );
 
-  // Sync athlete id to URL hash query string
+  // Sync athlete id to URL hash query string (opt-out for embedded consumers)
   useEffect(() => {
+    if (!syncUrl) return;
     const [path, qs] = window.location.hash.split("?");
     const params = new URLSearchParams(qs ?? "");
     if (selectedAthleteId) {
@@ -117,7 +128,7 @@ export function useSwimPlanningAthleteMode({
     if (nextHash !== window.location.hash) {
       window.history.replaceState(null, "", nextHash);
     }
-  }, [selectedAthleteId]);
+  }, [selectedAthleteId, syncUrl]);
 
   const selectedAthlete = useMemo(
     () => groupAthletes.find((a) => a.id === selectedAthleteId) ?? null,

@@ -4,7 +4,7 @@
  * to a single athlete.
  *
  * Read-only by design: shows the merged (group × athlete overrides) view of
- * the swim planning over a short 8-week window (current week + 7 ahead).
+ * the swim planning over a short 7-week window (current week + 6 ahead).
  * For edits, the coach clicks "Plein écran" and lands on the full
  * /coach/swim-planning page with the athlete pre-selected via the URL.
  *
@@ -31,8 +31,8 @@ interface Props {
   athleteId: number;
 }
 
-/** Short embedded window: current week + 7 ahead. Full page uses infinite scroll. */
-const EMBEDDED_WEEK_COUNT = 8;
+/** Short embedded window: current week + 6 ahead. Full page uses infinite scroll. */
+const EMBEDDED_WEEK_COUNT = 7;
 
 export default function SwimmerPlanningPanel({ athleteId }: Props) {
   // ── Athlete → group resolution ────────────────────────────────────
@@ -72,20 +72,27 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
   }, [groupSlots]);
 
   // ── Athlete-mode hook: merge group base with per-athlete overrides ─
+  // `syncUrl: false` — we don't want this embedded panel to scribble
+  // `?athlete=<id>` into the swimmer-detail URL (that URL sync is reserved
+  // for the full-page editor at `/coach/swim-planning`).
   const mode = useSwimPlanningAthleteMode({
     selectedGroupId: groupId,
     visibleWeekKeys,
     groupSlotsByWeek,
+    syncUrl: false,
   });
 
   // Force the panel to stay locked on this athlete — the hook manages its
-  // own selection state (with URL sync), so we push our athleteId prop into
-  // it whenever it changes (e.g. the coach navigates to a different swimmer).
+  // own selection state, so we push our athleteId prop into it whenever it
+  // changes (e.g. the coach navigates to a different swimmer). Destructure
+  // the two fields we need so the effect is not re-run on every render
+  // (the `mode` object identity changes every render).
+  const { selectedAthleteId, setSelectedAthleteId } = mode;
   useEffect(() => {
-    if (mode.selectedAthleteId !== athleteId) {
-      mode.setSelectedAthleteId(athleteId);
+    if (selectedAthleteId !== athleteId) {
+      setSelectedAthleteId(athleteId);
     }
-  }, [athleteId, mode]);
+  }, [athleteId, selectedAthleteId, setSelectedAthleteId]);
 
   // ── Local UI state (read-only: only expand/collapse) ──────────────
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
@@ -115,7 +122,7 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Vue lecture seule — 8 semaines. Les overrides filière / type de
+          Vue lecture seule — 7 semaines. Les overrides filière / type de
           semaine s'appliquent à ce nageur uniquement.
         </p>
         <Button variant="ghost" size="sm" asChild>
@@ -128,6 +135,7 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
 
       <SwimPlanningTimeline
         mode="athlete"
+        readOnly
         weeks={weeks}
         slotsByWeek={mode.effectiveSlotsByWeek}
         competitionsByWeek={new Map()}
@@ -145,6 +153,8 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
         editWeekType=""
         editWeekNotes=""
         existingWeekTypes={mode.existingWeekTypes}
+        // All callbacks are no-ops: `readOnly` guarantees the timeline never
+        // fires them. They are required as non-optional props so we keep them.
         onStartEditMeta={() => {}}
         onSaveMeta={() => {}}
         onCancelEditMeta={() => {}}
