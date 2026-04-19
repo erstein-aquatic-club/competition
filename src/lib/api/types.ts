@@ -1028,3 +1028,26 @@ export interface ChronoRecordInput {
   config: ChronoRecordConfig;
   swimmers: ChronoRecordSwimmer[];
 }
+
+// --- Swimmer sessions RPC (§144) ---
+
+export interface SwimmerSession {
+  swimmer_slot_id: string | null;
+  scheduled_date: string;
+  day_of_week: number;
+  bucket: "morning" | "evening";
+  slot_start_time: string;
+  slot_end_time: string;
+  slot_location: string | null;
+  slot_session_type: "swim" | "strength";
+  assignment_id: number | null;
+  assignment_source: "individual" | "subgroup" | "group" | "none";
+  assignment_title: string | null;
+  assignment_total_km: number | null;
+  swim_catalog_id: number | null;
+  strength_session_id: number | null;
+  training_slot_id: string | null;
+  is_absent: boolean;
+  absence_reason: string | null;
+  log_session_id: string | null;
+}

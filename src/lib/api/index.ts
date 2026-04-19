@@ -158,6 +158,9 @@ export {
   getUnassignedSlots30d,
 } from './assignments';
 
+// Swimmer sessions unified RPC (§144)
+export { getSwimmerSessions } from './swimmerSessions';
+
 export {
   getSwimCatalog,
   getSwimSessionById,
