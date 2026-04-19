@@ -10,6 +10,12 @@ import type {
 import type { SlotInstance } from "@/hooks/useSlotCalendar";
 import { computeSlotState, resolveSlotAssignment, sumAssignedDistance } from "@/hooks/useSlotCalendar";
 import { deriveScheduledSlot } from "@/lib/api/assignments";
+import type { SwimBlock } from "@/lib/swimTextParser";
+import {
+  autoNameSessionLabel,
+  buildItemsFromBlocks,
+  calculateSwimTotalDistance,
+} from "@/lib/swimSessionUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
@@ -23,7 +29,6 @@ import { filterCoachTrainingSlots } from "./coachTrainingSlotsFilter";
 // des modals correspondants (clic sur slot ou sur "ajouter depuis bibliothèque").
 // Lazy split → réduit le bundle initial du wrapper de ~1410 LOC.
 const SlotSessionSheet = lazyWithRetry(() => import("./SlotSessionSheet"));
-const SlotTemplatePicker = lazyWithRetry(() => import("./SlotTemplatePicker"));
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
 import { getCompetitions } from "@/lib/api/competitions";
 import type { Competition } from "@/lib/api/types";
@@ -1840,10 +1845,6 @@ const CoachTrainingSlotsScreen = ({
   const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<SlotInstance | null>(null);
   const [showSessionSheet, setShowSessionSheet] = useState(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [templateTargetInstance, setTemplateTargetInstance] = useState<SlotInstance | null>(null);
-  const [templateSelectedGroups, setTemplateSelectedGroups] = useState<number[]>([]);
-  const [templateVisibleFrom, setTemplateVisibleFrom] = useState<string>("");
 
   // Week navigation state
   const [weekMonday, setWeekMonday] = useState(() => getMonday(new Date()));
@@ -2290,12 +2291,6 @@ const CoachTrainingSlotsScreen = ({
     setShowOverrideForm(true);
   };
 
-  const handleCreateNewSession = (instance: SlotInstance) => {
-    if (!onOpenLibrary) return;
-    setShowSessionSheet(false);
-    onOpenLibrary(buildSwimLibraryContext(instance, "create"));
-  };
-
   const handleEditSession = (sessionId: number) => {
     if (!onOpenLibrary) return;
     setShowSessionSheet(false);
@@ -2306,24 +2301,98 @@ const CoachTrainingSlotsScreen = ({
     onOpenLibrary(buildSwimLibraryContext(selectedInstance, "edit", sessionId));
   };
 
-  const handlePickTemplate = (instance: SlotInstance, selectedGroupIds: number[], visibleFrom: string) => {
-    setTemplateTargetInstance(instance);
-    setTemplateSelectedGroups(selectedGroupIds);
-    setTemplateVisibleFrom(visibleFrom);
-    setShowSessionSheet(false);
-    setTemplatePickerOpen(true);
-  };
-
-  const assignTemplateMutation = useMutation({
+  // ── Quick-compose : crée la séance puis l'assigne dans la même opération.
+  // Remplace l'ancien chemin Empty → onOpenLibrary → SlotTemplatePicker.
+  const quickComposeMutation = useMutation({
     mutationFn: async ({
-      catalogId,
       instance,
+      blocks,
       groupIds,
+      subgroupId,
       visibleFrom,
     }: {
-      catalogId: number;
       instance: SlotInstance;
+      blocks: SwimBlock[];
       groupIds: number[];
+      subgroupId: number | undefined;
+      visibleFrom: string;
+    }) => {
+      if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
+      if (!userId) throw new Error("Utilisateur non connecté");
+      if (blocks.length === 0) throw new Error("Aucun bloc reconnu dans le texte");
+
+      const items = buildItemsFromBlocks(blocks);
+      const totalDistance = calculateSwimTotalDistance(items);
+      const sessionName = autoNameSessionLabel(
+        instance.date,
+        instance.slot.start_time,
+        totalDistance,
+      );
+
+      const result = await api.createSwimSession({
+        name: sessionName,
+        description: null,
+        total_distance: totalDistance,
+        folder: null,
+        created_by: userId,
+        items,
+      });
+
+      const sessionId = (result as { sessionId?: number })?.sessionId;
+      if (!sessionId) {
+        throw new Error("Impossible de récupérer l'ID de la séance créée");
+      }
+
+      try {
+        await api.bulkCreateSlotAssignments({
+          swimCatalogId: sessionId,
+          trainingSlotId: instance.slot.id,
+          scheduledDate: instance.date,
+          groupIds,
+          scheduledSlot: deriveScheduledSlot(instance.slot.start_time),
+          visibleFrom: visibleFrom || instance.date,
+          assignedBy: userId,
+          targetSubgroupId: subgroupId,
+        });
+      } catch (assignErr) {
+        // Rollback : supprime la séance créée si l'assignation échoue.
+        try {
+          await api.deleteSwimSession(sessionId);
+        } catch {
+          // Best-effort rollback.
+        }
+        throw assignErr;
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
+      void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
+      void queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
+      void queryClient.invalidateQueries({ queryKey: ["assigned_swim_catalog_ids"] });
+      setShowSessionSheet(false);
+      toast({ title: "Séance créée et assignée" });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Erreur",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignFromLibraryMutation = useMutation({
+    mutationFn: async ({
+      instance,
+      catalogId,
+      groupIds,
+      subgroupId,
+      visibleFrom,
+    }: {
+      instance: SlotInstance;
+      catalogId: number;
+      groupIds: number[];
+      subgroupId: number | undefined;
       visibleFrom: string;
     }) => {
       if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
@@ -2337,13 +2406,14 @@ const CoachTrainingSlotsScreen = ({
         scheduledSlot: deriveScheduledSlot(instance.slot.start_time),
         visibleFrom: visibleFrom || instance.date,
         assignedBy: userId,
+        targetSubgroupId: subgroupId,
       });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
       void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
-      setTemplatePickerOpen(false);
-      setTemplateTargetInstance(null);
+      void queryClient.invalidateQueries({ queryKey: ["assigned_swim_catalog_ids"] });
+      setShowSessionSheet(false);
       toast({ title: "Séance assignée au créneau" });
     },
     onError: (err: Error) => {
@@ -2355,15 +2425,43 @@ const CoachTrainingSlotsScreen = ({
     },
   });
 
-  const handleTemplateSelect = (catalogId: number) => {
-    if (!templateTargetInstance) return;
-    assignTemplateMutation.mutate({
-      catalogId,
-      instance: templateTargetInstance,
-      groupIds: templateSelectedGroups,
-      visibleFrom: templateVisibleFrom,
-    });
-  };
+  const handleQuickCompose = useCallback(
+    async (
+      instance: SlotInstance,
+      blocks: SwimBlock[],
+      groupIds: number[],
+      subgroupId: number | undefined,
+      visibleFrom: string,
+    ) => {
+      await quickComposeMutation.mutateAsync({
+        instance,
+        blocks,
+        groupIds,
+        subgroupId,
+        visibleFrom,
+      });
+    },
+    [quickComposeMutation],
+  );
+
+  const handleAssignFromLibrary = useCallback(
+    async (
+      instance: SlotInstance,
+      catalogId: number,
+      groupIds: number[],
+      subgroupId: number | undefined,
+      visibleFrom: string,
+    ) => {
+      await assignFromLibraryMutation.mutateAsync({
+        instance,
+        catalogId,
+        groupIds,
+        subgroupId,
+        visibleFrom,
+      });
+    },
+    [assignFromLibraryMutation],
+  );
 
   const coachesForForm = coaches.map((c) => ({
     id: c.id,
@@ -3159,9 +3257,9 @@ const CoachTrainingSlotsScreen = ({
             instance={selectedInstance}
             open={showSessionSheet}
             onOpenChange={setShowSessionSheet}
-            onCreateNew={handleCreateNewSession}
             onEditSession={handleEditSession}
-            onPickTemplate={handlePickTemplate}
+            onQuickCompose={handleQuickCompose}
+            onAssignFromLibrary={handleAssignFromLibrary}
             onEditSlot={handleEditSlot}
             onManageOverride={handleManageOverride}
           />
@@ -3191,23 +3289,6 @@ const CoachTrainingSlotsScreen = ({
         coaches={coachesForForm}
       />
 
-      <Suspense fallback={null}>
-        {templatePickerOpen && (
-          <SlotTemplatePicker
-            open={templatePickerOpen}
-            onOpenChange={(open: boolean) => {
-              setTemplatePickerOpen(open);
-              if (!open) {
-                setTemplateTargetInstance(null);
-                setTemplateSelectedGroups([]);
-                setTemplateVisibleFrom("");
-              }
-            }}
-            onSelect={(catalogId: number, _sessionName: string) => handleTemplateSelect(catalogId)}
-            isAssigning={assignTemplateMutation.isPending}
-          />
-        )}
-      </Suspense>
     </div>
   );
 };

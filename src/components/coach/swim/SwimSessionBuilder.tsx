@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { intensityTone } from "@/components/swim/IntensityDots";
-import { calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
+import { buildItemsFromBlocks, calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
 import { detectTextWarnings, normalizeIntensityValue, parseSwimText } from "@/lib/swimTextParser";
 import type { SwimBlock, SwimExercise, TextWarning } from "@/lib/swimTextParser";
 import type { SwimSessionItem } from "@/lib/api";
@@ -82,46 +82,6 @@ const formatRecoveryTime = (seconds: number | null) => {
   if (min > 0 && sec > 0) return `${min}'${sec.toString().padStart(2, "0")}`;
   if (min > 0) return `${min}'00`;
   return `${sec}s`;
-};
-
-const buildItemsFromBlocks = (blocks: SwimBlock[]): SwimSessionItem[] => {
-  let orderIndex = 0;
-  return blocks.flatMap((block, blockIndex) =>
-    block.exercises.map((exercise, exerciseIndex) => {
-      const rawPayload = {
-        block_title: block.title,
-        block_description: block.description || null,
-        block_order: blockIndex,
-        block_repetitions: block.repetitions ?? null,
-        block_modalities: block.modalities || null,
-        block_equipment: block.equipment ?? [],
-        exercise_repetitions: exercise.repetitions ?? null,
-        exercise_rest: exercise.rest ?? null,
-        exercise_rest_type: exercise.restType ?? "rest",
-        exercise_stroke: exercise.stroke || null,
-        exercise_stroke_type: exercise.strokeType || null,
-        exercise_intensity: exercise.intensity ? normalizeIntensityValue(exercise.intensity) : null,
-        exercise_modalities: exercise.modalities || null,
-        exercise_equipment: exercise.equipment ?? [],
-        exercise_order: exerciseIndex,
-      };
-      const exerciseLabel =
-        exercise.repetitions && exercise.distance
-          ? `${exercise.repetitions}x${exercise.distance}m`
-          : exercise.distance
-            ? `${exercise.distance}m`
-            : null;
-      return {
-        ordre: orderIndex++,
-        label: exerciseLabel,
-        distance: exercise.distance ?? null,
-        duration: null,
-        intensity: exercise.intensity ? normalizeIntensityValue(exercise.intensity) : null,
-        notes: exercise.modalities || null,
-        raw_payload: rawPayload,
-      } as SwimSessionItem;
-    }),
-  );
 };
 
 export function SwimSessionBuilder({

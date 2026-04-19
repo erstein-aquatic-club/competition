@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§141 Chantier C — optimisation backend Supabase)*
+*Dernière mise à jour : 2026-04-19 (§142 Vue semaine coach — quick-compose séance sur créneau vide)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -88,6 +88,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 103 | Vue semaine coach — héritage créneaux persos sur dates antérieures à un stage | Haute | Faible | Fait (§139) |
 | 104 | Chantier B — quick wins perf frontend (staleTime, queryKey stable, select ciblés) | Haute | Faible | Fait (§140) |
 | 105 | Chantier C — optimisation backend Supabase (index cron, consolidation RLS, drop 11 indexes) | Haute | Moyenne | Fait (§141) |
+| 106 | Vue semaine coach — quick-compose séance sur créneau vide (2 clics vs 8) | Haute | Moyenne | Fait (§142) |
 
 ---
 

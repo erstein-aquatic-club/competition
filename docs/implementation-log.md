@@ -9828,3 +9828,70 @@ Les 11 droppés :
 - Le gain sur le cron "Séance terminée ?" ne sera mesurable qu'après plusieurs exécutions (l'index partiel était absent avant, les stats partent de zéro).
 - 7 "FK sémantiques" (colonnes `*_id`/`created_by` sans contrainte FK déclarée) continueront à apparaître dans les advisors `unused_index` tant que pas de traffic. Amélioration future possible : ajouter les contraintes FK formelles pour l'intégrité données.
 - 146 warnings `multiple_permissive_policies` restent sur les tables non-consolidées. Chantier séparé si besoin.
+
+## §142 — Vue semaine coach : quick-compose séance sur créneau vide (2026-04-19)
+
+**Branche** : `main`
+**Chantier ROADMAP** : §106 — Vue semaine coach, flow d'ajout de séance simplifié
+
+### Contexte — Pourquoi ce patch
+
+Le flow d'ajout d'une séance sur un créneau vide depuis la vue semaine était l'un des workflows principaux du coach, et pourtant le plus friction-lourd : **8 clics** répartis sur 3 surfaces distinctes.
+
+Chemin précédent :
+1. Clic créneau → sheet s'ouvre
+2. Clic "Nouvelle séance" → ferme sheet + ouvre bibliothèque
+3. Clic onglet "Texte" dans le builder
+4. Clic "Convertir en séance" (parse du texte collé)
+5. Sauvegarder + retour au calendrier
+6. Re-clic sur le même créneau (le sheet s'était fermé à l'étape 2)
+7. Clic "Depuis la bibliothèque" → ouvre `SlotTemplatePicker`
+8. Retrouver + sélectionner la séance qui venait d'être créée
+
+Le coach devait créer une séance "orpheline" puis la rattacher au créneau dans un second temps, parce que le modèle du code sépare `createSwimSession` et `bulkCreateSlotAssignments` en deux opérations indépendantes.
+
+### Changements réalisés — Ce qui a été modifié
+
+**Nouveau flow (2 clics + 1 coller)** :
+1. Clic sur le créneau vide → sheet s'ouvre avec onglets `Texte` / `Bibliothèque`
+2. Coller le texte → `parseSwimText` tourne à chaque frappe + stats live (blocs / distance / durée) + disclosure "Voir les blocs" qui monte une `SwimSessionTimeline` read-only pour relire l'output du parser
+3. Clic "Créer & assigner" → une seule mutation crée la séance (nom auto) puis l'assigne au créneau
+
+L'onglet `Bibliothèque` est inline dans le même sheet (plus de `SlotTemplatePicker` séparé) avec search + tap direct sur une séance pour l'assigner.
+
+**Nommage auto** : `autoNameSessionLabel(date, startTime, distance)` → `"Mardi 15/04 soir · 2 900m"`. Cutoff matin/soir à 13h (cohérent avec `deriveScheduledSlot`).
+
+**Rollback** : si `bulkCreateSlotAssignments` échoue après `createSwimSession`, on tente de supprimer la séance créée (best-effort via `deleteSwimSession`) pour éviter l'orphelin.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---|---|
+| `src/pages/coach/SlotSessionSheet.tsx` | Remplace `EmptyBody` par `QuickComposeBody` (onglets Texte/Bibliothèque, parse live, stats, disclosure blocs, inline library). Nouvelles props : `onQuickCompose`, `onAssignFromLibrary`. Props supprimées : `onCreateNew`, `onPickTemplate`. |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Nouvelles mutations chaînées : `quickComposeMutation` (create + assign + rollback), `assignFromLibraryMutation`. Handlers : `handleQuickCompose`, `handleAssignFromLibrary`. Supprimé : `handleCreateNewSession`, `handlePickTemplate`, `assignTemplateMutation`, `handleTemplateSelect`, tout le state `templatePickerOpen`/`templateTargetInstance`/`templateSelectedGroups`/`templateVisibleFrom`, le mount du `SlotTemplatePicker`. |
+| `src/lib/swimSessionUtils.ts` | +`buildItemsFromBlocks` (extrait de `SwimSessionBuilder` pour partage) et +`autoNameSessionLabel` (format `Jour DD/MM matin\|soir · XXXXm`, cutoff 13h). |
+| `src/components/coach/swim/SwimSessionBuilder.tsx` | Supprime la copie locale de `buildItemsFromBlocks`, importe depuis `swimSessionUtils`. |
+| `src/pages/coach/SlotTemplatePicker.tsx` | **Supprimé** (orphelin après inline). |
+| `docs/design/slot-quick-compose.html` | Mock design autonome (éditorial, Oswald + Fraunces) montrant before/after + les 3 scènes mobiles. |
+
+### Tests
+
+- `npm test -- --run` : 228/228 ✅
+- `npx tsc --noEmit` : 0 erreur ✅
+- `npm run build` : OK, PWA generate OK (207 entries)
+- Pas de tests RLS (pas de modification de policy, pas de migration SQL)
+
+### Décisions prises
+
+1. **Nommage auto figé au moment de la création** — le coach peut renommer ensuite via "Modifier la séance". Le nom reflète la distance totale parsée au clic, pas une valeur live.
+2. **Mode blocs conservé en relecture** — disclosure "Voir les blocs" monte `SwimSessionTimeline` read-only. L'édition fine des blocs reste accessible depuis le flow "Modifier la séance" (builder classique).
+3. **Cutoff matin/soir à 13h** — cohérent avec `deriveScheduledSlot` (qui utilise déjà ce cutoff pour `session_assignments.scheduled_slot`). Zéro divergence.
+4. **Bibliothèque inline** — supprime la surface `SlotTemplatePicker`. Search + tap direct dans le même sheet. Les `queryClient.invalidateQueries(["swim_catalog"])` au succès rafraîchit l'onglet.
+5. **Rollback best-effort** — si l'assign échoue, on tente un delete de la séance créée. Si le rollback échoue à son tour, on laisse l'orphelin (le coach peut le supprimer manuellement depuis la bibliothèque — mieux qu'un échec silencieux).
+6. **Parse à chaque frappe** — pas de debounce. `parseSwimText` est rapide (fonction pure, pas de regex pathologiques mesurée) et l'usage typique est le paste-complet, pas la saisie caractère-par-caractère.
+
+### Limites / dette
+
+- Le parser (`parseSwimText`) reste dépendant du format attendu ; si le coach colle un texte mal structuré, le feedback est un bandeau "Aucun bloc reconnu" sans indiquer précisément la ligne fautive. La détection plus fine est dans `detectTextWarnings` (déjà utilisée dans le builder complet) — on pourrait la remonter dans le quick-compose plus tard si le besoin émerge.
+- Pas de preview de la durée réelle basée sur allures du nageur — l'estimation `~ XX′` utilise un ratio plat 2 min / 100 m. Suffisant pour un ordre de grandeur.
+- Si le coach colle un texte, clique "Créer & assigner" avec succès, puis ré-ouvre le même créneau et tente une nouvelle compose sur un autre groupe : `bulkCreateSlotAssignments` rejette (unique constraint). Comportement attendu mais l'erreur est affichée via toast générique. Amélioration UX possible : détecter le cas et proposer "Remplacer l'assignation existante".

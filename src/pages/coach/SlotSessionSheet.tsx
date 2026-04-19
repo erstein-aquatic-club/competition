@@ -5,7 +5,7 @@
  * Behavior adapts to SlotState (empty / draft / published / cancelled).
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -37,12 +37,17 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import {
-  Plus,
   BookOpen,
+  CalendarCheck,
   Pencil,
   Copy,
   Eye,
   EyeOff,
+  FileText,
+  Layers,
+  Search,
+  Sparkles,
+  SwatchBook,
   Trash2,
   Clock,
   MapPin,
@@ -50,6 +55,7 @@ import {
   Loader2,
   Ban,
   AlertTriangle,
+  ChevronDown,
   ChevronRight,
   ArrowLeft,
   Share2,
@@ -61,8 +67,20 @@ import {
 import { supabase, canUseSupabase } from "@/lib/api/client";
 import type { SlotInstance, SlotState } from "@/hooks/useSlotCalendar";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
-import { getSwimSessionById, generateShareToken } from "@/lib/api/swim";
+import {
+  getSwimSessionById,
+  generateShareToken,
+  getSwimCatalog,
+} from "@/lib/api/swim";
+import { getAssignedSwimCatalogIds } from "@/lib/api/assignments";
 import { ShareMenu } from "@/components/shared/ShareMenu";
+import { parseSwimText, type SwimBlock } from "@/lib/swimTextParser";
+import type { SwimSessionTemplate } from "@/lib/api/types";
+import {
+  buildItemsFromBlocks,
+  calculateSwimTotalDistance,
+} from "@/lib/swimSessionUtils";
+import { cn } from "@/lib/utils";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -70,9 +88,21 @@ export interface SlotSessionSheetProps {
   instance: SlotInstance | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateNew: (slotInstance: SlotInstance) => void;
   onEditSession: (sessionId: number) => void;
-  onPickTemplate: (slotInstance: SlotInstance, selectedGroupIds: number[], visibleFrom: string, targetSubgroupId?: number) => void;
+  onQuickCompose: (
+    slotInstance: SlotInstance,
+    blocks: SwimBlock[],
+    selectedGroupIds: number[],
+    targetSubgroupId: number | undefined,
+    visibleFrom: string,
+  ) => Promise<void>;
+  onAssignFromLibrary: (
+    slotInstance: SlotInstance,
+    catalogId: number,
+    selectedGroupIds: number[],
+    targetSubgroupId: number | undefined,
+    visibleFrom: string,
+  ) => Promise<void>;
   onEditSlot?: (slotInstance: SlotInstance) => void;
   onManageOverride?: (slotInstance: SlotInstance) => void;
 }
@@ -131,9 +161,9 @@ export default function SlotSessionSheet({
   instance,
   open,
   onOpenChange,
-  onCreateNew,
   onEditSession,
-  onPickTemplate,
+  onQuickCompose,
+  onAssignFromLibrary,
   onEditSlot,
   onManageOverride,
 }: SlotSessionSheetProps) {
@@ -389,7 +419,7 @@ export default function SlotSessionSheet({
                     <SessionUnavailableBody override={override} />
                   )}
                   {state === "empty" && (
-                    <EmptyBody
+                    <QuickComposeBody
                       instance={instance}
                       groups={groups}
                       selectedGroups={selectedGroups}
@@ -399,9 +429,8 @@ export default function SlotSessionSheet({
                       visibleFrom={visibleFrom}
                       onToggleGroup={handleToggleGroup}
                       onVisibleFromChange={setVisibleFrom}
-                      onCreateNew={onCreateNew}
-                      onPickTemplate={onPickTemplate}
-                      onClose={() => onOpenChange(false)}
+                      onQuickCompose={onQuickCompose}
+                      onAssignFromLibrary={onAssignFromLibrary}
                     />
                   )}
                   {(state === "draft" || state === "published") && (
@@ -568,9 +597,18 @@ function SessionUnavailableBody({
   );
 }
 
-// ── EmptyBody ───────────────────────────────────────────────
+// ── QuickComposeBody ────────────────────────────────────────
+//
+// Empty slot → compose a session in a single surface: paste text (live parse)
+// or pick from library. Create-and-assign happens in one chained mutation
+// handled by the parent via onQuickCompose / onAssignFromLibrary.
 
-function EmptyBody({
+function estimateDurationMinutes(distance: number): number {
+  if (distance <= 0) return 0;
+  return Math.max(5, Math.round((distance / 100) * 2));
+}
+
+function QuickComposeBody({
   instance,
   groups,
   selectedGroups,
@@ -580,9 +618,8 @@ function EmptyBody({
   visibleFrom,
   onToggleGroup,
   onVisibleFromChange,
-  onCreateNew,
-  onPickTemplate,
-  onClose,
+  onQuickCompose,
+  onAssignFromLibrary,
 }: {
   instance: SlotInstance;
   groups: SlotInstance["groups"];
@@ -593,20 +630,116 @@ function EmptyBody({
   visibleFrom: string;
   onToggleGroup: (groupId: number) => void;
   onVisibleFromChange: (date: string) => void;
-  onCreateNew: (inst: SlotInstance) => void;
-  onPickTemplate: (inst: SlotInstance, selectedGroupIds: number[], visibleFrom: string, targetSubgroupId?: number) => void;
-  onClose: () => void;
+  onQuickCompose: SlotSessionSheetProps["onQuickCompose"];
+  onAssignFromLibrary: SlotSessionSheetProps["onAssignFromLibrary"];
 }) {
-  const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
+  const [tab, setTab] = useState<"text" | "library">("text");
+  const [rawText, setRawText] = useState("");
+  const [showBlocks, setShowBlocks] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [assigningCatalogId, setAssigningCatalogId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
-  const handleCreateNew = () => {
-    onClose();
-    onCreateNew(instance);
+  const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
+  const hasGroup = selectedGroups.length > 0;
+
+  // ── Live parse ──
+  const parsedBlocks = useMemo<SwimBlock[]>(() => {
+    if (!rawText.trim()) return [];
+    try {
+      return parseSwimText(rawText);
+    } catch {
+      return [];
+    }
+  }, [rawText]);
+
+  const parsedItems = useMemo(
+    () => buildItemsFromBlocks(parsedBlocks),
+    [parsedBlocks],
+  );
+
+  const totalDistance = useMemo(
+    () => calculateSwimTotalDistance(parsedItems),
+    [parsedItems],
+  );
+
+  const estimatedMinutes = estimateDurationMinutes(totalDistance);
+
+  const canSubmitText =
+    parsedBlocks.length > 0 &&
+    hasGroup &&
+    isVisibleFromValid &&
+    !submitting;
+
+  // ── Library data (only when tab active) ──
+  const { data: catalog, isLoading: catalogLoading } = useQuery({
+    queryKey: ["swim_catalog"],
+    queryFn: () => getSwimCatalog(),
+    enabled: tab === "library",
+    staleTime: 60_000,
+  });
+
+  const { data: assignedIds } = useQuery({
+    queryKey: ["assigned_swim_catalog_ids"],
+    queryFn: () => getAssignedSwimCatalogIds(),
+    enabled: tab === "library",
+    staleTime: 60_000,
+  });
+
+  const filteredCatalog = useMemo<SwimSessionTemplate[]>(() => {
+    if (!catalog) return [];
+    const q = search.trim().toLowerCase();
+    return catalog
+      .filter((s) => !s.is_archived)
+      .filter(
+        (s) =>
+          !q ||
+          s.name.toLowerCase().includes(q) ||
+          (s.folder ?? "").toLowerCase().includes(q),
+      )
+      .slice(0, 40);
+  }, [catalog, search]);
+
+  const libraryDisabled = !hasGroup || !isVisibleFromValid || submitting;
+
+  // ── Handlers ──
+  const handleTextSubmit = async () => {
+    if (!canSubmitText) return;
+    setSubmitting(true);
+    try {
+      await onQuickCompose(
+        instance,
+        parsedBlocks,
+        selectedGroups,
+        selectedSubgroupId,
+        visibleFrom,
+      );
+      // Parent closes the sheet via showSessionSheet=false on success.
+    } catch {
+      // Parent shows the error toast.
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handlePickTemplate = () => {
-    onClose();
-    onPickTemplate(instance, selectedGroups, visibleFrom, selectedSubgroupId);
+  const handleLibrarySelect = async (catalogId: number) => {
+    if (libraryDisabled) return;
+    setSubmitting(true);
+    setAssigningCatalogId(catalogId);
+    try {
+      await onAssignFromLibrary(
+        instance,
+        catalogId,
+        selectedGroups,
+        selectedSubgroupId,
+        visibleFrom,
+      );
+    } catch {
+      // Parent shows the error toast.
+    } finally {
+      setSubmitting(false);
+      setAssigningCatalogId(null);
+    }
   };
 
   return (
@@ -698,23 +831,225 @@ function EmptyBody({
         )}
       </div>
 
-      <div className="space-y-2.5">
-        <ActionButton
-          icon={<Plus className="h-4 w-4" />}
-          label="Nouvelle séance"
-          description="Créer une séance de zéro"
-          onClick={handleCreateNew}
-          highlight
-          disabled={!isVisibleFromValid}
-        />
-        <ActionButton
-          icon={<BookOpen className="h-4 w-4" />}
-          label="Depuis la bibliothèque"
-          description={selectedGroups.length === 0 ? "Sélectionnez au moins un groupe" : !isVisibleFromValid ? "Date de visibilité invalide" : "Réutiliser une séance existante"}
-          onClick={handlePickTemplate}
-          disabled={selectedGroups.length === 0 || !isVisibleFromValid}
-        />
+      {/* ── Tabs ── */}
+      <div className="flex items-center rounded-xl border border-border bg-muted/50 p-0.5">
+        <button
+          type="button"
+          onClick={() => setTab("text")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
+            tab === "text"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <FileText className="h-3.5 w-3.5" />
+          Texte
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("library")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
+            tab === "library"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Bibliothèque
+        </button>
       </div>
+
+      {tab === "text" ? (
+        <div className="space-y-3">
+          <textarea
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            placeholder={"Collez ou tapez votre séance ici…\n\nEx.\nÉchauffement\n4x100 crawl V1 R30\n\nCorps\n2x(4x100 NL V3)\n6x50 papillon V2"}
+            className="min-h-[200px] w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+
+          {parsedBlocks.length > 0 ? (
+            <>
+              <div className="grid grid-cols-3 gap-2 rounded-xl border border-primary/20 bg-primary/5 px-2 py-2.5">
+                <QuickStat label="Blocs" value={String(parsedBlocks.length)} />
+                <QuickStat
+                  label="Mètres"
+                  value={totalDistance.toLocaleString("fr-FR")}
+                />
+                <QuickStat
+                  label="Durée"
+                  value={estimatedMinutes > 0 ? `~ ${estimatedMinutes}′` : "—"}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowBlocks((v) => !v)}
+                className="inline-flex w-full items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 opacity-70" />
+                  {showBlocks ? "Masquer les blocs" : "Voir les blocs"}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform",
+                    showBlocks && "rotate-180",
+                  )}
+                />
+              </button>
+              {showBlocks && (
+                <div className="rounded-xl border border-border/50 bg-muted/10 p-2">
+                  <SwimSessionTimeline
+                    title="Prévisualisation"
+                    items={parsedItems}
+                    showHeader={false}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            rawText.trim().length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
+                Aucun bloc reconnu. Vérifiez le format (titre de bloc sur une
+                ligne, exercices en dessous).
+              </div>
+            )
+          )}
+
+          <button
+            type="button"
+            onClick={handleTextSubmit}
+            disabled={!canSubmitText}
+            className={cn(
+              "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+              canSubmitText
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]"
+                : "bg-muted text-muted-foreground cursor-not-allowed",
+            )}
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {submitting ? "Assignation…" : "Créer & assigner"}
+          </button>
+
+          {!hasGroup && parsedBlocks.length > 0 && (
+            <p className="text-center text-[11px] text-muted-foreground">
+              Sélectionnez au moins un groupe pour activer le bouton.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher une séance…"
+              className="w-full rounded-xl border border-border bg-muted/30 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {!hasGroup && (
+            <p className="text-xs text-muted-foreground italic px-0.5">
+              Sélectionnez au moins un groupe pour assigner depuis la bibliothèque.
+            </p>
+          )}
+
+          <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-0.5">
+            {catalogLoading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="inline h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredCatalog.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                Aucune séance trouvée.
+              </p>
+            ) : (
+              filteredCatalog.map((s) => {
+                const distance = calculateSwimTotalDistance(s.items ?? []);
+                const isAssigned = assignedIds?.has(s.id) ?? false;
+                const isThisAssigning = assigningCatalogId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={libraryDisabled}
+                    onClick={() => handleLibrarySelect(s.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                      isAssigned
+                        ? "border-emerald-500/25 bg-emerald-500/5"
+                        : "border-border bg-card hover:bg-muted/40",
+                      libraryDisabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "active:scale-[0.98]",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                        isAssigned
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-primary/10 text-primary",
+                      )}
+                    >
+                      {isThisAssigning ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isAssigned ? (
+                        <CalendarCheck className="h-4 w-4" />
+                      ) : (
+                        <SwatchBook className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {s.name}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        {distance > 0 && (
+                          <span>{distance.toLocaleString("fr-FR")} m</span>
+                        )}
+                        {distance > 0 && s.folder && <span aria-hidden>·</span>}
+                        {s.folder && <span className="truncate">{s.folder}</span>}
+                        {isAssigned && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                              Déjà assignée
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-lg font-bold text-primary tabular-nums leading-none">
+        {value}
+      </p>
+      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
     </div>
   );
 }
