@@ -748,3 +748,71 @@ BEGIN
   ORDER BY ba.sched_date, ba.slot_start_time;
 END;
 $$;
+
+-- =============================================================================
+-- swim_planning_* overrides (§146, migration 00131) — individual planning for nageurs
+--
+-- Mirrors prod policies from migration 00131: SELECT open to authenticated,
+-- WRITE restricted to coach/admin only. Athletes must NOT be able to INSERT,
+-- UPDATE, or DELETE their own overrides — all writes go through a coach.
+--
+-- Policies collapse INSERT/UPDATE/DELETE into FOR ALL for test brevity. The
+-- invariant tested is "coach/admin can write, athletes cannot".
+-- =============================================================================
+
+CREATE TABLE public.swim_planning_week_meta (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id integer NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  week_start date NOT NULL,
+  week_type text,
+  notes text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(group_id, week_start)
+);
+
+CREATE TABLE public.swim_planning_slot_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id integer NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  week_start date NOT NULL,
+  day_of_week smallint NOT NULL,
+  time_slot text NOT NULL,
+  filiere text NOT NULL,
+  session_id uuid NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(athlete_id, week_start, day_of_week, time_slot)
+);
+
+CREATE TABLE public.swim_planning_week_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id integer NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  week_start date NOT NULL,
+  week_type text,
+  notes text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(athlete_id, week_start)
+);
+
+ALTER TABLE public.swim_planning_week_meta ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.swim_planning_slot_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.swim_planning_week_overrides ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY swim_planning_week_meta_select ON public.swim_planning_week_meta
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY swim_planning_week_meta_write ON public.swim_planning_week_meta
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+CREATE POLICY swim_planning_slot_overrides_select ON public.swim_planning_slot_overrides
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY swim_planning_slot_overrides_write ON public.swim_planning_slot_overrides
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+CREATE POLICY swim_planning_week_overrides_select ON public.swim_planning_week_overrides
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY swim_planning_week_overrides_write ON public.swim_planning_week_overrides
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
