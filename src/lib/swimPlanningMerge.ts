@@ -47,8 +47,6 @@ export function mergeSlots(
     seen.add(k);
     const ov = overrideMap.get(k);
     if (ov) {
-      // filiere === null → slot masqué pour ce nageur, on ne l'inclut pas
-      if (ov.filiere === null) continue;
       result.push({
         id: g.id,
         group_id: g.group_id,
@@ -76,9 +74,6 @@ export function mergeSlots(
   for (const o of athleteOverrides) {
     const k = slotKey(o);
     if (seen.has(k)) continue;
-    // Pure-athlete override with no group slot. filiere=null shouldn't happen
-    // here (suppression only targets existing group slots), but guard anyway.
-    if (o.filiere === null) continue;
     result.push({
       id: o.id,
       athlete_id: o.athlete_id,

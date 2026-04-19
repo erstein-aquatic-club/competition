@@ -942,8 +942,7 @@ export interface SwimPlanningSlotOverride {
   week_start: string;
   day_of_week: number;
   time_slot: "morning" | "evening";
-  /** null = créneau masqué pour ce nageur (suppression d'un créneau groupe) */
-  filiere: string | null;
+  filiere: string;
   session_id?: string | null;
   created_at?: string;
 }
@@ -953,8 +952,7 @@ export interface SwimPlanningSlotOverrideInput {
   week_start: string;
   day_of_week: number;
   time_slot: "morning" | "evening";
-  /** null = masquer le créneau groupe pour ce nageur */
-  filiere: string | null;
+  filiere: string;
   session_id?: string | null;
 }
 

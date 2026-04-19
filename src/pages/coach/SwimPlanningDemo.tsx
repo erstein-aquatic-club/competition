@@ -648,23 +648,23 @@ export default function SwimPlanningDemo() {
                     {filiereSheet.existingSlot.session_id ? "Modifier la séance liée" : "Lier une séance"}
                   </span>
                 </button>
-                {/* Delete: group mode = supprime le créneau groupe ; athlete mode =
-                    override existant → retire l'override, créneau groupe → masque pour ce nageur */}
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98]"
-                  onClick={handleDeleteSlot}
-                  disabled={isPending}
-                >
-                  <Trash2 className="h-4 w-4 shrink-0" />
-                  <span className="text-sm font-medium">
-                    {selectedAthleteId != null
-                      ? filiereSheet.existingSlot.overridden
-                        ? "Retirer la filière individuelle"
-                        : "Masquer ce créneau pour ce nageur"
-                      : "Supprimer"}
-                  </span>
-                </button>
+                {/* Delete: only in group mode, OR in athlete mode if this cell is an override */}
+                {(selectedAthleteId == null ||
+                  filiereSheet.existingSlot.overridden === true) && (
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98]"
+                    onClick={handleDeleteSlot}
+                    disabled={isPending}
+                  >
+                    <Trash2 className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-medium">
+                      {selectedAthleteId != null
+                        ? "Supprimer la filière individuelle"
+                        : "Supprimer"}
+                    </span>
+                  </button>
+                )}
               </>
             )}
           </div>
