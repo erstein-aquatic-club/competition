@@ -266,6 +266,13 @@ import {
   getSwimPlanningSlots as _getSwimPlanningSlots,
   upsertSwimPlanningSlot as _upsertSwimPlanningSlot,
   deleteSwimPlanningSlot as _deleteSwimPlanningSlot,
+  getSwimPlanningSlotOverrides as _getSwimPlanningSlotOverrides,
+  upsertSwimPlanningSlotOverride as _upsertSwimPlanningSlotOverride,
+  deleteSwimPlanningSlotOverride as _deleteSwimPlanningSlotOverride,
+  getSwimPlanningWeekMeta as _getSwimPlanningWeekMeta,
+  upsertSwimPlanningWeekMeta as _upsertSwimPlanningWeekMeta,
+  getSwimPlanningWeekOverrides as _getSwimPlanningWeekOverrides,
+  upsertSwimPlanningWeekOverride as _upsertSwimPlanningWeekOverride,
 } from "./api/swim-planning";
 
 import {
@@ -896,6 +903,13 @@ export const api = {
   async getSwimPlanningSlots(opts: Parameters<typeof _getSwimPlanningSlots>[0]) { return _getSwimPlanningSlots(opts); },
   async upsertSwimPlanningSlot(input: Parameters<typeof _upsertSwimPlanningSlot>[0]) { return _upsertSwimPlanningSlot(input); },
   async deleteSwimPlanningSlot(id: string) { return _deleteSwimPlanningSlot(id); },
+  async getSwimPlanningSlotOverrides(opts: Parameters<typeof _getSwimPlanningSlotOverrides>[0]) { return _getSwimPlanningSlotOverrides(opts); },
+  async upsertSwimPlanningSlotOverride(input: Parameters<typeof _upsertSwimPlanningSlotOverride>[0]) { return _upsertSwimPlanningSlotOverride(input); },
+  async deleteSwimPlanningSlotOverride(id: string) { return _deleteSwimPlanningSlotOverride(id); },
+  async getSwimPlanningWeekMeta(opts: Parameters<typeof _getSwimPlanningWeekMeta>[0]) { return _getSwimPlanningWeekMeta(opts); },
+  async upsertSwimPlanningWeekMeta(input: Parameters<typeof _upsertSwimPlanningWeekMeta>[0]) { return _upsertSwimPlanningWeekMeta(input); },
+  async getSwimPlanningWeekOverrides(opts: Parameters<typeof _getSwimPlanningWeekOverrides>[0]) { return _getSwimPlanningWeekOverrides(opts); },
+  async upsertSwimPlanningWeekOverride(input: Parameters<typeof _upsertSwimPlanningWeekOverride>[0]) { return _upsertSwimPlanningWeekOverride(input); },
 
   // ══════════════════════════════════════════════════════════════════
   // DELEGATION STUBS — Swim Filières
