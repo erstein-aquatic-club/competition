@@ -155,6 +155,7 @@ export {
   deleteSlotAssignments,
   resolveSwimmerAssignments,
   resolveSwimmerAssignmentsBatch,
+  getUnassignedSlots30d,
 } from './assignments';
 
 export {

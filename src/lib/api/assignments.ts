@@ -511,6 +511,28 @@ export async function getAssignedSwimCatalogIds(): Promise<Set<number>> {
   return ids;
 }
 
+/** Get unassigned swim slot occurrences over the past 30 days (J-30 → J-1). */
+export async function getUnassignedSlots30d(): Promise<Array<{
+  slot_id: string;
+  scheduled_date: string;   // YYYY-MM-DD
+  day_of_week: number;      // 1=Mon…7=Sun (ISO)
+  start_time: string;       // HH:MM:SS
+  end_time: string;         // HH:MM:SS
+  location: string | null;
+}>> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase.rpc("get_unassigned_slot_instances_30d");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row: any) => ({
+    slot_id: String(row.slot_id),
+    scheduled_date: String(row.scheduled_date),
+    day_of_week: Number(row.day_of_week),
+    start_time: String(row.start_time),
+    end_time: String(row.end_time),
+    location: row.location ?? null,
+  }));
+}
+
 // ── Swimmer-centric resolution ─────────────────────────────────────
 
 /**

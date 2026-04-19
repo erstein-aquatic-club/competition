@@ -158,6 +158,7 @@ import {
   getSlotAssignments as _getSlotAssignments,
   updateSlotVisibility as _updateSlotVisibility,
   deleteSlotAssignments as _deleteSlotAssignments,
+  getUnassignedSlots30d as _getUnassignedSlots30d,
 } from "./api/assignments";
 
 import {
@@ -394,33 +395,36 @@ export const api = {
       const dbPayload = mapToDbSession(session);
       const { data, error } = await supabase.from("dim_sessions").insert(dbPayload).select("id").single();
       if (error) {
-        // Handle unique constraint violation — resolve via targeted UPDATE matching
-        // the same partial index that rejected the INSERT. A plain .upsert() would
-        // fail with 42P10 because both dedupe indexes (idx_v2 on assignment_id,
-        // idx_legacy on time_slot) are partial.
+        // Resolve 23505 by UPDATE. Since migration 00116 the dedup index is
+        // (athlete_id, session_date, time_slot) regardless of assignment_id,
+        // so we look up the existing row by the full slot key and promote it
+        // in place. Preserving `assignment_id` when the incoming payload is
+        // unlinked avoids dropping a coach ↔ log association that the UI
+        // path may not carry.
         if (error.code === '23505') {
           const athleteId = dbPayload.athlete_id;
           const sessionDate = dbPayload.session_date;
-          const assignmentId = dbPayload.assignment_id ?? null;
-          if (athleteId == null || !sessionDate) throw new Error(error.message);
+          const timeSlot = dbPayload.time_slot;
+          if (athleteId == null || !sessionDate || !timeSlot) throw new Error(error.message);
 
-          let findQuery = supabase
+          const { data: existing, error: findErr } = await supabase
             .from("dim_sessions")
-            .select("id")
+            .select("id, assignment_id")
             .eq("athlete_id", Number(athleteId))
-            .eq("session_date", String(sessionDate));
-          if (assignmentId != null) {
-            findQuery = findQuery.eq("assignment_id", Number(assignmentId));
-          } else {
-            findQuery = findQuery.is("assignment_id", null).eq("time_slot", String(dbPayload.time_slot ?? ""));
-          }
-          const { data: existing, error: findErr } = await findQuery.maybeSingle();
+            .eq("session_date", String(sessionDate))
+            .eq("time_slot", String(timeSlot))
+            .maybeSingle();
           if (findErr) throw new Error(findErr.message);
           if (!existing?.id) throw new Error(error.message);
 
+          const updatePayload = {
+            ...dbPayload,
+            assignment_id: dbPayload.assignment_id ?? (existing as { assignment_id: number | null }).assignment_id ?? null,
+          };
+
           const { error: updErr } = await supabase
             .from("dim_sessions")
-            .update(dbPayload)
+            .update(updatePayload)
             .eq("id", existing.id);
           if (updErr) throw new Error(updErr.message);
           return { status: "ok", sessionId: existing.id as number };
@@ -723,6 +727,7 @@ export const api = {
   async assignments_delete(assignmentId: number) { return _assignments_delete(assignmentId); },
   async bulkCreateSlotAssignments(params: Parameters<typeof _bulkCreateSlotAssignments>[0]) { return _bulkCreateSlotAssignments(params); },
   async getSlotAssignments(params: Parameters<typeof _getSlotAssignments>[0]) { return _getSlotAssignments(params); },
+  async getUnassignedSlots30d() { return _getUnassignedSlots30d(); },
   async updateSlotVisibility(params: Parameters<typeof _updateSlotVisibility>[0]) { return _updateSlotVisibility(params); },
   async deleteSlotAssignments(params: Parameters<typeof _deleteSlotAssignments>[0]) { return _deleteSlotAssignments(params); },
 
