@@ -64,32 +64,8 @@ import {
 } from "@/components/coach/swim/swimPlanningShared";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Helpers
+   Constants
    ═══════════════════════════════════════════════════════════════════ */
-
-/** localStorage meta for week (type + notes) — demo only */
-function getWeekMeta(
-  groupId: number,
-  weekKey: string,
-): { weekType?: string; notes?: string } {
-  try {
-    const raw = localStorage.getItem(`swim-plan-meta-${groupId}-${weekKey}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function setWeekMeta(
-  groupId: number,
-  weekKey: string,
-  meta: { weekType?: string; notes?: string },
-) {
-  localStorage.setItem(
-    `swim-plan-meta-${groupId}-${weekKey}`,
-    JSON.stringify(meta),
-  );
-}
 
 const INITIAL_WEEK_COUNT = 13; // current + 12 ahead
 const LOAD_MORE_COUNT = 4;
@@ -381,53 +357,115 @@ export default function SwimPlanningDemo() {
   const [editingWeekKey, setEditingWeekKey] = useState<string | null>(null);
   const [editWeekType, setEditWeekType] = useState("");
   const [editWeekNotes, setEditWeekNotes] = useState("");
-  // Bump to force re-reads from localStorage
-  const [metaVersion, setMetaVersion] = useState(0);
 
-  // Collect existing week types for datalist
+  // Collect existing week types for datalist (from effective meta across
+  // visible weeks — both group + athlete overrides contribute).
   const existingWeekTypes = useMemo(() => {
     if (!selectedGroupId) return [];
     const types = new Set<string>();
     for (const w of weeks) {
-      const meta = getWeekMeta(selectedGroupId, w.weekKey);
-      if (meta.weekType) types.add(meta.weekType);
+      const meta = getEffectiveWeekMeta(w.weekKey);
+      if (meta.week_type) types.add(meta.week_type);
     }
     return Array.from(types).sort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weeks, selectedGroupId, metaVersion]);
+  }, [weeks, selectedGroupId, getEffectiveWeekMeta]);
 
   const handleStartEditMeta = (weekKey: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!selectedGroupId) return;
-    const meta = getWeekMeta(selectedGroupId, weekKey);
-    setEditWeekType(meta.weekType ?? "");
+    const meta = getEffectiveWeekMeta(weekKey);
+    setEditWeekType(meta.week_type ?? "");
     setEditWeekNotes(meta.notes ?? "");
     setEditingWeekKey(weekKey);
   };
 
+  // Group-level week meta mutation (group mode)
+  const upsertGroupMetaMutation = useMutation({
+    mutationFn: (input: {
+      group_id: number;
+      week_start: string;
+      week_type?: string | null;
+      notes?: string | null;
+    }) => api.upsertSwimPlanningWeekMeta(input),
+    onSuccess: () => {
+      setEditingWeekKey(null);
+      void queryClient.invalidateQueries({
+        queryKey: ["swim-planning-week-meta"],
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Erreur",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Per-athlete week override mutation (athlete mode)
+  const upsertAthleteWeekOverrideMutation = useMutation({
+    mutationFn: (input: {
+      athlete_id: number;
+      week_start: string;
+      week_type?: string | null;
+      notes?: string | null;
+    }) => api.upsertSwimPlanningWeekOverride(input),
+    onSuccess: () => {
+      setEditingWeekKey(null);
+      void queryClient.invalidateQueries({
+        queryKey: ["swim-planning-week-overrides"],
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Erreur",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveMeta = () => {
-    if (!editingWeekKey || !selectedGroupId) return;
-    setWeekMeta(selectedGroupId, editingWeekKey, {
-      weekType: editWeekType.trim() || undefined,
-      notes: editWeekNotes.trim() || undefined,
-    });
-    setEditingWeekKey(null);
-    setMetaVersion((v) => v + 1);
+    if (!editingWeekKey) return;
+    const weekType = editWeekType.trim() || null;
+    const notes = editWeekNotes.trim() || null;
+    if (selectedAthleteId != null) {
+      upsertAthleteWeekOverrideMutation.mutate({
+        athlete_id: selectedAthleteId,
+        week_start: editingWeekKey,
+        week_type: weekType,
+        notes,
+      });
+    } else if (selectedGroupId != null) {
+      upsertGroupMetaMutation.mutate({
+        group_id: selectedGroupId,
+        week_start: editingWeekKey,
+        week_type: weekType,
+        notes,
+      });
+    }
   };
 
   const handleCancelEditMeta = () => {
     setEditingWeekKey(null);
   };
 
-  // Bridge the timeline's getWeekMeta(weekKey) signature to our (groupId, weekKey) storage
+  // Bridge the timeline's getWeekMeta(weekKey) signature to the effective
+  // (merged) meta from DB.
   const getWeekMetaForTimeline = useCallback(
-    (weekKey: string): { weekType?: string; notes?: string; source?: "group" | "athlete" | "none" } => {
-      if (!selectedGroupId) return {};
-      // metaVersion intentionally referenced to re-run memoized consumers after save
-      void metaVersion;
-      return getWeekMeta(selectedGroupId, weekKey);
+    (weekKey: string): {
+      weekType?: string;
+      notes?: string;
+      source?: "group" | "athlete" | "none";
+    } => {
+      const m = getEffectiveWeekMeta(weekKey);
+      return {
+        weekType: m.week_type ?? undefined,
+        notes: m.notes ?? undefined,
+        source: m.source,
+      };
     },
-    [selectedGroupId, metaVersion],
+    [getEffectiveWeekMeta],
   );
 
   // ── Filiere sheet ──
@@ -462,6 +500,48 @@ export default function SwimPlanningDemo() {
       setFiliereSheet(null);
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-slots"],
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Erreur",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Per-athlete slot override mutations (athlete mode)
+  const upsertOverrideMutation = useMutation({
+    mutationFn: (input: {
+      athlete_id: number;
+      week_start: string;
+      day_of_week: number;
+      time_slot: "morning" | "evening";
+      filiere: string;
+      session_id?: string | null;
+    }) => api.upsertSwimPlanningSlotOverride(input),
+    onSuccess: () => {
+      setFiliereSheet(null);
+      void queryClient.invalidateQueries({
+        queryKey: ["swim-planning-slot-overrides"],
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Erreur",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteOverrideMutation = useMutation({
+    mutationFn: (id: string) => api.deleteSwimPlanningSlotOverride(id),
+    onSuccess: () => {
+      setFiliereSheet(null);
+      void queryClient.invalidateQueries({
+        queryKey: ["swim-planning-slot-overrides"],
       });
     },
     onError: (err: Error) => {
@@ -529,27 +609,63 @@ export default function SwimPlanningDemo() {
   }, [swimCatalog]);
 
   const handleSelectFiliere = (filiereId: string) => {
-    if (!filiereSheet || !selectedGroupId) return;
+    if (!filiereSheet) return;
+    const sessionId = filiereSheet.existingSlot?.session_id ?? null;
+    if (selectedAthleteId != null) {
+      upsertOverrideMutation.mutate({
+        athlete_id: selectedAthleteId,
+        week_start: filiereSheet.weekKey,
+        day_of_week: filiereSheet.dayIndex,
+        time_slot: filiereSheet.timeSlot,
+        filiere: filiereId,
+        session_id: sessionId,
+      });
+      return;
+    }
+    if (!selectedGroupId) return;
     upsertMutation.mutate({
       group_id: selectedGroupId,
       week_start: filiereSheet.weekKey,
       day_of_week: filiereSheet.dayIndex,
       time_slot: filiereSheet.timeSlot,
       filiere: filiereId,
-      session_id: filiereSheet.existingSlot?.session_id ?? null,
+      session_id: sessionId,
     });
   };
 
   const handleDeleteSlot = () => {
-    if (!filiereSheet?.existingSlot) return;
-    deleteMutation.mutate(filiereSheet.existingSlot.id);
+    const existing = filiereSheet?.existingSlot;
+    if (!existing) return;
+    if (selectedAthleteId != null) {
+      // Athlete mode: only delete if the cell is actually an override (never a group write).
+      if (!existing.overridden || !existing.overrideId) return;
+      deleteOverrideMutation.mutate(existing.overrideId);
+      return;
+    }
+    deleteMutation.mutate(existing.id);
   };
 
   const handleLinkSession = (sessionId: number) => {
-    if (!sessionPickerSlot || !selectedGroupId) return;
-    // Find the existing slot to get the filiere
-    const existing = findSlot(sessionPickerSlot.weekKey, sessionPickerSlot.dayIndex, sessionPickerSlot.timeSlot);
+    if (!sessionPickerSlot) return;
+    const existing = findSlot(
+      sessionPickerSlot.weekKey,
+      sessionPickerSlot.dayIndex,
+      sessionPickerSlot.timeSlot,
+    );
     if (!existing) return;
+    if (selectedAthleteId != null) {
+      upsertOverrideMutation.mutate({
+        athlete_id: selectedAthleteId,
+        week_start: sessionPickerSlot.weekKey,
+        day_of_week: sessionPickerSlot.dayIndex,
+        time_slot: sessionPickerSlot.timeSlot,
+        filiere: existing.filiere,
+        session_id: String(sessionId),
+      });
+      setSessionPickerSlot(null);
+      return;
+    }
+    if (!selectedGroupId) return;
     upsertMutation.mutate({
       group_id: selectedGroupId,
       week_start: sessionPickerSlot.weekKey,
@@ -562,9 +678,26 @@ export default function SwimPlanningDemo() {
   };
 
   const handleUnlinkSession = () => {
-    if (!sessionPickerSlot || !selectedGroupId) return;
-    const existing = findSlot(sessionPickerSlot.weekKey, sessionPickerSlot.dayIndex, sessionPickerSlot.timeSlot);
+    if (!sessionPickerSlot) return;
+    const existing = findSlot(
+      sessionPickerSlot.weekKey,
+      sessionPickerSlot.dayIndex,
+      sessionPickerSlot.timeSlot,
+    );
     if (!existing) return;
+    if (selectedAthleteId != null) {
+      upsertOverrideMutation.mutate({
+        athlete_id: selectedAthleteId,
+        week_start: sessionPickerSlot.weekKey,
+        day_of_week: sessionPickerSlot.dayIndex,
+        time_slot: sessionPickerSlot.timeSlot,
+        filiere: existing.filiere,
+        session_id: null,
+      });
+      setSessionPickerSlot(null);
+      return;
+    }
+    if (!selectedGroupId) return;
     upsertMutation.mutate({
       group_id: selectedGroupId,
       week_start: sessionPickerSlot.weekKey,
@@ -740,7 +873,7 @@ export default function SwimPlanningDemo() {
                       : "hover:bg-muted/50",
                   )}
                   onClick={() => handleSelectFiliere(f.id)}
-                  disabled={upsertMutation.isPending}
+                  disabled={upsertMutation.isPending || upsertOverrideMutation.isPending}
                 >
                   <span
                     className={cn(
@@ -789,15 +922,26 @@ export default function SwimPlanningDemo() {
                     {filiereSheet.existingSlot.session_id ? "Modifier la séance liée" : "Lier une séance"}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98]"
-                  onClick={handleDeleteSlot}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4 shrink-0" />
-                  <span className="text-sm font-medium">Supprimer</span>
-                </button>
+                {/* Delete: only in group mode, OR in athlete mode if this cell is an override */}
+                {(selectedAthleteId == null ||
+                  filiereSheet.existingSlot.overridden === true) && (
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98]"
+                    onClick={handleDeleteSlot}
+                    disabled={
+                      deleteMutation.isPending ||
+                      deleteOverrideMutation.isPending
+                    }
+                  >
+                    <Trash2 className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-medium">
+                      {selectedAthleteId != null
+                        ? "Supprimer la filière individuelle"
+                        : "Supprimer"}
+                    </span>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -867,7 +1011,7 @@ export default function SwimPlanningDemo() {
                               : "hover:bg-muted/50",
                           )}
                           onClick={() => handleLinkSession(s.id)}
-                          disabled={upsertMutation.isPending}
+                          disabled={upsertMutation.isPending || upsertOverrideMutation.isPending}
                         >
                           <Waves className="h-4 w-4 text-muted-foreground/50 shrink-0" />
                           <div className="flex-1 min-w-0">
