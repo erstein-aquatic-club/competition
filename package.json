@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "tsc",
-    "test": "node --test --import tsx \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+    "test": "node --test --experimental-test-module-mocks --import tsx \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
     "test:rls": "vitest run --config vitest.config.rls.ts",
     "storybook": "storybook dev -p 6006",

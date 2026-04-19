@@ -473,7 +473,13 @@ export async function updateSlotVisibility(params: {
   if (error) throw new Error(error.message);
 }
 
-/** Delete all assignments for a slot+date */
+/**
+ * Delete group assignments for a slot+date.
+ *
+ * Scoped to `target_user_id IS NULL` so individual swim assignments are
+ * preserved — removing a group session must not clobber a swimmer's personal
+ * assignment on the same slot/date (§144).
+ */
 export async function deleteSlotAssignments(params: {
   trainingSlotId: string;
   scheduledDate: string;
@@ -484,7 +490,8 @@ export async function deleteSlotAssignments(params: {
     .from("session_assignments")
     .delete()
     .eq("training_slot_id", params.trainingSlotId)
-    .eq("scheduled_date", params.scheduledDate);
+    .eq("scheduled_date", params.scheduledDate)
+    .is("target_user_id", null);
 
   if (error) throw new Error(error.message);
 }
