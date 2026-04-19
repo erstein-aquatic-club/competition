@@ -2380,7 +2380,7 @@ const CoachTrainingSlotsScreen = ({
       if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
       if (!userId) throw new Error("Utilisateur non connecté");
 
-      await api.bulkCreateSlotAssignments({
+      return api.bulkCreateSlotAssignments({
         swimCatalogId: catalogId,
         trainingSlotId: instance.slot.id,
         scheduledDate: instance.date,
@@ -2391,12 +2391,20 @@ const CoachTrainingSlotsScreen = ({
         targetSubgroupId: subgroupId,
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["slot-assignments"] });
       void queryClient.invalidateQueries({ queryKey: ["resolved-assignments-batch"] });
       void queryClient.invalidateQueries({ queryKey: ["assigned_swim_catalog_ids"] });
       setShowSessionSheet(false);
-      toast({ title: "Séance assignée au créneau" });
+      const preserved = result?.preservedIndividuals ?? [];
+      if (preserved.length > 0) {
+        toast({
+          title: "Séance assignée — séances personnelles préservées",
+          description: `${preserved.length} nageur${preserved.length > 1 ? "s" : ""} garde${preserved.length > 1 ? "nt" : ""} leur séance perso : ${preserved.map((p) => p.displayName).join(", ")}`,
+        });
+      } else {
+        toast({ title: "Séance assignée au créneau" });
+      }
     },
     onError: (err: Error) => {
       toast({
