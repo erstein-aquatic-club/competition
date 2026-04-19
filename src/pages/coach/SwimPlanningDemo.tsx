@@ -5,21 +5,19 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import type { SwimPlanningSlot, SwimPlanningSlotInput, GroupSummary, SwimSessionTemplate, Competition } from "@/lib/api/types";
-import { FILIERES, FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
+import type { EffectiveSlot } from "@/lib/swimPlanningMerge";
+import { FILIERES, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
 const FilieresEditor = lazyWithRetry(() => import("./FilieresEditor"));
-import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -35,97 +33,28 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  CalendarRange,
   Check,
-  ChevronDown,
-  ChevronLeft,
   Eye,
   Link2,
-  Pencil,
-  Plus,
   Search,
   Settings2,
   Trash2,
   Trophy,
   Unlink,
   Waves,
-  X,
 } from "lucide-react";
 import SwimPlanningAthleteView from "./SwimPlanningAthleteView";
+import SwimPlanningTimeline from "@/components/coach/swim/SwimPlanningTimeline";
+import {
+  DAY_ROWS,
+  generateWeeks,
+  getMonday,
+  type WeekInfo,
+} from "@/components/coach/swim/swimPlanningShared";
 
 /* ═══════════════════════════════════════════════════════════════════
    Helpers
    ═══════════════════════════════════════════════════════════════════ */
-
-function getISOWeekNumber(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  return (
-    1 +
-    Math.round(
-      ((d.getTime() - week1.getTime()) / 86400000 -
-        3 +
-        ((week1.getDay() + 6) % 7)) /
-        7,
-    )
-  );
-}
-
-function getMonday(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-interface WeekInfo {
-  monday: Date;
-  sunday: Date;
-  weekNumber: number;
-  weekKey: string; // "2026-04-06"
-}
-
-function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
-  return Array.from({ length: count }, (_, i) => {
-    const monday = new Date(startMonday);
-    monday.setDate(startMonday.getDate() + i * 7);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    return {
-      monday,
-      sunday,
-      weekNumber: getISOWeekNumber(monday),
-      weekKey: monday.toISOString().split("T")[0],
-    };
-  });
-}
-
-const DAY_ROWS = [
-  { index: 0, label: "Lun" },
-  { index: 1, label: "Mar" },
-  { index: 2, label: "Mer" },
-  { index: 3, label: "Jeu" },
-  { index: 4, label: "Ven" },
-  { index: 5, label: "Sam" },
-  { index: 6, label: "Dim" },
-] as const;
-
-function fmtDD_MM(d: Date): string {
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
-}
-
-function isCurrentWeek(weekKey: string): boolean {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const monday = new Date(weekKey + "T00:00:00");
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return today >= monday && today <= sunday;
-}
 
 /** localStorage meta for week (type + notes) — demo only */
 function getWeekMeta(
@@ -329,6 +258,17 @@ export default function SwimPlanningDemo() {
   const handleCancelEditMeta = () => {
     setEditingWeekKey(null);
   };
+
+  // Bridge the timeline's getWeekMeta(weekKey) signature to our (groupId, weekKey) storage
+  const getWeekMetaForTimeline = useCallback(
+    (weekKey: string): { weekType?: string; notes?: string; source?: "group" | "athlete" | "none" } => {
+      if (!selectedGroupId) return {};
+      // metaVersion intentionally referenced to re-run memoized consumers after save
+      void metaVersion;
+      return getWeekMeta(selectedGroupId, weekKey);
+    },
+    [selectedGroupId, metaVersion],
+  );
 
   // ── Filiere sheet ──
   const [filiereSheet, setFiliereSheet] = useState<{
@@ -548,87 +488,56 @@ export default function SwimPlanningDemo() {
       />
 
       {/* ── Timeline ── */}
-      <div className="relative px-4 pt-3">
-        {/* Vertical rail */}
-        <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
-
-        {slotsLoading && slots.length === 0 ? (
-          <div className="space-y-3 pl-8">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border p-3 animate-pulse motion-reduce:animate-none"
-              >
-                <div className="h-4 w-36 rounded bg-muted" />
-                <div className="h-3 w-24 mt-2 rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          weeks.map((week) => {
-            const current = isCurrentWeek(week.weekKey);
-            const expanded = expandedWeekKey === week.weekKey;
-            const editing = editingWeekKey === week.weekKey;
-            const meta = selectedGroupId
-              ? getWeekMeta(selectedGroupId, week.weekKey)
-              : {};
-            const weekSlots = slotsByWeek.get(week.weekKey) ?? [];
-            const filledCount = weekSlots.length;
-            const weekCompetitions = competitionsByWeek.get(week.weekKey) ?? [];
-
-            return (
-              <WeekCard
-                key={week.weekKey}
-                week={week}
-                isCurrent={current}
-                isExpanded={expanded}
-                isEditing={editing}
-                meta={meta}
-                filledCount={filledCount}
-                weekSlots={weekSlots}
-                weekCompetitions={weekCompetitions}
-                getDayCompetitions={getDayCompetitions}
-                onSelectCompetition={setSelectedCompetition}
-                editWeekType={editWeekType}
-                setEditWeekType={setEditWeekType}
-                editWeekNotes={editWeekNotes}
-                setEditWeekNotes={setEditWeekNotes}
-                existingWeekTypes={existingWeekTypes}
-                onToggleExpand={() =>
-                  setExpandedWeekKey(expanded ? null : week.weekKey)
-                }
-                onStartEditMeta={(e) => handleStartEditMeta(week.weekKey, e)}
-                onSaveMeta={handleSaveMeta}
-                onCancelEditMeta={handleCancelEditMeta}
-                findSlot={findSlot}
-                onCellTap={(dayIndex, timeSlot) => {
-                  const existing = findSlot(week.weekKey, dayIndex, timeSlot);
-                  setFiliereSheet({
-                    weekKey: week.weekKey,
-                    dayIndex,
-                    timeSlot,
-                    existingSlot: existing,
-                  });
-                }}
-                onLinkTap={(dayIndex, timeSlot) => {
-                  const existing = findSlot(week.weekKey, dayIndex, timeSlot);
-                  if (!existing) return;
-                  setSessionPickerSlot({
-                    weekKey: week.weekKey,
-                    dayIndex,
-                    timeSlot,
-                    currentSessionId: existing.session_id,
-                  });
-                  setSessionSearch("");
-                }}
-              />
-            );
-          })
-        )}
-
-        {/* Sentinel for infinite scroll */}
-        <div ref={sentinelRef} className="h-4" />
-      </div>
+      <SwimPlanningTimeline
+        mode="group"
+        weeks={weeks}
+        slotsByWeek={slotsByWeek as Map<string, EffectiveSlot[]>}
+        competitionsByWeek={competitionsByWeek}
+        expandedWeekKey={expandedWeekKey}
+        onToggleWeek={(weekKey) =>
+          setExpandedWeekKey((current) => (current === weekKey ? null : weekKey))
+        }
+        getWeekMeta={getWeekMetaForTimeline}
+        editingWeekKey={editingWeekKey}
+        editWeekType={editWeekType}
+        editWeekNotes={editWeekNotes}
+        existingWeekTypes={existingWeekTypes}
+        onStartEditMeta={handleStartEditMeta}
+        onSaveMeta={handleSaveMeta}
+        onCancelEditMeta={handleCancelEditMeta}
+        onEditTypeChange={setEditWeekType}
+        onEditNotesChange={setEditWeekNotes}
+        onSlotClick={(weekKey, dayIndex, timeSlot, slot) => {
+          // slot is EffectiveSlot | undefined from the timeline; re-find the
+          // SwimPlanningSlot from local state so the filiere sheet can edit it.
+          const existing = slot
+            ? findSlot(weekKey, dayIndex, timeSlot)
+            : undefined;
+          setFiliereSheet({
+            weekKey,
+            dayIndex,
+            timeSlot,
+            existingSlot: existing,
+          });
+        }}
+        onSessionPickerClick={(weekKey, dayIndex, timeSlot, currentSessionId) => {
+          const existing = findSlot(weekKey, dayIndex, timeSlot);
+          if (!existing) return;
+          setSessionPickerSlot({
+            weekKey,
+            dayIndex,
+            timeSlot,
+            currentSessionId: currentSessionId ?? existing.session_id,
+          });
+          setSessionSearch("");
+        }}
+        onCompetitionClick={setSelectedCompetition}
+        getDayCompetitions={getDayCompetitions}
+        sessionNameMap={sessionNameMap}
+        sentinelRef={sentinelRef}
+        isLoading={slotsLoading}
+        isEmpty={slots.length === 0}
+      />
 
       {/* ── Filiere bottom sheet ── */}
       <Sheet
@@ -995,468 +904,4 @@ function Header({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Week Card
-   ═══════════════════════════════════════════════════════════════════ */
-
-interface WeekCardProps {
-  week: WeekInfo;
-  isCurrent: boolean;
-  isExpanded: boolean;
-  isEditing: boolean;
-  meta: { weekType?: string; notes?: string };
-  filledCount: number;
-  weekSlots: SwimPlanningSlot[];
-  weekCompetitions: Competition[];
-  getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
-  onSelectCompetition: (c: Competition) => void;
-  editWeekType: string;
-  setEditWeekType: (v: string) => void;
-  editWeekNotes: string;
-  setEditWeekNotes: (v: string) => void;
-  existingWeekTypes: string[];
-  onToggleExpand: () => void;
-  onStartEditMeta: (e: React.MouseEvent) => void;
-  onSaveMeta: () => void;
-  onCancelEditMeta: () => void;
-  findSlot: (
-    weekKey: string,
-    dayIndex: number,
-    timeSlot: "morning" | "evening",
-  ) => SwimPlanningSlot | undefined;
-  onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
-  onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
-}
-
-function WeekCard({
-  week,
-  isCurrent,
-  isExpanded,
-  isEditing,
-  meta,
-  filledCount,
-  weekSlots,
-  weekCompetitions,
-  getDayCompetitions,
-  onSelectCompetition,
-  editWeekType,
-  setEditWeekType,
-  editWeekNotes,
-  setEditWeekNotes,
-  existingWeekTypes,
-  onToggleExpand,
-  onStartEditMeta,
-  onSaveMeta,
-  onCancelEditMeta,
-  findSlot,
-  onCellTap,
-  onLinkTap,
-}: WeekCardProps) {
-  const hasCompetition = weekCompetitions.length > 0;
-  const datalistId = `wt-${week.weekKey}`;
-
-  return (
-    <div className="relative pl-8 mb-2">
-      {/* Timeline dot */}
-      <div
-        className={cn(
-          "absolute left-[11px] top-3.5 h-[9px] w-[9px] rounded-full ring-2 ring-background transition-colors",
-          hasCompetition
-            ? "bg-amber-500"
-            : isCurrent
-              ? "bg-primary"
-              : filledCount > 0
-                ? "bg-emerald-500"
-                : "bg-muted-foreground/25",
-        )}
-      />
-
-      <div
-        className={cn(
-          "rounded-xl border bg-card transition-all overflow-hidden",
-          isCurrent && "ring-2 ring-primary",
-        )}
-      >
-        {/* ── Editing mode ── */}
-        {isEditing ? (
-          <div className="p-3 space-y-2.5">
-            <div className="text-xs font-medium text-muted-foreground">
-              S{week.weekNumber} &middot; {fmtDD_MM(week.monday)} &ndash;{" "}
-              {fmtDD_MM(week.sunday)}
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">
-                Type de semaine
-              </label>
-              <Input
-                className="h-8 text-sm"
-                placeholder="Ex : Foncier, Affutage..."
-                list={datalistId}
-                value={editWeekType}
-                onChange={(e) => setEditWeekType(e.target.value)}
-              />
-              <datalist id={datalistId}>
-                {existingWeekTypes.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">
-                Notes
-              </label>
-              <Textarea
-                className="text-sm min-h-[48px] resize-none"
-                placeholder="Note optionnelle"
-                rows={2}
-                value={editWeekNotes}
-                onChange={(e) => setEditWeekNotes(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-10 text-xs"
-                onClick={onCancelEditMeta}
-              >
-                <X className="mr-1 h-3 w-3" />
-                Annuler
-              </Button>
-              <Button size="sm" className="h-10 text-xs" onClick={onSaveMeta}>
-                <Check className="mr-1 h-3 w-3" />
-                Enregistrer
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* ── Collapsed header (always visible) ── */}
-            <button
-              type="button"
-              className="w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[48px] hover:bg-muted/40 transition-colors active:bg-muted/60"
-              onClick={onToggleExpand}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-foreground tabular-nums">
-                    S{week.weekNumber}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {fmtDD_MM(week.monday)} &ndash; {fmtDD_MM(week.sunday)}
-                  </span>
-                  {meta.weekType && (
-                    <Badge
-                      className="text-[10px] px-1.5 py-0 border-0 shrink-0"
-                      style={{
-                        backgroundColor: weekTypeColor(meta.weekType),
-                        color: weekTypeTextColor(meta.weekType),
-                      }}
-                    >
-                      {meta.weekType}
-                    </Badge>
-                  )}
-                  {filledCount > 0 && (
-                    <span className="inline-flex items-center gap-[3px] shrink-0">
-                      {/* Mini-dots: ordered Lun matin, Lun soir, Mar matin... */}
-                      {DAY_ROWS.flatMap((day) =>
-                        (["morning", "evening"] as const).map((ts) => {
-                          const slot = weekSlots.find(
-                            (s) => s.day_of_week === day.index && s.time_slot === ts,
-                          );
-                          if (!slot) return null;
-                          const f = FILIERE_MAP.get(slot.filiere);
-                          const style = FILIERE_STYLES[f?.color ?? "sky"] ?? FILIERE_STYLES.sky;
-                          return (
-                            <span
-                              key={`${day.index}-${ts}`}
-                              className={cn("h-[6px] w-[6px] rounded-full shrink-0", style.dot)}
-                            />
-                          );
-                        }),
-                      )}
-                    </span>
-                  )}
-                </div>
-                {meta.notes && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                    {meta.notes}
-                  </p>
-                )}
-                {hasCompetition && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {weekCompetitions.map((c) => {
-                      const d = new Date(c.date.slice(0, 10) + "T00:00:00");
-                      return (
-                        <span
-                          key={c.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectCompetition(c);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.stopPropagation();
-                              onSelectCompetition(c);
-                            }
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200 max-w-full"
-                        >
-                          <Trophy className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{c.name}</span>
-                          <span className="tabular-nums text-amber-700/70 dark:text-amber-300/70 shrink-0">
-                            {fmtDD_MM(d)}
-                          </span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Edit pencil */}
-              <button
-                type="button"
-                className="p-2 -m-1 rounded-lg hover:bg-muted/60 transition-colors shrink-0"
-                onClick={onStartEditMeta}
-                aria-label="Modifier la semaine"
-              >
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground/50" />
-              </button>
-
-              {/* Chevron */}
-              <motion.span
-                animate={{ rotate: isExpanded ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="shrink-0"
-              >
-                <ChevronDown className="h-4 w-4 text-muted-foreground/40" />
-              </motion.span>
-            </button>
-
-            {/* ── Expanded micro grid ── */}
-            <AnimatePresence>
-              {isExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <MicroGrid
-                    weekKey={week.weekKey}
-                    weekMonday={week.monday}
-                    findSlot={findSlot}
-                    onCellTap={onCellTap}
-                    onLinkTap={onLinkTap}
-                    getDayCompetitions={getDayCompetitions}
-                    onSelectCompetition={onSelectCompetition}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   Micro Grid — 6 rows x 2 columns (Matin / Soir)
-   ═══════════════════════════════════════════════════════════════════ */
-
-function MicroGrid({
-  weekKey,
-  weekMonday,
-  findSlot,
-  onCellTap,
-  onLinkTap,
-  getDayCompetitions,
-  onSelectCompetition,
-}: {
-  weekKey: string;
-  weekMonday: Date;
-  findSlot: (
-    weekKey: string,
-    dayIndex: number,
-    timeSlot: "morning" | "evening",
-  ) => SwimPlanningSlot | undefined;
-  onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
-  onLinkTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
-  getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
-  onSelectCompetition: (c: Competition) => void;
-}) {
-  return (
-    <div className="border-t bg-muted/20">
-      {/* Column headers */}
-      <div className="grid grid-cols-[48px_1fr_1fr] gap-1 px-3 pt-2 pb-1">
-        <span />
-        <span className="text-[10px] font-semibold text-muted-foreground text-center uppercase tracking-wider">
-          Matin
-        </span>
-        <span className="text-[10px] font-semibold text-muted-foreground text-center uppercase tracking-wider">
-          Soir
-        </span>
-      </div>
-
-      {/* Day rows */}
-      <div className="px-3 pb-3 space-y-1">
-        {DAY_ROWS.map((day) => {
-          const morning = findSlot(weekKey, day.index, "morning");
-          const evening = findSlot(weekKey, day.index, "evening");
-          const dayComps = getDayCompetitions(weekMonday, day.index);
-          const hasComp = dayComps.length > 0;
-          const emptyDay = !morning && !evening;
-          const primaryComp = dayComps[0];
-
-          return (
-            <div
-              key={day.index}
-              className={cn(
-                "grid grid-cols-[48px_1fr_1fr] gap-1 items-center rounded-lg transition-colors",
-                hasComp &&
-                  !emptyDay &&
-                  "bg-amber-50/60 dark:bg-amber-900/15 ring-1 ring-amber-200/60 dark:ring-amber-800/40 pr-1",
-              )}
-            >
-              <span
-                className={cn(
-                  "text-[11px] font-medium pl-0.5 flex items-center gap-1",
-                  hasComp
-                    ? "text-amber-700 dark:text-amber-300 font-semibold"
-                    : "text-muted-foreground",
-                )}
-              >
-                {hasComp && <Trophy className="h-3 w-3 shrink-0" />}
-                {day.label}
-              </span>
-
-              {hasComp && emptyDay ? (
-                <button
-                  type="button"
-                  onClick={() => onSelectCompetition(primaryComp)}
-                  className="col-span-2 relative h-9 w-full rounded-lg flex items-center gap-1.5 px-2 overflow-hidden
-                             bg-gradient-to-r from-amber-100 via-amber-50 to-amber-100
-                             dark:from-amber-900/40 dark:via-amber-900/20 dark:to-amber-900/40
-                             border border-amber-300/70 dark:border-amber-700/60
-                             text-amber-900 dark:text-amber-100
-                             active:scale-[0.98] transition-transform"
-                  aria-label={primaryComp.name}
-                >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 opacity-[0.18]
-                               bg-[repeating-linear-gradient(45deg,_transparent_0_6px,_currentColor_6px_7px)]"
-                  />
-                  <Trophy className="relative h-3.5 w-3.5 shrink-0" />
-                  <span className="relative text-[10px] font-bold tracking-tight truncate flex-1 text-left">
-                    {primaryComp.name}
-                  </span>
-                  {dayComps.length > 1 && (
-                    <span className="relative text-[9px] font-semibold opacity-70 shrink-0">
-                      +{dayComps.length - 1}
-                    </span>
-                  )}
-                </button>
-              ) : (
-                <>
-                  <SlotCell
-                    slot={morning}
-                    onTap={() => onCellTap(day.index, "morning")}
-                    onLinkTap={() => onLinkTap(day.index, "morning")}
-                  />
-                  <SlotCell
-                    slot={evening}
-                    onTap={() => onCellTap(day.index, "evening")}
-                    onLinkTap={() => onLinkTap(day.index, "evening")}
-                  />
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   Slot Cell — empty (dashed +) or filled (colored chip)
-   ═══════════════════════════════════════════════════════════════════ */
-
-function SlotCell({
-  slot,
-  onTap,
-  onLinkTap,
-}: {
-  slot: SwimPlanningSlot | undefined;
-  onTap: () => void;
-  onLinkTap: () => void;
-}) {
-  if (!slot) {
-    return (
-      <button
-        type="button"
-        className="h-9 w-full rounded-lg border border-dashed border-muted-foreground/20 flex items-center justify-center hover:border-muted-foreground/40 hover:bg-muted/30 transition-colors active:scale-95"
-        onClick={onTap}
-        aria-label="Ajouter une filiere"
-      >
-        <Plus className="h-3.5 w-3.5 text-muted-foreground/40" />
-      </button>
-    );
-  }
-
-  const filiere = FILIERE_MAP.get(slot.filiere);
-  const color = filiere?.color ?? "sky";
-  const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
-  const hasSession = !!slot.session_id;
-
-  return (
-    <div className="flex items-center gap-0.5 h-9 w-full">
-      {/* Filière chip — tap to change filière */}
-      <button
-        type="button"
-        className={cn(
-          "h-full flex-1 min-w-0 rounded-l-lg flex items-center justify-center px-1.5 transition-all active:scale-[0.97]",
-          style.bg,
-        )}
-        onClick={onTap}
-        aria-label={`Modifier: ${filiere?.short ?? slot.filiere}`}
-      >
-        <span className={cn("text-[10px] font-semibold truncate leading-tight", style.text)}>
-          {filiere?.short ?? slot.filiere}
-        </span>
-      </button>
-
-      {/* Link session button */}
-      <button
-        type="button"
-        className={cn(
-          "h-full w-7 shrink-0 rounded-r-lg flex items-center justify-center transition-all active:scale-[0.93]",
-          hasSession
-            ? cn(style.bg, "border-l border-white/20 dark:border-black/10")
-            : "bg-muted/40 border border-dashed border-muted-foreground/15 hover:border-muted-foreground/30",
-        )}
-        onClick={(e) => {
-          e.stopPropagation();
-          onLinkTap();
-        }}
-        aria-label={hasSession ? "Modifier la séance liée" : "Lier une séance"}
-      >
-        <Link2
-          className={cn(
-            "h-3 w-3",
-            hasSession
-              ? cn(style.text, "opacity-80")
-              : "text-muted-foreground/35",
-          )}
-        />
-      </button>
-    </div>
-  );
-}
-
+export type { WeekInfo };
