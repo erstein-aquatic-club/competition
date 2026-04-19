@@ -6,14 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ShieldAlert, Activity, Target, Trophy, ClipboardList, CheckSquare, MessageSquare, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getSwimmerBriefing, type SwimmerBriefing, type SwimmerBriefingPerf } from '@/lib/api/coach-quickview';
+import { getSwimmerBriefing, type SwimmerBriefing, type SwimmerBriefingPerf, type SwimmerBriefingObjective } from '@/lib/api/coach-quickview';
 import QuickViewAttendanceDialog from './QuickViewAttendanceDialog';
 import QuickViewCommentDialog from './QuickViewCommentDialog';
 import QuickViewAssignDrawer from './QuickViewAssignDrawer';
 import SwimmerFormBadge from '@/components/coach/swimmer-kpis/SwimmerFormBadge';
-import PainIndicator from '@/components/coach/swimmer-kpis/PainIndicator';
 import LoadMini from '@/components/coach/swimmer-kpis/LoadMini';
-import ObjectiveChips from '@/components/coach/swimmer-kpis/ObjectiveChips';
+import PainHistoryMap from '@/components/coach/PainHistoryMap';
+import { ObjectiveCard, ObjectiveGrid } from '@/components/shared/ObjectiveCard';
+import type { Objective } from '@/lib/api/types';
 
 /* ── helpers ──────────────────────────────────────────────────────── */
 
@@ -113,8 +114,12 @@ export type QuickViewContentProps = {
   onAssign: () => void;
 };
 
+function toObjective(o: SwimmerBriefingObjective): Objective {
+  return { id: o.id, athlete_id: '', event_code: o.event_code ?? null, target_time_seconds: o.target_time_seconds ?? null, text: o.text ?? null, pool_length: null };
+}
+
 export function QuickViewContent({ briefing, onBack, onAttendance, onComment, onAssign }: QuickViewContentProps) {
-  const { profile, wellness_today, pain_summary, load_summary, objectives_short, recent_perfs, today_session } = briefing;
+  const { profile, load_summary, objectives_short, recent_perfs, today_session } = briefing;
   const initial = profile.display_name.charAt(0).toUpperCase();
   const hasStickyFooter = !!today_session?.session_name;
 
@@ -173,14 +178,22 @@ export function QuickViewContent({ briefing, onBack, onAttendance, onComment, on
         </div>
       </div>
 
-      {/* ── Briefing du jour ─────────────────────────── */}
+      {/* ── Forme 7j ─────────────────────────────────── */}
       <div className="mx-4 mb-3 rounded-2xl border bg-card p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-primary" />
-          <p className="text-sm font-semibold">Briefing du jour</p>
+          <p className="text-sm font-semibold">Forme (7 derniers jours)</p>
         </div>
-        <SwimmerFormBadge wellness={wellness_today} />
-        <PainIndicator pain={pain_summary} />
+        <SwimmerFormBadge userId={profile.id} />
+      </div>
+
+      {/* ── Douleurs ─────────────────────────────────── */}
+      <div className="mx-4 mb-3 rounded-2xl border bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="h-4 w-4 text-rose-500" />
+          <p className="text-sm font-semibold">Douleurs (7 derniers jours)</p>
+        </div>
+        <PainHistoryMap userId={profile.id} days={7} />
       </div>
 
       {/* ── Charge récente ───────────────────────────── */}
@@ -199,7 +212,15 @@ export function QuickViewContent({ briefing, onBack, onAttendance, onComment, on
             <Target className="h-4 w-4 text-amber-500" />
             <p className="text-sm font-semibold">Objectifs en cours</p>
           </div>
-          <ObjectiveChips objectives={objectives_short} />
+          <ObjectiveGrid>
+            {objectives_short.map(o => (
+              <ObjectiveCard
+                key={o.id}
+                objective={toObjective(o)}
+                performances={recent_perfs.map(p => ({ event_code: p.event_code, pool_length: p.pool_length, time_seconds: p.time_seconds, competition_date: p.competition_date }))}
+              />
+            ))}
+          </ObjectiveGrid>
         </div>
       )}
 
