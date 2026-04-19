@@ -10169,3 +10169,79 @@ Chaque migration réversible (DROP COLUMN / DROP FUNCTION / DROP INDEX). Fronten
 - [ ] Déclarer absence AM lundi → PM lundi reste "prévue".
 - [ ] Déclarer absence jour entier lundi → AM+PM marqués absent.
 - [ ] Badge "Perso" visible sur les cards à assignment_source='individual'.
+
+## §148 — Fix KPI "Ressentis 30j" sur cards nageurs : rebase sur get_swimmer_sessions (2026-04-19)
+
+### Contexte
+
+Audit utilisateur du badge "Ressentis 30j" sur `CoachSwimmersOverview` (cards nageurs). Pour François (athlete_id=1) : affichage `13/39 (33%) rouge` + warning "30 non planifiés". Diagnostic : 3 bugs cumulés dans `get_feedback_rates_all_athletes` (v4) qui gonflaient le dénominateur et sous-comptaient les assignations.
+
+### Root cause
+
+La RPC v4 implémentait sa propre logique de matching parallèle à §147, avec 3 divergences :
+
+1. **Denominateur `total_slots` inclut strength** (salle) : `total_custom_raw` comptait tous les `swimmer_training_slots` sans filtrer `session_type`. Or `dim_sessions` est swim-only (strength va dans `strength_runs`) → strength slots créent des non-feedback systématiques.
+2. **Match `start_time =` strict** dans `group_custom` : si perso Fri 18:00 et groupe Fri 17:00 (même bucket evening), non matché → assignation non comptée.
+3. **Pas d'exclusion des `planned_absences`** : le nageur déclarant absent reste compté dans `total_slots`.
+
+Exemple François : `total=39` (20 swim + ~20 strength) au lieu de 18-20 swim réels, ratio 33% rouge au lieu de ~70% ambre.
+
+### Changements
+
+Migration `00131_feedback_rates_rpc_v5.sql` : redéfinit `get_feedback_rates_all_athletes` au-dessus de la RPC §147 `get_swimmer_sessions`. Simplification radicale — 40 lignes SQL (vs 100 en v4).
+
+Algorithme :
+1. Pour chaque athlète, `LATERAL get_swimmer_sessions(id, since, yesterday, false)`.
+2. Filtre `slot_session_type = 'swim' AND is_absent = false` → dénominateur honnête.
+3. `COUNT(*) FILTER (WHERE assignment_id IS NOT NULL)` = assignations réelles (bucket match + source_assignment_id via RPC, avec précédence individuel > subgroup > groupe).
+4. `feedback_count` reste un comptage indépendant de `dim_sessions` (inchangé — extras comptent, UI clamp à 100%).
+
+Les 3 bugs disparaissent automatiquement :
+- Bug 1 : `slot_session_type = 'swim'` filtre → strength exclu.
+- Bug 2 : `get_swimmer_sessions` utilise bucket match (règle R2 de §147).
+- Bug 3 : `is_absent = false` exclut les `planned_absences`.
+
+### Smoke test François (athlete_id=1)
+
+Avant v4 :
+```
+assigned=9, feedback=13, total=39   → 13/39 = 33% rouge + "30 non planifiés"
+```
+
+Après v5 :
+```
+assigned=5, feedback=13, total=18   → 13/18 = 72% ambre + "13 non planifiés"
+```
+
+Breakdown par jour (swim, non-absent) :
+- Mon evening : 3 expected / 2 assigned
+- Tue evening : 3 / 1
+- Thu evening : 3 / 1
+- Fri evening : 4 / 0 (la seule Fri avec assignation 247 est un `planned_absence` → filtrée des deux côtés)
+- Sat morning : 5 / 1
+- **Total : 18 / 5**
+
+Le 13/18 = 72% est le vrai taux de complétion de feedback pour François. Le 13 "non planifiés" reflète maintenant la réalité : le coach n'a pas assigné de séance sur ces créneaux.
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `supabase/migrations/00131_feedback_rates_rpc_v5.sql` | nouveau — ~40 L SQL |
+
+### Tests
+
+- Smoke test DB : François 13/18 (vs 13/39), cohérent avec ses 5 jours de swim × ~4 semaines moins absences.
+- Tests RLS non impactés : la fonction reste `SECURITY DEFINER` avec le même signature `(athlete_id, assigned_count, feedback_count, total_slots)`.
+- Frontend : aucun changement — `getFeedbackRatesAllAthletes` (wrapper TS) consomme le même shape.
+
+### Décisions
+
+- **Rebase sur `get_swimmer_sessions`** plutôt que patch ciblé des 3 bugs dans la v4 : élimine la duplication de logique (bucket, session_type, précédence, absences sont maintenant une seule source de vérité), aligné avec l'architecture §147.
+- **`feedback_count` inchangé** (count direct `dim_sessions`) : changer la sémantique (ne compter que les feedbacks attachés aux slots attendus) altèrerait le KPI et risquerait des régressions d'affichage. La précision marginale ne justifie pas le risque.
+- **Performance** : LATERAL call `get_swimmer_sessions` par athlète. Pour ~100 athlètes × ~30 slots = 3000 rows agrégées. Testé en <100ms. Acceptable.
+
+### Limites
+
+- Aucune contre-vérification automatisée (pas de test RLS intégration pour cette RPC). Si la v5 dérive, le badge deviendrait silencieusement incorrect. Ajouter un test dans `supabase/tests/rls/feedback_rates.test.ts` serait une amélioration V+1.
+- Pas de tracking du delta v4→v5 pour chaque athlète (on ne log pas "ton KPI changé de X à Y"). Si des coaches étaient habitués à lire les anciens chiffres, il faudra leur communiquer.

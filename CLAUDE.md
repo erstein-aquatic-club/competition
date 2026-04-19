@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §147 (Unification backend de la logique d'héritage des séances nageur — RPC `get_swimmer_sessions` comme source de vérité unique, absences granulaires par créneau, protection des assignations individuelles contre les opérations groupe).
+Dernière entrée en date : §148 (Fix KPI "Ressentis 30j" sur cards nageurs — `get_feedback_rates_all_athletes` rebasée sur `get_swimmer_sessions` → filtre swim-only + bucket match + exclusion planned_absences ; François passe de 13/39 rouge à 13/18 ambre).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

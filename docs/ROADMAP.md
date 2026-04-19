@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§147 Unification backend héritage séances nageur — RPC get_swimmer_sessions + protection individuels)*
+*Dernière mise à jour : 2026-04-19 (§148 Fix KPI "Ressentis 30j" — rebase get_feedback_rates_all_athletes sur get_swimmer_sessions)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -93,6 +93,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 106b | Quick-compose — split texte/blocs côte-à-côte en relecture | Faible | Faible | Fait (§144) |
 | 108 | Coach home — créneaux non assignés 30j + deep-link semaine | Moyenne | Moyenne | Fait (§145) |
 | 109 | Unification backend héritage séances nageur (RPC get_swimmer_sessions, absences par créneau, protection individuels) | Haute | Haute | Fait (§147) |
+| 110 | Fix KPI "Ressentis 30j" cards nageurs — rebase RPC sur get_swimmer_sessions (swim-only + bucket match + absences) | Haute | Faible | Fait (§148) |
 
 ---
 
