@@ -19,7 +19,7 @@ test('QuickViewContent renders amber ribbon', () => {
   const markup = renderToStaticMarkup(
     <QuickViewContent briefing={mockBriefing} onBack={() => {}} onAttendance={() => {}} onComment={() => {}} onAssign={() => {}} />,
   );
-  assert.ok(markup.includes('Mode dépannage'), 'should show Mode dépannage ribbon');
+  assert.ok(markup.includes('Mode coach secondaire'), 'should show Mode coach secondaire ribbon');
 });
 
 test('QuickViewContent renders athlete name', () => {

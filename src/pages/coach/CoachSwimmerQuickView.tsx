@@ -144,7 +144,7 @@ export function QuickViewContent({ briefing, onBack, onAttendance, onComment, on
           <ShieldAlert className="h-4 w-4 text-amber-700" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-amber-900">Mode dépannage</p>
+          <p className="text-xs font-semibold text-amber-900">Mode coach secondaire</p>
           <p className="text-[11px] text-amber-800/80 leading-tight">Ce nageur n'est pas dans vos prises en charge.</p>
         </div>
       </div>
