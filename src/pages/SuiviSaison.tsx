@@ -4,8 +4,8 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import type { TrainingWeek, Interview } from "@/lib/api";
-import type { ResolvedSlotAssignment, SwimPlanningSlot } from "@/lib/api/types";
-import { resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
+import type { SwimPlanningSlot } from "@/lib/api/types";
+import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import { FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -162,30 +162,40 @@ function getWeekDates(mondayIso: string): string[] {
 function WeekAssignedSessions({ monday, userId }: { monday: string; userId: number }) {
   const dates = useMemo(() => getWeekDates(monday), [monday]);
 
-  const { data: assignmentMap, isLoading } = useQuery({
-    queryKey: ["swimmer-assignments-batch", userId, monday],
-    queryFn: () => resolveSwimmerAssignmentsBatch(userId, dates),
-    enabled: !!userId,
+  const { data: swimmerSessionsRaw, isLoading } = useQuery({
+    queryKey: ["swimmer-sessions-week", userId, monday],
+    queryFn: () =>
+      getSwimmerSessions(userId, dates[0], dates[dates.length - 1], false),
+    enabled: !!userId && dates.length === 7,
     staleTime: 60_000,
   });
 
   if (isLoading) return <Skeleton className="h-12 rounded-lg" />;
 
-  // Collect days that have assignments
-  const daysWithSessions: Array<{ dayLabel: string; sessions: Array<{ title: string; type: "swim" | "strength" }> }> = [];
-
-  for (let i = 0; i < dates.length; i++) {
-    const slots: ResolvedSlotAssignment[] = assignmentMap?.get(dates[i]) ?? [];
-    const assigned = slots.filter((s) => s.assignment);
-    if (assigned.length === 0) continue;
-
-    daysWithSessions.push({
-      dayLabel: DAY_LABELS_SHORT[i],
-      sessions: assigned.map((s) => ({
-        title: s.assignment!.title || "Séance",
-        type: s.assignment!.session_type === "strength" ? "strength" : "swim",
-      })),
+  // Group assigned sessions per day using the RPC result directly.
+  // The RPC already pre-computes title/type so no further hydration needed.
+  const sessionsByDate = new Map<
+    string,
+    Array<{ title: string; type: "swim" | "strength" }>
+  >();
+  for (const row of swimmerSessionsRaw ?? []) {
+    if (row.assignment_id == null) continue;
+    const list = sessionsByDate.get(row.scheduled_date) ?? [];
+    list.push({
+      title: row.assignment_title || "Séance",
+      type: row.slot_session_type === "strength" ? "strength" : "swim",
     });
+    sessionsByDate.set(row.scheduled_date, list);
+  }
+
+  const daysWithSessions: Array<{
+    dayLabel: string;
+    sessions: Array<{ title: string; type: "swim" | "strength" }>;
+  }> = [];
+  for (let i = 0; i < dates.length; i++) {
+    const sessions = sessionsByDate.get(dates[i]) ?? [];
+    if (sessions.length === 0) continue;
+    daysWithSessions.push({ dayLabel: DAY_LABELS_SHORT[i], sessions });
   }
 
   if (daysWithSessions.length === 0) return null;
