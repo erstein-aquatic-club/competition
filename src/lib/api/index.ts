@@ -429,3 +429,17 @@ export {
   updateChronoRecord,
   deleteChronoRecord,
 } from './chrono-records';
+
+// Coach QuickView (substitute coach briefing + write flow)
+export {
+  getSwimmerBriefing,
+  recordAttendanceAsSub,
+  addSessionCommentAsSub,
+  assignSessionToSlotAsSub,
+  type SwimmerBriefing,
+  type SwimmerBriefingProfile,
+  type SwimmerBriefingWellness,
+  type SwimmerBriefingLoad,
+  type SwimmerBriefingSession,
+  type AttendanceStatus,
+} from './coach-quickview';
