@@ -9659,3 +9659,52 @@ Dans `slotInstancesById` (`CoachTrainingSlotsScreen.tsx`), la branche swimmer ne
 
 - La page "fiche nageur" (onglet Créneaux, `SwimmerSlotsTab`) reste le point d'entrée canonique pour gérer les swimmer_slots d'un athlète. La vue semaine coach propose maintenant un raccourci éditorial pour les cas de customisation rapide.
 - Le create via cette voie n'expose pas le choix du `source_assignment_id` — les slots créés sont "libres" (sans miroir d'une assignation de groupe). Acceptable pour un slot vraiment personnel ; si l'utilisateur veut hériter d'un créneau groupe, passer par `resetSwimmerSlots` (fiche nageur).
+
+## §139 — Vue semaine coach : héritage créneaux persos sur dates antérieures à un stage (2026-04-19)
+
+### Contexte
+
+Après §137, un cas restait non résolu : sur les dates **antérieures au démarrage d'un stage** (groupe temporaire), les créneaux personnalisés d'un nageur n'affichaient pas les assignations du groupe — alors que la vue "all" les affichait correctement.
+
+### Root cause
+
+`resolveSwimmerAssignmentsBatch` (utilisé par §137) filtre les assignations groupe via `visibleGroupIds = hasActiveTemporary ? temporaryGroupIds : permanentGroupIds` — c'est-à-dire l'état **courant** (aujourd'hui) de l'appartenance du nageur. Quand le nageur est aujourd'hui dans un stage actif (`hasActiveTemporary = true`), toutes les assignations passées ciblant son groupe permanent sont écartées → slots vides pour les dates antérieures au stage.
+
+La vue coach "all" n'a pas ce problème parce que `resolveSlotAssignment` matche directement via `training_slot_id`, sans se soucier de l'état temporel de l'appartenance du nageur.
+
+### Changements
+
+Remplacement de la résolution basée sur `resolveSwimmerAssignmentsBatch` par une résolution cohérente avec la vue "all" :
+
+1. Nouvelle requête `coach-swimmer-source-training-slot` : fetch des `training_slot_assignments` pour les `source_assignment_id` des `swimmer_training_slots`, construit une map `source_assignment_id → training_slot_id`.
+2. Map dérivée `swimmer_slot.id → original training_slot.id`.
+3. Map des `TrainingSlot` par `id` (reuse de la query `slots`).
+4. Dans `slotInstancesById` :
+   - Si swimmer mode + swim slot : retrouver le créneau groupe d'origine via la map, puis `resolveSlotAssignment(originalSlot, scheduledDate, slotAssignments)`. Exactement le même path que la vue "all".
+   - Si swimmer mode + strength slot : vide (inchangé depuis §138).
+   - Sinon : `resolveSlotAssignment` habituel.
+
+Suppression de l'import `resolveSwimmerAssignmentsBatch` (plus utilisé dans cette vue).
+
+### Fichiers modifiés
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | nouvelle résolution basée sur le créneau groupe d'origine | ~3215 lignes (vs ~3198 avant) |
+
+### Tests
+
+- `npx tsc --noEmit` → 0 erreur sur mon fichier (erreurs de merge conflict pré-existantes dans `src/lib/api/wellness.ts` non touchées — cherry-pick externe en cours).
+- Tests filtre `node coachTrainingSlotsFilter.test.ts` → 4 pass.
+- Tests RLS non lancés : aucune migration/policy/helper modifiée.
+
+### Décisions
+
+- **Ne pas toucher `resolveSwimmerAssignmentsBatch`** : utilisé aussi par la vue nageur (Dashboard). Modifier son filtrage groupe changerait le comportement côté nageur (où `visibleGroupIds` est la bonne sémantique : "ce que je dois faire aujourd'hui" dans la logique stage).
+- **Re-résolution basée sur le créneau groupe d'origine** : choix assumé de traiter la vue coach swimmer-filter comme un "miroir" du coach "all" pour le nageur concerné. Un coach qui filtre par un nageur veut voir *les mêmes assignations que le groupe voit*, pas *ce que le nageur voit dans son dashboard aujourd'hui*.
+- **Pas de fallback timing bucket** : si le swimmer_slot n'a pas de `source_assignment_id` (slot vraiment personnel créé sans template), ou si la training_slot d'origine est désactivée/supprimée, le slot reste vide. C'est cohérent avec l'intuition "créneau hors planning groupe = rien à hériter". Si le coach veut assigner individuellement, il doit passer par le libellé "individuel" des assignations (target_user_id), hors scope ici.
+
+### Limites
+
+- Un slot personnel sans `source_assignment_id` ne peut pas inherit de session — il n'est pas lié à un créneau groupe. Comportement attendu.
+- Les assignations `target_user_id = userId` (individuelles, sans `training_slot_id`) ne sont pas résolues sur les slots persos par cette approche. `resolveSlotAssignment` les traite uniquement via bucket fallback, et seulement si leur `training_slot_id` est null — pas notre scénario habituel. Cas rare et explicitement hors scope (voir Décisions).

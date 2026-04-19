@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-18 (§138 Vue semaine coach — ne pas hériter de séances nage sur créneaux salle + éditer swimmer_slots en place)*
+*Dernière mise à jour : 2026-04-19 (§139 Vue semaine coach — héritage créneaux persos sur dates antérieures à un stage)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -85,6 +85,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 100 | Restructuration CLAUDE.md — annuaire fichiers externalisé, -56% tokens au démarrage | Basse | Faible | Fait (§136) |
 | 101 | Fix vue semaine coach — assignations invisibles pour nageur à créneaux personnalisés | Haute | Faible | Fait (§137) |
 | 102 | Vue semaine coach — ne pas hériter de séances nage sur créneaux salle + éditer swimmer_slots en place | Haute | Faible | Fait (§138) |
+| 103 | Vue semaine coach — héritage créneaux persos sur dates antérieures à un stage | Haute | Faible | Fait (§139) |
 
 ---
 

@@ -9,14 +9,14 @@ import type {
 } from "@/lib/api/types";
 import type { SlotInstance } from "@/hooks/useSlotCalendar";
 import { computeSlotState, resolveSlotAssignment, sumAssignedDistance } from "@/hooks/useSlotCalendar";
-import { deriveScheduledSlot, resolveSwimmerAssignmentsBatch } from "@/lib/api/assignments";
+import { deriveScheduledSlot } from "@/lib/api/assignments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 import type { SharePayload } from "@/lib/share/types";
-import { fetchUserGroupIdsWithContext } from "@/lib/api/client";
+import { fetchUserGroupIdsWithContext, supabase } from "@/lib/api/client";
 import { filterCoachTrainingSlots } from "./coachTrainingSlotsFilter";
 
 // Lazy-loaded sheets : ces deux composants ne sont rendus qu'à l'ouverture
@@ -2050,46 +2050,62 @@ const CoachTrainingSlotsScreen = ({
       }),
   });
 
-  // When a swimmer with custom slots is selected, his swimmer_training_slots IDs
-  // don't match session_assignments.training_slot_id (which points to the group's
-  // training_slot). Reuse the swimmer-side resolver to map each custom slot to
-  // the assignment it inherits via source_assignment_id + group membership.
-  const weekIsoDates = useMemo(
-    () => weekDates.map((d) => toIsoDate(d)),
-    [weekDates],
+  // When a swimmer with custom slots is selected, his swimmer_training_slots
+  // don't own any session_assignments (those are tied to the group's
+  // training_slot via source_assignment_id → training_slot_assignments.slot_id).
+  // We resolve each custom slot to its inherited group training_slot and then
+  // call `resolveSlotAssignment` on that group slot — giving the coach the
+  // same result as the "all" view, immune to the swimmer's group-membership
+  // drift over time (e.g. a temp-group stage that wasn't active 2 weeks ago).
+  const swimmerSourceAssignmentIds = useMemo(
+    () =>
+      (swimmerSlots ?? [])
+        .map((s) => s.source_assignment_id)
+        .filter((id): id is string => id != null),
+    [swimmerSlots],
   );
 
-  const { data: resolvedSwimmerAssignments } = useQuery({
+  const { data: sourceTrainingSlotIdByAssignmentId } = useQuery({
     queryKey: [
-      "coach-resolved-swimmer-assignments",
+      "coach-swimmer-source-training-slot",
       swimmerFilterId,
-      weekMondayIso,
+      swimmerSourceAssignmentIds,
     ],
-    queryFn: () =>
-      resolveSwimmerAssignmentsBatch(swimmerFilterId!, weekIsoDates),
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      if (!swimmerSourceAssignmentIds.length) return map;
+      const { data, error } = await supabase
+        .from("training_slot_assignments")
+        .select("id, slot_id")
+        .in("id", swimmerSourceAssignmentIds);
+      if (error) throw new Error(error.message);
+      for (const row of data ?? []) {
+        map.set(String(row.id), String(row.slot_id));
+      }
+      return map;
+    },
     enabled: swimmerFilterId != null && swimmerHasCustom === true,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 
-  // "swimmerSlotId:YYYY-MM-DD" → assignmentId
-  const swimmerAssignmentIdByKey = useMemo(() => {
-    const map = new Map<string, number>();
-    if (!resolvedSwimmerAssignments) return map;
-    for (const [iso, list] of resolvedSwimmerAssignments.entries()) {
-      for (const r of list) {
-        if (r.assignmentId != null) {
-          map.set(`${r.swimmerSlotId}:${iso}`, r.assignmentId);
-        }
-      }
+  // swimmer_slot.id → source training_slot.id (the group's recurring slot
+  // this custom slot was cloned from).
+  const sourceTrainingSlotBySwimmerSlot = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!swimmerSlots || !sourceTrainingSlotIdByAssignmentId) return map;
+    for (const s of swimmerSlots) {
+      if (!s.source_assignment_id) continue;
+      const tsId = sourceTrainingSlotIdByAssignmentId.get(s.source_assignment_id);
+      if (tsId) map.set(s.id, tsId);
     }
     return map;
-  }, [resolvedSwimmerAssignments]);
+  }, [swimmerSlots, sourceTrainingSlotIdByAssignmentId]);
 
-  const slotAssignmentById = useMemo(() => {
-    const map = new Map<number, typeof slotAssignments[number]>();
-    for (const a of slotAssignments) map.set(a.id, a);
+  const trainingSlotById = useMemo(() => {
+    const map = new Map<string, TrainingSlot>();
+    for (const s of slots) map.set(s.id, s);
     return map;
-  }, [slotAssignments]);
+  }, [slots]);
 
   const weekOverrides = useMemo(() => {
     return allOverrides.filter(
@@ -2136,20 +2152,21 @@ const CoachTrainingSlotsScreen = ({
 
       let assignment;
       if (useSwimmerResolution) {
-        // slotAssignments only carries swim session_assignments, so strength
-        // (salle) swimmer-slots must stay empty — otherwise the timing-bucket
-        // fallback inside resolveSwimmerAssignmentsBatch can match a swim
-        // assignment to a salle slot.
-        if (slot.session_type === "swim") {
-          const assignmentId = swimmerAssignmentIdByKey.get(
-            `${slot.id}:${scheduledDate}`,
-          );
-          assignment =
-            assignmentId != null
-              ? slotAssignmentById.get(assignmentId)
-              : undefined;
-        } else {
+        // Strength (salle) slots don't carry swim assignments. Keep empty.
+        if (slot.session_type !== "swim") {
           assignment = undefined;
+        } else {
+          // Resolve via the group's training_slot the swimmer inherits from —
+          // same path as coach "all" view, so the swimmer-filter reflects
+          // exactly what's assigned to the group regardless of the swimmer's
+          // current group membership (fixes past dates before a temp group).
+          const sourceTsId = sourceTrainingSlotBySwimmerSlot.get(slot.id);
+          const originalSlot = sourceTsId
+            ? trainingSlotById.get(sourceTsId)
+            : undefined;
+          assignment = originalSlot
+            ? resolveSlotAssignment(originalSlot, scheduledDate, slotAssignments)
+            : undefined;
         }
       } else {
         assignment = resolveSlotAssignment(slot, scheduledDate, slotAssignments);
@@ -2178,8 +2195,8 @@ const CoachTrainingSlotsScreen = ({
     weekOverrides,
     swimmerFilterId,
     swimmerHasCustom,
-    swimmerAssignmentIdByKey,
-    slotAssignmentById,
+    sourceTrainingSlotBySwimmerSlot,
+    trainingSlotById,
   ]);
 
   const weekTotalDistance = useMemo(
