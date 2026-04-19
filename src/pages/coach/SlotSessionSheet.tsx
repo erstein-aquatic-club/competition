@@ -5,7 +5,7 @@
  * Behavior adapts to SlotState (empty / draft / published / cancelled).
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -74,7 +74,7 @@ import {
 } from "@/lib/api/swim";
 import { getAssignedSwimCatalogIds } from "@/lib/api/assignments";
 import { ShareMenu } from "@/components/shared/ShareMenu";
-import { parseSwimText, type SwimBlock } from "@/lib/swimTextParser";
+import { detectTextWarnings, parseSwimText, type SwimBlock, type TextWarning } from "@/lib/swimTextParser";
 import type { SwimSessionTemplate } from "@/lib/api/types";
 import {
   buildItemsFromBlocks,
@@ -643,6 +643,15 @@ function QuickComposeBody({
   const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
   const hasGroup = selectedGroups.length > 0;
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  const syncScroll = useCallback(() => {
+    if (backdropRef.current && textareaRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  }, []);
+
   // ── Live parse ──
   const parsedBlocks = useMemo<SwimBlock[]>(() => {
     if (!rawText.trim()) return [];
@@ -657,6 +666,29 @@ function QuickComposeBody({
     () => buildItemsFromBlocks(parsedBlocks),
     [parsedBlocks],
   );
+
+  const textWarnings = useMemo<TextWarning[]>(
+    () => (showBlocks && rawText.trim() ? detectTextWarnings(rawText) : []),
+    [showBlocks, rawText],
+  );
+
+  const backdropLines = useMemo(() => {
+    if (textWarnings.length === 0) return null;
+    const warningSet = new Set(textWarnings.map((w) => w.lineIndex));
+    return rawText.split("\n").map((line, i) => (
+      <span key={i}>
+        <span
+          className={cn(
+            "text-transparent",
+            warningSet.has(i) && "rounded-[2px] bg-amber-200/70 dark:bg-amber-700/40",
+          )}
+        >
+          {line || "\u200B"}
+        </span>
+        {"\n"}
+      </span>
+    ));
+  }, [rawText, textWarnings]);
 
   const totalDistance = useMemo(
     () => calculateSwimTotalDistance(parsedItems),
@@ -871,17 +903,33 @@ function QuickComposeBody({
                 "md:flex-row md:items-stretch",
             )}
           >
-            <textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              placeholder={"Collez ou tapez votre séance ici…\n\nEx.\nÉchauffement\n4x100 crawl V1 R30\n\nCorps\n2x(4x100 NL V3)\n6x50 papillon V2"}
+            <div
               className={cn(
-                "min-h-[200px] w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring",
-                showBlocks &&
-                  parsedBlocks.length > 0 &&
-                  "md:flex-1 md:min-h-[340px] md:resize-none",
+                "relative rounded-2xl border border-border bg-card focus-within:ring-2 focus-within:ring-ring",
+                showBlocks && parsedBlocks.length > 0 && "md:flex-1",
               )}
-            />
+            >
+              {backdropLines && (
+                <div
+                  ref={backdropRef}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words"
+                >
+                  {backdropLines}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                onScroll={syncScroll}
+                placeholder={"Collez ou tapez votre séance ici…\n\nEx.\nÉchauffement\n4x100 crawl V1 R30\n\nCorps\n2x(4x100 NL V3)\n6x50 papillon V2"}
+                className={cn(
+                  "relative min-h-[200px] w-full resize-y bg-transparent px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none",
+                  showBlocks && parsedBlocks.length > 0 && "md:min-h-[340px] md:resize-none",
+                )}
+              />
+            </div>
             {showBlocks && parsedBlocks.length > 0 && (
               <div className="md:flex-1 rounded-2xl border border-border/50 bg-muted/10 p-2 md:max-h-[420px] md:overflow-y-auto">
                 <SwimSessionTimeline
