@@ -656,6 +656,9 @@ function SlotCell({
   const style = FILIERE_STYLES[color] ?? FILIERE_STYLES.sky;
   const hasSession = !!slot.session_id;
   const overridden = slot.overridden === true && showOverrideBadge;
+  // In athlete mode, inherited (non-overridden) group slots get reduced
+  // opacity as a subtle hint that tapping them creates an individual override.
+  const inheritedInAthleteMode = showOverrideBadge && !overridden;
   const sessionName = slot.session_id
     ? sessionNameMap.get(String(slot.session_id))
     : undefined;
@@ -674,6 +677,7 @@ function SlotCell({
           "relative h-full flex-1 min-w-0 rounded-l-lg flex items-center justify-center px-1.5 transition-all active:scale-[0.97]",
           style.bg,
           overridden && "ring-2 ring-dashed ring-primary/50",
+          inheritedInAthleteMode && "opacity-70",
         )}
         onClick={onTap}
         aria-label={`Modifier: ${filiere?.short ?? slot.filiere}${overridden ? " (filière individuelle)" : ""}`}
