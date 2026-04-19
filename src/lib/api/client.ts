@@ -45,6 +45,7 @@ export const STORAGE_KEYS = {
   TIMESHEET_SHIFTS: "suivi_natation_timesheet_shifts",
   TIMESHEET_LOCATIONS: "suivi_natation_timesheet_locations",
   CHRONO_BACKUP: "eac-chrono-backup",
+  CHRONO_SAVE_QUEUE: "eac-chrono-save-queue",
 } as const;
 
 // --- Safe type conversions ---
