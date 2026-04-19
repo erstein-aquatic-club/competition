@@ -8,6 +8,7 @@ import {
   parseSwimText,
   normalizeIntensityValue,
   normalizeEquipmentValue,
+  detectTextWarnings,
 } from "@/lib/swimTextParser";
 
 // ── classifyLine ──
@@ -22,6 +23,16 @@ describe("classifyLine", () => {
     assert.equal(classifyLine("x2").type, "block_rep");
     assert.equal(classifyLine("x3").type, "block_rep");
     assert.equal(classifyLine("x2 (4*200 Cr V0 W relachement r : 20'' + r : 1'00) mat. AC").type, "block_rep");
+  });
+
+  test("block_rep: Nx (...) — digit-first form", () => {
+    assert.equal(classifyLine("3x  (1x papillon 1x dos 1x crawl)").type, "block_rep");
+    assert.equal(classifyLine("2x (4*100 Cr V2)").type, "block_rep");
+  });
+
+  test("exercise: Nx without parens stays exercise", () => {
+    assert.equal(classifyLine("8x 50 d:55''").type, "exercise");
+    assert.equal(classifyLine("16x 25 + PC papillon d:35''").type, "exercise");
   });
 
   test("exercise: starts with digit", () => {
@@ -470,5 +481,59 @@ x3
     assert.ok(blocks.length >= 1);
     assert.equal(blocks[0].exercises[0].distance, 800);
     assert.ok(blocks[0].exercises[0].modalities.includes("100 Cr / 100 Cr-D pull"));
+  });
+
+  test("Fix 1 — 3x (...) extrait repetitions=3", () => {
+    const text = `3x  (1x papillon 1x dos 1x crawl)`;
+    const blocks = parseSwimText(text);
+    const repBlock = blocks.find((b) => (b.repetitions ?? 1) === 3);
+    assert.ok(repBlock, "Should find a block with repetitions=3");
+  });
+
+  test("Fix 1 — 8x 50 sans parens reste un exercise 8×50", () => {
+    const text = `8x 50 d:55''`;
+    const blocks = parseSwimText(text);
+    assert.ok(blocks.length >= 1);
+    const ex = blocks[0].exercises[0];
+    assert.equal(ex.repetitions, 8);
+    assert.equal(ex.distance, 50);
+  });
+
+  test("Fix 2 — ligne commençant par NNN'' = temps, distance=null", () => {
+    const blocks = parseSwimText(`x6\n20'' jbes vertical @ 30''\n+ 50 EZ`);
+    const b = blocks.find((b) => (b.repetitions ?? 1) === 6);
+    assert.ok(b, "Block x6 should exist");
+    const timedEx = b!.exercises.find((e) => e.distance === null || e.distance === 0);
+    assert.ok(timedEx, "Timed exercise should have null/0 distance");
+    const swimEx = b!.exercises.find((e) => e.distance === 50);
+    assert.ok(swimEx, "50m EZ should be parsed");
+  });
+});
+
+// ── detectTextWarnings ──
+
+describe("detectTextWarnings", () => {
+  test("no warnings on clean text", () => {
+    const text = `300 Cr EZ\n8*50 jbes V1 @ 55''\n200 NAC`;
+    assert.deepEqual(detectTextWarnings(text), []);
+  });
+
+  test("warns on time-notation line (20'' jbes vertical)", () => {
+    const text = `x6\n20'' jbes vertical @ 30''\n+ 50 EZ`;
+    const warnings = detectTextWarnings(text);
+    assert.ok(warnings.length >= 1, "Should have at least 1 warning");
+    assert.ok(warnings.some((w) => w.type === "time_as_distance"), "Should warn time_as_distance");
+    assert.ok(warnings.some((w) => w.lineIndex === 1), "Warning should be on line index 1");
+  });
+
+  test("warns on split-distance pattern (1* 15 VMax / 10 EZ)", () => {
+    const text = `1* 15 VMax hypoxie / 10 EZ`;
+    const warnings = detectTextWarnings(text);
+    assert.ok(warnings.some((w) => w.type === "split_distance"), "Should warn split_distance");
+  });
+
+  test("empty text returns no warnings", () => {
+    assert.deepEqual(detectTextWarnings(""), []);
+    assert.deepEqual(detectTextWarnings("   "), []);
   });
 });

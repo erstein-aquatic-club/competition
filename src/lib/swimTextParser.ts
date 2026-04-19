@@ -94,8 +94,9 @@ export function classifyLine(raw: string): ClassifiedLine {
 
   if (!trimmed) return { type: "empty", raw, trimmed };
 
-  // block_rep: x2, x3, x2 (...) — must start with x followed by digit
+  // block_rep: x2, x3, x2 (...) — starts with x+digit, OR digit+x+paren e.g. "3x (...)"
   if (/^x\d+/i.test(trimmed)) return { type: "block_rep", raw, trimmed };
+  if (/^\d+x\s*\(/i.test(trimmed)) return { type: "block_rep", raw, trimmed };
 
   // sub_detail: starts with #
   if (trimmed.startsWith("#")) return { type: "sub_detail", raw, trimmed };
@@ -284,13 +285,16 @@ export function parseExerciseTokens(text: string): ExerciseTokens {
   const ascii = stripAccents(cleaned);
 
   // 2. Parse reps × distance: 3*100, 4x50, 8×25
+  // Guard: if the line starts with a time notation (e.g. "20'' jbes vertical") skip it as distance
+  const startsWithTime = /^\d+(?:''|"|″)/.test(cleaned);
+
   const repsDistMatch = cleaned.match(/(\d+)\s*[*x×]\s*(\d+)/i);
   if (repsDistMatch) {
     result.repetitions = Number(repsDistMatch[1]);
     if (result.repetitions > 50) result.repetitions = 50;
     result.distance = Number(repsDistMatch[2]);
-  } else {
-    // Distance alone: starts with a number
+  } else if (!startsWithTime) {
+    // Distance alone: starts with a number (but not a time notation)
     const distMatch = cleaned.match(/^(\d+)\b/);
     if (distMatch) {
       result.distance = Number(distMatch[1]);
@@ -548,8 +552,8 @@ function assembleBlock(raw: RawBlock, blockIndex: number): SwimBlock {
 
     switch (line.type) {
       case "block_rep": {
-        // x2, x3 (...) — extract repetitions and optional modalities in parens
-        const repMatch = line.trimmed.match(/^x(\d+)/i);
+        // x2, x3 (...) or 3x (...) — extract repetitions and optional modalities in parens
+        const repMatch = line.trimmed.match(/^x(\d+)/i) ?? line.trimmed.match(/^(\d+)x/i);
         if (repMatch) {
           block.repetitions = Math.min(Number(repMatch[1]), 50); // Cap to prevent absurd values
         }
@@ -738,4 +742,62 @@ export function parseSwimText(text: string): SwimBlock[] {
   }
 
   return merged;
+}
+
+// ── Text warnings ──
+
+export type TextWarningType = "time_as_distance" | "split_distance";
+
+export interface TextWarning {
+  lineIndex: number;
+  line: string;
+  type: TextWarningType;
+  message: string;
+}
+
+/**
+ * Scan raw workout text for patterns that produce incorrect or missing distances.
+ * Returns a list of warnings with line position and human-readable message.
+ * Does not modify parsing — purely diagnostic.
+ */
+export function detectTextWarnings(text: string): TextWarning[] {
+  if (!text || !text.trim()) return [];
+
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\u2018|\u2019/g, "'")
+    .replace(/\u00A0/g, " ");
+
+  const lines = normalized.split("\n");
+  const warnings: TextWarning[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+
+    // time_as_distance: line starts with N'' — parsed as distance but is actually a duration
+    if (/^\d+(?:''|"|″)/.test(trimmed)) {
+      warnings.push({
+        lineIndex: i,
+        line: trimmed,
+        type: "time_as_distance",
+        message: "Notation temps — non comptabilisé en mètres",
+      });
+      continue;
+    }
+
+    // split_distance: pattern "N* X ... / Y" where X and Y are distances separated by /
+    // e.g. "1* 15 VMax / 10 EZ" — only the first part (15m) is counted, 10m is lost
+    if (/^\d+\*\s*\d+\b.+\/\s*\d+/.test(trimmed)) {
+      warnings.push({
+        lineIndex: i,
+        line: trimmed,
+        type: "split_distance",
+        message: "Distance partielle — seule la première valeur est comptabilisée",
+      });
+    }
+  }
+
+  return warnings;
 }

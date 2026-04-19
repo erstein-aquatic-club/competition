@@ -7,6 +7,7 @@ import { SwimExerciseForm } from "./SwimExerciseForm";
 import { SessionMetadataForm } from "../shared/SessionMetadataForm";
 import { FormActions } from "../shared/FormActions";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   FileText,
@@ -20,8 +21,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { intensityTone } from "@/components/swim/IntensityDots";
 import { calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
-import { normalizeIntensityValue, parseSwimText } from "@/lib/swimTextParser";
-import type { SwimBlock, SwimExercise } from "@/lib/swimTextParser";
+import { detectTextWarnings, normalizeIntensityValue, parseSwimText } from "@/lib/swimTextParser";
+import type { SwimBlock, SwimExercise, TextWarning } from "@/lib/swimTextParser";
 import type { SwimSessionItem } from "@/lib/api";
 
 interface SwimSessionDraft {
@@ -151,6 +152,21 @@ export function SwimSessionBuilder({
     [session.blocks],
   );
 
+  const textWarnings = useMemo<TextWarning[]>(
+    () => (editorMode === "text" ? detectTextWarnings(rawText) : []),
+    [editorMode, rawText],
+  );
+
+  const nullDistanceCount = useMemo(
+    () =>
+      session.blocks.reduce(
+        (acc, block) =>
+          acc + block.exercises.filter((ex) => ex.distance === null).length * (block.repetitions ?? 1),
+        0,
+      ),
+    [session.blocks],
+  );
+
   const addBlock = () => {
     onSessionChange({
       ...session,
@@ -277,6 +293,15 @@ export function SwimSessionBuilder({
           showDuration={true}
           showTotalDistance={editorMode === "blocks"}
         />
+        {editorMode === "blocks" && nullDistanceCount > 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <span>
+              <span className="font-semibold">{nullDistanceCount} exercice{nullDistanceCount > 1 ? "s" : ""}</span>
+              {" sans distance — le total affiché peut être inférieur à la réalité"}
+            </span>
+          </div>
+        )}
 
         {/* Mode toggle: Blocs / Texte */}
         <div className="flex items-center rounded-xl border border-border bg-muted/50 p-0.5">
@@ -317,6 +342,25 @@ export function SwimSessionBuilder({
               placeholder={"Collez ou tapez votre séance ici…\n\nExemple :\nÉchauffement\n4x100 crawl V1 R30\n8x50 educ dos V0\n\nCorps de séance\n2x(4x100 NL V3 D1'30)\n6x50 papillon jambes V2 R20\n\nRetour au calme\n200 4N souple"}
               className="min-h-[280px] w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            {textWarnings.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {textWarnings.length} ligne{textWarnings.length > 1 ? "s" : ""} avec distance incertaine
+                </div>
+                <ul className="space-y-1">
+                  {textWarnings.map((w) => (
+                    <li key={w.lineIndex} className="text-[11px] text-amber-800 dark:text-amber-300">
+                      <span className="font-mono opacity-60">L{w.lineIndex + 1}</span>
+                      {" · "}
+                      <span className="font-medium">{w.message}</span>
+                      {" — "}
+                      <span className="opacity-75 break-all">{w.line.length > 50 ? `${w.line.slice(0, 50)}…` : w.line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => {
