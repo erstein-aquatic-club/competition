@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§149 Cascade annulation bucket swim → slots perso nageurs — get_swimmer_sessions filtre slots perso si tous les slots swim du groupe du bucket sont cancelled)*
+*Dernière mise à jour : 2026-04-19 (§150 Coach QuickView — mode dépannage pour coaches non-titulaires : briefing RPC + enregistrement présence/commentaire/séance avec recorded_by)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -95,6 +95,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 109 | Unification backend héritage séances nageur (RPC get_swimmer_sessions, absences par créneau, protection individuels) | Haute | Haute | Fait (§147) |
 | 110 | Fix KPI "Ressentis 30j" cards nageurs — rebase RPC sur get_swimmer_sessions (swim-only + bucket match + absences) | Haute | Faible | Fait (§148) |
 | 111 | Cascade annulation bucket swim → slots perso nageurs (get_swimmer_sessions) | Haute | Moyenne | Fait (§149) |
+| 112 | Coach QuickView — mode dépannage pour coaches non-titulaires (briefing RPC SECURITY DEFINER + attendance/comment/assign avec recorded_by) | Haute | Haute | Fait (§150) |
 
 ---
 

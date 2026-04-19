@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §149 (Cascade annulation bucket swim → slots perso nageurs — `get_swimmer_sessions` filtre les slots perso swim si tous les slots swim du groupe sur le même bucket/date sont `status='cancelled'` ; cleanup DB 04-06 Lundi de Pâques ; François passe de 13/18 à 12/13).
+Dernière entrée en date : §150 (Coach QuickView — mode dépannage pour coaches non-titulaires : briefing RPC SECURITY DEFINER + enregistrement présence/commentaire/séance avec `recorded_by` ; dispatcher thin `CoachSwimmerDetail` ; 4 composants KPI swimmer-kpis).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

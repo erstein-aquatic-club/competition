@@ -10303,3 +10303,75 @@ Le 13/18 = 72% est le vrai taux de complétion de feedback pour François. Le 13
 
 - Aucune contre-vérification automatisée (pas de test RLS intégration pour cette RPC). Si la v5 dérive, le badge deviendrait silencieusement incorrect. Ajouter un test dans `supabase/tests/rls/feedback_rates.test.ts` serait une amélioration V+1.
 - Pas de tracking du delta v4→v5 pour chaque athlète (on ne log pas "ton KPI changé de X à Y"). Si des coaches étaient habitués à lire les anciens chiffres, il faudra leur communiquer.
+
+---
+
+## §150 — Coach QuickView : mode dépannage pour coaches non-titulaires (2026-04-19)
+
+### Contexte
+
+Quand un coach substituant cliquait sur la fiche d'un nageur qu'il ne gérait pas, il se heurtait à un écran "Accès refusé" bloquant. Ce §150 remplace ce mur par un briefing lecture-seule "mode dépannage" permettant au substituant d'enregistrer la présence, d'ajouter un commentaire de séance, et d'assigner une séance à un créneau vide — toutes les saisies portant un `recorded_by` permettant d'identifier le substituant dans les vues du titulaire.
+
+### Changements
+
+**Migrations SQL (3 fichiers, branche `feat/coach-quickview`, à appliquer via MCP) :**
+
+- `00133_coach_quickview_recorded_by.sql` (~52 L) : crée `session_attendance` (id UUID, session_id INT→dim_sessions, athlete_id INT→users, recorded_by UUID→auth.users, status CHECK IN('present','absent','late'), comment TEXT, UNIQUE session+athlete) et `session_comments` (id UUID, dim_session_id, athlete_id INT→users, author_user_id INT, recorded_by UUID, body TEXT 1–500). Ajoute `recorded_by UUID` sur `swim_planning_slot_overrides` et `swim_planning_slots`.
+
+- `00134_coach_quickview_rls.sql` (~63 L) : policies RLS sur `session_attendance` (SELECT coach/admin/comité all, athlete own ; INSERT coach/admin WITH CHECK recorded_by = auth.uid() ; UPDATE coach/admin USING recorded_by = auth.uid()) et `session_comments` (même pattern SELECT, INSERT coach/admin).
+
+- `00135_get_swimmer_quickview_briefing.sql` (~165 L) : RPC `get_swimmer_quickview_briefing(p_athlete_id INTEGER) RETURNS JSONB SECURITY DEFINER`. Gate `app_user_role() NOT IN ('coach', 'admin')`. Renvoie profile, wellness_today (readiness_score), pain_summary (zones JSON), load_summary (volume 7j/28j), objectives_short (max 4), recent_perfs (max 3 swimmer_performances 90j), today_session (session_assignments + catalog). Bridging integer→UUID via `JOIN auth.users ON email = public.users.email`.
+
+**API module :**
+
+- `src/lib/api/coach-quickview.ts` (~143 L) : `getSwimmerBriefing`, `recordAttendanceAsSub` (upsert UNIQUE), `addSessionCommentAsSub` (auth.getUser() pour recorded_by), `assignSessionToSlotAsSub`.
+- `src/lib/api/index.ts` : re-exports des 4 fonctions + types (`SwimmerBriefing`, `AttendanceStatus`).
+
+**Routing dispatcher :**
+
+- `src/pages/coach/CoachSwimmerDetail.tsx` (533 L → 33 L) : dispatcher thin — calcule `hasAccess = swimmerIds.has(athleteId)`, route vers `CoachSwimmerFullView` (titulaire) ou `CoachSwimmerQuickView` (substituant).
+- `src/pages/coach/CoachSwimmerFullView.tsx` (NEW ~528 L) : renommage de l'ancien `CoachSwimmerDetail` — contenu identique, nom de composant mis à jour.
+
+**QuickView page :**
+
+- `src/pages/coach/CoachSwimmerQuickView.tsx` (~346 L) : remplace le placeholder 9 L. Exporte `QuickViewContent` (présentationnel pur, utilisé dans les tests) + default wrapper data. Layout : header → ruban ambre "Mode dépannage" → carte identité → briefing (SwimmerFormBadge + PainIndicator) → LoadMini → ObjectiveChips (conditionnel) → rail PerfCard (conditionnel) → SessionTodayBlock (3 états) → pied de page sticky. `useQuery` staleTime 2 min.
+
+- `src/pages/coach/QuickViewAttendanceDialog.tsx` (~90 L) : RadioGroup Présent/Absent/Retard + Textarea 200 car. `supabase.auth.getUser()` in-handler pour `recorded_by`.
+- `src/pages/coach/QuickViewCommentDialog.tsx` (~78 L) : Textarea 500 car + compteur live, appelle `addSessionCommentAsSub`.
+- `src/pages/coach/QuickViewAssignDrawer.tsx` (~176 L) : Sheet bottom 2 tabs (Bibliothèque / Nouvelle). Bibliothèque : `useQuery getSwimCatalog` + search client-side. Nouvelle : création ad-hoc swim_sessions_catalog + assignation. Invalidate `['coach-quickview-briefing', athleteId]` après succès.
+
+**KPI components (src/components/coach/swimmer-kpis/) :**
+
+- `SwimmerFormBadge.tsx` (~51 L) : badge couleur (vert/ambre/rouge) sur readiness_score + heure formatée manuellement.
+- `PainIndicator.tsx` (~36 L) : dot couleur selon `reports_7d`.
+- `LoadMini.tsx` (~34 L) : grille 3 colonnes km / séances / RPE.
+- `ObjectiveChips.tsx` (~37 L) : chips event_code + temps formaté.
+
+**Tests :**
+
+- `src/lib/api/__tests__/coach-quickview.test.ts` : 3 cas (null, throw attendance, throw comment) — Node.js built-in runner avec `mock.module`.
+- `src/pages/coach/__tests__/CoachSwimmerQuickView.test.tsx` : 4 cas renderToStaticMarkup sur `QuickViewContent`.
+- `src/pages/coach/__tests__/QuickViewAttendanceDialog.test.tsx` : interface check (hooks context non disponible en SSR).
+- `src/pages/coach/__tests__/QuickViewCommentDialog.test.tsx` : idem.
+- `src/pages/coach/__tests__/QuickViewAssignDrawer.test.tsx` : interface check.
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur.
+- `npm test` (Vitest) : tous les tests précédents OK (no regression).
+- Node built-in runner : 10 tests QuickView pass.
+- RLS intégration (Task 13) : **en attente Docker** — à exécuter avant merge sur main.
+
+### Décisions
+
+- **Thin dispatcher** : `CoachSwimmerDetail` réduit de 533 L à 33 L — `hasAccess` calculé avec `useMySwimmerIds` existant, pas de nouvelle API.
+- **SECURITY DEFINER RPC** : lecture via fonction SQL plutôt que RLS multi-tables directes — garantit que seuls les champs whitelistés sont exposés.
+- **Bridging integer→UUID** dans la RPC : les `objectives.athlete_id` sont UUID, l'input est INTEGER → JOIN via email dans `auth.users`. Sans tables.
+- **`assignSessionToSlotAsSub`** insère dans `session_assignments` plutôt que de modifier `swim_planning_slots` — cohérent avec le pattern existant, n'invalide pas les séances déjà planifiées.
+- **Drawer minimal from scratch** (176 L) plutôt que refactoring `SlotSessionSheet` (1443 L) — ROI inverse vu la complexité d'extraction.
+
+### Limites
+
+- **Task 14 (attribution badges)** non implémentée : `session_attendance` et `session_comments` sont de nouvelles tables sans affichage existant dans `SwimmerFeedbackTab` / `SwimmerSlotsTab`. Les badges d'attribution seront ajoutés dans un §dédié une fois l'affichage de ces données construit.
+- **RLS tests** (Task 13) nécessitent Docker Desktop — à valider avant merge.
+- **`assignSessionToSlotAsSub`** : le `slotId` passé est `assignment_id` (id de session_assignments), pas l'id d'un slot vide — la mise à jour `swim_planning_slot_overrides.recorded_by` est best-effort (silent fail si pas de match).
