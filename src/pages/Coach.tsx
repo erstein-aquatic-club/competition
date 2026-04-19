@@ -66,6 +66,7 @@ type CoachHomeProps = {
   onOpenRecordsAdmin: () => void;
   onOpenSwimPlanning: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
+  onOpenWeekAt: (weekDate: string) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
   kpiLoading: boolean;
@@ -217,6 +218,7 @@ const CoachHome = ({
   onOpenRecordsAdmin,
   onOpenSwimPlanning,
   onOpenAthlete,
+  onOpenWeekAt,
   athletes,
   athletesLoading,
   kpiLoading,
@@ -237,6 +239,50 @@ const CoachHome = ({
     const jsDay = now.getDay(); // 0=Sun
     return jsDay === 0 ? 6 : jsDay - 1;
   }, [now]);
+
+  // ── Section "Créneaux à compléter (30j)" ──────────────────────
+  const { data: unassignedSlots = [], isLoading: unassignedLoading } = useQuery({
+    queryKey: ["unassigned-slots-30d"],
+    queryFn: () => api.getUnassignedSlots30d(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [unassignedExpanded, setUnassignedExpanded] = useState(false);
+
+  function mondayIsoOfDate(dateIso: string): string {
+    const d = new Date(dateIso + "T00:00:00");
+    const jsDay = d.getDay();
+    const diff = jsDay === 0 ? -6 : 1 - jsDay;
+    d.setDate(d.getDate() + diff);
+    return formatDateIso(d);
+  }
+
+  const unassignedByWeek = useMemo(() => {
+    const weekGroups = new Map<string, typeof unassignedSlots>();
+    for (const slot of unassignedSlots) {
+      const mon = mondayIsoOfDate(slot.scheduled_date);
+      const list = weekGroups.get(mon) ?? [];
+      list.push(slot);
+      weekGroups.set(mon, list);
+    }
+    return Array.from(weekGroups.entries());
+  }, [unassignedSlots]);
+
+  const DOW_LABELS_SHORT = ["Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam.", "Dim."] as const;
+  function formatSlotDateLabel(dateIso: string): string {
+    const d = new Date(dateIso + "T00:00:00");
+    const jsDay = d.getDay();
+    const dowIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const month = d.toLocaleDateString("fr-FR", { month: "short" });
+    return `${DOW_LABELS_SHORT[dowIdx]} ${d.getDate()} ${month}`;
+  }
+  function formatSlotTimeLabel(start: string, end: string): string {
+    return `${start.slice(0, 5)}-${end.slice(0, 5)}`;
+  }
+  function formatWeekLabel(mondayIso: string): string {
+    const d = new Date(mondayIso + "T00:00:00");
+    return `Semaine du ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`;
+  }
 
   // ── Section B: Slot data ────────────────────────────────────
   const { data: slots = [] } = useQuery({
@@ -542,6 +588,82 @@ const CoachHome = ({
             )}
           </div>
         </button>
+      </section>
+
+      {/* ── Section B-bis: Créneaux à compléter (30j) ── */}
+      <section className="space-y-2.5">
+        <SectionLabel>Créneaux à compléter</SectionLabel>
+
+        {unassignedLoading ? (
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="h-4 w-48 animate-pulse rounded bg-muted" />
+          </div>
+        ) : unassignedSlots.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/25">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-[12px] font-semibold text-emerald-900 dark:text-emerald-200">
+              Tous les créneaux des 30 derniers jours sont assignés
+            </span>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <button
+              type="button"
+              onClick={() => setUnassignedExpanded((v) => !v)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-amber-100/60 dark:active:bg-amber-950/40"
+              aria-expanded={unassignedExpanded}
+            >
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span className="flex-1 text-[13px] font-semibold text-amber-900 dark:text-amber-200">
+                {unassignedSlots.length} créneau{unassignedSlots.length > 1 ? "x" : ""} à compléter
+                <span className="ml-1 text-[11px] font-normal text-amber-700/80 dark:text-amber-300/80">
+                  (30 derniers jours)
+                </span>
+              </span>
+              <ChevronRight
+                className={[
+                  "h-4 w-4 shrink-0 text-amber-600 transition-transform dark:text-amber-400",
+                  unassignedExpanded ? "rotate-90" : "",
+                ].join(" ")}
+              />
+            </button>
+
+            {unassignedExpanded && (
+              <div className="border-t border-amber-200/70 dark:border-amber-900/40">
+                {unassignedByWeek.map(([mondayIso, weekSlots]) => (
+                  <div key={mondayIso}>
+                    <div className="bg-amber-100/40 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200/70">
+                      {formatWeekLabel(mondayIso)}
+                    </div>
+                    <div className="divide-y divide-amber-200/50 dark:divide-amber-900/30">
+                      {weekSlots.map((slot) => (
+                        <button
+                          key={`${slot.slot_id}-${slot.scheduled_date}`}
+                          type="button"
+                          onClick={() => onOpenWeekAt(mondayIso)}
+                          className="flex w-full items-center gap-3 bg-white/60 px-4 py-2.5 text-left transition-colors active:bg-white/90 dark:bg-black/10 dark:active:bg-black/20"
+                        >
+                          <span className="text-[12px] font-semibold text-foreground min-w-[5.5rem]">
+                            {formatSlotDateLabel(slot.scheduled_date)}
+                          </span>
+                          <span className="text-[11px] tabular-nums text-muted-foreground">
+                            {formatSlotTimeLabel(slot.start_time, slot.end_time)}
+                          </span>
+                          {slot.location && (
+                            <span className="truncate text-[11px] text-muted-foreground/80">
+                              · {slot.location}
+                            </span>
+                          )}
+                          <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── Section C: Alertes (conditional) ── */}
@@ -1077,6 +1199,7 @@ export default function Coach() {
           onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
           onOpenAthlete={handleOpenAthlete}
+          onOpenWeekAt={(weekDate) => setRouteState({ section: "week", weekDate })}
           athletes={myAthletes}
           athletesLoading={athletesLoading}
           kpiLoading={coachKpisQuery.isLoading}
