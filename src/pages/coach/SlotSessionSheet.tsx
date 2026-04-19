@@ -648,7 +648,7 @@ function QuickComposeBody({
 
   const syncScroll = useCallback(() => {
     if (backdropRef.current && textareaRef.current) {
-      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.style.transform = `translateY(-${textareaRef.current.scrollTop}px)`;
     }
   }, []);
 
@@ -905,7 +905,7 @@ function QuickComposeBody({
           >
             <div
               className={cn(
-                "relative rounded-2xl border border-border bg-card focus-within:ring-2 focus-within:ring-ring",
+                "relative overflow-hidden rounded-2xl border border-border bg-card focus-within:ring-2 focus-within:ring-ring",
                 showBlocks && parsedBlocks.length > 0 && "md:flex-1",
               )}
             >
@@ -913,7 +913,7 @@ function QuickComposeBody({
                 <div
                   ref={backdropRef}
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words"
+                  className="pointer-events-none absolute inset-x-0 top-0 px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words"
                 >
                   {backdropLines}
                 </div>

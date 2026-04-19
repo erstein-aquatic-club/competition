@@ -1212,9 +1212,6 @@ export default function Coach() {
         <Suspense fallback={<PageSkeleton />}>
           <CoachWeekView
             groups={groups}
-            athletes={athletes}
-            swimSessions={swimSessions}
-            strengthSessions={strengthSessions}
             initialWeekDate={routeState.weekDate}
           />
         </Suspense>

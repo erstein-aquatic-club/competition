@@ -118,6 +118,7 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
 
   const { getSessionStatus, completionByISO } = useCompletionStatus({
     gridDates,
+    sessions,
     presenceDefaults,
     attendanceOverrideBySessionId,
     getSessionsForISO,

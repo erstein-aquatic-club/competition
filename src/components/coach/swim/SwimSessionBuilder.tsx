@@ -117,7 +117,7 @@ export function SwimSessionBuilder({
 
   const syncScroll = React.useCallback(() => {
     if (backdropRef.current && textareaRef.current) {
-      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.style.transform = `translateY(-${textareaRef.current.scrollTop}px)`;
     }
   }, []);
 
@@ -323,12 +323,12 @@ export function SwimSessionBuilder({
         {editorMode === "text" ? (
           /* ── Text mode ── */
           <div className="space-y-3">
-            <div className="relative rounded-2xl border border-border bg-card focus-within:ring-2 focus-within:ring-ring">
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-card focus-within:ring-2 focus-within:ring-ring">
               {backdropLines && (
                 <div
                   ref={backdropRef}
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words"
+                  className="pointer-events-none absolute inset-x-0 top-0 px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words"
                 >
                   {backdropLines}
                 </div>

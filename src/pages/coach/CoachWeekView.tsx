@@ -1,43 +1,22 @@
 import { lazy, Suspense, useState } from "react";
-import { CalendarDays, CalendarRange, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
 
 const CoachTrainingSlotsScreen = lazy(() => import("./CoachTrainingSlotsScreen"));
-const CoachCalendar = lazy(() => import("./CoachCalendar"));
 const SwimCatalog = lazy(() => import("./SwimCatalog"));
-
-type ViewMode = "week" | "month";
-const LS_KEY = "eac-coach-week-mode";
-
-function readMode(): ViewMode {
-  const v = localStorage.getItem(LS_KEY);
-  return v === "month" ? "month" : "week";
-}
 
 type CoachWeekViewProps = {
   groups: Array<{ id: number | string; name: string }>;
-  athletes: Array<{ id: number | null; display_name: string; group_label?: string | null }>;
-  swimSessions?: Array<{ id: number; name: string }>;
-  strengthSessions?: Array<{ id: number; title: string }>;
   initialWeekDate?: string;
 };
 
 export default function CoachWeekView({
   groups,
-  athletes,
-  swimSessions,
-  strengthSessions,
   initialWeekDate,
 }: CoachWeekViewProps) {
-  const [mode, setMode] = useState<ViewMode>(readMode);
   const [libraryContext, setLibraryContext] = useState<SwimLibraryEntryContext | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
-
-  const switchMode = (m: ViewMode) => {
-    setMode(m);
-    localStorage.setItem(LS_KEY, m);
-  };
 
   const handleOpenLibrary = (context?: SwimLibraryEntryContext) => {
     setLibraryContext(context ?? null);
@@ -71,59 +50,15 @@ export default function CoachWeekView({
     );
   }
 
-  const modeToggle = (
-    <div className="flex gap-1 rounded-xl border bg-card p-0.5">
-      <button
-        type="button"
-        onClick={() => switchMode("week")}
-        className={[
-          "flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-          mode === "week"
-            ? "bg-primary text-primary-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        ].join(" ")}
-      >
-        <CalendarDays className="h-3.5 w-3.5" />
-        Semaine
-      </button>
-      <button
-        type="button"
-        onClick={() => switchMode("month")}
-        className={[
-          "flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-          mode === "month"
-            ? "bg-primary text-primary-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        ].join(" ")}
-      >
-        <CalendarRange className="h-3.5 w-3.5" />
-        Mois
-      </button>
-    </div>
-  );
-
   return (
     <div className="space-y-2">
       {/* Content */}
       <Suspense fallback={<PageSkeleton />}>
-        {mode === "week" ? (
-          <CoachTrainingSlotsScreen
-            groups={groups}
-            onOpenLibrary={handleOpenLibrary}
-            modeToggle={modeToggle}
-            initialWeekDate={initialWeekDate}
-          />
-        ) : (
-          <>
-            <div className="flex justify-end">{modeToggle}</div>
-            <CoachCalendar
-              athletes={athletes}
-              groups={groups}
-              swimSessions={swimSessions}
-              strengthSessions={strengthSessions}
-            />
-          </>
-        )}
+        <CoachTrainingSlotsScreen
+          groups={groups}
+          onOpenLibrary={handleOpenLibrary}
+          initialWeekDate={initialWeekDate}
+        />
       </Suspense>
     </div>
   );

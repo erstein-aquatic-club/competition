@@ -219,3 +219,20 @@ Coûts mesurés — chaque token gaspillé est un token en moins pour le raisonn
 | Lire `supabase/tests/schema.sql` | 4 800 | **Uniquement si on ajoute une table/policy au schéma de test.** Pas pour un simple run. |
 
 **Règle générale** : le workflow normal (patch RLS → run tests → commit) coûte **~990 tokens** (docker ps + test output). Toute lecture de fichier test supplémentaire doit être justifiée par un besoin concret (modification, debug, ajout).
+
+### Gestion stricte du Contexte et des Sessions (NOUVEAU)
+
+L'utilisation de Claude Code consomme très vite le quota quotidien parce que le contexte de la session grossit à chaque question. **Il est vital de suivre cette hygiène** :
+
+1. **Cycle de vie court des sessions et Auto-nettoyage (IMPORTANT)**
+   - L'accumulation d'historique coûte extrêmement cher en tokens. 
+   - **Règle absolue pour toi (Claude)** : Dès que tu as validé un plan d'implémentation complet ou passé un jalon majeur sur une tâche, tu DOIS vider ou compacter ton contexte de manière totalement autonome sans demander d'intervention à l'utilisateur. 
+   - Utilise l'outil ou la commande appropriée à ta disposition (par ex. commande interne de compactage ou exécution autonome d'un vidage avec résumé).
+   - Assure-toi de garder en mémoire courte l'objectif principal et la référence au fichier de suivi (ex: `docs/ROADMAP.md`) lors du vidage pour ne pas perdre le fil. Ne notifie l'utilisateur que pour confirmer la complétion de la tâche et ton avancement, sans lui demander de taper de commandes de maintenance.
+
+2. **Choix du Modèle (Scaling) pour Claude Code**
+   - `claude --model claude-3-haiku-20240307` (ou alias `haiku`) : À utiliser en priorité pour des petits refactorings, des alignements visuels Tailwind, de l'édition d'un seul fichier, ou la rédaction d'un log. C'est presque gratuit.
+   - `claude` (par défaut Sonnet/Opus) : À réserver UNIQUEMENT pour les tâches où l'agent doit arpenter de nombreux fichiers, pour le design architectural global, ou la résolution d'un bug incompréhensible nécessitant une grande compréhension systémique.
+
+3. **Environnement purifié via `.claudeignore`**
+   Un fichier `.claudeignore` est désormais en place (ignorant `dist`, `node_modules`, `public`, `.git`, etc.) pour empêcher le glob/grep de siphonner des fichiers minifiés ou massifs non pertinents. Ne pas le supprimer. S'il y a un dossier lourd temporaire, ajoutez-le.

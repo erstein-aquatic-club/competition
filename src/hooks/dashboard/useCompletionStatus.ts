@@ -11,6 +11,7 @@ import {
 
 interface Params {
   gridDates: Date[];
+  sessions: Session[] | undefined;
   presenceDefaults: PresenceDefaults;
   attendanceOverrideBySessionId: AttendanceOverrides;
   getSessionsForISO: (iso: string) => PlannedSession[];
@@ -41,6 +42,7 @@ export type DayCompletion = {
  */
 export function useCompletionStatus({
   gridDates,
+  sessions,
   presenceDefaults,
   attendanceOverrideBySessionId,
   getSessionsForISO,
@@ -64,6 +66,15 @@ export function useCompletionStatus({
 
   const completionByISO = useMemo(() => {
     const map: Record<string, DayCompletion> = {};
+
+    // Pre-index logs by ISO date so the orphan pass below is O(1) per cell.
+    const logsByIso = new Map<string, Session[]>();
+    for (const s of (Array.isArray(sessions) ? sessions : [])) {
+      const iso = String(s?.date ?? "").slice(0, 10);
+      if (!iso) continue;
+      if (!logsByIso.has(iso)) logsByIso.set(iso, []);
+      logsByIso.get(iso)!.push(s);
+    }
 
     for (const d of gridDates) {
       const iso = toISODate(d);
@@ -98,11 +109,27 @@ export function useCompletionStatus({
         slots.push({ slotKey: s.slotKey, expected: true, completed: hasLog, absent: isAbsent, slotTime: s.slotTime });
       }
 
+      // Orphan logs: the swimmer logged a session outside any planned slot
+      // (extra training day, slot not in their personalised schedule). Count
+      // them as completed so the calendar dot reflects reality — aligned with
+      // SuiviSemaine which always surfaces every log.
+      const dayLogs = logsByIso.get(iso);
+      if (dayLogs && dayLogs.length > 0) {
+        for (const log of dayLogs) {
+          if (typeof log?.id !== "number" || usedLogIds.has(log.id)) continue;
+          usedLogIds.add(log.id);
+          const slotKey: SlotKey = log?.slot === "Soir" ? "PM" : "AM";
+          total += 1;
+          completed += 1;
+          slots.push({ slotKey, expected: true, completed: true, absent: false });
+        }
+      }
+
       map[iso] = { completed, total, slots };
     }
 
     return map;
-  }, [gridDates, getSessionsForISO, getSessionStatus, getLogForSession]);
+  }, [sessions, gridDates, getSessionsForISO, getSessionStatus, getLogForSession]);
 
   return { getSessionStatus, completionByISO };
 }

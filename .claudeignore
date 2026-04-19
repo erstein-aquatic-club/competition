@@ -1,0 +1,22 @@
+# Exclure les dossiers générés et les dépendances
+node_modules/
+dist/
+dist-ssr/
+coverage/
+
+# Exclure les dossiers système et Git
+.git/
+.worktrees/
+.DS_Store
+
+# Exclure les gros dossiers d'assets et statiques
+public/
+attached_assets/
+
+# Exclure des parties du framework/outillage si non modifiées fréquemment
+.storybook/
+playwright-report/
+test-results/
+
+# Exclure temporairement le schéma RLS massif sauf si on bosse explicitement dessus (les tests l'utilisent, mais l'agent Claude a rarement besoin de tout lister)
+# supabase/tests/rls/

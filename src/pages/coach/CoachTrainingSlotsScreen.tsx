@@ -302,7 +302,6 @@ type CoachTrainingSlotsScreenProps = {
   onBack?: () => void;
   groups: Array<{ id: number | string; name: string }>;
   onOpenLibrary?: (context?: SwimLibraryEntryContext) => void;
-  modeToggle?: React.ReactNode;
   initialWeekDate?: string;
 };
 
@@ -1849,7 +1848,6 @@ const CoachTrainingSlotsScreen = ({
   onBack,
   groups,
   onOpenLibrary,
-  modeToggle,
   initialWeekDate,
 }: CoachTrainingSlotsScreenProps) => {
   const { toast } = useToast();
@@ -3023,7 +3021,6 @@ const CoachTrainingSlotsScreen = ({
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Nouveau
         </Button>
-        {modeToggle}
       </div>
 
       {/* ── Desktop: row 2 — week navigation ── */}
