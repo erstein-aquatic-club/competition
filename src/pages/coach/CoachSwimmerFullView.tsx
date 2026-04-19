@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import CoachBreadcrumb from "@/components/shared/CoachBreadcrumb";
 import SwimmerFeedbackTab from "./SwimmerFeedbackTab";
 import SwimmerObjectivesTab from "./SwimmerObjectivesTab";
-import SwimmerPlanningTab from "./SwimmerPlanningTab";
+import SwimmerPlanningPanel from "./SwimmerPlanningPanel";
 import SwimmerInterviewsTab from "./SwimmerInterviewsTab";
 import SwimmerSlotsTab from "@/components/coach/SwimmerSlotsTab";
 import PlanningWizard from "@/components/coach/PlanningWizard";
@@ -460,12 +460,12 @@ export default function CoachSwimmerFullView({
                 <CollapsibleTrigger asChild>
                   <button type="button" className="w-full flex items-center gap-2 group">
                     <CalendarRange className="h-4 w-4 text-emerald-500" />
-                    <h2 className="text-sm font-semibold">Macro-cycles</h2>
+                    <h2 className="text-sm font-semibold">Planification natation</h2>
                     <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
-                  <SwimmerPlanningTab athleteId={athleteId} />
+                  <SwimmerPlanningPanel athleteId={athleteId} />
                 </CollapsibleContent>
               </Collapsible>
             </>
