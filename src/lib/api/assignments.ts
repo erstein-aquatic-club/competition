@@ -330,7 +330,13 @@ export function deriveScheduledSlot(startTime: string): "morning" | "evening" {
   return hour < 13 ? "morning" : "evening";
 }
 
-/** Create one assignment per group for a session on a specific slot+date */
+/**
+ * Create one assignment per group for a session on a specific slot+date.
+ *
+ * Individual assignments (target_user_id IS NOT NULL) on the same slot+date
+ * are NOT modified — they are fetched before the insert so the caller can
+ * inform the coach that those swimmers keep their personal session (§144).
+ */
 export async function bulkCreateSlotAssignments(params: {
   swimCatalogId: number;
   trainingSlotId: string;
@@ -340,7 +346,14 @@ export async function bulkCreateSlotAssignments(params: {
   visibleFrom: string | null;
   assignedBy: number;
   targetSubgroupId?: number;
-}): Promise<{ created: number }> {
+}): Promise<{
+  created: number;
+  preservedIndividuals: Array<{
+    userId: number;
+    displayName: string;
+    sessionTitle: string;
+  }>;
+}> {
   if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
   // Check for existing assignments on the same slot+date+groups to prevent duplicates
@@ -354,6 +367,35 @@ export async function bulkCreateSlotAssignments(params: {
   if (existing && existing.length > 0) {
     throw new Error("Ces groupes ont déjà des assignations sur ce créneau");
   }
+
+  // Fetch individuals that will be preserved (informational; not modified).
+  const { data: individualsRaw, error: individualsError } = await supabase
+    .from("session_assignments")
+    .select(
+      `target_user_id,
+       users:users!session_assignments_target_user_id_fkey(display_name),
+       swim_sessions_catalog(name)`,
+    )
+    .eq("training_slot_id", params.trainingSlotId)
+    .eq("scheduled_date", params.scheduledDate)
+    .not("target_user_id", "is", null);
+  if (individualsError) throw new Error(individualsError.message);
+
+  const preservedIndividuals = ((individualsRaw ?? []) as Array<{
+    target_user_id: number;
+    users?: { display_name?: string | null } | { display_name?: string | null }[] | null;
+    swim_sessions_catalog?: { name?: string | null } | { name?: string | null }[] | null;
+  }>).map((row) => {
+    const userRec = Array.isArray(row.users) ? row.users[0] : row.users;
+    const catalogRec = Array.isArray(row.swim_sessions_catalog)
+      ? row.swim_sessions_catalog[0]
+      : row.swim_sessions_catalog;
+    return {
+      userId: row.target_user_id,
+      displayName: userRec?.display_name ?? "Nageur",
+      sessionTitle: catalogRec?.name ?? "Séance",
+    };
+  });
 
   const rows = params.groupIds.map((groupId) => ({
     assignment_type: "swim" as const,
@@ -381,7 +423,7 @@ export async function bulkCreateSlotAssignments(params: {
     }
     throw new Error(error.message);
   }
-  return { created: data?.length ?? 0 };
+  return { created: data?.length ?? 0, preservedIndividuals };
 }
 
 /** Get all slot-linked assignments for a date range (coach view) */
