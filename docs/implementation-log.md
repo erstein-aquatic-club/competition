@@ -10045,3 +10045,127 @@ Nouvelle section **"Créneaux à compléter"** entre "Ma semaine" et "Alertes" d
 - Pas de notification push quand N franchit un seuil. Le chantier se limite au signal visuel passif.
 - Pas de test RLS intégration (voir ci-dessus). À surveiller si la RPC est modifiée — re-smoke-test manuel via MCP.
 
+
+## §147 — Unification backend de la logique d'héritage des séances nageur (2026-04-19)
+
+### Contexte
+
+Les patchs §137 → §143 ont empilé des corrections successives côté frontend pour faire fonctionner l'héritage des séances groupe sur les créneaux personnalisés d'un nageur. Chaque fix révélait un cas manqué par le précédent. Cette accumulation produisait un code fragile, divergent entre Dashboard nageur et vue semaine coach. Les règles d'absence (table `planned_absences` jour-entière) étaient grossières. Les opérations groupe écrasaient silencieusement les assignations individuelles.
+
+Ce chantier unifie toute la logique en un seul RPC Postgres (`get_swimmer_sessions`), source de vérité unique consommée par toutes les vues.
+
+Design doc : `docs/plans/2026-04-19-swimmer-inheritance-unification-design.md`
+Plan d'implémentation : `docs/plans/2026-04-19-swimmer-inheritance-unification-plan.md`
+
+Exécution via agent team (swimmer-inheritance-unification) avec 4 agents parallèles : db-engineer (Phases 1-2), frontend-engineer (Phases 3-4), api-engineer (Phase 5), ui-engineer (Phase 6).
+
+### Règles métier encodées
+
+| # | Règle |
+|---|---|
+| R1 | Dénominateur de présence = `swimmer_training_slots`. Pas de créneau ce jour/bucket → n'existe pas dans ses stats. |
+| R2 | Héritage groupe → nageur : même jour + même bucket (cutoff 13h). Horaires peuvent différer. |
+| R3 | Précédence : individuel > subgroup > groupe. |
+| R4 | Création groupe sur créneau avec individuels → toast listant les individuels préservés. |
+| R5 | Suppression groupe ne touche jamais aux individuels. |
+| R6 | Absence granulaire par créneau (pas par jour). |
+| R7 | Pas d'absence inférée : seul un log `planned_absences` compte. |
+| R8 | Source de vérité unique : RPC `get_swimmer_sessions`. |
+| R9 | Même règle bucket pour swim ET strength. |
+| R10 | Coach voit les brouillons (`p_include_drafts=true`), nageur non. |
+
+### Changements
+
+**Phase 1 — Migrations SQL (db-engineer, 3 commits)**
+- `00128_planned_absences_per_slot` : colonnes `scheduled_slot` (CHECK morning/evening) + `training_slot_id`, unique partiel `(user_id, date, COALESCE(scheduled_slot, 'all'))`.
+- `00129_get_swimmer_sessions_rpc` : fonction plpgsql `get_swimmer_sessions(p_user_id, p_from, p_to, p_include_drafts)` — 18 colonnes RETURNS TABLE, algorithme en 5 étapes (dénominateur, résolution training_slot source, précédence individuel > subgroup > groupe, absences, logs). `SECURITY INVOKER`.
+- `00130_session_assignments_individual_unique` : index unique partiel `(training_slot_id, scheduled_date, target_user_id) WHERE target_user_id IS NOT NULL AND assignment_type='swim'`.
+
+**Phase 2 — Tests RLS (db-engineer, 1 commit)**
+- 12 cas dans `supabase/tests/rls/get_swimmer_sessions.test.ts` (héritage exact, fallback par attributs §143, bucket mismatch, précédence individuel/subgroup/groupe, absences par bucket, RLS inter-nageur, coach permissif, nageur sans perso).
+- Schéma de tests étoffé (swimmer_training_slots, training_slot_assignments, swim_sessions_catalog, planned_absences, RPC body verbatim).
+- Suite RLS complète : 90/90 verts (+12 nouveaux cas).
+
+**Phase 3 — Wrapper TS (frontend-engineer, 1 commit)**
+- `src/lib/api/swimmerSessions.ts` : `getSwimmerSessions(userId, from, to, includeDrafts?)` retourne `SwimmerSession[]`.
+- Type `SwimmerSession` ajouté à `src/lib/api/types.ts`.
+
+**Phase 4 — Migration des 5 consommateurs (frontend-engineer, 5 commits)**
+- `useDashboardSessions.ts` — Dashboard nageur.
+- `CoachTrainingSlotsScreen.tsx` — **suppression de la logique §137/139/143 complète** (`swimmerSourceAssignmentIds`, `sourceTrainingSlotIdByAssignmentId`, `sourceTrainingSlotBySwimmerSlot`, `trainingSlotById`, `findGroupTrainingSlotByAttributes`, import `supabase` inutilisé). Net -84 LOC.
+- `SuiviSemaine.tsx`, `SuiviSaison.tsx`, `SwimmerHome.tsx` — adaptés au nouveau shape plat.
+
+**Phase 5 — Refactor mutations (api-engineer, 3 commits)**
+- `deleteSlotAssignments` : ajout `.is("target_user_id", null)` → préserve les individuels lors des suppressions groupe.
+- `bulkCreateSlotAssignments` : retourne `{ created, preservedIndividuals: Array<{userId, displayName, sessionTitle}> }`. Pré-check des individuels existants sur le créneau avant insert.
+- `assignIndividualSession(params)` : nouveau helper slot-aware (insère `training_slot_id + target_user_id` simultanément, mapping erreur 23505 → message français).
+- Tests node:test avec `--experimental-test-module-mocks` (flag ajouté au script npm test).
+
+**Phase 6 — UI (ui-engineer, 5 commits)**
+- `PreservedIndividualsDialog.tsx` (112 L) : AlertDialog shadcn violet, ShieldCheck icon, chips par nageur. Disponible pour V1+ (flow fetch→dialog→confirm→bulkCreate).
+- Intégration V1 (toast enrichi) dans `assignFromLibraryMutation` et `quickComposeMutation` (§142) de `CoachTrainingSlotsScreen.tsx`.
+- `IndividualAssignmentBadge.tsx` (22 L) : badge "Perso" violet avec icône User, variants sm/md, cohérent avec AcwrBadge.
+- Badge wiré dans les cards de slots quand `assignment_source === 'individual'` (via extension du type `SlotInstance` dans `useSlotCalendar.ts`).
+
+### Fichiers modifiés (impact majeur)
+
+| Fichier | Changement | Taille |
+|---|---|---|
+| `supabase/migrations/00128_planned_absences_per_slot.sql` | nouveau | |
+| `supabase/migrations/00129_get_swimmer_sessions_rpc.sql` | nouveau (~130 L SQL) | |
+| `supabase/migrations/00130_session_assignments_individual_unique.sql` | nouveau | |
+| `supabase/tests/rls/get_swimmer_sessions.test.ts` | nouveau (12 tests) | |
+| `src/lib/api/swimmerSessions.ts` | nouveau | |
+| `src/lib/api/assignments.ts` | `deleteSlotAssignments` + `bulkCreateSlotAssignments` + `assignIndividualSession` | ~1149 L |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | -84 L (logique §137/139/143 supprimée) + toast preserved + badge | ~3311 L |
+| `src/hooks/dashboard/useDashboardSessions.ts` | RPC consumption | ~345 L |
+| `src/components/coach/PreservedIndividualsDialog.tsx` | nouveau | 112 L |
+| `src/components/coach/IndividualAssignmentBadge.tsx` | nouveau | 22 L |
+
+### Tests
+
+- `npm run test:rls` : **90/90** (12 nouveaux cas + 78 existants).
+- `npm test` : **239/239** (tests node:test avec --experimental-test-module-mocks pour Phase 5).
+- `npx tsc --noEmit --skipLibCheck` : 0 erreur (hors .stories.tsx pre-existing).
+
+### Décisions architecturales
+
+- **RPC Postgres vs fonction TS partagée** : RPC choisi pour garantir la logique côté serveur (RLS applicables, aucune divergence possible entre consommateurs). Coût : une migration SQL + refactor frontend.
+- **V1 toast vs V1 dialog pre-confirm** : V1 toast retenu pour simplicité (flow async-await direct). `PreservedIndividualsDialog` reste disponible comme brique pour V2 si l'UX demande une confirmation explicite.
+- **`resolveSwimmerAssignmentsBatch` conservé** : en coexistence avec `getSwimmerSessions`. Nettoyage déplacé en Phase 7 (après 1-2 semaines stable).
+- **Précédence individuel > subgroup > groupe** encodée dans le RPC via `DISTINCT ON` + `ORDER BY priority ASC` — source de vérité côté serveur.
+- **Numérotation §147** : numéro §144 collision avec un chantier parallèle (split quick-compose). §146 réservé chrono avatars + offline. §147 = ce chantier. Les 17 commits conservent leur tag `(§144)` dans les messages pour traçabilité de session, mais l'entrée log canonique est §147.
+
+### Limites (acceptées pour V1)
+
+- **Historique d'appartenance groupe non tracké** : changement de groupe perd les assignations passées (cas rare).
+- **Rapport mensuel non migré** : `useMonthlyReport.ts` reste sur `dim_sessions`. Intégration V2 si besoin.
+- **Performance > 3 mois non testée** : le RPC est optimisé pour 1 semaine (7 dates). Batch par chunks côté client si besoin.
+- **Suppression d'un individuel** depuis V1 : uniquement via fiche nageur. Raccourci vue semaine possible en V2.
+- **Phase 7 (cleanup `resolveSwimmerAssignmentsBatch`)** : différée 1-2 semaines après UAT stable.
+
+### Invariants garantis
+
+| Invariant | Avant | Après |
+|---|---|---|
+| Héritage créneau perso + groupe même bucket | Partiel (bugs §137→§143) | Garanti SQL |
+| Pas d'héritage bucket mismatch | OK frontend | Garanti SQL |
+| Individuel > groupe | OK certaines vues | Garanti SQL, homogène |
+| Création groupe préserve individuel | Cassé (delete wipe) | Index unique + delete scoped + toast |
+| Absence par créneau | Jour entier seulement | `scheduled_slot` nullable |
+| Pas d'absence auto sans ressenti | OK | Confirmé par tests |
+| Dénominateur = créneaux perso du nageur | OK sauf fiche Suivi | Unifié via RPC |
+
+### Rollback
+
+Chaque migration réversible (DROP COLUMN / DROP FUNCTION / DROP INDEX). Frontend peut rester sur `resolveSwimmerAssignmentsBatch` en parallèle. Aucun big-bang.
+
+### UAT (à valider)
+
+- [ ] Semaine 09-10/04 : François's perso Thu/Fri 18:00 affichent Elite group sessions.
+- [ ] Semaine courante : idem.
+- [ ] Assigner individuel à François mardi PM, puis séance groupe mardi PM → toast liste François préservé, individuelle intacte en DB.
+- [ ] Supprimer séance groupe → individuelle de François non touchée.
+- [ ] Déclarer absence AM lundi → PM lundi reste "prévue".
+- [ ] Déclarer absence jour entier lundi → AM+PM marqués absent.
+- [ ] Badge "Perso" visible sur les cards à assignment_source='individual'.

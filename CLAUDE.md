@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §145 (Coach home — section accordéon "Créneaux à compléter" sur 30 derniers jours, avec deep-link vers la semaine concernée via `?section=week&weekDate=YYYY-MM-DD`).
+Dernière entrée en date : §147 (Unification backend de la logique d'héritage des séances nageur — RPC `get_swimmer_sessions` comme source de vérité unique, absences granulaires par créneau, protection des assignations individuelles contre les opérations groupe).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

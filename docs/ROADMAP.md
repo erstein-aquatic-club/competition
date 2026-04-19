@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§145 Coach home — créneaux non assignés 30j + deep-link semaine)*
+*Dernière mise à jour : 2026-04-19 (§147 Unification backend héritage séances nageur — RPC get_swimmer_sessions + protection individuels)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -92,6 +92,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 107 | Vue semaine coach — fallback d'attributs pour swimmer_slots sans source | Haute | Faible | Fait (§143) |
 | 106b | Quick-compose — split texte/blocs côte-à-côte en relecture | Faible | Faible | Fait (§144) |
 | 108 | Coach home — créneaux non assignés 30j + deep-link semaine | Moyenne | Moyenne | Fait (§145) |
+| 109 | Unification backend héritage séances nageur (RPC get_swimmer_sessions, absences par créneau, protection individuels) | Haute | Haute | Fait (§147) |
 
 ---
 
