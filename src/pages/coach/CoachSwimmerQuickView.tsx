@@ -7,6 +7,9 @@ import { ArrowLeft, ShieldAlert, Activity, Target, Trophy, ClipboardList, CheckS
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getSwimmerBriefing, type SwimmerBriefing, type SwimmerBriefingPerf } from '@/lib/api/coach-quickview';
+import QuickViewAttendanceDialog from './QuickViewAttendanceDialog';
+import QuickViewCommentDialog from './QuickViewCommentDialog';
+import QuickViewAssignDrawer from './QuickViewAssignDrawer';
 import SwimmerFormBadge from '@/components/coach/swimmer-kpis/SwimmerFormBadge';
 import PainIndicator from '@/components/coach/swimmer-kpis/PainIndicator';
 import LoadMini from '@/components/coach/swimmer-kpis/LoadMini';
@@ -310,10 +313,34 @@ export default function CoachSwimmerQuickView({ athleteId: athleteIdProp, onBack
         onComment={() => setCommentOpen(true)}
         onAssign={() => setAssignOpen(true)}
       />
-      {/* Modals — Task 10/11/12 will wire these */}
-      {attendanceOpen && <div data-testid="attendance-modal" />}
-      {commentOpen && <div data-testid="comment-modal" />}
-      {assignOpen && <div data-testid="assign-drawer" />}
+      {briefing.today_session && (
+        <QuickViewAttendanceDialog
+          open={attendanceOpen}
+          onOpenChange={setAttendanceOpen}
+          dimSessionId={briefing.today_session.assignment_id}
+          athleteId={athleteId}
+          onSuccess={() => {}}
+        />
+      )}
+      {briefing.today_session && (
+        <QuickViewCommentDialog
+          open={commentOpen}
+          onOpenChange={setCommentOpen}
+          dimSessionId={briefing.today_session.assignment_id}
+          athleteId={athleteId}
+          onSuccess={() => {}}
+        />
+      )}
+      {briefing.today_session && (
+        <QuickViewAssignDrawer
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          slotId={briefing.today_session.assignment_id}
+          athleteId={athleteId}
+          timeSlot={briefing.today_session.time_slot}
+          onSuccess={() => {}}
+        />
+      )}
     </>
   );
 }
