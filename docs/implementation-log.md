@@ -9821,7 +9821,7 @@ Les 11 droppés :
 - **Ne PAS drop les 46 autres indexes "unused"** malgré les advisors : l'app est sous-exploitée en prod, pg_stat_statements sous-estime la valeur réelle. FK indexes accélèrent les JOINs futurs et protègent les cascade deletes. Drop aveugle = risque de régression quand l'usage monte.
 - **Classification 3 buckets** via grep codebase + check `information_schema.table_constraints` (36 FK formellement déclarées + 7 FK sémantiques non déclarées).
 - **Préservation `idx_session_assignments_notif_pending`** (créé dans 00120) : le cron n'a pas encore tourné après sa création, l'advisor le flaggera "unused" mais il est load-bearing par construction.
-- **C5 (leaked_password_protection)** : action Dashboard Supabase → l'utilisateur doit l'activer manuellement sur https://supabase.com/dashboard/project/fscnobivsgornxdwqwlk/auth/providers. Hors scope migration SQL.
+- **C5 (leaked_password_protection)** : nécessite Supabase **Pro plan** — le projet EAC est sur Free tier, feature indisponible. Le warning advisor `auth_leaked_password_protection` restera donc actif en permanence. Limitation connue, déjà notée dans §110. Hors scope tant que le projet reste en Free.
 
 ### Limites
 
