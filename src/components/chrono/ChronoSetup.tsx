@@ -191,91 +191,38 @@ export default function ChronoSetup({
         </p>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Distance totale */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Distance totale</span>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-10 w-10"
-                onClick={() => {
-                  const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
-                  dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
-                }}
-                disabled={state.totalDistanceM <= 0}
-              ><Minus className="h-3.5 w-3.5" /></Button>
-              <input
-                type="text" inputMode="numeric"
-                value={state.totalDistanceM || ""} placeholder="—"
-                onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-                className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-              />
-              <span className="text-xs text-muted-foreground">m</span>
-              <Button variant="outline" size="icon" className="h-10 w-10"
-                onClick={() => {
-                  const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
-                  dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
-                }}
-              ><Plus className="h-3.5 w-3.5" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {DISTANCE_PRESETS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => dispatch({ type: "SET_TOTAL_DISTANCE", meters: d })}
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
-                    state.totalDistanceM === d
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  {d} m
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Splits tous les */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Splits tous les</span>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-10 w-10"
-                onClick={() => {
-                  const prev = [...SPLIT_PRESETS].reverse().find((d) => d < state.splitDistanceM);
-                  dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
-                }}
-                disabled={state.splitDistanceM <= 25}
-              ><Minus className="h-3.5 w-3.5" /></Button>
-              <input
-                type="text" inputMode="numeric"
-                value={state.splitDistanceM || ""} placeholder="50"
-                onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-                className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-              />
-              <span className="text-xs text-muted-foreground">m</span>
-              <Button variant="outline" size="icon" className="h-10 w-10"
-                onClick={() => {
-                  const next = SPLIT_PRESETS.find((d) => d > state.splitDistanceM);
-                  dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
-                }}
-              ><Plus className="h-3.5 w-3.5" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {SPLIT_PRESETS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => dispatch({ type: "SET_SPLIT_DISTANCE", meters: d })}
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
-                    state.splitDistanceM === d
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  {d} m
-                </button>
-              ))}
-            </div>
-          </div>
+          <PresetDistanceField
+            label="Distance totale"
+            value={state.totalDistanceM}
+            presets={DISTANCE_PRESETS}
+            minValue={0}
+            inputWidth="w-16"
+            onDecrement={() => {
+              const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
+              dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
+            }}
+            onIncrement={() => {
+              const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
+              dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
+            }}
+            onChange={(v) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: v })}
+          />
+          <PresetDistanceField
+            label="Splits tous les"
+            value={state.splitDistanceM}
+            presets={SPLIT_PRESETS}
+            minValue={25}
+            inputWidth="w-14"
+            onDecrement={() => {
+              const prev = [...SPLIT_PRESETS].reverse().find((d) => d < state.splitDistanceM);
+              dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
+            }}
+            onIncrement={() => {
+              const next = SPLIT_PRESETS.find((d) => d > state.splitDistanceM);
+              dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
+            }}
+            onChange={(v) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: v })}
+          />
         </div>
       </div>
 
@@ -759,6 +706,70 @@ function NewManualTabBody({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── PresetDistanceField — reusable stepper + chip row for a distance value ──
+
+function PresetDistanceField({
+  label,
+  value,
+  presets,
+  minValue,
+  suffix = "m",
+  inputWidth,
+  onDecrement,
+  onIncrement,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  presets: readonly number[];
+  minValue: number;
+  suffix?: string;
+  inputWidth: string;
+  onDecrement: () => void;
+  onIncrement: () => void;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="icon" className="h-10 w-10"
+          onClick={onDecrement}
+          disabled={value <= minValue}
+        ><Minus className="h-3.5 w-3.5" /></Button>
+        <input
+          type="text" inputMode="numeric"
+          value={value || ""} placeholder="—"
+          onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
+          className={`${inputWidth} text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary`}
+        />
+        <span className="text-xs text-muted-foreground">{suffix}</span>
+        <Button variant="outline" size="icon" className="h-10 w-10"
+          onClick={onIncrement}
+        ><Plus className="h-3.5 w-3.5" /></Button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {presets.map((d) => (
+          <button
+            key={d}
+            type="button"
+            aria-pressed={value === d}
+            aria-label={`${label} ${d} ${suffix}`}
+            onClick={() => onChange(d)}
+            className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
+              value === d
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {d} {suffix}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
