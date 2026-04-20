@@ -156,53 +156,6 @@ export default function ChronoSetup({
         </Button>
       </div>
 
-      {/* ── Lane count controls + wave dots ─────────────── */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Lignes :</span>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() =>
-            dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })
-          }
-          disabled={state.laneCount <= 1}
-        >
-          <Minus className="h-4 w-4" />
-        </Button>
-        <span className="min-w-[1.5rem] text-center font-medium">
-          {state.laneCount}
-        </span>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() =>
-            dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })
-          }
-          disabled={state.laneCount >= maxLanes}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-
-        {activeWaves.length > 0 && (
-          <div className="ml-auto flex items-center gap-1.5">
-            {activeWaves.map((w) => {
-              const c = WAVE_COLORS[w - 1];
-              return (
-                <span
-                  key={w}
-                  className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium ${c.bg} ${c.text}`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
-                  {c.label}
-                </span>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
       {/* ── Per-wave config cards (interval + optional overrides) ── */}
       {activeWaves.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -306,58 +259,103 @@ export default function ChronoSetup({
         </div>
       </div>
 
-      {/* ── Lane sections ──────────────────────────────── */}
+      {/* ── Lane sections ──────────────────────────── */}
       <div className="flex flex-col gap-3">
-        {Array.from({ length: state.laneCount }, (_, i) => i + 1).map(
-          (lane) => {
-            const swimmers = swimmersByLane(lane);
-            return (
-              <div
-                key={lane}
-                className={`rounded-lg border bg-card p-3 transition-colors ${
-                  swimmers.length > 0 ? "border-border" : "border-border/50 bg-card/40"
-                }`}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Ligne {lane}
+        {Array.from({ length: state.laneCount }, (_, i) => i + 1).map((lane) => {
+          const swimmers = swimmersByLane(lane);
+          const isEmpty = swimmers.length === 0;
+          return (
+            <div
+              key={lane}
+              className={`rounded-lg border bg-card p-3 transition-colors ${
+                isEmpty ? "border-border/50 bg-card/40" : "border-border"
+              }`}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground">
+                  Ligne {lane}
+                </span>
+                {swimmers.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                    {swimmers.length} nageur{swimmers.length > 1 ? "s" : ""}
                   </span>
-                  {swimmers.length > 0 && (
-                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-                      {swimmers.length} nageur{swimmers.length > 1 ? "s" : ""}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {swimmers.map((s) => (
-                    <SwimmerChip
-                      key={s.key}
-                      swimmer={s}
-                      laneCount={state.laneCount}
-                      maxSwimmersPerLane={maxSwimmersPerLane}
-                      allSwimmers={state.swimmers}
-                      maxWaves={maxWaves}
-                      dispatch={dispatch}
-                    />
-                  ))}
-
-                  {/* Add swimmer button — hidden when lane is full on mobile */}
-                  {swimmers.length < maxSwimmersPerLane && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddLane(lane);
-                        setSearch("");
-                      }}
-                      className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted hover:border-primary/50 hover:text-primary transition-colors cursor-pointer"
-                    >
-                      <Plus className="h-5 w-5" />
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-            );
-          },
+
+              <div className="flex flex-wrap items-center gap-2">
+                {swimmers.map((s) => (
+                  <SwimmerChip
+                    key={s.key}
+                    swimmer={s}
+                    laneCount={state.laneCount}
+                    maxSwimmersPerLane={maxSwimmersPerLane}
+                    allSwimmers={state.swimmers}
+                    maxWaves={maxWaves}
+                    dispatch={dispatch}
+                  />
+                ))}
+
+                {isEmpty && (
+                  <p className="flex-1 py-1 text-xs italic text-muted-foreground/50 select-none">
+                    Vide — appuyez sur + pour ajouter un nageur
+                  </p>
+                )}
+
+                {swimmers.length < maxSwimmersPerLane && (
+                  <button
+                    type="button"
+                    onClick={() => { setAddLane(lane); setSearch(""); }}
+                    className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:border-primary/50 hover:bg-muted hover:text-primary transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Ajouter
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Ligne count + wave badges ─────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10"
+          onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })}
+          disabled={state.laneCount <= 1}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          {state.laneCount} ligne{state.laneCount > 1 ? "s" : ""}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10"
+          onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })}
+          disabled={state.laneCount >= maxLanes}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+
+        {activeWaves.length > 0 && (
+          <div className="ml-auto flex items-center gap-1.5">
+            {activeWaves.map((w) => {
+              const c = WAVE_COLORS[w - 1];
+              return (
+                <span
+                  key={w}
+                  className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium ${c.bg} ${c.text}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+                  {c.label}
+                </span>
+              );
+            })}
+          </div>
         )}
       </div>
 
