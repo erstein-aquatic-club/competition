@@ -132,6 +132,16 @@ export default function ChronoSetup({
     return parts.length > 0 ? `· ${parts.join(" · ")}` : "";
   }, [state.seriesCount, activeWaves.length, state.waves]);
 
+  const footerSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (state.swimmers.length > 0)
+      parts.push(`${state.swimmers.length} nageur${state.swimmers.length > 1 ? "s" : ""}`);
+    if (state.totalDistanceM > 0) parts.push(`${state.totalDistanceM} m`);
+    if (state.splitDistanceM > 0) parts.push(`splits ${state.splitDistanceM} m`);
+    if (parts.length === 0) return "Ajoutez des nageurs pour commencer";
+    return parts.join(" · ");
+  }, [state.swimmers.length, state.totalDistanceM, state.splitDistanceM]);
+
   const handleAddSwimmer = (a: AthleteSummary) => {
     if (a.id == null || addLane == null || laneFull) return;
     dispatch({
@@ -154,7 +164,7 @@ export default function ChronoSetup({
   };
 
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex flex-col gap-5 p-4 pb-24">
       {/* ── Title input — inline, minimalist, borderless ─ */}
       <label className="group flex items-baseline gap-2 border-b border-border/60 pb-1 focus-within:border-primary/70 transition-colors">
         <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 group-focus-within:text-primary" />
@@ -167,19 +177,6 @@ export default function ChronoSetup({
           className="flex-1 bg-transparent text-[15px] font-medium text-foreground placeholder:font-normal placeholder:italic placeholder:text-muted-foreground/60 outline-none"
         />
       </label>
-
-      {/* ── Header ─────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Préparation</h2>
-        <Button
-          disabled={state.swimmers.length === 0}
-          onClick={() => dispatch({ type: "START_RACE" })}
-          className="gap-2 px-5"
-        >
-          <Play className="h-4 w-4" />
-          Lancer
-        </Button>
-      </div>
 
       {/* ── Programme ─────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card/50 p-3">
@@ -556,6 +553,25 @@ export default function ChronoSetup({
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Sticky footer — résumé + Lancer ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/90 backdrop-blur-sm px-4 py-3 flex items-center justify-between gap-4">
+        <p className={`text-sm truncate ${
+          state.swimmers.length === 0
+            ? "text-muted-foreground/60 italic"
+            : "text-muted-foreground"
+        }`}>
+          {footerSummary}
+        </p>
+        <Button
+          disabled={state.swimmers.length === 0}
+          onClick={() => dispatch({ type: "START_RACE" })}
+          className="gap-2 shrink-0"
+        >
+          <Play className="h-4 w-4" />
+          Lancer
+        </Button>
+      </div>
     </div>
   );
 }
