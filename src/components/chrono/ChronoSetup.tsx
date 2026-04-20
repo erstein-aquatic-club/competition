@@ -147,10 +147,9 @@ export default function ChronoSetup({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Préparation</h2>
         <Button
-          size="sm"
           disabled={state.swimmers.length === 0}
           onClick={() => dispatch({ type: "START_RACE" })}
-          className="gap-1.5"
+          className="gap-2 px-5"
         >
           <Play className="h-4 w-4" />
           Lancer
@@ -163,7 +162,7 @@ export default function ChronoSetup({
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9"
+          className="h-10 w-10"
           onClick={() =>
             dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })
           }
@@ -177,7 +176,7 @@ export default function ChronoSetup({
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9"
+          className="h-10 w-10"
           onClick={() =>
             dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })
           }
@@ -233,31 +232,34 @@ export default function ChronoSetup({
       )}
 
       {/* ── Série / Distance config ─────────────────── */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Series count — FIRST */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Séries :</span>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8"
-              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
-              disabled={state.seriesCount <= 0}
-            ><Minus className="h-3.5 w-3.5" /></Button>
-            <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
-              onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-              className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-            />
-            <Button variant="outline" size="icon" className="h-8 w-8"
-              onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
-            ><Plus className="h-3.5 w-3.5" /></Button>
+      <div className="rounded-lg border border-border bg-card/50 p-3">
+        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Programme
+        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          {/* Series count */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground">Séries</span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-10 w-10"
+                onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
+                disabled={state.seriesCount <= 0}
+              ><Minus className="h-3.5 w-3.5" /></Button>
+              <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
+                onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+                className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+              />
+              <Button variant="outline" size="icon" className="h-10 w-10"
+                onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
+              ><Plus className="h-3.5 w-3.5" /></Button>
+            </div>
           </div>
-        </div>
 
-        <span className="text-muted-foreground">×</span>
+          <span className="text-muted-foreground/60 font-medium">×</span>
 
-        {/* Total distance stepper */}
-        <div className="flex items-center gap-2">
+          {/* Total distance stepper */}
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8"
+            <Button variant="outline" size="icon" className="h-10 w-10"
               onClick={() => {
                 const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
                 dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
@@ -269,37 +271,37 @@ export default function ChronoSetup({
               className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
             />
             <span className="text-xs text-muted-foreground">m</span>
-            <Button variant="outline" size="icon" className="h-8 w-8"
+            <Button variant="outline" size="icon" className="h-10 w-10"
               onClick={() => {
                 const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
                 dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
               }}
             ><Plus className="h-3.5 w-3.5" /></Button>
           </div>
-        </div>
 
-        {/* Split distance */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">splits à</span>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8"
-              onClick={() => {
-                const prev = [...SPLIT_PRESETS].reverse().find((d) => d < state.splitDistanceM);
-                dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
-              }}
-              disabled={state.splitDistanceM <= 25}
-            ><Minus className="h-3.5 w-3.5" /></Button>
-            <input type="text" inputMode="numeric" value={state.splitDistanceM || ""} placeholder="50"
-              onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-              className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-            />
-            <span className="text-xs text-muted-foreground">m</span>
-            <Button variant="outline" size="icon" className="h-8 w-8"
-              onClick={() => {
-                const next = SPLIT_PRESETS.find((d) => d > state.splitDistanceM);
-                dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
-              }}
-            ><Plus className="h-3.5 w-3.5" /></Button>
+          {/* Split distance */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground">splits à</span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-10 w-10"
+                onClick={() => {
+                  const prev = [...SPLIT_PRESETS].reverse().find((d) => d < state.splitDistanceM);
+                  dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
+                }}
+                disabled={state.splitDistanceM <= 25}
+              ><Minus className="h-3.5 w-3.5" /></Button>
+              <input type="text" inputMode="numeric" value={state.splitDistanceM || ""} placeholder="50"
+                onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+                className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+              />
+              <span className="text-xs text-muted-foreground">m</span>
+              <Button variant="outline" size="icon" className="h-10 w-10"
+                onClick={() => {
+                  const next = SPLIT_PRESETS.find((d) => d > state.splitDistanceM);
+                  dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
+                }}
+              ><Plus className="h-3.5 w-3.5" /></Button>
+            </div>
           </div>
         </div>
       </div>
@@ -312,10 +314,19 @@ export default function ChronoSetup({
             return (
               <div
                 key={lane}
-                className="rounded-lg border border-border bg-card p-3"
+                className={`rounded-lg border bg-card p-3 transition-colors ${
+                  swimmers.length > 0 ? "border-border" : "border-border/50 bg-card/40"
+                }`}
               >
-                <div className="mb-2 text-xs font-medium text-muted-foreground">
-                  Ligne {lane}
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Ligne {lane}
+                  </span>
+                  {swimmers.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                      {swimmers.length} nageur{swimmers.length > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {swimmers.map((s) => (
@@ -338,7 +349,7 @@ export default function ChronoSetup({
                         setAddLane(lane);
                         setSearch("");
                       }}
-                      className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted"
+                      className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted hover:border-primary/50 hover:text-primary transition-colors cursor-pointer"
                     >
                       <Plus className="h-5 w-5" />
                     </button>
@@ -513,7 +524,7 @@ export default function ChronoSetup({
                 "Sélectionnez un ou plusieurs nageurs"
               )}
             </p>
-            <Button size="sm" onClick={closeAddSheet} className="gap-1.5 shrink-0">
+            <Button onClick={closeAddSheet} className="gap-1.5 shrink-0">
               <Check className="h-4 w-4" />
               Terminé
             </Button>
@@ -796,7 +807,7 @@ function WaveConfigCard({
             <button
               type="button"
               onClick={resetPersonalize}
-              className="ml-auto text-[11px] text-muted-foreground hover:text-destructive hover:underline transition-colors"
+              className="ml-auto text-[11px] text-muted-foreground hover:text-destructive hover:underline transition-colors cursor-pointer"
             >
               Réinitialiser
             </button>
@@ -805,7 +816,7 @@ function WaveConfigCard({
           <button
             type="button"
             onClick={activatePersonalize}
-            className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <Pencil className="h-3 w-3" />
             Personnaliser
@@ -996,7 +1007,7 @@ function SwimmerChip({
           type="button"
           onClick={handleCycleWave}
           aria-label={`Vague ${c.label} — changer`}
-          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${c.bg} ${c.border} ${c.text}`}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold cursor-pointer hover:opacity-80 transition-opacity ${c.bg} ${c.border} ${c.text}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
           {c.label}
