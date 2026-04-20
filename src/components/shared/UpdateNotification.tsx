@@ -45,7 +45,7 @@ export function UpdateNotification() {
   return (
     <AnimatePresence>
       {updateAvailable && (
-        <div className="fixed top-3 left-0 right-0 z-50 pointer-events-none flex justify-center px-4">
+        <div className="fixed top-3 left-0 right-0 z-toast pointer-events-none flex justify-center px-4">
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

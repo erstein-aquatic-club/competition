@@ -1039,13 +1039,17 @@ export default function Coach() {
   });
 
   const topAthletes = useMemo(() => myAthletes.slice(0, 5), [myAthletes]);
+  const topAthleteKey = useMemo(
+    () => topAthletes.map((athlete) => athlete.id ?? athlete.display_name).join("|"),
+    [topAthletes],
+  );
   const { data: groups = [] } = useQuery({
     queryKey: ["groups"],
     queryFn: () => api.getGroups(),
     enabled: coachAccess && shouldLoadGroups,
   });
   const coachKpisQuery = useQuery({
-    queryKey: ["coach-kpis", kpiPeriod, topAthletes.map((athlete) => athlete.id ?? athlete.display_name)],
+    queryKey: ["coach-kpis", kpiPeriod, topAthleteKey],
     enabled: coachAccess && activeSection === "home" && topAthletes.length > 0,
     queryFn: async () => {
       const lookbackDays = kpiPeriod;

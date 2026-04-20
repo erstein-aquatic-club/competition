@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, Suspense, lazy, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 import { api, type Exercise, type SwimmerPerformance } from "@/lib/api";
 import type { SwimRecordWithPool } from "@/lib/types";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { shouldShowRecords } from "@/pages/Profile";
 import { Check, ChevronDown, ChevronRight, Dumbbell, Edit2, Download, RefreshCw, StickyNote, Trash2, Trophy, Waves, X, AlertCircle } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+const PerformanceChart = lazy(() => import("@/components/records/PerformanceChart"));
 import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
@@ -1007,98 +1007,19 @@ export default function Records() {
                                   {histComparePool ? `${histPoolLen}m + ${otherPoolLen}m` : `+ ${otherPoolLen}m`}
                                 </button>
                               </div>
-                              <ResponsiveContainer width="100%" height={200}>
-                                <LineChart data={chartData} margin={{ top: 8, right: 10, left: 0, bottom: 5 }}>
-                                  <defs>
-                                    <linearGradient id="objLine" x1="0" y1="0" x2="1" y2="0">
-                                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.85} />
-                                      <stop offset="50%" stopColor="#10b981" stopOpacity={0.85} />
-                                      <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.85} />
-                                    </linearGradient>
-                                    <filter id="dotGlow">
-                                      <feGaussianBlur stdDeviation="2.5" result="blur" />
-                                      <feMerge>
-                                        <feMergeNode in="blur" />
-                                        <feMergeNode in="SourceGraphic" />
-                                      </feMerge>
-                                    </filter>
-                                  </defs>
-                                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                  <XAxis dataKey="date" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                                  <YAxis
-                                    domain={[
-                                      (dataMin: number) => chartTargetTime != null ? Math.min(dataMin, chartTargetTime) - 0.5 : dataMin,
-                                      (dataMax: number) => chartTargetTime != null ? Math.max(dataMax, chartTargetTime) + 0.5 : dataMax,
-                                    ]}
-                                    tick={{ fontSize: 10 }}
-                                    className="text-muted-foreground"
-                                    reversed
-                                    tickFormatter={(v: number) => {
-                                      const min = Math.floor(v / 60);
-                                      const sec = Math.floor(v % 60);
-                                      const cs = Math.round((v % 1) * 100);
-                                      return min > 0 ? `${min}:${String(sec).padStart(2, "0")}` : `${sec}.${String(cs).padStart(2, "0")}`;
-                                    }}
-                                  />
-                                  <Tooltip
-                                    formatter={(value: number, name: string) => {
-                                      const min = Math.floor(value / 60);
-                                      const sec = Math.floor(value % 60);
-                                      const cs = Math.round((value % 1) * 100);
-                                      const display = min > 0
-                                        ? `${min}:${String(sec).padStart(2, "0")}.${String(cs).padStart(2, "0")}`
-                                        : `${sec}.${String(cs).padStart(2, "0")}`;
-                                      const label = name === "timeOther" ? `${otherPoolLen}m` : `${histPoolLen}m`;
-                                      return [display, label];
-                                    }}
-                                    labelStyle={{ fontSize: 11 }}
-                                    contentStyle={{ borderRadius: 12, fontSize: 12 }}
-                                  />
-                                  {chartTargetTime != null && (
-                                    <ReferenceLine
-                                      y={chartTargetTime}
-                                      stroke="#f59e0b"
-                                      strokeWidth={2}
-                                      strokeDasharray="8 4"
-                                      ifOverflow="extendDomain"
-                                    />
-                                  )}
-                                  <Line
-                                    type="monotone"
-                                    dataKey="time"
-                                    name="time"
-                                    stroke="hsl(var(--primary))"
-                                    strokeWidth={2}
-                                    dot={(props: any) => {
-                                      const { cx: dx, cy: dy, payload, key } = props;
-                                      if (payload.time == null) return <g key={key} />;
-                                      const beats = chartTargetTime != null && payload.time <= chartTargetTime;
-                                      return beats ? (
-                                        <g key={key} filter="url(#dotGlow)">
-                                          <circle cx={dx} cy={dy} r={4.5} fill="#10b981" stroke="#fff" strokeWidth={1.5} />
-                                        </g>
-                                      ) : (
-                                        <circle key={key} cx={dx} cy={dy} r={3} fill="hsl(var(--primary))" stroke="#fff" strokeWidth={1} />
-                                      );
-                                    }}
-                                    activeDot={{ r: 5 }}
-                                    connectNulls
-                                  />
-                                  {histComparePool && (
-                                    <Line
-                                      type="monotone"
-                                      dataKey="timeOther"
-                                      name="timeOther"
-                                      stroke="hsl(var(--chart-2, 25 95% 53%))"
-                                      strokeWidth={2}
-                                      strokeDasharray="4 2"
-                                      dot={{ r: 2.5 }}
-                                      activeDot={{ r: 4 }}
-                                      connectNulls
-                                    />
-                                  )}
-                                </LineChart>
-                              </ResponsiveContainer>
+                              <Suspense
+                                fallback={
+                                  <div className="h-[200px] w-full animate-pulse rounded-lg bg-muted/40" />
+                                }
+                              >
+                                <PerformanceChart
+                                  data={chartData}
+                                  targetTime={chartTargetTime ?? null}
+                                  histPoolLen={histPoolLen}
+                                  otherPoolLen={otherPoolLen}
+                                  compareOther={histComparePool}
+                                />
+                              </Suspense>
                               {/* Objective badge */}
                               {chartTargetTime && (
                                 <div className="flex items-center justify-center px-2 pt-1 pb-1">

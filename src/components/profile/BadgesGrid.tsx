@@ -5,7 +5,7 @@ import { BADGE_DEFINITIONS, type BadgeDefinition } from "@/lib/achievementRules"
 import type { Achievement } from "@/lib/api/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, Trophy } from "lucide-react";
+import { ChevronDown, Trophy, Flame, Heart, Dumbbell, Medal, type LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface BadgesGridProps {
@@ -16,12 +16,12 @@ interface BadgesGridProps {
 
 type BadgeType = BadgeDefinition["type"];
 
-const TYPE_META: Record<BadgeType, { label: string; icon: string; color: string; bg: string; track: string }> = {
-  streak:      { label: "Présence",    icon: "🔥", color: "text-orange-500",  bg: "bg-orange-500",  track: "bg-orange-500/20" },
-  pr:          { label: "Records",     icon: "🏆", color: "text-amber-500",   bg: "bg-amber-500",   track: "bg-amber-500/20" },
-  wellness:    { label: "Bien-être",   icon: "💚", color: "text-emerald-500", bg: "bg-emerald-500", track: "bg-emerald-500/20" },
-  attendance:  { label: "Musculation", icon: "💪", color: "text-blue-500",    bg: "bg-blue-500",    track: "bg-blue-500/20" },
-  competition: { label: "Compétition", icon: "🥇", color: "text-violet-500",  bg: "bg-violet-500",  track: "bg-violet-500/20" },
+const TYPE_META: Record<BadgeType, { label: string; Icon: LucideIcon; color: string; bg: string; track: string }> = {
+  streak:      { label: "Présence",    Icon: Flame,    color: "text-orange-500",  bg: "bg-orange-500",  track: "bg-orange-500/20" },
+  pr:          { label: "Records",     Icon: Trophy,   color: "text-amber-500",   bg: "bg-amber-500",   track: "bg-amber-500/20" },
+  wellness:    { label: "Bien-être",   Icon: Heart,    color: "text-emerald-500", bg: "bg-emerald-500", track: "bg-emerald-500/20" },
+  attendance:  { label: "Musculation", Icon: Dumbbell, color: "text-blue-500",    bg: "bg-blue-500",    track: "bg-blue-500/20" },
+  competition: { label: "Compétition", Icon: Medal,    color: "text-violet-500",  bg: "bg-violet-500",  track: "bg-violet-500/20" },
 };
 
 const TYPE_ORDER: BadgeType[] = ["streak", "wellness", "attendance", "pr", "competition"];
@@ -60,9 +60,7 @@ function CategoryTrack({
     <div className="flex items-center gap-3">
       {/* Icon + label */}
       <div className="flex items-center gap-2 w-[100px] shrink-0">
-        <span className="text-lg leading-none" role="img" aria-label={meta.label}>
-          {meta.icon}
-        </span>
+        <meta.Icon className={`h-4 w-4 ${meta.color}`} aria-label={meta.label} />
         <div className="min-w-0">
           <p className="text-xs font-semibold leading-tight truncate">{meta.label}</p>
           <p className="text-[10px] text-muted-foreground/50">

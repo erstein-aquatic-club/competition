@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minus, Plus, Check } from "lucide-react";
+import { Minus, Plus, Check, Moon, Smile, Battery, BatteryLow, Sparkles, Flame, Frown, Laugh, Wind, Zap, Bed, Bandage, Heart, type LucideIcon } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { upsertWellness, computeReadinessScore, getWellnessForDate } from "@/lib/api/wellness";
 import { getPainReportsForDate, upsertPainReports } from "@/lib/api/painReports";
@@ -40,16 +40,16 @@ const INTENSITY_CLASSES: Record<number, string> = {
 interface WellnessItem {
   key: string;
   label: string;
-  emoji: [string, string]; // [low, high]
+  icons: [LucideIcon, LucideIcon]; // [low, high]
   positive?: boolean; // true = higher is better (colors reversed: 5=green, 1=red)
 }
 
 const ITEMS: WellnessItem[] = [
-  { key: "sleep_quality", label: "Sommeil (qualité)", emoji: ["😴", "😊"], positive: true },
-  { key: "fatigue", label: "Fatigue", emoji: ["💪", "🥵"] },
-  { key: "soreness", label: "Courbatures", emoji: ["✨", "🔥"] },
-  { key: "mood", label: "Humeur", emoji: ["😔", "😄"], positive: true },
-  { key: "stress", label: "Stress", emoji: ["🧘", "😰"] },
+  { key: "sleep_quality", label: "Sommeil (qualité)", icons: [Moon, Smile], positive: true },
+  { key: "fatigue", label: "Fatigue", icons: [Battery, BatteryLow] },
+  { key: "soreness", label: "Courbatures", icons: [Sparkles, Flame] },
+  { key: "mood", label: "Humeur", icons: [Frown, Laugh], positive: true },
+  { key: "stress", label: "Stress", icons: [Wind, Zap] },
 ];
 
 // ── Component ──────────────────────────────────────────────────
@@ -193,12 +193,13 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
       {/* 1-5 rated items */}
       {ITEMS.map((item) => {
         const [value, setValue] = stateMap[item.key];
+        const [IconLow, IconHigh] = item.icons;
         return (
           <div key={item.key} className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-base leading-none">{item.emoji[0]}</span>
+              <IconLow className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <span className="text-xs font-semibold text-foreground">{item.label}</span>
-              <span className="text-base leading-none ml-auto">{item.emoji[1]}</span>
+              <IconHigh className="h-4 w-4 text-muted-foreground ml-auto" aria-hidden="true" />
             </div>
             <div className="flex gap-1.5">
               {[1, 2, 3, 4, 5].map((n) => {
@@ -228,7 +229,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
       {/* Sleep hours stepper */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-base leading-none">💤</span>
+          <Bed className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <span className="text-xs font-semibold text-foreground">Heures de sommeil</span>
         </div>
         <div className="flex items-center justify-center gap-3">
@@ -286,7 +287,11 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
               : "border-border bg-muted text-muted-foreground hover:bg-muted/70",
           ].join(" ")}
         >
-          <span className="text-base leading-none">{hasPain ? "🩹" : "❤️"}</span>
+          {hasPain ? (
+            <Bandage className="h-4 w-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <Heart className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
           <span>{hasPain ? "Douleurs signalées" : "As-tu des douleurs ?"}</span>
           {hasPain && Object.keys(painZones).length > 0 && (
             <span className="ml-auto text-xs bg-red-500/20 px-1.5 py-0.5 rounded-full">

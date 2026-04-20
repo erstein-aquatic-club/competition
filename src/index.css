@@ -252,11 +252,20 @@ body {
 @utility z-fab {
   z-index: var(--z-index-fab);
 }
+@utility z-mobilenav {
+  z-index: var(--z-index-mobilenav);
+}
+@utility z-bar {
+  z-index: var(--z-index-bar);
+}
 @utility z-nav {
   z-index: var(--z-index-nav);
 }
 @utility z-modal {
   z-index: var(--z-index-modal);
+}
+@utility z-toast {
+  z-index: var(--z-index-toast);
 }
 
 @layer base {
