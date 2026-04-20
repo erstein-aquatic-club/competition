@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
 import { FolderOpen, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isCurrentWeek, fmtDD_MM } from "@/components/coach/swim/swimPlanningShared";
+import { isCurrentWeek, fmtDD_MM, getMonday } from "@/components/coach/swim/swimPlanningShared";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
 import { MyPlanWeekCard } from "./MyPlanWeekCard";
 import { MyPlanSessionSheet } from "./MyPlanSessionSheet";
@@ -73,7 +73,9 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
   const weekInstances = useMemo(() => {
     const allCycles = rootFolders.flatMap((root) => subFoldersMap.get(root.id) ?? []);
     if (allCycles.length === 0 || rootFolders.length === 0) return [];
-    return buildWeekInstances(rootFolders[0], allCycles, sessionsByFolder);
+    const all = buildWeekInstances(rootFolders[0], allCycles, sessionsByFolder);
+    const todayMondayKey = getMonday(new Date()).toISOString().split("T")[0];
+    return all.filter((inst) => inst.week.weekKey >= todayMondayKey);
   }, [rootFolders, subFoldersMap, sessionsByFolder]);
 
   // Auto-open current week on first render
