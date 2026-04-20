@@ -10,13 +10,14 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 
 | Fichier | Rôle | Taille |
 |---------|------|--------|
-| `src/lib/api.ts` | Façade API (stubs → modules) | ~893 lignes |
-| `src/lib/api/types.ts` | Interfaces TypeScript (sessions, strength, users, comps, wellness, cycles, challenges, achievements, pain) | ~994 lignes |
+| `src/lib/api.ts` | Façade API (stubs → modules) | 966 lignes |
+| `src/lib/api/types.ts` | Interfaces TypeScript (sessions, strength, users, comps, wellness, cycles, challenges, achievements, pain, strength-planning) | 1179 lignes |
 | `src/lib/api/client.ts` | Supabase client, utilitaires | ~316 lignes |
 | `src/lib/api/transformers.ts` | Fonctions de transformation strength | ~228 lignes |
 | `src/lib/api/helpers.ts` | Fonctions de mapping | ~161 lignes |
 | `src/lib/api/localStorage.ts` | Stockage local fallback | ~119 lignes |
-| `src/lib/api/index.ts` | Re-exports centralisés | ~416 lignes |
+| `src/lib/api/index.ts` | Re-exports centralisés | 460 lignes |
+| `src/lib/api/strength-planning.ts` | CRUD strength_planning_* : slots groupe + overrides athlete + week meta (Phase 2 §157) | 170 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |
 | `src/lib/api/users.ts` | Profil, athlètes, approbation | ~450 lignes |
@@ -131,12 +132,19 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/competition/TimelineTab.tsx` | Onglet Jour J (fusion chronologique courses + routines) | ~235 lignes |
 | `src/components/competition/ChecklistTab.tsx` | Onglet checklist (templates, progress bar, toggle) | ~415 lignes |
 | `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) | |
-| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur — wrapper mince timeline hebdomadaire (§156) | 271 lignes |
+| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur — consomme strength_planning_* BDD avec fallback cycles Phase 1 (§156+§157) | 325 lignes |
 | `src/components/strength/MyPlanWeekCard.tsx` | Carte semaine collapse/expand : rail dot, header S/dates/phase/chips compétitions, grille 7j (§156) | 215 lignes |
 | `src/components/strength/MyPlanSessionSheet.tsx` | Bottom Sheet aperçu séance muscu (titre, phase badge, liste items, Lancer) (§156) | 103 lignes |
 | `src/components/strength/MyPlanSessionRow.tsx` | Ligne jour×séance dans carte semaine (check, badge jour, titre, compteur) (§156) | 99 lignes |
 | `src/lib/strength/strengthPlanWeeks.ts` | Pure helpers : buildWeekInstances, parseWeekRange, weekInfoFromSNumber, types WeekInstance/WeekSession (§156) | 181 lignes |
 | `src/lib/strength/strengthPhaseStyles.ts` | PHASE_STYLES, detectPhase, type StrengthPhase extraits de MyPlanTab (§156) | 21 lignes |
+| `src/lib/strengthPlanningMerge.ts` | mergeStrengthSlots + mergeStrengthWeekMeta — merge group slots + athlete overrides (Phase 2 §157) | 121 lignes |
+| `src/lib/__tests__/strengthPlanningMerge.test.ts` | 13 tests unitaires merge slots et weekMeta strength planning (§157) | 164 lignes |
+| `supabase/tests/rls/strength_planning.test.ts` | Tests RLS intégration : 4 tables strength_planning_* — SELECT/INSERT/UPDATE/DELETE + §113 regression (§157) | 389 lignes |
+| `src/lib/unsavedDraftStore.ts` | Helpers saveDraft/loadDraft/clearDraft — snapshot localStorage résilient (quota OK, corruption-safe) pour WorkoutRunner + FeedbackDrawer (§158) | 90 lignes |
+| `src/lib/__tests__/unsavedDraftStore.test.ts` | 9 sous-tests `node:test` — round-trip, corrupted blob, quota exceeded, storage absent (§158) | 127 lignes |
+| `src/lib/__tests__/strengthAtomicSet.test.ts` | 7 tests `node:test` — log_strength_set_atomic RPC + reconcile error aggregation (§158) | 209 lignes |
+| `supabase/migrations/00137_log_strength_set_atomic.sql` | RPC atomique set-log + 1RM upsert (SECURITY DEFINER, search_path public, authz via app_user_id/role) — transaction unique (§158) | 142 lignes |
 | `src/hooks/useCompetitionsByWeek.ts` | Hook partagé : competitionsByWeek Map + getDayCompetitions par jour (§156) | 67 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |

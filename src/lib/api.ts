@@ -377,6 +377,19 @@ import {
   countUnreadComments48h as _countUnreadComments48h,
 } from "./api/coach-comments";
 
+import {
+  getStrengthPlanningSlots as _getStrengthPlanningSlots,
+  upsertStrengthPlanningSlot as _upsertStrengthPlanningSlot,
+  deleteStrengthPlanningSlot as _deleteStrengthPlanningSlot,
+  getStrengthPlanningSlotOverrides as _getStrengthPlanningSlotOverrides,
+  upsertStrengthPlanningSlotOverride as _upsertStrengthPlanningSlotOverride,
+  deleteStrengthPlanningSlotOverride as _deleteStrengthPlanningSlotOverride,
+  getStrengthPlanningWeekMeta as _getStrengthPlanningWeekMeta,
+  upsertStrengthPlanningWeekMeta as _upsertStrengthPlanningWeekMeta,
+  getStrengthPlanningWeekOverrides as _getStrengthPlanningWeekOverrides,
+  upsertStrengthPlanningWeekOverride as _upsertStrengthPlanningWeekOverride,
+} from "./api/strength-planning";
+
 // --- API Service ---
 
 export const api = {
@@ -936,4 +949,18 @@ export const api = {
   async getSwimmerComments(coachUserId: number, options?: Parameters<typeof _getSwimmerComments>[1]) { return _getSwimmerComments(coachUserId, options); },
   async markCommentsRead(coachUserId: number, sessionIds: number[]) { return _markCommentsRead(coachUserId, sessionIds); },
   async countUnreadComments48h(coachUserId: number) { return _countUnreadComments48h(coachUserId); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — Strength Planning (Phase 2 §157)
+  // ══════════════════════════════════════════════════════════════════
+  async getStrengthPlanningSlots(opts: Parameters<typeof _getStrengthPlanningSlots>[0]) { return _getStrengthPlanningSlots(opts); },
+  async upsertStrengthPlanningSlot(input: Parameters<typeof _upsertStrengthPlanningSlot>[0]) { return _upsertStrengthPlanningSlot(input); },
+  async deleteStrengthPlanningSlot(id: string) { return _deleteStrengthPlanningSlot(id); },
+  async getStrengthPlanningSlotOverrides(opts: Parameters<typeof _getStrengthPlanningSlotOverrides>[0]) { return _getStrengthPlanningSlotOverrides(opts); },
+  async upsertStrengthPlanningSlotOverride(input: Parameters<typeof _upsertStrengthPlanningSlotOverride>[0]) { return _upsertStrengthPlanningSlotOverride(input); },
+  async deleteStrengthPlanningSlotOverride(id: string) { return _deleteStrengthPlanningSlotOverride(id); },
+  async getStrengthPlanningWeekMeta(opts: Parameters<typeof _getStrengthPlanningWeekMeta>[0]) { return _getStrengthPlanningWeekMeta(opts); },
+  async upsertStrengthPlanningWeekMeta(input: Parameters<typeof _upsertStrengthPlanningWeekMeta>[0]) { return _upsertStrengthPlanningWeekMeta(input); },
+  async getStrengthPlanningWeekOverrides(opts: Parameters<typeof _getStrengthPlanningWeekOverrides>[0]) { return _getStrengthPlanningWeekOverrides(opts); },
+  async upsertStrengthPlanningWeekOverride(input: Parameters<typeof _upsertStrengthPlanningWeekOverride>[0]) { return _upsertStrengthPlanningWeekOverride(input); },
 };

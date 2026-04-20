@@ -8,16 +8,18 @@ const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-/** Extract calling user's app_user_id from JWT (best-effort, returns null if missing) */
-async function getCallerUserId(req: Request): Promise<number | null> {
+/** Extract calling user's app_user_id + role from JWT (returns nulls if missing) */
+async function getCallerIdentity(req: Request): Promise<{ userId: number | null; role: string | null }> {
   const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
+  if (!authHeader?.startsWith("Bearer ")) return { userId: null, role: null };
   const token = authHeader.replace("Bearer ", "");
   const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
   const { data: { user } } = await callerClient.auth.getUser(token);
-  return (user?.app_metadata?.app_user_id as number) ?? null;
+  const userId = (user?.app_metadata?.app_user_id as number) ?? null;
+  const role = (user?.app_metadata?.app_user_role as string) ?? null;
+  return { userId, role };
 }
 
 /** Check monthly rate limit for a user based on their role */
@@ -61,10 +63,23 @@ Deno.serve(async (req) => {
   let logId: number | null = null;
 
   try {
-    const { swimmer_iuf, user_id, swimmer_name } = await req.json();
+    const { swimmer_iuf, user_id: requestedUserId, swimmer_name } = await req.json();
     if (!swimmer_iuf) return new Response(JSON.stringify({ error: "Missing swimmer_iuf" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const triggeredBy = await getCallerUserId(req);
+    const { userId: triggeredBy, role: callerRole } = await getCallerIdentity(req);
+    if (!triggeredBy) {
+      return new Response(JSON.stringify({ error: "Unauthenticated" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // SECURITY: derive user_id attached to performances from the authenticated caller.
+    // - admin / coach may attribute performances to an arbitrary user_id (bulk / on-behalf imports)
+    //   OR leave it null (admin import sans assignation directe).
+    // - athletes (and anyone else) can only attribute performances to themselves — any client-supplied
+    //   user_id is ignored.
+    const canAttributeToOthers = callerRole === "admin" || callerRole === "coach";
+    const effectiveUserId: number | null = canAttributeToOthers
+      ? ((typeof requestedUserId === "number" ? requestedUserId : null))
+      : triggeredBy;
 
     // Rate limit check
     const rateCheck = await checkRateLimit(triggeredBy);
@@ -91,7 +106,7 @@ Deno.serve(async (req) => {
     const totalFound = performances.length;
 
     const rows = performances.map(p => ({
-      user_id: user_id ?? null,
+      user_id: effectiveUserId,
       swimmer_iuf,
       event_code: p.event_name,
       pool_length: p.pool_length,

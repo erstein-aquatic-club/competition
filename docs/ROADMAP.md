@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-20 (§156 Mon plan muscu — timeline hebdomadaire Phase 1 : carte semaine collapse/expand, rail + dots, badge phase, Sheet aperçu séance, intégration compétitions)*
+*Dernière mise à jour : 2026-04-20 (§158 Audit sprint : sécurité edge functions + atomicité strength logs RPC + résilience brouillons WorkoutRunner/FeedbackDrawer)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -101,6 +101,8 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 115 | Planification natation — granularité par nageur (overrides filière + week_type) + retrait macro-cycles | Haute | Haute | Fait (§153) |
 | 116 | ChronoSetup refonte progressive disclosure | Moyenne | Faible | Fait (§155) |
 | 117 | Mon plan muscu — timeline hebdomadaire Phase 1 (zéro migration BDD) | Haute | Haute | Fait (§156) |
+| 118 | Mon plan muscu — Phase 2 data model BDD + refactor MyPlanTab | Haute | Haute | Fait (§157) |
+| 119 | Audit sprint — sécurité edge functions + atomicité strength logs + résilience brouillons | Haute | Moyenne | Fait (§158) |
 
 ---
 

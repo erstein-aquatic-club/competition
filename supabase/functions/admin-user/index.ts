@@ -79,7 +79,13 @@ async function handleCreateCoach(body: {
     return errorResponse("Missing required fields: display_name and email");
   }
 
-  const password = body.password || generatePassword();
+  // Track whether the server generated the password — we only echo it back to
+  // the admin when THEY don't already have it. If the admin supplied the
+  // password themselves, returning it in the response body is pure redundancy
+  // and unnecessarily widens the exposure surface (HTTP caches, devtools,
+  // accidental client-side logging, etc.).
+  const adminSuppliedPassword = typeof body.password === "string" && body.password.length > 0;
+  const password = adminSuppliedPassword ? body.password! : generatePassword();
 
   // Create the auth user — the trigger handle_new_auth_user will create users + user_profiles rows
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -132,13 +138,16 @@ async function handleCreateCoach(body: {
     // Non-fatal: role is set in DB, JWT will sync on next login
   }
 
+  // Only return the password when it was generated server-side — otherwise
+  // the admin already has the value they just submitted. This minimises the
+  // lifetime of the plaintext secret in any non-essential surface.
   return jsonResponse({
     user: {
       id: publicUser.id,
       email,
       display_name,
     },
-    initial_password: password,
+    initial_password: adminSuppliedPassword ? null : password,
   });
 }
 

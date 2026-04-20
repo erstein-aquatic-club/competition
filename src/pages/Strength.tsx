@@ -678,6 +678,7 @@ export default function Strength() {
               initialLogs={activeRunLogs}
               initialStep={activeRunnerStep}
               isFinishing={isFinishing}
+              runId={activeRunId ?? undefined}
               onStepChange={(step) => setActiveRunnerStep(step)}
               onExitFocus={() => {
                 setScreenMode("list");

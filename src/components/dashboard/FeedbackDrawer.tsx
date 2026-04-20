@@ -17,6 +17,7 @@ import { slideInFromBottom, staggerChildren, listItem } from "@/lib/animations";
 import { durationsSeconds } from "@/lib/design-tokens";
 import { StrokeDetailForm } from "./StrokeDetailForm";
 import type { Session, SwimExerciseLogInput } from "@/lib/api";
+import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -496,6 +497,73 @@ export function FeedbackDrawer({
   useEffect(() => {
     setAdvancedOpen(false);
   }, [activeSessionId]);
+
+  // --- Unsaved draft resilience -----------------------------------------
+  // Persists the in-progress feedback under
+  // `eac_draft:feedback_drawer:<sessionId>` so a PWA background-kill or
+  // tab-close doesn't erase the swimmer's ratings/comment before save.
+  const draftKey = activeSessionId ? `feedback_drawer:${activeSessionId}` : null;
+  const draftRestoredForRef = useRef<string | null>(null);
+  const draftDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // On session open: restore if a draft exists for this session.
+  useEffect(() => {
+    if (!draftKey || !activeSessionId) return;
+    if (draftRestoredForRef.current === activeSessionId) return;
+    draftRestoredForRef.current = activeSessionId;
+    const draft = loadDraft<DraftState>(draftKey);
+    if (!draft) return;
+    const payload = draft.payload;
+    if (!payload || typeof payload !== "object") return;
+    const hasContent =
+      (payload.comment && payload.comment.length > 0) ||
+      Number.isInteger(payload.difficulty) ||
+      Number.isInteger(payload.fatigue_end) ||
+      Number.isInteger(payload.performance) ||
+      Number.isInteger(payload.engagement) ||
+      (payload.exerciseLogs && payload.exerciseLogs.length > 0);
+    if (!hasContent) {
+      clearDraft(draftKey);
+      return;
+    }
+    onDraftStateChange(payload);
+  }, [draftKey, activeSessionId]);
+
+  // Debounced save on every draftState change.
+  useEffect(() => {
+    if (!draftKey) return;
+    if (draftDebounceRef.current) clearTimeout(draftDebounceRef.current);
+    draftDebounceRef.current = setTimeout(() => {
+      saveDraft(draftKey, draftState);
+    }, 500);
+    return () => {
+      if (draftDebounceRef.current) clearTimeout(draftDebounceRef.current);
+    };
+  }, [draftKey, draftState]);
+
+  // Synchronous flush on tab hide / pagehide / beforeunload.
+  useEffect(() => {
+    if (!draftKey) return;
+    const flush = () => saveDraft(draftKey, draftState);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [draftKey, draftState]);
+
+  // Clear draft once the parent confirms a successful save.
+  useEffect(() => {
+    if (saveState === "saved" && draftKey) {
+      clearDraft(draftKey);
+    }
+  }, [saveState, draftKey]);
 
   // Lock body scroll when drawer is open — prevents background scroll bleed-through
   useEffect(() => {

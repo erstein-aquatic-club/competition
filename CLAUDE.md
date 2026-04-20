@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §156 (Mon plan muscu — timeline hebdomadaire Phase 1 : carte semaine collapse/expand, rail + dots, badge phase, Sheet aperçu séance, intégration compétitions).
+Dernière entrée en date : §158 (Audit sprint — sécurité `ffn-performances` user_id injection v63 + `admin-user` password leak v98 + atomicité strength logs RPC 00137 + résilience brouillons WorkoutRunner/FeedbackDrawer via `unsavedDraftStore`).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-13 (§110 Audit sécurité & robustesse — 4 sprints consolidés)*
+*Dernière mise à jour : 2026-04-20 (§158 Audit sprint — sécurité edge functions + atomicité strength logs + résilience brouillons)*
 
 ## Légende
 
@@ -105,7 +105,7 @@ Tous les feature flags sont activés.
 | Dossiers exercices | ✅ | `StrengthCatalog.tsx`, `FolderSection.tsx`, `MoveToFolderPopover.tsx` | Même système que séances, types séparés (§32) |
 | Assignation | ✅ | `CoachAssignScreen.tsx` | Via écran d'assignation partagé |
 | Dossiers par nageur (hiérarchiques) | ✅ | `StrengthCatalog.tsx`, `FolderSection.tsx`, `CopyToAthleteDialog.tsx` | Filtre nageur, dossiers 2 niveaux (cycle → séances), copie inter-nageurs, assignation rapide (§90) |
-| Vue nageur Mon plan muscu | ✅ | `MyPlanTab.tsx`, `MyPlanWeekCard.tsx`, `MyPlanSessionSheet.tsx`, `Strength.tsx` | Timeline hebdomadaire ISO collapse/expand, badge phase, Sheet aperçu séance, intégration compétitions (§90 phase 2 → §156 Phase 1 timeline) |
+| Vue nageur Mon plan muscu | ✅ | `MyPlanTab.tsx`, `MyPlanWeekCard.tsx`, `MyPlanSessionSheet.tsx`, `Strength.tsx`, `strengthPlanningMerge.ts`, `strength-planning.ts` | Timeline hebdomadaire ISO collapse/expand, badge phase, Sheet aperçu séance, intégration compétitions. Phase 2 (§157) : données depuis `strength_planning_slot_overrides` BDD (backfill 32 overrides) avec fallback cycles Phase 1. Éditeur coach (Phase 3) à venir. |
 | Dashboard coach | ✅ | `Coach.tsx` | Mobile first, KPI unifié, grille 2x2 avec compteurs, cards nageurs (§35) |
 | Calendrier coach | ✅ | `CoachCalendar.tsx`, `useCoachCalendarState.ts` | Vue mensuelle assignations, filtre groupe/nageur, 3 slots éditables inline (Nage Matin, Nage Soir, Muscu), indicateur musculation DayCell (§53, §54) |
 
@@ -129,6 +129,10 @@ Tous les feature flags sont activés.
 | RLS storage avatars/gifs | ✅ | Migration `00102` | Avatars ownership par `split_part(name,'.',1)`, exercise-gifs mutations coach/admin only (§110) |
 | CHECK strength_set_logs bornes | ✅ | Migration `00106` | `difficulty ∈ [1,5]`, `rpe ∈ [1,10]` en défense profondeur (§110) |
 | CHECK session_assignments visible_from | ✅ | Migration `00105` | `chk_visible_from_before_date` activée (était `NOT VALID`) (§110) |
+| Anti-injection `ffn-performances` user_id | ✅ | Edge Function `ffn-performances` v63 | `user_id` dérivé du JWT côté serveur ; admin/coach peuvent attribuer on-behalf, athlete forcé à son propre id (§158) |
+| `admin-user` password leak mitigated | ✅ | Edge Function `admin-user` v98 | `initial_password` retourné uniquement si généré serveur (admin-supplied → `null`) ; audit log déjà clean (§158) |
+| Atomicité strength set + 1RM | ✅ | Migration `00137`, `src/lib/api/strength.ts` | RPC `log_strength_set_atomic` SECURITY DEFINER — insert set + upsert 1RM en une transaction ; `reconcileStrengthRunLogs` agrège les erreurs sans avorter ; `updateStrengthRun` check 2e write (§158) |
+| Résilience brouillons WorkoutRunner / FeedbackDrawer | ✅ | `src/lib/unsavedDraftStore.ts`, WorkoutRunner, FeedbackDrawer | Snapshot localStorage debounced + flush sur pagehide/visibilitychange ; restore-on-mount avec toast ; quota-safe (§158) |
 
 ### Messagerie
 

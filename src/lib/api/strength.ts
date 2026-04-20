@@ -445,16 +445,56 @@ export async function logStrengthSet(payload: {
   };
 
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("strength_set_logs")
-      .insert(createSetLogDbPayload(payload));
-    if (error) throw new Error(error.message);
     const context = resolveAthleteContext();
-    const updated = await maybeUpdateOneRm(context);
+    // athlete_id is required server-side; if missing, we cannot use the atomic
+    // RPC (no 1RM to update). Fall back to a plain set-log insert — behaves
+    // like before minus the 1RM update, which requires the athlete id anyway.
+    const athleteIdRaw = context.athleteId;
+    const athleteIdNum =
+      athleteIdRaw === null || athleteIdRaw === undefined || athleteIdRaw === ""
+        ? null
+        : Number(athleteIdRaw);
+
+    if (athleteIdNum === null || !Number.isFinite(athleteIdNum)) {
+      const { error } = await supabase
+        .from("strength_set_logs")
+        .insert(createSetLogDbPayload(payload));
+      if (error) throw new Error(error.message);
+      return { status: "ok", one_rm_updated: false, one_rm: undefined };
+    }
+
+    // Compute the 1RM estimate client-side; the RPC will only persist it if
+    // it beats the existing record. Bodyweight sets skip 1RM estimation.
+    const oneRmEstimate =
+      isBodyweight(payload.weight)
+        ? null
+        : estimateOneRm(Number(payload.weight), Number(payload.reps));
+
+    const { data, error } = await supabase.rpc("log_strength_set_atomic", {
+      p_user_id: athleteIdNum,
+      p_exercise_id: payload.exercise_id,
+      p_reps: payload.reps ?? null,
+      p_weight: payload.weight ?? null,
+      p_run_id: payload.run_id,
+      p_completed_at: new Date().toISOString(),
+      p_set_index: payload.set_index ?? null,
+      p_difficulty: payload.difficulty ?? null,
+      p_rpe: payload.rpe ?? null,
+      p_notes: payload.notes ?? null,
+      p_rest_seconds: payload.rest_seconds ?? null,
+      p_pct_1rm_suggested: payload.pct_1rm_suggested ?? null,
+      p_one_rm_estimate: oneRmEstimate,
+    });
+    if (error) throw new Error(error.message);
+    const result = (data ?? {}) as {
+      set_id?: number;
+      one_rm_updated?: boolean;
+      one_rm?: number | null;
+    };
     return {
       status: "ok",
-      one_rm_updated: Boolean(updated),
-      one_rm: updated ?? undefined,
+      one_rm_updated: Boolean(result.one_rm_updated),
+      one_rm: result.one_rm ?? undefined,
     };
   }
 
@@ -484,34 +524,74 @@ export async function logStrengthSet(payload: {
 /**
  * Re-inserts any set logs missing from the DB compared to the local logs array.
  * Used before completing a run when fire-and-forget saves may have silently failed.
+ *
+ * Returns a list of per-set errors; the caller may ignore it (existing callers
+ * do) or surface the failures. A thrown error from the initial count query is
+ * propagated so we don't silently hide connection / RLS problems.
  */
+export interface ReconcileStrengthSetError {
+  index: number;
+  exercise_id: number;
+  message: string;
+}
+
+export interface ReconcileStrengthRunLogsResult {
+  attempted: number;
+  succeeded: number;
+  errors: ReconcileStrengthSetError[];
+}
+
 export async function reconcileStrengthRunLogs(params: {
   runId: number;
   logs: Array<{ exercise_id: number; set_number?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
   athleteId?: number | null;
   athleteName?: string | null;
-}): Promise<void> {
-  if (!canUseSupabase() || params.logs.length === 0) return;
+}): Promise<ReconcileStrengthRunLogsResult> {
+  const emptyResult: ReconcileStrengthRunLogsResult = {
+    attempted: 0,
+    succeeded: 0,
+    errors: [],
+  };
+  if (!canUseSupabase() || params.logs.length === 0) return emptyResult;
   const { count, error } = await supabase
     .from("strength_set_logs")
     .select("id", { count: "exact", head: true })
     .eq("run_id", params.runId);
-  if (error) return; // non-fatal — worst case: some logs already in DB (duplicates prevented by PK)
-  const remoteCount = count ?? 0;
-  if (remoteCount >= params.logs.length) return;
-  const missing = params.logs.slice(remoteCount);
-  for (const [i, log] of missing.entries()) {
-    await logStrengthSet({
-      run_id: params.runId,
-      exercise_id: log.exercise_id,
-      set_index: log.set_number ?? remoteCount + i + 1,
-      reps: log.reps ?? null,
-      weight: log.weight ?? null,
-      difficulty: log.difficulty ?? null,
-      athlete_id: params.athleteId ?? null,
-      athlete_name: params.athleteName ?? null,
-    });
+  if (error) {
+    // Previously this silently returned. Surface as an exception so the caller
+    // doesn't assume a clean reconcile when the count query failed.
+    throw new Error(
+      `reconcileStrengthRunLogs: count query failed: ${error.message}`,
+    );
   }
+  const remoteCount = count ?? 0;
+  if (remoteCount >= params.logs.length) return emptyResult;
+  const missing = params.logs.slice(remoteCount);
+  const errors: ReconcileStrengthSetError[] = [];
+  let succeeded = 0;
+  for (const [i, log] of missing.entries()) {
+    try {
+      await logStrengthSet({
+        run_id: params.runId,
+        exercise_id: log.exercise_id,
+        set_index: log.set_number ?? remoteCount + i + 1,
+        reps: log.reps ?? null,
+        weight: log.weight ?? null,
+        difficulty: log.difficulty ?? null,
+        athlete_id: params.athleteId ?? null,
+        athlete_name: params.athleteName ?? null,
+      });
+      succeeded += 1;
+    } catch (err) {
+      // Collect but don't abort — one bad set shouldn't block the others.
+      errors.push({
+        index: remoteCount + i,
+        exercise_id: log.exercise_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return { attempted: missing.length, succeeded, errors };
 }
 
 export async function updateStrengthRun(update: {
@@ -528,10 +608,13 @@ export async function updateStrengthRun(update: {
       .eq("id", update.run_id);
     if (error) throw new Error(error.message);
     if (update.status === "completed" && update.assignment_id) {
-      await supabase
+      // Previously the error of this 2nd write was not inspected, leaving the
+      // run flagged completed while the assignment stayed stuck "in_progress".
+      const { error: assignmentError } = await supabase
         .from("session_assignments")
         .update({ status: "completed" })
         .eq("id", update.assignment_id);
+      if (assignmentError) throw new Error(assignmentError.message);
     }
     return { status: "ok" };
   }

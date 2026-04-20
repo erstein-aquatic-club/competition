@@ -1083,6 +1083,78 @@ export interface ChronoRecordInput {
   swimmers: ChronoRecordSwimmer[];
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Strength planning — groups + per-athlete overrides (Phase 2)
+// ═══════════════════════════════════════════════════════════════════
+
+export interface StrengthPlanningSlot {
+  id: string;
+  group_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  session_template_id: number | null;
+  notes: string | null;
+  created_at: string;
+}
+export interface StrengthPlanningSlotInput {
+  group_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  session_template_id?: number | null;
+  notes?: string | null;
+}
+
+export interface StrengthPlanningSlotOverride {
+  id: string;
+  athlete_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  session_template_id: number | null;
+  notes: string | null;
+  created_at: string;
+}
+export interface StrengthPlanningSlotOverrideInput {
+  athlete_id: number;
+  week_start: string;
+  day_of_week: number;
+  time_slot: "morning" | "evening";
+  session_template_id?: number | null;
+  notes?: string | null;
+}
+
+export interface StrengthPlanningWeekMeta {
+  id: string;
+  group_id: number;
+  week_start: string;
+  week_type: string | null;
+  notes: string | null;
+  updated_at: string;
+}
+export interface StrengthPlanningWeekMetaInput {
+  group_id: number;
+  week_start: string;
+  week_type?: string | null;
+  notes?: string | null;
+}
+
+export interface StrengthPlanningWeekOverride {
+  id: string;
+  athlete_id: number;
+  week_start: string;
+  week_type: string | null;
+  notes: string | null;
+  updated_at: string;
+}
+export interface StrengthPlanningWeekOverrideInput {
+  athlete_id: number;
+  week_start: string;
+  week_type?: string | null;
+  notes?: string | null;
+}
+
 // --- Swimmer sessions RPC (§144) ---
 
 export interface SwimmerSession {

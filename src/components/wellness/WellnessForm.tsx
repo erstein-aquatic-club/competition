@@ -42,14 +42,16 @@ interface WellnessItem {
   label: string;
   icons: [LucideIcon, LucideIcon]; // [low, high]
   positive?: boolean; // true = higher is better (colors reversed: 5=green, 1=red)
+  labelLow: string;
+  labelHigh: string;
 }
 
 const ITEMS: WellnessItem[] = [
-  { key: "sleep_quality", label: "Sommeil (qualité)", icons: [Moon, Smile], positive: true },
-  { key: "fatigue", label: "Fatigue", icons: [Battery, BatteryLow] },
-  { key: "soreness", label: "Courbatures", icons: [Sparkles, Flame] },
-  { key: "mood", label: "Humeur", icons: [Frown, Laugh], positive: true },
-  { key: "stress", label: "Stress", icons: [Wind, Zap] },
+  { key: "sleep_quality", label: "Sommeil (qualité)", icons: [Moon, Smile], positive: true, labelLow: "Mauvais", labelHigh: "Excellent" },
+  { key: "fatigue", label: "Fatigue", icons: [Battery, BatteryLow], labelLow: "Aucune", labelHigh: "Épuisé(e)" },
+  { key: "soreness", label: "Courbatures", icons: [Sparkles, Flame], labelLow: "Aucune", labelHigh: "Intense" },
+  { key: "mood", label: "Humeur", icons: [Frown, Laugh], positive: true, labelLow: "Déprimé(e)", labelHigh: "Au top" },
+  { key: "stress", label: "Stress", icons: [Wind, Zap], labelLow: "Zen", labelHigh: "Débordé(e)" },
 ];
 
 // ── Component ──────────────────────────────────────────────────
@@ -221,6 +223,10 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
                   </button>
                 );
               })}
+            </div>
+            <div className="flex justify-between px-0.5">
+              <span className="text-[10px] text-muted-foreground">{item.labelLow}</span>
+              <span className="text-[10px] text-muted-foreground">{item.labelHigh}</span>
             </div>
           </div>
         );

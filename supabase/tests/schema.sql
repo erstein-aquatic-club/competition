@@ -816,3 +816,92 @@ CREATE POLICY swim_planning_week_overrides_write ON public.swim_planning_week_ov
   FOR ALL TO authenticated
   USING ((SELECT app_user_role()) IN ('coach','admin'))
   WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+-- =============================================================================
+-- strength_planning_* (migration 00136) — group + per-athlete overrides
+--
+-- Mirrors prod policies from migration 00136: SELECT open to authenticated,
+-- WRITE restricted to coach/admin only. Athletes must NOT be able to INSERT,
+-- UPDATE, or DELETE slots or overrides — all writes go through a coach.
+-- =============================================================================
+
+CREATE TABLE public.strength_planning_slots (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id integer NOT NULL,
+  week_start date NOT NULL,
+  day_of_week smallint NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  time_slot text NOT NULL CHECK (time_slot IN ('morning', 'evening')),
+  session_template_id integer NULL,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(group_id, week_start, day_of_week, time_slot)
+);
+
+CREATE TABLE public.strength_planning_slot_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id integer NOT NULL,
+  week_start date NOT NULL,
+  day_of_week smallint NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  time_slot text NOT NULL CHECK (time_slot IN ('morning', 'evening')),
+  session_template_id integer NULL,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(athlete_id, week_start, day_of_week, time_slot)
+);
+
+CREATE TABLE public.strength_planning_week_meta (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id integer NOT NULL,
+  week_start date NOT NULL,
+  week_type text,
+  notes text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(group_id, week_start)
+);
+
+CREATE TABLE public.strength_planning_week_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id integer NOT NULL,
+  week_start date NOT NULL,
+  week_type text,
+  notes text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(athlete_id, week_start)
+);
+
+ALTER TABLE public.strength_planning_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.strength_planning_slot_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.strength_planning_week_meta ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.strength_planning_week_overrides ENABLE ROW LEVEL SECURITY;
+
+-- strength_planning_slots
+CREATE POLICY strength_planning_slots_select ON public.strength_planning_slots
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY strength_planning_slots_write ON public.strength_planning_slots
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+-- strength_planning_slot_overrides
+CREATE POLICY strength_planning_slot_overrides_select ON public.strength_planning_slot_overrides
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY strength_planning_slot_overrides_write ON public.strength_planning_slot_overrides
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+-- strength_planning_week_meta
+CREATE POLICY strength_planning_week_meta_select ON public.strength_planning_week_meta
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY strength_planning_week_meta_write ON public.strength_planning_week_meta
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+-- strength_planning_week_overrides
+CREATE POLICY strength_planning_week_overrides_select ON public.strength_planning_week_overrides
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY strength_planning_week_overrides_write ON public.strength_planning_week_overrides
+  FOR ALL TO authenticated
+  USING ((SELECT app_user_role()) IN ('coach','admin'))
+  WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));

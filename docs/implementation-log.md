@@ -10648,3 +10648,106 @@ Exécution : plan de 10 tâches (voir `docs/plans/2026-04-18-coach-individual-sw
 - Parsing nom cycle best-effort ; noms non conformes → fallback semaine courante + offset index
 - Badge "Perso" non implémenté (réservé Phase 2)
 - Refactor bonus de SwimPlanningAthleteView pour utiliser useCompetitionsByWeek non fait (laissé pour Phase 2 / §157)
+
+---
+
+## §157 — Mon plan muscu : Phase 2 — Data model BDD + refactor MyPlanTab (2026-04-20)
+
+**Contexte :** Phase 1 (§156) projetait les cycles existants sur un calendrier hebdo via parsing de noms (`S13-S15`). Phase 2 introduit un vrai modèle de données miroir du swim planning : 4 tables BDD (`strength_planning_slots`, `strength_planning_slot_overrides`, `strength_planning_week_meta`, `strength_planning_week_overrides`) + API wrappers + helpers merge + refactor `MyPlanTab` pour consommer les données BDD avec fallback Phase 1.
+
+**Design doc :** `docs/plans/2026-04-20-strength-planning-phase2-datamodel-design.md`
+
+**Changements :**
+
+- `supabase/migrations/00136_strength_planning_slots.sql` (NOUVEAU, 200 l.) — 4 tables + 16 policies RLS (SELECT open/write coach+admin) + backfill DO $$ des cycles existants → `strength_planning_slot_overrides`. Divergence vs design doc : table BDD est `strength_sessions` (pas `strength_session_templates` qui n'existe pas en prod). Backfill utilise `name` au lieu de `title`.
+- `src/lib/api/types.ts` (MODIFIÉ, +72 l., 1107→1179) — 8 nouveaux types : `StrengthPlanningSlot`, `StrengthPlanningSlotInput`, `StrengthPlanningSlotOverride`, `StrengthPlanningSlotOverrideInput`, `StrengthPlanningWeekMeta`, `StrengthPlanningWeekMetaInput`, `StrengthPlanningWeekOverride`, `StrengthPlanningWeekOverrideInput`
+- `src/lib/api/strength-planning.ts` (NOUVEAU, 170 l.) — 10 fonctions CRUD : `getStrengthPlanningSlots`, `upsertStrengthPlanningSlot`, `deleteStrengthPlanningSlot`, `getStrengthPlanningSlotOverrides`, `upsertStrengthPlanningSlotOverride`, `deleteStrengthPlanningSlotOverride` (avec `.select("id")` §113), `getStrengthPlanningWeekMeta`, `upsertStrengthPlanningWeekMeta`, `getStrengthPlanningWeekOverrides`, `upsertStrengthPlanningWeekOverride`
+- `src/lib/api/index.ts` (MODIFIÉ, +12 l., 447→460) — re-exports du module strength-planning
+- `src/lib/api.ts` (MODIFIÉ, +28 l., 938→966) — import + 10 stubs délégués dans l'objet `api`
+- `src/lib/strengthPlanningMerge.ts` (NOUVEAU, 121 l.) — `mergeStrengthSlots` + `mergeStrengthWeekMeta` (miroir de swimPlanningMerge). Algorithme : override per-slot écrase, override athlete-only s'ajoute, week meta = athlete > group > none
+- `src/lib/__tests__/strengthPlanningMerge.test.ts` (NOUVEAU, 164 l.) — 13 tests unitaires : merge sans override, avec override, add-only, priorité, null session_template_id, notes override, duplication, weekMeta cases
+- `src/components/strength/MyPlanTab.tsx` (REFACTORÉ, 197→325 l.) — Phase 2 queries (slots/overrides/weekMeta/weekOverrides), merge → effectiveSlots, construction WeekInstance[] depuis effective slots + catalog lookup, fallback Phase 1 si effectiveSlots vides ET rootFolders présents
+- `supabase/tests/schema.sql` (MODIFIÉ, 818→907 l.) — 4 tables strength_planning_* + 8 policies pour tests RLS locaux
+- `supabase/tests/rls/strength_planning.test.ts` (NOUVEAU, 389 l.) — tests RLS : SELECT global, INSERT athlete bloqué, coach/admin autorisés, DELETE athlete = no-op §113, UPDATE athlete = no-op, idempotent upsert, 4 tables couvertes
+
+**Migration Supabase :** 00136 appliquée via MCP sur `fscnobivsgornxdwqwlk`. Backfill = 32 overrides créés.
+
+**Tests :**
+- `npx tsc --noEmit` — 0 erreur ✅
+- `npm test` — 264/264 ✅ (13 nouveaux strengthPlanningMerge + 251 existants)
+- `npm run test:rls` — EN ATTENTE confirmation Docker utilisateur ⏳
+
+**Décisions :**
+- Colonne `session_template_id` conservée comme nom dans les nouvelles tables (sémantique claire), mais FK pointe sur `strength_sessions(id)` (nom réel BDD prod)
+- Phase 2 affiche 12 semaines depuis la semaine courante (parité swim `INITIAL_WEEK_COUNT`)
+- Fallback Phase 1 s'active si `effectiveSlots.length === 0` ET `rootFolders.length > 0` — continuité douce pendant migration
+- `MyPlanWeekCard` et `MyPlanSessionRow` réutilisés tels quels (prop `timeSlotBadge` optionnelle du design doc non implémentée car les sessions n'ont qu'un slot par jour dans le backfill initial — reporté Phase 3)
+- `cycleId: 0` dans les WeekInstances Phase 2 (pas de cycle associé) — clé de rendu stable via `week.weekKey`
+
+**Limites / dette :**
+- Tests RLS en attente Docker (fichiers créés, prêts à lancer)
+- `timeSlotBadge` Matin/Soir non implémenté (non urgent, backfill 99% = evening uniquement)
+- Éditeur coach Phase 3 requis pour créer des slots de groupe
+- La `strength_session_templates` du design doc est une inadvertance — c'est bien `strength_sessions` en prod
+
+---
+
+## §158 — Audit sprint : sécurité edge functions + atomicité strength logs + résilience brouillons (2026-04-20)
+
+**Contexte :** audit transverse de l'app (4 domaines parallèles : sécurité, robustesse, UX, data model) avec priorisation Top-5. Sprint d'exécution sur les 5 issues prioritaires, dispatché via 5 agents parallèles (1 vérif + 4 exécution). Issue #5 (Coach QuickView RPC) close après vérification : l'accès universel coach→athlète est intentionnel (§152 "mode dépannage" substituant), écriture traçable via `recorded_by`.
+
+**Issues fixées :**
+
+### Issue #1 — `ffn-performances` : user_id injection (Critique)
+- `supabase/functions/ffn-performances/index.ts` (MODIFIÉ) — helper `getCallerIdentity` étendu pour retourner `{ userId, role }` depuis `user.app_metadata.app_user_id`/`app_user_role` (pattern aligné avec `admin-user`). Guard 401 unauthenticated. Role gate : admin/coach peuvent attribuer à un `user_id` arbitraire (imports on-behalf légitimes) ; athlete → forcé à `triggeredBy` côté serveur. `user_id: user_id ?? null` remplacé par `user_id: effectiveUserId` dans l'upsert.
+- **Déploiement :** v62→v63 via MCP `deploy_edge_function` (verify_jwt: true conservé).
+
+### Issue #2 — `admin-user` : plaintext password exposure (Medium)
+- Audit : les writes `admin_audit_log` étaient déjà clean (aucun password persisté). Le vrai risque = réponse HTTP redondante quand l'admin a lui-même saisi le mot de passe.
+- `supabase/functions/admin-user/index.ts` (MODIFIÉ) — flag `adminSuppliedPassword` ; `initial_password` n'est retourné que si généré serveur (sinon `null`). Commentaire documentant le raisonnement.
+- **Déploiement :** v97→v98 via MCP (verify_jwt: false conservé — la fonction valide elle-même le JWT via `auth.getUser(token)`).
+
+### Issue #3 — Strength set logs : atomicité + silent failures (Haute)
+- `supabase/migrations/00137_log_strength_set_atomic.sql` (NOUVEAU, 143 l.) — RPC `public.log_strength_set_atomic(...)` en `SECURITY DEFINER` + `SET search_path = public`. Authz via `app_user_id()` / `app_user_role()` (conforme convention projet, pas d'`auth.uid()` direct). En une transaction : insert `strength_set_logs` + upsert `one_rm_records` (seulement si nouveau PR). Retourne `jsonb { set_id, one_rm_updated, one_rm }`. GRANT EXECUTE authenticated / REVOKE PUBLIC.
+- `src/lib/api/strength.ts` (MODIFIÉ, L447-498 / L528-595 / L567-577) :
+  - `logStrengthSet` → call RPC unique ; fallback `.insert(...)` quand `athlete_id` absent (pas de 1RM à updater). Errors throw.
+  - `reconcileStrengthRunLogs` → retourne nouveau `ReconcileStrengthRunLogsResult { attempted, succeeded, errors[] }` (non-breaking, callers ignorent le retour). Error initial lève, chaque itération try/catch agrégé sans avorter la boucle.
+  - `updateStrengthRun` → 2e write (`session_assignments.update`) await `{ error }` et throw si failed (plus de silent drop).
+- `src/lib/__tests__/strengthAtomicSet.test.ts` (NOUVEAU, 7 tests `node:test`) — RPC appelée avec args attendus / bodyweight → null 1RM / RPC error throws / PR → `one_rm_updated=true` / reconcile continue past mid-loop error + aggregates / reconcile throws sur count query error / empty logs = no-op.
+- **Migration Supabase :** 00137 appliquée via MCP sur `fscnobivsgornxdwqwlk`. Advisor re-run : 0 new warnings (`log_strength_set_atomic` absent de la liste → `SET search_path` effectif).
+
+### Issue #4 — Unsaved-data résilience (WorkoutRunner + FeedbackDrawer)
+- `src/lib/unsavedDraftStore.ts` (NOUVEAU, 75 l.) — utilitaire `saveDraft` / `loadDraft<T>` / `clearDraft`. Enveloppe `{ v: 1, savedAt, payload }`, try/catch partout (Safari private-mode quota OK), no-op si `window.localStorage` absent.
+- `src/components/strength/WorkoutRunner.tsx` (MODIFIÉ) — nouvelle prop `runId?`, effet restore-on-mount (toast "Brouillon retrouvé"), save debounced 500ms sur `difficulty`/`fatigue`/`comments`/`currentSetInputs`, flush sync sur `pagehide`/`beforeunload`/`visibilitychange→hidden`, `clearDraft` à la fin du save. Draft key = `workout_runner:<runId>`.
+- `src/components/dashboard/FeedbackDrawer.tsx` (MODIFIÉ) — restore par `activeSessionId`, save debounced, flush sync sur tab hide, clear quand `saveState === "saved"`. Draft key = `feedback_drawer:<activeSessionId>`.
+- `src/pages/Strength.tsx` (L681) — passe `runId={activeRunId ?? undefined}` à `<WorkoutRunner>`.
+- `src/lib/__tests__/unsavedDraftStore.test.ts` (NOUVEAU, 9 sous-tests `node:test`) — round-trip, missing/corrupted/wrong-shape → null, clear, quota-exceeded swallowed, getItem/setItem/removeItem errors swallowed, no-op sans storage.
+
+### Issue #5 — Coach QuickView RPC authz (Vérification, fermé)
+- Lecture migrations 00133-00135 + `src/lib/api/coach-quickview.ts` + `docs/implementation-log.md §152`.
+- **Verdict :** universal-access intentionnel. §152 remplace explicitement un mur "Accès refusé" par un briefing read-only pour les coachs substituants. Le gate RPC check seulement `v_caller_role IN ('coach', 'admin')`, pas l'assignment. Les writes (`session_attendance`, `session_comments`, slot overrides) portent `recorded_by = auth.uid()` pour audit. Modèle club-wide volontaire.
+- **Aucun code change.** Issue fermée.
+
+**Tests :**
+- `npx tsc --noEmit` — 0 erreur ✅
+- `npm test` — 280 pass / 0 fail (audit seul : +16 tests ; précédent 264 + §157 13 nouveaux déjà inclus = baseline 264 avant §158)
+- `npm run test:rls` — non exécuté (Docker pas demandé au user, pas de modif RLS côté policies existantes — la nouvelle RPC `log_strength_set_atomic` est `SECURITY DEFINER` avec authz interne, pas de nouvelle policy)
+
+**Déploiements :**
+- Edge Functions : `ffn-performances` v63 + `admin-user` v98 via MCP
+- Migration : 00137 via MCP
+- Frontend : push sur `main` → GitHub Actions déploie automatiquement (en cours)
+
+**Décisions / trade-offs :**
+- `updateStrengthRun` resté en "check + throw" plutôt qu'un 2e RPC atomic (hors scope, aurait nécessité revue RLS coach vs athlete)
+- `admin-user` verify_jwt: false conservé (fonction fait sa propre validation via `auth.getUser(token)`) — pas d'opportunité de régression
+- `unsavedDraftStore` enabled par défaut (pas de feature flag) — user a explicitement demandé la résilience
+- Bundle impact minimal (`unsavedDraftStore` ~75 lignes, pas de deps)
+
+**Side-discovery (hors scope, à tracker séparément) :**
+- Migration 00083 `save_strength_run_atomic` écrit dans une colonne `set_number` qui n'existe pas en prod (colonne réelle = `set_index`). Cette RPC est probablement cassée depuis §83. À investiguer dans un chantier dédié.
+
+**Limites / dette :**
+- Pas de test E2E pour les Edge Functions fixées (le harness RLS ne couvre pas les Edge Functions). Smoke test manuel recommandé post-deploy avec JWT athlète + body `user_id` forgé → doit être ignoré côté serveur.
+- Restore-on-mount des brouillons n'est pas testé en E2E ; la shape `DraftState` de `FeedbackDrawer` doit être re-vérifiée si le parent refactore.
+- `save_strength_run_atomic` (§83) cassé — non fixé.

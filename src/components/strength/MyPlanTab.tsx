@@ -4,8 +4,9 @@ import { api } from "@/lib/api";
 import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
 import { FolderOpen, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isCurrentWeek, fmtDD_MM, getMonday } from "@/components/coach/swim/swimPlanningShared";
+import { isCurrentWeek, fmtDD_MM, getMonday, getISOWeekNumber } from "@/components/coach/swim/swimPlanningShared";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
+import type { WeekInstance } from "@/lib/strength/strengthPlanWeeks";
 import { MyPlanWeekCard } from "./MyPlanWeekCard";
 import { useCompetitionsByWeek } from "@/hooks/useCompetitionsByWeek";
 import {
@@ -14,6 +15,23 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { mergeStrengthSlots } from "@/lib/strengthPlanningMerge";
+import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
+
+/** Number of future weeks to display from current week */
+const PLAN_WEEK_COUNT = 12;
+
+/** Build ISO date strings for the next N weeks from today's Monday */
+function buildWeekStarts(count: number): string[] {
+  const monday = getMonday(new Date());
+  const starts: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i * 7);
+    starts.push(d.toISOString().split("T")[0]);
+  }
+  return starts;
+}
 
 interface MyPlanTabProps {
   athleteId: number;
@@ -24,7 +42,40 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
-  // ── Data loading ────────────────────────────────────────────────────────
+  // Stable week starts for the next 12 weeks
+  const weekStarts = useMemo(() => buildWeekStarts(PLAN_WEEK_COUNT), []);
+
+  // ── Profile (to get group_id) ───────────────────────────────────────────────
+  const { data: profile } = useQuery({
+    queryKey: ["profile", athleteId],
+    queryFn: () => api.getProfile({ userId: athleteId }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const groupId = profile?.group_id ?? null;
+
+  // ── Phase 2: Strength planning slots ────────────────────────────────────────
+  const { data: groupSlots = [] } = useQuery({
+    queryKey: ["strength_planning_slots", groupId, weekStarts],
+    queryFn: () =>
+      groupId
+        ? api.getStrengthPlanningSlots({ groupId, weekStarts })
+        : Promise.resolve([]),
+    enabled: groupId != null,
+  });
+
+  const { data: athleteOverrides = [] } = useQuery({
+    queryKey: ["strength_planning_slot_overrides", athleteId, weekStarts],
+    queryFn: () =>
+      api.getStrengthPlanningSlotOverrides({ athleteId, weekStarts }),
+  });
+
+  // Merge: athlete overrides take precedence over group slots
+  const effectiveSlots = useMemo(
+    () => mergeStrengthSlots(groupSlots, athleteOverrides),
+    [groupSlots, athleteOverrides],
+  );
+
+  // ── Phase 1 fallback data (cycles-based) ────────────────────────────────────
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
     queryFn: () => api.getStrengthFolders("session", { athleteId }),
@@ -35,7 +86,7 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     queryFn: () => api.getStrengthSessions(),
   });
 
-  // ── Hierarchy ───────────────────────────────────────────────────────────
+  // ── Hierarchy for Phase 1 fallback ─────────────────────────────────────────
   const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
 
   const subFoldersMap = useMemo(() => {
@@ -64,14 +115,91 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     return map;
   }, [folders, allSessions]);
 
-  // ── Week instances ──────────────────────────────────────────────────────
-  const weekInstances = useMemo(() => {
+  // ── Sessions lookup map (id → StrengthSessionTemplate) ─────────────────────
+  const sessionsById = useMemo(() => {
+    const map = new Map<number, StrengthSessionTemplate>();
+    for (const s of allSessions) {
+      map.set(s.id, s);
+    }
+    return map;
+  }, [allSessions]);
+
+  // ── Determine which source to use ──────────────────────────────────────────
+  // Use Phase 2 BDD slots if any effective slots exist.
+  // Fall back to Phase 1 cycle parsing only if no BDD slots but cycles exist.
+  const usePhase2 = effectiveSlots.length > 0;
+  const useFallback = !usePhase2 && rootFolders.length > 0;
+
+  // ── Phase 2: Build WeekInstances from effective slots ──────────────────────
+  const phase2WeekInstances = useMemo((): WeekInstance[] => {
+    if (!usePhase2) return [];
+
+    // Group effective slots by week_start
+    const byWeek = new Map<string, typeof effectiveSlots>();
+    for (const slot of effectiveSlots) {
+      const arr = byWeek.get(slot.week_start) ?? [];
+      arr.push(slot);
+      byWeek.set(slot.week_start, arr);
+    }
+
+    const instances: WeekInstance[] = [];
+    for (const weekStart of weekStarts) {
+      const slots = byWeek.get(weekStart) ?? [];
+      if (slots.length === 0) continue;
+
+      const monday = new Date(weekStart + "T00:00:00");
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const weekNumber = getISOWeekNumber(monday);
+
+      // Build WeekSession entries from slots that have a session_template_id
+      const sessions = slots
+        .filter((slot) => slot.session_template_id != null)
+        .map((slot) => {
+          const session = sessionsById.get(slot.session_template_id!);
+          if (!session) return null;
+          const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+          const dayLabel = DAY_LABELS[slot.day_of_week] ?? null;
+          const cleanTitle = (session.title ?? session.name ?? "").replace(
+            /^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*[—–\-:]\s*/i,
+            "",
+          ).trim();
+          return {
+            dayIndex: slot.day_of_week,
+            dayLabel,
+            session,
+            cleanTitle,
+          };
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null)
+        .sort((a, b) => a.dayIndex - b.dayIndex);
+
+      instances.push({
+        week: { monday, sunday, weekNumber, weekKey: weekStart },
+        cycleId: 0, // no cycle for Phase 2
+        cycleName: "",
+        cycleShortLabel: `S${weekNumber}`,
+        phase: detectPhase(""),
+        phaseName: "",
+        dateRangeLabel: null,
+        sessions,
+      });
+    }
+    return instances;
+  }, [usePhase2, effectiveSlots, weekStarts, sessionsById]);
+
+  // ── Phase 1 fallback: build WeekInstances from cycles ─────────────────────
+  const fallbackWeekInstances = useMemo((): WeekInstance[] => {
+    if (!useFallback) return [];
     const allCycles = rootFolders.flatMap((root) => subFoldersMap.get(root.id) ?? []);
-    if (allCycles.length === 0 || rootFolders.length === 0) return [];
+    if (allCycles.length === 0) return [];
     const all = buildWeekInstances(rootFolders[0], allCycles, sessionsByFolder);
     const todayMondayKey = getMonday(new Date()).toISOString().split("T")[0];
     return all.filter((inst) => inst.week.weekKey >= todayMondayKey);
-  }, [rootFolders, subFoldersMap, sessionsByFolder]);
+  }, [useFallback, rootFolders, subFoldersMap, sessionsByFolder]);
+
+  // ── Final week instances ────────────────────────────────────────────────────
+  const weekInstances = usePhase2 ? phase2WeekInstances : fallbackWeekInstances;
 
   // Auto-open current week on first render
   useEffect(() => {
@@ -84,10 +212,10 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekInstances.length]);
 
-  // ── Competitions ────────────────────────────────────────────────────────
+  // ── Competitions ────────────────────────────────────────────────────────────
   const { competitionsByWeek, getDayCompetitions } = useCompetitionsByWeek(athleteId);
 
-  // ── Loading skeleton ────────────────────────────────────────────────────
+  // ── Loading skeleton ────────────────────────────────────────────────────────
   if (foldersLoading) {
     return (
       <div className="space-y-3 pt-2">
@@ -98,8 +226,9 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     );
   }
 
-  // ── Empty states ────────────────────────────────────────────────────────
-  if (rootFolders.length === 0) {
+  // ── Empty states ────────────────────────────────────────────────────────────
+  // No Phase 2 slots AND no Phase 1 cycles → show "aucun plan"
+  if (!usePhase2 && rootFolders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <FolderOpen className="h-10 w-10 mb-4 text-muted-foreground/30" />
@@ -124,7 +253,7 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     );
   }
 
-  // ── Timeline ────────────────────────────────────────────────────────────
+  // ── Timeline ────────────────────────────────────────────────────────────────
   return (
     <div className="relative pt-1 pb-4">
       {/* Vertical timeline rail */}

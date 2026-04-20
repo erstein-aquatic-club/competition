@@ -37,6 +37,7 @@ import { BODYWEIGHT_SENTINEL, isBodyweight } from "@/lib/api/client";
 import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from "@/lib/types";
 import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
+import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -138,6 +139,7 @@ export function WorkoutRunner({
   onAddExercise,
   onSubstitute,
   userId,
+  runId,
 }: {
   session: StrengthSessionTemplate;
   exercises: Exercise[];
@@ -157,6 +159,10 @@ export function WorkoutRunner({
   onAddExercise?: (exercise: Exercise) => void;
   onSubstitute?: (itemIndex: number, exercise: Exercise) => void;
   userId: number;
+  /** When provided, in-progress finish-form state (difficulty/fatigue/comments)
+   *  is persisted to localStorage so the swimmer can recover after an iOS
+   *  PWA background-kill or accidental tab close. */
+  runId?: string | number | null;
 }) {
   const { toast } = useToast();
   const isLoggingRef = useRef(false);
@@ -311,6 +317,89 @@ export function WorkoutRunner({
   const targetWeight = hasPercent ? Math.round(rm * (percentValue / 100)) : 0;
 
   const [currentSetInputs, setCurrentSetInputs] = useState<Record<number, SetInputValues>>({});
+
+  // --- Unsaved draft resilience -------------------------------------------
+  // Persists `difficulty` / `fatigue` / `comments` / `currentSetInputs`
+  // (in-progress values) under `eac_draft:workout_runner:<runId>` so an
+  // iOS PWA background-kill doesn't erase finish-form notes or the
+  // partially-typed weight/reps for the active set. Logs themselves are
+  // already persisted by the parent via `onLogSets` → localStorage.
+  const draftKey = runId != null && runId !== "" ? `workout_runner:${runId}` : null;
+  const draftRestoredRef = useRef(false);
+  const draftDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // On mount: offer to restore if a snapshot exists for this run.
+  useEffect(() => {
+    if (!draftKey || draftRestoredRef.current) return;
+    type WorkoutDraft = {
+      difficulty: number;
+      fatigue: number;
+      comments: string;
+      currentSetInputs: Record<number, SetInputValues>;
+    };
+    const draft = loadDraft<WorkoutDraft>(draftKey);
+    if (!draft) return;
+    draftRestoredRef.current = true;
+    const payload = draft.payload ?? ({} as WorkoutDraft);
+    const hasContent =
+      (payload.comments && payload.comments.length > 0) ||
+      (payload.currentSetInputs &&
+        Object.keys(payload.currentSetInputs).length > 0);
+    if (!hasContent) {
+      clearDraft(draftKey);
+      return;
+    }
+    toast({
+      title: "Brouillon retrouvé",
+      description: "Une saisie non enregistrée a été restaurée.",
+    });
+    if (typeof payload.difficulty === "number") setDifficulty(payload.difficulty);
+    if (typeof payload.fatigue === "number") setFatigue(payload.fatigue);
+    if (typeof payload.comments === "string") setComments(payload.comments);
+    if (payload.currentSetInputs && typeof payload.currentSetInputs === "object") {
+      setCurrentSetInputs(payload.currentSetInputs);
+    }
+  }, [draftKey, toast]);
+
+  // Debounced save on meaningful state changes.
+  useEffect(() => {
+    if (!draftKey) return;
+    clearTimeout(draftDebounceRef.current);
+    draftDebounceRef.current = setTimeout(() => {
+      saveDraft(draftKey, {
+        difficulty,
+        fatigue,
+        comments,
+        currentSetInputs,
+      });
+    }, 500);
+    return () => clearTimeout(draftDebounceRef.current);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs]);
+
+  // Synchronous flush on tab hide / pagehide / beforeunload.
+  useEffect(() => {
+    if (!draftKey) return;
+    const flush = () => {
+      saveDraft(draftKey, {
+        difficulty,
+        fatigue,
+        comments,
+        currentSetInputs,
+      });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs]);
+
   const logLookup = useMemo(() => {
     const map = new Map<string, SetLogEntry>();
     logs.forEach((log: SetLogEntry, index: number) => {
@@ -704,6 +793,7 @@ export function WorkoutRunner({
                   comments,
                   logs,
                 });
+                if (draftKey) clearDraft(draftKey);
               }}
             >
               {isFinishing ? "ENREGISTREMENT..." : "ENREGISTRER & FERMER"}

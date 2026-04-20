@@ -369,6 +369,20 @@ export {
   resetSwimFiliere,
 } from './swim-filieres';
 
+// Strength planning (Phase 2 §157)
+export {
+  getStrengthPlanningSlots,
+  upsertStrengthPlanningSlot,
+  deleteStrengthPlanningSlot,
+  getStrengthPlanningSlotOverrides,
+  upsertStrengthPlanningSlotOverride,
+  deleteStrengthPlanningSlotOverride,
+  getStrengthPlanningWeekMeta,
+  upsertStrengthPlanningWeekMeta,
+  getStrengthPlanningWeekOverrides,
+  upsertStrengthPlanningWeekOverride,
+} from './strength-planning';
+
 // Coach assignments
 export {
   getMySwimmers,
