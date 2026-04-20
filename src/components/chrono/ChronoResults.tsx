@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { SwimmerAvatar } from "./SwimmerAvatar";
+import { enqueue, isRetriableError } from "../../lib/chrono-save-queue";
 import type { ChronoState, SplitRecord } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
@@ -222,7 +223,13 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
       toast.success("Brouillon enregistré");
       onSaveDraft?.();
     } catch (err: any) {
-      toast.error(err.message || "Erreur de sauvegarde");
+      if (isRetriableError(err)) {
+        enqueue({ kind: "record", payload: buildChronoRecordInput(state, "draft"), createdAt: Date.now() });
+        toast.info("Brouillon sauvegardé localement — renvoi auto dès retour réseau");
+        onSaveDraft?.();
+      } else {
+        toast.error(err.message || "Erreur de sauvegarde");
+      }
     } finally {
       setSavingDraft(false);
     }
@@ -282,10 +289,32 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const key = swimmers[i].swimmer.key;
+      const entry = swimmers[i];
+      const key = entry.swimmer.key;
       if (result.status === "fulfilled") {
         newStatuses.set(key, "sent");
         successCount++;
+      } else if (isRetriableError(result.reason)) {
+        const authUid = await resolveAuthUid(entry.swimmer.athleteId!).catch(() => null);
+        if (authUid) {
+          enqueue({
+            kind: "export",
+            payload: {
+              authUid,
+              log: {
+                exercise_label: "Chrono coach",
+                split_times: flattenSplits(entry.splitsByRep),
+                notes: `Série chrono — Ligne ${entry.swimmer.lane}`,
+              },
+            },
+            createdAt: Date.now(),
+          });
+          newStatuses.set(key, "sent");
+          successCount++;
+        } else {
+          newStatuses.set(key, "error");
+          errorCount++;
+        }
       } else {
         newStatuses.set(key, "error");
         errorCount++;
@@ -297,7 +326,11 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
 
     try {
       await createChronoRecord(buildChronoRecordInput(state, "sent"));
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      if (isRetriableError(err)) {
+        enqueue({ kind: "record", payload: buildChronoRecordInput(state, "sent"), createdAt: Date.now() });
+      }
+    }
 
     if (errorCount === 0) {
       toast.success(`${successCount} résultat${successCount > 1 ? "s" : ""} envoyé${successCount > 1 ? "s" : ""}`);
