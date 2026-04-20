@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { SwimmerAvatar } from "./SwimmerAvatar";
 import type { ChronoState, SplitRecord } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import { formatTime, formatLap, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
@@ -134,6 +135,7 @@ function findBestSeriesIdx(splitsByRep: SplitRecord[][]): number {
 interface RankingRow {
   key: string;
   displayName: string;
+  avatarUrl: string | null;
   wave: number;
   kind: "registered" | "manual";
   bestSeriesIdx: number;
@@ -179,6 +181,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
         return {
           key: rs.swimmer.key,
           displayName: rs.swimmer.displayName,
+          avatarUrl: rs.swimmer.avatarUrl,
           wave: rs.swimmer.wave,
           kind: rs.swimmer.kind,
           bestSeriesIdx: bestIdx,
@@ -534,6 +537,7 @@ function RankRow({
       {/* Name + meta */}
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
+          <SwimmerAvatar swimmer={{ displayName: row.displayName, avatarUrl: row.avatarUrl }} size="xs" className="shrink-0" />
           {isManual && (
             <UserRound className="h-3 w-3 shrink-0 text-muted-foreground/70" aria-label="Nageur manuel" />
           )}
