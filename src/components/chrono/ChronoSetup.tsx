@@ -184,57 +184,59 @@ export default function ChronoSetup({
         </div>
       )}
 
-      {/* ── Série / Distance config ─────────────────── */}
+      {/* ── Programme ─────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card/50 p-3">
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Programme
         </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          {/* Series count */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm text-muted-foreground">Séries</span>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Distance totale */}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Distance totale</span>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" className="h-10 w-10"
-                onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
-                disabled={state.seriesCount <= 0}
+                onClick={() => {
+                  const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
+                  dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
+                }}
+                disabled={state.totalDistanceM <= 0}
               ><Minus className="h-3.5 w-3.5" /></Button>
-              <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
-                onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-                className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+              <input
+                type="text" inputMode="numeric"
+                value={state.totalDistanceM || ""} placeholder="—"
+                onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+                className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
               />
+              <span className="text-xs text-muted-foreground">m</span>
               <Button variant="outline" size="icon" className="h-10 w-10"
-                onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
+                onClick={() => {
+                  const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
+                  dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
+                }}
               ><Plus className="h-3.5 w-3.5" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {DISTANCE_PRESETS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => dispatch({ type: "SET_TOTAL_DISTANCE", meters: d })}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
+                    state.totalDistanceM === d
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {d} m
+                </button>
+              ))}
             </div>
           </div>
 
-          <span className="text-muted-foreground/60 font-medium">×</span>
-
-          {/* Total distance stepper */}
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-10 w-10"
-              onClick={() => {
-                const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
-                dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
-              }}
-              disabled={state.totalDistanceM <= 0}
-            ><Minus className="h-3.5 w-3.5" /></Button>
-            <input type="text" inputMode="numeric" value={state.totalDistanceM || ""} placeholder="—"
-              onChange={(e) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-              className="w-16 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-            />
-            <span className="text-xs text-muted-foreground">m</span>
-            <Button variant="outline" size="icon" className="h-10 w-10"
-              onClick={() => {
-                const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
-                dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
-              }}
-            ><Plus className="h-3.5 w-3.5" /></Button>
-          </div>
-
-          {/* Split distance */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm text-muted-foreground">splits à</span>
+          {/* Splits tous les */}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Splits tous les</span>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" className="h-10 w-10"
                 onClick={() => {
@@ -243,7 +245,9 @@ export default function ChronoSetup({
                 }}
                 disabled={state.splitDistanceM <= 25}
               ><Minus className="h-3.5 w-3.5" /></Button>
-              <input type="text" inputMode="numeric" value={state.splitDistanceM || ""} placeholder="50"
+              <input
+                type="text" inputMode="numeric"
+                value={state.splitDistanceM || ""} placeholder="50"
                 onChange={(e) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: Number(e.target.value.replace(/\D/g, "")) || 0 })}
                 className="w-14 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
               />
@@ -254,6 +258,22 @@ export default function ChronoSetup({
                   dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
                 }}
               ><Plus className="h-3.5 w-3.5" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {SPLIT_PRESETS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => dispatch({ type: "SET_SPLIT_DISTANCE", meters: d })}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
+                    state.splitDistanceM === d
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {d} m
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -305,7 +325,7 @@ export default function ChronoSetup({
                   <button
                     type="button"
                     onClick={() => { setAddLane(lane); setSearch(""); }}
-                    className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:border-primary/50 hover:bg-muted hover:text-primary transition-colors cursor-pointer"
+                    className="ml-auto flex h-10 items-center gap-1.5 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:border-primary/50 hover:bg-muted hover:text-primary transition-colors cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Ajouter
