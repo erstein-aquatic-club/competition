@@ -956,11 +956,11 @@ function Header({
             <button
               type="button"
               onClick={() => onSelectAthlete(null)}
-              className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-[11px] font-medium text-amber-800 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100 bg-white/60 hover:bg-white dark:bg-amber-900/40 dark:hover:bg-amber-900/60 border border-amber-200/80 dark:border-amber-800/60 transition-colors active:scale-[0.97]"
+              className="shrink-0 inline-flex items-center gap-1.5 h-9 min-h-9 px-3 rounded-full text-xs font-semibold text-amber-800 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100 bg-white/80 hover:bg-white dark:bg-amber-900/40 dark:hover:bg-amber-900/60 border border-amber-300/80 dark:border-amber-800/60 shadow-sm transition-colors active:scale-[0.97]"
               aria-label="Retour au plan du groupe"
             >
-              <ArrowLeft className="h-3 w-3" />
-              Retour plan groupe
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Retour au plan groupe
             </button>
           </div>
         )}

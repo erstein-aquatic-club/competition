@@ -470,11 +470,42 @@ export default function SlotSessionSheet({
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer la séance ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Cette action supprimera définitivement la séance assignée pour ce
-              créneau le {formatDateFr(instance.date)}. Les nageurs ne verront
-              plus cette séance.
+            <AlertDialogTitle>
+              Supprimer la séance du {formatDateFr(instance.date)} ?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                {assignment?.session_name && (
+                  <div className="font-semibold text-foreground">
+                    {assignment.session_name}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  {state === "published" && (
+                    <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
+                      Publiée
+                    </span>
+                  )}
+                  {state === "draft" && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
+                      Brouillon
+                    </span>
+                  )}
+                  {groups.map((g) => (
+                    <span
+                      key={g.group_id}
+                      className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary"
+                    >
+                      {g.group_name}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-muted-foreground">
+                  {state === "published"
+                    ? "Cette séance est visible par les nageurs. La supprimer la retirera immédiatement de leur planning."
+                    : "Cette action supprimera définitivement la séance pour ce créneau."}
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -635,7 +666,15 @@ function QuickComposeBody({
 }) {
   const [tab, setTab] = useState<"text" | "library">("text");
   const [rawText, setRawText] = useState("");
+  const [debouncedText, setDebouncedText] = useState("");
   const [showBlocks, setShowBlocks] = useState(false);
+
+  // Debounce parsing (300ms) — the parser walks the full text for every keystroke
+  // and rebuilds backdrop lines, which stutters on long sessions.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedText(rawText), 300);
+    return () => clearTimeout(t);
+  }, [rawText]);
   const [submitting, setSubmitting] = useState(false);
   const [assigningCatalogId, setAssigningCatalogId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -652,24 +691,26 @@ function QuickComposeBody({
     }
   }, []);
 
-  // ── Live parse ──
+  // ── Live parse (debounced) ──
   const parsedBlocks = useMemo<SwimBlock[]>(() => {
-    if (!rawText.trim()) return [];
+    if (!debouncedText.trim()) return [];
     try {
-      return parseSwimText(rawText);
+      return parseSwimText(debouncedText);
     } catch {
       return [];
     }
-  }, [rawText]);
+  }, [debouncedText]);
 
   const parsedItems = useMemo(
     () => buildItemsFromBlocks(parsedBlocks),
     [parsedBlocks],
   );
 
+  // Warnings always computed — the textarea backdrop highlights suspicious lines
+  // so users see issues before they click "Voir les blocs".
   const textWarnings = useMemo<TextWarning[]>(
-    () => (showBlocks && rawText.trim() ? detectTextWarnings(rawText) : []),
-    [showBlocks, rawText],
+    () => (debouncedText.trim() ? detectTextWarnings(debouncedText) : []),
+    [debouncedText],
   );
 
   const backdropLines = useMemo(() => {
@@ -964,6 +1005,11 @@ function QuickComposeBody({
                 <span className="inline-flex items-center gap-2">
                   <Layers className="h-3.5 w-3.5 opacity-70" />
                   {showBlocks ? "Masquer les blocs" : "Voir les blocs"}
+                  {textWarnings.length > 0 && (
+                    <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                      {textWarnings.length} avertissement{textWarnings.length > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </span>
                 <ChevronDown
                   className={cn(
@@ -974,7 +1020,7 @@ function QuickComposeBody({
               </button>
             </>
           ) : (
-            rawText.trim().length > 0 && (
+            debouncedText.trim().length > 0 && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
                 Aucun bloc reconnu. Vérifiez le format (titre de bloc sur une
                 ligne, exercices en dessous).

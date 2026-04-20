@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
 import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine } from "lucide-react";
 import { useLocation } from "wouter";
@@ -473,6 +473,18 @@ export function FeedbackDrawer({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showMissing, setShowMissing] = useState(false);
+  const missingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (missingTimeoutRef.current) clearTimeout(missingTimeoutRef.current);
+  }, []);
+  const flashMissing = () => {
+    setShowMissing(true);
+    if (missingTimeoutRef.current) clearTimeout(missingTimeoutRef.current);
+    missingTimeoutRef.current = setTimeout(() => {
+      setShowMissing(false);
+      missingTimeoutRef.current = null;
+    }, 3000);
+  };
 
   const activeSession = useMemo(() => {
     if (!activeSessionId) return null;
@@ -1235,8 +1247,7 @@ export function FeedbackDrawer({
                       className="flex-1 flex flex-col items-stretch"
                       onClick={() => {
                         if (isDisabled && canRate && !allFilled) {
-                          setShowMissing(true);
-                          setTimeout(() => setShowMissing(false), 3000);
+                          flashMissing();
                         }
                       }}
                     >
