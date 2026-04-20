@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §153 (Planification natation — granularité par nageur : nouvelles tables `swim_planning_slot_overrides`, `swim_planning_week_overrides`, `swim_planning_week_meta` ; hook `useSwimPlanningAthleteMode` ; timeline présentationnel `SwimPlanningTimeline` + `readOnly` ; `SwimmerPlanningPanel` remplace `SwimmerPlanningTab` ; badge "Perso" côté nageur).
+Dernière entrée en date : §154 (Mode focus muscu : fallback localStorage systématique + fix bouton bloqué — `onLogSets`/`onProgress` fire-and-forget, `onFinish` async avec offline queue fallback sur catch réseau).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

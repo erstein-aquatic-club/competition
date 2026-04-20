@@ -362,6 +362,7 @@ export default function Strength() {
       }
     },
     onError: () => {
+      if (screenMode === "focus") return; // data is in localStorage — silent in focus mode
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
       toast({
@@ -400,13 +401,11 @@ export default function Strength() {
       setScreenMode("summary");
       toast({ title: "Séance sauvegardée", description: "Bravo pour l'effort !" });
     },
-    onError: (_error, variables) => {
+    onError: () => {
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
       setIsFinishing(false);
-      if (variables?.status === "completed") {
-        toast({ title: "Erreur", description: "Impossible d'enregistrer la séance. Réessayez.", variant: "destructive" });
-      }
+      // No toast here — onFinish catch block handles the offline fallback for completed runs
     },
   });
 
@@ -689,35 +688,35 @@ export default function Strength() {
               userId={userId ?? 0}
               onLogSets={async (blockLogs) => {
                 if (!activeRunId) return;
+                // Always persist locally first — triggers localStorage write via useStrengthState
                 setActiveRunLogs((prev) => [...(prev ?? []), ...blockLogs]);
-                if (!isOnline) {
-                  // Logs are safe in localStorage via useStrengthState; queue for later
-                  return;
-                }
-                await Promise.all(
-                  blockLogs.map((log: SetLogEntry, index: number) =>
-                    logStrengthSet.mutateAsync({
-                      run_id: activeRunId,
-                      exercise_id: log.exercise_id,
-                      set_index: log.set_number ?? index + 1,
-                      reps: log.reps ?? null,
-                      weight: log.weight ?? null,
-                      difficulty: log.difficulty ?? null,
-                      athlete_id: userId ?? null,
-                      athlete_name: user ?? null,
-                    }),
-                  ),
+                if (!isOnline) return;
+                // Fire-and-forget: don't block WorkoutRunner while network is slow
+                // isLoggingRef lock is released immediately so the next set can be validated
+                blockLogs.forEach((log: SetLogEntry, index: number) =>
+                  logStrengthSet.mutate({
+                    run_id: activeRunId,
+                    exercise_id: log.exercise_id,
+                    set_index: log.set_number ?? index + 1,
+                    reps: log.reps ?? null,
+                    weight: log.weight ?? null,
+                    difficulty: log.difficulty ?? null,
+                    athlete_id: userId ?? null,
+                    athlete_name: user ?? null,
+                  }),
                 );
               }}
               onProgress={async (progressPct) => {
                 if (!activeRunId) return;
-                await updateRun.mutateAsync({
+                if (!isOnline) return;
+                // Fire-and-forget: progress updates are nice-to-have; data is in localStorage
+                updateRun.mutate({
                   run_id: activeRunId,
                   progress_pct: progressPct,
                   status: "in_progress",
                 });
               }}
-              onFinish={(result) => {
+              onFinish={async (result) => {
                 if (!activeRunId) return;
                 if (isFinishing) return;
                 if (!activeRunLogs || activeRunLogs.length === 0) {
@@ -728,37 +727,51 @@ export default function Strength() {
                   });
                   return;
                 }
+                // Full payload for the offline queue (includes athlete_name + started_at for saveStrengthRun)
+                const offlinePayload = {
+                  run_id: activeRunId,
+                  assignment_id: activeAssignment?.id ?? undefined,
+                  session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
+                  athlete_id: userId ?? undefined,
+                  athlete_name: user ?? undefined,
+                  started_at: sessionStartTime ? new Date(sessionStartTime).toISOString() : null,
+                  date: new Date().toISOString(),
+                  progress_pct: 100,
+                  status: "completed",
+                  ...result,
+                };
                 if (!isOnline) {
-                  enqueue("strength-run-completed", {
-                    run_id: activeRunId,
+                  enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                  toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                  setScreenMode("summary");
+                  return;
+                }
+                setIsFinishing(true);
+                try {
+                  // Re-insert any set logs that may have been lost in fire-and-forget saves
+                  await api.reconcileStrengthRunLogs({
+                    runId: activeRunId,
+                    logs: result.logs,
+                    athleteId: userId ?? null,
+                    athleteName: user ?? null,
+                  });
+                  await updateRun.mutateAsync({
                     assignment_id: activeAssignment?.id ?? undefined,
+                    run_id: activeRunId,
                     session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
                     athlete_id: userId ?? undefined,
-                    athlete_name: user ?? undefined,
-                    started_at: sessionStartTime ? new Date(sessionStartTime).toISOString() : null,
                     date: new Date().toISOString(),
                     progress_pct: 100,
                     status: "completed",
                     ...result,
                   });
-                  toast({
-                    title: "Séance sauvegardée hors-ligne",
-                    description: "Sera synchronisée au retour du réseau.",
-                  });
+                  // onSuccess handles navigation to summary + toast
+                } catch {
+                  // Network failed despite navigator.online — fallback to offline queue
+                  enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                  toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
                   setScreenMode("summary");
-                  return;
                 }
-                setIsFinishing(true);
-                updateRun.mutate({
-                  assignment_id: activeAssignment?.id ?? undefined,
-                  run_id: activeRunId,
-                  session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
-                  athlete_id: userId ?? undefined,
-                  date: new Date().toISOString(),
-                  progress_pct: 100,
-                  status: "completed",
-                  ...result,
-                });
               }}
             />
           </div>

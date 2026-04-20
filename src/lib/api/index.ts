@@ -392,6 +392,7 @@ export {
   deleteStrengthSession,
   startStrengthRun,
   logStrengthSet,
+  reconcileStrengthRunLogs,
   updateStrengthRun,
   deleteStrengthRun,
   saveStrengthRun,

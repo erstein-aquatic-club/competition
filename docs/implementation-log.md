@@ -104,6 +104,44 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ---
 
+## 2026-04-20 — §154 Mode focus muscu : fallback localStorage systématique + bug bouton bloqué
+
+**Branche** : `main`
+**Chantier ROADMAP** : Bug offline mode focus musculation
+
+### Contexte
+
+François a signalé deux bugs lors d'une séance de musculation avec réseau instable :
+1. "Impossible d'enregistrer la séance. Réessayez." — en fin de séance malgré des données locales intactes.
+2. Bouton "Valider série" apparemment inactif sur la série 4/4 de "tractions prise neutre" (l'écran avançait mais les taps ne répondaient plus).
+
+### Root causes identifiées
+
+**Bug 1** : `updateRun.onError` affichait le message "Réessayez" sans jamais déclencher de fallback offline, même si les logs étaient dans localStorage. Le check `isOnline` s'appuie sur `navigator.online` qui reste `true` même avec une connexion intermittente.
+
+**Bug 2** : Dans `WorkoutRunner.handleValidateSet`, sur la dernière série d'un exercice, `advanceExercise()` (qui change `currentBlock` vers l'exercice suivant) était appelé **avant** que `isLoggingRef.current = true` soit posé. Le verrou était donc appliqué sur le **nouvel** exercice, bloquant silencieusement la validation de sa première série pendant tout le timeout réseau.
+
+### Changements
+
+`src/pages/Strength.tsx` (5 modifications) :
+
+1. **`onLogSets` → fire-and-forget** : utilise `logStrengthSet.mutate()` au lieu de `mutateAsync`. Retourne immédiatement après avoir sauvegardé en localStorage ; la sauvegarde réseau se fait en arrière-plan, sans bloquer `isLoggingRef`.
+2. **`logStrengthSet.onError`** : supprime le toast en `screenMode === "focus"` (les données sont en localStorage, erreur silencieuse acceptable).
+3. **`onProgress` → fire-and-forget** : utilise `updateRun.mutate()` au lieu de `mutateAsync`. Les updates de progression sont best-effort.
+4. **`onFinish` → async avec fallback offline** : utilise `mutateAsync` + `try/catch`. Si le réseau échoue malgré `navigator.online`, on enqueue dans l'offline queue (exactement comme le path explicitement offline) et on navigue vers le résumé. Plus de "Réessayez" perdu sans fallback.
+5. **`updateRun.onError`** : retire le toast "Impossible d'enregistrer la séance" pour le cas `completed` (maintenant géré dans le `catch` de `onFinish`).
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur
+- Tests existants non impactés (fichiers strength runner pre-existants vides dans les worktrees)
+
+### Décision
+
+Toutes les écritures réseau en mode focus sont maintenant best-effort : les données sont toujours dans localStorage en priorité (via `setActiveRunLogs` → `useStrengthState` → localStorage). La séance est garantie d'aller en summary même sans réseau.
+
+**Gap de niche couvert (§154b)** : `reconcileStrengthRunLogs` ajouté dans `src/lib/api/strength.ts` — appelé dans le try block de `onFinish` avant `updateRun.mutateAsync`. Requête le count remote, réinsère les séries manquantes (diff avec `result.logs`). Si ça échoue aussi, le catch fallback à l'offline queue qui a la même logique via `OfflineMutationSync`.
+
 ## 2026-04-19 — §151 KPI Ressentis 30j v6 : match expected slots uniquement
 
 **Branche** : `main`

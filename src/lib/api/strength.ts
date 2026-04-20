@@ -481,6 +481,39 @@ export async function logStrengthSet(payload: {
   };
 }
 
+/**
+ * Re-inserts any set logs missing from the DB compared to the local logs array.
+ * Used before completing a run when fire-and-forget saves may have silently failed.
+ */
+export async function reconcileStrengthRunLogs(params: {
+  runId: number;
+  logs: Array<{ exercise_id: number; set_number?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
+  athleteId?: number | null;
+  athleteName?: string | null;
+}): Promise<void> {
+  if (!canUseSupabase() || params.logs.length === 0) return;
+  const { count, error } = await supabase
+    .from("strength_set_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("run_id", params.runId);
+  if (error) return; // non-fatal — worst case: some logs already in DB (duplicates prevented by PK)
+  const remoteCount = count ?? 0;
+  if (remoteCount >= params.logs.length) return;
+  const missing = params.logs.slice(remoteCount);
+  for (const [i, log] of missing.entries()) {
+    await logStrengthSet({
+      run_id: params.runId,
+      exercise_id: log.exercise_id,
+      set_index: log.set_number ?? remoteCount + i + 1,
+      reps: log.reps ?? null,
+      weight: log.weight ?? null,
+      difficulty: log.difficulty ?? null,
+      athlete_id: params.athleteId ?? null,
+      athlete_name: params.athleteName ?? null,
+    });
+  }
+}
+
 export async function updateStrengthRun(update: {
   run_id: number;
   progress_pct?: number;
