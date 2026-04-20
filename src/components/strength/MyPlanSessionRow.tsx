@@ -1,13 +1,9 @@
-import React from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronRight, Dumbbell } from "lucide-react";
+import { ChevronRight, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WeekSession } from "@/lib/strength/strengthPlanWeeks";
 
 interface MyPlanSessionRowProps {
   weekSession: WeekSession;
-  checked: boolean;
-  onToggleCheck: (e: React.MouseEvent) => void;
   onSelect: () => void;
 }
 
@@ -21,12 +17,7 @@ const DAY_COLORS: Record<string, string> = {
   Dim: "bg-gray-500/15 text-gray-600 dark:text-gray-400",
 };
 
-export function MyPlanSessionRow({
-  weekSession,
-  checked,
-  onToggleCheck,
-  onSelect,
-}: MyPlanSessionRowProps) {
+export function MyPlanSessionRow({ weekSession, onSelect }: MyPlanSessionRowProps) {
   const { session, dayLabel, cleanTitle } = weekSession;
   const itemCount = session.items?.length ?? 0;
 
@@ -34,46 +25,8 @@ export function MyPlanSessionRow({
     <button
       type="button"
       onClick={onSelect}
-      className={cn(
-        "w-full flex items-center gap-2 h-10 px-2.5 rounded-lg bg-card border border-border/50 active:scale-[0.99] transition-transform",
-        checked && "opacity-55",
-      )}
+      className="w-full min-w-0 flex items-center gap-2 h-10 px-2.5 rounded-lg bg-card border border-border/50 active:scale-[0.99] transition-transform overflow-hidden"
     >
-      {/* Check circle */}
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={onToggleCheck}
-        onKeyDown={(e) => e.key === "Enter" && onToggleCheck(e as unknown as React.MouseEvent)}
-        className="relative flex items-center justify-center shrink-0 h-5 w-5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={checked ? "Marquer non fait" : "Marquer fait"}
-      >
-        <AnimatePresence mode="wait">
-          {checked ? (
-            <motion.span
-              key="checked"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 25 }}
-              className="flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500"
-            >
-              <Check className="h-3 w-3 text-white" strokeWidth={3} />
-            </motion.span>
-          ) : (
-            <motion.span
-              key="unchecked"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="h-5 w-5 rounded-full border-2 border-muted-foreground/25"
-            />
-          )}
-        </AnimatePresence>
-      </span>
-
-      {/* Day badge or dumbbell icon */}
       {dayLabel ? (
         <span
           className={cn(
@@ -87,7 +40,7 @@ export function MyPlanSessionRow({
         <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       )}
 
-      <span className="text-[12px] font-medium truncate flex-1">{cleanTitle}</span>
+      <span className="text-[12px] font-medium truncate flex-1 text-left">{cleanTitle}</span>
 
       <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
         {itemCount} ex.

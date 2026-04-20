@@ -14,8 +14,6 @@ interface MyPlanWeekCardProps {
   onToggleExpand: () => void;
   competitions: Competition[];
   getDayCompetitions: (monday: Date, dayIndex: number) => Competition[];
-  isSessionChecked: (sessionId: number) => boolean;
-  onToggleCheck: (sessionId: number) => void;
   onSelectSession: (session: StrengthSessionTemplate) => void;
   onSelectCompetition: (c: Competition) => void;
 }
@@ -29,8 +27,6 @@ export function MyPlanWeekCard({
   onToggleExpand,
   competitions,
   getDayCompetitions,
-  isSessionChecked,
-  onToggleCheck,
   onSelectSession,
   onSelectCompetition,
 }: MyPlanWeekCardProps) {
@@ -167,11 +163,6 @@ export function MyPlanWeekCard({
                           <MyPlanSessionRow
                             key={ws.session.id}
                             weekSession={ws}
-                            checked={isSessionChecked(ws.session.id)}
-                            onToggleCheck={(e) => {
-                              e.stopPropagation();
-                              onToggleCheck(ws.session.id);
-                            }}
                             onSelect={() => onSelectSession(ws.session)}
                           />
                         ))}
@@ -196,11 +187,6 @@ export function MyPlanWeekCard({
                       </span>
                       <MyPlanSessionRow
                         weekSession={ws}
-                        checked={isSessionChecked(ws.session.id)}
-                        onToggleCheck={(e) => {
-                          e.stopPropagation();
-                          onToggleCheck(ws.session.id);
-                        }}
                         onSelect={() => onSelectSession(ws.session)}
                       />
                     </div>

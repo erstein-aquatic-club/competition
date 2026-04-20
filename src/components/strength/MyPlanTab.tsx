@@ -1,15 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
 import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
 import { FolderOpen, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  isSessionChecked,
-  toggleSessionCheck,
-  getISOWeekKey,
-} from "@/lib/planCheckHelpers";
 import { isCurrentWeek, fmtDD_MM } from "@/components/coach/swim/swimPlanningShared";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
 import { MyPlanWeekCard } from "./MyPlanWeekCard";
@@ -28,7 +22,6 @@ interface MyPlanTabProps {
 }
 
 export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
-  const [checkedVersion, setCheckedVersion] = useState(0);
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<{
     session: StrengthSessionTemplate;
@@ -94,54 +87,6 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekInstances.length]);
 
-  // ── Completed runs fetch (all covered weeks) ────────────────────────────
-  const earliestWeekStart = useMemo(
-    () => weekInstances[0]?.week.monday.toISOString().slice(0, 10) ?? null,
-    [weekInstances],
-  );
-
-  const { data: completedRunsByWeek } = useQuery({
-    queryKey: ["strength-completed-runs-all", athleteId, earliestWeekStart],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("strength_session_runs")
-        .select("session_id, started_at")
-        .eq("athlete_id", athleteId)
-        .eq("status", "completed")
-        .gte("started_at", earliestWeekStart + "T00:00:00");
-      const map = new Map<string, Set<string>>();
-      for (const run of data ?? []) {
-        const wk = getISOWeekKey(new Date(run.started_at));
-        const set = map.get(wk) ?? new Set<string>();
-        set.add(String(run.session_id));
-        map.set(wk, set);
-      }
-      return map;
-    },
-    enabled: !!earliestWeekStart,
-    staleTime: 60_000,
-  });
-
-  const checkIsChecked = useCallback(
-    (sessionId: number, isoWeekKey: string) => {
-      void checkedVersion; // trigger re-read on toggle
-      const sid = String(sessionId);
-      return (
-        isSessionChecked(athleteId, sid, isoWeekKey) ||
-        (completedRunsByWeek?.get(isoWeekKey)?.has(sid) ?? false)
-      );
-    },
-    [athleteId, checkedVersion, completedRunsByWeek],
-  );
-
-  const handleToggleCheck = useCallback(
-    (sessionId: number, isoWeekKey: string) => {
-      toggleSessionCheck(athleteId, sessionId, isoWeekKey);
-      setCheckedVersion((v) => v + 1);
-    },
-    [athleteId],
-  );
-
   // ── Competitions ────────────────────────────────────────────────────────
   const { competitionsByWeek, getDayCompetitions } = useCompetitionsByWeek(athleteId);
 
@@ -190,8 +135,6 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
 
       {weekInstances.map((inst) => {
         const weekCompetitions = competitionsByWeek.get(inst.week.weekKey) ?? [];
-        // Use ISO week key format for localStorage (backward-compatible with old MyPlanTab)
-        const isoWeekKey = getISOWeekKey(inst.week.monday);
         return (
           <MyPlanWeekCard
             key={`${inst.cycleId}-${inst.week.weekKey}`}
@@ -205,8 +148,6 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
             }
             competitions={weekCompetitions}
             getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
-            isSessionChecked={(sid) => checkIsChecked(sid, isoWeekKey)}
-            onToggleCheck={(sid) => handleToggleCheck(sid, isoWeekKey)}
             onSelectSession={(session) =>
               setSelectedSession({ session, phase: inst.phase })
             }
