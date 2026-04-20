@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from "react";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
+import { SwimmerAvatar } from "./SwimmerAvatar";
 import { formatTime, formatLap, formatPace, CHRONO_PRECISION } from "../../hooks/useChronoTimer";
 import { Info, Gauge, Flag } from "lucide-react";
 import { WAVE_COLORS, resolveWaveConfig } from "../../lib/chrono-types";
@@ -233,6 +234,7 @@ function WaveHeaderCell({
 function SwimmerCard({
   swimmerKey,
   displayName,
+  avatarUrl,
   wave,
   waveStartedAt,
   currentSplits,
@@ -245,6 +247,7 @@ function SwimmerCard({
 }: {
   swimmerKey: string;
   displayName: string;
+  avatarUrl: string | null;
   wave: number;
   waveStartedAt: number | null;
   currentSplits: { cumulativeMs: number; lapMs: number }[];
@@ -362,7 +365,7 @@ function SwimmerCard({
           active ? "cursor-pointer active:bg-muted/30" : ""
         }`}
       >
-        {/* Row 1 : wave chip + name */}
+        {/* Row 1 : wave chip + avatar + name */}
         <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-0.5">
           <span
             className={`inline-flex h-5 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-[10px] font-black text-white leading-none ${wc.dot}`}
@@ -370,6 +373,7 @@ function SwimmerCard({
           >
             {wc.label}
           </span>
+          <SwimmerAvatar swimmer={{ displayName, avatarUrl }} size="xs" className="shrink-0" />
           <span
             className={`text-sm font-semibold leading-tight min-w-0 truncate ${
               stopped ? "text-muted-foreground line-through" : "text-foreground"
@@ -721,6 +725,7 @@ function LaneRow({
                   key={s.key}
                   swimmerKey={s.key}
                   displayName={s.displayName}
+                  avatarUrl={s.avatarUrl}
                   wave={s.wave}
                   waveStartedAt={waveState?.startedAt ?? null}
                   currentSplits={
