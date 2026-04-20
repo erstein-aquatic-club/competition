@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Play, Plus, Minus, X, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves } from "lucide-react";
+import { Play, Plus, Minus, X, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
@@ -107,6 +107,31 @@ export default function ChronoSetup({
   );
   const laneFull = addLane != null && laneCount >= maxSwimmersPerLane;
 
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("eac-chrono-advanced-open") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleAdvanced = useCallback(() => {
+    setAdvancedOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("eac-chrono-advanced-open", String(next)); } catch { /* quota */ }
+      return next;
+    });
+  }, []);
+
+  const advancedSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (state.seriesCount > 0) parts.push(`${state.seriesCount} série${state.seriesCount > 1 ? "s" : ""}`);
+    if (activeWaves.length > 1) parts.push(`${activeWaves.length} vagues`);
+    const hasInterval = state.waves.some((w) => w.departureIntervalSec > 0);
+    if (hasInterval) parts.push("intervalles");
+    return parts.length > 0 ? `· ${parts.join(" · ")}` : "";
+  }, [state.seriesCount, activeWaves.length, state.waves]);
+
   const handleAddSwimmer = (a: AthleteSummary) => {
     if (a.id == null || addLane == null || laneFull) return;
     dispatch({
@@ -156,34 +181,6 @@ export default function ChronoSetup({
         </Button>
       </div>
 
-      {/* ── Per-wave config cards (interval + optional overrides) ── */}
-      {activeWaves.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Par vague</span>
-            {(() => {
-              const customCount = state.waves.filter((w) => w.overrides !== null).length;
-              if (customCount === 0) return null;
-              return (
-                <span className="text-[10px] text-muted-foreground/70 italic">
-                  {customCount} personnalisée{customCount > 1 ? "s" : ""}
-                </span>
-              );
-            })()}
-          </div>
-          <div className="flex flex-col gap-2">
-            {activeWaves.map((w) => (
-              <WaveConfigCard
-                key={w}
-                wave={w}
-                state={state}
-                dispatch={dispatch}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── Programme ─────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card/50 p-3">
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -223,6 +220,69 @@ export default function ChronoSetup({
             }}
             onChange={(v) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: v })}
           />
+        </div>
+
+        {/* Séparateur + section Avancé */}
+        <div className="mt-3 border-t border-border/50 pt-3">
+          <button
+            type="button"
+            onClick={toggleAdvanced}
+            className="flex w-full items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            {advancedOpen
+              ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+              : <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+            }
+            <span>Avancé</span>
+            {!advancedOpen && advancedSummary && (
+              <span className="text-muted-foreground/60 font-normal">{advancedSummary}</span>
+            )}
+          </button>
+
+          {advancedOpen && (
+            <div className="mt-3 flex flex-col gap-4">
+              {/* Séries */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Séries :</span>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-10 w-10"
+                    onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
+                    disabled={state.seriesCount <= 0}
+                  ><Minus className="h-3.5 w-3.5" /></Button>
+                  <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
+                    onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+                    className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+                  />
+                  <Button variant="outline" size="icon" className="h-10 w-10"
+                    onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
+                  ><Plus className="h-3.5 w-3.5" /></Button>
+                </div>
+              </div>
+
+              {/* WaveConfigCards */}
+              {activeWaves.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-muted-foreground">Par vague</span>
+                    {(() => {
+                      const customCount = state.waves.filter((w) => w.overrides !== null).length;
+                      if (customCount === 0) return null;
+                      return (
+                        <span className="text-[10px] text-muted-foreground/70 italic">
+                          {customCount} personnalisée{customCount > 1 ? "s" : ""}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {activeWaves.map((w) => (
+                      <WaveConfigCard key={w} wave={w} state={state} dispatch={dispatch} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
