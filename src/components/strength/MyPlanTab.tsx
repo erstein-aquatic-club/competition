@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { isCurrentWeek, fmtDD_MM, getMonday } from "@/components/coach/swim/swimPlanningShared";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
 import { MyPlanWeekCard } from "./MyPlanWeekCard";
-import { MyPlanSessionSheet } from "./MyPlanSessionSheet";
 import { useCompetitionsByWeek } from "@/hooks/useCompetitionsByWeek";
 import {
   Sheet,
@@ -23,10 +22,6 @@ interface MyPlanTabProps {
 
 export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
-  const [selectedSession, setSelectedSession] = useState<{
-    session: StrengthSessionTemplate;
-    phase: string;
-  } | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
   // ── Data loading ────────────────────────────────────────────────────────
@@ -150,24 +145,11 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
             }
             competitions={weekCompetitions}
             getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
-            onSelectSession={(session) =>
-              setSelectedSession({ session, phase: inst.phase })
-            }
+            onSelectSession={onSelectSession}
             onSelectCompetition={setSelectedCompetition}
           />
         );
       })}
-
-      {/* Session preview sheet */}
-      <MyPlanSessionSheet
-        session={selectedSession?.session ?? null}
-        phase={(selectedSession?.phase as any) ?? null}
-        onClose={() => setSelectedSession(null)}
-        onLaunch={(session) => {
-          setSelectedSession(null);
-          onSelectSession(session);
-        }}
-      />
 
       {/* Competition info sheet */}
       {selectedCompetition && (
