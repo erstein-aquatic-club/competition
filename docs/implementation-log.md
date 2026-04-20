@@ -10751,3 +10751,52 @@ Exécution : plan de 10 tâches (voir `docs/plans/2026-04-18-coach-individual-sw
 - Pas de test E2E pour les Edge Functions fixées (le harness RLS ne couvre pas les Edge Functions). Smoke test manuel recommandé post-deploy avec JWT athlète + body `user_id` forgé → doit être ignoré côté serveur.
 - Restore-on-mount des brouillons n'est pas testé en E2E ; la shape `DraftState` de `FeedbackDrawer` doit être re-vérifiée si le parent refactore.
 - `save_strength_run_atomic` (§83) cassé — non fixé.
+
+---
+
+## §159 — Fix live bug §83 : complétion séance muscu jamais enregistrée (migration 00138)
+
+**Date** : 2026-04-20
+
+**Contexte** :
+Side-discovery de §158 confirmée sur la prod : la RPC `save_strength_run_atomic` (ajoutée en §83, modifiée en §86) référence une colonne `set_number` dans `strength_set_logs`, qui n'a jamais existé. La colonne réelle est `set_index` depuis `00001_initial_schema.sql:328`. Résultat : toute séance muscu complétée via le batch commit (fin de séance) levait une erreur SQL `column "set_number" does not exist`, interceptée par le client et affichée à l'utilisateur — et la séance restait en `status = 'in_progress'` avec `completed_at = null` indéfiniment.
+
+Symptôme visible en prod (query exécutée avant fix sur fenêtre 30j) :
+- 8 runs `completed` vs 3 runs `in_progress` avec sets complets (athlete_id=1, runs #51, #52, #53)
+- Les sets étaient écrits normalement parce que le per-set path passe par `log_strength_set_atomic` (§158 migration 00137), qui utilise `set_index` correctement — seule la RPC batch `save_strength_run_atomic` était cassée.
+
+Second bug corrigé dans la foulée : `get_strength_run_summary` (migration 00082 l.36) ordonnait les agrégats via `ORDER BY MIN(s2.set_number)` — même colonne fantôme. Silencieux en read-only mais faussait potentiellement l'ordre des exercices dans les résumés de séance.
+
+**Changements** :
+
+1. **`supabase/migrations/00138_fix_strength_run_column_names.sql` (créé + appliqué via MCP)** :
+   - `save_strength_run_atomic` recréée :
+     - INSERT dans `strength_set_logs` cible `set_index` (pas `set_number`)
+     - Lecture JSON : `COALESCE((log->>'set_index')::int, (log->>'set_number')::int)` — tolère les deux clés, le client envoie `set_index` (cf. `strength.ts:688`)
+     - 1RM : `COALESCE((r->>'weight')::numeric, (r->>'one_rm')::numeric)` — le client envoie `weight` (cf. `strength.ts:701`), fallback `one_rm` pour compat
+     - `athlete_id` 1RM : `COALESCE` avec `v_target_athlete_id` — évite les NULL si le client n'envoie pas
+     - WHERE filtre les lignes 1RM sans valeur valide (évite NULL violations)
+     - **Authz ajoutée** (consistant avec §158) : `app_user_id()` requis ; `v_target_athlete_id <> caller AND role NOT IN ('coach','admin')` → `RAISE EXCEPTION 'forbidden'`. Les athlètes ne peuvent plus écrire une séance pour un autre user.
+   - `get_strength_run_summary` recréée avec `ORDER BY MIN(s2.set_index)`.
+
+**Fichiers modifiés** :
+- `supabase/migrations/00138_fix_strength_run_column_names.sql` (nouveau)
+- `CLAUDE.md` (dernière entrée §159)
+- `docs/ROADMAP.md` (header + chantier 120)
+- `docs/FEATURES_STATUS.md` (header + ligne "Complétion séance muscu")
+- `docs/implementation-log.md` (cette entrée)
+- `docs/claude/files-map.md` (migration 00138)
+
+**Vérifications** :
+- `pg_get_functiondef('public.save_strength_run_atomic')` post-apply : INSERT cible `set_index`, authz en place. ✅
+- `get_advisors('security')` après migration : seulement les deux warnings préexistants (`get_swimmer_sessions` search_path mutable + leaked-password protection). Aucun nouveau warning. ✅
+- Audit prod 30j avant fix : 8 completed / 3 in_progress avec sets complets — ratio anormal confirmé (hors patch, ratio attendu ≈ 100% completed). Runs orphelins identifiés : #51 (session 39, 9 sets, 2026-04-13), #52 (session 43, 1 set, 2026-04-18), #53 (session 23, 12 sets, 2026-04-20). Backfill à la main possible mais laissé à l'arbitrage utilisateur (opération destructive sur données live).
+
+**Décisions** :
+- Pas de DROP/CREATE — `CREATE OR REPLACE FUNCTION` suffit, préserve les grants existants
+- Ajout de l'authz consistant avec §158 (fix sécurité bonus "gratuit" pendant qu'on recrée la fonction)
+- Compatibilité descendante côté JSON (`set_number` fallback + `one_rm` fallback) pour éviter toute régression si un caller tiers ou une transaction pendante envoyait les vieilles clés
+
+**Limites / dette** :
+- Les 3 runs orphelins en prod (#51, #52, #53) ne sont pas automatiquement réparés — nécessite confirmation explicite utilisateur pour UPDATE status = 'completed'
+- Pas de test unitaire pour la RPC elle-même — couverte indirectement par `strengthAtomicSet.test.ts` (§158) qui mocke le retour

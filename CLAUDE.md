@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §158 (Audit sprint — sécurité `ffn-performances` user_id injection v63 + `admin-user` password leak v98 + atomicité strength logs RPC 00137 + résilience brouillons WorkoutRunner/FeedbackDrawer via `unsavedDraftStore`).
+Dernière entrée en date : §159 (fix live bug §83 — `save_strength_run_atomic` écrivait dans colonne inexistante `set_number` → séances jamais marquées complétées ; migration 00138 corrige `set_index`, aligne 1RM sur clé `weight`, ajoute authz, corrige aussi `get_strength_run_summary` en 00082).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

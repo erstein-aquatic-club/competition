@@ -145,6 +145,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/__tests__/unsavedDraftStore.test.ts` | 9 sous-tests `node:test` — round-trip, corrupted blob, quota exceeded, storage absent (§158) | 127 lignes |
 | `src/lib/__tests__/strengthAtomicSet.test.ts` | 7 tests `node:test` — log_strength_set_atomic RPC + reconcile error aggregation (§158) | 209 lignes |
 | `supabase/migrations/00137_log_strength_set_atomic.sql` | RPC atomique set-log + 1RM upsert (SECURITY DEFINER, search_path public, authz via app_user_id/role) — transaction unique (§158) | 142 lignes |
+| `supabase/migrations/00138_fix_strength_run_column_names.sql` | Fix live bug §83 — recrée `save_strength_run_atomic` (INSERT `set_index` au lieu de `set_number`, clé 1RM `weight`, authz `app_user_id`/`app_user_role`) + `get_strength_run_summary` (ORDER BY `set_index`) (§159) | 156 lignes |
 | `src/hooks/useCompetitionsByWeek.ts` | Hook partagé : competitionsByWeek Map + getDayCompetitions par jour (§156) | 67 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |

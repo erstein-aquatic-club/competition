@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-20 (§158 Audit sprint — sécurité edge functions + atomicité strength logs + résilience brouillons)*
+*Dernière mise à jour : 2026-04-20 (§159 Fix live bug §83 — `save_strength_run_atomic` colonne `set_number` inexistante, séances muscu jamais marquées complétées)*
 
 ## Légende
 
@@ -133,6 +133,7 @@ Tous les feature flags sont activés.
 | `admin-user` password leak mitigated | ✅ | Edge Function `admin-user` v98 | `initial_password` retourné uniquement si généré serveur (admin-supplied → `null`) ; audit log déjà clean (§158) |
 | Atomicité strength set + 1RM | ✅ | Migration `00137`, `src/lib/api/strength.ts` | RPC `log_strength_set_atomic` SECURITY DEFINER — insert set + upsert 1RM en une transaction ; `reconcileStrengthRunLogs` agrège les erreurs sans avorter ; `updateStrengthRun` check 2e write (§158) |
 | Résilience brouillons WorkoutRunner / FeedbackDrawer | ✅ | `src/lib/unsavedDraftStore.ts`, WorkoutRunner, FeedbackDrawer | Snapshot localStorage debounced + flush sur pagehide/visibilitychange ; restore-on-mount avec toast ; quota-safe (§158) |
+| Complétion séance muscu (batch commit) | ✅ | Migration `00138`, `src/lib/api/strength.ts:707` | Fix live bug §83 : `save_strength_run_atomic` écrivait dans colonne inexistante `set_number` (actuelle = `set_index`) → séance jamais marquée `completed` ; 8 séances complétées vs 3 orphelines sur 30j avant fix. Migration 00138 corrige INSERT (`set_index`), aligne clé 1RM sur `weight`, ajoute authz `app_user_id()`/`app_user_role()`, corrige aussi `get_strength_run_summary` (00082 ORDER BY set_index) (§159) |
 
 ### Messagerie
 
