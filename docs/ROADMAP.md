@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-20 (§155 ChronoSetup — refonte progressive disclosure : preset chips Distance/Splits, section Avancé collapsible, sticky footer)*
+*Dernière mise à jour : 2026-04-20 (§156 Mon plan muscu — timeline hebdomadaire Phase 1 : carte semaine collapse/expand, rail + dots, badge phase, Sheet aperçu séance, intégration compétitions)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -100,6 +100,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 114 | Coach QuickView — mode dépannage pour coaches non-titulaires (briefing RPC SECURITY DEFINER + attendance/comment/assign avec recorded_by) | Haute | Haute | Fait (§152) |
 | 115 | Planification natation — granularité par nageur (overrides filière + week_type) + retrait macro-cycles | Haute | Haute | Fait (§153) |
 | 116 | ChronoSetup refonte progressive disclosure | Moyenne | Faible | Fait (§155) |
+| 117 | Mon plan muscu — timeline hebdomadaire Phase 1 (zéro migration BDD) | Haute | Haute | Fait (§156) |
 
 ---
 

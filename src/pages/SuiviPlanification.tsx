@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
 import SwimPlanningAthleteView from "@/pages/coach/SwimPlanningAthleteView";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
+import type { StrengthSessionTemplate } from "@/lib/api/types";
 import { CalendarRange, Waves, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,7 @@ export default function SuiviPlanification() {
   });
   const groupId = profile?.group_id ?? null;
 
-  const handleSelectSession = useCallback(() => {
+  const handleSelectSession = useCallback((_session: StrengthSessionTemplate) => {
     navigate("/strength");
   }, [navigate]);
 

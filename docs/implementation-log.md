@@ -10617,3 +10617,34 @@ Exécution : plan de 10 tâches (voir `docs/plans/2026-04-18-coach-individual-sw
 **Limites :**
 - Sur très petits écrans (<375px), les deux colonnes de la card Programme peuvent être serrées — acceptable (le coach utilise au minimum un téléphone moderne)
 - Le footer `fixed` crée un z-context différent du Sheet Radix (z-50) — le footer (z-20) passe correctement derrière le Sheet
+
+---
+
+## §156 — Mon plan muscu : timeline hebdomadaire (Phase 1, zéro migration BDD) (2026-04-20)
+
+**Contexte :** La vue "Mon plan" musculation affichait les cycles comme un empilement de dossiers. Ce patch aligne l'UX sur la planification natation : timeline verticale de semaines ISO, carte collapse/expand, rail + dots, badge phase, intégration compétitions, Sheet aperçu séance.
+
+**Changements :**
+- `src/lib/strength/strengthPhaseStyles.ts` (NOUVEAU) — export `StrengthPhase`, `PHASE_STYLES`, `detectPhase` extraits de MyPlanTab
+- `src/lib/strength/strengthPlanWeeks.ts` (NOUVEAU) — pure function `buildWeekInstances` : explode cycles → WeekInstance[]; + `parseWeekRange`, `weekInfoFromSNumber`, types `WeekSession`/`WeekInstance`
+- `src/lib/strength/__tests__/strengthPlanWeeks.test.ts` (NOUVEAU) — 8 cas unitaires : parseWeekRange, weekInfoFromSNumber, buildWeekInstances (simple, plage, fallback, tri, sessions triées, exclusion items vides)
+- `src/hooks/useCompetitionsByWeek.ts` (NOUVEAU) — hook partagé extrait du swim view : `competitionsByWeek` Map + `getDayCompetitions`
+- `src/components/strength/MyPlanSessionSheet.tsx` (NOUVEAU) — Bottom Sheet aperçu séance (titre, badge phase, liste items, bouton Lancer)
+- `src/components/strength/MyPlanSessionRow.tsx` (NOUVEAU) — ligne jour×séance dans expand (check h-5, badge jour, titre, compteur, chevron)
+- `src/components/strength/MyPlanWeekCard.tsx` (NOUVEAU) — carte semaine collapse/expand avec timeline dot, header S/dates/phase badge, chips compétitions ambre, grille 7 jours × 1 colonne
+- `src/components/strength/MyPlanTab.tsx` (REFACTORÉ) — wrapper mince : buildWeekInstances → weekInstances[], auto-open semaine courante, check per-week (localStorage + completed runs), Sheet séance + Sheet compétition
+- `src/pages/SuiviPlanification.tsx` (FIX) — `handleSelectSession` correctement typé `(session: StrengthSessionTemplate) => void`
+
+**Tests :** `npx tsc --noEmit` 0 erreur ✅ · `npm test` 263/263 ✅ · `npm run test:rls` non requis (zéro policy RLS touchée)
+
+**Décisions :**
+- `weekKey` MonDay-date-string ("2026-04-06") pour identification des cartes ; `getISOWeekKey(monday)` pour localStorage (rétro-compatibilité avec les checks utilisateurs existants en format "2026-W15")
+- Phase badge construit depuis `phase.toUpperCase()` (pas de clé texte séparée)
+- Competition Sheet minimal (nom, date, lieu) — parité partielle swim ; full spec réservée Phase 2
+- Auto-open : semaine courante au montage ; si hors plage → dernière semaine du plan
+
+**Limites (Phase 1) :**
+- Sessions dupliquées sur chaque semaine d'un cycle plage (ex: S13-S15 → 3× les mêmes séances) — Phase 2 résout avec `strength_planning_slots` per-week
+- Parsing nom cycle best-effort ; noms non conformes → fallback semaine courante + offset index
+- Badge "Perso" non implémenté (réservé Phase 2)
+- Refactor bonus de SwimPlanningAthleteView pour utiliser useCompetitionsByWeek non fait (laissé pour Phase 2 / §157)

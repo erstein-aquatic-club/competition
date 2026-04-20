@@ -131,7 +131,13 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/competition/TimelineTab.tsx` | Onglet Jour J (fusion chronologique courses + routines) | ~235 lignes |
 | `src/components/competition/ChecklistTab.tsx` | Onglet checklist (templates, progress bar, toggle) | ~415 lignes |
 | `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) | |
-| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur (lecture cycles + lancement séance) | ~158 lignes |
+| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur — wrapper mince timeline hebdomadaire (§156) | 271 lignes |
+| `src/components/strength/MyPlanWeekCard.tsx` | Carte semaine collapse/expand : rail dot, header S/dates/phase/chips compétitions, grille 7j (§156) | 215 lignes |
+| `src/components/strength/MyPlanSessionSheet.tsx` | Bottom Sheet aperçu séance muscu (titre, phase badge, liste items, Lancer) (§156) | 103 lignes |
+| `src/components/strength/MyPlanSessionRow.tsx` | Ligne jour×séance dans carte semaine (check, badge jour, titre, compteur) (§156) | 99 lignes |
+| `src/lib/strength/strengthPlanWeeks.ts` | Pure helpers : buildWeekInstances, parseWeekRange, weekInfoFromSNumber, types WeekInstance/WeekSession (§156) | 181 lignes |
+| `src/lib/strength/strengthPhaseStyles.ts` | PHASE_STYLES, detectPhase, type StrengthPhase extraits de MyPlanTab (§156) | 21 lignes |
+| `src/hooks/useCompetitionsByWeek.ts` | Hook partagé : competitionsByWeek Map + getDayCompetitions par jour (§156) | 67 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |
 | `src/components/strength/TeamPlansSection.tsx` | Plans d'équipe visibles entre nageurs (§93) | |

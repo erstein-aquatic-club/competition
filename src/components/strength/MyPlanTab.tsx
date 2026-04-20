@@ -1,185 +1,42 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-import type { StrengthSessionTemplate, StrengthFolder } from "@/lib/api/types";
-import { Check, ChevronRight, Dumbbell, FolderOpen } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
+import { FolderOpen, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getISOWeekKey,
-  getCheckedSessionIds,
+  isSessionChecked,
   toggleSessionCheck,
+  getISOWeekKey,
 } from "@/lib/planCheckHelpers";
+import { isCurrentWeek, fmtDD_MM } from "@/components/coach/swim/swimPlanningShared";
+import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
+import { MyPlanWeekCard } from "./MyPlanWeekCard";
+import { MyPlanSessionSheet } from "./MyPlanSessionSheet";
+import { useCompetitionsByWeek } from "@/hooks/useCompetitionsByWeek";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
-/* ── Phase colours ── */
-const PHASE_STYLES: Record<string, { border: string; bg: string; text: string; dot: string }> = {
-  reprise:     { border: "border-l-slate-400",  bg: "bg-slate-400/10",  text: "text-slate-600",  dot: "bg-slate-400" },
-  force:       { border: "border-l-red-500",    bg: "bg-red-500/10",    text: "text-red-600",    dot: "bg-red-500" },
-  puissance:   { border: "border-l-orange-500", bg: "bg-orange-500/10", text: "text-orange-600", dot: "bg-orange-500" },
-  taper:       { border: "border-l-blue-500",   bg: "bg-blue-500/10",   text: "text-blue-600",   dot: "bg-blue-500" },
-  compétition: { border: "border-l-emerald-500",bg: "bg-emerald-500/10",text: "text-emerald-600",dot: "bg-emerald-500" },
-};
-
-function detectPhase(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes("reprise") || n.includes("s0")) return "reprise";
-  if (n.includes("force")) return "force";
-  if (n.includes("puissance")) return "puissance";
-  if (n.includes("taper")) return "taper";
-  if (n.includes("compét") || n.includes("compet")) return "compétition";
-  return "force";
-}
-
-/* ── Day ordering & badges ── */
-const DAY_ORDER: [RegExp, string, string][] = [
-  [/^lun/i,  "Lun", "bg-sky-500/15 text-sky-700 dark:text-sky-400"],
-  [/^mar/i,  "Mar", "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"],
-  [/^mer/i,  "Mer", "bg-amber-500/15 text-amber-700 dark:text-amber-400"],
-  [/^jeu/i,  "Jeu", "bg-violet-500/15 text-violet-700 dark:text-violet-400"],
-  [/^ven/i,  "Ven", "bg-orange-500/15 text-orange-700 dark:text-orange-400"],
-  [/^sam/i,  "Sam", "bg-rose-500/15 text-rose-700 dark:text-rose-400"],
-  [/^dim/i,  "Dim", "bg-gray-500/15 text-gray-600 dark:text-gray-400"],
-];
-
-function getDayInfo(title: string | undefined | null): { index: number; label: string; color: string } | null {
-  if (!title) return null;
-  const t = title.trim();
-  for (let i = 0; i < DAY_ORDER.length; i++) {
-    const [pattern, label, color] = DAY_ORDER[i];
-    if (pattern.test(t)) return { index: i, label, color };
-  }
-  return null;
-}
-
-/** Strip the day prefix from title for cleaner display */
-function stripDayPrefix(title: string): string {
-  return title.replace(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*[—–\-:]\s*/i, "").trim();
-}
-
-function sortByDay(sessions: StrengthSessionTemplate[]): StrengthSessionTemplate[] {
-  return [...sessions].sort((a, b) => {
-    const da = getDayInfo(a.title ?? a.name);
-    const db = getDayInfo(b.title ?? b.name);
-    if (da && db) return da.index - db.index;
-    if (da) return -1;
-    if (db) return 1;
-    return 0;
-  });
-}
-
-/* ── Check circle ── */
-function SessionCheck({ checked, onToggle }: { checked: boolean; onToggle: (e: React.MouseEvent) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="relative flex items-center justify-center shrink-0 h-6 w-6 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={checked ? "Marquer non fait" : "Marquer fait"}
-    >
-      <AnimatePresence mode="wait">
-        {checked ? (
-          <motion.span
-            key="checked"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 500, damping: 25 }}
-            className="flex items-center justify-center h-6 w-6 rounded-full bg-emerald-500 dark:bg-emerald-600"
-          >
-            <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
-          </motion.span>
-        ) : (
-          <motion.span
-            key="unchecked"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="h-6 w-6 rounded-full border-2 border-muted-foreground/25"
-          />
-        )}
-      </AnimatePresence>
-    </button>
-  );
-}
-
-/* ── Cycle progress ── */
-function CycleProgress({ done, total }: { done: number; total: number }) {
-  if (total === 0) return null;
-  const pct = Math.round((done / total) * 100);
-  return (
-    <div className="flex items-center gap-2 mt-1.5">
-      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-        <motion.div
-          className={cn("h-full rounded-full", pct >= 100 ? "bg-emerald-500" : "bg-primary/60")}
-          initial={{ width: 0 }}
-          animate={{ width: `${Math.min(pct, 100)}%` }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-        />
-      </div>
-      <span className="text-[10px] font-bold tabular-nums text-muted-foreground shrink-0">
-        {done}/{total}
-      </span>
-    </div>
-  );
-}
-
-/* ── Component ── */
 interface MyPlanTabProps {
   athleteId: number;
   onSelectSession: (session: StrengthSessionTemplate) => void;
 }
 
 export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
-  const weekKey = useMemo(() => getISOWeekKey(), []);
   const [checkedVersion, setCheckedVersion] = useState(0);
+  const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<{
+    session: StrengthSessionTemplate;
+    phase: string;
+  } | null>(null);
+  const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
-  // Checked sessions from localStorage (re-read on checkedVersion change)
-  const checkedIds = useMemo(
-    () => getCheckedSessionIds(athleteId, weekKey),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [athleteId, weekKey, checkedVersion],
-  );
-
-  // Auto-check: fetch completed runs for this week
-  const weekStart = useMemo(() => {
-    const d = new Date();
-    const day = d.getDay() || 7; // Mon=1..Sun=7
-    d.setDate(d.getDate() - day + 1);
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
-  }, []);
-
-  const { data: completedRunSessionIds } = useQuery({
-    queryKey: ["strength-completed-runs-week", athleteId, weekKey],
-    queryFn: async () => {
-      const { data } = await (await import("@/lib/supabase")).supabase
-        .from("strength_session_runs")
-        .select("session_id")
-        .eq("athlete_id", athleteId)
-        .eq("status", "completed")
-        .gte("started_at", weekStart);
-      return new Set((data ?? []).map((r: any) => String(r.session_id)).filter(Boolean));
-    },
-    staleTime: 60_000,
-  });
-
-  const isChecked = useCallback(
-    (sessionId: number) => {
-      const sid = String(sessionId);
-      return checkedIds.has(sid) || (completedRunSessionIds?.has(sid) ?? false);
-    },
-    [checkedIds, completedRunSessionIds],
-  );
-
-  const handleToggle = useCallback(
-    (e: React.MouseEvent, sessionId: number) => {
-      e.stopPropagation();
-      toggleSessionCheck(athleteId, sessionId, weekKey);
-      setCheckedVersion((v) => v + 1);
-    },
-    [athleteId, weekKey],
-  );
+  // ── Data loading ────────────────────────────────────────────────────────
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
     queryFn: () => api.getStrengthFolders("session", { athleteId }),
@@ -190,6 +47,7 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     queryFn: () => api.getStrengthSessions(),
   });
 
+  // ── Hierarchy ───────────────────────────────────────────────────────────
   const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
 
   const subFoldersMap = useMemo(() => {
@@ -209,7 +67,6 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     const map = new Map<number, StrengthSessionTemplate[]>();
     for (const s of allSessions) {
       if (s.folder_id && folderIdSet.has(s.folder_id)) {
-        // Exclude sessions with 0 strength items (e.g. swim-only sessions)
         if ((s.items?.length ?? 0) === 0) continue;
         const arr = map.get(s.folder_id) ?? [];
         arr.push(s);
@@ -219,20 +76,87 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     return map;
   }, [folders, allSessions]);
 
+  // ── Week instances ──────────────────────────────────────────────────────
+  const weekInstances = useMemo(() => {
+    const allCycles = rootFolders.flatMap((root) => subFoldersMap.get(root.id) ?? []);
+    if (allCycles.length === 0 || rootFolders.length === 0) return [];
+    return buildWeekInstances(rootFolders[0], allCycles, sessionsByFolder);
+  }, [rootFolders, subFoldersMap, sessionsByFolder]);
+
+  // Auto-open current week on first render
+  useEffect(() => {
+    if (weekInstances.length > 0 && expandedWeekKey === null) {
+      const current = weekInstances.find((inst) => isCurrentWeek(inst.week.weekKey));
+      setExpandedWeekKey(
+        current?.week.weekKey ?? weekInstances[weekInstances.length - 1].week.weekKey,
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekInstances.length]);
+
+  // ── Completed runs fetch (all covered weeks) ────────────────────────────
+  const earliestWeekStart = useMemo(
+    () => weekInstances[0]?.week.monday.toISOString().slice(0, 10) ?? null,
+    [weekInstances],
+  );
+
+  const { data: completedRunsByWeek } = useQuery({
+    queryKey: ["strength-completed-runs-all", athleteId, earliestWeekStart],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("strength_session_runs")
+        .select("session_id, started_at")
+        .eq("athlete_id", athleteId)
+        .eq("status", "completed")
+        .gte("started_at", earliestWeekStart + "T00:00:00");
+      const map = new Map<string, Set<string>>();
+      for (const run of data ?? []) {
+        const wk = getISOWeekKey(new Date(run.started_at));
+        const set = map.get(wk) ?? new Set<string>();
+        set.add(String(run.session_id));
+        map.set(wk, set);
+      }
+      return map;
+    },
+    enabled: !!earliestWeekStart,
+    staleTime: 60_000,
+  });
+
+  const checkIsChecked = useCallback(
+    (sessionId: number, isoWeekKey: string) => {
+      void checkedVersion; // trigger re-read on toggle
+      const sid = String(sessionId);
+      return (
+        isSessionChecked(athleteId, sid, isoWeekKey) ||
+        (completedRunsByWeek?.get(isoWeekKey)?.has(sid) ?? false)
+      );
+    },
+    [athleteId, checkedVersion, completedRunsByWeek],
+  );
+
+  const handleToggleCheck = useCallback(
+    (sessionId: number, isoWeekKey: string) => {
+      toggleSessionCheck(athleteId, sessionId, isoWeekKey);
+      setCheckedVersion((v) => v + 1);
+    },
+    [athleteId],
+  );
+
+  // ── Competitions ────────────────────────────────────────────────────────
+  const { competitionsByWeek, getDayCompetitions } = useCompetitionsByWeek(athleteId);
+
+  // ── Loading skeleton ────────────────────────────────────────────────────
   if (foldersLoading) {
     return (
-      <div className="space-y-6 pt-2">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="space-y-2">
-            <div className="h-5 w-48 rounded bg-muted animate-pulse" />
-            <div className="h-14 w-full rounded-xl bg-muted animate-pulse" />
-            <div className="h-14 w-full rounded-xl bg-muted animate-pulse" />
-          </div>
+      <div className="space-y-3 pt-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="rounded-xl border p-3 h-14 bg-muted animate-pulse" />
         ))}
       </div>
     );
   }
 
+  // ── Empty states ────────────────────────────────────────────────────────
   if (rootFolders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -245,121 +169,102 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     );
   }
 
+  if (weekInstances.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          Les séances de ce plan n'ont pas encore d'exercices configurés.
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Demande à ton coach de compléter ta planification.
+        </p>
+      </div>
+    );
+  }
+
+  // ── Timeline ────────────────────────────────────────────────────────────
   return (
     <div className="relative pt-1 pb-4">
       {/* Vertical timeline rail */}
-      <div className="absolute left-[11px] top-6 bottom-6 w-px bg-border" />
+      <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
 
-      {rootFolders.map((root) => {
-        const cycles = subFoldersMap.get(root.id) ?? [];
+      {weekInstances.map((inst) => {
+        const weekCompetitions = competitionsByWeek.get(inst.week.weekKey) ?? [];
+        // Use ISO week key format for localStorage (backward-compatible with old MyPlanTab)
+        const isoWeekKey = getISOWeekKey(inst.week.monday);
         return (
-          <div key={root.id} className="space-y-5">
-            {cycles.map((cycle, idx) => {
-              const raw = sessionsByFolder.get(cycle.id) ?? [];
-              const sessions = sortByDay(raw);
-              if (sessions.length === 0) return null;
-              const phase = detectPhase(cycle.name);
-              const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-              // Extract short label (e.g. "S13" or "S15-S16")
-              const shortLabel = cycle.name.match(/^(S\d+(?:-S\d+)?)/)?.[1] ?? "";
-              // Extract phase name (after —)
-              const phaseName = cycle.name.replace(/^S\d+(?:-S\d+)?\s*[—–\-]\s*/, "").replace(/\s*\(.*\)$/, "").trim();
-
-              const doneCount = sessions.filter((s) => isChecked(s.id)).length;
-
-              return (
-                <div key={cycle.id} className="relative pl-8">
-                  {/* Timeline dot */}
-                  <div className={cn("absolute left-[7px] top-1 h-[9px] w-[9px] rounded-full ring-2 ring-background", style.dot)} />
-
-                  {/* Cycle header */}
-                  <div className="mb-2.5">
-                    <div className="flex items-center gap-2">
-                      {shortLabel && (
-                        <span className={cn("inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase", style.bg, style.text)}>
-                          {shortLabel}
-                        </span>
-                      )}
-                      <span className="text-sm font-semibold text-foreground">{phaseName}</span>
-                    </div>
-                    {/* Date range from folder name */}
-                    {cycle.name.match(/\((.+)\)/) && (
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {cycle.name.match(/\((.+)\)/)?.[1]}
-                      </p>
-                    )}
-                    <CycleProgress done={doneCount} total={sessions.length} />
-                  </div>
-
-                  {/* Sessions */}
-                  <div className={cn("rounded-xl border-l-[3px] overflow-hidden divide-y divide-border/50", style.border)}>
-                    {sessions.map((s) => {
-                      const dayInfo = getDayInfo(s.title ?? s.name);
-                      const cleanTitle = stripDayPrefix(s.title ?? s.name ?? "Sans titre");
-                      const itemCount = s.items?.length ?? 0;
-                      const done = isChecked(s.id);
-
-                      return (
-                        <div
-                          key={s.id}
-                          className={cn(
-                            "flex items-center gap-2 w-full text-left px-3 py-2.5 bg-card transition-all",
-                            done && "opacity-55",
-                          )}
-                        >
-                          <SessionCheck
-                            checked={done}
-                            onToggle={(e) => handleToggle(e, s.id)}
-                          />
-
-                          <button
-                            onClick={() => onSelectSession(s)}
-                            className="flex items-center gap-2.5 flex-1 min-w-0 hover:bg-accent/50 rounded-lg -mx-1 px-1 py-0.5 transition-colors"
-                          >
-                            {dayInfo ? (
-                              <span className={cn(
-                                "inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-bold shrink-0 min-w-[32px]",
-                                dayInfo.color,
-                              )}>
-                                {dayInfo.label}
-                              </span>
-                            ) : (
-                              <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            )}
-
-                            <span className="text-[13px] font-medium flex-1 truncate">{cleanTitle}</span>
-
-                            <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                              {itemCount} ex.
-                            </span>
-                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* End dot */}
-            <div className="relative pl-8">
-              <div className="absolute left-[7px] top-1 h-[9px] w-[9px] rounded-full bg-muted-foreground/20 ring-2 ring-background" />
-              <p className="text-[11px] text-muted-foreground/50 font-medium">Fin du plan</p>
-            </div>
-          </div>
+          <MyPlanWeekCard
+            key={`${inst.cycleId}-${inst.week.weekKey}`}
+            instance={inst}
+            isCurrent={isCurrentWeek(inst.week.weekKey)}
+            isExpanded={expandedWeekKey === inst.week.weekKey}
+            onToggleExpand={() =>
+              setExpandedWeekKey((k) =>
+                k === inst.week.weekKey ? null : inst.week.weekKey,
+              )
+            }
+            competitions={weekCompetitions}
+            getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
+            isSessionChecked={(sid) => checkIsChecked(sid, isoWeekKey)}
+            onToggleCheck={(sid) => handleToggleCheck(sid, isoWeekKey)}
+            onSelectSession={(session) =>
+              setSelectedSession({ session, phase: inst.phase })
+            }
+            onSelectCompetition={setSelectedCompetition}
+          />
         );
       })}
 
-      {!foldersLoading && folders.length > 0 && Array.from(sessionsByFolder.values()).every(arr => arr.length === 0) && (
-        <div className="rounded-xl border border-dashed p-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Les séances de ce plan n'ont pas encore d'exercices configurés.
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Demande à ton coach de compléter ta planification.
-          </p>
-        </div>
+      {/* Session preview sheet */}
+      <MyPlanSessionSheet
+        session={selectedSession?.session ?? null}
+        phase={(selectedSession?.phase as any) ?? null}
+        onClose={() => setSelectedSession(null)}
+        onLaunch={(session) => {
+          setSelectedSession(null);
+          onSelectSession(session);
+        }}
+      />
+
+      {/* Competition info sheet */}
+      {selectedCompetition && (
+        <Sheet
+          open={!!selectedCompetition}
+          onOpenChange={(open) => !open && setSelectedCompetition(null)}
+        >
+          <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2 text-base">
+                <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
+                {selectedCompetition.name}
+              </SheetTitle>
+            </SheetHeader>
+            <div className="space-y-1.5 pt-2 pb-4 text-sm text-muted-foreground">
+              {selectedCompetition.date && (
+                <p>
+                  <span className="font-medium text-foreground">Date : </span>
+                  {fmtDD_MM(new Date(selectedCompetition.date + "T00:00:00"))}
+                  {selectedCompetition.end_date &&
+                    selectedCompetition.end_date !== selectedCompetition.date && (
+                      <span>
+                        {" – "}
+                        {fmtDD_MM(new Date(selectedCompetition.end_date + "T00:00:00"))}
+                      </span>
+                    )}
+                </p>
+              )}
+              {selectedCompetition.location && (
+                <p>
+                  <span className={cn("font-medium text-foreground")}>Lieu : </span>
+                  {selectedCompetition.location}
+                </p>
+              )}
+              {selectedCompetition.description && (
+                <p className="text-xs mt-2">{selectedCompetition.description}</p>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

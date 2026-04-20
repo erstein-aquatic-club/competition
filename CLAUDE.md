@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §155 (ChronoSetup — refonte progressive disclosure : preset chips, section Avancé collapsible, sticky footer).
+Dernière entrée en date : §156 (Mon plan muscu — timeline hebdomadaire Phase 1 : carte semaine collapse/expand, rail + dots, badge phase, Sheet aperçu séance, intégration compétitions).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
