@@ -10591,3 +10591,29 @@ Exécution : plan de 10 tâches (voir `docs/plans/2026-04-18-coach-individual-sw
 - **Skeleton loading non propagé** dans `SwimmerPlanningPanel` : le hook n'expose pas d'`isLoading` composite (uniquement `isPending` pour les mutations). Le panneau affiche 7 semaines vides durant le fetch. Suivi : ajouter `queriesLoading` au hook et wirer le skeleton `<SwimPlanningTimeline isLoading>` existant.
 - **Follow-up refacto** (flagué par code-quality review Task 8) : extraire `buildEffectiveSlotsByWeek(visibleWeekKeys, groupSlotsByWeek, overrides)` dans `swimPlanningMerge.ts` pour que le hook coach ET `SwimPlanningAthleteView` appellent le même pur. ~25 L de duplication aujourd'hui, faible risque de drift.
 - **Drop des tables `training_cycles` / `training_weeks`** : Task 10 du plan, non exécuté ce §. À faire après validation prod (1-2 semaines sans regression report).
+
+## §155 — ChronoSetup : refonte progressive disclosure (2026-04-20)
+
+**Contexte :** Complexité perçue trop élevée — toutes les options visibles simultanément. Coaches occasionnels perdus face aux options vagues/intervalles/overrides.
+
+**Changements :**
+- Lane cards : bouton `[+ Ajouter]` inline + texte ghost sur lane vide + compteur lignes sous les lanes
+- Section "Programme" : composant `PresetDistanceField` avec preset chips Distance (DISTANCE_PRESETS) et Splits (SPLIT_PRESETS), aria-pressed + aria-label sur les chips, layout grid 2 colonnes sm:grid-cols-2
+- Section "Avancé" collapsible (Séries + WaveConfigCards) dans la card Programme — repliée par défaut, état persisté `localStorage("eac-chrono-advanced-open")`, badge résumé "· X séries · Y vagues · intervalles" quand replié
+- Sticky footer fixe (`fixed bottom-0`) : résumé "X nageurs · Y m · splits Z m" + bouton "Lancer" — toujours accessible
+- Suppression du header "Préparation" + bouton Lancer du header
+
+**Fichiers modifiés :**
+- `src/components/chrono/ChronoSetup.tsx` — refonte complète (1189 lignes)
+
+**Tests :** `npx tsc --noEmit` ✅ · `npm test` 262/262 ✅
+
+**Décisions :**
+- `fixed` pour le sticky footer (parent CoachChronoScreen sans transform/filter — aucun risque de stacking context parasite)
+- Section "Avancé" intégrée dans la card Programme (cohésion thématique — options avancées du même programme)
+- `PresetDistanceField` extrait en composant local (évite duplication Distance/Splits)
+- `aria-pressed` sur les chips presets (toggle visuel = sémantique ARIA pressed)
+
+**Limites :**
+- Sur très petits écrans (<375px), les deux colonnes de la card Programme peuvent être serrées — acceptable (le coach utilise au minimum un téléphone moderne)
+- Le footer `fixed` crée un z-context différent du Sheet Radix (z-50) — le footer (z-20) passe correctement derrière le Sheet

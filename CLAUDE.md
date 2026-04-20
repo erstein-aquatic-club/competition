@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §154 (Mode focus muscu : fallback localStorage systématique + fix bouton bloqué — `onLogSets`/`onProgress` fire-and-forget, `onFinish` async avec offline queue fallback sur catch réseau).
+Dernière entrée en date : §155 (ChronoSetup — refonte progressive disclosure : preset chips, section Avancé collapsible, sticky footer).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-19 (§153 Planification natation : granularité par nageur via swim_planning_*_overrides + retrait macro-cycles SwimmerPlanningTab)*
+*Dernière mise à jour : 2026-04-20 (§155 ChronoSetup — refonte progressive disclosure : preset chips Distance/Splits, section Avancé collapsible, sticky footer)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -99,6 +99,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 113 | KPI Ressentis 30j v6 — feedback_count = slots attendus matchés (alignement avec historique §150) | Haute | Faible | Fait (§151) |
 | 114 | Coach QuickView — mode dépannage pour coaches non-titulaires (briefing RPC SECURITY DEFINER + attendance/comment/assign avec recorded_by) | Haute | Haute | Fait (§152) |
 | 115 | Planification natation — granularité par nageur (overrides filière + week_type) + retrait macro-cycles | Haute | Haute | Fait (§153) |
+| 116 | ChronoSetup refonte progressive disclosure | Moyenne | Faible | Fait (§155) |
 
 ---
 
