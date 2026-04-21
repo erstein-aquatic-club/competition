@@ -48,7 +48,7 @@ BEGIN
 
   INSERT INTO strength_session_runs (
     session_id, athlete_id, assignment_id, started_at, completed_at,
-    status, feeling, rpe, duration, comments
+    status, fatigue, comments
   ) VALUES (
     (p_data->>'session_id')::int,
     v_target_athlete_id,
@@ -56,9 +56,7 @@ BEGIN
     COALESCE((p_data->>'started_at')::timestamptz, now()),
     now(),
     'completed',
-    NULLIF(p_data->>'feeling', '')::int,
-    NULLIF(p_data->>'rpe', '')::int,
-    NULLIF(p_data->>'duration', '')::int,
+    NULLIF(p_data->>'fatigue', '')::int,
     NULLIF(p_data->>'comments', '')
   ) RETURNING id INTO v_run_id;
 
