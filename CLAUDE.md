@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §161 (Notifications nageur — nettoyage réel côté serveur : migration 00139 ajoute une DELETE policy sur `notification_targets` pour `target_user_id = app_user_id()` et une table `notification_dismissals` pour masquer les notifs de groupe sans affecter les autres membres ; nouvel export API `notifications_clear_all` qui DELETE les targets perso + upserts les dismissals pour les group-targeted ; `notifications_list` filtre transparent via les dismissals ; UI `SwimmerMessagesView` relabel "Effacer toutes les notifications" avec toast de bilan).
+Dernière entrée en date : §162 (Bugfix séances muscu bloquées "en cours" — `enqueue()` dispatche maintenant `eac-offline-queue-updated` ; `OfflineMutationSync` écoute cet événement pour rejouer la queue immédiatement sans attendre une transition réseau ; data fix SQL runs 51-54 François ; migration 00138 `save_strength_run_atomic` appliquée).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

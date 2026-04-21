@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-21 (§161 Notifications nageur — nettoyage réel serveur : migration 00139 + DELETE policy notification_targets + table notification_dismissals, `notifications_clear_all` API, UI "Effacer toutes les notifications")*
+*Dernière mise à jour : 2026-04-21 (§162 Bugfix séances muscu bloquées en cours — CustomEvent queue offline + data fix SQL runs 51-54 + migration 00138 appliquée)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -106,6 +106,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 120 | Fix bug §83 live — `save_strength_run_atomic` colonne `set_number` inexistante (séances muscu jamais complétées) | Critique | Faible | Fait (§159) |
 | 121 | Mon plan muscu — Phase 3 éditeur coach (/coach/strength-planning, timeline, sheets, tuile Coach) | Haute | Haute | Fait (§160) |
 | 122 | Notifications nageur — nettoyage réel serveur (DELETE targets perso + dismissals table pour group-targeted, UI relabel) | Haute | Faible | Fait (§161) |
+| 123 | Bugfix séances muscu bloquées "en cours" — queue offline rejoue immédiatement via CustomEvent (OfflineMutationSync) + data fix SQL + migration 00138 | Critique | Faible | Fait (§162) |
 
 ---
 

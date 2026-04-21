@@ -10909,3 +10909,58 @@ Demande utilisateur : "Si le nageur nettoie, que cela nettoie ses notifications 
 - Si un cron recrée une notification (ex: rappel quotidien wellness) **après** un clear, elle réapparaît comme une nouvelle notification — c'est le comportement attendu (ce n'est pas la notification d'hier qui revient, c'est celle d'aujourd'hui). La télémétrie utilisateur "trop de notifs" reste à adresser par §B (TTL sur triggers) ou par un débouncing coach-side.
 - La fonctionnalité "Réafficher les messages masqués" du empty state reste opérationnelle mais ne ré-affiche que les dismiss locaux (la suppression serveur est irréversible côté JS — il n'y a pas de UI pour DELETE un dismissal). Suffisant pour le use case nominal.
 - Tests RLS non lancés (Docker non démarré). À valider à la prochaine session Docker-enabled pour couvrir les régressions RLS silencieuses (type §113).
+
+---
+
+## §162 — Fix séances muscu bloquées "en cours" + queue offline ne rejouant pas (2026-04-21)
+
+**Branche** : `main`
+**Chantier ROADMAP** : §162 — Bugfix strength run completion + offline queue
+
+### Contexte
+
+Plusieurs séances de musculation de François restaient bloquées au statut `in_progress` en DB (runs 51–54, `athlete_id=1`) malgré un clic sur "ENREGISTRER & FERMER". Investigation via requêtes directes Supabase :
+
+- Runs 53 et 54 : `progress_pct=100`, 12 set_logs chacun → séances clairement terminées
+- Runs 51 et 52 : partiellement faites (67 % et 0 %) → abandonnées
+
+**Cause racine** : quand `updateRun.mutateAsync` échoue (timeout Supabase, blip réseau), le `catch` dans `onFinish` (Strength.tsx:770) enqueue le payload en `offlineQueue` et affiche "Séance sauvegardée hors-ligne". Mais `OfflineMutationSync` ne se redéclenche que lors d'une transition réseau (`isOnline` false → true). Si l'utilisateur est resté connecté en permanence, `isOnline` ne change jamais, l'effect ne se ré-exécute pas, et le run reste `in_progress` indéfiniment.
+
+**Problème secondaire** : migration 00138 (`save_strength_run_atomic` avec `set_index` au lieu de `set_number`) n'avait pas encore été appliquée en DB — corrigée dans ce patch.
+
+**Data fix** : 4 runs corrigés directement en SQL (runs 53 et 54 → `completed` avec `completed_at` du dernier set_log ; runs 51 et 52 → `abandoned`).
+
+### Changements réalisés
+
+1. **`src/lib/offlineQueue.ts`** : `enqueue()` dispatche un `CustomEvent('eac-offline-queue-updated')` après chaque ajout à la queue.
+2. **`src/components/shared/OfflineMutationSync.tsx`** : refactorisé avec `useCallback` pour extraire `runSync`. Deux `useEffect` : un sur les deps (réseau/auth, comportement existant), un nouveau écoutant `QUEUE_UPDATED_EVENT` → déclenche le replay immédiatement même en restant online.
+3. **Migration 00138 appliquée via MCP** (`save_strength_run_atomic` : `set_number` → `set_index`, authz SECURITY DEFINER, fix `get_strength_run_summary`).
+4. **Data fix SQL** via `execute_sql` MCP : runs 53+54 → `completed`, runs 51+52 → `abandoned`.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/offlineQueue.ts` | +3 lignes : export `QUEUE_UPDATED_EVENT`, dispatch dans `enqueue()` |
+| `src/components/shared/OfflineMutationSync.tsx` | Refacto `useCallback` + listener `QUEUE_UPDATED_EVENT` |
+| `supabase/migrations/00138_fix_strength_run_column_names.sql` | Déjà créé, appliqué via MCP dans ce patch |
+| `docs/implementation-log.md` | Cette entrée |
+| `docs/ROADMAP.md` | Header + ligne §162 |
+| `CLAUDE.md` | §Chantiers — §162 |
+| `docs/claude/files-map.md` | Tailles mises à jour |
+
+### Tests
+
+- `npx tsc --noEmit` : aucune erreur sur les fichiers modifiés. ✅
+- Tests RLS : non concernés (pas de migration RLS dans ce patch). ✅
+- Data fix vérifié via `SELECT` post-UPDATE : statuts corrects en DB. ✅
+
+### Décisions prises
+
+- **CustomEvent plutôt que polling** : plus réactif (immédiat), zéro overhead, pas de setInterval à gérer.
+- **`useCallback` + deux effects** plutôt que dupliquer la logique : le callback est stable tant que les deps ne changent pas, les deux triggers (réseau et event) appellent la même fonction.
+- **Runs 51 et 52 marqués `abandoned`** (non `completed`) : progress 0 % et 67 % → séances non terminées, cohérent sémantiquement.
+
+### Limites / dette
+
+- Le `catch` dans `onFinish` ne distingue pas "vraiment offline" de "erreur réseau transitoire online". Si l'erreur est persistante (ex : token expiré), le replay va échouer 5× puis l'item sera "poisoned" et abandonné silencieusement. À améliorer : détecter les erreurs d'auth et afficher un message explicite.
