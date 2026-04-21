@@ -144,6 +144,7 @@ import {
   markNotificationRead as _markNotificationRead,
   notifications_list as _notifications_list,
   notifications_mark_read as _notifications_mark_read,
+  notifications_clear_all as _notifications_clear_all,
 } from "./api/notifications";
 
 import { getNotificationLog as _getNotificationLog } from "./api/notificationLog";
@@ -763,6 +764,7 @@ export const api = {
   async markNotificationRead(id: number) { return _markNotificationRead(id); },
   async notifications_list(options: Parameters<typeof _notifications_list>[0]) { return _notifications_list(options); },
   async notifications_mark_read(payload: Parameters<typeof _notifications_mark_read>[0]) { return _notifications_mark_read(payload); },
+  async notifications_clear_all(payload: Parameters<typeof _notifications_clear_all>[0]) { return _notifications_clear_all(payload); },
   async getNotificationLog(limit?: number, offset?: number) { return _getNotificationLog(limit, offset); },
 
   // ══════════════════════════════════════════════════════════════════

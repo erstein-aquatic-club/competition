@@ -147,37 +147,49 @@ export default function SwimmerMessagesView({
     openNotificationDestination(notification);
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     const targetIds = notifications
       .map((notification) => notification.target_id)
       .filter((targetId): targetId is number => targetId != null);
 
     if (targetIds.length === 0) return;
 
-    // Immediate local dismiss for snappy UI
+    // Optimistic dismiss locally so the UI is instant.
     setDismissedTargetIds((current) => Array.from(new Set([...current, ...targetIds])));
     setSelectedTargetId(null);
 
-    // Mark all unread notifications as read server-side so home badge clears
-    const unreadTargetIds = notifications
-      .filter((n) => !n.read && n.target_id != null)
-      .map((n) => n.target_id as number);
+    try {
+      const result = await api.notifications_clear_all({ userId });
+      queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
 
-    if (unreadTargetIds.length > 0) {
-      Promise.all(unreadTargetIds.map((id) => api.notifications_mark_read({ targetId: id })))
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
-          queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
-        })
-        .catch(() => {
-          // Non-blocking — local dismiss already applied
-        });
+      // Server did the definitive cleanup (DELETE + dismissals) — the local
+      // dismiss list becomes redundant for the ids we just handled. We clear
+      // it so it doesn't grow unbounded over time.
+      persistDismissedNotificationTargetIds(userId, []);
+      setDismissedTargetIds([]);
+      syncedDismissedUnreadIdsRef.current = new Set();
+
+      const totalCleared = result.deleted + result.dismissed;
+      toast({
+        title: "Messages effacés",
+        description:
+          totalCleared > 0
+            ? `${totalCleared} notification${totalCleared > 1 ? "s" : ""} nettoyée${totalCleared > 1 ? "s" : ""}.`
+            : "Aucune notification à nettoyer.",
+      });
+    } catch (error) {
+      // Local dismiss already applied — degrade gracefully but warn the user
+      // that the cleanup isn't persisted cross-device.
+      toast({
+        title: "Nettoyage serveur incomplet",
+        description:
+          "Les notifications sont masquées sur cet appareil. Réessayez plus tard pour effacer définitivement.",
+        variant: "destructive",
+      });
+      // Log for debug
+      console.error("[notifications_clear_all] failed", error);
     }
-
-    toast({
-      title: "Notifications effacées",
-      description: "Les notifications ont été marquées comme lues.",
-    });
   };
 
   const handleRestoreHiddenNotifications = () => {
@@ -209,9 +221,16 @@ export default function SwimmerMessagesView({
           </div>
         </div>
         {notifications.length > 0 ? (
-          <Button variant="ghost" size="sm" className="-ml-1 w-fit" onClick={handleClearAll}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-1 w-fit"
+            onClick={() => {
+              void handleClearAll();
+            }}
+          >
             <Trash2 className="h-4 w-4" />
-            Masquer toutes les notifications sur cet appareil
+            Effacer toutes les notifications
           </Button>
         ) : null}
       </div>

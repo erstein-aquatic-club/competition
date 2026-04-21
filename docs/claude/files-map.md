@@ -22,7 +22,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |
 | `src/lib/api/users.ts` | Profil, athlètes, approbation | ~450 lignes |
 | `src/lib/api/assignments.ts` | Assignments CRUD (sessions, slots, tracking) | ~1015 lignes |
-| `src/lib/api/notifications.ts` | Notifications CRUD | ~261 lignes |
+| `src/lib/api/notifications.ts` | Notifications CRUD + `notifications_clear_all` serveur (§161) | 352 lignes |
 | `src/lib/api/timesheet.ts` | Pointage heures CRUD | ~326 lignes |
 | `src/lib/api/swim.ts` | Catalogue nage, sessions, partage public | ~416 lignes |
 | `src/lib/api/wellness.ts` | Wellness checks + scoring readiness | ~84 lignes |
@@ -146,6 +146,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/__tests__/strengthAtomicSet.test.ts` | 7 tests `node:test` — log_strength_set_atomic RPC + reconcile error aggregation (§158) | 209 lignes |
 | `supabase/migrations/00137_log_strength_set_atomic.sql` | RPC atomique set-log + 1RM upsert (SECURITY DEFINER, search_path public, authz via app_user_id/role) — transaction unique (§158) | 142 lignes |
 | `supabase/migrations/00138_fix_strength_run_column_names.sql` | Fix live bug §83 — recrée `save_strength_run_atomic` (INSERT `set_index` au lieu de `set_number`, clé 1RM `weight`, authz `app_user_id`/`app_user_role`) + `get_strength_run_summary` (ORDER BY `set_index`) (§159) | 156 lignes |
+| `supabase/migrations/00139_notification_clear_server_side.sql` | DELETE policy sur `notification_targets` + table `notification_dismissals` pour masquage persistant par user des notifs de groupe (§161) | 66 lignes |
 | `src/hooks/useCompetitionsByWeek.ts` | Hook partagé : competitionsByWeek Map + getDayCompetitions par jour (§156) | 67 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |

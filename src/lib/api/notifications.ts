@@ -114,6 +114,16 @@ export async function markNotificationRead(id: number) {
   localStorageSave(STORAGE_KEYS.NOTIFICATIONS, updated);
 }
 
+async function fetchUserDismissedNotificationIds(userId?: number | null): Promise<Set<number>> {
+  if (!userId || !canUseSupabase()) return new Set();
+  const { data, error } = await supabase
+    .from("notification_dismissals")
+    .select("notification_id")
+    .eq("user_id", userId);
+  if (error || !data) return new Set();
+  return new Set(data.map((row: { notification_id: number }) => row.notification_id));
+}
+
 export async function notifications_list(options: {
   targetUserId?: number | null;
   targetAthleteName?: string | null;
@@ -162,9 +172,16 @@ export async function notifications_list(options: {
     if (options.to) {
       query = query.lte("notifications.created_at", options.to + "T23:59:59");
     }
-    const { data: rawTargets, error } = await query;
+    const [{ data: rawTargets, error }, dismissedIds] = await Promise.all([
+      query,
+      fetchUserDismissedNotificationIds(options.targetUserId ?? null),
+    ]);
     if (error) throw new Error(error.message);
-      const mapped = (rawTargets ?? []).map((t: any) => {
+    const filteredTargets = (rawTargets ?? []).filter((t: any) => {
+      const notifId = t?.notifications?.id;
+      return notifId == null || !dismissedIds.has(notifId);
+    });
+    const mapped = filteredTargets.map((t: any) => {
       const notif = t.notifications || {};
       return {
         id: safeInt(t.id, Date.now()),
@@ -258,4 +275,78 @@ export async function notifications_mark_read(payload: {
     notif.id === resolvedId ? { ...notif, read: true } : notif,
   );
   localStorageSave(STORAGE_KEYS.NOTIFICATIONS, updated);
+}
+
+/**
+ * §161 — Nettoyage serveur des notifications visibles pour l'utilisateur.
+ * Personal targets (target_user_id = userId) → DELETE (RLS permet depuis §00139).
+ * Group targets (target_group_id, partagées) → INSERT dans notification_dismissals
+ * pour masquer persistently sans affecter les autres membres du groupe.
+ *
+ * Renvoie le bilan pour toast / debug. Idempotent : re-run OK (ignoreDuplicates sur dismissals).
+ */
+export async function notifications_clear_all(options: {
+  userId: number;
+}): Promise<{ deleted: number; dismissed: number }> {
+  if (!canUseSupabase()) {
+    const notifs = (localStorageGet(STORAGE_KEYS.NOTIFICATIONS) || []) as any[];
+    const remaining = notifs.filter(
+      (n: any) => n.target_user_id !== options.userId && n.target_user_id != null,
+    );
+    localStorageSave(STORAGE_KEYS.NOTIFICATIONS, remaining);
+    return { deleted: notifs.length - remaining.length, dismissed: 0 };
+  }
+
+  if (!options.userId) return { deleted: 0, dismissed: 0 };
+
+  const groupIds = await fetchUserGroupIds(options.userId);
+  const orFilters: string[] = [`target_user_id.eq.${options.userId}`];
+  groupIds.forEach((gid) => orFilters.push(`target_group_id.eq.${gid}`));
+
+  const { data: targets, error: fetchError } = await supabase
+    .from("notification_targets")
+    .select("id, target_user_id, target_group_id, notification_id")
+    .or(orFilters.join(","));
+  if (fetchError) throw new Error(fetchError.message);
+  if (!targets || targets.length === 0) return { deleted: 0, dismissed: 0 };
+
+  const personalTargetIds = targets
+    .filter((t: any) => t.target_user_id === options.userId)
+    .map((t: any) => t.id as number);
+  const groupNotifIds = Array.from(
+    new Set(
+      targets
+        .filter((t: any) => t.target_group_id != null)
+        .map((t: any) => t.notification_id as number),
+    ),
+  );
+
+  let deleted = 0;
+  let dismissed = 0;
+
+  if (personalTargetIds.length > 0) {
+    const { error: delError, count } = await supabase
+      .from("notification_targets")
+      .delete({ count: "exact" })
+      .in("id", personalTargetIds);
+    if (delError) throw new Error(delError.message);
+    deleted = count ?? personalTargetIds.length;
+  }
+
+  if (groupNotifIds.length > 0) {
+    const rows = groupNotifIds.map((nid) => ({
+      user_id: options.userId,
+      notification_id: nid,
+    }));
+    const { error: insError } = await supabase
+      .from("notification_dismissals")
+      .upsert(rows, {
+        onConflict: "user_id,notification_id",
+        ignoreDuplicates: true,
+      });
+    if (insError) throw new Error(insError.message);
+    dismissed = groupNotifIds.length;
+  }
+
+  return { deleted, dismissed };
 }

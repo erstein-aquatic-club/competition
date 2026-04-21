@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-21 (§160 Mon plan muscu — Phase 3 éditeur coach : route `/coach/strength-planning`, timeline groupe/nageur, picker séances, sheets, tuile Coach home)*
+*Dernière mise à jour : 2026-04-21 (§161 Notifications nageur — nettoyage réel serveur : DELETE policy notification_targets + table notification_dismissals + API notifications_clear_all)*
 
 ## Légende
 
@@ -300,6 +300,7 @@ Tous les feature flags sont activés.
 | Database webhook trigger | ✅ | `00044_push_webhook_trigger.sql` | pg_net trigger sur notification_targets INSERT |
 | Push toggle dans Profil | ✅ | `Profile.tsx` | Activer/désactiver depuis la page profil |
 | VAPID keys config | ✅ | `pushConfig.ts`, `pages.yml` | GitHub Secrets + Supabase Secrets |
+| Nettoyage notifications nageur | ✅ | `00139_notification_clear_server_side.sql`, `notifications.ts`, `SwimmerMessagesView.tsx` | §161 DELETE policy notification_targets + table notification_dismissals pour group-targeted + API `notifications_clear_all` + bouton "Effacer toutes les notifications" |
 
 ### UI/UX & Design System (Phase 6)
 

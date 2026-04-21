@@ -10837,3 +10837,75 @@ Second bug corrigé dans la foulée : `get_strength_run_summary` (migration 0008
 **Limites / dette** :
 - Les 3 runs orphelins en prod (#51, #52, #53) ne sont pas automatiquement réparés — nécessite confirmation explicite utilisateur pour UPDATE status = 'completed'
 - Pas de test unitaire pour la RPC elle-même — couverte indirectement par `strengthAtomicSet.test.ts` (§158) qui mocke le retour
+
+---
+
+## §161 — Nettoyage notifications nageur réellement serveur (migration 00139)
+
+**Date** : 2026-04-21
+
+**Contexte** :
+La vue Messages nageur (`/profile?section=messages`) avait un bouton "Masquer toutes les notifications sur cet appareil" qui ne faisait qu'alimenter un dismiss list en `localStorage` (`profile-notifications-dismissed:{userId}`) et marquer les `read_at` côté DB. Zéro DELETE. Sur changement d'appareil, mode privé, clear de cache, réinstall PWA ou purge iOS Safari, le localStorage disparaissait et **toutes les anciennes notifications marquées read redevenaient visibles** — d'où le symptôme "je nettoie mais les notifications reviennent".
+
+Aggravé par trois facteurs DB :
+1. Les triggers automatiques (§00045 slots/séances/compétitions, §00074 coach comments, §00090 entretiens, §00104 routing, §00109 fin de séance) n'assignent jamais `expires_at` → le cron §00085 ne purge rien → accumulation ad vitam.
+2. Deux crons génèrent des notifications quotidiennes/fréquentes :
+   - `wellness-morning-push` (§00070) — 04:00 UTC quotidien si wellness non rempli
+   - `slot-session-reminder` (§00109) — toutes les 15 min pour chaque séance non notifiée
+3. Aucune policy DELETE sur `notification_targets` → impossible de supprimer côté JS même si on le voulait (bloqué silencieusement par RLS).
+
+Demande utilisateur : "Si le nageur nettoie, que cela nettoie ses notifications en base si possible."
+
+**Changements** :
+
+1. **`supabase/migrations/00139_notification_clear_server_side.sql` (créé + appliqué via MCP)** :
+   - Nouvelle policy `notification_targets_delete` : `target_user_id = app_user_id() OR role IN ('admin','coach')`. Les notifs de groupe (`target_group_id`, `target_user_id = NULL`) restent protégées d'un DELETE par un membre — elles sont partagées entre les N membres du groupe.
+   - Nouvelle table `notification_dismissals (user_id, notification_id, dismissed_at)` avec `UNIQUE (user_id, notification_id)`, CASCADE sur `users` et `notifications`. Permet à chaque membre d'un groupe de masquer personnellement une notif partagée sans affecter les autres.
+   - RLS activée + 3 policies (SELECT/INSERT/DELETE) `user_id = app_user_id()` (coach/admin permissifs pour maintenance).
+
+2. **`src/lib/api/notifications.ts`** :
+   - Nouveau helper interne `fetchUserDismissedNotificationIds(userId)` : query `notification_dismissals` filtrée par user.
+   - `notifications_list` : exécute en parallèle la query targets et la query dismissals, puis filtre les targets dont la notification est dismissée. Transparent pour les deux consommateurs (`SwimmerHome` via `notifications-home` + `SwimmerMessagesView` via `profile-notifications`).
+   - Nouveau export `notifications_clear_all({ userId })` :
+     - Récupère les targets visibles de l'user (perso + via groupes, comme `notifications_list`).
+     - DELETE les targets personnelles (`target_user_id = userId`) — RLS autorise depuis §00139.
+     - INSERT (upsert `ignoreDuplicates`) dans `notification_dismissals` pour chaque notification_id d'une target de groupe.
+     - Renvoie `{ deleted, dismissed }` pour le toast de feedback.
+   - Fallback offline (`!canUseSupabase()`) : filtre le localStorage `NOTIFICATIONS` sur `target_user_id`.
+
+3. **`src/lib/api/index.ts` + `src/lib/api.ts`** : exportent `notifications_clear_all` au niveau top-level façade.
+
+4. **`src/components/profile/SwimmerMessagesView.tsx`** :
+   - `handleClearAll` devient `async` : dismiss local optimiste → appel serveur → invalidation des queries `profile-notifications` et `notifications-home` → reset du dismiss local (devient redondant après le clear serveur) → toast avec le bilan `{ deleted, dismissed }`.
+   - En cas d'échec serveur, le dismiss local reste en place (dégradation gracieuse) + toast destructive.
+   - Relabel du bouton : "Masquer toutes les notifications sur cet appareil" → **"Effacer toutes les notifications"**.
+
+**Fichiers modifiés** :
+- `supabase/migrations/00139_notification_clear_server_side.sql` (nouveau)
+- `src/lib/api/notifications.ts` (262 → 352 lignes, +34 %)
+- `src/lib/api/index.ts` (re-export)
+- `src/lib/api.ts` (façade + import)
+- `src/components/profile/SwimmerMessagesView.tsx` (339 → 357 lignes)
+- `CLAUDE.md` (§ Chantiers — §161)
+- `docs/ROADMAP.md` (header + chantier)
+- `docs/FEATURES_STATUS.md` (header + ligne notifications)
+- `docs/implementation-log.md` (cette entrée)
+- `docs/claude/files-map.md` (migration 00139)
+
+**Vérifications** :
+- Migration appliquée via MCP : `pg_policies` confirme 1 DELETE policy sur `notification_targets`, 3 policies sur `notification_dismissals`, `relrowsecurity = true`. ✅
+- `npx tsc --noEmit` : exit 0. ✅
+- `vitest run src/lib/__tests__/notificationsVisibility.test.ts` : 4 passes (artefact "failed suite" pré-existant, pas causé par ce patch). ✅
+- Tests RLS intégration (`npm run test:rls`) : **non lancés** — Docker non démarré au moment du patch. À lancer au prochain redémarrage de Docker (migration modifie 2 policies RLS et ajoute 3 policies sur nouvelle table → entre dans les critères obligatoires).
+
+**Décisions prises** :
+- **Table dismissals plutôt que colonne `hidden_at` sur `notification_targets`** : pour les notifs de groupe (`target_group_id`), il n'existe qu'une ligne partagée entre tous les membres. Une colonne `hidden_at` serait partagée → masquer côté nageur A masquerait aussi pour nageur B. La table séparée résout ce cas proprement.
+- **DELETE hard pour les notifs perso vs dismissal soft pour les notifs de groupe** : cohérent avec la sémantique "ma" notification (perso) vs "notre" notification (groupe). Allège la DB pour le gros du trafic (les notifs perso sont majoritaires).
+- **Pas de purge des orphelins (`notifications` sans targets)** : laissé au cron `cleanup_expired_notifications` (§00085) et au CASCADE naturel sur `notification_dismissals`. Traitement ultérieur possible si l'accumulation devient problématique.
+- **Pas de TTL `expires_at` ajouté aux triggers (§B du plan initial)** : hors scope de la demande. À considérer si l'accumulation de notifs en DB devient un problème performance (actuellement la vue Messages tire `limit: 100`).
+- **localStorage dismiss list conservé** : sert encore de cache offline optimiste (feedback UI instantané avant le round-trip serveur) et de fallback `!canUseSupabase()`. Non retiré pour ne pas régresser l'UX offline.
+
+**Limites / dette** :
+- Si un cron recrée une notification (ex: rappel quotidien wellness) **après** un clear, elle réapparaît comme une nouvelle notification — c'est le comportement attendu (ce n'est pas la notification d'hier qui revient, c'est celle d'aujourd'hui). La télémétrie utilisateur "trop de notifs" reste à adresser par §B (TTL sur triggers) ou par un débouncing coach-side.
+- La fonctionnalité "Réafficher les messages masqués" du empty state reste opérationnelle mais ne ré-affiche que les dismiss locaux (la suppression serveur est irréversible côté JS — il n'y a pas de UI pour DELETE un dismissal). Suffisant pour le use case nominal.
+- Tests RLS non lancés (Docker non démarré). À valider à la prochaine session Docker-enabled pour couvrir les régressions RLS silencieuses (type §113).

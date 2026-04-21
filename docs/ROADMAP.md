@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-21 (§160 Planification muscu — Phase 3 éditeur coach : route `/coach/strength-planning`, timeline groupe/nageur, picker séances + sheet détail, tuile Coach home ; consomme data model §157)*
+*Dernière mise à jour : 2026-04-21 (§161 Notifications nageur — nettoyage réel serveur : migration 00139 + DELETE policy notification_targets + table notification_dismissals, `notifications_clear_all` API, UI "Effacer toutes les notifications")*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -105,6 +105,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 119 | Audit sprint — sécurité edge functions + atomicité strength logs + résilience brouillons | Haute | Moyenne | Fait (§158) |
 | 120 | Fix bug §83 live — `save_strength_run_atomic` colonne `set_number` inexistante (séances muscu jamais complétées) | Critique | Faible | Fait (§159) |
 | 121 | Mon plan muscu — Phase 3 éditeur coach (/coach/strength-planning, timeline, sheets, tuile Coach) | Haute | Haute | Fait (§160) |
+| 122 | Notifications nageur — nettoyage réel serveur (DELETE targets perso + dismissals table pour group-targeted, UI relabel) | Haute | Faible | Fait (§161) |
 
 ---
 

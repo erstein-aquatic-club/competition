@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §160 (Mon plan muscu — Phase 3 éditeur coach : page `/coach/strength-planning` miroir de SwimPlanningDemo, timeline groupe/nageur avec sync URL ?athlete=<id>, picker séances searchable, sheet détail + changement/détachement/suppression, tuile Coach home. Consomme data model Phase 2 §157, pas de migration).
+Dernière entrée en date : §161 (Notifications nageur — nettoyage réel côté serveur : migration 00139 ajoute une DELETE policy sur `notification_targets` pour `target_user_id = app_user_id()` et une table `notification_dismissals` pour masquer les notifs de groupe sans affecter les autres membres ; nouvel export API `notifications_clear_all` qui DELETE les targets perso + upserts les dismissals pour les group-targeted ; `notifications_list` filtre transparent via les dismissals ; UI `SwimmerMessagesView` relabel "Effacer toutes les notifications" avec toast de bilan).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
