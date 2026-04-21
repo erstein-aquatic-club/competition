@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "sideEffects": ["**/*.css"],
   "scripts": {
     "dev": "vite dev --port 8080",
     "build": "vite build",

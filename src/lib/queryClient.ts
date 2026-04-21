@@ -48,12 +48,15 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: false, // PWA : évite refetch massif au retour avant-plan
       refetchOnReconnect: true,
-      staleTime: 5 * 60 * 1000, // 5 min — override localement pour data statique
-      gcTime: 30 * 60 * 1000, // 30 min — conserve le cache plus longtemps (offline PWA)
+      refetchOnMount: false, // cache frais suffit — évite refetch sur chaque navigation
+      staleTime: 10 * 60 * 1000, // 10 min — data métier semaine/saison, rare updates
+      gcTime: 60 * 60 * 1000, // 60 min — maximise cache offline PWA
       retry: 1,
+      networkMode: "always", // PWA : tentative même offline, fallback localStorage gère le reste
     },
     mutations: {
       retry: false,
+      networkMode: "always",
     },
   },
 });

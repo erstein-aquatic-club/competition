@@ -568,10 +568,9 @@ export async function reconcileStrengthRunLogs(params: {
   if (remoteCount >= params.logs.length) return emptyResult;
   const missing = params.logs.slice(remoteCount);
   const errors: ReconcileStrengthSetError[] = [];
-  let succeeded = 0;
-  for (const [i, log] of missing.entries()) {
-    try {
-      await logStrengthSet({
+  const results = await Promise.allSettled(
+    missing.map((log, i) =>
+      logStrengthSet({
         run_id: params.runId,
         exercise_id: log.exercise_id,
         set_index: log.set_number ?? remoteCount + i + 1,
@@ -580,17 +579,21 @@ export async function reconcileStrengthRunLogs(params: {
         difficulty: log.difficulty ?? null,
         athlete_id: params.athleteId ?? null,
         athlete_name: params.athleteName ?? null,
-      });
+      }),
+    ),
+  );
+  let succeeded = 0;
+  results.forEach((res, i) => {
+    if (res.status === "fulfilled") {
       succeeded += 1;
-    } catch (err) {
-      // Collect but don't abort — one bad set shouldn't block the others.
+    } else {
       errors.push({
         index: remoteCount + i,
-        exercise_id: log.exercise_id,
-        message: err instanceof Error ? err.message : String(err),
+        exercise_id: missing[i].exercise_id,
+        message: res.reason instanceof Error ? res.reason.message : String(res.reason),
       });
     }
-  }
+  });
   return { attempted: missing.length, succeeded, errors };
 }
 

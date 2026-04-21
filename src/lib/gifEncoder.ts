@@ -1,5 +1,3 @@
-import * as gifencModule from "gifenc";
-
 type GifencExports = {
   GIFEncoder: () => {
     writeFrame: (
@@ -15,19 +13,21 @@ type GifencExports = {
   applyPalette: (data: Uint8ClampedArray, palette: number[][]) => Uint8Array;
 };
 
-function resolveGifencExports(): GifencExports {
-  const moduleLike = gifencModule as unknown as {
+let gifencCache: GifencExports | null = null;
+
+async function loadGifenc(): Promise<GifencExports> {
+  if (gifencCache) return gifencCache;
+  const mod = (await import("gifenc")) as unknown as {
     default?: unknown;
     GIFEncoder?: unknown;
     quantize?: unknown;
     applyPalette?: unknown;
   };
-
   const candidate: unknown =
-    "GIFEncoder" in moduleLike
-      ? moduleLike
-      : moduleLike.default && typeof moduleLike.default === "object"
-        ? moduleLike.default
+    "GIFEncoder" in mod
+      ? mod
+      : mod.default && typeof mod.default === "object"
+        ? mod.default
         : null;
 
   if (
@@ -37,13 +37,12 @@ function resolveGifencExports(): GifencExports {
     "quantize" in candidate &&
     "applyPalette" in candidate
   ) {
-    return candidate as GifencExports;
+    gifencCache = candidate as GifencExports;
+    return gifencCache;
   }
 
   throw new Error("gifenc exports are unavailable in this runtime.");
 }
-
-const { GIFEncoder, quantize, applyPalette } = resolveGifencExports();
 
 export const MAX_GIF_WIDTH = 240;
 export const MAX_DURATION_S = 5;
@@ -100,11 +99,12 @@ function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
   });
 }
 
-export function encodeGif(
+export async function encodeGif(
   frames: ImageData[],
   width: number,
   height: number,
-): Blob {
+): Promise<Blob> {
+  const { GIFEncoder, quantize, applyPalette } = await loadGifenc();
   const gif = GIFEncoder();
 
   for (const frame of frames) {
@@ -127,5 +127,5 @@ export async function videoToGif(
   endS: number,
 ): Promise<Blob> {
   const { frames, width, height } = await extractFrames(video, startS, endS);
-  return encodeGif(frames, width, height);
+  return await encodeGif(frames, width, height);
 }

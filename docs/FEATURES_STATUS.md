@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-21 (§163 Notifications — cohérence textuelle (tutoiement compétition/entretien, titre "Nouvelle compétition") + auto-purge expires_at sur crons wellness matin et slot-session-reminder, migrations 00142/00143)*
+*Dernière mise à jour : 2026-04-21 (§164 Audit perf + Sprint 1 — `Promise.allSettled` sur reconcileStrengthRunLogs et push-send, defaults React Query durcis, `sideEffects: ["**/*.css"]`, lazy import gifenc, migrations 00140 FK indexes + 00141 drop indexes redondants)*
 
 ## Légende
 
@@ -303,6 +303,13 @@ Tous les feature flags sont activés.
 | Nettoyage notifications nageur | ✅ | `00139_notification_clear_server_side.sql`, `notifications.ts`, `SwimmerMessagesView.tsx` | §161 DELETE policy notification_targets + table notification_dismissals pour group-targeted + API `notifications_clear_all` + bouton "Effacer toutes les notifications" |
 | Cohérence textuelle notifications | ✅ | `00142_notification_text_alignment.sql` | §163 tutoiement aligné sur compétition/entretien + titre "Nouvelle compétition" + point final sur body compétition/entretien/wellness |
 | Auto-purge notifications crons (TTL) | ✅ | `00143_notification_auto_expire_crons.sql`, `notifications.ts` | §163 `expires_at` = J+1 sur wellness matin et slot-session-reminder + backfill 25 notifs existantes + filtrage client `expires_at <= now()` dans `notifications_list` |
+| Parallélisation reconcileStrengthRunLogs | ✅ | `src/lib/api/strength.ts` | §164 `Promise.allSettled` remplace boucle `for-await` — 20 sets séquentiels → parallèles (~×10 sur complétion séance muscu) |
+| Parallélisation push-send | ✅ | `supabase/functions/push-send/index.ts` | §164 `Promise.allSettled` sur envois webpush — 10 abonnés ~1 s → ~100 ms, 404/410 toujours collectées pour cleanup |
+| React Query defaults durcis | ✅ | `src/lib/queryClient.ts` | §164 staleTime 10 min, gcTime 60 min, refetchOnMount false, refetchOnWindowFocus false, refetchOnReconnect true, retry 1 |
+| Tree-shaking Rollup via sideEffects | ✅ | `package.json` | §164 `"sideEffects": ["**/*.css"]` — réduction bundle chunks inutilisés |
+| Lazy import gifenc | ✅ | `src/lib/gifEncoder.ts` | §164 `loadGifenc()` async + cache — ~20 KB sortent du chunk principal (chargés à la volée dans VideoTrimmer) |
+| Indexes FK planning (8) | ✅ | `00140_fk_indexes_planning_tables.sql` | §164 indexes sur FK manquantes (planned_absences, session_attendance, session_comments, strength_planning_*, swim_planning_*) |
+| Drop indexes redondants | ✅ | `00141_drop_redundant_indexes.sql` | §164 drop 2 indexes strictement couverts par UNIQUE (session_attendance_session_idx, idx_notification_dismissals_user) |
 
 ### UI/UX & Design System (Phase 6)
 

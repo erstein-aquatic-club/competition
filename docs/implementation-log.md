@@ -10967,7 +10967,7 @@ Plusieurs séances de musculation de François restaient bloquées au statut `in
 
 ---
 
-## §163 — Audit perf global + Sprint 1 optimisations (2026-04-21)
+## §164 — Audit perf global + Sprint 1 optimisations (2026-04-21)
 
 ### Contexte
 

@@ -186,26 +186,33 @@ Deno.serve(async (req) => {
     }
 
     const pushPayload = JSON.stringify({ title, body, url: url || "#/" });
-    let sent = 0;
     const expiredIds: string[] = [];
 
-    for (const sub of subscriptions) {
-      try {
-        await webpush.sendNotification(
+    const results = await Promise.allSettled(
+      subscriptions.map((sub) =>
+        webpush.sendNotification(
           {
             endpoint: sub.endpoint,
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
           pushPayload
-        );
+        )
+      )
+    );
+
+    let sent = 0;
+    results.forEach((res, idx) => {
+      if (res.status === "fulfilled") {
         sent++;
-      } catch (err: any) {
-        console.error(`[push] Error sending to ${sub.endpoint}:`, err.statusCode || err.message);
-        if (err.statusCode === 404 || err.statusCode === 410) {
+      } else {
+        const sub = subscriptions[idx];
+        const err = res.reason as any;
+        console.error(`[push] Error sending to ${sub.endpoint}:`, err?.statusCode || err?.message);
+        if (err?.statusCode === 404 || err?.statusCode === 410) {
           expiredIds.push(sub.id);
         }
       }
-    }
+    });
 
     if (expiredIds.length > 0) {
       await supabase.from("push_subscriptions").delete().in("id", expiredIds);
