@@ -17,6 +17,8 @@ export type QueuedMutation = {
   lastAttemptAt?: number;
 };
 
+export const QUEUE_UPDATED_EVENT = "eac-offline-queue-updated";
+
 export function enqueue(type: string, payload: Record<string, unknown>) {
   const queue = getQueue();
   queue.push({
@@ -27,6 +29,7 @@ export function enqueue(type: string, payload: Record<string, unknown>) {
     retryCount: 0,
   });
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  window.dispatchEvent(new CustomEvent(QUEUE_UPDATED_EVENT));
 }
 
 /**

@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
-import { getQueue, markRetry, removeQueueItem, type QueuedMutation } from "@/lib/offlineQueue";
+import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, type QueuedMutation } from "@/lib/offlineQueue";
 import { supabase } from "@/lib/supabase";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useAuth } from "@/lib/auth";
@@ -86,90 +86,83 @@ export function OfflineMutationSync() {
   const queryClient = useQueryClient();
   const isSyncingRef = useRef(false);
 
-  useEffect(() => {
-    if (!isOnline || !user || !canUseSupabase() || isSyncingRef.current) {
-      return;
-    }
+  const runSync = useCallback(async () => {
+    if (!isOnline || !user || !canUseSupabase() || isSyncingRef.current) return;
 
     const queue = getQueue();
-    if (queue.length === 0) {
-      return;
-    }
+    if (queue.length === 0) return;
 
-    let cancelled = false;
+    isSyncingRef.current = true;
+    let syncedCount = 0;
+    let poisonedCount = 0;
+    let lastError: unknown = null;
 
-    const syncQueuedMutations = async () => {
-      isSyncingRef.current = true;
-      let syncedCount = 0;
-      let poisonedCount = 0;
-      let lastError: unknown = null;
-
-      try {
-        // Per-item try/catch: a failing mutation must not block the rest
-        // of the queue. After MAX_RETRY_ATTEMPTS consecutive failures
-        // markRetry() drops the item as "poisoned" so the queue drains.
-        for (const mutation of queue) {
-          if (cancelled) break;
-
-          if (!isQueuedStrengthCompletion(mutation)) {
-            console.warn("[offline-sync] Unsupported queued mutation:", mutation.type);
-            removeQueueItem(mutation.id);
-            continue;
-          }
-
-          try {
-            await replayStrengthCompletion(mutation.payload);
-            removeQueueItem(mutation.id);
-            syncedCount += 1;
-          } catch (itemError) {
-            lastError = itemError;
-            console.error(
-              `[offline-sync] Replay failed for ${mutation.id} (${mutation.type}):`,
-              itemError,
-            );
-            const dropped = markRetry(mutation.id);
-            if (dropped) poisonedCount += 1;
-          }
+    try {
+      for (const mutation of queue) {
+        if (!isQueuedStrengthCompletion(mutation)) {
+          console.warn("[offline-sync] Unsupported queued mutation:", mutation.type);
+          removeQueueItem(mutation.id);
+          continue;
         }
 
-        if (!cancelled && syncedCount > 0) {
-          queryClient.invalidateQueries({ queryKey: ["strength_history"] });
-          queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress"] });
-          queryClient.invalidateQueries({ queryKey: ["assignments"] });
-          queryClient.invalidateQueries({ queryKey: ["1rm"] });
-          queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-          toast({
-            title: "Données synchronisées",
-            description: `${syncedCount} séance(s) hors ligne ont été enregistrée(s).`,
-          });
+        try {
+          await replayStrengthCompletion(mutation.payload);
+          removeQueueItem(mutation.id);
+          syncedCount += 1;
+        } catch (itemError) {
+          lastError = itemError;
+          console.error(
+            `[offline-sync] Replay failed for ${mutation.id} (${mutation.type}):`,
+            itemError,
+          );
+          const dropped = markRetry(mutation.id);
+          if (dropped) poisonedCount += 1;
         }
-
-        if (!cancelled && poisonedCount > 0) {
-          toast({
-            title: "Synchronisation partielle",
-            description: `${poisonedCount} séance(s) n'ont pas pu être synchronisées après plusieurs tentatives et ont été abandonnées.`,
-            variant: "destructive",
-          });
-        } else if (!cancelled && lastError && syncedCount === 0) {
-          toast({
-            title: "Synchronisation en attente",
-            description: lastError instanceof Error
-              ? lastError.message
-              : "Impossible de synchroniser les données hors ligne pour le moment.",
-            variant: "destructive",
-          });
-        }
-      } finally {
-        isSyncingRef.current = false;
       }
-    };
 
-    void syncQueuedMutations();
+      if (syncedCount > 0) {
+        queryClient.invalidateQueries({ queryKey: ["strength_history"] });
+        queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress"] });
+        queryClient.invalidateQueries({ queryKey: ["assignments"] });
+        queryClient.invalidateQueries({ queryKey: ["1rm"] });
+        queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
+        toast({
+          title: "Données synchronisées",
+          description: `${syncedCount} séance(s) hors ligne ont été enregistrée(s).`,
+        });
+      }
 
-    return () => {
-      cancelled = true;
-    };
+      if (poisonedCount > 0) {
+        toast({
+          title: "Synchronisation partielle",
+          description: `${poisonedCount} séance(s) n'ont pas pu être synchronisées après plusieurs tentatives et ont été abandonnées.`,
+          variant: "destructive",
+        });
+      } else if (lastError && syncedCount === 0) {
+        toast({
+          title: "Synchronisation en attente",
+          description: lastError instanceof Error
+            ? lastError.message
+            : "Impossible de synchroniser les données hors ligne pour le moment.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      isSyncingRef.current = false;
+    }
   }, [isOnline, queryClient, toast, user]);
+
+  // Replay on network/auth state changes (back online, login)
+  useEffect(() => {
+    void runSync();
+  }, [runSync]);
+
+  // Replay immediately when an item is enqueued while already online
+  useEffect(() => {
+    const handleQueueUpdated = () => { void runSync(); };
+    window.addEventListener(QUEUE_UPDATED_EVENT, handleQueueUpdated);
+    return () => window.removeEventListener(QUEUE_UPDATED_EVENT, handleQueueUpdated);
+  }, [runSync]);
 
   return null;
 }
