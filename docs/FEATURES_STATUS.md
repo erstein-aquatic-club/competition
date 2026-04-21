@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-21 (§161 Notifications nageur — nettoyage réel serveur : DELETE policy notification_targets + table notification_dismissals + API notifications_clear_all)*
+*Dernière mise à jour : 2026-04-21 (§163 Notifications — cohérence textuelle (tutoiement compétition/entretien, titre "Nouvelle compétition") + auto-purge expires_at sur crons wellness matin et slot-session-reminder, migrations 00142/00143)*
 
 ## Légende
 
@@ -301,6 +301,8 @@ Tous les feature flags sont activés.
 | Push toggle dans Profil | ✅ | `Profile.tsx` | Activer/désactiver depuis la page profil |
 | VAPID keys config | ✅ | `pushConfig.ts`, `pages.yml` | GitHub Secrets + Supabase Secrets |
 | Nettoyage notifications nageur | ✅ | `00139_notification_clear_server_side.sql`, `notifications.ts`, `SwimmerMessagesView.tsx` | §161 DELETE policy notification_targets + table notification_dismissals pour group-targeted + API `notifications_clear_all` + bouton "Effacer toutes les notifications" |
+| Cohérence textuelle notifications | ✅ | `00142_notification_text_alignment.sql` | §163 tutoiement aligné sur compétition/entretien + titre "Nouvelle compétition" + point final sur body compétition/entretien/wellness |
+| Auto-purge notifications crons (TTL) | ✅ | `00143_notification_auto_expire_crons.sql`, `notifications.ts` | §163 `expires_at` = J+1 sur wellness matin et slot-session-reminder + backfill 25 notifs existantes + filtrage client `expires_at <= now()` dans `notifications_list` |
 
 ### UI/UX & Design System (Phase 6)
 

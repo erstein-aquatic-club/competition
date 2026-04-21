@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §162 (Bugfix séances muscu bloquées "en cours" — `enqueue()` dispatche maintenant `eac-offline-queue-updated` ; `OfflineMutationSync` écoute cet événement pour rejouer la queue immédiatement sans attendre une transition réseau ; data fix SQL runs 51-54 François ; migration 00138 `save_strength_run_atomic` appliquée).
+Dernière entrée en date : §163 (Notifications — cohérence textuelle et auto-purge crons. Phase 1 migration 00140 : triggers `auto_notify_competition_assignment` → titre `Nouvelle compétition` + body tutoiement, `auto_notify_interview_created`/`_transition` en tutoiement. Phase 2 migration 00141 : `send_wellness_morning_push` et cron `slot-session-reminder` posent `expires_at = CURRENT_DATE + 1 day` ; backfill 25 notifs existantes ; `notifications_list` filtre côté client `expires_at <= now()` pour masquage immédiat en complément du cron `cleanup-notifications` hebdo).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

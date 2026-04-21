@@ -10964,3 +10964,201 @@ Plusieurs séances de musculation de François restaient bloquées au statut `in
 ### Limites / dette
 
 - Le `catch` dans `onFinish` ne distingue pas "vraiment offline" de "erreur réseau transitoire online". Si l'erreur est persistante (ex : token expiré), le replay va échouer 5× puis l'item sera "poisoned" et abandonné silencieusement. À améliorer : détecter les erreurs d'auth et afficher un message explicite.
+
+---
+
+## §163 — Audit perf global + Sprint 1 optimisations (2026-04-21)
+
+### Contexte
+
+Audit end-to-end de l'app demandé par l'utilisateur pour améliorer fluidité et temps de
+chargement. Cinq sous-agents en parallèle (bundle/deps, React Query, rendering, DB
+Supabase via MCP, Edge Functions/réseau). Rapports consolidés en plan priorisé ;
+exécution du Sprint 1 "gains immédiats, risque quasi-nul".
+
+### Changements
+
+1. **`src/lib/api/strength.ts` — `reconcileStrengthRunLogs` parallélisée**
+   (lignes 567-599). La boucle `for-await` sur `logStrengthSet` devenait un vrai
+   goulot pour la complétion d'une séance muscu (20 sets ⇒ 20 RTT séquentiels).
+   Remplacée par `Promise.allSettled(missing.map(…))`. La collecte d'erreurs
+   conserve l'index original (offset `remoteCount + i`), donc le comportement
+   vis-à-vis du caller est inchangé : un set en échec n'aborte pas la suite, et
+   le gain attendu est ×10 sur séance complète.
+
+2. **`supabase/functions/push-send/index.ts` — envois push parallélisés**
+   (lignes 188-215). `for-await` remplacée par `Promise.allSettled`. Les 404/410
+   (subscription expirée) sont toujours collectées pour nettoyage DB. Gain ~×N
+   linéaire sur le nombre d'abonnés (10 abonnés : ~1 s → ~100 ms).
+
+3. **`src/lib/queryClient.ts` — defaults React Query remontés**
+   - `staleTime` 5 min → 10 min (data métier semaine/saison, rare updates)
+   - `gcTime` 30 min → 60 min (PWA offline, maximise cache)
+   - `refetchOnMount: false` ajouté (évite refetch à chaque navigation)
+   - `networkMode: "always"` pour queries et mutations (PWA : le fallback
+     localStorage gère l'offline, pas React Query)
+
+4. **`package.json` — `"sideEffects": ["**/*.css"]`**. Permet à Rollup d'être
+   plus agressif en tree-shaking : seuls les CSS sont déclarés avec effets
+   de bord. Les imports top-level non-CSS deviennent éligibles à l'élimination
+   si leurs exports ne sont jamais consommés.
+
+5. **`src/lib/gifEncoder.ts` — `gifenc` lazy-chargé**. L'import top-level
+   `import * as gifencModule from "gifenc"` forçait le chunk gifenc (~20 KB
+   gzip) à être chargé dès l'ouverture de `MediaSourceSheet` coach, même si
+   l'utilisateur ne trimait jamais une vidéo. Refactoré en `loadGifenc()`
+   async avec cache interne. `encodeGif` et `videoToGif` sont devenues `async`
+   ; seul consommateur `VideoTrimmer` était déjà dans un callback async.
+
+6. **Migration 00140 `fk_indexes_planning_tables`** (appliquée via MCP).
+   Ajoute 8 indexes FK leading manquants signalés par l'advisor :
+   `planned_absences.training_slot_id`, `session_attendance.recorded_by`,
+   `session_comments.author_user_id`, `session_comments.recorded_by`,
+   `strength_planning_slot_overrides.session_template_id`,
+   `strength_planning_slots.session_template_id`,
+   `swim_planning_slot_overrides.recorded_by`,
+   `swim_planning_slots.recorded_by`. Tables toutes < 100 rows, donc
+   `CREATE INDEX` sans `CONCURRENTLY` acceptable.
+
+7. **Migration 00141 `drop_redundant_indexes`** (appliquée via MCP). Drop
+   de 2 indexes strictement couverts par des UNIQUE constraints en
+   leading-column :
+   - `session_attendance_session_idx` couvert par UNIQUE(session_id, athlete_id)
+   - `idx_notification_dismissals_user` couvert par UNIQUE(user_id, notification_id)
+
+   L'audit initial suggérait d'en dropper plus, mais vérification table
+   par table : les autres `idx_scan=0` sont des FK indexes ou composites
+   spécifiques utiles dès remplissage — on les garde.
+
+### Décisions
+
+- **`Promise.allSettled` vs `Promise.all`** dans strength et push-send : on
+  ne veut pas qu'un set (ou une subscription) en échec fasse avorter les
+  autres. Le comportement résultant est équivalent à celui de la boucle
+  `try/catch` d'origine, mais en parallèle.
+- **`sideEffects` whitelist CSS plutôt que `false`** : les imports de `.css`
+  ont des effets globaux (injection de styles) et ne doivent jamais être
+  tree-shakés. Tout le reste du code projet est pur (pas de polyfill ou
+  d'init globale hors `src/main.tsx`, qui est l'entry point donc non
+  concerné par tree-shaking).
+- **Refactor gifenc sync → async** accepté : seul `VideoTrimmer.tsx:57` le
+  consomme et déjà dans un `await videoToGif(…)` async.
+- **Pas de `CREATE INDEX CONCURRENTLY`** : `apply_migration` Supabase MCP
+  exécute dans une transaction. Sur des tables < 100 rows, le lock est
+  de quelques ms — non-bloquant.
+- **Migration 00141 (et non 00143)** : numéro suivant naturel dans la
+  séquence après 00140, le plan initial évoquait 00143 par simple défaut.
+
+### QW abandonnées après vérification
+
+- **QW7 stabilisation queryKey Dashboard/Coach** : inspection montre que
+  les keys sont déjà stables. `user: string | null`, `userId: number | null`
+  (primitifs), `monday/sunday` via `const now = useMemo(() => new Date(), [])`
+  (deps vides, stable). Rien à corriger.
+- **QW8 `refetchOnMount:false` explicite par query** : devient redondant
+  avec le `refetchOnMount:false` global dans `queryClient.ts`.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/api/strength.ts` | `reconcileStrengthRunLogs` → Promise.allSettled |
+| `supabase/functions/push-send/index.ts` | envois push → Promise.allSettled |
+| `src/lib/queryClient.ts` | staleTime/gcTime/refetchOnMount/networkMode |
+| `package.json` | `"sideEffects": ["**/*.css"]` |
+| `src/lib/gifEncoder.ts` | lazy-load `gifenc`, `encodeGif` async |
+| `supabase/migrations/00140_fk_indexes_planning_tables.sql` | 8 indexes FK (nouveau) |
+| `supabase/migrations/00141_drop_redundant_indexes.sql` | 2 drops (nouveau) |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur. ✅
+- Tests RLS : non concernés — les migrations 00140/00141 ne touchent
+  ni policies ni `ENABLE/DISABLE ROW LEVEL SECURITY`. Conformément à
+  la règle d'usage §121, on ne lance pas `npm run test:rls`.
+- Build local non lancé (pas de credentials Supabase en local, cf.
+  CLAUDE.md § Déploiement). Vérification en pré-prod via GH Actions.
+
+### Limites / dette résiduelle
+
+- Le plan complet identifie 4 sprints. Sprint 1 livre les gains
+  "frictionless" ; restent ouverts :
+  - **Sprint 2** : index cron `assignment_reminder`, wrap RLS initplan
+    batch 2, projections `.select()`, lazy Recharts.
+  - **Sprint 3** : RPC consolidées (`get_dashboard_briefing`), service
+    worker tuning, virtualisation des listes longues.
+  - **Sprint 4** : FFN cache DB, wrapper global Framer Motion, RPC
+    coach/admin.
+- Le service worker n'a PAS été retouché ici. Les nouveaux `staleTime`
+  ne prennent effet que quand le cache existant est invalidé (ou lors
+  d'un nouveau chargement). Hard refresh recommandé après déploiement
+  pour benchmarks.
+
+## §163 — Audit textes notifications + cohérence éditoriale + auto-purge crons (2026-04-21)
+
+**Branche** : `main`
+**Chantier ROADMAP** : §163 — Notifications — cohérence textuelle + TTL sur crons
+
+### Contexte — Pourquoi ce patch
+
+Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence** (ton/format) et **pertinence** (bruit). Diagnostic :
+
+1. **Ton hétérogène** : wellness matin et rappel séance tutoient (« Comment te sens-**tu** »), tandis que compétition et entretien vouvoient (« **Vous** êtes inscrit(e) »). Même nageur, même vue, deux registres → langue non maîtrisée.
+2. **Titre #4 trop vague** : `Compétition` seul, sans verbe d'action, alors que tous les autres labels signalent l'événement (`Créneau annulé`, `Nouvelle séance natation`).
+3. **Deux crons à gros volume sans TTL** : `Comment te sens-tu ce matin ?` (quotidien 04h UTC) et `Séance terminée ?` (toutes les 15 min, 30 min avant fin de slot) créaient des notifs sans `expires_at`, donc jamais purgées par le cron `cleanup-notifications` (qui ne touche que les notifs expirées depuis > 30 j). Un nageur actif accumulait facilement 10–15 lignes de bruit avant d'effacer manuellement.
+
+### Changements réalisés
+
+**Phase 1 — Cohérence textuelle (migration 00140)**
+
+- `auto_notify_competition_assignment()` : titre `Compétition` → **`Nouvelle compétition`**, body en tutoiement (« **Tu es** inscrit(e) à X le DD/MM. ») + point final.
+- `auto_notify_interview_created()` : body « attend **ta** contribution. » (tutoiement).
+- `auto_notify_interview_transition()` : body « **Ton** entretien est prêt pour relecture et signature. » (tutoiement).
+- URLs metadata `/suivi/entretiens` conservées (acquis §104).
+
+**Phase 2 — Auto-purge via `expires_at` (migration 00141)**
+
+- `send_wellness_morning_push()` : insère avec `expires_at = (CURRENT_DATE + 1 day)::timestamptz` → la notif disparaît de la vue nageur dès le lendemain 00:00 UTC (≈ 02:00 CEST).
+- Cron `slot-session-reminder` réécrit avec `expires_at = (CURRENT_DATE + 1 day)::timestamptz` → la notif ne survit pas à la nuit.
+- Body wellness enrichi d'un point final (`Remplis ton bien-être en 30 secondes.`).
+- **Backfill** : 25 notifs existantes (wellness + séance terminée) sans `expires_at` se voient attribuer `created_at + 1 day` → masquées immédiatement côté client après déploiement, purgées par le cron `cleanup-notifications` > 30 jours après.
+
+**Phase 3 — Filtrage expiré côté API (client)**
+
+- `notifications_list()` : dans la branche Supabase, ajoute `if (notif.expires_at && Date.parse(notif.expires_at) <= nowMs) return false;` lors du filtrage (après le filtre dismissals). Garantit que l'UX reflète le masquage **immédiatement**, sans attendre le cron hebdo de cleanup.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00142_notification_text_alignment.sql` (nouveau, 94 lignes) | Triggers compétition + entretien, ton tutoiement |
+| `supabase/migrations/00143_notification_auto_expire_crons.sql` (nouveau, 124 lignes) | `expires_at` sur crons wellness + slot-reminder + backfill + body point final |
+| `src/lib/api/notifications.ts` (352 → 359 lignes) | Filtre `expires_at <= now()` dans `notifications_list` |
+| `docs/implementation-log.md` | Entrée §163 |
+| `docs/ROADMAP.md` | Header + ligne §163 |
+| `docs/FEATURES_STATUS.md` | Ligne "purge auto crons" §79 |
+| `CLAUDE.md` | § Chantiers — §163 |
+| `docs/claude/files-map.md` | Nouvelles migrations + taille notifications.ts |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0, aucune erreur. ✅
+- `vitest run src/lib/api/__tests__` : 21/21 tests passent. Les 7 « suites failed » sont des fichiers pré-existants sans `describe` (pas introduits par ce patch). ✅
+- Vérification MCP post-migration :
+  - `cron.job` : `slot-session-reminder` (`*/15 * * * *`), `wellness-morning-push` (`0 4 * * *`), `cleanup-notifications` (`0 3 * * 0`) tous présents. ✅
+  - Backfill : `SELECT COUNT(*) ... WHERE expires_at IS NOT NULL AND (type='wellness' OR ...)` = 25. ✅
+- Tests RLS : non lancés — patch touche uniquement des fonctions trigger/cron + logique JS de filtrage, **aucune policy RLS modifiée**, donc hors critères `§ Tests RLS` de CLAUDE.md.
+
+### Décisions prises
+
+- **Tutoiement partout** plutôt que vouvoiement : l'app tutoyait déjà dans 70 % des canaux (home, formulaire wellness, toasts). Harmoniser vers la minorité (vouvoiement) aurait été un travail de rebranding plus large que ce patch.
+- **`expires_at = CURRENT_DATE + 1 day`** plutôt que « fin de journée précise » : plus simple, évite les pièges de timezone (serveur UTC vs CEST). La notif wellness émise à 04:00 UTC expire à 00:00 UTC J+1 → visible pendant ~20 h, ce qui couvre toute la journée utile. La notif séance (émise 30 min avant fin de slot) expire à 00:00 UTC J+1 → visible quelques heures max, objectif rempli.
+- **Filtrage client au lieu de `WHERE` serveur** : l'OR supabase-js sur notification_targets avec joint inner `notifications` rend le `.or(...)` imbriqué complexe. Le filtrage JS post-fetch est acceptable car les lots restent petits (< 200 lignes après le limit RLS, et backfill déjà appliqué).
+- **Backfill 25 notifs** : sans ce UPDATE, les notifs existantes continuaient à apparaître jusqu'au cleanup hebdo. Avec backfill, disparition immédiate côté utilisateur après reload.
+- **Gating ciblage wellness non implémenté** : l'audit recommandait aussi de limiter les wellness aux nageurs avec séance prévue J+1. Écarté pour ce chantier : (1) change la sémantique (devient conditionnel → l'objectif pédagogique du bien-être quotidien n'est pas lié qu'aux jours de séance), (2) nécessite discussion produit. Le TTL + cosmétique traitent déjà la plainte principale (surcharge visuelle).
+
+### Limites / dette
+
+- **Les notifs `Créneau annulé` et `Nouvelle séance` n'ont pas encore d'`expires_at`** : pas dans le scope §163 (faible volume, 1 événement = 1 notif, peu de bruit accumulé). À ajouter plus tard si l'audit UX le révèle nécessaire (expire par ex. `scheduled_date + 1 day`).
+- **Les bodies ont des ponctuations mixtes** (certains terminent par `.`, d'autres non) : seulement wellness/compétition/entretien alignés avec point final, les autres (créneau, séance assignée, séance terminée) gardent leur forme actuelle. Détail cosmétique mineur, pas prioritaire.
+- **Pas de test E2E UX** : vérifier post-déploiement que les anciennes notifs wellness/séance disparaissent effectivement de la vue nageur après un reload.

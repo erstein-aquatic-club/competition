@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-21 (§162 Bugfix séances muscu bloquées en cours — CustomEvent queue offline + data fix SQL runs 51-54 + migration 00138 appliquée)*
+*Dernière mise à jour : 2026-04-21 (§163 Notifications — cohérence textuelle (tutoiement compétition/entretien, titre "Nouvelle compétition") + auto-purge expires_at sur crons wellness matin et slot-session-reminder, migrations 00140/00141 appliquées)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -107,6 +107,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 121 | Mon plan muscu — Phase 3 éditeur coach (/coach/strength-planning, timeline, sheets, tuile Coach) | Haute | Haute | Fait (§160) |
 | 122 | Notifications nageur — nettoyage réel serveur (DELETE targets perso + dismissals table pour group-targeted, UI relabel) | Haute | Faible | Fait (§161) |
 | 123 | Bugfix séances muscu bloquées "en cours" — queue offline rejoue immédiatement via CustomEvent (OfflineMutationSync) + data fix SQL + migration 00138 | Critique | Faible | Fait (§162) |
+| 124 | Notifications — audit textuel + tutoiement (compétition/entretien) + titre `Nouvelle compétition` + `expires_at` auto-purge sur crons wellness matin et slot-session-reminder (migrations 00140/00141) | Haute | Faible | Fait (§163) |
 
 ---
 

@@ -177,9 +177,16 @@ export async function notifications_list(options: {
       fetchUserDismissedNotificationIds(options.targetUserId ?? null),
     ]);
     if (error) throw new Error(error.message);
+    const nowMs = Date.now();
     const filteredTargets = (rawTargets ?? []).filter((t: any) => {
-      const notifId = t?.notifications?.id;
-      return notifId == null || !dismissedIds.has(notifId);
+      const notif = t?.notifications;
+      if (!notif) return true;
+      if (dismissedIds.has(notif.id)) return false;
+      if (notif.expires_at) {
+        const expiresMs = Date.parse(notif.expires_at);
+        if (Number.isFinite(expiresMs) && expiresMs <= nowMs) return false;
+      }
+      return true;
     });
     const mapped = filteredTargets.map((t: any) => {
       const notif = t.notifications || {};
