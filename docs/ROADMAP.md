@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-20 (§159 Fix live bug §83 : `save_strength_run_atomic` référence colonne inexistante `set_number` → séances jamais marquées complétées ; migration 00138 corrige `set_index`, clé 1RM `weight`, ajoute authz + corrige aussi `get_strength_run_summary` 00082)*
+*Dernière mise à jour : 2026-04-21 (§160 Planification muscu — Phase 3 éditeur coach : route `/coach/strength-planning`, timeline groupe/nageur, picker séances + sheet détail, tuile Coach home ; consomme data model §157)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -104,6 +104,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 118 | Mon plan muscu — Phase 2 data model BDD + refactor MyPlanTab | Haute | Haute | Fait (§157) |
 | 119 | Audit sprint — sécurité edge functions + atomicité strength logs + résilience brouillons | Haute | Moyenne | Fait (§158) |
 | 120 | Fix bug §83 live — `save_strength_run_atomic` colonne `set_number` inexistante (séances muscu jamais complétées) | Critique | Faible | Fait (§159) |
+| 121 | Mon plan muscu — Phase 3 éditeur coach (/coach/strength-planning, timeline, sheets, tuile Coach) | Haute | Haute | Fait (§160) |
 
 ---
 

@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-20 (§159 Fix live bug §83 — `save_strength_run_atomic` colonne `set_number` inexistante, séances muscu jamais marquées complétées)*
+*Dernière mise à jour : 2026-04-21 (§160 Mon plan muscu — Phase 3 éditeur coach : route `/coach/strength-planning`, timeline groupe/nageur, picker séances, sheets, tuile Coach home)*
 
 ## Légende
 
@@ -105,7 +105,8 @@ Tous les feature flags sont activés.
 | Dossiers exercices | ✅ | `StrengthCatalog.tsx`, `FolderSection.tsx`, `MoveToFolderPopover.tsx` | Même système que séances, types séparés (§32) |
 | Assignation | ✅ | `CoachAssignScreen.tsx` | Via écran d'assignation partagé |
 | Dossiers par nageur (hiérarchiques) | ✅ | `StrengthCatalog.tsx`, `FolderSection.tsx`, `CopyToAthleteDialog.tsx` | Filtre nageur, dossiers 2 niveaux (cycle → séances), copie inter-nageurs, assignation rapide (§90) |
-| Vue nageur Mon plan muscu | ✅ | `MyPlanTab.tsx`, `MyPlanWeekCard.tsx`, `MyPlanSessionSheet.tsx`, `Strength.tsx`, `strengthPlanningMerge.ts`, `strength-planning.ts` | Timeline hebdomadaire ISO collapse/expand, badge phase, Sheet aperçu séance, intégration compétitions. Phase 2 (§157) : données depuis `strength_planning_slot_overrides` BDD (backfill 32 overrides) avec fallback cycles Phase 1. Éditeur coach (Phase 3) à venir. |
+| Vue nageur Mon plan muscu | ✅ | `MyPlanTab.tsx`, `MyPlanWeekCard.tsx`, `MyPlanSessionSheet.tsx`, `Strength.tsx`, `strengthPlanningMerge.ts`, `strength-planning.ts` | Timeline hebdomadaire ISO collapse/expand, badge phase, Sheet aperçu séance, intégration compétitions. Phase 2 (§157) : données depuis `strength_planning_slot_overrides` BDD (backfill 32 overrides) avec fallback cycles Phase 1. |
+| Éditeur coach planif. muscu | ✅ | `StrengthPlanningScreen.tsx`, `StrengthPlanningTimeline.tsx`, `useStrengthPlanningAthleteMode.ts`, `Coach.tsx` | Route `/coach/strength-planning` miroir `SwimPlanningDemo` : timeline groupe/nageur avec sync URL `?athlete=<id>`, picker séances searchable, sheet détail (changer/détacher/supprimer), sheet compétitions, tuile "Planif. Muscu" dans Coach home (§160) |
 | Dashboard coach | ✅ | `Coach.tsx` | Mobile first, KPI unifié, grille 2x2 avec compteurs, cards nageurs (§35) |
 | Calendrier coach | ✅ | `CoachCalendar.tsx`, `useCoachCalendarState.ts` | Vue mensuelle assignations, filtre groupe/nageur, 3 slots éditables inline (Nage Matin, Nage Soir, Muscu), indicateur musculation DayCell (§53, §54) |
 

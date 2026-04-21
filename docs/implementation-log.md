@@ -10747,10 +10747,47 @@ Exécution : plan de 10 tâches (voir `docs/plans/2026-04-18-coach-individual-sw
 **Side-discovery (hors scope, à tracker séparément) :**
 - Migration 00083 `save_strength_run_atomic` écrit dans une colonne `set_number` qui n'existe pas en prod (colonne réelle = `set_index`). Cette RPC est probablement cassée depuis §83. À investiguer dans un chantier dédié.
 
+---
+
+## §160 — Planification muscu : Phase 3 — Éditeur coach (2026-04-20)
+
+**Chantier ROADMAP :** §160 — Strength planning Phase 3 (éditeur coach)
+
+**Contexte :** Phase 2 (§157) a posé le data model BDD (4 tables, RLS, API, merge helpers). Phase 3 livre l'éditeur coach : page `/coach/strength-planning` miroir structurel de `SwimPlanningDemo.tsx`, permettant au coach de créer/modifier/supprimer des slots de séances de musculation par groupe ou par nageur (mode override).
+
+**Changements réalisés :**
+1. `src/hooks/coach/useStrengthPlanningAthleteMode.ts` — hook miroir de `useSwimPlanningAthleteMode.ts` avec API strength (sélection athlète, merge slots/weekMeta, mutations routées groupe vs athlète, sync URL ?athlete=<id>).
+2. `src/components/coach/strength/StrengthPlanningTimeline.tsx` — composant présentationnel miroir de `SwimPlanningTimeline.tsx` avec chips session (nom tronqué + dot phase via `detectPhase`/`PHASE_STYLES`) au lieu de chips filière, 7 jours (DAY_ROWS partagé avec swim), badge "Perso" overridden.
+3. `src/pages/coach/StrengthPlanningScreen.tsx` — page coach complète : header groupe/nageur, infinite scroll via IntersectionObserver, picker sessions (searchable, filtré sur templates avec items), sheet détail (liste exercices + notes + changer/détacher/supprimer), sheet compétitions.
+4. `src/App.tsx` — route `/coach/strength-planning` ajoutée (lazy + `lazyWithRetry`).
+5. `src/pages/Coach.tsx` — tile "Planif. Muscu" (icône Dumbbell, violet) ajoutée dans le quickAccess du CoachHome ; `onOpenStrengthPlanning` propagé.
+
+**Fichiers modifiés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/hooks/coach/useStrengthPlanningAthleteMode.ts` | Créé (460 l.) |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Créé (749 l.) |
+| `src/pages/coach/StrengthPlanningScreen.tsx` | Créé (1074 l.) |
+| `src/App.tsx` | Modifié — ajout import lazy + route |
+| `src/pages/Coach.tsx` | Modifié — ajout tile + prop + import Dumbbell |
+
+**Tests :**
+- `npx tsc --noEmit` — 0 erreur ✅
+- `npm test` — 280 pass / 0 fail (pas de régression) ✅
+- `npm run test:rls` — non exécuté (pas de nouvelle policy RLS — consomme §157)
+
+**Décisions / trade-offs :**
+- Catalogage sessions : regroupement par `folder_id` optionnel — V1 liste plate avec recherche, hiérarchie visible si plusieurs folders.
+- `changeSessionMode` : booléen d'état local dans la page pour réutiliser le même sheet picker depuis la vue détail sans ouvrir 2 sheets simultanément.
+- Suppression "Détacher" séparée de "Supprimer" : `Détacher` = keepe le slot mais vide le `session_template_id`; "Supprimer" = deleteSlot. Cohérent avec le design doc §6.5.
+- `loadingMoreRef` guard ajouté (pattern swim §228-247) pour éviter les rafraîchissements multiples sur l'IntersectionObserver.
+- Pas de tests unit sur le hook/timeline : les tests swim existants couvrent le pattern, les variations muscu sont triviales (renommage de champs). À ajouter dans un chantier dédié si régression.
+
 **Limites / dette :**
-- Pas de test E2E pour les Edge Functions fixées (le harness RLS ne couvre pas les Edge Functions). Smoke test manuel recommandé post-deploy avec JWT athlète + body `user_id` forgé → doit être ignoré côté serveur.
-- Restore-on-mount des brouillons n'est pas testé en E2E ; la shape `DraftState` de `FeedbackDrawer` doit être re-vérifiée si le parent refactore.
-- `save_strength_run_atomic` (§83) cassé — non fixé.
+- Picker sessions : regroupement par folder non implémenté (V1 liste plate). Amélioration possible V2.
+- Copie de semaine : hors scope (design doc §3).
+- Drag & drop : hors scope (design doc §12).
 
 ---
 

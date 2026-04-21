@@ -92,6 +92,7 @@ const SwimSessionView = lazyWithRetry(() => import("@/pages/SwimSessionView"));
 const SharedSwimSession = lazyWithRetry(() => import("@/pages/SharedSwimSession"));
 const CoachSwimmerDetail = lazyWithRetry(() => import("@/pages/coach/CoachSwimmerDetail"));
 const SwimPlanningDemo = lazyWithRetry(() => import("@/pages/coach/SwimPlanningDemo"));
+const StrengthPlanningScreen = lazyWithRetry(() => import("@/pages/coach/StrengthPlanningScreen"));
 const CompetitionDetail = lazyWithRetry(() => import("@/pages/CompetitionDetail"));
 const SwimNotes = lazyWithRetry(() => import("@/pages/SwimNotes"));
 const MonthlyReport = lazyWithRetry(() => import("@/pages/MonthlyReport"));
@@ -278,6 +279,7 @@ function AppRouter() {
             <Route path="/competition/:id" component={CompetitionDetail} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
             <Route path="/coach/swim-planning" component={SwimPlanningDemo} />
+            <Route path="/coach/strength-planning" component={StrengthPlanningScreen} />
             <Route path="/coach" component={Coach} />
             <Route path="/admin" component={Admin} />
             <Route path="/administratif" component={Administratif} />

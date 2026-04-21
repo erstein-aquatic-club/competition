@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §159 (fix live bug §83 — `save_strength_run_atomic` écrivait dans colonne inexistante `set_number` → séances jamais marquées complétées ; migration 00138 corrige `set_index`, aligne 1RM sur clé `weight`, ajoute authz, corrige aussi `get_strength_run_summary` en 00082).
+Dernière entrée en date : §160 (Mon plan muscu — Phase 3 éditeur coach : page `/coach/strength-planning` miroir de SwimPlanningDemo, timeline groupe/nageur avec sync URL ?athlete=<id>, picker séances searchable, sheet détail + changement/détachement/suppression, tuile Coach home. Consomme data model Phase 2 §157, pas de migration).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

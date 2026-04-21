@@ -14,6 +14,7 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Dumbbell,
   MessageSquareText,
   ShieldCheck,
   Sunrise,
@@ -65,6 +66,7 @@ type CoachHomeProps = {
   onOpenRecordsClub: () => void;
   onOpenRecordsAdmin: () => void;
   onOpenSwimPlanning: () => void;
+  onOpenStrengthPlanning: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   onOpenWeekAt: (weekDate: string) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
@@ -217,6 +219,7 @@ const CoachHome = ({
   onOpenRecordsClub,
   onOpenRecordsAdmin,
   onOpenSwimPlanning,
+  onOpenStrengthPlanning,
   onOpenAthlete,
   onOpenWeekAt,
   athletes,
@@ -447,6 +450,7 @@ const CoachHome = ({
   const quickAccess = useMemo(
     () => [
       { label: "Planif. Nage", icon: Waves, action: onOpenSwimPlanning, color: "text-cyan-500", bg: "bg-cyan-100 dark:bg-cyan-900/30" },
+      { label: "Planif. Muscu", icon: Dumbbell, action: onOpenStrengthPlanning, color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
       { label: "Echéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
       { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
       { label: "Mes nageurs", icon: UserCheck, action: () => onNavigate("my-swimmers"), color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
@@ -455,7 +459,7 @@ const CoachHome = ({
       { label: "Chronos", icon: Timer, action: () => onNavigate("chrono-history"), color: "text-rose-500", bg: "bg-rose-100 dark:bg-rose-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
-    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -1202,6 +1206,7 @@ export default function Coach() {
           onOpenRecordsClub={() => navigate("/records-club")}
           onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
+          onOpenStrengthPlanning={() => navigate("/coach/strength-planning")}
           onOpenAthlete={handleOpenAthlete}
           onOpenWeekAt={(weekDate) => setRouteState({ section: "week", weekDate })}
           athletes={myAthletes}
