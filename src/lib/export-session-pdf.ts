@@ -214,13 +214,13 @@ export async function exportSessionPdf(
   const HAS_DESC = !!(session.description ?? "").trim();
   const TITLE_H = HAS_DESC ? 17 : 11;
   const MARGIN_GAP = 3;
-  const FOOTER_H = 12;
+  const FOOTER_H = 14;
   const PAGE_H = 297;
   const availableH = PAGE_H - HEADER_H - META_H - TITLE_H - MARGIN_GAP - FOOTER_H;
 
   // Base 9pt ≈ 5.8mm row height (with padding)
   const BASE_FONT = 9;
-  const BASE_ROW_H = 5.8;
+  const BASE_ROW_H = 7.5;
   const maxRows = availableH / BASE_ROW_H;
   const fontSize = rowCount <= maxRows
     ? BASE_FONT
