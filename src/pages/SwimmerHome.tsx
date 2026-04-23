@@ -590,7 +590,7 @@ export default function SwimmerHome() {
                       if (session.isMuscu) {
                         navigate("/strength");
                       } else {
-                        navigate("/natation");
+                        navigate("/natation?open=today");
                       }
                     }}
                   >

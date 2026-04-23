@@ -508,6 +508,19 @@ export default function Dashboard() {
     openDay(toISODate(t));
   }, [openDay, setMonthCursor]);
 
+  // Auto-open today's drawer when navigated from SwimmerHome with ?open=today
+  const autoOpenDoneRef = React.useRef(false);
+  React.useEffect(() => {
+    if (autoOpenDoneRef.current) return;
+    if (!window.location.hash.includes("open=today")) return;
+    autoOpenDoneRef.current = true;
+    const cleanHash = window.location.hash.replace(/[?&]open=today/, "") || "#/natation";
+    window.history.replaceState(null, "", window.location.pathname + cleanHash);
+    const t = new Date();
+    setMonthCursor(startOfMonth(t));
+    openDay(toISODate(t));
+  }, [openDay, setMonthCursor]);
+
   const openSession = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId);
     setDetailsOpen(false);
