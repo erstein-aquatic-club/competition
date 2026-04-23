@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-04-21 (§164 Audit perf global + Sprint 1 — parallélisation `reconcileStrengthRunLogs` et `push-send` via `Promise.allSettled`, defaults React Query (staleTime 10 min, refetchOnMount false), `sideEffects: ["**/*.css"]`, lazy import gifenc, migrations 00140 FK indexes + 00141 drop index redondants)*
+*Dernière mise à jour : §166 — Export PDF séance bord de bassin (2026-04-23)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -109,6 +109,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 123 | Bugfix séances muscu bloquées "en cours" — queue offline rejoue immédiatement via CustomEvent (OfflineMutationSync) + data fix SQL + migration 00138 | Critique | Faible | Fait (§162) |
 | 124 | Notifications — audit textuel + tutoiement (compétition/entretien) + titre `Nouvelle compétition` + `expires_at` auto-purge sur crons wellness matin et slot-session-reminder (migrations 00142/00143) | Haute | Faible | Fait (§163) |
 | 125 | Audit perf global + Sprint 1 (parallélisation `reconcileStrengthRunLogs` + `push-send`, defaults React Query, `sideEffects: ["**/*.css"]`, lazy import gifenc, migrations 00140 FK indexes + 00141 drop indexes redondants) | Haute | Moyenne | Fait (§164) |
+| §166 | Export PDF séance bord de bassin | Nouveau `src/lib/export-session-pdf.ts` — PDF A4 une page jsPDF + bouton "Télécharger PDF" dans le drawer `SlotSessionSheet` | 2026-04-23 | ✅ Livré |
 
 ---
 
