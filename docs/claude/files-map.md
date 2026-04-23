@@ -100,7 +100,12 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/imageUtils.ts` | Compression image Canvas (avatar upload, WebP/JPEG ≤200KB) | ~95 lignes |
 | `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) | ~530 lignes |
 | `src/pages/coach/CoachSmsScreen.tsx` | Écran SMS généraliste coach (groupe/nageur) | ~190 lignes |
-| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) — inclut les mutations quick-compose + assign-from-library (§142) | ~3296 lignes |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) — inclut les mutations quick-compose + assign-from-library (§142) | ~3174 lignes |
+| `src/pages/coach/lib/slotTiming.ts` | Pures : constantes timeline + timeToPx/durationPx/durationLabel (§168) | 48 lignes |
+| `src/pages/coach/lib/weekDates.ts` | Pures : getMonday/getISOWeek/toIsoDate + iterateDatesInclusive (§168) | 96 lignes |
+| `src/pages/coach/lib/slotDisplay.ts` | Pures : isSwimSlot + getSlotCompletionState + formatAssignedKmParts (§168) | 55 lignes |
+| `src/pages/coach/lib/swimLibraryContext.ts` | Pures : buildSwimLibraryContext (nav catalog depuis timeline) (§168) | 43 lignes |
+| `src/pages/coach/__tests__/fixtures/slots.ts` | Fixtures canoniques pour tests training slots (makeTrainingSlot, makeSlotInstance, etc.) (§168) | 151 lignes |
 | `src/pages/coach/SlotSessionSheet.tsx` | Bottom sheet créneau — quick-compose (texte + bibliothèque inline) + édition/visibilité/suppression (§85, §142) | ~1380 lignes |
 | `src/hooks/useSlotCalendar.ts` | Hook matérialisation créneaux récurrents → instances semaine (§85) | ~358 lignes |
 | `src/lib/neurotype-quiz-data.ts` | 30 questions quiz + 5 profils neurotype + couleurs | ~450 lignes |

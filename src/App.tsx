@@ -6,6 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, handlePasswordReset } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FEATURES } from "@/lib/features";
@@ -351,6 +352,26 @@ function DarkModeApplier() {
   return null;
 }
 
+/**
+ * Warms React Query cache with pivot queries right after login. Fire-and-forget :
+ * a failed prefetch cannot break any render path, and the existing `useQuery`
+ * calls will pick up the cached data transparently on first mount.
+ */
+function CacheWarmer() {
+  const userId = useAuth((s) => s.userId);
+  useEffect(() => {
+    if (!userId) return;
+    void queryClient
+      .prefetchQuery({
+        queryKey: ["groups"],
+        queryFn: () => api.getGroups(),
+        staleTime: 10 * 60 * 1000,
+      })
+      .catch(() => {});
+  }, [userId]);
+  return null;
+}
+
 function App() {
   const { loadUser } = useAuth();
   useVersionCheck();
@@ -388,6 +409,7 @@ function App() {
     <PWAInstallGate>
       <QueryClientProvider client={queryClient}>
         <DarkModeApplier />
+        <CacheWarmer />
         <TooltipProvider>
           <UpdateNotification />
           <OfflineMutationSync />

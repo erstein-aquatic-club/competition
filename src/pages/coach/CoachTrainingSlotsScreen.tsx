@@ -26,6 +26,36 @@ import { fetchUserGroupIdsWithContext } from "@/lib/api/client";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import type { SwimmerSession } from "@/lib/api/types";
 import { filterCoachTrainingSlots } from "./coachTrainingSlotsFilter";
+import {
+  TIMELINE_START,
+  TIMELINE_END,
+  TIMELINE_HEIGHT,
+  PX_PER_HOUR,
+  HOUR_LABELS,
+  formatTime,
+  timeToMinutes,
+  timeToPx,
+  durationPx,
+  durationLabel,
+} from "./lib/slotTiming";
+import {
+  DAYS_FR,
+  DAYS_SHORT,
+  todayIso,
+  getMonday,
+  getISOWeek,
+  formatDayMonth,
+  toIsoDate,
+  diffDaysInclusive,
+  iterateDatesInclusive,
+} from "./lib/weekDates";
+import {
+  type SlotCompletionState,
+  isSwimSlot,
+  getSlotCompletionState,
+  formatAssignedKmParts,
+} from "./lib/slotDisplay";
+import { buildSwimLibraryContext } from "./lib/swimLibraryContext";
 
 // Lazy-loaded sheets : ces deux composants ne sont rendus qu'à l'ouverture
 // des modals correspondants (clic sur slot ou sur "ajouter depuis bibliothèque").
@@ -88,16 +118,6 @@ import {
   Trophy,
 } from "lucide-react";
 
-/** Split meters into a French-locale km value + unit, or null if ≤ 0. */
-function formatAssignedKmParts(
-  distanceMeters: number,
-): { value: string; unit: string } | null {
-  if (!distanceMeters || distanceMeters <= 0) return null;
-  const km = Math.round(distanceMeters / 100) / 10;
-  const value = Number.isInteger(km) ? `${km}` : km.toString().replace(".", ",");
-  return { value, unit: "km" };
-}
-
 type WeekVolumeChipProps = {
   distanceMeters: number;
   variant: "desktop" | "mobile";
@@ -159,143 +179,6 @@ interface CompetitionDayEntry {
   totalDays: number;
 }
 
-function diffDaysInclusive(startIso: string, endIso: string): number {
-  const [sy, sm, sd] = startIso.split("-").map(Number);
-  const [ey, em, ed] = endIso.split("-").map(Number);
-  const start = new Date(sy, sm - 1, sd).getTime();
-  const end = new Date(ey, em - 1, ed).getTime();
-  return Math.round((end - start) / 86400000) + 1;
-}
-
-function iterateDatesInclusive(startIso: string, endIso: string): string[] {
-  const [sy, sm, sd] = startIso.split("-").map(Number);
-  const [ey, em, ed] = endIso.split("-").map(Number);
-  const out: string[] = [];
-  const cur = new Date(sy, sm - 1, sd);
-  const end = new Date(ey, em - 1, ed);
-  const pad = (v: number) => String(v).padStart(2, "0");
-  while (cur.getTime() <= end.getTime()) {
-    out.push(`${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`);
-    cur.setDate(cur.getDate() + 1);
-  }
-  return out;
-}
-
-// ── Constants ────────────────────────────────────────────────────
-
-const DAYS_FR = [
-  "Lundi",
-  "Mardi",
-  "Mercredi",
-  "Jeudi",
-  "Vendredi",
-  "Samedi",
-  "Dimanche",
-];
-
-const DAYS_SHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-
-/** Timeline range */
-const TIMELINE_START = 6; // 06:00
-const TIMELINE_END = 22; // 22:00
-const TIMELINE_HOURS = TIMELINE_END - TIMELINE_START; // 16h
-const PX_PER_HOUR = 40;
-const TIMELINE_HEIGHT = TIMELINE_HOURS * PX_PER_HOUR; // 640px
-const HOUR_LABELS = Array.from({ length: TIMELINE_HOURS + 1 }, (_, i) => TIMELINE_START + i);
-
-
-// ── Helpers ──────────────────────────────────────────────────────
-
-function formatTime(t: string): string {
-  // "08:00:00" → "08:00"
-  return t.slice(0, 5);
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Convert "HH:MM" or "HH:MM:SS" to minutes since midnight */
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-/** Convert time to pixel offset from timeline top */
-function timeToPx(t: string): number {
-  const mins = timeToMinutes(t);
-  return ((mins - TIMELINE_START * 60) / 60) * PX_PER_HOUR;
-}
-
-/** Duration in px between two time strings */
-function durationPx(start: string, end: string): number {
-  return timeToPx(end) - timeToPx(start);
-}
-
-/** Get Monday of the week containing `date` */
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sun, 1=Mon...6=Sat
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/** ISO week number (ISO 8601) */
-function getISOWeek(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  return 1 + Math.round(((d.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7);
-}
-
-/** Format date as "DD/MM" */
-function formatDayMonth(date: Date): string {
-  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
-}
-
-/** ISO date string "YYYY-MM-DD" from a Date */
-function toIsoDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** True if slot is a swimming session (vs PPG/muscu) — based on explicit session_type */
-function isSwimSlot(slot: { session_type?: "swim" | "strength" | null }): boolean {
-  return (slot.session_type ?? "swim") === "swim";
-}
-
-function buildSwimLibraryContext(
-  instance: SlotInstance,
-  mode: "create" | "edit",
-  swimCatalogId?: number,
-): SwimLibraryEntryContext {
-  const base = {
-    slot: {
-      trainingSlotId: instance.slot.id,
-      scheduledDate: instance.date,
-      startTime: instance.slot.start_time,
-      endTime: instance.slot.end_time,
-      location: instance.slot.location,
-    },
-  };
-
-  if (mode === "edit" && swimCatalogId != null) {
-    return {
-      mode,
-      swimCatalogId,
-      ...base,
-    };
-  }
-
-  return {
-    mode: "create",
-    ...base,
-  };
-}
-
 // ── Types ────────────────────────────────────────────────────────
 
 type CoachTrainingSlotsScreenProps = {
@@ -306,8 +189,6 @@ type CoachTrainingSlotsScreenProps = {
 };
 
 // (AssignmentRow removed — groups and coaches are now independent multi-select lists)
-
-type SlotCompletionState = "empty" | "draft" | "published" | "cancelled";
 
 // ── Slot Form Sheet ─────────────────────────────────────────────
 
@@ -1158,11 +1039,6 @@ const OverrideFormSheet = ({
 
 // ── Timeline Slot Block (positioned absolutely on the timeline) ──
 
-function getSlotCompletionState(instance?: SlotInstance): SlotCompletionState {
-  if (!instance) return "empty";
-  return instance.state;
-}
-
 function SlotCompletionBadge({
   state,
   compact = false,
@@ -1468,16 +1344,6 @@ type MobileViewProps = {
   competitionsByDate: Map<string, CompetitionDayEntry[]>;
   onOpenCompetition: (competition: Competition) => void;
 };
-
-/** Compute duration string from two time strings */
-function durationLabel(start: string, end: string): string {
-  const diff = timeToMinutes(end) - timeToMinutes(start);
-  const h = Math.floor(diff / 60);
-  const m = diff % 60;
-  if (h === 0) return `${m}min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h${String(m).padStart(2, "0")}`;
-}
 
 const MobileView = ({
   slotsByDay,

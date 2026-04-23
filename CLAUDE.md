@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §166 (Export PDF séance bord de bassin : nouveau `src/lib/export-session-pdf.ts` jsPDF + bouton "Télécharger PDF" dans le drawer `SlotSessionSheet`).
+Dernière entrée en date : §168 (Test fence pour refactor futur de `CoachTrainingSlotsScreen` : extraction helpers purs dans `src/pages/coach/lib/` + fixtures canoniques dans `src/pages/coach/__tests__/fixtures/` + 41 nouveaux tests. Monolithe : 3308 → 3174 lignes, comportement inchangé, tests 321/321).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

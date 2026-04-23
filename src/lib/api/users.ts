@@ -135,14 +135,14 @@ export async function getAthletes(): Promise<AthleteSummary[]> {
     );
   }
 
-  const { data: groups, error: groupsError } = await supabase
-    .from("groups")
-    .select("id, name");
-  if (groupsError) throw new Error(groupsError.message);
-  // Fetch user_profiles for ffn_iuf lookup
-  const { data: profiles } = await supabase
-    .from("user_profiles")
-    .select("user_id, ffn_iuf, avatar_url");
+  // Fetch groups + profiles in parallel (no data dependency — saves 1 RTT)
+  const [groupsRes, profilesRes] = await Promise.all([
+    supabase.from("groups").select("id, name"),
+    supabase.from("user_profiles").select("user_id, ffn_iuf, avatar_url"),
+  ]);
+  if (groupsRes.error) throw new Error(groupsRes.error.message);
+  const groups = groupsRes.data;
+  const profiles = profilesRes.data;
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
 
   if (!groups?.length) {

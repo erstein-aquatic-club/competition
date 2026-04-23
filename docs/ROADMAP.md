@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §166 — Export PDF séance bord de bassin (2026-04-23)*
+*Dernière mise à jour : §168 — Test fence CoachTrainingSlotsScreen (2026-04-23)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -110,6 +110,8 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 124 | Notifications — audit textuel + tutoiement (compétition/entretien) + titre `Nouvelle compétition` + `expires_at` auto-purge sur crons wellness matin et slot-session-reminder (migrations 00142/00143) | Haute | Faible | Fait (§163) |
 | 125 | Audit perf global + Sprint 1 (parallélisation `reconcileStrengthRunLogs` + `push-send`, defaults React Query, `sideEffects: ["**/*.css"]`, lazy import gifenc, migrations 00140 FK indexes + 00141 drop indexes redondants) | Haute | Moyenne | Fait (§164) |
 | §166 | Export PDF séance bord de bassin | Nouveau `src/lib/export-session-pdf.ts` — PDF A4 une page jsPDF + bouton "Télécharger PDF" dans le drawer `SlotSessionSheet` | 2026-04-23 | ✅ Livré |
+| §167 | Audit perf global — Sprint 1 (quick-wins 0-régression) | `exportSessionPdf` lazy import, `Promise.all` dans `getAthletes` + `renameSwimCatalogFolder`, `CacheWarmer` prefetch `["groups"]`, suppression `apiRequest`/`getQueryFn` morts, `key` stable dans `SuiviSaison` | 2026-04-23 | ✅ Livré |
+| §168 | Test fence pour futur refactor `CoachTrainingSlotsScreen` (couche 1/4) | Extraction helpers purs (`slotTiming`, `weekDates`, `slotDisplay`, `swimLibraryContext`) + fixtures canoniques (`makeTrainingSlot`, `makeSlotInstance`, etc.) + 41 tests unitaires. CoachTrainingSlotsScreen.tsx : 3308 → 3174 lignes, comportement inchangé | 2026-04-23 | ✅ Livré |
 
 ---
 

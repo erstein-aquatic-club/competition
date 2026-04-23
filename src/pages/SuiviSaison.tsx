@@ -214,7 +214,7 @@ function WeekAssignedSessions({ monday, userId }: { monday: string; userId: numb
             <div className="flex-1 min-w-0 flex items-center gap-1 flex-wrap">
               {day.sessions.map((s, i) => (
                 <span
-                  key={i}
+                  key={`${s.type}-${s.title}-${i}`}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[140px]",
                     s.type === "swim"

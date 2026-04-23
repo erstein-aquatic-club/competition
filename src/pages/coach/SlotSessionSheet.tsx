@@ -82,7 +82,6 @@ import {
   calculateSwimTotalDistance,
 } from "@/lib/swimSessionUtils";
 import { cn } from "@/lib/utils";
-import { exportSessionPdf } from "@/lib/export-session-pdf";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -276,6 +275,7 @@ export default function SlotSessionSheet({
           staleTime: 5 * 60 * 1000,
         }));
       if (!session) throw new Error("Session introuvable");
+      const { exportSessionPdf } = await import("@/lib/export-session-pdf");
       await exportSessionPdf(session, instance);
     } catch {
       toast({

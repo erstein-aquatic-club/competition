@@ -379,25 +379,27 @@ export async function renameSwimCatalogFolder(oldPath: string, newPath: string):
     .eq("path", oldPath);
   if (folderErr) throw new Error(folderErr.message);
 
-  // Rename sub-folders
-  const { data: subFolders } = await supabase
-    .from("swim_catalog_folders")
-    .select("id, path")
-    .like("path", `${oldPath}/%`);
-  for (const sf of subFolders ?? []) {
-    const updated = newPath + sf.path.slice(oldPath.length);
-    await supabase.from("swim_catalog_folders").update({ path: updated }).eq("id", sf.id);
-  }
+  // Fetch sub-folders + sessions in parallel (independent lookups)
+  const [subFoldersRes, sessionsRes] = await Promise.all([
+    supabase
+      .from("swim_catalog_folders")
+      .select("id, path")
+      .like("path", `${oldPath}/%`),
+    supabase
+      .from("swim_sessions_catalog")
+      .select("id, folder")
+      .or(`folder.eq.${oldPath},folder.like.${oldPath}/%`),
+  ]);
 
-  // Update sessions referencing old path
-  const { data: sessions } = await supabase
-    .from("swim_sessions_catalog")
-    .select("id, folder")
-    .or(`folder.eq.${oldPath},folder.like.${oldPath}/%`);
-  for (const s of sessions ?? []) {
+  // Parallelise updates — each row is independent
+  await Promise.all((subFoldersRes.data ?? []).map((sf) => {
+    const updated = newPath + sf.path.slice(oldPath.length);
+    return supabase.from("swim_catalog_folders").update({ path: updated }).eq("id", sf.id);
+  }));
+  await Promise.all((sessionsRes.data ?? []).map((s) => {
     const updated = s.folder === oldPath ? newPath : newPath + s.folder.slice(oldPath.length);
-    await supabase.from("swim_sessions_catalog").update({ folder: updated }).eq("id", s.id);
-  }
+    return supabase.from("swim_sessions_catalog").update({ folder: updated }).eq("id", s.id);
+  }));
 }
 
 export async function deleteSwimCatalogFolder(path: string): Promise<void> {

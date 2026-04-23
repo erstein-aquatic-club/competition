@@ -4,6 +4,75 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §168 — Test fence pour futur refactor CoachTrainingSlotsScreen (2026-04-23)
+
+**Contexte :** `CoachTrainingSlotsScreen.tsx` pèse 3308 lignes et reste le plus gros monolithe du dépôt. Un refactor ultérieur (extraction de composants, hook unique) présente un risque régression élevé faute de tests sur ses frontières internes. Ce chantier pose la couche 1 du plan de tests anti-régression : extraction des helpers purs + fixtures canoniques + tests unitaires. Comportement inchangé — c'est un *move + test*.
+
+**Changements :**
+- `src/pages/coach/lib/slotTiming.ts` (NEW, 48 lignes) — `TIMELINE_*` constantes, `formatTime`, `timeToMinutes`, `timeToPx`, `durationPx`, `durationLabel`. Maths de la timeline coach.
+- `src/pages/coach/lib/weekDates.ts` (NEW, 96 lignes) — `DAYS_FR`, `DAYS_SHORT`, `todayIso`, `getMonday`, `getISOWeek` (ISO 8601), `formatDayMonth`, `toIsoDate` (timezone locale), `diffDaysInclusive`, `iterateDatesInclusive`. Utilitaires date de la vue semaine.
+- `src/pages/coach/lib/slotDisplay.ts` (NEW, 55 lignes) — Type `SlotCompletionState`, fonctions `isSwimSlot`, `getSlotCompletionState`, `formatAssignedKmParts`. Classifiers UI pour les slots.
+- `src/pages/coach/lib/swimLibraryContext.ts` (NEW, 43 lignes) — `buildSwimLibraryContext` : construit le contexte de navigation vers la bibliothèque de séances (mode create/edit).
+- `src/pages/coach/__tests__/fixtures/slots.ts` (NEW, 151 lignes) — Fixtures canoniques : `makeTrainingSlot`, `makeTrainingSlotAssignment`, `makeTrainingSlotCoach`, `makeTrainingSlotOverride`, `makeSlotAssignment`, `makeSlotInstance` (avec `slotOverrides`), `makeSwimBlock`. Centralise la shape des objets testés pour que les futurs changements de type cassent la compilation atomiquement.
+- 5 fichiers de tests `__tests__/` (NEW, ~350 lignes au total, 41 nouveaux tests unitaires `node --test`).
+- `src/pages/coach/CoachTrainingSlotsScreen.tsx` (3308 → 3174 lignes, −4%) — Imports ajoutés vers les nouveaux modules, suppression des définitions locales devenues doublons. Aucun changement de logique.
+
+**Fichiers modifiés :**
+- NEW : `src/pages/coach/lib/slotTiming.ts`, `weekDates.ts`, `slotDisplay.ts`, `swimLibraryContext.ts`
+- NEW : `src/pages/coach/__tests__/fixtures/slots.ts` + `slots.test.ts`
+- NEW : `src/pages/coach/__tests__/slotTiming.test.ts`, `weekDates.test.ts`, `slotDisplay.test.ts`, `swimLibraryContext.test.ts`
+- MODIFIED : `src/pages/coach/CoachTrainingSlotsScreen.tsx`
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur
+- `npm test` → **321/321 passants** (280 → 321, +41)
+
+**Décisions :**
+- **Pure `move` avant refactor** : on ne touche pas au comportement, on ne change pas les signatures. L'extraction est trivialement réversible et sert uniquement de filet pour le vrai refactor à venir.
+- **Module `lib/` sous `pages/coach/`** : plus proche du consommateur que `src/lib/` global ; conservatif vs un big-bang de réorganisation.
+- **Fixtures > factories inline** : supprime la duplication de shape. Les tests `swimLibraryContext` et `slotDisplay` ont été refactorés immédiatement pour les utiliser, démontrant le pattern.
+- **`SlotCompletionState` conservé comme alias** (structurellement `= SlotState` de `useSlotCalendar`) : évite de forcer le fichier appelant à dépendre du hook, et préserve la sémantique UI.
+- **Tests DST + ISO 53 + année à cheval** : `iterateDatesInclusive` et `getISOWeek` ont un test spécifique pour les cas limites réels (2020 → ISO week 53, spring 2026 DST).
+- **Couches 2-4 du plan pas livrées ici** : mutation contracts (Vitest + mock api), flows RTL, e2e Playwright restent pour §169+. Le plan détaillé est dans la conversation précédente.
+
+**Limites :**
+- Le refactor *proprement dit* n'est pas fait — seulement le terrain préparé. La page reste à 3174 lignes.
+- Les tests couvrent la logique pure (temps, dates, classification) mais pas les mutations (`createMutation`, `quickComposeMutation` avec rollback, etc.). Ces contrats sont prévus en couche 3.
+
+## §167 — Audit perf global (Sprint 1 : quick-wins 0-régression) (2026-04-23)
+
+**Contexte :** Audit complet demandé par l'utilisateur (perf + simplification + résilience basse connexion). L'audit a identifié ~15 pistes, classées par niveau de risque régression. Ce premier sprint applique uniquement les 6 items "vert" (garantie 0 régression après revue ligne à ligne).
+
+**Changements :**
+- `src/pages/coach/SlotSessionSheet.tsx` — `exportSessionPdf` passé en dynamic import (`await import()` dans le handler) : jspdf + jspdf-autotable (~200 KB gzippés) ne sont plus inclus dans le chunk du drawer, mais chargés à la demande au clic "Télécharger PDF" (symétrique avec `exportRecordsPdf` dans `RecordsClub.tsx:297`).
+- `src/lib/api/users.ts` — `getAthletes()` : fetch `groups` + `user_profiles` parallélisé via `Promise.all` (−1 RTT, ≈ 200–400 ms sur 3G).
+- `src/lib/api/swim.ts` — `renameSwimCatalogFolder()` : fetch sous-dossiers + sessions en `Promise.all`, updates parallélisés (vs boucle `for...await` qui sérialisait N requêtes). Gain proportionnel au nombre d'enfants.
+- `src/App.tsx` — Nouveau composant `<CacheWarmer />` placé dans le `QueryClientProvider` : fire-and-forget prefetch de `["groups"]` dès que `userId` devient truthy, pour que les pages Coach/Planning/Compétitions trouvent la query en cache au premier mount.
+- `src/lib/queryClient.ts` — Suppression du code mort : `apiRequest()` (legacy template Lovable, 0 usage) et `getQueryFn()` (fallback par défaut, vérifié inutilisé : 0/284 `useQuery` sans `queryFn` explicite). Fichier passe de 62 → 20 lignes.
+- `src/pages/SuiviSaison.tsx` — `key={i}` → `key={\`${s.type}-${s.title}-${i}\`}` sur la map des sessions du jour : contenu plus stable si l'ordre change. Zéro impact visuel (span sans état interne).
+
+**Fichiers modifiés :** `src/pages/coach/SlotSessionSheet.tsx`, `src/lib/api/users.ts`, `src/lib/api/swim.ts`, `src/App.tsx`, `src/lib/queryClient.ts`, `src/pages/SuiviSaison.tsx`
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur
+- `npm test` → 280/280 passants
+
+**Décisions :**
+- **Pas touché** aux pistes `framer-motion lazy`, `networkMode: offlineFirst`, `retry: 3 + backoff`, extension offline queue, pagination `.limit()` : risque régression non nul, chaque point mérite son propre patch avec QA dédiée.
+- **Pas touché** au split des pages monolithes (`CoachTrainingSlotsScreen.tsx` 3308 lignes, `SuiviSemaine.tsx` 1363, `Coach.tsx` 1324, `Dashboard.tsx` 1071) : refactor majeur, impossible à garantir sans suite e2e ciblée.
+- **Prefetch limité à `["groups"]`** : petit payload, utilisé par Coach, CoachCompetitionsScreen, SwimPlanningDemo, StrengthPlanningScreen. Étendre à d'autres queries pivots plus tard si mesure d'impact le justifie.
+- **CacheWarmer dans App.tsx** plutôt que dans `loadUser()` : ne complique pas la logique d'auth, subscribe proprement au store Zustand, error caught silencieusement (fire-and-forget).
+
+**Impact perf attendu (non mesuré empiriquement) :**
+- Bundle `SlotSessionSheet` chunk : −~200 KB de jspdf/autotable éjectés du eager path
+- Latence `getAthletes` : −1 RTT
+- Latence `renameSwimCatalogFolder` : −(N−1) RTT sur dossier à N enfants
+- Page Coach / Planning : cache `["groups"]` chaud dès le mount → skeleton évité
+
+**Limites :**
+- L'effet perf n'a pas été mesuré (pas de bench avant/après). On le verra à l'usage sur 3G / 4G dégradée.
+- L'audit complet a identifié beaucoup d'autres pistes (voir réponse d'audit dans l'historique de conversation) — les prochains sprints peuvent s'y attaquer un point à la fois.
+
 ## §166 — Export PDF séance bord de bassin (2026-04-23)
 
 **Contexte :** Le coach a besoin d'imprimer la séance assignée à un créneau pour l'emmener au bord du bassin. La demande : tout sur une seule feuille A4.
