@@ -10,27 +10,40 @@ export interface PrDetection {
   improvement: number; // percentage
 }
 
+// Maps difficulty (1–5) to estimated Reps In Reserve.
+// 5/5 = at failure (RIR 0). Lower difficulty = more reps in reserve.
+function difficultyToRIR(difficulty: number | null | undefined): number {
+  if (difficulty == null) return 0;
+  const map: Record<number, number> = { 1: 5, 2: 4, 3: 3, 4: 1, 5: 0 };
+  return map[Math.round(difficulty)] ?? 0;
+}
+
 /**
- * Epley formula: 1RM = weight * (1 + reps / 30)
- * Returns 0 for invalid inputs.
+ * Epley formula: 1RM = weight * (1 + effectiveReps / 30)
+ * When difficulty < 5, adds estimated RIR to reps so the 1RM reflects true
+ * strength rather than the effort of a submaximal set.
  */
-export function estimateOneRM(weight: number, reps: number): number {
+export function estimateOneRM(weight: number, reps: number, difficulty?: number | null): number {
   if (reps <= 0 || weight <= 0) return 0;
-  if (reps === 1) return weight;
-  return Math.round(weight * (1 + reps / 30) * 10) / 10;
+  const rir = difficultyToRIR(difficulty);
+  const effectiveReps = reps + rir;
+  if (effectiveReps <= 0) return 0;
+  if (effectiveReps === 1) return weight;
+  return Math.round(weight * (1 + effectiveReps / 30) * 10) / 10;
 }
 
 /**
  * Detect if a set beats the current best estimated 1RM.
+ * Accepts optional difficulty to adjust the estimate for submaximal sets.
  * Returns null if no PR or if there is no previous best (0).
  */
 export function detectPR(
-  currentSet: { weight: number; reps: number },
+  currentSet: { weight: number; reps: number; difficulty?: number | null },
   currentBest1rm: number,
   exerciseName: string,
 ): PrDetection | null {
   if (currentBest1rm <= 0) return null;
-  const newEstimated = estimateOneRM(currentSet.weight, currentSet.reps);
+  const newEstimated = estimateOneRM(currentSet.weight, currentSet.reps, currentSet.difficulty);
   if (newEstimated <= 0) return null;
   if (newEstimated > currentBest1rm) {
     return {

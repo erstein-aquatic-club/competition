@@ -31,6 +31,26 @@ describe("estimateOneRM", () => {
     // 60 * (1 + 10/30) = 60 * 1.3333 = 80.0
     expect(estimateOneRM(60, 10)).toBeCloseTo(80.0, 1);
   });
+
+  it("difficulty 5 gives same result as no difficulty (at failure = RIR 0)", () => {
+    expect(estimateOneRM(100, 5, 5)).toBeCloseTo(estimateOneRM(100, 5), 1);
+  });
+
+  it("difficulty 3 adds 3 RIR — higher estimate than at-failure", () => {
+    // effectiveReps = 5 + 3 = 8 → 100 * (1 + 8/30) = 126.7
+    expect(estimateOneRM(100, 5, 3)).toBeCloseTo(126.7, 1);
+    expect(estimateOneRM(100, 5, 3)).toBeGreaterThan(estimateOneRM(100, 5, 5));
+  });
+
+  it("difficulty 1 adds 5 RIR — highest estimate", () => {
+    // effectiveReps = 5 + 5 = 10 → 100 * (1 + 10/30) = 133.3
+    expect(estimateOneRM(100, 5, 1)).toBeCloseTo(133.3, 1);
+    expect(estimateOneRM(100, 5, 1)).toBeGreaterThan(estimateOneRM(100, 5, 3));
+  });
+
+  it("null difficulty falls back to RIR 0 (conservative)", () => {
+    expect(estimateOneRM(100, 5, null)).toBeCloseTo(estimateOneRM(100, 5), 1);
+  });
 });
 
 describe("detectPR", () => {

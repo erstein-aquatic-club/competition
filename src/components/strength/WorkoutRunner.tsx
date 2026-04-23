@@ -587,7 +587,7 @@ export function WorkoutRunner({
     if (logWeight > 0 && logReps > 0 && !isBodyweight(logWeight)) {
       const currentBest1rm = oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight || 0;
       const exName = currentExerciseDef?.nom_exercice ?? "Exercice";
-      const pr = detectPR({ weight: logWeight, reps: logReps }, currentBest1rm, exName);
+      const pr = detectPR({ weight: logWeight, reps: logReps, difficulty: newLog.difficulty }, currentBest1rm, exName);
       if (pr) {
         const setKey = `${currentBlock.exercise_id}-${currentSetIndex}`;
         setPrSets((prev) => new Set(prev).add(setKey));
@@ -609,6 +609,12 @@ export function WorkoutRunner({
       if (autoRest && currentBlock.rest_seconds > 0) {
         startRestTimer(currentBlock.rest_seconds, "set");
       }
+      // Carry the logged weight forward so the next set doesn't revert to the plan target
+      const nextIdx = currentSetIndex; // 0-indexed key for next set (currentSetIndex + 1 - 1)
+      setCurrentSetInputs((prev) => {
+        if (prev[nextIdx] !== undefined) return prev;
+        return { ...prev, [nextIdx]: { weight: newLog.weight, reps: newLog.reps } };
+      });
       setCurrentSetIndex((prev) => Math.min(currentBlock.sets, prev + 1));
     }
 
