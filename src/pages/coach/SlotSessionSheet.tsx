@@ -59,6 +59,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Share2,
+  FileDown,
 } from "lucide-react";
 import {
   updateSlotVisibility,
@@ -81,6 +82,7 @@ import {
   calculateSwimTotalDistance,
 } from "@/lib/swimSessionUtils";
 import { cn } from "@/lib/utils";
+import { exportSessionPdf } from "@/lib/export-session-pdf";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -259,6 +261,32 @@ export default function SlotSessionSheet({
       toast({ title: "Erreur", description: "Impossible de supprimer la séance.", variant: "destructive" });
     },
   });
+
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!instance || !previewCatalogId) return;
+    setExportingPdf(true);
+    try {
+      const session =
+        previewSession ??
+        (await queryClient.fetchQuery({
+          queryKey: ["swim-session-preview", previewCatalogId],
+          queryFn: () => getSwimSessionById(previewCatalogId),
+          staleTime: 5 * 60 * 1000,
+        }));
+      if (!session) throw new Error("Session introuvable");
+      await exportSessionPdf(session, instance);
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   // ── Handlers ─────────────────────────────────────────────
   const handleToggleGroup = (groupId: number) => {
@@ -449,6 +477,8 @@ export default function SlotSessionSheet({
                       onEditSession={onEditSession}
                       onRequestDelete={() => setDeleteConfirmOpen(true)}
                       onPreview={assignment?.swim_catalog_id != null ? () => setPreviewOpen(true) : undefined}
+                      onExportPdf={assignment?.swim_catalog_id != null ? handleExportPdf : undefined}
+                      isExportingPdf={exportingPdf}
                     />
                   )}
                 </>
@@ -1178,6 +1208,8 @@ function FilledBody({
   onEditSession,
   onRequestDelete,
   onPreview,
+  onExportPdf,
+  isExportingPdf,
 }: {
   instance: SlotInstance;
   assignment: NonNullable<SlotInstance["assignment"]>;
@@ -1191,6 +1223,8 @@ function FilledBody({
   onEditSession: (sessionId: number) => void;
   onRequestDelete: () => void;
   onPreview?: () => void;
+  onExportPdf?: () => void;
+  isExportingPdf?: boolean;
 }) {
   const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
 
@@ -1284,6 +1318,22 @@ function FilledBody({
             description="Ouvrir dans l'éditeur"
             onClick={() => onEditSession(assignment.swim_catalog_id!)}
             highlight
+          />
+        )}
+
+        {onExportPdf && (
+          <ActionButton
+            icon={
+              isExportingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )
+            }
+            label="Télécharger PDF"
+            description="Séance en une page, pour le bord du bassin"
+            disabled={isExportingPdf}
+            onClick={onExportPdf}
           />
         )}
 
