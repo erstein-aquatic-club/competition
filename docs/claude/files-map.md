@@ -255,6 +255,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/hooks/useStrengthState.ts` | Hook état muscu | ~202 lignes |
 | `src/lib/types.ts` | Types globaux | ~555 lignes |
 | `src/lib/export-records-pdf.ts` | Export PDF records | ~456 lignes |
+| `src/lib/export-session-pdf.ts` | Génère un PDF A4 d'une séance natation (jsPDF + branding EAC, pour bord de bassin) | ~434 |
 | `src/lib/design-tokens.ts` | Design tokens (couleurs, espacements) | ~254 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | ~670 lignes |
 | `docs/claude/files-map.md` | Annuaire détaillé des fichiers du projet (chargé à la demande) | |

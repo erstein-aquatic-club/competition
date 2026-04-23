@@ -4,6 +4,24 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §166 — Export PDF séance bord de bassin (2026-04-23)
+
+**Contexte :** Le coach a besoin d'imprimer la séance assignée à un créneau pour l'emmener au bord du bassin. La demande : tout sur une seule feuille A4.
+
+**Changements :**
+- `src/lib/export-session-pdf.ts` (NEW, 434 lignes) — générateur jsPDF : bandeau EAC rouge, bande métadonnées (date/horaire/lieu/groupes), titre séance + distance, table blocs/exercices/notes (5 colonnes), scaling automatique fontSize 6–9pt pour tenir sur 1 page A4
+- `src/pages/coach/SlotSessionSheet.tsx` — bouton "Télécharger PDF" (ActionButton avec FileDown) dans FilledBody, visible uniquement quand `swim_catalog_id != null` ; handler `handleExportPdf` réutilise `previewSession` du cache React Query ou fetch réseau en fallback
+
+**Fichiers modifiés :** `src/lib/export-session-pdf.ts` (NEW), `src/pages/coach/SlotSessionSheet.tsx`
+
+**Tests :** `npm test -- --run` → tous passants. Validation manuelle à faire depuis l'app.
+
+**Décisions :**
+- jsPDF programmatique (vs html2canvas) : garantit le tenu 1 page via scaling, évite les risques oklab/color-mix Tailwind v4
+- 5 colonnes : Exercice, Nage, Intensité, Récupération, Matériel (distance encodée dans le label "4×100m")
+- Notes en subrow italique pleine largeur (↳ ...) pour ne pas tronquer les consignes techniques
+- `BASE_ROW_H = 7.5` calibré sur la hauteur réelle autoTable (padding 1.8mm × 2 + ligne 9pt)
+
 ## 2026-04-23 — §165 Sélecteur d'épreuve entraînement : fix overflow + distances 15m
 **Branche** : `main`
 **Chantier ROADMAP** : §165 — UX Records entraînement
