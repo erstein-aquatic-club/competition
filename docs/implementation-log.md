@@ -4,6 +4,33 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## 2026-04-23 — §165 Sélecteur d'épreuve entraînement : fix overflow + distances 15m
+**Branche** : `main`
+**Chantier ROADMAP** : §165 — UX Records entraînement
+
+### Contexte
+Le `<Select>` Radix (portal-based) dans la bottom sheet de saisie d'un record entraînement débordait vers le haut et ne permettait pas le scroll. De plus, les 15m (repères d'entraînement non-officiels) n'étaient pas disponibles.
+
+### Changements réalisés
+- Remplacement du `<Select>` par un `<EventPicker>` inline (deux rangées de pills : nage + distance) — aucun portal, aucun problème de positionnement dans une bottom sheet
+- Ajout des distances 15m pour NL, Dos, Brasse, Papillon (marquées ★ dans l'UI)
+- `STROKE_CONFIG` + `detectStroke` + `EventPicker` ajoutés dans `Records.tsx`
+- Suppression de l'import `FFN_EVENTS` (plus utilisé) et des composants Select inutiles
+
+### Fichiers modifiés
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/Records.tsx` | Remplacement Select → EventPicker, ajout 15m |
+
+### Tests
+- [x] `npx tsc --noEmit` — 0 erreur
+- [ ] Test manuel : ouvrir "Ajouter un record", sélectionner nage + distance 15m
+
+### Décisions
+- EventPicker inline (pills) évite totalement les problèmes de positionnement Radix dans les bottom sheets
+- 15m uniquement pour NL/DOS/BR/PAP (pas 4N — 15m 4N n'existe pas en pratique)
+- Le label "15m Nage Libre" (etc.) est généré par `eventLabel()` existant, aucun changement DB nécessaire
+
 ### Format d'une entrée
 
 ```

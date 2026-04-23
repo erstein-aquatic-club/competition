@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §164 (Audit perf global + Sprint 1 gains immédiats : parallélisation `reconcileStrengthRunLogs` via `Promise.allSettled` (20 sets ⇒ ×10), parallélisation `push-send` sur abonnés, defaults React Query durcis (staleTime 10 min, refetchOnMount false, refetchOnWindowFocus false), `"sideEffects": ["**/*.css"]` pour tree-shaking Rollup, gifenc lazy import via `loadGifenc()`, migration 00140 ajoute 8 indexes FK manquants sur tables planning, migration 00141 drop 2 indexes strictement redondants avec UNIQUE constraints).
+Dernière entrée en date : §165 (Records entraînement — fix débordement dropdown + distances 15m via EventPicker inline). §164 (Audit perf global + Sprint 1 gains immédiats : parallélisation `reconcileStrengthRunLogs` via `Promise.allSettled` (20 sets ⇒ ×10), parallélisation `push-send` sur abonnés, defaults React Query durcis (staleTime 10 min, refetchOnMount false, refetchOnWindowFocus false), `"sideEffects": ["**/*.css"]` pour tree-shaking Rollup, gifenc lazy import via `loadGifenc()`, migration 00140 ajoute 8 indexes FK manquants sur tables planning, migration 00141 drop 2 indexes strictement redondants avec UNIQUE constraints).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

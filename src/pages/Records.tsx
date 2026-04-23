@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { eventCodeFromFfnName, ffnNamesFromEventCode, FFN_EVENTS, eventLabel } from "@/lib/objectiveHelpers";
+import { eventCodeFromFfnName, ffnNamesFromEventCode, eventLabel } from "@/lib/objectiveHelpers";
 import { useLocation } from "wouter";
 
 type OneRmRecord = {
@@ -132,6 +132,74 @@ function InlineEditBar({
 }
 
 const SkeletonRow = () => <div className="h-10 rounded-xl bg-muted animate-pulse motion-reduce:animate-none" />;
+
+const STROKE_CONFIG = [
+  { code: "NL",  label: "NL",  distances: [15, 50, 100, 200, 400, 800, 1500] },
+  { code: "DOS", label: "Dos", distances: [15, 50, 100, 200] },
+  { code: "BR",  label: "Bra", distances: [15, 50, 100, 200] },
+  { code: "PAP", label: "Pap", distances: [15, 50, 100, 200] },
+  { code: "QN",  label: "4N",  distances: [200, 400] },
+];
+
+function detectStroke(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes("nage libre")) return "NL";
+  if (l.includes("dos")) return "DOS";
+  if (l.includes("brasse")) return "BR";
+  if (l.includes("papillon")) return "PAP";
+  if (l.includes("4 nages")) return "QN";
+  return "NL";
+}
+
+function EventPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [stroke, setStroke] = useState<string>(() => (value ? detectStroke(value) : "NL"));
+  const strokeConfig = STROKE_CONFIG.find((s) => s.code === stroke);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1.5 flex-wrap">
+        {STROKE_CONFIG.map((s) => (
+          <button
+            key={s.code}
+            type="button"
+            onClick={() => setStroke(s.code)}
+            className={cx(
+              "h-9 px-3 rounded-xl border text-sm font-semibold transition-all active:scale-95",
+              stroke === s.code
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted border-border text-muted-foreground hover:bg-muted/70"
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {strokeConfig && (
+        <div className="flex gap-1.5 flex-wrap">
+          {strokeConfig.distances.map((d) => {
+            const label = eventLabel(`${d}${stroke}`);
+            const isSel = value === label;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => onChange(label)}
+                className={cx(
+                  "h-9 px-3 rounded-xl border text-sm font-semibold transition-all active:scale-95",
+                  isSel
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                )}
+              >
+                {d}m{d === 15 && <span className="ml-0.5 text-[9px] font-bold opacity-50">★</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Records() {
   const user = useAuth((s) => s.user);
@@ -745,27 +813,19 @@ export default function Records() {
                         </SheetDescription>
                       </SheetHeader>
                       <form onSubmit={handleSwimSubmit} className="mt-5 space-y-5">
-                        {/* Épreuve — Select avec FFN_EVENTS */}
+                        {/* Épreuve — picker groupé par nage (évite le débordement des dropdowns en bottom sheet) */}
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
                             <span className="text-base leading-none">🏁</span>
                             <Label className="text-xs font-semibold">Épreuve</Label>
+                            {swimForm.event_name && (
+                              <span className="ml-auto text-xs font-semibold text-primary truncate">{swimForm.event_name}</span>
+                            )}
                           </div>
-                          <Select
+                          <EventPicker
                             value={swimForm.event_name}
-                            onValueChange={(value) => setSwimForm({ ...swimForm, event_name: value })}
-                          >
-                            <SelectTrigger className="h-10 rounded-xl">
-                              <SelectValue placeholder="Choisir une épreuve" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {FFN_EVENTS.map((code) => (
-                                <SelectItem key={code} value={eventLabel(code)}>
-                                  {eventLabel(code)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            onChange={(value) => setSwimForm({ ...swimForm, event_name: value })}
+                          />
                         </div>
 
                         {/* Bassin — toggle pills */}
