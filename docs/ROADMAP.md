@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §168 — Test fence CoachTrainingSlotsScreen (2026-04-23)*
+*Dernière mise à jour : §169 — Records club filtrés par appartenance historique au club (2026-04-25)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -112,6 +112,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | §166 | Export PDF séance bord de bassin | Nouveau `src/lib/export-session-pdf.ts` — PDF A4 une page jsPDF + bouton "Télécharger PDF" dans le drawer `SlotSessionSheet` | 2026-04-23 | ✅ Livré |
 | §167 | Audit perf global — Sprint 1 (quick-wins 0-régression) | `exportSessionPdf` lazy import, `Promise.all` dans `getAthletes` + `renameSwimCatalogFolder`, `CacheWarmer` prefetch `["groups"]`, suppression `apiRequest`/`getQueryFn` morts, `key` stable dans `SuiviSaison` | 2026-04-23 | ✅ Livré |
 | §168 | Test fence pour futur refactor `CoachTrainingSlotsScreen` (couche 1/4) | Extraction helpers purs (`slotTiming`, `weekDates`, `slotDisplay`, `swimLibraryContext`) + fixtures canoniques (`makeTrainingSlot`, `makeSlotInstance`, etc.) + 41 tests unitaires. CoachTrainingSlotsScreen.tsx : 3308 → 3174 lignes, comportement inchangé | 2026-04-23 | ✅ Livré |
+| §169 | Records club filtrés par appartenance historique au club | Capture `club_name` depuis cellule club FFN dans le parser partagé, ajout colonne `swimmer_performances.club_name` + index partiel, `app_settings.home_club_name` configurable, filtre `recalculateClubRecords` sur égalité stricte. Walk-from-end + break-on-button structurel pour gérer cellule club vide. Compteur `skipped_other_club` ajouté à `RecalcStats`. Edge functions `ffn-performances` v64 + `import-club-records` v74. Re-import full post-migration (backfill via MCP `pg_net.http_post`). +4 tests, 325/325. | 2026-04-25 | ✅ Livré |
 
 ---
 

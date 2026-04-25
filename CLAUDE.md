@@ -52,8 +52,8 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 |----------|--------|--------|
 | `admin-user` | Fonctionnelle (ACTIVE, v97) | `supabase/functions/admin-user/` |
 | `ffn-sync` | Fonctionnelle (ACTIVE, v53) — cron sync FFN | `supabase/functions/ffn-sync/` |
-| `ffn-performances` | Fonctionnelle (ACTIVE, v62) | `supabase/functions/ffn-performances/` |
-| `import-club-records` | Fonctionnelle (ACTIVE, v73) | `supabase/functions/import-club-records/` |
+| `ffn-performances` | Fonctionnelle (ACTIVE, v64) — capte `club_name` depuis cellule club FFN | `supabase/functions/ffn-performances/` |
+| `import-club-records` | Fonctionnelle (ACTIVE, v74) — recalc filtré sur `app_settings.home_club_name` | `supabase/functions/import-club-records/` |
 | `push-send` | Fonctionnelle (ACTIVE, v33) | `supabase/functions/push-send/` |
 
 ## Documentation
@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §168 (Test fence pour refactor futur de `CoachTrainingSlotsScreen` : extraction helpers purs dans `src/pages/coach/lib/` + fixtures canoniques dans `src/pages/coach/__tests__/fixtures/` + 41 nouveaux tests. Monolithe : 3308 → 3174 lignes, comportement inchangé, tests 321/321).
+Dernière entrée en date : §169 (Records club filtrés par appartenance historique au club : ajout colonne `swimmer_performances.club_name` + index partiel, `app_settings.home_club_name` configurable, parser FFN capte la cellule club via walk-from-end + break-on-button, `recalculateClubRecords` filtre sur égalité stricte. Edge functions `ffn-performances` v64 + `import-club-records` v74. Backfill via re-import full mode. Tests 325/325, +4 tests sur fixture HTML réelle + edge cases synthétiques).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

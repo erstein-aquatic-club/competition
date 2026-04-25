@@ -4,6 +4,51 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §169 — Records club filtrés par appartenance historique au club (2026-04-25)
+
+**Contexte :** les records EAC agrégeaient toutes les performances FFN des nageurs actifs, sans tenir compte du club d'appartenance au moment de la performance. Conséquence : un nageur arrivé d'un autre club apportait son palmarès historique au palmarès EAC, ce qui le faussait. La FFN expose le club au moment de la performance dans la vue "Performances" (`nat_recherche.php?...&idopt=prf`) qu'on parsait déjà mais sans le capter.
+
+**Changements :**
+- `swimmer_performances` : nouvelle colonne `club_name TEXT` (NULL = inconnu / pre-feature) + index partiel `idx_perf_club_name` sur les valeurs non-NULL.
+- `app_settings.home_club_name = "ERSTEIN AQUATIC CLUB"` (jsonb string) : libellé du club "maison", configurable. Lu par le recalcul à chaque invocation.
+- `_shared/ffn-parser.ts` : ajout du champ `club_name` à `RecFull`. Extraction par walk inverse des cellules de la ligne `<tr>` — la cellule club est juste après le `<button>` action de FFN. On stoppe au bouton (`break`) si on n'a pas trouvé de club avant, ce qui évite la fall-through vers la cellule lieu (`GUEBWILLER (FRA)`) ou temps (`00:24.10`) pour les anciennes perfs sans club affiché. Validators existants (`parseDate`, `pts`, `[DEP]`, numérique, âge) + nouveau skip pour les libellés location avec code pays `\([A-Z]{3}\)`.
+- `ffn-performances/index.ts` (Edge function v63 → v64) et `import-club-records/index.ts` (v73 → v74) : ajout de `club_name: p.club_name` dans le mapping vers `swimmer_performances.upsert(...)`. L'`onConflict` UPDATE remplit la colonne sur les rows existantes lors du re-import.
+- `recalculateClubRecords()` :
+  - Lecture de `home_club_name` depuis `app_settings` une fois en début de fonction, avec runtime check (`typeof === "string"`) + `console.warn` si row absente/invalide + fallback hardcodé `"ERSTEIN AQUATIC CLUB"` (boot-strapping).
+  - Filtre `if (perf.club_name !== homeClubName) { stats.skipped_other_club++; continue; }` placé **après** `swimmerInfo` mais **avant** `normalizedCode` / âge — garde les compteurs aval focalisés sur les perfs effectivement EAC.
+  - Nouveau compteur `skipped_other_club` exposé dans `RecalcStats` (et donc dans la response JSON) — surveillance d'un drop anormal post-déploiement (signal d'un changement de libellé FFN).
+- Backfill : 1 run `import-club-records` mode `full` post-deploy → ré-fetch FFN pour tous les nageurs actifs, peuple `club_name` sur les rows existantes, recalcule les records filtrés.
+
+**Fichiers modifiés :**
+- NEW : `supabase/migrations/00144_swimmer_performances_club.sql` (18 lignes)
+- NEW : `src/__tests__/ffnParser.test.ts` (4 tests : extraction club, non-régression `competition_name` / `time_seconds`, fallthrough empty cell → null, club hétérogène `"NATATION OBERNAI"`)
+- NEW : `src/__tests__/fixtures/ffn-prf-sample.html` (157 lignes, fixture FFN réelle, IUF 879576)
+- NEW : `src/__tests__/fixtures/ffn-prf-edge-cases.html` (22 lignes, 2 lignes synthétiques pour edge cases)
+- MODIFIED : `supabase/functions/_shared/ffn-parser.ts` (+22 lignes)
+- MODIFIED : `supabase/functions/ffn-performances/index.ts` (+1 ligne)
+- MODIFIED : `supabase/functions/import-club-records/index.ts` (+30 lignes)
+- NEW : `docs/plans/2026-04-25-records-club-historique-design.md`, `docs/plans/2026-04-25-records-club-historique-plan.md`
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur
+- `npm test` → **325/325 passants** (323 → 325, +4)
+- Aucun test RLS (aucune policy modifiée — la nouvelle colonne hérite des policies existantes de `swimmer_performances`)
+
+**Décisions :**
+- **Pas de `club_code`** : la cellule FFN ne fournit que le libellé (pas de code club). Stocker un code aurait nécessité 1 fetch HTTP par compétition (page `resultats.php?idcpt=...`) — disproportionné. YAGNI.
+- **Égalité stricte sur libellé** plutôt que regex/substring/allowlist : déterministe, pas de faux positifs (un futur club "ERSTEIN-MUTTERSHOLTZ" hypothétique ne contaminerait pas), simple à modifier via `app_settings`.
+- **NULL → exclu** au lieu de "NULL = assumed-EAC" : fail-safe (cohérent avec la tradition projet : "no silent failures"). Les rows pre-feature ne polluent pas le palmarès tant qu'elles ne sont pas re-fetchées.
+- **Filtre placé après `swimmerInfo`, avant `normalizedCode`** : garde la télémétrie aval (event_code unmapped, age missing) focalisée sur les perfs EAC pertinentes — un nageur passé par un autre club ne pollue pas `unmappedCodes`.
+- **Walk inverse des cellules + break-on-button** : structurellement plus solide qu'un index de cellule en dur (FFN peut ajouter une colonne en tête sans casser le parser), et explicitement résilient au cas "cellule club vide" (older perfs).
+- **Test fence avec fixture HTML réelle** : capture d'une page FFN authentique (IUF 879576, page 25m) pour test sur cas réels, complétée par une fixture synthétique compacte pour les edge cases impossibles à reproduire en prod (cellule club vide, club hétérogène).
+
+**Limites :**
+- Si la FFN renomme le club ("ERSTEIN AQUATIC CLUB" → "EAC ERSTEIN" par ex.), les records cassent jusqu'à update de `app_settings.home_club_name` (1 UPDATE SQL via MCP). Surveillance possible via `recalc_stats.skipped_other_club` post-import — un saut anormal est le signal.
+- Les perfs très anciennes sans cellule club affichée (avant ~2010 selon FFN) restent à `club_name = NULL` et sont exclues. Acceptable — peu probable de toucher des nageurs actuels.
+- Le backfill d'un nageur dépend de l'historique FFN actuel : si une perf historique a été retirée de FFN, sa row reste à `club_name = NULL`. Pas de cleanup nécessaire.
+
+---
+
 ## §168 — Test fence pour futur refactor CoachTrainingSlotsScreen (2026-04-23)
 
 **Contexte :** `CoachTrainingSlotsScreen.tsx` pèse 3308 lignes et reste le plus gros monolithe du dépôt. Un refactor ultérieur (extraction de composants, hook unique) présente un risque régression élevé faute de tests sur ses frontières internes. Ce chantier pose la couche 1 du plan de tests anti-régression : extraction des helpers purs + fixtures canoniques + tests unitaires. Comportement inchangé — c'est un *move + test*.
