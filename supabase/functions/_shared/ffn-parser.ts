@@ -35,6 +35,7 @@ export interface RecFull extends Rec {
   competition_name: string | null;
   competition_location: string | null;
   swimmer_age: number | null;
+  club_name: string | null;
 }
 
 export function parseHtmlFull(html: string, defaultPool?: number): RecFull[] {
@@ -66,7 +67,26 @@ export function parseHtmlFull(html: string, defaultPool?: number): RecFull[] {
           competitionName = c;
         }
       }
-      results.push({ event_name: cells[0], pool_length: pool, time_seconds: time, record_date: date, ffn_points: pts, competition_name: competitionName, competition_location: null, swimmer_age: swimmerAge });
+
+      // Extract club name: walk cells from the end, skip empty / button / link cells
+      const cellsRaw = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
+      let clubName: string | null = null;
+      for (let i = cellsRaw.length - 1; i >= 0; i--) {
+        const raw = cellsRaw[i];
+        if (/<button|<a\s/i.test(raw)) continue;
+        const text = clean(raw.replace(/<[^>]*>/g, ""));
+        if (!text || text.length < 4) continue;
+        if (parseDate(text)) continue;
+        if (/pts/i.test(text)) continue;
+        if (/^\[[A-Z]+\]$/.test(text)) continue; // niveau type [DEP]
+        if (/^\d+$/.test(text)) continue;
+        if (/^\(\d+\s*ans?\)$/i.test(text)) continue; // âge
+        // First valid match from the end = club
+        clubName = text;
+        break;
+      }
+
+      results.push({ event_name: cells[0], pool_length: pool, time_seconds: time, record_date: date, ffn_points: pts, competition_name: competitionName, competition_location: null, swimmer_age: swimmerAge, club_name: clubName });
     }
   }
   return results;
