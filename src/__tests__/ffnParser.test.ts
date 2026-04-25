@@ -9,6 +9,11 @@ const fixture = fs.readFileSync(
   "utf8",
 );
 
+const edgeFixture = fs.readFileSync(
+  path.resolve("src/__tests__/fixtures/ffn-prf-edge-cases.html"),
+  "utf8",
+);
+
 test("parseHtmlFull captures club_name from FFN performance row", () => {
   const rows = parseHtmlFull(fixture, 25);
   assert.ok(rows.length > 0, "expected at least one parsed row");
@@ -33,3 +38,24 @@ test("parseHtmlFull preserves competition_name and time_seconds (no regression)"
     );
   }
 });
+
+test("parseHtmlFull yields club_name === null when club cell is empty (does NOT fall through to location)", () => {
+  const rows = parseHtmlFull(edgeFixture, 25);
+  // Row 1 has empty club cell + location "STRASBOURG (FRA)" — club must be null,
+  // NOT "STRASBOURG (FRA)" or any city-derived string.
+  const strasbourgRow = rows.find((r) => r.time_seconds === 24.10);
+  assert.ok(strasbourgRow, "expected to find the empty-club row");
+  assert.equal(
+    strasbourgRow!.club_name,
+    null,
+    `empty club cell must yield null, got ${JSON.stringify(strasbourgRow!.club_name)}`,
+  );
+});
+
+test("parseHtmlFull captures heterogeneous club name (NATATION OBERNAI)", () => {
+  const rows = parseHtmlFull(edgeFixture, 25);
+  const obernaiRow = rows.find((r) => r.time_seconds === 24.50);
+  assert.ok(obernaiRow, "expected to find the OBERNAI club row");
+  assert.equal(obernaiRow!.club_name, "NATATION OBERNAI");
+});
+

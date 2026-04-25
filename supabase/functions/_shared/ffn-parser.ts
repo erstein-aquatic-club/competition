@@ -68,12 +68,16 @@ export function parseHtmlFull(html: string, defaultPool?: number): RecFull[] {
         }
       }
 
-      // Extract club name: walk cells from the end, skip empty / button / link cells
+      // Extract club name: walk cells from the end. The FFN layout places the
+      // club cell right after the action button/link (results page link).
+      // We STOP at the button cell — if we haven't found a club before hitting
+      // it, the club cell is empty (older perfs) and we return null. This
+      // prevents fall-through to upstream cells (location, time, event name).
       const cellsRaw = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
       let clubName: string | null = null;
       for (let i = cellsRaw.length - 1; i >= 0; i--) {
         const raw = cellsRaw[i];
-        if (/<button|<a\s/i.test(raw)) continue;
+        if (/<button|<a\s/i.test(raw)) break; // stop at action button: nothing past this point can be the club
         const text = clean(raw.replace(/<[^>]*>/g, ""));
         if (!text || text.length < 4) continue;
         if (parseDate(text)) continue;
@@ -81,6 +85,7 @@ export function parseHtmlFull(html: string, defaultPool?: number): RecFull[] {
         if (/^\[[A-Z]+\]$/.test(text)) continue; // niveau type [DEP]
         if (/^\d+$/.test(text)) continue;
         if (/^\(\d+\s*ans?\)$/i.test(text)) continue; // âge
+        if (/\([A-Z]{3}\)/.test(text)) continue; // location cell with country code
         // First valid match from the end = club
         clubName = text;
         break;

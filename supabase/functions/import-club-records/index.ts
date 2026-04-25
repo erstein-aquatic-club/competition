@@ -183,8 +183,16 @@ async function recalculateClubRecords(): Promise<RecalcStats> {
     .select("value")
     .eq("key", "home_club_name")
     .single();
-  const homeClubName = (homeClubSetting?.value as string | undefined)
-    ?? "ERSTEIN AQUATIC CLUB";
+  const rawValue = homeClubSetting?.value;
+  let homeClubName: string;
+  if (typeof rawValue === "string" && rawValue.length > 0) {
+    homeClubName = rawValue;
+  } else {
+    console.warn(
+      `[recalc] home_club_name missing or invalid in app_settings (got ${typeof rawValue}), using default`,
+    );
+    homeClubName = "ERSTEIN AQUATIC CLUB";
+  }
 
   // Load ALL swimmers (active + inactive) for record calculation
   // Note: is_active only controls FFN import, not record eligibility
