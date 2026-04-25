@@ -18,6 +18,8 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
   - Filtre `if (perf.club_name !== homeClubName) { stats.skipped_other_club++; continue; }` placé **après** `swimmerInfo` mais **avant** `normalizedCode` / âge — garde les compteurs aval focalisés sur les perfs effectivement EAC.
   - Nouveau compteur `skipped_other_club` exposé dans `RecalcStats` (et donc dans la response JSON) — surveillance d'un drop anormal post-déploiement (signal d'un changement de libellé FFN).
 - Backfill : 1 run `import-club-records` mode `full` post-deploy → ré-fetch FFN pour tous les nageurs actifs, peuple `club_name` sur les rows existantes, recalcule les records filtrés.
+- **v75** : ajout du flag `include_inactive: true` dans le body. Le re-import par défaut filtre `is_active=true` (cron auto-sync continue de ne fetcher que les actifs). Avec `include_inactive`, étend aux ex-membres pour qu'un record EAC historique détenu par un nageur inactif (ex-club) reste dans le palmarès (sinon NULL → exclu = sur-filtrage).
+- **v76** : ajout du filtre `swimmer_iufs: string[]` dans le body. Le mode `include_inactive` sur 67 nageurs (~1.5s × 67 = 100s rien qu'en `delay`) dépasse le budget compute de Supabase Edge Functions (`WORKER_RESOURCE_LIMIT` 546). Le filtre permet de chunker un backfill en plusieurs appels (3 lots de 13/13/11 IUFs ≈ 50s chacun, fit dans le budget).
 
 **Fichiers modifiés :**
 - NEW : `supabase/migrations/00144_swimmer_performances_club.sql` (18 lignes)
