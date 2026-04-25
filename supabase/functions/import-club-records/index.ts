@@ -155,6 +155,7 @@ interface RecalcStats {
   skipped_no_swimmer: number;
   skipped_no_event_code: number;
   skipped_no_age: number;
+  skipped_other_club: number;
   processed: number;
   per_swimmer_bests: number;
   club_records_upserted: number;
@@ -169,11 +170,21 @@ async function recalculateClubRecords(): Promise<RecalcStats> {
     skipped_no_swimmer: 0,
     skipped_no_event_code: 0,
     skipped_no_age: 0,
+    skipped_other_club: 0,
     processed: 0,
     per_swimmer_bests: 0,
     club_records_upserted: 0,
     unmapped_event_codes: [],
   };
+
+  // Read configured home club name (used to filter performances by affiliation)
+  const { data: homeClubSetting } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "home_club_name")
+    .single();
+  const homeClubName = (homeClubSetting?.value as string | undefined)
+    ?? "ERSTEIN AQUATIC CLUB";
 
   // Load ALL swimmers (active + inactive) for record calculation
   // Note: is_active only controls FFN import, not record eligibility
@@ -227,6 +238,11 @@ async function recalculateClubRecords(): Promise<RecalcStats> {
     const swimmerInfo = swimmerMap.get(perf.swimmer_iuf);
     if (!swimmerInfo) {
       stats.skipped_no_swimmer++;
+      continue;
+    }
+
+    if (perf.club_name !== homeClubName) {
+      stats.skipped_other_club++;
       continue;
     }
 
