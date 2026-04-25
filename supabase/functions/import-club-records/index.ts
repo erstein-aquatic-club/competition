@@ -430,12 +430,16 @@ Deno.serve(async (req) => {
     // Parse request body for mode + flags
     let mode = "full";
     let includeInactive = false;
+    let swimmerIufFilter: string[] | null = null;
     try {
       const body = await req.json();
       if (body?.mode === "recalculate") mode = "recalculate";
       if (body?.include_inactive === true) includeInactive = true;
+      if (Array.isArray(body?.swimmer_iufs) && body.swimmer_iufs.every((x: unknown) => typeof x === "string")) {
+        swimmerIufFilter = body.swimmer_iufs as string[];
+      }
     } catch {
-      // No body or invalid JSON: default to full mode, active-only
+      // No body or invalid JSON: default to full mode, active-only, no IUF filter
     }
 
     // Rate limit check (only for full mode which fetches from FFN)
@@ -459,11 +463,17 @@ Deno.serve(async (req) => {
     // 1. Get swimmers with IUF (active only by default; include_inactive=true
     //    extends to ex-club members — used for one-shot backfills like §169
     //    so historic EAC records held by inactive swimmers stay in the palmarès).
+    //    swimmer_iufs (optional array) further restricts to specific IUFs —
+    //    used to chunk a large backfill across multiple calls and stay under
+    //    the edge-function compute budget.
     let swimmerQuery = supabaseAdmin
       .from("club_record_swimmers")
       .select("*")
       .not("iuf", "is", null);
     if (!includeInactive) swimmerQuery = swimmerQuery.eq("is_active", true);
+    if (swimmerIufFilter && swimmerIufFilter.length > 0) {
+      swimmerQuery = swimmerQuery.in("iuf", swimmerIufFilter);
+    }
     const { data: swimmers, error: swErr } = await swimmerQuery;
 
     if (swErr) throw new Error(`Failed to fetch swimmers: ${swErr.message}`);
