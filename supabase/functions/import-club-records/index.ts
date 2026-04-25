@@ -495,6 +495,7 @@ Deno.serve(async (req) => {
           competition_date: p.record_date,
           competition_location: p.competition_location,
           ffn_points: p.ffn_points,
+          club_name: p.club_name,
           source: "ffn",
         }));
 
