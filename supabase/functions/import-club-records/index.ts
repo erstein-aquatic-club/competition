@@ -427,13 +427,15 @@ Deno.serve(async (req) => {
   const { role, userId: triggeredBy } = callerResult;
 
   try {
-    // Parse request body for mode
+    // Parse request body for mode + flags
     let mode = "full";
+    let includeInactive = false;
     try {
       const body = await req.json();
       if (body?.mode === "recalculate") mode = "recalculate";
+      if (body?.include_inactive === true) includeInactive = true;
     } catch {
-      // No body or invalid JSON: default to full mode
+      // No body or invalid JSON: default to full mode, active-only
     }
 
     // Rate limit check (only for full mode which fetches from FFN)
@@ -454,12 +456,15 @@ Deno.serve(async (req) => {
     }
 
     // Full mode: fetch FFN + recalculate
-    // 1. Get all active swimmers with IUF
-    const { data: swimmers, error: swErr } = await supabaseAdmin
+    // 1. Get swimmers with IUF (active only by default; include_inactive=true
+    //    extends to ex-club members — used for one-shot backfills like §169
+    //    so historic EAC records held by inactive swimmers stay in the palmarès).
+    let swimmerQuery = supabaseAdmin
       .from("club_record_swimmers")
       .select("*")
-      .eq("is_active", true)
       .not("iuf", "is", null);
+    if (!includeInactive) swimmerQuery = swimmerQuery.eq("is_active", true);
+    const { data: swimmers, error: swErr } = await swimmerQuery;
 
     if (swErr) throw new Error(`Failed to fetch swimmers: ${swErr.message}`);
 
