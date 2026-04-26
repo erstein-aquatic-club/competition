@@ -463,3 +463,30 @@ function stopRefreshTimer() {
     proactiveRefreshTimer = null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// §171 P1 — iOS suspend les timers en background. Au retour au premier plan,
+// forcer un refresh si elapsed > 50 min, AVANT que React Query ne déclenche
+// des fetchs qui échoueraient avec un token expiré.
+// ---------------------------------------------------------------------------
+
+const FORCE_REFRESH_THRESHOLD_MS = 50 * 60 * 1000;
+
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible") return;
+    const { accessToken } = useAuth.getState();
+    if (!accessToken) return;
+    const elapsed = Date.now() - lastRefreshAt;
+    if (elapsed < FORCE_REFRESH_THRESHOLD_MS) return;
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        console.warn("[auth] visibilitychange refresh failed", error);
+      }
+      // onAuthStateChange handles store sync on success
+    } catch (err) {
+      console.warn("[auth] visibilitychange refresh threw", err);
+    }
+  });
+}
