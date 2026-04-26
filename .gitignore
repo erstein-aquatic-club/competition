@@ -33,5 +33,13 @@ src/integrations/
 *.sw?
 supabase/.temp/
 
-# Worktrees
+# Worktrees (parallel agent sessions, not part of the trunk)
 .worktrees/
+.claude/worktrees/
+
+# Personal docs / spreadsheets dragged into /docs (not project artifacts).
+# *.xlsx is global on purpose: any .xlsx in /docs is a draft / personal
+# scratch and shouldn't enter the repo. Move to /supabase/seeds or rename
+# to a non-xlsx format if you genuinely need to track it.
+docs/*.xlsx
+docs/*.xls
