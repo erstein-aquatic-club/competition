@@ -608,7 +608,7 @@ export default function Profile() {
     return (
       <SwimmerMessagesView
         userId={userId ?? 0}
-        onBack={() => setActiveSection("home")}
+        onBack={() => window.history.back()}
         onOpenProfileSection={(section) => setActiveSection(section)}
       />
     );

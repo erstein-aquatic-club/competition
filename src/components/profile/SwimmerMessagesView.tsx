@@ -163,11 +163,11 @@ export default function SwimmerMessagesView({
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
 
-      // Server did the definitive cleanup (DELETE + dismissals) — the local
-      // dismiss list becomes redundant for the ids we just handled. We clear
-      // it so it doesn't grow unbounded over time.
-      persistDismissedNotificationTargetIds(userId, []);
-      setDismissedTargetIds([]);
+      // Keep dismissed IDs in localStorage until the cache refetch completes.
+      // Clearing them here would cause SwimmerHome to flash stale badges while
+      // the ["notifications-home"] query is still in flight with old cache data.
+      // The old target IDs are harmless once the server has deleted/dismissed
+      // the underlying rows — new notifications will have different target_id values.
       syncedDismissedUnreadIdsRef.current = new Set();
 
       const totalCleared = result.deleted + result.dismissed;
