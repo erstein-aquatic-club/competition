@@ -27,6 +27,7 @@ const ALICE = { appUserId: 1, appUserRole: "athlete" as const };
 const BOB = { appUserId: 2, appUserRole: "athlete" as const };
 const CAROL = { appUserId: 3, appUserRole: "coach" as const };
 const DIANA = { appUserId: 4, appUserRole: "admin" as const };
+const EVE = { appUserId: 5, appUserRole: "coach" as const };
 
 beforeAll(async () => {
   await resetDb();
@@ -160,6 +161,108 @@ describe("session_assignments RLS", () => {
         return r.rows;
       });
       expect(deleted).toEqual([{ id: 5 }]);
+    });
+  });
+
+  // ===========================================================================
+  // §174 P0 #1 — migration 00145_assignments_write_ownership.sql
+  //
+  // Pre-§174, `assignments_write FOR ALL` granted any coach the right to
+  // UPDATE/DELETE assignments owned by ANOTHER coach. Migration 00145 splits
+  // the policy into INSERT (any coach/admin), UPDATE/DELETE (admin OR
+  // coach owner via assigned_by = app_user_id()).
+  //
+  // All seed assignments (sa1..sa5) are owned by Carol (assigned_by = 3).
+  // Eve (id=5, role=coach) owns nothing — she's the cross-coach attacker.
+  // ===========================================================================
+  describe("WRITE — cross-coach ownership (§174 P0 #1)", () => {
+    it("Eve coach CANNOT update Carol's assignment (silent no-op)", async () => {
+      const updated = await asUser(EVE, async (c) => {
+        const r = await c.query<{ id: number }>(
+          `UPDATE session_assignments SET status = 'completed'
+           WHERE id = 1 RETURNING id`,
+        );
+        return r.rows;
+      });
+      // Pre-00145: would return [{id:1}]. Post-00145: empty (RLS blocks UPDATE).
+      expect(updated).toEqual([]);
+    });
+
+    it("Eve coach CANNOT delete Carol's assignment (silent no-op)", async () => {
+      const deleted = await asUser(EVE, async (c) => {
+        const r = await c.query<{ id: number }>(
+          "DELETE FROM session_assignments WHERE id = 1 RETURNING id",
+        );
+        return r.rows;
+      });
+      // Pre-00145: would return [{id:1}]. Post-00145: empty.
+      expect(deleted).toEqual([]);
+    });
+
+    it("Eve coach CAN insert her own assignment (INSERT is open to all coach/admin)", async () => {
+      const inserted = await asUser(EVE, async (c) => {
+        const r = await c.query<{ id: number; assigned_by: number }>(
+          `INSERT INTO session_assignments
+             (assignment_type, target_user_id, assigned_by, scheduled_date)
+           VALUES ('swim', 1, 5, '2026-05-01')
+           RETURNING id, assigned_by`,
+        );
+        return r.rows;
+      });
+      expect(inserted).toHaveLength(1);
+      expect(inserted[0].assigned_by).toBe(5);
+    });
+
+    it("Eve coach CAN update her own assignment (assigned_by = her id)", async () => {
+      const updated = await asUser(EVE, async (c) => {
+        // Insert + update in same transaction (rollback semantics of asUser).
+        const ins = await c.query<{ id: number }>(
+          `INSERT INTO session_assignments
+             (assignment_type, target_user_id, assigned_by, scheduled_date)
+           VALUES ('swim', 1, 5, '2026-05-02')
+           RETURNING id`,
+        );
+        const newId = ins.rows[0].id;
+        const upd = await c.query<{ id: number }>(
+          `UPDATE session_assignments SET status = 'completed'
+           WHERE id = $1 RETURNING id`,
+          [newId],
+        );
+        return upd.rows;
+      });
+      expect(updated).toHaveLength(1);
+    });
+
+    it("admin CAN update any assignment (admin bypass)", async () => {
+      const updated = await asUser(DIANA, async (c) => {
+        const r = await c.query<{ id: number }>(
+          `UPDATE session_assignments SET status = 'completed'
+           WHERE id = 1 RETURNING id`,
+        );
+        return r.rows;
+      });
+      expect(updated).toEqual([{ id: 1 }]);
+    });
+
+    it("admin CAN delete any assignment (admin bypass)", async () => {
+      const deleted = await asUser(DIANA, async (c) => {
+        const r = await c.query<{ id: number }>(
+          "DELETE FROM session_assignments WHERE id = 2 RETURNING id",
+        );
+        return r.rows;
+      });
+      expect(deleted).toEqual([{ id: 2 }]);
+    });
+
+    it("Carol CAN update her own assignment (regression: §174 must not break the legitimate path)", async () => {
+      const updated = await asUser(CAROL, async (c) => {
+        const r = await c.query<{ id: number }>(
+          `UPDATE session_assignments SET status = 'completed'
+           WHERE id = 1 RETURNING id`,
+        );
+        return r.rows;
+      });
+      expect(updated).toEqual([{ id: 1 }]);
     });
   });
 });

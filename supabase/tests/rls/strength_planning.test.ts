@@ -68,6 +68,13 @@ describe("strength_planning_slots RLS", () => {
   });
 
   it("athlete CAN read all group slots (SELECT is open)", async () => {
+    await asServiceRole(async (c) => {
+      await c.query(
+        `INSERT INTO strength_planning_slots (group_id, week_start, day_of_week, time_slot)
+         VALUES (1, '2026-05-04', 0, 'evening')
+         ON CONFLICT DO NOTHING`,
+      );
+    });
     const rows = await asUser(ALICE, async (c) => {
       const r = await c.query<{ group_id: number }>(
         `SELECT group_id FROM strength_planning_slots ORDER BY group_id`,
@@ -78,6 +85,13 @@ describe("strength_planning_slots RLS", () => {
   });
 
   it("coach CAN update a group slot", async () => {
+    await asServiceRole(async (c) => {
+      await c.query(
+        `INSERT INTO strength_planning_slots (group_id, week_start, day_of_week, time_slot)
+         VALUES (1, '2026-05-04', 0, 'evening')
+         ON CONFLICT DO NOTHING`,
+      );
+    });
     const updated = await asUser(CAROL, async (c) => {
       const r = await c.query<{ id: string }>(
         `UPDATE strength_planning_slots
@@ -123,9 +137,9 @@ describe("strength_planning_slots RLS", () => {
   });
 
   it("idempotent upsert: same unique key → update not duplicate error", async () => {
-    // First insert (already done above for day_of_week=0)
-    const first = await asUser(CAROL, async (c) => {
-      const r = await c.query<{ id: string }>(
+    // Both upserts must run in the SAME transaction since asUser rollbacks each call.
+    const result = await asUser(CAROL, async (c) => {
+      const first = await c.query<{ id: string }>(
         `INSERT INTO strength_planning_slots
            (group_id, week_start, day_of_week, time_slot, notes)
          VALUES (1, '2026-05-11', 3, 'evening', 'First')
@@ -133,13 +147,7 @@ describe("strength_planning_slots RLS", () => {
            DO UPDATE SET notes = excluded.notes
          RETURNING id`,
       );
-      return r.rows;
-    });
-    expect(first).toHaveLength(1);
-
-    // Second upsert with same key
-    const second = await asUser(CAROL, async (c) => {
-      const r = await c.query<{ id: string; notes: string }>(
+      const second = await c.query<{ id: string; notes: string }>(
         `INSERT INTO strength_planning_slots
            (group_id, week_start, day_of_week, time_slot, notes)
          VALUES (1, '2026-05-11', 3, 'evening', 'Updated')
@@ -147,11 +155,12 @@ describe("strength_planning_slots RLS", () => {
            DO UPDATE SET notes = excluded.notes
          RETURNING id, notes`,
       );
-      return r.rows;
+      return { first: first.rows, second: second.rows };
     });
-    expect(second).toHaveLength(1);
-    expect(second[0].id).toBe(first[0].id); // same row updated
-    expect(second[0].notes).toBe("Updated");
+    expect(result.first).toHaveLength(1);
+    expect(result.second).toHaveLength(1);
+    expect(result.second[0].id).toBe(result.first[0].id); // same row updated
+    expect(result.second[0].notes).toBe("Updated");
   });
 });
 
@@ -325,6 +334,13 @@ describe("strength_planning_week_meta RLS", () => {
   });
 
   it("athlete CAN read group week meta", async () => {
+    await asServiceRole(async (c) => {
+      await c.query(
+        `INSERT INTO strength_planning_week_meta (group_id, week_start, week_type, notes)
+         VALUES (1, '2026-05-04', 'force', 'Charge montante')
+         ON CONFLICT (group_id, week_start) DO NOTHING`,
+      );
+    });
     const rows = await asUser(ALICE, async (c) => {
       const r = await c.query<{ group_id: number }>(
         `SELECT group_id FROM strength_planning_week_meta`,
@@ -366,6 +382,13 @@ describe("strength_planning_week_overrides RLS", () => {
   });
 
   it("athlete CAN read all week overrides (SELECT is global)", async () => {
+    await asServiceRole(async (c) => {
+      await c.query(
+        `INSERT INTO strength_planning_week_overrides (athlete_id, week_start, week_type, notes)
+         VALUES (1, '2026-05-04', 'taper', 'Allègement individuel')
+         ON CONFLICT DO NOTHING`,
+      );
+    });
     const rows = await asUser(ALICE, async (c) => {
       const r = await c.query<{ athlete_id: number }>(
         `SELECT athlete_id FROM strength_planning_week_overrides`,

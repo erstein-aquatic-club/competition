@@ -4,6 +4,83 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §182 — Rattrapage tests RLS reportés post-audit robustesse : §174 P0 cross-coach + RPC authz + fix 5 tests cassés strength_planning (2026-04-26)
+
+**Contexte :** Les chantiers §173/§174/§179 ont laissé plusieurs tests RLS reportés faute de Docker disponible au moment de l'exécution. Audit du backlog avant ouverture d'un nouveau chantier : 5 échecs pré-existants dans `strength_planning.test.ts` (introduits en §157, jamais corrigés) + tests jamais écrits pour les migrations 00145 (cross-coach `session_assignments`) et 00146 (RPC `save_strength_run_atomic` authz). Phase 1 (fix baseline) + Phase 2 (couverture P0 sécu) menées en bloc. Phase 3 (chrono_records, one_rm_records, push_subscriptions, pain_reports, etc.) reportée à un chantier dédié vu son volume.
+
+**Phase 1 — Fix baseline `strength_planning.test.ts` (5 échecs pré-existants) :**
+
+Cause racine : `_helpers.ts:asUser` rollback systématiquement chaque transaction. Les 5 tests cassés dépendaient d'inserts faits dans des `asUser` calls précédents (chaque call = transaction isolée → rollback → 0 row visible au test suivant). Pattern correct déjà utilisé dans le même fichier sur "coach CAN delete a group slot" : seed via `asServiceRole` avant l'assertion.
+
+- **`athlete CAN read all group slots` (L70-78)** : ajout `asServiceRole` insert pour seeder `(group_id=1, week_start=2026-05-04, day_of_week=0, time_slot='evening')`.
+- **`coach CAN update a group slot` (L80-91)** : même seed que ci-dessus avant le UPDATE.
+- **`idempotent upsert: same unique key → update not duplicate error` (L125-155)** : refactor — les deux INSERT...ON CONFLICT runent désormais dans un seul `asUser` callback (transaction unique), au lieu de deux transactions séparées qui faisaient chacune un INSERT frais (IDs différents → assertion `second[0].id === first[0].id` cassée).
+- **`athlete CAN read group week meta` (L327-335)** : seed `strength_planning_week_meta` via `asServiceRole`.
+- **`athlete CAN read all week overrides` (L368-376)** : seed `strength_planning_week_overrides` via `asServiceRole`.
+
+**Phase 2A — Cross-coach `session_assignments` (§174 P0 #1, migration 00145) :**
+
+- **`supabase/tests/schema.sql`** : remplacement de la policy legacy `assignments_write FOR ALL` par les 3 policies split (`assignments_insert` any coach/admin, `assignments_update`/`assignments_delete` admin OR `coach AND assigned_by = app_user_id()`). Mirror exact de la migration 00145 prod.
+- **`supabase/tests/rls/session_assignments.test.ts`** : ajout fixture `EVE = {appUserId: 5, role: 'coach'}` (présent dans seed.sql mais inutilisé jusqu'ici). Nouveau bloc `describe("WRITE — cross-coach ownership (§174 P0 #1)")` avec 7 tests :
+  - Eve coach **CANNOT** update Carol's assignment (sa1, owned by Carol id=3) — silent no-op
+  - Eve coach **CANNOT** delete Carol's assignment — silent no-op
+  - Eve coach **CAN** insert her own assignment (`assigned_by=5`) — INSERT reste ouvert à coach/admin
+  - Eve coach **CAN** update her own assignment dans la même transaction (insert + update sequencé)
+  - admin **CAN** update any assignment — bypass admin
+  - admin **CAN** delete any assignment — bypass admin
+  - Carol **CAN** update her own assignment (sa1) — régression : §174 ne doit pas casser le chemin légitime
+
+**Phase 2B — RPC `save_strength_run_atomic` authz (§174 P0/P1 #5, migration 00146) :**
+
+La RPC complète a des dépendances (table `one_rm_records`, colonnes étendues sur `strength_session_runs`, etc.) non portées dans le test schema minimal. Stratégie : extraire UNIQUEMENT le bloc authz dans une fonction stub `_test_save_strength_run_authz(p_athlete_id int, p_assignment_id int)` qui lève les MÊMES exceptions que la RPC prod (mêmes ERRCODE, mêmes messages). Synchronisation manuelle requise quand la migration 00146 évolue.
+
+- **`supabase/tests/schema.sql`** : ajout fonction `_test_save_strength_run_authz` (~50 lignes), avec checks identiques à 00146 :
+  1. `v_caller_id IS NULL` → `unauthenticated` (42501)
+  2. `p_athlete_id IS NULL` → `athlete_id is required` (22023)
+  3. `p_athlete_id <> v_caller_id AND v_caller_role NOT IN ('coach', 'admin')` → `cannot save run for another athlete` (42501)
+  4. `p_assignment_id NOT NULL`, `target_user_id NULL`, caller athlete → `cannot mark non-direct assignment completed` (42501)
+  5. `p_assignment_id NOT NULL`, `target_user_id <> p_athlete_id`, caller != admin → `assignment X does not target athlete Y` (42501)
+  6. Retour `'ok'` si tous les checks passent.
+
+- **NEW `supabase/tests/rls/save_strength_run_authz.test.ts`** (171 lignes, 11 tests) :
+  - 4 tests "athlete identity check" : athlete OK self / FORBID other / coach bypass / admin bypass
+  - 6 tests "assignment ownership check" (LE coeur de §174 P0/P1 #5) : athlete OK direct match / FORBID forged assignment_id / FORBID group target / admin bypass on cross-athlete / coach bypass on group / coach FORBID on direct cross-athlete
+  - 1 test "input validation" : NULL athlete_id rejeté avec ERRCODE 22023
+
+**Fichiers modifiés / créés :**
+- MODIFIED : `supabase/tests/schema.sql` (~921 → 991 lignes, +70) — split policies session_assignments + fonction `_test_save_strength_run_authz`
+- MODIFIED : `supabase/tests/rls/strength_planning.test.ts` (389 → 412 lignes, +23) — 4 seeds `asServiceRole` + refactor idempotent upsert
+- MODIFIED : `supabase/tests/rls/session_assignments.test.ts` (165 → 268 lignes, +103) — fixture EVE + 7 tests cross-coach
+- NEW : `supabase/tests/rls/save_strength_run_authz.test.ts` (171 lignes, 11 tests)
+
+**Tests :**
+- `npm run test:rls` baseline avant patch : **120 pass / 5 fail** (sur 125)
+- `npm run test:rls` après patch : **143 pass / 0 fail** (sur 143) — +18 tests
+  - strength_planning : 18 → 23 (5 fix)
+  - session_assignments : 12 → 19 (+7 cross-coach)
+  - save_strength_run_authz : NEW, 11 tests
+- `npx tsc --noEmit` → 0 erreur
+- Pas de modification code production → `npm test` non requis
+
+**Décisions :**
+- **Stub function plutôt que RPC complète** dans test schema : porter `save_strength_run_atomic` au complet aurait demandé d'ajouter table `one_rm_records` + colonnes manquantes sur `strength_session_runs`/`strength_set_logs` + `ON CONFLICT (athlete_id, exercise_id)` machinery. Heavy lift pour un test focalisé sur la sécu authz. Le stub mirrors les IF blocks verbatim et lève les mêmes exceptions — couverture 100% sur l'authz, 0% sur l'insert path (couvert par tests JS unit + smoke manuel).
+- **Préfixe `_test_`** sur la fonction stub : signale qu'elle n'est pas du code prod mais un helper de test schema. Évite la confusion lors d'un futur grep `save_strength_run_atomic` (ne match pas).
+- **Refactor idempotent upsert en transaction unique** plutôt que `asServiceRole` seed : le test vérifie que CAROL peut faire un double upsert légitime — l'opération doit être attribuée au coach, pas au service role. Une seule transaction préserve cette sémantique.
+- **Eve coach (id=5) déjà dans seed.sql** : pas besoin de modifier le seed. Le commentaire `Eve have no CSA link` mentionnait cette fixture comme "unassigned coach", parfaite pour le rôle d'attaquant cross-coach.
+
+**Limites :**
+- **Phase 3 reportée** : tests `strength_session_runs` cross-athlete (C4.7), `one_rm_records` athlete_id falsifié (C4.8), `chrono_records` (Task 14), `pain_reports`/`wellness_checks`/`objectives` (Task 16), `push_subscriptions`/`app_settings` (Task 15). Volume = ~10-15 tests + ports schema. À traiter en chantier dédié §183+.
+- **§173 Task 13 (4 tests slot_assignments) reporté** : `chk_visible_from_before_date` + isolation cross-coach + `idx_sa_unique_slot_group_v2`. Sur table `slot_assignments` non portée dans test schema (différente de `session_assignments`). Volume similaire à Phase 3, même chantier dédié.
+- **§179 migration 00147 `assigned_by` WITH CHECK** : mentionnée dans le log mais le fichier de migration n'a jamais été créé. À écrire si la garde s'avère nécessaire (l'INSERT côté API est déjà gardé par `bulkCreateSlotAssignments` qui force `assigned_by`).
+- **Stub authz non testé contre la VRAIE RPC prod** : si la migration 00146 évolue côté prod sans synchroniser le stub, les tests passeront à tort. Mitigation : commentaire IMPORTANT dans le schema + ce log.
+
+**Qualité :**
+- Zéro régression (143/143 passants vs 120/125 baseline).
+- Mirror exact des migrations 00145/00146 dans test schema (vérifié manuellement contre les fichiers SQL).
+- Pattern aligné sur l'existant : `asServiceRole` pour seeds, `asUser` pour assertions, fixtures déterministes (Alice=1/Bob=2/Carol=3/Diana=4/Eve=5).
+
+---
+
 ## §181 — UX polish post-audit : touch targets + sticky CTA + nav coach 5 items + badge optimistic + AlertDialog split (2026-04-26)
 
 **Contexte :** suite à l'audit consolidé Opus du 26-04, 5 frictions UI/UX P2/P3 résiduelles à corriger après les §172/§173/§175. Skill `/frontend-design` invoqué pour les patterns de touch targets et d'AlertDialog. Lot G+H du plan robustesse 10/10 ; relancé manuellement après que l'agent parallèle a perdu ses écritures sur fichiers concurrents.

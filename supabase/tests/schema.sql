@@ -306,9 +306,30 @@ CREATE POLICY assignments_select ON public.session_assignments
     )
   );
 
--- WRITE (INSERT/UPDATE/DELETE): coach/admin only
-CREATE POLICY assignments_write ON public.session_assignments
-  FOR ALL USING (app_user_role() = ANY (ARRAY['admin','coach']));
+-- WRITE (split per §174 / migration 00145):
+--   INSERT: any coach/admin
+--   UPDATE/DELETE: admin OR coach owner via assigned_by = app_user_id()
+CREATE POLICY assignments_insert ON public.session_assignments
+  FOR INSERT TO authenticated
+  WITH CHECK (app_user_role() IN ('admin', 'coach'));
+
+CREATE POLICY assignments_update ON public.session_assignments
+  FOR UPDATE TO authenticated
+  USING (
+    app_user_role() = 'admin'
+    OR (app_user_role() = 'coach' AND assigned_by = app_user_id())
+  )
+  WITH CHECK (
+    app_user_role() = 'admin'
+    OR (app_user_role() = 'coach' AND assigned_by = app_user_id())
+  );
+
+CREATE POLICY assignments_delete ON public.session_assignments
+  FOR DELETE TO authenticated
+  USING (
+    app_user_role() = 'admin'
+    OR (app_user_role() = 'coach' AND assigned_by = app_user_id())
+  );
 
 -- =============================================================================
 -- notifications + notification_targets (§16 fix, §79 push)
@@ -905,3 +926,66 @@ CREATE POLICY strength_planning_week_overrides_write ON public.strength_planning
   FOR ALL TO authenticated
   USING ((SELECT app_user_role()) IN ('coach','admin'))
   WITH CHECK ((SELECT app_user_role()) IN ('coach','admin'));
+
+-- =============================================================================
+-- save_strength_run_atomic — authz-only stub (§174 P0/P1 #5, migration 00146)
+--
+-- The full RPC has heavy dependencies (one_rm_records, full strength_set_logs
+-- column set, ON CONFLICT machinery) that we have not ported to this minimal
+-- test schema. To keep regression coverage on the *security* check (which is
+-- what 00146 added), we mirror only the authz block as a pure function that
+-- raises the same exceptions as prod when authz fails, and returns 'ok' when
+-- authz passes. Tests assert the boundary behavior; insert correctness is
+-- covered by JS unit tests + manual smoke.
+--
+-- IMPORTANT: keep `_test_save_strength_run_authz` synced with the IF blocks
+-- in supabase/migrations/00146_save_strength_run_assignment_authz.sql.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public._test_save_strength_run_authz(
+  p_athlete_id integer,
+  p_assignment_id integer
+) RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller_id int := app_user_id();
+  v_caller_role text := app_user_role();
+  v_assignment_target int;
+BEGIN
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_athlete_id IS NULL THEN
+    RAISE EXCEPTION 'athlete_id is required' USING ERRCODE = '22023';
+  END IF;
+
+  IF p_athlete_id <> v_caller_id
+     AND v_caller_role NOT IN ('coach', 'admin') THEN
+    RAISE EXCEPTION 'forbidden: cannot save run for another athlete' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_assignment_id IS NOT NULL THEN
+    SELECT target_user_id INTO v_assignment_target
+      FROM session_assignments
+     WHERE id = p_assignment_id;
+
+    IF v_assignment_target IS NULL THEN
+      IF v_caller_role NOT IN ('coach', 'admin') THEN
+        RAISE EXCEPTION 'forbidden: cannot mark non-direct assignment completed'
+          USING ERRCODE = '42501';
+      END IF;
+    ELSIF v_assignment_target <> p_athlete_id
+          AND v_caller_role <> 'admin' THEN
+      RAISE EXCEPTION 'forbidden: assignment % does not target athlete %',
+        p_assignment_id, p_athlete_id USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  RETURN 'ok';
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public._test_save_strength_run_authz(integer, integer) TO authenticated;
