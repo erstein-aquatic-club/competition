@@ -4,6 +4,57 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §175 — Consolidation post-audit nageur : 4 P2 résiduels + tests régression (2026-04-26)
+
+**Contexte :** suite à l'audit §172, identification de 4 bugs P2 non couverts par §172 ni par §174 (audit infra parallèle). Cross-check confirmé après convergence des deux audits. Sprint de consolidation avant nouveau chantier.
+
+**Bugs P2 corrigés (Lot 1) :**
+
+- **`Dashboard.tsx:159-178`** — `authUuid` réactif. Avant : `useEffect [user]` capté UNE fois au mount, rate les SIGNED_OUT/SIGNED_IN cycles cross-tab et les TOKEN_REFRESHED. Après : abonnement à `supabase.auth.onAuthStateChange` avec cleanup ; le UUID reste à jour pour `saveSwimExerciseLogs`.
+- **`Strength.tsx:670-705`** — pré-persistance localStorage du runId. Avant : entre `startRun.mutateAsync` succès serveur et `setActiveRunId(res.run_id)`, un kill app laissait un run "in_progress" orphelin sans trace locale. Après : écriture synchrone du focus-state (screenMode, session, runId, cycleType) dans `strength-focus-state-${athleteKey}` avant tout setState ; `useStrengthState` restore-on-mount résurrecte cleanly. Try/catch silencieux sur quota — la query React `["strength_run_in_progress"]` reste comme canal de récupération secondaire.
+- **`OfflineMutationSync.tsx:117-158,189-201`** — toast utilisateur sur types non reconnus. Avant : `console.warn + removeQueueItem` silencieux → données potentiellement perdues sans signal après un downgrade PWA (queue écrite par un build récent, lue par un build plus ancien). Après : compteur `unsupportedCount` + `unsupportedTypes` agrégés sur le drain, toast destructive batched ("Données obsolètes ignorées" + types) et invitation à mettre à jour.
+- **`offlineQueue.ts:21-28,86-96` + `OfflineMutationSync.tsx:215-235`** — toast user sur reaping TTL/poison. Avant : items reaped (>7j ou ≥5 retries) silencieux → un nageur offline 8 jours perdait sa séance sans alerte. Après : nouvel event `QUEUE_REAPED_EVENT` dispatché par `getQueue` avec `detail.count`, `OfflineMutationSync` écoute et toast destructive avec message contextuel ("ouvre l'app plus régulièrement").
+
+**Tests régression ajoutés (Lot 2) :**
+
+- **NEW `src/lib/api/__tests__/strength.test.ts`** (8 tests) :
+  - `updateStrengthRun — §159 regression` (5 tests) — pin la garde "throw on assignment update error" (avant §159, bug live d'avril : run flippait `completed`, assignment restait `in_progress` → calendrier nageur "en cours" perpétuel). Couvre : success path complet, throw sur 1ère update, throw sur 2nde update (le cas §159), no-op si `assignment_id` absent, no-op si `status !== "completed"`.
+  - `reconcileStrengthRunLogs` (3 tests) — short-circuit sur logs vides (no-op zéro DB call), throw sur count query failure (avant §170 retournait silencieusement clean), no-op si `remoteCount >= local logs`.
+- **NEW `src/components/dashboard/__tests__/DayCell.test.tsx`** (7 tests) :
+  - Dumbbell visible si `strengthAssigned && !hasCompetition` (Trophy prioritaire), invisible si `hasCompetition`, invisible si `!strengthAssigned`.
+  - SlotPill variants : success → `bg-status-success` + `text-white` (contraste dark mode), in-progress → `bg-muted-foreground/30` + `text-foreground`, absent → `bg-muted-foreground/15` + `text-muted-foreground` (intentionally dimmed), rest day → Moon `text-muted-foreground/40` distinct.
+
+Pattern `node:test + mock.module` aligné sur `bulkCreateSlotAssignments.test.ts` ; pattern SSR `renderToStaticMarkup` aligné sur `PainIndicator.test.tsx`.
+
+**Fichiers modifiés :**
+- MODIFIED : `src/pages/Dashboard.tsx` (+18 / -6 — onAuthStateChange subscription)
+- MODIFIED : `src/pages/Strength.tsx` (+30 / -2 — pré-persistance focus-state)
+- MODIFIED : `src/components/shared/OfflineMutationSync.tsx` (+27 / -3 — toasts + listener)
+- MODIFIED : `src/lib/offlineQueue.ts` (+13 / -1 — QUEUE_REAPED_EVENT)
+- NEW : `src/lib/api/__tests__/strength.test.ts` (220 lignes, 8 tests)
+- NEW : `src/components/dashboard/__tests__/DayCell.test.tsx` (160 lignes, 7 tests)
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur
+- `npm test` → **355/355 passants** (340 → 355, +15)
+- Aucune migration DB ni policy → `npm run test:rls` non requis (cf. CLAUDE.md § "Tests RLS — règles d'usage")
+
+**Décisions :**
+- **Pré-persistance localStorage avant setState** plutôt que `flushSync` : `flushSync` a des side-effects connus (commit forcé, peut casser les transitions Suspense). Écriture localStorage synchrone est zéro-side-effect, le `useStrengthState` effect overwrite proprement au prochain render. Le seul cas perdu est la fenêtre microseconde entre `startRun.mutateAsync` resolve et le `localStorage.setItem` du current callback — négligeable.
+- **Event `QUEUE_REAPED_EVENT` dédié** plutôt que détourner `QUEUE_UPDATED_EVENT` : la sémantique diffère (drain ≠ reap) ; les listeners ne devraient pas re-déclencher `runSync` quand seuls des items sont reaped (pas de nouveaux items à drain).
+- **Toast batched par drain** sur les types non reconnus plutôt qu'un toast par item : un swimmer offline 2 semaines avec une queue de 50 items aurait été noyé par 50 toasts. Une seule alerte par session avec la liste des types affectés.
+- **Pattern `node:test + mock.module`** aligné sur l'existant (assignments tests) plutôt qu'introduire `vi.mock` : la cohérence locale prime sur la préférence personnelle.
+- **Tests RTL skip** : pas de jsdom dans le projet, pas de @testing-library installé. SSR via `renderToStaticMarkup` couvre déjà les contrats visuels statiques (présence/absence de classes, glyphes, aria-labels) — suffisant pour DayCell. Tests interactifs reportés avec leur infra.
+
+**Limites / non couvert :**
+- **C4.2 logStrengthSet branches** reporté §176 (athleteId null fallback, bodyweight skip 1RM, atomic RPC, PR detection). Pattern connu via §159 tests, ROI immédiat plus faible que C4.3+C4.6.
+- **C4.4 useStrengthState restore** reporté §176 — §174 `auth-state.test.ts` couvre déjà une partie ; pur restore localStorage demande RTL.
+- **C4.5 WorkoutRunner race substitute** reporté §176 — déjà mitigé par 2 gardes en code (`isLoggingRef` + `currentSetIndex > blockSets`). Test simulation 1-frame complexe.
+- **C4.7-9 RLS Phase 3** bloqués — Docker non démarré (CLAUDE.md interdit de le lancer sans permission utilisateur). À reprendre §176 quand Docker actif. Cibles : `strength_session_runs` cross-athlete read/update/delete, `one_rm_records` athlete_id falsifié dans `update1RM`, RPC `log_strength_set_atomic` avec `p_user_id` forgé.
+- **`Dashboard.tsx saveSwimExerciseLogs`** utilise toujours un fresh `getSession()` à chaque mutation (`:258,300`) — donc le bug stale UUID est doublement couvert. La nouvelle subscription est surtout utile pour le `Link to swim notes` qui dépendait de l'ancien capture.
+
+---
+
 ## §174 — Audit robustesse infrastructure : auth/session, offline queue, RLS, RPC atomicity, PWA (2026-04-26)
 
 **Contexte :** Audit transversal des couches critiques non métier (rapport en tête de session du 2026-04-26). Top 3 risques P0 identifiés : (1) cross-coach assignment hijack via `assignments_write FOR ALL`, (2) perte silencieuse d'un set offline si quota localStorage saturé (iOS Safari), (3) NetworkFirst sur `/auth/*` qui peut servir un ancien JWT. Plus 6 P1 (race INITIAL_SESSION/null iOS PWA, timer iOS suspendu, double drain queue, 5xx tué après 5 retries, RPC sans timeout, skipWaiting mid-session) + 1 P2 (push handler foreground).

@@ -669,6 +669,39 @@ export default function Strength() {
           cycle_type: lockedCycle,
         });
         if (res?.run_id) {
+          // Pre-persist to localStorage BEFORE the React setState commit.
+          // Anti-orphan guard: if the swimmer kills the app between
+          // startRun's server success and useStrengthState's persist effect
+          // (which only fires after a React re-render with screenMode set),
+          // the run would otherwise live as "in_progress" on the server
+          // with no local trace — invisible from the swimmer's next
+          // session and surfacing only via SessionBrowser's
+          // strength_run_in_progress query if they happen to come back.
+          //
+          // Writing the full focus-state shape (screenMode + session +
+          // runId) here means useStrengthState's restore-on-mount path can
+          // resurrect it cleanly. The next render will overwrite this
+          // entry with the up-to-date payload anyway.
+          if (typeof window !== "undefined") {
+            const focusKey = `strength-focus-state-${historyAthleteKey ?? "anonymous"}`;
+            try {
+              window.localStorage.setItem(
+                focusKey,
+                JSON.stringify({
+                  screenMode: "reader",
+                  session: { ...activeSession, cycle: lockedCycle, items: activeFilteredItems },
+                  assignment: activeAssignment,
+                  runId: res.run_id,
+                  runLogs: [],
+                  runnerStep: 1,
+                  cycleType: lockedCycle,
+                }),
+              );
+            } catch {
+              // localStorage full / private mode — the SessionBrowser
+              // query path remains as the secondary recovery channel.
+            }
+          }
           setActiveRunId(res.run_id);
           setActiveRunLogs((prev) => prev ?? []);
         }

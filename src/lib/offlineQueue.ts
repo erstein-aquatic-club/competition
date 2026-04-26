@@ -18,6 +18,12 @@ export type QueuedMutation = {
 };
 
 export const QUEUE_UPDATED_EVENT = "eac-offline-queue-updated";
+/** Dispatched when stale (> TTL) or poisoned (>= MAX retries) items are
+ *  dropped at read time. `detail.count` carries the number of items
+ *  reaped in this pass. Listened to by OfflineMutationSync to surface a
+ *  user-visible toast — previous silent drop in console.warn meant
+ *  swimmers could lose a session that aged out without ever being told. */
+export const QUEUE_REAPED_EVENT = "eac-offline-queue-reaped";
 
 /** Thrown when localStorage rejects a write — typically iOS Safari quota. */
 export class OfflineQueueQuotaError extends Error {
@@ -80,6 +86,11 @@ export function getQueue(): QueuedMutation[] {
   if (reaped > 0) {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(alive));
     console.warn(`[offline-queue] Reaped ${reaped} stale/poisoned mutation(s)`);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(QUEUE_REAPED_EVENT, { detail: { count: reaped } }),
+      );
+    }
   }
   return alive;
 }

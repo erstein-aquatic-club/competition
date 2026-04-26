@@ -154,13 +154,29 @@ export default function Dashboard() {
     km: number | null;
   } | null>(null);
 
-  // Get Supabase auth UUID for swim exercise logs
+  // Get Supabase auth UUID for swim exercise logs.
+  // We re-read on `onAuthStateChange` (not just `[user]`) because the
+  // display name can stay identical across a TOKEN_REFRESHED while the
+  // underlying session.user.id is technically the same — but more
+  // importantly because a SIGNED_OUT/SIGNED_IN cycle (cross-tab logout,
+  // password reset) keeps the same display name briefly while the UUID
+  // rotates. The previous `[user]` dependency missed those cycles.
   const [authUuid, setAuthUuid] = React.useState<string | null>(null);
   React.useEffect(() => {
+    let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
-      setAuthUuid(data.session?.user?.id ?? null);
+      if (!cancelled) setAuthUuid(data.session?.user?.id ?? null);
     });
-  }, [user]);
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!cancelled) setAuthUuid(session?.user?.id ?? null);
+      },
+    );
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+    };
+  }, []);
 
   const { data: sessions, isLoading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useQuery({
     queryKey: ["sessions", userId ?? user],

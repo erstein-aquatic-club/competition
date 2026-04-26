@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
-import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
+import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
 import { runSyncOnce } from "@/lib/offlineSync";
 import { supabase } from "@/lib/supabase";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -112,6 +112,8 @@ export function OfflineMutationSync() {
     await runSyncOnce(async () => {
       let syncedCount = 0;
       let poisonedCount = 0;
+      let unsupportedCount = 0;
+      const unsupportedTypes = new Set<string>();
       let lastError: unknown = null;
 
       for (const mutation of queue) {
@@ -131,7 +133,14 @@ export function OfflineMutationSync() {
             syncedCount += 1;
             continue;
           }
+          // Unrecognised type: typically means the queue was written by a
+          // newer build and the swimmer reverted to an older PWA. Track it
+          // so we can surface a single user-visible warning instead of the
+          // previous silent console.warn — that path lost data without any
+          // signal to the swimmer.
           console.warn("[offline-sync] Unsupported queued mutation:", mutation.type);
+          unsupportedTypes.add(mutation.type);
+          unsupportedCount += 1;
           removeQueueItem(mutation.id);
         } catch (itemError) {
           lastError = itemError;
@@ -175,6 +184,18 @@ export function OfflineMutationSync() {
           variant: "destructive",
         });
       }
+
+      if (unsupportedCount > 0) {
+        // Single toast batched for all unsupported types in this drain.
+        // Helps support track down "data lost after PWA downgrade" reports
+        // and tells the swimmer something happened — previous silent drop
+        // was the worst-of-both: data lost AND no signal.
+        toast({
+          title: "Données obsolètes ignorées",
+          description: `${unsupportedCount} mutation(s) d'un format inconnu (${Array.from(unsupportedTypes).join(", ")}) ont été abandonnées. Mets l'app à jour si le problème persiste.`,
+          variant: "destructive",
+        });
+      }
     });
   }, [isOnline, queryClient, toast, user]);
 
@@ -189,6 +210,25 @@ export function OfflineMutationSync() {
     window.addEventListener(QUEUE_UPDATED_EVENT, handleQueueUpdated);
     return () => window.removeEventListener(QUEUE_UPDATED_EVENT, handleQueueUpdated);
   }, [runSync]);
+
+  // Tell the swimmer when items aged out / hit the retry cap and were
+  // dropped from the queue. Without this, a session offline-queued before
+  // a long trip without network could be silently lost after 7 days
+  // (TTL) with no signal — the only trace was a console.warn invisible
+  // to the user.
+  useEffect(() => {
+    const handleReaped = (e: Event) => {
+      const count = (e as CustomEvent<{ count: number }>).detail?.count ?? 0;
+      if (count <= 0) return;
+      toast({
+        title: "Données hors-ligne abandonnées",
+        description: `${count} mutation(s) trop ancienne(s) ou ayant échoué trop de fois ont été abandonnées. Si tu attendais une synchronisation, ouvre l'app plus régulièrement quand tu retrouves le réseau.`,
+        variant: "destructive",
+      });
+    };
+    window.addEventListener(QUEUE_REAPED_EVENT, handleReaped);
+    return () => window.removeEventListener(QUEUE_REAPED_EVENT, handleReaped);
+  }, [toast]);
 
   return null;
 }
