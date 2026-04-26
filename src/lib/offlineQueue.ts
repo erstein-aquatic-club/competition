@@ -131,3 +131,14 @@ export function dequeue(): QueuedMutation | undefined {
   saveQueue(queue);
   return item;
 }
+
+/** True if the error is recoverable on retry (network blip, server overload). */
+export function isTransientError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  if (msg.includes("failed to fetch")) return true;
+  if (msg.includes("network")) return true;
+  if (msg.includes("timeout")) return true;
+  if (/\b5\d{2}\b/.test(msg)) return true; // any 5xx in message
+  return false;
+}
