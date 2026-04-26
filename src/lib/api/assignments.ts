@@ -183,9 +183,17 @@ export async function assignments_create(
       const targetPayload: Record<string, unknown> = { notification_id: notif.id };
       if (data.target_user_id) targetPayload.target_user_id = data.target_user_id;
       if (data.target_group_id) targetPayload.target_group_id = data.target_group_id;
-      await supabase
+      const { error: targetError } = await supabase
         .from("notification_targets")
         .insert(targetPayload);
+      if (targetError) {
+        // Rollback : supprimer la notification orpheline pour éviter une notif sans cible
+        await supabase.from("notifications").delete().eq("id", notif.id);
+        console.warn(
+          '[assignments] Notification rolled back (target insert failed):',
+          targetError.message,
+        );
+      }
       // Push delivery handled by pg_net trigger (00044)
     }
     return { status: "assigned" };
@@ -355,6 +363,20 @@ export async function bulkCreateSlotAssignments(params: {
   }>;
 }> {
   if (!canUseSupabase()) throw new Error("Connexion indisponible");
+
+  if (!params.groupIds.length) {
+    throw new Error("Aucun groupe à assigner");
+  }
+
+  if (
+    params.visibleFrom &&
+    params.scheduledDate &&
+    params.visibleFrom > params.scheduledDate
+  ) {
+    throw new Error(
+      "La date de visibilité ne peut pas être postérieure au jour du créneau",
+    );
+  }
 
   // Check for existing assignments on the same slot+date+groups to prevent duplicates
   const { data: existing, error: checkError } = await supabase
