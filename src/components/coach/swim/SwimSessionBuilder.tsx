@@ -374,6 +374,13 @@ export function SwimSessionBuilder({
                   });
                   return;
                 }
+                const splitWarnings = textWarnings.filter((w) => w.type === "split_distance");
+                if (splitWarnings.length > 0) {
+                  const proceed = window.confirm(
+                    `${splitWarnings.length} ligne(s) avec distance partielle (ex: "10 EZ" perdu après le /). Convertir quand même ?`,
+                  );
+                  if (!proceed) return;
+                }
                 onSessionChange({ ...session, blocks, description: rawText });
                 setEditorMode("blocks");
                 toast({ title: `${blocks.length} bloc(s) importé(s)` });

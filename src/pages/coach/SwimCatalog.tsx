@@ -563,6 +563,15 @@ export default function SwimCatalog({
 
   const handleMoveToFolder = (folder: string | null) => {
     if (!pendingMoveSession) return;
+    if (folder !== null && !allFolders.includes(folder)) {
+      toast({
+        title: "Dossier introuvable",
+        description: "Ce dossier a été supprimé entre-temps. Rafraîchissez la page.",
+        variant: "destructive",
+      });
+      setPendingMoveSession(null);
+      return;
+    }
     moveMutation.mutate({ sessionId: pendingMoveSession.id, folder });
   };
 
