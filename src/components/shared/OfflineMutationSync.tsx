@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
-import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, type QueuedMutation } from "@/lib/offlineQueue";
+import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
+import { runSyncOnce } from "@/lib/offlineSync";
 import { supabase } from "@/lib/supabase";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useAuth } from "@/lib/auth";
@@ -101,20 +102,18 @@ export function OfflineMutationSync() {
   const user = useAuth((s) => s.user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isSyncingRef = useRef(false);
 
   const runSync = useCallback(async () => {
-    if (!isOnline || !user || !canUseSupabase() || isSyncingRef.current) return;
+    if (!isOnline || !user || !canUseSupabase()) return;
 
     const queue = getQueue();
     if (queue.length === 0) return;
 
-    isSyncingRef.current = true;
-    let syncedCount = 0;
-    let poisonedCount = 0;
-    let lastError: unknown = null;
+    await runSyncOnce(async () => {
+      let syncedCount = 0;
+      let poisonedCount = 0;
+      let lastError: unknown = null;
 
-    try {
       for (const mutation of queue) {
         // Dispatch by type. Each branch is responsible for its own retry /
         // remove logic; unrecognised types are dropped so the queue does not
@@ -140,6 +139,10 @@ export function OfflineMutationSync() {
             `[offline-sync] Replay failed for ${mutation.id} (${mutation.type}):`,
             itemError,
           );
+          if (isTransientError(itemError)) {
+            // Don't penalize the item — Supabase blip, retry next online tick
+            continue;
+          }
           const dropped = markRetry(mutation.id);
           if (dropped) poisonedCount += 1;
         }
@@ -172,9 +175,7 @@ export function OfflineMutationSync() {
           variant: "destructive",
         });
       }
-    } finally {
-      isSyncingRef.current = false;
-    }
+    });
   }, [isOnline, queryClient, toast, user]);
 
   // Replay on network/auth state changes (back online, login)

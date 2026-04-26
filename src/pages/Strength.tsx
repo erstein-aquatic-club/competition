@@ -786,18 +786,30 @@ export default function Strength() {
                 // not lost if the user finishes online from a different device
                 // or if the reconcile-at-finish step never runs.
                 if (!isOnline) {
-                  blockLogs.forEach((log: SetLogEntry, index: number) =>
-                    enqueue("strength-set-log", {
-                      run_id: activeRunId,
-                      exercise_id: log.exercise_id,
-                      set_index: log.set_number ?? index + 1,
-                      reps: log.reps ?? null,
-                      weight: log.weight ?? null,
-                      difficulty: log.difficulty ?? null,
-                      athlete_id: userId ?? null,
-                      athlete_name: user ?? null,
-                    } as Record<string, unknown>),
-                  );
+                  let quotaErrored = false;
+                  blockLogs.forEach((log: SetLogEntry, index: number) => {
+                    try {
+                      enqueue("strength-set-log", {
+                        run_id: activeRunId,
+                        exercise_id: log.exercise_id,
+                        set_index: log.set_number ?? index + 1,
+                        reps: log.reps ?? null,
+                        weight: log.weight ?? null,
+                        difficulty: log.difficulty ?? null,
+                        athlete_id: userId ?? null,
+                        athlete_name: user ?? null,
+                      } as Record<string, unknown>);
+                    } catch {
+                      quotaErrored = true;
+                    }
+                  });
+                  if (quotaErrored) {
+                    toast({
+                      title: "Mémoire pleine",
+                      description: "Reconnecte-toi au réseau pour libérer l'espace de stockage.",
+                      variant: "destructive",
+                    });
+                  }
                   return;
                 }
                 // Online fire-and-forget: don't block WorkoutRunner while
@@ -817,7 +829,15 @@ export default function Strength() {
                   };
                   logStrengthSet.mutate(payload, {
                     onError: () => {
-                      enqueue("strength-set-log", payload as Record<string, unknown>);
+                      try {
+                        enqueue("strength-set-log", payload as Record<string, unknown>);
+                      } catch {
+                        toast({
+                          title: "Mémoire pleine",
+                          description: "Reconnecte-toi au réseau pour libérer l'espace de stockage.",
+                          variant: "destructive",
+                        });
+                      }
                     },
                   });
                 });
@@ -857,9 +877,17 @@ export default function Strength() {
                   ...result,
                 };
                 if (!isOnline) {
-                  enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
-                  toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
-                  setScreenMode("summary");
+                  try {
+                    enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                    toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                    setScreenMode("summary");
+                  } catch {
+                    toast({
+                      title: "Mémoire pleine",
+                      description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau.",
+                      variant: "destructive",
+                    });
+                  }
                   return;
                 }
                 setIsFinishing(true);
@@ -888,10 +916,18 @@ export default function Strength() {
                   // comes from reconcileStrengthRunLogs (before the mutation), and even
                   // when it does, we land in this catch instead, which left the button
                   // stuck disabled until full app refresh.
-                  enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
-                  toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
                   setIsFinishing(false);
-                  setScreenMode("summary");
+                  try {
+                    enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                    toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                    setScreenMode("summary");
+                  } catch {
+                    toast({
+                      title: "Mémoire pleine",
+                      description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau.",
+                      variant: "destructive",
+                    });
+                  }
                 }
               }}
             />

@@ -34,14 +34,14 @@ export default defineConfig(({ mode }) => ({
     tailwindcss(),
     versionJsonPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',  // §171 P1: was 'autoUpdate' — gated via UpdateNotification
       workbox: {
         importScripts: ['push-handler.js'],
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
         globIgnores: ['**/version.json'],
         cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
+        clientsClaim: false,  // §171 P1: was true — let UpdateNotification gate the activation
+        skipWaiting: false,   // §171 P1: was true — same reason
         navigateFallback: mode === 'production' ? '/competition/index.html' : '/index.html',
         navigateFallbackDenylist: [/^\/competition\/api/, /^\/competition\/version\.json/],
         runtimeCaching: [
@@ -75,12 +75,9 @@ export default defineConfig(({ mode }) => ({
           },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
-            handler: 'NetworkFirst',
+            handler: 'NetworkOnly',
             options: {
-              cacheName: 'supabase-auth',
-              expiration: { maxEntries: 5, maxAgeSeconds: 60 * 5 },
-              cacheableResponse: { statuses: [0, 200] },
-              networkTimeoutSeconds: 5,
+              cacheName: 'supabase-auth-no-cache',
             },
           },
         ],

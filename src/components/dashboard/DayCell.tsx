@@ -56,11 +56,27 @@ export const DayCell = memo(function DayCell({
   const ring = isSelected ? "ring-2 ring-primary/30" : "";
   const todayRing = isToday && !isSelected ? "ring-2 ring-primary/50" : "";
   const focusRing = isFocused ? "ring-2 ring-primary" : "";
-  const slotPillTone = (slot?: SlotStatus) => {
-    if (!slot?.expected) return "hidden";
-    if (slot.completed) return "bg-status-success";
-    if (slot.absent) return "bg-muted-foreground/15";
-    return "bg-muted-foreground/30";
+  /**
+   * Returns the pill background AND glyph color for a slot status, picked
+   * so the inner Sun/Moon icon stays readable in both light and dark modes.
+   *
+   * Why per-tone colors instead of a global `text-foreground/70`:
+   *   - `--status-success` is hsl(142 71% 45%) in light but hsl(142 55% 50%)
+   *     in dark — bright enough that a 70% white glyph fades. Force
+   *     `text-white` on success keeps Sun/Moon legible on the green pill in
+   *     both themes.
+   *   - `bg-muted-foreground/30` (in-progress) sits on a low-saturation
+   *     fond — `text-foreground` (true black/white per theme) gives the
+   *     strongest contrast.
+   *   - `bg-muted-foreground/15` (absent) is intentionally washed out;
+   *     `text-muted-foreground` keeps the glyph dimmed to match the
+   *     "this slot was skipped" semantics without being unreadable.
+   */
+  const slotPillTone = (slot?: SlotStatus): { bg: string; glyph: string } | null => {
+    if (!slot?.expected) return null;
+    if (slot.completed) return { bg: "bg-status-success", glyph: "text-white" };
+    if (slot.absent) return { bg: "bg-muted-foreground/15", glyph: "text-muted-foreground" };
+    return { bg: "bg-muted-foreground/30", glyph: "text-foreground" };
   };
 
   const amSlot = slots.find((s) => s.slotKey === "AM");
@@ -119,12 +135,12 @@ export const DayCell = memo(function DayCell({
               <div className="flex items-center gap-1">
                 {expectedSlots.length > 0
                   ? expectedSlots.map((slot, i) => (
-                      <SlotPill key={i} slot={slot} tone={slotPillTone(slot)} />
+                      <SlotPill key={i} slot={slot} variant={slotPillTone(slot)} />
                     ))
                   : (
                     <>
-                      <SlotPill slot={amSlot} tone={slotPillTone(amSlot)} />
-                      <SlotPill slot={pmSlot} tone={slotPillTone(pmSlot)} />
+                      <SlotPill slot={amSlot} variant={slotPillTone(amSlot)} />
+                      <SlotPill slot={pmSlot} variant={slotPillTone(pmSlot)} />
                     </>
                   )}
               </div>
@@ -137,37 +153,35 @@ export const DayCell = memo(function DayCell({
 });
 
 /**
- * A single AM/PM pill: keeps the existing tri-tone background
- * (success/in-progress/absent) for at-a-glance status scanning, and adds a
- * tiny Sun/Moon glyph inside so a swimmer who doesn't know the convention
- * can still tell which slot is which without a legend.
+ * A single AM/PM pill: keeps the tri-tone background (success/in-progress/
+ * absent) for at-a-glance status scanning, and adds a tiny Sun/Moon glyph
+ * inside so a swimmer who doesn't know the convention can still tell which
+ * slot is which without a legend.
  *
- * Hidden when `tone === "hidden"` (slot not expected) — the SlotStatus
+ * Hidden when `variant === null` (slot not expected) — the SlotStatus
  * already encodes that case via slotPillTone().
  */
 function SlotPill({
   slot,
-  tone,
+  variant,
 }: {
   slot: SlotStatus | undefined;
-  tone: string;
+  variant: { bg: string; glyph: string } | null;
 }) {
-  if (tone === "hidden") return null;
-  // The pill background tone encodes status (vert = fait, gris foncé = en
-  // attente, gris pâle = absent). The inner glyph encodes the slot
-  // (Sun = matin, Moon = soir). Glyph color is `text-foreground/70` so it
-  // stays visible across all three backgrounds in both light/dark themes —
-  // pure white was readable on the success/muted-foreground variants but
-  // disappeared on the muted-foreground/15 (absent) pill.
+  if (!variant) return null;
+  // strokeWidth 3 (vs lucide's default 2) keeps the glyph readable at 8px
+  // on retina mobile screens, especially over the muted-foreground/30 pill
+  // where stroke 2 disappeared after the icon was reduced from 12×8 plain
+  // to 14×14 with inner Sun/Moon.
   const Icon = slot?.slotKey === "PM" ? Moon : Sun;
   return (
     <span
       className={cn(
         "inline-flex h-3.5 w-3.5 items-center justify-center rounded-full",
-        tone,
+        variant.bg,
       )}
     >
-      <Icon className="h-2 w-2 text-foreground/70" strokeWidth={2.5} />
+      <Icon className={cn("h-2 w-2", variant.glyph)} strokeWidth={3} />
     </span>
   );
 }

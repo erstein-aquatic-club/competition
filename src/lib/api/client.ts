@@ -315,3 +315,25 @@ export const fetchUserGroupIdsWithContext = async (
   if (error || !data) return empty;
   return partitionGroupIds(data as unknown as GroupMemberRow[]);
 };
+
+// --- Promise timeout helper ---
+
+/**
+ * Race a promise against a timeout. On expiration, rejects with a typed error
+ * containing the label so callers (and `isTransientError`) can recognize it.
+ */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label = "rpc",
+): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label}: timeout after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ]);
+}

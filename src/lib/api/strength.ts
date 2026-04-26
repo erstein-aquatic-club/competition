@@ -17,6 +17,7 @@ import {
   STORAGE_KEYS,
   BODYWEIGHT_SENTINEL,
   isBodyweight,
+  withTimeout,
 } from './client';
 import type {
   Exercise,
@@ -483,7 +484,7 @@ export async function logStrengthSet(payload: {
         ? null
         : estimateOneRm(Number(payload.weight), Number(payload.reps));
 
-    const { data, error } = await supabase.rpc("log_strength_set_atomic", {
+    const rpcPromise = Promise.resolve(supabase.rpc("log_strength_set_atomic", {
       p_user_id: athleteIdNum,
       p_exercise_id: payload.exercise_id,
       p_reps: payload.reps ?? null,
@@ -497,7 +498,8 @@ export async function logStrengthSet(payload: {
       p_rest_seconds: payload.rest_seconds ?? null,
       p_pct_1rm_suggested: payload.pct_1rm_suggested ?? null,
       p_one_rm_estimate: oneRmEstimate,
-    });
+    }));
+    const { data, error } = await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic");
     if (error) throw new Error(error.message);
     const result = (data ?? {}) as {
       set_id?: number;
@@ -720,7 +722,7 @@ export async function saveStrengthRun(run: any) {
       }),
     );
 
-    const { data, error } = await supabase.rpc('save_strength_run_atomic', {
+    const rpcPromise = Promise.resolve(supabase.rpc('save_strength_run_atomic', {
       p_data: {
         run_id: run.run_id ?? null,
         session_id: run.session_id ?? null,
@@ -735,7 +737,8 @@ export async function saveStrengthRun(run: any) {
         logs: rpcLogs,
         one_rm_estimates: oneRmEstimates,
       },
-    });
+    }));
+    const { data, error } = await withTimeout(rpcPromise, 15_000, "save_strength_run_atomic");
     if (error) {
       if (error.message?.includes("violates foreign key")) {
         throw new Error("Un exercice référencé n'existe plus. Veuillez rafraîchir la page.");

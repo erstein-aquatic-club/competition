@@ -328,7 +328,21 @@ export const handlePasswordReset = async (newPassword: string): Promise<{ error:
 /** Timestamp of last successful token refresh (used by proactive refresh). */
 let lastRefreshAt = Date.now();
 
-supabase.auth.onAuthStateChange((event, session) => {
+function hasStoredSupabaseToken(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith("sb-") && key.endsWith("-auth-token")) {
+        const raw = window.localStorage.getItem(key);
+        if (raw && raw !== "null") return true;
+      }
+    }
+  } catch { /* private mode */ }
+  return false;
+}
+
+export function handleAuthEvent(event: string, session: Session | null) {
   if (event === "TOKEN_REFRESHED" && session) {
     lastRefreshAt = Date.now();
     startRefreshTimer();
@@ -361,37 +375,44 @@ supabase.auth.onAuthStateChange((event, session) => {
     return;
   }
 
-  // All other events (INITIAL_SESSION, SIGNED_IN, PASSWORD_RECOVERY, etc.)
   if (session) {
     const state = useAuth.getState();
     lastRefreshAt = Date.now();
     startRefreshTimer();
 
     if (state.isLoaded && state.user) {
-      // User already loaded (e.g. app returning from background): only update tokens,
-      // do NOT reset isLoaded to false — that would blank the UI.
       useAuth.setState({
         accessToken: session.access_token,
         refreshToken: session.refresh_token,
       });
     } else {
-      // First load: call loginFromSession then loadUser to complete the profile fetch.
       state.loginFromSession(session);
       state.loadUser().catch(() => {});
     }
-  } else {
-    useAuth.setState({
-      user: null,
-      userId: null,
-      role: null,
-      isApproved: null,
-      approvalStatus: "not_required",
-      isLoaded: true,
-      accessToken: null,
-      refreshToken: null,
-    });
+    return;
   }
-});
+
+  // §171 P1 — INITIAL_SESSION/null may arrive transiently on iOS PWA wake-up.
+  // If a Supabase token is still in localStorage, swallow the null and wait
+  // for the next event. This prevents a spurious logout on resume.
+  if (event === "INITIAL_SESSION" && hasStoredSupabaseToken()) {
+    console.warn("[auth] INITIAL_SESSION arrived null but token present — ignoring");
+    return;
+  }
+
+  useAuth.setState({
+    user: null,
+    userId: null,
+    role: null,
+    isApproved: null,
+    approvalStatus: "not_required",
+    isLoaded: true,
+    accessToken: null,
+    refreshToken: null,
+  });
+}
+
+supabase.auth.onAuthStateChange((event, session) => handleAuthEvent(event, session));
 
 
 // ---------------------------------------------------------------------------
@@ -467,4 +488,31 @@ function stopRefreshTimer() {
     proactiveRefreshTimer = null;
   }
   consecutiveRefreshFailures = 0;
+}
+
+// ---------------------------------------------------------------------------
+// §171 P1 — iOS suspend les timers en background. Au retour au premier plan,
+// forcer un refresh si elapsed > 50 min, AVANT que React Query ne déclenche
+// des fetchs qui échoueraient avec un token expiré.
+// ---------------------------------------------------------------------------
+
+const FORCE_REFRESH_THRESHOLD_MS = 50 * 60 * 1000;
+
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible") return;
+    const { accessToken } = useAuth.getState();
+    if (!accessToken) return;
+    const elapsed = Date.now() - lastRefreshAt;
+    if (elapsed < FORCE_REFRESH_THRESHOLD_MS) return;
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        console.warn("[auth] visibilitychange refresh failed", error);
+      }
+      // onAuthStateChange handles store sync on success
+    } catch (err) {
+      console.warn("[auth] visibilitychange refresh threw", err);
+    }
+  });
 }

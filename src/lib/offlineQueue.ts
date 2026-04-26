@@ -19,6 +19,15 @@ export type QueuedMutation = {
 
 export const QUEUE_UPDATED_EVENT = "eac-offline-queue-updated";
 
+/** Thrown when localStorage rejects a write — typically iOS Safari quota. */
+export class OfflineQueueQuotaError extends Error {
+  constructor(cause: unknown) {
+    super("Offline storage full — please reconnect to free space");
+    this.name = "OfflineQueueQuotaError";
+    if (cause instanceof Error) this.stack = cause.stack;
+  }
+}
+
 export function enqueue(type: string, payload: Record<string, unknown>) {
   const queue = getQueue();
   queue.push({
@@ -28,7 +37,18 @@ export function enqueue(type: string, payload: Record<string, unknown>) {
     timestamp: Date.now(),
     retryCount: 0,
   });
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  } catch (err) {
+    // Best-effort: drop the catalog mirror (largest non-essential entry) and retry once.
+    try {
+      localStorage.removeItem("suivi_natation_exercises");
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    } catch (retryErr) {
+      console.error("[offline-queue] enqueue persist failed", retryErr);
+      throw new OfflineQueueQuotaError(retryErr);
+    }
+  }
   window.dispatchEvent(new CustomEvent(QUEUE_UPDATED_EVENT));
 }
 
@@ -110,4 +130,15 @@ export function dequeue(): QueuedMutation | undefined {
   const item = queue.shift();
   saveQueue(queue);
   return item;
+}
+
+/** True if the error is recoverable on retry (network blip, server overload). */
+export function isTransientError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  if (msg.includes("failed to fetch")) return true;
+  if (msg.includes("network")) return true;
+  if (msg.includes("timeout")) return true;
+  if (/\b5\d{2}\b/.test(msg)) return true; // any 5xx in message
+  return false;
 }
