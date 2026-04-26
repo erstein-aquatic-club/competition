@@ -12,22 +12,35 @@ self.addEventListener('push', function(event) {
     data = { title: 'EAC Natation', body: event.data.text() };
   }
 
-  var options = {
-    body: data.body || '',
-    icon: 'icon-192.png',
-    badge: 'favicon.png',
-    data: { url: data.url || '#/' },
-    vibrate: [200, 100, 200],
-    tag: data.tag || 'eac-notification',
-    renotify: true,
-  };
-
-  var title = data.title || 'EAC Natation';
-
   event.waitUntil(
     (async function() {
       try {
-        await self.registration.showNotification(title, options);
+        // §171 P2 — if any window client is focused, skip OS notification
+        // (the focused client owns the in-app toast); just postMessage the
+        // payload so the client can render it however it wants.
+        var clients = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true,
+        });
+        var focused = false;
+        for (var i = 0; i < clients.length; i++) {
+          if (clients[i].focused) {
+            focused = true;
+            try { clients[i].postMessage({ type: 'eac-push', payload: data }); } catch (_) {}
+          }
+        }
+        if (focused) return;
+
+        var options = {
+          body: data.body || '',
+          icon: 'icon-192.png',
+          badge: 'favicon.png',
+          data: { url: data.url || '#/' },
+          vibrate: [200, 100, 200],
+          tag: data.tag || 'eac-notification',
+          renotify: true,
+        };
+        await self.registration.showNotification(data.title || 'EAC Natation', options);
       } catch (err) {
         console.error('[push-handler] showNotification failed:', err);
       }
