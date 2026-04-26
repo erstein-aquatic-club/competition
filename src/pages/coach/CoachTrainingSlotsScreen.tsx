@@ -2219,12 +2219,23 @@ const CoachTrainingSlotsScreen = ({
         });
       } catch (assignErr) {
         // Rollback : supprime la séance créée si l'assignation échoue.
+        // Si le rollback lui-même échoue, on log explicitement l'orphelin pour
+        // éviter une pollution silencieuse du catalogue (§171).
+        let rollbackOk = true;
         try {
           await api.deleteSwimSession(sessionId);
-        } catch {
-          // Best-effort rollback.
+        } catch (rollbackErr) {
+          rollbackOk = false;
+          console.error(
+            "[quickCompose] rollback failed — orphan swim session in catalog",
+            { sessionId, rollbackErr, assignErr },
+          );
         }
-        throw assignErr;
+        const baseMsg = assignErr instanceof Error ? assignErr.message : String(assignErr);
+        const suffix = rollbackOk
+          ? ""
+          : " (séance créée mais non assignée — supprimez-la manuellement)";
+        throw new Error(baseMsg + suffix);
       }
     },
     onSuccess: (result) => {
