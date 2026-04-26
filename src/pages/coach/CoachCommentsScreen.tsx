@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -80,14 +80,16 @@ export default function CoachCommentsScreen({ onBack, onOpenAthlete }: Props) {
     },
   });
 
+  const markedIdsRef = useRef<Set<number>>(new Set());
+
   useEffect(() => {
     if (!coachUserId || comments.length === 0) return;
-    const unreadIds = comments
-      .filter((c) => !c.is_read)
+    const newUnreadIds = comments
+      .filter((c) => !c.is_read && !markedIdsRef.current.has(c.session_id))
       .map((c) => c.session_id);
-    if (unreadIds.length > 0) {
-      markReadMutation.mutate(unreadIds);
-    }
+    if (newUnreadIds.length === 0) return;
+    newUnreadIds.forEach((id) => markedIdsRef.current.add(id));
+    markReadMutation.mutate(newUnreadIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coachUserId, comments]);
 
