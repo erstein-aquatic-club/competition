@@ -2,12 +2,14 @@ import { Suspense, useEffect, useDeferredValue, useMemo, useState } from "react"
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, Exercise, StrengthCycleType, StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api";
+import type { AthleteSummary } from "@/lib/api/types";
 import type { StrengthSessionInput } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getStrengthSessionsPaginated } from "@/lib/api/strength";
@@ -333,6 +335,34 @@ function FolderDropdown({
   );
 }
 
+function AssignAthleteSelect({
+  athletes,
+  value,
+  onChange,
+}: {
+  athletes: AthleteSummary[];
+  value: number | null;
+  onChange: (id: number | null) => void;
+}) {
+  return (
+    <Select
+      value={value != null ? String(value) : ""}
+      onValueChange={(v) => onChange(v ? Number(v) : null)}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Choisir un nageur" />
+      </SelectTrigger>
+      <SelectContent>
+        {athletes.filter((a) => a.id != null).map((a) => (
+          <SelectItem key={a.id} value={String(a.id)}>
+            {a.display_name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export default function StrengthCatalog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -361,6 +391,9 @@ export default function StrengthCatalog() {
     sourceId: number;
     sourceLabel: string;
   } | null>(null);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignTargetAthleteId, setAssignTargetAthleteId] = useState<number | null>(null);
+  const [assignAfterSaveId, setAssignAfterSaveId] = useState<number | null>(null);
 
   const handleGifUpload = async (media: File | Blob, isGif: boolean, setter: (url: string) => void) => {
     const maxSize = 10 * 1024 * 1024;
@@ -513,12 +546,35 @@ export default function StrengthCatalog() {
 
   const createSession = useMutation({
     mutationFn: (data: StrengthSessionInput) => api.createStrengthSession(data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setIsCreating(false);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
-      toast({ title: "Séance créée avec succès" });
+      const afterSaveId = assignAfterSaveId;
+      if (afterSaveId != null) {
+        setAssignAfterSaveId(null);
+        const sessionId = (data as { id?: number })?.id;
+        if (sessionId) {
+          api.assignments_create({
+            session_type: "strength",
+            session_id: sessionId,
+            target_user_id: afterSaveId,
+          }).then(() => {
+            toast({ title: "Séance créée et assignée" });
+          }).catch((err: Error) => {
+            toast({
+              title: "Séance créée mais non assignée",
+              description: err.message,
+              variant: "destructive",
+            });
+          });
+        } else {
+          toast({ title: "Séance créée avec succès" });
+        }
+      } else {
+        toast({ title: "Séance créée avec succès" });
+      }
     }
   });
 
@@ -683,6 +739,41 @@ export default function StrengthCatalog() {
       updateSession.mutate({ ...sessionPayload, id: editingSessionId });
     } else {
       createSession.mutate(sessionPayload);
+    }
+  };
+
+  const handleSaveAndAssign = () => {
+    if (!newSession.title.trim()) {
+      toast({
+        title: "Titre requis",
+        description: "Ajoutez un nom de séance avant d'assigner.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setAssignDialogOpen(true);
+  };
+
+  const handleConfirmAssign = () => {
+    if (assignTargetAthleteId == null) return;
+    if (editingSessionId) {
+      // Mode édition : assigner directement sans recréer
+      api.assignments_create({
+        session_type: "strength",
+        session_id: editingSessionId,
+        target_user_id: assignTargetAthleteId,
+      }).then(() => {
+        toast({ title: "Séance assignée" });
+      }).catch((err: Error) => {
+        toast({ title: "Erreur d'assignation", description: err.message, variant: "destructive" });
+      });
+      setAssignDialogOpen(false);
+      setAssignTargetAthleteId(null);
+    } else {
+      setAssignAfterSaveId(assignTargetAthleteId);
+      setAssignDialogOpen(false);
+      setAssignTargetAthleteId(null);
+      handleSaveSession();
     }
   };
 
@@ -1085,6 +1176,7 @@ export default function StrengthCatalog() {
           onReorderItems={reorderItems}
           onExerciseDialogOpen={() => setExerciseDialogOpen(true)}
           isSaving={createSession.isPending || updateSession.isPending}
+          onSaveAndAssign={planCreationContext ? undefined : handleSaveAndAssign}
         />
       </>
     );
@@ -1458,6 +1550,30 @@ export default function StrengthCatalog() {
           />
         </Suspense>
       )}
+
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assigner à un nageur</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-3">
+            La séance sera enregistrée puis assignée à ce nageur.
+          </p>
+          <AssignAthleteSelect
+            athletes={athletes}
+            value={assignTargetAthleteId}
+            onChange={setAssignTargetAthleteId}
+          />
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => { setAssignDialogOpen(false); setAssignTargetAthleteId(null); }}>
+              Annuler
+            </Button>
+            <Button onClick={handleConfirmAssign} disabled={assignTargetAthleteId == null}>
+              Enreg. &amp; assigner
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

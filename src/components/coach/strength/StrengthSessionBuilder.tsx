@@ -36,6 +36,7 @@ interface StrengthSessionBuilderProps {
   onReorderItems: (fromIndex: number, toIndex: number) => void;
   onExerciseDialogOpen: () => void;
   isSaving?: boolean;
+  onSaveAndAssign?: () => void;
 }
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
@@ -60,6 +61,7 @@ export function StrengthSessionBuilder({
   onReorderItems,
   onExerciseDialogOpen,
   isSaving,
+  onSaveAndAssign,
 }: StrengthSessionBuilderProps) {
   const [exerciseFilter, setExerciseFilter] = useState<"all" | "strength" | "warmup">("all");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -88,6 +90,7 @@ export function StrengthSessionBuilder({
         onSave={onSave}
         onCancel={onCancel}
         onPreview={handlePreview}
+        onSaveAndAssign={onSaveAndAssign}
       />
 
       <div className="p-4 space-y-4">

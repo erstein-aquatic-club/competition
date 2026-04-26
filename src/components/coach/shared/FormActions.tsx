@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronLeft, Play, Save } from "lucide-react";
+import { ChevronLeft, Play, Save, UserPlus } from "lucide-react";
 
 interface FormActionsProps {
   isEditing: boolean;
@@ -19,6 +19,7 @@ interface FormActionsProps {
   onSave: () => void;
   onCancel: () => void;
   onPreview?: () => void;
+  onSaveAndAssign?: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
   deleteDialogTitle?: string;
@@ -52,6 +53,7 @@ export function FormActions({
   pendingDelete,
   onDeleteConfirm,
   onDeleteCancel,
+  onSaveAndAssign,
 }: FormActionsProps) {
   return (
     <>
@@ -77,6 +79,19 @@ export function FormActions({
               title="Aperçu nageur"
             >
               <Play className="h-4 w-4" />
+            </button>
+          )}
+          {onSaveAndAssign && (
+            <button
+              type="button"
+              onClick={onSaveAndAssign}
+              disabled={isSaving || saveDisabled}
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+              aria-label="Enregistrer et assigner"
+              title="Enregistrer et assigner"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Enreg. &amp; assigner
             </button>
           )}
           <Button
