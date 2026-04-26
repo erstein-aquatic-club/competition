@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, summarizeApiError, type ClubRecordSwimmer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -207,6 +208,7 @@ const SwimmerCard = ({ swimmer, onUpdate, onImport, onMerge, importPending }: Sw
 export default function RecordsAdmin() {
   const role = useAuth((state) => state.role);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [newSwimmer, setNewSwimmer] = useState({
     display_name: "",
@@ -496,7 +498,7 @@ export default function RecordsAdmin() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { window.location.hash = "#/records-club"; }}
+            onClick={() => navigate("/records-club")}
           >
             <Eye className="h-4 w-4 mr-1" />
             Voir les records

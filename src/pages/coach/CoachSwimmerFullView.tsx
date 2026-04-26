@@ -499,7 +499,7 @@ export default function CoachSwimmerFullView({
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  window.location.hash = `#/coach?section=comms&tab=notifications&athleteId=${athleteId}`;
+                  navigate(`/coach?section=comms&tab=notifications&athleteId=${athleteId}`);
                 }}
               >
                 <Bell className="mr-1.5 h-3.5 w-3.5" />
@@ -510,7 +510,7 @@ export default function CoachSwimmerFullView({
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  window.location.hash = `#/coach?section=comms&tab=sms&athleteId=${athleteId}`;
+                  navigate(`/coach?section=comms&tab=sms&athleteId=${athleteId}`);
                 }}
               >
                 <MessageSquare className="mr-1.5 h-3.5 w-3.5" />

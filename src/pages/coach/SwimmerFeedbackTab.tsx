@@ -271,7 +271,7 @@ export default function SwimmerFeedbackTab({
       return;
     }
     setSelectedAthlete({ id: athleteId, name: athleteName });
-    navigate("/progress");
+    navigate("/suivi/progression");
   };
 
   const renderFeedbackCard = (session: Session, extraBadge?: React.ReactNode) => {

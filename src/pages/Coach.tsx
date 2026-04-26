@@ -1164,7 +1164,7 @@ export default function Coach() {
   const handleOpenAthlete = (athlete: CoachAthleteOption) => {
     setSelectedAthlete({ id: athlete.id ?? null, name: athlete.display_name });
     if (athlete.id == null) {
-      navigate("/progress");
+      navigate("/suivi/progression");
       return;
     }
     // Persist recent athletes for "Nageurs récents" section

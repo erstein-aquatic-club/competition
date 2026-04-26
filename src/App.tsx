@@ -22,6 +22,7 @@ import { PushPermissionBanner } from "@/components/shared/PushPermissionBanner";
 import { requiresApprovalForRole } from "@/lib/authRules";
 import { OfflineMutationSync } from "@/components/shared/OfflineMutationSync";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { useInAppPushBridge } from "@/hooks/useInAppPushBridge";
 
 // Clear the reload flag on successful app load
 sessionStorage.removeItem('chunk_reload');
@@ -275,7 +276,7 @@ function AppRouter() {
             <Route path="/reset-password" component={ResetPassword} />
             <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <SwimmerHome />}</Route>
             <Route path="/natation" component={Dashboard} />
-            <Route path="/progress">{() => { window.location.hash = "#/suivi/progression"; return null; }}</Route>
+            <Route path="/progress"><Redirect to="/suivi/progression" /></Route>
             <Route path="/hall-of-fame" component={FEATURES.hallOfFame ? HallOfFame : ComingSoon} />
             <Route path="/competition/:id" component={CompetitionDetail} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
@@ -353,6 +354,15 @@ function DarkModeApplier() {
 }
 
 /**
+ * Bridge for foreground push notifications from Service Worker.
+ * Displays in-app toasts and invalidates query cache.
+ */
+function PushBridge() {
+  useInAppPushBridge();
+  return null;
+}
+
+/**
  * Warms React Query cache with pivot queries right after login. Fire-and-forget :
  * a failed prefetch cannot break any render path, and the existing `useQuery`
  * calls will pick up the cached data transparently on first mount.
@@ -410,6 +420,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <DarkModeApplier />
         <CacheWarmer />
+        <PushBridge />
         <TooltipProvider>
           <UpdateNotification />
           <OfflineMutationSync />
