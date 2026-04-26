@@ -34,14 +34,14 @@ export default defineConfig(({ mode }) => ({
     tailwindcss(),
     versionJsonPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',  // §171 P1: was 'autoUpdate' — gated via UpdateNotification
       workbox: {
         importScripts: ['push-handler.js'],
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
         globIgnores: ['**/version.json'],
         cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
+        clientsClaim: false,  // §171 P1: was true — let UpdateNotification gate the activation
+        skipWaiting: false,   // §171 P1: was true — same reason
         navigateFallback: mode === 'production' ? '/competition/index.html' : '/index.html',
         navigateFallbackDenylist: [/^\/competition\/api/, /^\/competition\/version\.json/],
         runtimeCaching: [

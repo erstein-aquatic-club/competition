@@ -7,27 +7,23 @@ declare const __BUILD_TIMESTAMP__: string;
 console.log(`[EAC] Build: ${__BUILD_TIMESTAMP__}`);
 (window as any).__eacBuildTimestamp = __BUILD_TIMESTAMP__;
 
-// vite-plugin-pwa: autoUpdate mode – SW activates immediately (skipWaiting + clientsClaim)
-// Extra safety: periodic check every hour + check on visibility change
+// vite-plugin-pwa: gated update mode — new SW waits until user accepts via UpdateNotification.
+// Periodic check every hour (only) — do NOT check on visibilitychange:
+// would activate a new version mid-session, risking blank pages on iOS PWA.
 const UPDATE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 const updateSW = registerSW({
-  immediate: true,
+  immediate: false,
   onRegistered(r) {
     if (r) {
       (window as any).__pwaRegistration = r;
-
-      // Periodic update check every hour (only) — do NOT check on visibilitychange:
-      // calling r.update() every time the app comes back from background causes
-      // the SW to activate a new version mid-session, which blanks the page on iOS PWA.
       setInterval(() => {
         r.update().catch(() => {});
       }, UPDATE_INTERVAL_MS);
     }
   },
   onNeedRefresh() {
-    // In autoUpdate mode the new SW is already active.
-    // Notify the UI so we can reload with a brief countdown.
+    // The new SW is waiting. Notify the UI so the user can accept the update.
     window.dispatchEvent(new CustomEvent('pwa-update-available'));
   },
 });
@@ -40,7 +36,8 @@ async function applyUpdate() {
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
   } catch { /* best-effort */ }
-  window.location.reload();
+  // Activate the waiting SW (skipWaiting + reload in one shot)
+  await updateSW(true);
 }
 
 (window as any).__pwaUpdateSW = updateSW;
