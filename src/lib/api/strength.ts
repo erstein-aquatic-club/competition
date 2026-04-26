@@ -583,19 +583,27 @@ export async function reconcileStrengthRunLogs(params: {
   if (remoteCount >= params.logs.length) return emptyResult;
   const missing = params.logs.slice(remoteCount);
   const errors: ReconcileStrengthSetError[] = [];
-  const results = await Promise.allSettled(
-    missing.map((log, i) =>
-      logStrengthSet({
-        run_id: params.runId,
-        exercise_id: log.exercise_id,
-        set_index: log.set_number ?? remoteCount + i + 1,
-        reps: log.reps ?? null,
-        weight: log.weight ?? null,
-        difficulty: log.difficulty ?? null,
-        athlete_id: params.athleteId ?? null,
-        athlete_name: params.athleteName ?? null,
-      }),
+  // Run all missing-set inserts in parallel and enforce a global 30 s budget.
+  // Sequential fire-and-forget could take 200 s+ (20 sets × 10 s each);
+  // the allSettled wrapper ensures we wait for all slots but a hung network
+  // triggers the timeout, unblocking the UI and letting the caller enqueue.
+  const results = await withTimeout(
+    Promise.allSettled(
+      missing.map((log, i) =>
+        logStrengthSet({
+          run_id: params.runId,
+          exercise_id: log.exercise_id,
+          set_index: log.set_number ?? remoteCount + i + 1,
+          reps: log.reps ?? null,
+          weight: log.weight ?? null,
+          difficulty: log.difficulty ?? null,
+          athlete_id: params.athleteId ?? null,
+          athlete_name: params.athleteName ?? null,
+        }),
+      ),
     ),
+    30_000,
+    "reconcile-batch",
   );
   let succeeded = 0;
   results.forEach((res, i) => {

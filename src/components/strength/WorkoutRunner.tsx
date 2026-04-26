@@ -899,7 +899,7 @@ export function WorkoutRunner({
             isOnline ? "bg-emerald-500" : "bg-red-500"
           )} aria-label={isOnline ? "En ligne" : "Hors ligne"} />
           {onSubstitute && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+            <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0"
               onClick={() => withFocusDisclaimer(() => setSubstitutePickerOpen(true))}
               aria-label="Remplacer l'exercice"
             >
@@ -910,7 +910,7 @@ export function WorkoutRunner({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="h-10 w-10 shrink-0"
               aria-label="Quitter le focus"
               onClick={() => {
                 if (logs.length > 0) {
@@ -1034,11 +1034,11 @@ export function WorkoutRunner({
                 <button
                   key={level}
                   type="button"
-                  // h-9 w-9 (36px) keeps the row visually compact while staying
-                  // tap-friendly with wet hands at the pool. The previous h-6
-                  // (24px) failed Apple HIG and produced misclicks.
+                  // h-11 w-11 (44px) atteint Apple HIG. Précédemment h-9 (36px,
+                  // §172) restait sous le seuil de tap-friendliness mains
+                  // mouillées au bord du bassin.
                   className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold transition-all",
+                    "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-all",
                     selected
                       ? colorClass
                       : "border-muted-foreground/25 bg-muted/30 text-muted-foreground/60",

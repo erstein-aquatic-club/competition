@@ -709,6 +709,8 @@ function QuickComposeBody({
   const submittingRef = useRef(false);
   const [assigningCatalogId, setAssigningCatalogId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [splitDistanceAlertOpen, setSplitDistanceAlertOpen] = useState(false);
+  const splitDistanceConfirmRef = useRef<((proceed: boolean) => void) | null>(null);
 
   const isVisibleFromValid = !visibleFrom || visibleFrom <= instance.date;
   const hasGroup = selectedGroups.length > 0;
@@ -812,9 +814,10 @@ function QuickComposeBody({
     if (!canSubmitText || submittingRef.current) return;
     const splitWarnings = textWarnings.filter((w) => w.type === "split_distance");
     if (splitWarnings.length > 0) {
-      const proceed = window.confirm(
-        `${splitWarnings.length} ligne(s) avec distance partielle (ex: "10 EZ" perdu après le /). Assigner quand même ?`,
-      );
+      const proceed = await new Promise<boolean>((resolve) => {
+        splitDistanceConfirmRef.current = resolve;
+        setSplitDistanceAlertOpen(true);
+      });
       if (!proceed) return;
     }
     submittingRef.current = true;
@@ -1073,13 +1076,13 @@ function QuickComposeBody({
             )
           )}
 
-          <div className="sticky bottom-0 -mx-5 -mb-8 border-t border-border/50 bg-background/95 px-5 py-3 backdrop-blur-sm">
+          <div className="sticky bottom-0 -mx-5 -mb-8 border-t border-border/50 bg-background/95 px-5 py-3.5 backdrop-blur-sm">
             <button
               type="button"
               onClick={handleTextSubmit}
               disabled={!canSubmitText}
               className={cn(
-                "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-semibold transition-colors",
                 canSubmitText
                   ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]"
                   : "bg-muted text-muted-foreground cursor-not-allowed",
@@ -1193,6 +1196,53 @@ function QuickComposeBody({
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={splitDistanceAlertOpen}
+        onOpenChange={(open) => {
+          if (!open && splitDistanceConfirmRef.current) {
+            splitDistanceConfirmRef.current(false);
+            splitDistanceConfirmRef.current = null;
+          }
+          setSplitDistanceAlertOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Distance partielle détectée</AlertDialogTitle>
+            <AlertDialogDescription>
+              {textWarnings.filter((w) => w.type === "split_distance").length} ligne(s)
+              avec distance partielle (ex : « 10 EZ » perdu après le « / »). Assigner
+              quand même ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                if (splitDistanceConfirmRef.current) {
+                  splitDistanceConfirmRef.current(false);
+                  splitDistanceConfirmRef.current = null;
+                }
+                setSplitDistanceAlertOpen(false);
+              }}
+            >
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (splitDistanceConfirmRef.current) {
+                  splitDistanceConfirmRef.current(true);
+                  splitDistanceConfirmRef.current = null;
+                }
+                setSplitDistanceAlertOpen(false);
+              }}
+            >
+              Assigner quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

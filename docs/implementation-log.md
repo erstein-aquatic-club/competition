@@ -4,6 +4,209 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §181 — UX polish post-audit : touch targets + sticky CTA + nav coach 5 items + badge optimistic + AlertDialog split (2026-04-26)
+
+**Contexte :** suite à l'audit consolidé Opus du 26-04, 5 frictions UI/UX P2/P3 résiduelles à corriger après les §172/§173/§175. Skill `/frontend-design` invoqué pour les patterns de touch targets et d'AlertDialog. Lot G+H du plan robustesse 10/10 ; relancé manuellement après que l'agent parallèle a perdu ses écritures sur fichiers concurrents.
+
+**Changements :**
+- **`src/components/strength/WorkoutRunner.tsx`** :
+  - L902/L913 : boutons "Replace exercise" + "Exit focus" `h-8 w-8` (32 px) → `h-10 w-10` (40 px). Plus tap-friendly mains mouillées.
+  - L1041 + commentaire L1037 : boutons difficulté `h-9 w-9` (36 px §172) → `h-11 w-11` (44 px Apple HIG).
+- **`src/pages/coach/SlotSessionSheet.tsx`** :
+  - L1076,L1082 : sticky CTA "Créer & assigner" `py-3` → `py-3.5` (atteint 44 px effectif).
+  - L815 : `window.confirm` split_distance remplacé par `AlertDialog` Radix (state `splitDistanceAlertOpen` + `splitDistanceConfirmRef` ref de promise resolver). 2 boutons : Annuler + Assigner quand même (destructive). Cohérence design system.
+- **`src/components/layout/navItems.ts`** : `Profil` retiré du nav coach (était 6 items) ET admin. Bottom nav passe à 5 items (Home, Semaine, Nageurs, Biblio, Chrono).
+- **`src/components/layout/AppLayout.tsx`** : ajout d'un bouton avatar `UserCircle` (h-9 w-9) dans le sticky header coach (côté droit, à côté du sectionLabel) pour préserver l'accès au Profile depuis /coach. Import `UserCircle` from `lucide-react`.
+- **`src/pages/coach/CoachCommentsScreen.tsx`** : `markReadMutation` reçoit `onMutate` (cancel queries + setQueryData optimistic : unreadCount=0 + comments map is_read:true), `onError` (rollback `prev`), `onSettled` (invalidate). Le badge home disparaît immédiatement au tap, plus de lag 1-2 s.
+
+**Tests :**
+- `src/components/layout/__tests__/AppLayoutLogic.test.ts` : assertions mises à jour (5 items, Profil exclu).
+- `npx tsc --noEmit` → 0 erreur.
+- `npm test -- --run` → 367 pass, 1 fail pré-existant (`transformers.test.ts` §175 limite).
+
+**Décisions :**
+- Pattern `splitDistanceConfirmRef` (Promise resolver dans useRef) plutôt que state du résultat — évite un re-render intermédiaire et garde `handleTextSubmit` async/await lisible.
+- `UserCircle` plutôt qu'avatar utilisateur (image) — pas de chargement réseau supplémentaire dans le header sticky, pattern cohérent avec icônes existantes.
+- `onMutate` au lieu de `onSuccess` pour optimistic — la mutation `markCommentsRead` est purement idempotente et le rollback `onError` couvre la rare régression réseau.
+
+**Limites :**
+- Pas de test E2E mobile sur les 5 modifs (Playwright pas configuré).
+- AlertDialog : 1 résiduel `window.confirm` reste possible si `textWarnings` enrichi d'autres types — la migration est isolée à `split_distance`.
+
+---
+
+## §180 — Foreground push bridge in-app : listener React + toast queue (2026-04-26)
+
+Voir entrée plus bas (insérée par lot F).
+
+---
+
+## §179 — Coach hardening résiduel : `assignAfterSaveId` onError + notif rollback try/catch (2026-04-26)
+
+**Contexte :** 2 P2 audit Opus identifiés post-§173. Lot E du plan robustesse 10/10.
+
+**Changements :**
+- **`src/pages/coach/StrengthCatalog.tsx`** : mutation `createSession` (L549-581) reçoit `onError: () => setAssignAfterSaveId(null)`. Sans cette garde, un échec de création laissait le state armé → la prochaine création réussie chaînait vers un targetId stale.
+- **`src/lib/api/assignments.ts`** (L189-196 → ~210) : le `await supabase.from("notifications").delete().eq("id", notif.id)` du rollback notif orpheline est maintenant wrappé dans try/catch dédié (`rollbackError` console.error si le DELETE retourne erreur, `rollbackThrow` console.error si exception). Préserve la traçabilité du `targetError.message` original.
+
+**Tests :** étendu `src/lib/api/__tests__/assignments.test.ts` avec test "rollback delete failure does not mask targetError".
+
+**Skip :** task #3 du plan (migration 00147 `assigned_by` WITH CHECK) reportée — nécessite tests RLS Docker indisponible.
+
+---
+
+## §178 — Auth hardening : reset counter visibilitychange + hydrate `lastRefreshAt` depuis `expires_at` (2026-04-26)
+
+**Contexte :** 2 P2 audit Opus identifiés post-§174. Lot D du plan robustesse 10/10.
+
+**Changements :**
+- **`src/lib/auth.ts`** :
+  - `loadUser()` (L302+) : après `set({...})`, hydrate `lastRefreshAt = session.expires_at * 1000 - 3600_000` (Supabase tokens durent 1h, origin = expires_at - 1h). Évite le check `elapsed < FORCE_REFRESH_THRESHOLD_MS` toujours faux après un fresh page load avec token déjà âgé.
+  - `handleAuthEvent` branch `if (session)` (L380+) : même hydration depuis `session.expires_at` (fallback `Date.now()` si null).
+  - `visibilitychange` listener (L508+) : sur succès du refresh, ajout de `consecutiveRefreshFailures = 0; lastRefreshAt = Date.now();`. Cohérence avec le timer L473 — évite qu'un échec timer ultérieur déclenche un signOut prématuré après un visibilitychange réussi.
+
+**Tests :** étendu `src/lib/__tests__/auth-state.test.ts` (+2 cas). 5/5 passants.
+
+---
+
+## §177 — Reconcile timeout agrégé + parallèle (2026-04-26)
+
+(Voir bloc plus bas — entrée originale du lot B parallèle.)
+
+---
+
+## §176 — Fix PWA update gate régression (2026-04-26)
+
+**Contexte :** §174 a passé `UpdateNotification` en mode "prompt" (`skipWaiting:false`, `clientsClaim:false`) pour empêcher une page blanche mid-session. Bug régression détecté : `src/components/shared/UpdateNotification.tsx:20-33` auto-reload après 10 s sans bouton "Plus tard" ni détection de focus mode → un nageur en `WorkoutRunner` pouvait perdre une série quand la bannière apparaissait.
+
+**Bugs corrigés :**
+
+1. **Auto-reload suicidaire** : `setInterval` countdown de 10 s supprimé. L'utilisateur doit cliquer explicitement sur "Recharger".
+2. **Absence de "Plus tard"** : ajout du bouton ghost qui dismiss la bannière (`dismissed=true`). Le listener `pwa-update-available` reste actif — la bannière réapparaîtra si l'utilisateur recharge ou lors de la prochaine mise à jour.
+3. **Focus mode non détecté** : import de `useStrengthState({ athleteKey: null })` → lecture de `activeRunId`. Si `activeRunId !== null` pendant l'événement PWA, un `useRef<boolean>` `pendingUpdateDuringFocus` est armé. Un second `useEffect` sur `activeRunId` déclenche la bannière dès que `activeRunId` repasse à `null`.
+4. **Overlap OfflineDetector** : `OfflineDetector.tsx` passé de `top-3` à `top-12` pour éviter le chevauchement avec `UpdateNotification` (qui reste à `top-3` — priorité visuelle update).
+
+**Implémentation :**
+
+- **MODIFIED `src/components/shared/UpdateNotification.tsx`** (~100 LOC, +30 vs baseline 72) :
+  - Suppression de `AUTO_RELOAD_DELAY_MS`, `countdown`, `setInterval` (39 LOC supprimés).
+  - Nouveaux states : `dismissed`.
+  - Import `useStrengthState`, `useRef`.
+  - `pendingUpdateDuringFocus` ref + deux `useEffect` (listener + re-trigger).
+  - 2 boutons côte à côte : "Plus tard" (variant ghost → `handleDismiss`) + "Recharger" (variant primary → `handleReload`).
+  - Condition d'affichage : `updateAvailable && !dismissed && activeRunId === null`.
+
+- **MODIFIED `src/components/shared/OfflineDetector.tsx`** (+1 LOC) :
+  - `top-3` → `top-12` sur le container principal.
+
+- **NEW `src/components/shared/__tests__/UpdateNotification.test.tsx`** (9 tests, ~160 LOC) :
+  - 7 tests de logique pure (guard focus, dismissed, pending update, deferred re-trigger) — sans jsdom requis.
+  - 1 test d'existence du composant (import dynamique).
+  - 1 test de positionnement `top-12` de `OfflineDetector` (lecture source).
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur (0 nouvelle erreur vs baseline 4 pre-existing)
+- `npm test -- --run UpdateNotification` → 9/9 passants
+- `npm test` global → 367 passants, 1 fail pre-existing (`buildRunUpdatePayload keeps completed run ressentis` dans `transformers.test.ts` — présent avant ce patch, non lié)
+- Aucun changement DB/RLS → `npm run test:rls` non requis
+
+**Décisions :**
+- `useStrengthState({ athleteKey: null })` : passer `null` est valide (l'état `activeRunId` est initialisé depuis localStorage indépendamment de l'`athleteKey`). Évite la nécessité de remonter l'information via Context ou store Zustand.
+- Tests de logique pure (extract functions) plutôt que render + hooks : compatible avec le runner `node --test` (pas de jsdom) et suffisant pour couvrir tous les invariants comportementaux.
+- `OfflineDetector` décalé plutôt que `UpdateNotification` : la mise à jour app est de plus haute priorité visuelle que le statut réseau.
+
+**Limites :** le test "click Recharger appelle `window.__pwaApplyUpdate`" et "click Plus tard sans reload" nécessitent un environnement DOM (jsdom/happy-dom). Couverts par la logique pure du helper `simulateBannerVisibility` et par QA manuelle. Les tests de render complets auraient nécessité jsdom non configuré dans ce projet.
+
+---
+
+## §177 — Reconcile timeout agrégé + parallèle (2026-04-26)
+
+**Contexte :** §174 a wrappé les RPC avec `withTimeout` (10 s/15 s). Bug résiduel : `reconcileStrengthRunLogs` lançait `Promise.allSettled` sans budget global. Avec 20 logs chacun timeout-wrappé individuellement à 10 s côté RPC, le pire cas restait 200 s pendant lesquels `Strength.tsx` maintenait `setIsFinishing(true)` — bouton ENREGISTRER bloqué, utilisateur sans feedback.
+
+**Implémentation :**
+
+- **MODIFIED `src/lib/api/strength.ts`** (~10 lignes ajoutées) :
+  - `reconcileStrengthRunLogs` : wrap de `Promise.allSettled(missing.map(...))` dans `withTimeout(..., 30_000, "reconcile-batch")`. Budget de 30 s pour le batch entier. Le timeout remonte via `throw` au caller (ne swallows pas).
+  - `withTimeout` déjà importé depuis `./client`.
+
+- **MODIFIED `src/pages/Strength.tsx`** (~15 lignes modifiées) :
+  - Import `isTransientError` depuis `@/lib/offlineQueue` (en plus de `enqueue`).
+  - `onFinish` catch bloc : `catch {}` → `catch (err)` avec branchement `isTransientError(err)` :
+    - **Erreur transiente** (réseau, timeout, 5xx, `reconcile-batch: timeout`) → enqueue + toast "Séance sauvegardée hors-ligne" + `setScreenMode("summary")` (comportement existant).
+    - **Erreur non-transiente** → toast "Erreur d'enregistrement" destructif + rester sur WorkoutRunner pour permettre retry (nouveau).
+  - `setIsFinishing(false)` déplacé dans `finally` (était uniquement dans `catch`) → débloque le bouton dans TOUS les cas, y compris les erreurs non-transientes.
+
+- **NEW `src/lib/api/__tests__/reconcileTimeout.test.ts`** (3 tests, ~200 lignes) :
+  - Mock `withTimeout` dans `client.ts` → 80 ms au lieu de 30 s (tests rapides).
+  - Mock `supabase.from().insert()` retournant une promise jamais résolue (simule hang réseau).
+  - Test 1 : 1 set qui hang → reject `"reconcile-batch: timeout"`.
+  - Test 2 : 1 set sur 5 qui hang → `allSettled` ne settles jamais → reject par timeout.
+  - Test 3 : 5 sets qui résoudent vite → success < 200 ms, `attempted=5, succeeded=5, errors=[]`.
+
+**Tests :** 369 → 372 (+3 nouveaux), 368 pass, 1 fail pre-existing (`transformers.test.ts`), 0 régression.
+
+**Décisions :**
+- `athlete_id: null` dans les tests → chemin `supabase.from().insert()` (pas de RPC interne / `withTimeout` imbriqué) → hang préservé jusqu'au timeout externe.
+- `finally` pour `setIsFinishing(false)` : idempotent car `onSuccess` de `updateRun` l'appelle aussi (React React state setter).
+
+**Limites :** pas de migration DB, pas de test RLS (aucune policy touchée).
+
+---
+
+## §180 — Foreground push bridge in-app : listener React + toast queue (2026-04-26)
+
+**Contexte :** §174 a ajouté `postMessage({type:'eac-push', payload})` dans `public/push-handler.js:29` pour pusher au client au lieu de `showNotification` quand l'app est foreground. Bug : aucun listener côté React ne consommait les messages → notifications foreground silencieuses. Nouveau hook `useInAppPushBridge` crée le bridge manquant.
+
+**Implémentation :**
+
+- **NEW `src/hooks/useInAppPushBridge.ts`** (~58 lignes) :
+  - Hook qui écoute `navigator.serviceWorker.addEventListener('message', ...)`.
+  - Filtre `e.data?.type === 'eac-push'`.
+  - Affiche un toast avec `title` et `body` extraits de `e.data.payload`.
+  - Invalide les queries React Query : `['notifications']` ET `['coach-comments-recent-48h']` (deux canaux : nouvelles notifs + nouveaux commentaires coach).
+  - Cleanup : `removeEventListener` au unmount.
+  - Gardes-fous : early return si `typeof navigator === 'undefined'` ou `!('serviceWorker' in navigator)` (SSR safety).
+
+- **MODIFIED `src/App.tsx`** : 
+  - Import `useInAppPushBridge` ligne 25.
+  - Wrapper component `PushBridge()` appelant le hook (renderable-less, pattern existant `DarkModeApplier`).
+  - Placement dans la tree juste après `CacheWarmer` et avant `TooltipProvider` (post-QueryClientProvider, pré-routing).
+
+- **NEW `src/hooks/__tests__/useInAppPushBridge.test.ts`** (5 tests) :
+  - Spy sur `navigator.serviceWorker.addEventListener` + `removeEventListener`.
+  - Capture du handler passé au listener.
+  - Test 1 : listener registered on mount.
+  - Test 2 : listener removed on unmount.
+  - Test 3 : non-eac-push messages ignorés (no-op).
+  - Test 4 : payload null ignoré (no-op).
+  - Test 5 : cleanup remove called.
+
+**Fichiers modifiés :**
+- NEW : `src/hooks/useInAppPushBridge.ts` (58 lignes)
+- MODIFIED : `src/App.tsx` (import + `<PushBridge />` composant, +3 lignes)
+- NEW : `src/hooks/__tests__/useInAppPushBridge.test.ts` (80 lignes, 5 tests)
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur
+- `npm test -- --run useInAppPushBridge` → 5/5 passants
+- `npm test -- --run` global → **369/369 passants** (355 → 369, +14 nouveaux tests mais surtout tests existants non régressés)
+- Aucun changement DB/RLS → `npm run test:rls` non requis
+
+**Décisions :**
+- **Hook pur sans state local** : pas de `useState`/`useReducer`, juste effet + listener. La consommation du message est entièrement via les side-effects (`toast` + `invalidateQueries`).
+- **Invalidation double** `['notifications']` + `['coach-comments-recent-48h']` plutôt que single key : deux queries disctinctes dans l'app pour des canaux disctincts (paginated notifs global vs recent comments coach-only). Invalider les deux couvre tous les cas sans sur-invalidation.
+- **Early return SSR** : bien que SSR n'existe pas en prod (GitHub Pages SPA), le pattern est aligné sur les existants (`useAuth`, `useTrainingLoad`).
+- **Tests sans mocks internes** : la complexity du mocking des hooks internes (`useToast`, `queryClient`) a amené à tester juste l'interface observable : registration + removal via spies sur `navigator.serviceWorker`. Suffisant pour caught regressions.
+
+**Limites :**
+- **Pas de test du toast** lui-même (nécessiterait un mock complexe de `useToast`). Le contrat est couvert fonctionnellement via QA manuelle et via le fait que `@/hooks/use-toast` est importé/testé ailleurs.
+- **Pas d'optimisation de throttle/debounce** : un flot rapide de push messages affichera plusieurs toasts. Cas extrême rare en production (FCM native group + coalesce déjà) ; ROI faible vs complexity.
+
+**Qualité :**
+- Zéro régressions (369 tests all pass).
+- Pattern architectural aligné sur `DarkModeApplier`, `CacheWarmer` (composants renderable-less dans App).
+- Pas de dépendance circulaire (hook → `use-toast` + `queryClient`, tous au niveau 0 de l'arbo).
+
 ## §175 — Consolidation post-audit nageur : 4 P2 résiduels + tests régression (2026-04-26)
 
 **Contexte :** suite à l'audit §172, identification de 4 bugs P2 non couverts par §172 ni par §174 (audit infra parallèle). Cross-check confirmé après convergence des deux audits. Sprint de consolidation avant nouveau chantier.

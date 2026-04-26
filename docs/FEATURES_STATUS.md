@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-21 (§164 Audit perf + Sprint 1 — `Promise.allSettled` sur reconcileStrengthRunLogs et push-send, defaults React Query durcis, `sideEffects: ["**/*.css"]`, lazy import gifenc, migrations 00140 FK indexes + 00141 drop indexes redondants)*
+*Dernière mise à jour : 2026-04-26 (§180 Foreground push bridge in-app — `useInAppPushBridge` React hook écoutant `navigator.serviceWorker` messages eac-push, affichant toast + invalidant queries notifications + coach-comments)*
 
 ## Légende
 
@@ -311,6 +311,7 @@ Tous les feature flags sont activés.
 | Lazy import gifenc | ✅ | `src/lib/gifEncoder.ts` | §164 `loadGifenc()` async + cache — ~20 KB sortent du chunk principal (chargés à la volée dans VideoTrimmer) |
 | Indexes FK planning (8) | ✅ | `00140_fk_indexes_planning_tables.sql` | §164 indexes sur FK manquantes (planned_absences, session_attendance, session_comments, strength_planning_*, swim_planning_*) |
 | Drop indexes redondants | ✅ | `00141_drop_redundant_indexes.sql` | §164 drop 2 indexes strictement couverts par UNIQUE (session_attendance_session_idx, idx_notification_dismissals_user) |
+| Bridge push foreground in-app | ✅ | `src/hooks/useInAppPushBridge.ts`, `src/App.tsx` | §180 listener React sur messages SW eac-push, toast + invalidation queries notifications/coach-comments |
 
 ### UI/UX & Design System (Phase 6)
 

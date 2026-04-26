@@ -577,6 +577,9 @@ export default function StrengthCatalog() {
       } else {
         toast({ title: "Séance créée avec succès" });
       }
+    },
+    onError: () => {
+      setAssignAfterSaveId(null);
     }
   });
 

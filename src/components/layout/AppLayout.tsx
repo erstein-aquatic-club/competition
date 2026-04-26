@@ -9,6 +9,7 @@ import { OfflineDetector } from "@/components/shared/OfflineDetector";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { OfflineSyncBanner } from "@/components/shared/OfflineSyncBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
+import { UserCircle } from "lucide-react";
 
 const COACH_SECTION_LABELS: Record<string, string> = {
   home: "Accueil",
@@ -163,6 +164,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             return (
               <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-background/95 backdrop-blur px-4 py-2 border-b border-border/40">
                 <span className="text-sm font-semibold text-foreground">{sectionLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => handleNavClick("/profile")}
+                  className="h-9 w-9 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  aria-label="Profil"
+                >
+                  <UserCircle className="h-5 w-5" />
+                </button>
               </div>
             );
           })()}

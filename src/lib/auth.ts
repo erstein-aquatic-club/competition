@@ -301,6 +301,13 @@ export const useAuth = create<AuthState>((set) => ({
       refreshToken: session.refresh_token,
     });
 
+    // Hydrate lastRefreshAt from the session's expires_at so visibilitychange
+    // and the proactive timer evaluate against the real token age, not module
+    // load time. Supabase tokens last 1h → origin = expires_at - 3600s.
+    if (session.expires_at) {
+      lastRefreshAt = session.expires_at * 1000 - 60 * 60 * 1000;
+    }
+
     return displayName;
   },
 }));
@@ -377,7 +384,12 @@ export function handleAuthEvent(event: string, session: Session | null) {
 
   if (session) {
     const state = useAuth.getState();
-    lastRefreshAt = Date.now();
+    // Hydrate lastRefreshAt from session.expires_at when available (more
+    // accurate than Date.now() on INITIAL_SESSION/SIGNED_IN where the token
+    // may already be partially aged from previous tab/PWA cycle).
+    lastRefreshAt = session.expires_at
+      ? session.expires_at * 1000 - 60 * 60 * 1000
+      : Date.now();
     startRefreshTimer();
 
     if (state.isLoaded && state.user) {
@@ -509,7 +521,14 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
       const { data, error } = await supabase.auth.refreshSession();
       if (error || !data.session) {
         console.warn("[auth] visibilitychange refresh failed", error);
+        return;
       }
+      // Cohérence avec startRefreshTimer L473 : un refresh réussi
+      // (timer OU visibilitychange) doit reset le compteur d'échecs et
+      // mettre à jour lastRefreshAt — sinon le compteur reste au seuil
+      // de tolérance et un échec timer ultérieur cause un signOut prématuré.
+      consecutiveRefreshFailures = 0;
+      lastRefreshAt = Date.now();
       // onAuthStateChange handles store sync on success
     } catch (err) {
       console.warn("[auth] visibilitychange refresh threw", err);

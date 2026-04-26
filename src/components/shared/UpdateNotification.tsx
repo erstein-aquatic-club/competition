@@ -1,50 +1,72 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useStrengthState } from "@/hooks/useStrengthState";
 
-// Auto-reload delay: if user doesn't click, reload after 10 seconds
-const AUTO_RELOAD_DELAY_MS = 10_000;
-
+/**
+ * §176 — Shows a "mise à jour disponible" pill.
+ * - No auto-reload: user must explicitly click "Recharger".
+ * - "Plus tard" dismisses the banner (listener stays active for next reload).
+ * - Focus-mode guard: if activeRunId !== null (WorkoutRunner active) the
+ *   banner is suppressed. A ref records that an update arrived during focus
+ *   so the banner re-appears as soon as activeRunId returns to null.
+ */
 export function UpdateNotification() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
-  const [countdown, setCountdown] = useState(Math.ceil(AUTO_RELOAD_DELAY_MS / 1000));
 
+  // useStrengthState requires an athleteKey; pass null (anonymous) — we only
+  // need activeRunId, which is initialised from localStorage independently.
+  const { activeRunId } = useStrengthState({ athleteKey: null });
+
+  // Tracks whether an update event arrived while a workout was in focus.
+  const pendingUpdateDuringFocus = useRef(false);
+
+  // Listen for the PWA update event.
   useEffect(() => {
-    const handler = () => setUpdateAvailable(true);
+    const handler = () => {
+      if (activeRunId !== null) {
+        // Workout in progress: defer the banner, remember we have a pending update.
+        pendingUpdateDuringFocus.current = true;
+      } else {
+        setUpdateAvailable(true);
+        setDismissed(false);
+      }
+    };
     window.addEventListener("pwa-update-available", handler);
     return () => window.removeEventListener("pwa-update-available", handler);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRunId]);
 
-  // Auto-reload countdown when update is available
+  // Re-evaluate when activeRunId transitions back to null after a deferred update.
   useEffect(() => {
-    if (!updateAvailable) return;
-    const tick = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(tick);
-          handleReload();
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [updateAvailable]);
+    if (activeRunId === null && pendingUpdateDuringFocus.current) {
+      pendingUpdateDuringFocus.current = false;
+      setUpdateAvailable(true);
+      setDismissed(false);
+    }
+  }, [activeRunId]);
 
   const handleReload = async () => {
     setIsReloading(true);
     const applyUpdate = (window as any).__pwaApplyUpdate;
-    if (typeof applyUpdate === 'function') {
+    if (typeof applyUpdate === "function") {
       await applyUpdate();
     } else {
       window.location.reload();
     }
   };
 
+  const handleDismiss = () => {
+    setDismissed(true);
+  };
+
+  const show = updateAvailable && !dismissed && activeRunId === null;
+
   return (
     <AnimatePresence>
-      {updateAvailable && (
+      {show && (
         <div className="fixed top-3 left-0 right-0 z-toast pointer-events-none flex justify-center px-4">
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.9 }}
@@ -58,11 +80,17 @@ export function UpdateNotification() {
               Mise à jour disponible
             </span>
             <button
+              onClick={handleDismiss}
+              className="rounded-full px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground hover:bg-muted active:bg-muted/80"
+            >
+              Plus tard
+            </button>
+            <button
               onClick={handleReload}
               disabled={isReloading}
               className="rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-[11px] font-bold transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-50"
             >
-              {isReloading ? "..." : `Recharger (${countdown}s)`}
+              {isReloading ? "..." : "Recharger"}
             </button>
           </motion.div>
         </div>

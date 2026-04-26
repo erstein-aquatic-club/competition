@@ -72,10 +72,33 @@ export default function CoachCommentsScreen({ onBack, onOpenAthlete }: Props) {
     enabled: !!coachUserId,
   });
 
-  // Auto-mark unread as read
+  // Auto-mark unread as read — optimistic update pour faire disparaître le badge
+  // immédiatement plutôt qu'attendre l'invalidate (lag 1-2s post-mutation).
   const markReadMutation = useMutation({
     mutationFn: (ids: number[]) => api.markCommentsRead(coachUserId!, ids),
-    onSuccess: () => {
+    onMutate: async (ids: number[]) => {
+      const queryKey = ["coach-comments-recent-48h", coachUserId];
+      await queryClient.cancelQueries({ queryKey });
+      const prev = queryClient.getQueryData<{ comments: any[]; unreadCount: number } | undefined>(queryKey);
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        const idSet = new Set(ids);
+        return {
+          ...old,
+          unreadCount: 0,
+          comments: old.comments.map((c: any) =>
+            idSet.has(c.session_id) ? { ...c, is_read: true } : c,
+          ),
+        };
+      });
+      return { prev };
+    },
+    onError: (_err, _ids, ctx) => {
+      if (ctx?.prev) {
+        queryClient.setQueryData(["coach-comments-recent-48h", coachUserId], ctx.prev);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["coach-comments-recent-48h"] });
     },
   });

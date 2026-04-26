@@ -21,7 +21,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { OneRmGate } from "@/components/strength/OneRmGate";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { enqueue } from "@/lib/offlineQueue";
+import { enqueue, isTransientError } from "@/lib/offlineQueue";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -943,24 +943,36 @@ export default function Strength() {
                     ...result,
                   });
                   // onSuccess handles navigation to summary + toast
-                } catch {
-                  // Network failed despite navigator.online — fallback to offline queue.
-                  // Reset isFinishing here: updateRun.onError doesn't fire when the throw
-                  // comes from reconcileStrengthRunLogs (before the mutation), and even
-                  // when it does, we land in this catch instead, which left the button
-                  // stuck disabled until full app refresh.
-                  setIsFinishing(false);
-                  try {
-                    enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
-                    toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
-                    setScreenMode("summary");
-                  } catch {
+                } catch (err) {
+                  // Distinguish transient errors (network blip, timeout including
+                  // "reconcile-batch: timeout") from hard failures.
+                  // Transient → enqueue + summary (existing behavior).
+                  // Hard failure → destructive toast, stay on WorkoutRunner for retry.
+                  if (isTransientError(err)) {
+                    try {
+                      enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                      toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                      setScreenMode("summary");
+                    } catch {
+                      toast({
+                        title: "Mémoire pleine",
+                        description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau.",
+                        variant: "destructive",
+                      });
+                    }
+                  } else {
                     toast({
-                      title: "Mémoire pleine",
-                      description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau.",
+                      title: "Erreur d'enregistrement",
+                      description: "Une erreur inattendue est survenue. Réessaie.",
                       variant: "destructive",
                     });
+                    // Stay on WorkoutRunner so the user can retry
                   }
+                } finally {
+                  // Always unblock the ENREGISTRER button, regardless of error type.
+                  // Previously only set in catch, which left the button stuck disabled
+                  // on non-transient errors until a full app refresh.
+                  setIsFinishing(false);
                 }
               }}
             />

@@ -16,7 +16,6 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
       { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
       { href: "/coach?section=library", icon: Library, label: "Biblio" },
       { href: "/coach?section=chrono", icon: Timer, label: "Chrono" },
-      { href: "/profile", icon: User, label: "Profil" },
     ];
   }
   if (normalizedRole === "comite") {
@@ -33,7 +32,6 @@ export const getNavItemsForRole = (role: string | null): NavItem[] => {
       { href: "/coach?section=swimmers", icon: Users, label: "Nageurs" },
       { href: "/coach?section=library", icon: Library, label: "Biblio" },
       { href: "/coach?section=chrono", icon: Timer, label: "Chrono" },
-      { href: "/profile", icon: User, label: "Profil" },
     ];
   }
   const athleteItems: NavItem[] = [

@@ -25,6 +25,12 @@ type ChainScript = {
 const scripts: ChainScript[] = [];
 const fromCalls: string[] = [];
 const updatedPayloads: unknown[] = [];
+// Per-test control of supabase.rpc() return: each entry consumed in FIFO.
+// `args` captured so tests can assert which RPC was called and with what
+// payload — important for §172/§174 atomic RPC contracts.
+type RpcCall = { name: string; args: unknown };
+const rpcCalls: RpcCall[] = [];
+const rpcResults: { data: unknown; error: null | { message: string } }[] = [];
 
 before(async () => {
   const real = await import("../client.ts");
@@ -73,7 +79,11 @@ before(async () => {
           }
           return makeChain(script);
         },
-        rpc: () => ({ then: (r: (v: unknown) => void) => r({ data: null, error: null }) }),
+        rpc: (name: string, args: unknown) => {
+          rpcCalls.push({ name, args });
+          const next = rpcResults.shift() ?? { data: null, error: null };
+          return { then: (r: (v: unknown) => void) => r(next) };
+        },
       },
     },
   });
@@ -257,5 +267,135 @@ describe("reconcileStrengthRunLogs", () => {
     assert.deepEqual(result, { attempted: 0, succeeded: 0, errors: [] });
     // Only the count query was issued — no per-set inserts.
     assert.deepEqual(fromCalls, ["strength_set_logs"]);
+  });
+});
+
+describe("logStrengthSet — branch coverage", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+    updatedPayloads.length = 0;
+    rpcCalls.length = 0;
+    rpcResults.length = 0;
+  });
+
+  it("falls back to a plain insert when athlete_id is missing (no RPC, no 1RM update)", async () => {
+    // Anonymous swimmer (catalog session, no athlete context). The atomic
+    // RPC needs p_user_id, so the implementation falls back to a plain
+    // strength_set_logs INSERT. one_rm_updated must be false — there's
+    // no athlete to attach a PR to.
+    scripts.push(
+      { expect: "strength_set_logs", result: { data: null, error: null } },
+    );
+
+    const { logStrengthSet } = await import("../strength.ts");
+    const result = await logStrengthSet({
+      run_id: 1,
+      exercise_id: 10,
+      reps: 8,
+      weight: 80,
+      // athlete_id and athlete_name both null → fallback path
+    });
+
+    assert.deepEqual(result, { status: "ok", one_rm_updated: false, one_rm: undefined });
+    assert.deepEqual(fromCalls, ["strength_set_logs"]);
+    // No RPC must have been hit on this branch.
+    assert.equal(rpcCalls.length, 0);
+  });
+
+  it("uses the atomic RPC when athlete_id is present (single round-trip, server-side 1RM update)", async () => {
+    rpcResults.push({
+      data: { set_id: 42, one_rm_updated: true, one_rm: 100 },
+      error: null,
+    });
+
+    const { logStrengthSet } = await import("../strength.ts");
+    const result = await logStrengthSet({
+      run_id: 1,
+      exercise_id: 10,
+      reps: 5,
+      weight: 100,
+      athlete_id: 7,
+    });
+
+    assert.deepEqual(result, { status: "ok", one_rm_updated: true, one_rm: 100 });
+    // No `from()` call: the RPC handles both insert + 1RM update atomically.
+    assert.deepEqual(fromCalls, []);
+    assert.equal(rpcCalls.length, 1);
+    assert.equal(rpcCalls[0].name, "log_strength_set_atomic");
+    const args = rpcCalls[0].args as Record<string, unknown>;
+    assert.equal(args.p_user_id, 7);
+    assert.equal(args.p_exercise_id, 10);
+    // 1RM estimate computed client-side from (weight=100, reps=5) ≈ 115 (Brzycki).
+    // The exact value comes from estimateOneRm(); just assert it's > 0 (i.e. not null).
+    assert.ok(typeof args.p_one_rm_estimate === "number" && (args.p_one_rm_estimate as number) > 0);
+  });
+
+  it("passes p_one_rm_estimate=null for bodyweight sets (skip 1RM, prevents PDC contamination)", async () => {
+    // Bodyweight sentinel = -1. The previous implementation passed weight=-1
+    // through estimateOneRm and produced absurd 1RM values. §95 fix routed
+    // it via isBodyweight() to skip estimation entirely.
+    rpcResults.push({
+      data: { set_id: 50, one_rm_updated: false, one_rm: null },
+      error: null,
+    });
+
+    const { logStrengthSet } = await import("../strength.ts");
+    await logStrengthSet({
+      run_id: 1,
+      exercise_id: 10,
+      reps: 12,
+      weight: -1, // BODYWEIGHT_SENTINEL
+      athlete_id: 7,
+    });
+
+    assert.equal(rpcCalls.length, 1);
+    const args = rpcCalls[0].args as Record<string, unknown>;
+    assert.equal(args.p_one_rm_estimate, null, "bodyweight must skip 1RM estimation");
+    // Server still receives the raw -1 weight to log the set itself.
+    assert.equal(args.p_weight, -1);
+  });
+
+  it("throws when the RPC returns an error (post-§174 withTimeout still propagates supabase errors)", async () => {
+    rpcResults.push({
+      data: null,
+      error: { message: "RLS denied: athlete_id mismatch" },
+    });
+
+    const { logStrengthSet } = await import("../strength.ts");
+
+    await assert.rejects(
+      () => logStrengthSet({
+        run_id: 1,
+        exercise_id: 10,
+        reps: 5,
+        weight: 80,
+        athlete_id: 7,
+      }),
+      (err: Error) => err.message.includes("RLS denied"),
+    );
+  });
+
+  it("throws on insert error in the fallback branch (no silent swallow when athlete_id missing)", async () => {
+    // Symmetrical to the success fallback: the no-athlete path must still
+    // surface DB errors to the caller. Otherwise a swimmer running an
+    // anonymous catalog session could lose sets without any signal.
+    scripts.push(
+      {
+        expect: "strength_set_logs",
+        result: { data: null, error: { message: "Connection reset" } },
+      },
+    );
+
+    const { logStrengthSet } = await import("../strength.ts");
+    await assert.rejects(
+      () => logStrengthSet({
+        run_id: 1,
+        exercise_id: 10,
+        reps: 5,
+        weight: 80,
+      }),
+      (err: Error) => err.message.includes("Connection reset"),
+    );
   });
 });

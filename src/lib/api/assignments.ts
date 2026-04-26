@@ -188,7 +188,14 @@ export async function assignments_create(
         .insert(targetPayload);
       if (targetError) {
         // Rollback : supprimer la notification orpheline pour éviter une notif sans cible
-        await supabase.from("notifications").delete().eq("id", notif.id);
+        try {
+          const { error: rollbackError } = await supabase.from("notifications").delete().eq("id", notif.id);
+          if (rollbackError) {
+            console.error('[assignments] Notification rollback DELETE failed:', rollbackError.message);
+          }
+        } catch (rollbackThrow) {
+          console.error('[assignments] Notification rollback threw:', rollbackThrow);
+        }
         console.warn(
           '[assignments] Notification rolled back (target insert failed):',
           targetError.message,
