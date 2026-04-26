@@ -4,6 +4,93 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §173 — Audit robustesse chemin critique COACH : login → builder → assign → comms (2026-04-26)
+
+**Contexte :** audit complet du chemin critique coach (Coach.tsx → SwimSessionBuilder/StrengthSessionBuilder → SlotSessionSheet → CoachCommentsScreen) pour atteindre 0 bug + 0 friction mobile + protocole anti-régression. Cible : adulte sur iOS/Android (parfois tablette bord du bassin), planning hebdomadaire régulier, attente de rapidité d'exécution. Jumeau du §172 (audit nageur) du même jour. Plan complet dans `docs/plans/2026-04-26-coach-critical-path-hardening-plan.md`.
+
+> **Note de numérotation :** les 8 commits portent le tag `§171` (numéro choisi avant rédaction du plan, alors que §170 était la dernière entrée connue). Le §172 (audit nageur) ayant atterri en parallèle, ce chantier devient §173. Pas de rebase des messages — coût/bénéfice défavorable, traçabilité préservée par les hashs.
+
+**Diagnostic — 15 défauts identifiés :**
+
+P0 critiques :
+1. **Garde manquante `groupIds=[]` dans `bulkCreateSlotAssignments`** — succès silencieux `{ created: 0 }` si un futur appelant oublie le pré-check côté UI.
+2. **Rollback `quickComposeMutation` non observable** — si `bulkCreateSlotAssignments` échoue après `createSwimSession` réussi et que `deleteSwimSession` du rollback échoue lui aussi, le catalogue se pollue d'une séance auto-nommée orpheline sans la moindre télémetrie.
+3. **Notification orpheline silencieuse dans `assignments_create`** — si `notification_targets` insert échoue après `notifications` OK, une notif sans cible reste en DB et l'assignment est marqué `assigned` quand même.
+
+P1 importants :
+4. **`markRead` re-fire infini** — `CoachCommentsScreen` re-postait les mêmes IDs déjà lus à chaque invalidation `coach-comments-recent-48h` (toutes les 2 min) → write spam.
+5. **Double-tap "Créer & assigner" iOS** — `disabled={!canSubmitText}` repose sur le state React `submitting` qui ne flippe qu'au prochain render → 2 séances créées en fast-tap.
+6. **`handleMoveToFolder` aveugle** — pas de check que le dossier cible existe encore dans `allFolders` avant la mutation → séance déplacée vers chemin orphelin si suppression concurrente.
+7. **Pas de validation client `visible_from`** — le check existe en DB (CHECK 00088) mais le coach voyait un message PostgreSQL brut.
+8. **State leak `SlotSessionSheet`** — si l'utilisateur tape rapidement 2 créneaux, `selectedGroups` peut partir cross-instance avant que le `useEffect([instance])` ne reset.
+9. **Warning `split_distance` non bloquant** — coach pouvait envoyer une séance avec 30 % de distance perdue silencieusement.
+
+P1 UX critique :
+10. **CTA QuickCompose non sticky** — sur iPhone SE 375px, 4-5 scrolls pour atteindre "Créer & assigner".
+11. **`visible_from` opaque** — pas d'aide contextuelle, coachs publient à la date du jour par accident.
+12. **Pas de Save & Assign muscu** — créer une séance muscu pour 1 nageur imposait 5+ taps.
+
+P2 cosmétique :
+13. **`window.prompt` natif pour créer dossier muscu** — focus auto absent, validation pauvre, hors design system.
+14. **Toggle warmup sans reset des champs** — un exercice qui devient "strength" gardait `warmup_reps`/`warmup_duration` orphelins persistés en DB.
+15. **Composant `DragDropList` au nom trompeur** — pas de drag réel, juste 3 boutons up/down/delete.
+
+**Changements réalisés (8 commits, branche `chantier/171-coach-critical-path-hardening`) :**
+
+| Hash | Sujet | Périmètre |
+|------|-------|-----------|
+| `74d92ca40` | gardes défensives `bulkCreateSlotAssignments` + rollback notif orpheline | P0 #1 + #3 + #7 |
+| `1264c7f4a` | rollback observable `quickComposeMutation` | P0 #2 |
+| `af0e401b1` | `markRead` idempotent via `useRef<Set<number>>` | P1 #4 |
+| `7ed42eb53` | `SlotSessionSheet` robustesse + UX (5 fixes en 1 commit : double-tap guard, split confirm, helper `visible_from`, sticky CTA, key remount) | P1 #5 + #8 + #9 + #10 + #11 |
+| `999658bf6` | gardes `SwimCatalog.handleMoveToFolder` + confirm `split_distance` Builder | P1 #6 + #9b |
+| `c4467ab5d` | bouton "Enreg. & assigner" muscu (Plan A complet) | P1 #12 |
+| `6c26735f6` | `Dialog` Radix au lieu de `window.prompt` + reset warmup fields | P2 #13 + #14 |
+| `ff5d321d4` | refactor `DragDropList` → `OrderedList` | P2 #15 |
+
+**Fichiers modifiés :**
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/api/assignments.ts` (1168 → 1190 lignes) | 3 gardes : `groupIds=[]`, `visibleFrom > scheduledDate`, rollback notif orpheline |
+| `src/lib/api/__tests__/assignments.test.ts` (nouveau, 67 lignes) | Tests `node:test` couvrant les 2 gardes `bulkCreateSlotAssignments` |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` (3174 lignes, +18 / -8) | rollback observable + `key` remount sur `<SlotSessionSheet>` |
+| `src/pages/coach/CoachCommentsScreen.tsx` (240 lignes, +5 / -2) | `useRef<Set>` pour markRead idempotent |
+| `src/pages/coach/SlotSessionSheet.tsx` (1539 → 1559 lignes) | double-tap guard, split confirm, helper visible_from, sticky CTA |
+| `src/pages/coach/SwimCatalog.tsx` (996 lignes, +9 / -1) | check `allFolders.includes(folder)` avant move |
+| `src/components/coach/swim/SwimSessionBuilder.tsx` (576 lignes, +6 / -0) | confirm bloquant si split_distance |
+| `src/pages/coach/StrengthCatalog.tsx` (1463 → 1638 lignes) | Save & Assign : 3 states + `AssignAthleteSelect` inline + chaînage createSession.onSuccess → assignments_create + Dialog créer dossier + reset warmup fields |
+| `src/components/coach/strength/StrengthSessionBuilder.tsx` (282 → 285 lignes) | prop `onSaveAndAssign?` forwarded à `FormActions` |
+| `src/components/coach/shared/FormActions.tsx` (126 → 140 lignes) | bouton pill `<UserPlus>` conditionnel "Enreg. & assigner" |
+| `src/components/coach/shared/OrderedList.tsx` (renommé depuis `DragDropList.tsx`, 72 lignes) | rename + symbole interne |
+| `docs/plans/2026-04-26-coach-critical-path-hardening-plan.md` (nouveau) | Plan d'exécution TDD du chantier |
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur ✅
+- `npm test -- --run` → **336/336 passants** (333 baseline + 2 gardes assignments + 1 ajouté côté Save & Assign muscu) ✅
+- `npm run test:rls` → **non lancé** : aucune migration RLS ni helper auth modifié, critères CLAUDE.md non remplis. Les 4 tests RLS additionnels du plan (Task 13a-d) sont reportés au prochain run avec Docker démarré.
+
+**Décisions :**
+- **Défense en profondeur API** plutôt que UI-only — le `groupIds=[]` était déjà gardé chez les 2 callers, mais une régression future re-créerait silencieusement le bug. La garde côté API protège tous les futurs appelants.
+- **Rollback observable** plutôt que silencieux — `console.error` + suffix toast informe le coach qu'une intervention manuelle est requise. Pas de migration vers RPC atomique : trade-off effort/risque pas justifié pour un échec rare en cascade.
+- **`useRef<Set>` plutôt que mutation optimistic update** dans CoachCommentsScreen : plus simple, pas de patch local du cache React Query, pas de risque de désync.
+- **`submittingRef` synchrone** plutôt que `submitting` state-only — le bug est la fenêtre microtask entre `touchend` et le `setState` qui n'a pas encore re-render.
+- **`window.confirm` accepté pour `split_distance`** — palier rare (mauvais format texte). Migration vers `AlertDialog` Radix possible si l'usage devient quotidien (TODO §174+).
+- **Sticky CTA dans le sheet** plutôt que fixed positioning : `sticky bottom-0` joue bien avec `<SheetContent overflow-y-auto>` sans z-index jonglerie.
+- **`key={slot.id+date}` remount complet du sheet** plutôt que `useLayoutEffect` reset — re-monter coûte ~2-3 ms, raisonnement plus simple.
+- **Plan A complet pour Save & Assign muscu** : `createStrengthSession` retournait déjà `{ id }` exploitable. Mode édition skip le re-create et appelle directement `assignments_create` avec l'ID existant.
+- **`Dialog` Radix uniquement pour la création de dossier muscu** — le rename de dossier (`FolderDropdown.onRename`) garde `window.prompt` natif pour ce patch (faible impact, refactor reporté §174).
+- **Reset warmup fields uniquement vers `strength`** — laisser les champs `pct_1rm/series/reps` quand on toggle vers `warmup` (le coach peut hésiter et revenir).
+- **Rename DragDropList plutôt que vrai DnD** : aucune demande UX, 0 callsite externe trouvé.
+
+**Limites / non couvert :**
+- **4 tests RLS du plan (Task 13) non implémentés** — Docker non démarré sur la session. Les invariants critiques (`chk_visible_from_before_date`, `idx_sa_unique_slot_group_v2`, isolation cross-coach) sont protégés par la DB mais sans test d'intégration du côté de l'app.
+- **`assignments_create` legacy** : le wrapper accepte toujours un `assigned_date` non typé pour `visible_from`. La validation client a été ajoutée uniquement dans `bulkCreateSlotAssignments` (chemin actif).
+- **Test E2E mobile non automatisé** : les fixes #5 (double-tap) et #10 (sticky CTA) reposent sur un test manuel iPhone SE 375px documenté dans le plan, pas encore couvert par Playwright.
+- **AthletePicker non extrait en composant réutilisable** : l'inline `<AssignAthleteSelect>` dans StrengthCatalog duplique partiellement la logique de `CopyToAthleteDialog`. Refactor d'unification reporté si une 3ᵉ surface en a besoin.
+
+---
+
 ## §172 — Audit robustesse chemin nageur : calendrier, focus, plan→drawer (2026-04-26)
 
 **Contexte :** audit complet du chemin critique nageur (login → dashboard → séance natation/muscu → ressenti → focus muscu) pour atteindre 0 bug + 0 friction mobile + protocole anti-régression. Le préparateur physique passe désormais uniquement par `strength_planning_slots` (plan groupe + overrides per-athlète) ; les assignments coach muscu n'alimentaient pas le calendrier nageur, qui affichait "Repos" pour des jours où une séance était bel et bien prévue.
