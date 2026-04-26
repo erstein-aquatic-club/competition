@@ -706,6 +706,7 @@ function QuickComposeBody({
     return () => clearTimeout(t);
   }, [rawText]);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [assigningCatalogId, setAssigningCatalogId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
 
@@ -808,7 +809,15 @@ function QuickComposeBody({
 
   // ── Handlers ──
   const handleTextSubmit = async () => {
-    if (!canSubmitText) return;
+    if (!canSubmitText || submittingRef.current) return;
+    const splitWarnings = textWarnings.filter((w) => w.type === "split_distance");
+    if (splitWarnings.length > 0) {
+      const proceed = window.confirm(
+        `${splitWarnings.length} ligne(s) avec distance partielle (ex: "10 EZ" perdu après le /). Assigner quand même ?`,
+      );
+      if (!proceed) return;
+    }
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await onQuickCompose(
@@ -822,12 +831,14 @@ function QuickComposeBody({
     } catch {
       // Parent shows the error toast.
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handleLibrarySelect = async (catalogId: number) => {
-    if (libraryDisabled) return;
+    if (libraryDisabled || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setAssigningCatalogId(catalogId);
     try {
@@ -841,6 +852,7 @@ function QuickComposeBody({
     } catch {
       // Parent shows the error toast.
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
       setAssigningCatalogId(null);
     }
@@ -917,6 +929,9 @@ function QuickComposeBody({
           <CalendarDays className="mr-1 inline h-3 w-3 opacity-60" />
           Visible à partir du
         </Label>
+        <p className="text-[11px] text-muted-foreground -mt-1 mb-1.5">
+          Laissez sur aujourd'hui pour publier immédiatement. Sinon, les nageurs verront la séance à partir de cette date.
+        </p>
         <input
           id="visible-from-empty"
           type="date"
@@ -1058,30 +1073,32 @@ function QuickComposeBody({
             )
           )}
 
-          <button
-            type="button"
-            onClick={handleTextSubmit}
-            disabled={!canSubmitText}
-            className={cn(
-              "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
-              canSubmitText
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]"
-                : "bg-muted text-muted-foreground cursor-not-allowed",
-            )}
-          >
-            {submitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {submitting ? "Assignation…" : "Créer & assigner"}
-          </button>
+          <div className="sticky bottom-0 -mx-5 -mb-8 border-t border-border/50 bg-background/95 px-5 py-3 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={handleTextSubmit}
+              disabled={!canSubmitText}
+              className={cn(
+                "inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition-colors",
+                canSubmitText
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]"
+                  : "bg-muted text-muted-foreground cursor-not-allowed",
+              )}
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {submitting ? "Assignation…" : "Créer & assigner"}
+            </button>
 
-          {!hasGroup && parsedBlocks.length > 0 && (
-            <p className="text-center text-[11px] text-muted-foreground">
-              Sélectionnez au moins un groupe pour activer le bouton.
-            </p>
-          )}
+            {!hasGroup && parsedBlocks.length > 0 && (
+              <p className="text-center text-[11px] text-muted-foreground mt-2">
+                Sélectionnez au moins un groupe pour activer le bouton.
+              </p>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -1358,6 +1375,9 @@ function FilledBody({
             >
               Visible à partir du
             </Label>
+            <p className="text-[11px] text-muted-foreground -mt-1 mb-1.5">
+              Laissez sur aujourd'hui pour publier immédiatement. Sinon, les nageurs verront la séance à partir de cette date.
+            </p>
             <input
               id="visible-from-edit"
               type="date"

@@ -3143,6 +3143,7 @@ const CoachTrainingSlotsScreen = ({
       <Suspense fallback={null}>
         {showSessionSheet && (
           <SlotSessionSheet
+            key={selectedInstance ? `${selectedInstance.slot.id}-${selectedInstance.date}` : "none"}
             instance={selectedInstance}
             open={showSessionSheet}
             onOpenChange={setShowSessionSheet}
