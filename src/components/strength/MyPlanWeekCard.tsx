@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Trophy } from "lucide-react";
+import { ChevronDown, Play, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Competition, StrengthSessionTemplate } from "@/lib/api/types";
 import type { WeekInstance } from "@/lib/strength/strengthPlanWeeks";
@@ -15,7 +15,16 @@ interface MyPlanWeekCardProps {
   competitions: Competition[];
   getDayCompetitions: (monday: Date, dayIndex: number) => Competition[];
   onSelectSession: (session: StrengthSessionTemplate) => void;
+  /** When provided AND we render a session matching today's day-of-week
+   *  inside the current week, an extra "Démarrer maintenant" CTA appears. */
+  onLaunchSessionDirect?: (session: StrengthSessionTemplate) => void;
   onSelectCompetition: (c: Competition) => void;
+}
+
+/** Convert JS Date.getDay() (Sun=0..Sat=6) to plan day-of-week (Mon=0..Sun=6). */
+function todayPlanDayIndex(): number {
+  const d = new Date().getDay();
+  return d === 0 ? 6 : d - 1;
 }
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -28,8 +37,10 @@ export function MyPlanWeekCard({
   competitions,
   getDayCompetitions,
   onSelectSession,
+  onLaunchSessionDirect,
   onSelectCompetition,
 }: MyPlanWeekCardProps) {
+  const todayIdx = isCurrent ? todayPlanDayIndex() : -1;
   const style = PHASE_STYLES[instance.phase];
   const hasCompetition = competitions.length > 0;
 
@@ -159,13 +170,34 @@ export function MyPlanWeekCard({
                           </button>
                         ))}
                         {/* Session rows */}
-                        {daySessions.map((ws) => (
-                          <MyPlanSessionRow
-                            key={ws.session.id}
-                            weekSession={ws}
-                            onSelect={() => onSelectSession(ws.session)}
-                          />
-                        ))}
+                        {daySessions.map((ws) => {
+                          const isToday = dayIdx === todayIdx;
+                          return (
+                            <div key={ws.session.id} className="space-y-1">
+                              <MyPlanSessionRow
+                                weekSession={ws}
+                                onSelect={() => onSelectSession(ws.session)}
+                              />
+                              {/* "Démarrer maintenant" CTA only on today's row,
+                                  current week, when the parent supplied a direct
+                                  launch handler. The plain row tap still routes
+                                  to the reader for swimmers who want a preview. */}
+                              {isToday && onLaunchSessionDirect && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onLaunchSessionDirect(ws.session);
+                                  }}
+                                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 h-9 text-xs font-semibold text-primary-foreground active:scale-[0.98] transition shadow-sm"
+                                >
+                                  <Play className="h-3.5 w-3.5 fill-current" />
+                                  Démarrer maintenant
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                         {/* Empty day */}
                         {daySessions.length === 0 && dayComps.length === 0 && (
                           <div className="h-10 flex items-center px-2.5">

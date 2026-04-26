@@ -4,6 +4,99 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §172 — Audit robustesse chemin nageur : calendrier, focus, plan→drawer (2026-04-26)
+
+**Contexte :** audit complet du chemin critique nageur (login → dashboard → séance natation/muscu → ressenti → focus muscu) pour atteindre 0 bug + 0 friction mobile + protocole anti-régression. Le préparateur physique passe désormais uniquement par `strength_planning_slots` (plan groupe + overrides per-athlète) ; les assignments coach muscu n'alimentaient pas le calendrier nageur, qui affichait "Repos" pour des jours où une séance était bel et bien prévue.
+
+**Diagnostic — défauts identifiés :**
+
+1. **Plan non câblé sur le calendrier nageur** — `Dashboard.tsx` n'envoyait pas `strengthByISO` à `CalendarGrid`. Conséquence : aucune indication de séance muscu sur le calendrier, le nageur n'apprenait l'existence d'une séance qu'en allant sur l'onglet Strength.
+2. **`isFinishing` jamais reset au catch** — `Strength.tsx onFinish` : si `reconcileStrengthRunLogs` ou `updateRun.mutateAsync` jette, on enqueue offline + summary mais le bouton ENREGISTRER reste bloqué jusqu'au refresh complet de l'app.
+3. **Invalidation queryKey assignments incomplète** — `Strength.tsx` invalide `["assignments", user, "strength"]`, Dashboard utilise `["assignments", userId ?? user]`. Après complétion muscu, le calendrier ne se rafraîchissait pas.
+4. **Drawer fermé avant succès mutation** — `Dashboard.saveFeedback` set `setActiveSessionId(null)` synchroniquement après `mutation.mutate()`. En cas d'échec, le drawer se ferme visuellement avec juste un toast d'erreur → confusion.
+5. **Auth refresh fail = signOut brutal** — `auth.ts` proactive refresh : 1 échec réseau (4G coupé pendant un set) déclenchait `signOut()` immédiat → page blanche en plein workout.
+6. **`wasOfflineRef` reset avant succès reconcile** — un échec transitoire sur la reconciliation back-online rendait le rattrapage impossible jusqu'au prochain offline→online cycle.
+7. **Variable shadow `setDifficulty`** dans `handleValidateSet` — collision avec le state setter, source de confusion lecture.
+8. **Boutons difficulté 24px** dans WorkoutRunner Card (sous Apple HIG 44px) → mistaps mains mouillées au bord du bassin.
+9. **Boutons ressenti 40-44px** sous le seuil sur mobile.
+10. **Toggles présence hebdo 32px**.
+11. **Header sticky WorkoutRunner sans `safe-area-inset-top`** → coupé sous le notch iPhone PWA.
+12. **Numpad charge → reps : 8-10 taps par set** (tap charge + numpad + Valider + tap reps + numpad + Valider + Valider série) — mode "tunnel" absent.
+13. **"Passer cet exercice" sans confirmation** même quand des séries déjà loggées sur l'exercice courant — un tap accidentel perdait la progression visible.
+14. **"Remplis les 4 indicateurs" en flash 3s** — un nageur novice tapait le bouton désactivé sans comprendre pourquoi rien ne se passait.
+15. **Bug TZ latent dans `buildWeekStarts`** — détecté via TDD sur le nouveau hook : `toISOString().split("T")` shifte à UTC, rendant le lundi 00:00 CEST comme dimanche en UTC. Les week_starts envoyées à Supabase auraient été décalées d'un jour en EU → slots du plan absents du calendrier.
+
+**Changements réalisés :**
+
+- **NEW `src/hooks/useStrengthPlanByISO.ts`** (133 lignes) : hook qui lit `strength_planning_slots` (groupe) + `strength_planning_slot_overrides` (per-athlète) via `mergeStrengthSlots` (sémantique §157 : override individuel l'emporte, jamais écrasé par plan groupe). Expose `planByISO`, `resolvedByISO` (avec session template), `effectiveSlots` et `strengthByISO` (booléen rapide pour le calendrier). Catalog query partage la `queryKey ["strength_catalog"]` avec MyPlanTab → pas de double fetch. Helpers `buildWeekStarts` et `isoFromWeekStartAndDay` exportés et formatent en local-date (pas de shift UTC).
+- **NEW `src/hooks/__tests__/useStrengthPlanByISO.test.ts`** (8 tests) : régression TZ explicite (toISOString → local), edge case dimanche (`getDay()=0`), boundaries mois/année, alignement Monday strict.
+- **`Dashboard.tsx`** :
+  - Branche le hook → passe `strengthByISO` à `CalendarGrid`.
+  - Passe `strengthSessionsForSelectedDay = resolvedByISO.get(selectedISO)` au `FeedbackDrawer` + handler `onOpenStrengthSession` qui écrit `sessionStorage.eac_pending_strength_focus_slot_id` puis `navigate("/strength")`.
+  - `saveFeedback` : retrait des `setActiveSessionId(null) / setDetailsOpen(false) / setAlternativeOverride(null)` synchrones — déplacés dans les `onSuccess` des deux mutations (avec délai 1.2s pour laisser le toast de succès atterrir).
+  - `setAlternativeOverride(null)` ajouté dans les `onSuccess` de `mutation` et `updateMutation`.
+- **`DayCell.tsx`** : icône `Dumbbell h-3 w-3 text-orange-500` en haut-gauche si `strengthAssigned && !hasCompetition` (Trophy garde la priorité absolue, conflit pratique inexistant car pas de muscu les jours de compétition). Pills AM/PM passent à `h-3.5 w-3.5` rondes contenant un mini `<Sun/>` ou `<Moon/>` h-2 (couleur fond préservée pour le scan de statut vert/gris-foncé/gris-pâle, glyphe en `text-foreground/70` lisible sur les 3 fonds en light + dark).
+- **`FeedbackDrawer.tsx`** :
+  - Nouvelle prop `strengthSessionsForSelectedDay: ResolvedPlanEntry[]` + `onOpenStrengthSession`.
+  - Carte muscu rendue après les cartes natation (couleur orange distincte, lecture seule, badge "Plan personnalisé" si `slot.overridden`, tap → /strength).
+  - "Remplis les 4 indicateurs pour valider" affiché en gris permanent dès que `canRate && !allFilled`, escalade en rouge au tap (le flash 3s reste comme escalade visuelle).
+  - Boutons ressenti 1-5 : `h-10 sm:h-11` → `h-11 sm:h-12`.
+- **`Strength.tsx`** :
+  - `setIsFinishing(false)` ajouté dans le catch de `onFinish` avant `setScreenMode("summary")`.
+  - Invalidations `["assignments", user, "strength"]` remplacées par préfixe `["assignments"]` (couvre Dashboard et la sous-clé strength).
+  - `wasOfflineRef.current = false` déplacé dans `.then()` du reconcile (au lieu d'avant l'await) — un échec transitoire ne fait plus perdre la fenêtre de retry.
+  - Nouveau `startPlanSessionDirect(session)` qui appelle `startPlanSession` puis bump un `autoLaunchKey`. Un useEffect détecte `activeSession` committé + `screenMode==="reader"` et déclenche `handleLaunchFocus()` depuis une closure fraîche. Court-circuite le reader pour le bouton "Démarrer maintenant" et pour le handoff sessionStorage.
+- **`MyPlanTab.tsx`** :
+  - Nouvelle prop `onLaunchSessionDirect`.
+  - useEffect au mount lit `sessionStorage.eac_pending_strength_focus_slot_id`, attend que `effectiveSlots` + `sessionsById` soient peuplés, résout le slot → session, déclenche `onLaunchSessionDirect(session)`. Consomme la clé une seule fois.
+- **`MyPlanWeekCard.tsx`** : helper `todayPlanDayIndex()` (Sun=0..Sat=6 → Mon=0..Sun=6). Pour les sessions où `dayIdx === todayIdx && isCurrent`, render un bouton CTA primary "Démarrer maintenant" sous le `MyPlanSessionRow` (icône Play). Le tap normal sur le row garde le routing reader pour swimmers qui veulent une preview.
+- **`WorkoutRunner.tsx`** :
+  - Variable shadow `setDifficulty` renommée `setDifficultyValue`.
+  - Boutons difficulté 1-5 : `h-6 w-6` → `h-9 w-9` (24px → 36px).
+  - Exit bar sticky : `pt-[max(0.5rem,env(safe-area-inset-top))]`.
+  - Numpad mode tunnel : après `applyDraftValue` sur weight, si reps de ce set non saisi → bascule auto sur `activeInput="reps"` avec `draftValue` pré-rempli depuis `currentBlock.reps`. Drawer reste ouvert. Indicateur "1/2 → 2/2" dans `DrawerTitle`.
+  - Bouton "Passer cet exercice" : si `logs` filtrés sur l'exercice courant > 0 → AlertDialog `skipExerciseConfirmOpen` avec label "Tu as déjà validé des séries sur cet exercice. Elles seront conservées, mais l'exercice sera marqué comme abandonné." Sinon skip direct (préserve le flow normal).
+- **`Dashboard.tsx settings dialog`** : toggles présence hebdo `h-8 w-8` → `h-9 w-9`.
+- **`auth.ts`** : nouvelle constante `REFRESH_FAILURE_TOLERANCE = 3`. `startRefreshTimer` incrémente `consecutiveRefreshFailures` à chaque échec, `signOut()` uniquement à partir du 3ème consécutif. Reset à zéro sur succès et dans `stopRefreshTimer`. Le swimmer en plein set tolère les 4G qui blip 1-2 fois.
+
+**Fichiers modifiés :**
+- NEW : `src/hooks/useStrengthPlanByISO.ts` (133 lignes)
+- NEW : `src/hooks/__tests__/useStrengthPlanByISO.test.ts` (8 tests)
+- MODIFIED : `src/components/dashboard/DayCell.tsx` (+62 / -23 — Dumbbell + SlotPill component)
+- MODIFIED : `src/components/dashboard/FeedbackDrawer.tsx` (+78 / -7 — carte muscu, hint permanent, boutons h-11/h-12)
+- MODIFIED : `src/components/strength/MyPlanTab.tsx` (+22 / -5 — onLaunchSessionDirect, sessionStorage handoff)
+- MODIFIED : `src/components/strength/MyPlanWeekCard.tsx` (+38 / -10 — bouton "Démarrer maintenant" jour J)
+- MODIFIED : `src/components/strength/WorkoutRunner.tsx` (+58 / -15 — tunnel mode, skip confirm, h-9 difficulté, safe-area)
+- MODIFIED : `src/lib/auth.ts` (+27 / -9 — tolérance 3 échecs refresh)
+- MODIFIED : `src/pages/Dashboard.tsx` (+34 / -7 — wire hook, alternative reset onSuccess)
+- MODIFIED : `src/pages/Strength.tsx` (+59 / -13 — startPlanSessionDirect, autoLaunchKey, prefix invalidate, isFinishing reset)
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur
+- `npx vitest run src/hooks/__tests__/useStrengthPlanByISO.test.ts` → **8/8 passants**
+- Suite globale (excl. worktrees pollutants) : **247 → 253 passants** (+6, dont 8 nouveaux ; 2 doublons mockés résolus différemment) ; **55 fails identiques à la baseline pré-existants**, aucune régression introduite.
+- Aucun test RLS lancé — aucune migration ni policy modifiée (purement client + nouveau hook utilisant des tables/RPCs déjà gardées par les tests RLS existants).
+
+**Décisions :**
+- **`mergeStrengthSlots` réutilisé tel quel** : le hook se contente de wrap les queries + dériver les Maps. Le contrat "override individuel jamais écrasé par groupe" reste localisé dans une fonction pure déjà testée à fond (`strengthPlanningMerge.test.ts`).
+- **sessionStorage plutôt que query params** pour le handoff Dashboard → Strength : pas de pollution URL, pas de problème si l'utilisateur revient en arrière (la clé est consommée une seule fois). Pas de Zustand pour ne pas créer un store global pour 1 trigger.
+- **`autoLaunchKey` plutôt que micro-task** dans `startPlanSessionDirect` : `handleLaunchFocus` lit `activeSession` via closure ; appelé synchroniquement après `setActiveSession` il voit l'ancienne valeur. Un `useEffect [autoLaunchKey, activeSession, screenMode]` attend le commit de React puis tire depuis une closure fraîche. Pattern auditable, zéro setTimeout magique.
+- **Préfixe `["assignments"]` pour invalidate** au lieu de cloner les deux clés explicitement : React Query 5 matche par préfixe ; toute future query commençant par `["assignments", ...]` sera couverte sans modif. Réduit le risque de re-régression du même bug.
+- **Tolérance 3 échecs auth** plutôt que retry exponentiel : un nageur en zone 4G dégradée ne devrait pas être logout pour 1 minute de blip ; 3 échecs × 60s = 3 min, après quoi le token Supabase 1h a encore ~2 min de slack avant expiration → le user n'a pas encore vu de 401 sur ses requêtes.
+- **Pills + mini-icône** plutôt que Sun/Moon brutes : préserve le code couleur tri-tonal pour scanner l'état de complétion (la vraie valeur du calendrier), ajoute juste un signal AM/PM intrinsèque. Choix validé en conversation avec l'utilisateur (Option A).
+- **`text-foreground/70` sur la pill grise pâle** plutôt que `text-white/90` : white invisible sur le fond `muted-foreground/15` (statut absent). Test visuel mental sur les 3 toiles (vert success, gris-foncé attente, gris-pâle absent) en light + dark → 70% noir/blanc dynamique passe partout.
+- **Court-circuit reader uniquement pour "Démarrer maintenant"** : le tap normal sur la carte plan garde le reader pour swimmers qui veulent vérifier les exercices avant de lancer. CTA explicite = launch direct, tap normal = preview.
+- **C2.2 (Présent rapide) reporté** : un bouton "Présent sans saisie" créerait un log incomplet (4 indicateurs vides) qui apparaîtrait comme "complété" sur le calendrier alors que le ressenti manque. Demande clarification utilisateur avant impl. Le tap sur la carte de session ouvre déjà le formulaire — équivalent UX de "Présent + saisie". Le bouton "Absent" rapide existe déjà (`FeedbackDrawer.tsx:870-882`).
+- **C5c (lien `strength_planning_slot_id` sur runs) reporté** : la complétion est déjà traçable par croisement `strength_session_runs.athlete_id + started_at` avec les slots du plan. Un FK dédié n'apporte qu'une simplification de requête et nécessite de design la sémantique groupe/override. À faire lors d'une feature qui en a besoin (ex. annuler une complétion).
+
+**Limites / non couvert :**
+- Pas de visualisation "muscu fait" sur le calendrier (la dumbbell reste orange après complétion). Reportée à C5c — la donnée est en DB, le rendu seul manque.
+- C4 partiel : 8 nouveaux tests sur le hook, mais pas encore de couverture pour `reconcileStrengthRunLogs branches`, `useStrengthState restore`, `WorkoutRunner substitute race`, `DayCell rendering`. À ajouter sur PR séparée.
+- `transformers.test.ts` est apparu modifié dans `git status` mais ce n'est pas mon patch — la modif (utilisation de `node:test`) précédait ma session, je n'y touche pas.
+- Aucune migration Supabase ; aucun appel `npm run test:rls` (cf. CLAUDE.md § "Tests RLS — règles d'usage" : critères non remplis).
+
+---
+
 ## §170 — Audit robustesse focus muscu (substitution + offline + GIF) (2026-04-26)
 
 **Contexte :** un nageur a rapporté qu'en mode focus, le changement d'exercices "n'a pas fonctionné" et que les GIFs affichés étaient "complètement erronés", possiblement sur réseau dégradé. Audit complet du flow Mon plan → SessionDetailPreview → focus → substitute/add/log/finish, online et offline.

@@ -202,6 +202,7 @@ export function WorkoutRunner({
   const [shouldReplace, setShouldReplace] = useState(false);
   const [isGifOpen, setIsGifOpen] = useState(false);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const [skipExerciseConfirmOpen, setSkipExerciseConfirmOpen] = useState(false);
   // Track which set keys triggered a PR for trophy display
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
 
@@ -579,13 +580,13 @@ export function WorkoutRunner({
       }
       return;
     }
-    const setDifficulty = currentSetInputs[currentSetIndex - 1]?.difficulty ?? null;
+    const setDifficultyValue = currentSetInputs[currentSetIndex - 1]?.difficulty ?? null;
     const newLog = {
       exercise_id: currentBlock.exercise_id,
       set_number: currentSetIndex,
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
       weight: currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight,
-      difficulty: setDifficulty,
+      difficulty: setDifficultyValue,
     };
     setLogs((prev) => [...prev, newLog]);
 
@@ -670,6 +671,20 @@ export function WorkoutRunner({
         [activeInput]: parsed,
       },
     }));
+    // Tunnel mode: after validating weight, if reps for this set isn't set
+    // yet, slide directly to the reps step instead of closing the drawer.
+    // Saves a "tap card → numpad" round-trip on every single set, which adds
+    // up fast across a 20-set session with wet hands.
+    const repsAlreadySet =
+      currentSetInputs[currentSetIndex - 1]?.reps !== undefined &&
+      currentSetInputs[currentSetIndex - 1]?.reps !== null;
+    if (activeInput === "weight" && !repsAlreadySet) {
+      setActiveInput("reps");
+      const nextValue = currentBlock.reps ?? "";
+      setDraftValue(nextValue ? String(nextValue) : "");
+      setShouldReplace(Boolean(nextValue));
+      return;
+    }
     setInputSheetOpen(false);
   };
 
@@ -820,9 +835,12 @@ export function WorkoutRunner({
 
   return (
     <div className="space-y-6 pb-44">
-      {/* Exit bar */}
+      {/* Exit bar — pt-[env(safe-area-inset-top)] keeps the "Quitter" link
+          reachable on iPhones with a notch when running as a PWA: without it,
+          the sticky bar slides under the system status area and the link
+          becomes invisible/inaccessible above ~6 sets in. */}
       {onExitFocus && (
-        <div className="sticky top-0 z-10 flex items-center gap-2 bg-background/95 backdrop-blur px-4 py-2 border-b">
+        <div className="sticky top-0 z-10 flex items-center gap-2 bg-background/95 backdrop-blur px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 border-b">
           <button
             type="button"
             onClick={() => {
@@ -1016,8 +1034,11 @@ export function WorkoutRunner({
                 <button
                   key={level}
                   type="button"
+                  // h-9 w-9 (36px) keeps the row visually compact while staying
+                  // tap-friendly with wet hands at the pool. The previous h-6
+                  // (24px) failed Apple HIG and produced misclicks.
                   className={cn(
-                    "flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold transition-all",
+                    "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold transition-all",
                     selected
                       ? colorClass
                       : "border-muted-foreground/25 bg-muted/30 text-muted-foreground/60",
@@ -1067,7 +1088,20 @@ export function WorkoutRunner({
           <button
             type="button"
             className="text-xs text-muted-foreground font-medium py-1 active:text-foreground transition-colors"
-            onClick={() => advanceExercise()}
+            onClick={() => {
+              // Confirm only when there's already partial work on the current
+              // exercise — otherwise skipping a fresh block is a normal flow
+              // (e.g. swimmer realises an exercise isn't relevant today) and
+              // a confirm dialog adds friction without benefit.
+              const hasLogsForCurrent = currentBlock
+                ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
+                : false;
+              if (hasLogsForCurrent) {
+                setSkipExerciseConfirmOpen(true);
+              } else {
+                advanceExercise();
+              }
+            }}
           >
             Passer cet exercice
           </button>
@@ -1204,8 +1238,13 @@ export function WorkoutRunner({
         <DrawerContent className="max-h-[90dvh]">
           <div className="mx-auto w-full max-w-md px-4 pb-8">
             <DrawerHeader className="pb-2">
-              <DrawerTitle className="text-center">
-                {activeInput === "weight" ? "Charge" : "Répétitions"}
+              <DrawerTitle className="text-center flex items-center justify-center gap-2">
+                <span>{activeInput === "weight" ? "Charge" : "Répétitions"}</span>
+                {/* Tunnel-mode step indicator: weight = step 1/2, reps = step 2/2.
+                    Lets the swimmer know they don't need to dismiss after weight. */}
+                <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                  {activeInput === "weight" ? "1/2" : "2/2"}
+                </span>
               </DrawerTitle>
               <DrawerDescription className="text-center">
                 Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · Objectif{" "}
@@ -1391,6 +1430,24 @@ export function WorkoutRunner({
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      <AlertDialog open={skipExerciseConfirmOpen} onOpenChange={setSkipExerciseConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Passer cet exercice ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tu as déjà validé des séries sur cet exercice. Elles seront conservées,
+              mais l'exercice sera marqué comme abandonné.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setSkipExerciseConfirmOpen(false); advanceExercise(); }}>
+              Passer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Task 13: Continue picker from completion */}
       {onAddExercise && (

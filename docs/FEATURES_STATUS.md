@@ -49,8 +49,8 @@ Tous les feature flags sont activés.
 
 | Fonctionnalité | Statut | Fichiers | Notes |
 |----------------|--------|----------|-------|
-| Dashboard calendrier | ✅ | `Dashboard.tsx`, `DayCell.tsx`, `CalendarHeader.tsx`, `CalendarGrid.tsx`, `useDashboardState.ts` | Pills dynamiques par créneau (AM/PM), vert si rempli, gris si attendu, repos avec icône Minus |
-| Saisie ressenti | ✅ | `Dashboard.tsx` | Difficulté, fatigue, perf, engagement, distance, commentaire |
+| Dashboard calendrier | ✅ | `Dashboard.tsx`, `DayCell.tsx`, `CalendarHeader.tsx`, `CalendarGrid.tsx`, `useDashboardState.ts`, `useStrengthPlanByISO.ts` | Pills dynamiques par créneau (AM/PM), vert si rempli, gris si attendu, repos avec icône Minus. §172 : pills 14×14 avec mini Sun/Moon (couleur statut préservée), icône Dumbbell haut-gauche si séance muscu prévue (Trophy compétition prioritaire). Source plan muscu = `strength_planning_slots` + overrides via `useStrengthPlanByISO` (sémantique §157, plan individuel jamais écrasé). |
+| Saisie ressenti | ✅ | `Dashboard.tsx`, `FeedbackDrawer.tsx` | Difficulté, fatigue, perf, engagement, distance, commentaire. §172 : carte muscu jour rendue dans le drawer (handoff → /strength), hint permanent "Remplis les 4 indicateurs", boutons ressenti h-11/h-12, fermeture session différée à mutation.onSuccess. |
 | Notes techniques exercice | ✅ | `ExerciseLogInline.tsx`, `SwimSessionTimeline.tsx`, `swim-logs.ts` | Saisie inline depuis la timeline (§58), expansion par exercice, auto-détection reps, temps/coups par rep |
 | Historique notes techniques | ✅ | `SwimExerciseLogsHistory.tsx` | Vue chronologique groupée par date |
 | Présence/absence | ✅ | `Dashboard.tsx` | Toggle par créneau |
@@ -88,7 +88,8 @@ Tous les feature flags sont activés.
 |----------------|--------|----------|-------|
 | Liste séances assignées | ✅ | `Strength.tsx` | Segmented control, cards compactes, auto-start, AlertDialog |
 | Preview séance | ✅ | `Strength.tsx` | Mode "reader", dock masqué, lancement unique |
-| Mode focus (WorkoutRunner) | ✅ | `WorkoutRunner.tsx` | Header compact, bouton "Passer", notes visibles, timer simplifié |
+| Mode focus (WorkoutRunner) | ✅ | `WorkoutRunner.tsx` | Header compact, bouton "Passer", notes visibles, timer simplifié. §172 : mode tunnel charge→reps (1/2→2/2 dans drawer), confirmation skip exercice si logs>0, boutons difficulté h-9 (24→36px), safe-area-inset-top sur exit bar PWA iOS. |
+| Saisie depuis "Mon plan" jour-J | ✅ | `MyPlanWeekCard.tsx`, `MyPlanTab.tsx`, `Strength.tsx` (§172) | Bouton CTA "Démarrer maintenant" sur la séance du jour J + semaine courante → court-circuite le reader via `autoLaunchKey`. Handoff Dashboard drawer → /strength via sessionStorage `eac_pending_strength_focus_slot_id`. |
 | Timer repos enrichi | ✅ | `RestScreen.tsx`, `RestExerciseTab.tsx`, `RestSessionTab.tsx`, `RestPerfsTab.tsx` | 3 tabs swipables (exercice/séance/perfs), timer glow, progression, volume, 1RM (§94). §95 : GIF full ratio, notes perso éditables, pastilles série X/Y, estimation temps restant, sparkline 1RM, fix swipe/scroll |
 | Saisie charge/reps | ✅ | `WorkoutRunner.tsx` | Auto-sauvegarde, volume formaté fr-FR, option "Poids du corps" (PDC) (§64) |
 | Noms exercices français | ✅ | `dim_exercices` (DB) | 59 exercices traduits en français (§64) |

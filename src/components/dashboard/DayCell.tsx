@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { Moon, Trophy } from "lucide-react";
+import { Dumbbell, Moon, Sun, Trophy } from "lucide-react";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -87,7 +87,20 @@ export const DayCell = memo(function DayCell({
     >
       <div className="flex h-full flex-col justify-between">
         <div className="flex items-start justify-between">
-          <div className={cn("text-[12px] font-semibold", hasAbsence ? "text-muted-foreground" : "text-foreground")}>{date.getDate()}</div>
+          <div className="flex items-center gap-1">
+            <div className={cn("text-[12px] font-semibold", hasAbsence ? "text-muted-foreground" : "text-foreground")}>{date.getDate()}</div>
+            {/* Strength session indicator. Trophy (competition) takes the
+                top-right slot; the dumbbell sits next to the date number on
+                the top-left. We never show muscu on a competition day in
+                practice, but if it ever happens the Trophy still wins
+                visually as agreed. */}
+            {strengthAssigned && !hasCompetition ? (
+              <Dumbbell
+                className="h-3 w-3 text-orange-500 shrink-0"
+                aria-label="Séance musculation prévue"
+              />
+            ) : null}
+          </div>
           {hasCompetition ? (
             <Trophy className="h-3 w-3 text-amber-500" />
           ) : (
@@ -97,30 +110,24 @@ export const DayCell = memo(function DayCell({
 
         <div className="flex items-center justify-end gap-1">
           {hasCompetition ? null : isRest && !strengthAssigned ? (
+            // "Real" rest day: no swim, no muscu. Soft moon hints there's
+            // genuinely nothing planned (kept distinct from the PM-pill moon
+            // below, which is solid + colored to encode completion status).
             <Moon className="h-3 w-3 text-muted-foreground/40" />
           ) : (
             <>
               <div className="flex items-center gap-1">
-                {expectedSlots.length > 0 ? (
-                  expectedSlots.map((slot, i) => (
-                    <span
-                      key={i}
-                      className={cn(
-                        "inline-flex h-2 w-3 rounded-full",
-                        slotPillTone(slot),
-                      )}
-                    />
-                  ))
-                ) : (
-                  <>
-                    <span className={cn("inline-flex h-2 w-3 rounded-full", slotPillTone(amSlot))} />
-                    <span className={cn("inline-flex h-2 w-3 rounded-full", slotPillTone(pmSlot))} />
-                  </>
-                )}
+                {expectedSlots.length > 0
+                  ? expectedSlots.map((slot, i) => (
+                      <SlotPill key={i} slot={slot} tone={slotPillTone(slot)} />
+                    ))
+                  : (
+                    <>
+                      <SlotPill slot={amSlot} tone={slotPillTone(amSlot)} />
+                      <SlotPill slot={pmSlot} tone={slotPillTone(pmSlot)} />
+                    </>
+                  )}
               </div>
-              {strengthAssigned ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
-              ) : null}
             </>
           )}
         </div>
@@ -128,3 +135,39 @@ export const DayCell = memo(function DayCell({
     </button>
   );
 });
+
+/**
+ * A single AM/PM pill: keeps the existing tri-tone background
+ * (success/in-progress/absent) for at-a-glance status scanning, and adds a
+ * tiny Sun/Moon glyph inside so a swimmer who doesn't know the convention
+ * can still tell which slot is which without a legend.
+ *
+ * Hidden when `tone === "hidden"` (slot not expected) — the SlotStatus
+ * already encodes that case via slotPillTone().
+ */
+function SlotPill({
+  slot,
+  tone,
+}: {
+  slot: SlotStatus | undefined;
+  tone: string;
+}) {
+  if (tone === "hidden") return null;
+  // The pill background tone encodes status (vert = fait, gris foncé = en
+  // attente, gris pâle = absent). The inner glyph encodes the slot
+  // (Sun = matin, Moon = soir). Glyph color is `text-foreground/70` so it
+  // stays visible across all three backgrounds in both light/dark themes —
+  // pure white was readable on the success/muted-foreground variants but
+  // disappeared on the muted-foreground/15 (absent) pill.
+  const Icon = slot?.slotKey === "PM" ? Moon : Sun;
+  return (
+    <span
+      className={cn(
+        "inline-flex h-3.5 w-3.5 items-center justify-center rounded-full",
+        tone,
+      )}
+    >
+      <Icon className="h-2 w-2 text-foreground/70" strokeWidth={2.5} />
+    </span>
+  );
+}

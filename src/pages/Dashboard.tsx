@@ -30,6 +30,7 @@ import {
 import { ChallengeProgressBar } from "@/components/shared/ChallengeProgressBar";
 import { getActiveChallenges } from "@/lib/api/challenges";
 import { fetchUserGroupIds } from "@/lib/api/client";
+import { useStrengthPlanByISO } from "@/hooks/useStrengthPlanByISO";
 import type { SaveState } from "@/components/shared/BottomActionBar";
 
 /**
@@ -206,6 +207,14 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // ── Strength plan → calendar feed ───────────────────────────
+  // The plan (strength_planning_slots + per-athlete overrides) is the
+  // single source of truth for muscu sessions. Without this, the calendar
+  // showed "Repos" for days where the swimmer actually had a strength
+  // session scheduled — they discovered it only by tapping into Strength.
+  const { strengthByISO, resolvedByISO: strengthResolvedByISO } =
+    useStrengthPlanByISO(userId, userGroupIds?.[0] ?? null);
+
   const { data: activeChallenges = [] } = useQuery({
     queryKey: ["active-challenges", userGroupIds],
     queryFn: () => getActiveChallenges(userGroupIds?.[0] ?? null),
@@ -271,6 +280,7 @@ export default function Dashboard() {
         setDrawerOpen(false);
         setActiveSessionId(null);
         setDetailsOpen(false);
+        setAlternativeOverride(null);
       }, 1200);
     },
     onError: () => {
@@ -312,6 +322,7 @@ export default function Dashboard() {
         setDrawerOpen(false);
         setActiveSessionId(null);
         setDetailsOpen(false);
+        setAlternativeOverride(null);
       }, 1200);
     },
     onError: () => {
@@ -647,11 +658,11 @@ export default function Dashboard() {
     } else {
       mutation.mutate({ ...payload, _exerciseLogs: draftState.exerciseLogs.length > 0 ? draftState.exerciseLogs : undefined });
     }
-
-    setActiveSessionId(null);
-    setDetailsOpen(false);
-    setAlternativeOverride(null);
-  }, [activeSessionId, user, userId, draftState, stableDurationMin, sessionsForSelectedDay, getLogForSession, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen, alternativeOverride]);
+    // Drawer / session close is handled by mutation.onSuccess (with a 1.2s
+    // delay so the success toast lands). Closing here would also fire on
+    // mutation error → the swimmer would lose the drawer context with only
+    // an error toast as feedback.
+  }, [activeSessionId, user, userId, draftState, stableDurationMin, sessionsForSelectedDay, getLogForSession, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, alternativeOverride]);
 
   const toggleDefaultPresence = useCallback((weekdayIdx: number, slotKey: SlotKey) => {
     setPresenceDefaults((prev) => ({
@@ -855,6 +866,7 @@ export default function Dashboard() {
             monthCursor={monthCursor}
             gridDates={gridDates}
             completionByISO={completionByISO}
+            strengthByISO={strengthByISO}
             competitionDates={competitionDates}
             absenceDates={absenceDates}
             selectedISO={selectedISO}
@@ -946,7 +958,7 @@ export default function Dashboard() {
                           aria-label={`${WEEKDAYS_FR[dayIdx]} ${slot.label}`}
                           aria-pressed={on}
                           className={cn(
-                            "h-8 w-8 rounded-full border-2 transition-all duration-150 active:scale-90",
+                            "h-9 w-9 rounded-full border-2 transition-all duration-150 active:scale-90",
                             on
                               ? "border-primary bg-primary text-primary-foreground shadow-sm"
                               : "border-border bg-background text-transparent hover:border-primary/40",
@@ -1063,6 +1075,23 @@ export default function Dashboard() {
               ? alternativeOverride.title
               : null
           }
+          strengthSessionsForSelectedDay={strengthResolvedByISO.get(selectedISO) ?? []}
+          onOpenStrengthSession={(slotId) => {
+            // Hand off to /strength via sessionStorage. Shallow approach:
+            // - keeps the Dashboard drawer free of focus-mode internals
+            // - preserves the rule "Mon plan reste le point d'entrée"
+            //   (Strength.tsx routes the swimmer onto MyPlanTab and surfaces
+            //   the matching session card)
+            try {
+              sessionStorage.setItem(
+                "eac_pending_strength_focus_slot_id",
+                String(slotId),
+              );
+            } catch {
+              /* private mode / quota → fall back to plain navigation */
+            }
+            navigate("/strength");
+          }}
         />
 
       </div>

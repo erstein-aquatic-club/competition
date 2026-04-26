@@ -158,6 +158,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `supabase/migrations/00142_notification_text_alignment.sql` | Cohérence textuelle notifs — titre `Nouvelle compétition` + tutoiement body compétition/entretien (§163) | 94 lignes |
 | `supabase/migrations/00143_notification_auto_expire_crons.sql` | `expires_at = J+1` sur crons `send_wellness_morning_push` et `slot-session-reminder` + backfill 25 notifs existantes (§163) | 124 lignes |
 | `src/hooks/useCompetitionsByWeek.ts` | Hook partagé : competitionsByWeek Map + getDayCompetitions par jour (§156) | 67 lignes |
+| `src/hooks/useStrengthPlanByISO.ts` | Hook nageur — fusionne plan groupe + overrides (mergeStrengthSlots §157) et expose `planByISO`/`resolvedByISO`/`strengthByISO` au calendrier Dashboard et au FeedbackDrawer (§172). Helpers `buildWeekStarts`/`isoFromWeekStartAndDay` exportés (TZ-safe via local-date components, fix bug latent toISOString shift UTC). | 176 lignes |
+| `src/hooks/__tests__/useStrengthPlanByISO.test.ts` | 8 tests unitaires sur les helpers TZ-safe (régression boundaries mois/année, dimanche edge case `getDay()=0`, no shift UTC) (§172) | 61 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |
 | `src/components/strength/TeamPlansSection.tsx` | Plans d'équipe visibles entre nageurs (§93) | |

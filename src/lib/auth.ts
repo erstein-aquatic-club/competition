@@ -404,8 +404,18 @@ supabase.auth.onAuthStateChange((event, session) => {
 
 const REFRESH_CHECK_INTERVAL_MS = 60_000; // 60 seconds
 const REFRESH_THRESHOLD_MS = 55 * 60 * 1000; // 55 minutes
+/**
+ * Number of consecutive proactive-refresh failures before forcing signOut.
+ * Lower values previously kicked the swimmer mid-set when the network
+ * blipped: a single failed refresh during a workout meant a brutal logout
+ * + page redirect to "/". Tolerating up to 3 transient failures keeps the
+ * UI alive long enough to reach the next interval (≈ 3 minutes) where the
+ * network usually recovers.
+ */
+const REFRESH_FAILURE_TOLERANCE = 3;
 
 let proactiveRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let consecutiveRefreshFailures = 0;
 
 function startRefreshTimer() {
   if (proactiveRefreshTimer) return; // already running
@@ -416,17 +426,32 @@ function startRefreshTimer() {
     const elapsed = Date.now() - lastRefreshAt;
     if (elapsed < REFRESH_THRESHOLD_MS) return;
 
+    const handleFailure = async (reason: unknown) => {
+      consecutiveRefreshFailures += 1;
+      console.warn(
+        `[auth] Proactive refresh failure #${consecutiveRefreshFailures}/${REFRESH_FAILURE_TOLERANCE}`,
+        reason,
+      );
+      if (consecutiveRefreshFailures >= REFRESH_FAILURE_TOLERANCE) {
+        console.warn("[auth] Refresh tolerance exhausted, signing out");
+        await supabase.auth.signOut();
+      }
+      // Below threshold: leave the user logged in. Network may recover before
+      // the next tick; if not, we'll escalate. The next REFRESH_THRESHOLD_MS
+      // window keeps the existing JWT valid (Supabase tokens last 1h, we
+      // refresh at 55 min — there's still ≈ 5 min of slack on first failure).
+    };
+
     try {
       const { data, error } = await supabase.auth.refreshSession();
       if (error || !data.session) {
-        console.warn("[auth] Proactive refresh failed, signing out", error);
-        await supabase.auth.signOut();
-        // onAuthStateChange SIGNED_OUT handler will clear store + redirect
+        await handleFailure(error);
+        return;
       }
       // On success, onAuthStateChange TOKEN_REFRESHED handler updates store
+      consecutiveRefreshFailures = 0;
     } catch (err) {
-      console.warn("[auth] Proactive refresh error", err);
-      await supabase.auth.signOut();
+      await handleFailure(err);
     }
   }, REFRESH_CHECK_INTERVAL_MS);
 
@@ -441,4 +466,5 @@ function stopRefreshTimer() {
     clearInterval(proactiveRefreshTimer);
     proactiveRefreshTimer = null;
   }
+  consecutiveRefreshFailures = 0;
 }

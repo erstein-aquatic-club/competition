@@ -215,8 +215,14 @@ export default function Strength() {
       return;
     }
     if (!wasOfflineRef.current) return;
-    wasOfflineRef.current = false;
-    if (!activeRunId || !activeRunLogs || activeRunLogs.length === 0) return;
+    if (!activeRunId || !activeRunLogs || activeRunLogs.length === 0) {
+      wasOfflineRef.current = false;
+      return;
+    }
+    // Keep wasOfflineRef = true until reconcile actually succeeds. Otherwise
+    // a transient error here (RLS hiccup, 503) silently swallows the offline
+    // logs: the next online tick wouldn't retry, and the reconcile-at-finish
+    // path only runs if the swimmer ever taps "Terminer".
     void api
       .reconcileStrengthRunLogs({
         runId: activeRunId,
@@ -224,9 +230,10 @@ export default function Strength() {
         athleteId: userId ?? null,
         athleteName: user ?? null,
       })
+      .then(() => {
+        wasOfflineRef.current = false;
+      })
       .catch((err) => {
-        // Silent — reconcile will run again at finish. Surface only via console
-        // so a degraded reconcile (e.g. RLS error) shows up in support traces.
         console.warn("[strength] background reconcile failed:", err);
       });
   }, [isOnline, activeRunId, activeRunLogs, userId, user]);
@@ -277,6 +284,13 @@ export default function Strength() {
   });
 
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+
+  /** Bumped when we want to launch focus immediately after the next render
+   *  has committed activeSession. Used by startPlanSessionDirect (Démarrer
+   *  maintenant) to skip the reader screen — without the indirection, calling
+   *  handleLaunchFocus synchronously after startPlanSession reads a stale
+   *  closure and bails on `activeFilteredItems.length === 0`. */
+  const [autoLaunchKey, setAutoLaunchKey] = useState(0);
 
   // Task 11: Exercise substitution state
   const [substitutions, setSubstitutions] = useState<Map<number, { originalIndex: number; exercise: Exercise }>>(new Map());
@@ -373,7 +387,9 @@ export default function Strength() {
           );
         }
       }
-      queryClient.invalidateQueries({ queryKey: ["assignments", user, "strength"] });
+      // Invalidate by prefix so both ["assignments", user, "strength"] (this page)
+      // and ["assignments", userId ?? user] (Dashboard calendar) refresh together.
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
       queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress", historyAthleteKey] });
       queryClient.invalidateQueries({ queryKey: ["strength_history"] });
     },
@@ -435,8 +451,11 @@ export default function Strength() {
           buildInProgressRunCache(null),
         );
       }
-      queryClient.invalidateQueries({ queryKey: ["assignments", user] });
-      queryClient.invalidateQueries({ queryKey: ["assignments", user, "strength"] });
+      // Prefix invalidation covers both the strength-scoped key on this page
+      // and the swimmer Dashboard's ["assignments", userId ?? user]. Without
+      // this, the calendar still showed the muscu pill as "to do" right after
+      // the swimmer finished a session.
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
       queryClient.invalidateQueries({ queryKey: ["1rm", user, userId] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       setScreenMode("summary");
@@ -579,6 +598,37 @@ export default function Strength() {
     setSubstitutions(new Map());
     setOriginalItemCount(items.length);
   };
+
+  /**
+   * Same as startPlanSession but skips the reader screen — used for the
+   * "Démarrer maintenant" CTA on the day-J card and for handoff from the
+   * Dashboard drawer (sessionStorage `eac_pending_strength_focus_slot_id`).
+   *
+   * We can't call handleLaunchFocus synchronously: it reads activeSession
+   * via closure and would see the previous render's value. autoLaunchKey
+   * triggers a useEffect once the new session has committed, then fires
+   * handleLaunchFocus from a fresh closure.
+   */
+  const startPlanSessionDirect = (session: StrengthSessionTemplate) => {
+    startPlanSession(session);
+    setAutoLaunchKey((k) => k + 1);
+  };
+
+  // Wait for activeSession + activeFilteredItems to be committed before
+  // launching focus. handleLaunchFocus has its own guards (empty session,
+  // missing 1RM gate); we rely on those rather than re-checking here.
+  useEffect(() => {
+    if (autoLaunchKey === 0) return;
+    if (!activeSession) return;
+    if (screenMode !== "reader") return;
+    if (activeFilteredItems.length === 0) return;
+    setAutoLaunchKey(0);
+    void handleLaunchFocus();
+    // We deliberately omit handleLaunchFocus from deps: it's a stable
+    // function in this render but the React lint plugin can't prove it.
+    // Re-running this effect on every render would defeat the gate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLaunchKey, activeSession, screenMode, activeFilteredItems.length]);
 
   const handleLaunchFocus = async () => {
     if (!activeSession) return;
@@ -833,9 +883,14 @@ export default function Strength() {
                   });
                   // onSuccess handles navigation to summary + toast
                 } catch {
-                  // Network failed despite navigator.online — fallback to offline queue
+                  // Network failed despite navigator.online — fallback to offline queue.
+                  // Reset isFinishing here: updateRun.onError doesn't fire when the throw
+                  // comes from reconcileStrengthRunLogs (before the mutation), and even
+                  // when it does, we land in this catch instead, which left the button
+                  // stuck disabled until full app refresh.
                   enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
                   toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                  setIsFinishing(false);
                   setScreenMode("summary");
                 }
               }}
@@ -943,6 +998,7 @@ export default function Strength() {
                 <MyPlanTab
                   athleteId={userId}
                   onSelectSession={startPlanSession}
+                  onLaunchSessionDirect={startPlanSessionDirect}
                 />
               )}
               {screenMode === "reader" && activeSession && exercises && (

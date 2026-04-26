@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
-import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine } from "lucide-react";
+import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine, Dumbbell } from "lucide-react";
 import { useLocation } from "wouter";
 import { BottomActionBar, type SaveState } from "@/components/shared/BottomActionBar";
 import {
@@ -17,6 +17,7 @@ import { slideInFromBottom, staggerChildren, listItem } from "@/lib/animations";
 import { durationsSeconds } from "@/lib/design-tokens";
 import { StrokeDetailForm } from "./StrokeDetailForm";
 import type { Session, SwimExerciseLogInput } from "@/lib/api";
+import type { ResolvedPlanEntry } from "@/hooks/useStrengthPlanByISO";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 
 function cn(...classes: Array<string | false | null | undefined>) {
@@ -430,6 +431,11 @@ interface FeedbackDrawerProps {
   onSwitchAlternative?: (sessionId: string, assignmentId: number, title: string, km: number | null) => void;
   /** When set, shows a banner indicating the swimmer switched to an alternative session */
   alternativeOverrideTitle?: string | null;
+  /** Strength sessions resolved from the plan for the selected day. Empty array
+   *  when no plan slot exists. The drawer renders one card per entry; the card
+   *  is read-only (no rating fields) and routes the swimmer to /strength on tap. */
+  strengthSessionsForSelectedDay?: ResolvedPlanEntry[];
+  onOpenStrengthSession?: (slotId: string) => void;
 }
 
 export function FeedbackDrawer({
@@ -464,6 +470,8 @@ export function FeedbackDrawer({
   onRemoveDayAbsence,
   onSwitchAlternative,
   alternativeOverrideTitle,
+  strengthSessionsForSelectedDay = [],
+  onOpenStrengthSession,
 }: FeedbackDrawerProps) {
   // Use getLogForSession helper if provided, fallback to direct lookup
   const getLog = getLogForSessionProp ?? ((id: string) => logsBySessionId[id]);
@@ -981,6 +989,62 @@ export function FeedbackDrawer({
                   );
                 })()}
 
+                {/* Strength plan card(s) — surfaced from strength_planning_slots.
+                    The plan is a separate domain (no swim ressenti, no AM/PM
+                    parity) so we render dedicated read-only cards rather than
+                    funneling them through renderSessionCard which assumes a
+                    swim feedback flow. Tap → /strength (point d'entrée Mon plan). */}
+                {!activeSession && strengthSessionsForSelectedDay.length > 0 && (
+                  <div className="mt-4 grid gap-2 overflow-hidden">
+                    {strengthSessionsForSelectedDay.map(({ slot, session }) => {
+                      const title = session?.title ?? "Séance musculation";
+                      const itemCount = session?.items?.length ?? 0;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => onOpenStrengthSession?.(slot.id)}
+                          className="group w-full min-w-0 rounded-3xl border border-orange-200/70 dark:border-orange-900/40 bg-orange-50/50 dark:bg-orange-950/20 px-3 py-3 text-left transition overflow-hidden hover:border-orange-300 hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-10 w-10 shrink-0 rounded-2xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                                <Dumbbell className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="truncate text-sm font-semibold text-foreground">
+                                    {title}
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">
+                                    {slot.time_slot === "morning" ? "Matin" : "Soir"}
+                                  </span>
+                                </div>
+                                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                  <span className="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/40 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:text-orange-300">
+                                    Musculation
+                                  </span>
+                                  {itemCount > 0 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {itemCount} exercice{itemCount > 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                  {slot.overridden && (
+                                    <span className="text-[10px] text-primary">
+                                      Plan personnalisé
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition group-hover:text-foreground group-hover:translate-x-0.5" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Détail séance + ressenti */}
                 <AnimatePresence>
                   {activeSession && (
@@ -1190,7 +1254,7 @@ export function FeedbackDrawer({
                                                 disabled={!canRate}
                                                 onClick={() => onDraftStateChange({ ...draftState, [ind.key]: n })}
                                                 className={cn(
-                                                  "h-10 w-10 sm:h-11 sm:w-11 rounded-2xl border text-sm font-semibold transition shrink-0",
+                                                  "h-11 w-11 sm:h-12 sm:w-12 rounded-2xl border text-sm font-semibold transition shrink-0",
                                                   !canRate
                                                     ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
                                                     : isSel
@@ -1334,9 +1398,20 @@ export function FeedbackDrawer({
                       >
                         Valider
                       </button>
-                      {showMissing && (
-                        <div className="text-destructive text-xs text-center mt-1 font-medium">
-                          Remplis les 4 indicateurs
+                      {/* Permanent hint when validation is gated by missing indicators.
+                          Previously only `showMissing` (3s flash on tap) revealed the
+                          reason — first-time users would tap the disabled button without
+                          understanding why nothing happens. Now the hint is always
+                          visible while the gate is active; the tap still flashes
+                          destructive ring on the indicator rows for escalation. */}
+                      {canRate && !allFilled && (
+                        <div
+                          className={cn(
+                            "text-xs text-center mt-1 font-medium transition-colors",
+                            showMissing ? "text-destructive" : "text-muted-foreground",
+                          )}
+                        >
+                          Remplis les 4 indicateurs pour valider
                         </div>
                       )}
                     </div>

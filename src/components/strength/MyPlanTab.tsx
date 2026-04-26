@@ -36,9 +36,13 @@ function buildWeekStarts(count: number): string[] {
 interface MyPlanTabProps {
   athleteId: number;
   onSelectSession: (session: StrengthSessionTemplate) => void;
+  /** Optional: launch the session directly into focus mode (skip reader).
+   *  Used by the day-J "Démarrer maintenant" CTA and by the handoff from
+   *  the Dashboard drawer (eac_pending_strength_focus_slot_id). */
+  onLaunchSessionDirect?: (session: StrengthSessionTemplate) => void;
 }
 
-export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
+export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }: MyPlanTabProps) {
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
@@ -212,6 +216,26 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekInstances.length]);
 
+  // Handoff from Dashboard day drawer: when the swimmer tapped a muscu card
+  // there, the slot id was stashed in sessionStorage. As soon as the slot
+  // catalog + session catalog are both loaded, resolve and launch directly
+  // into focus mode. The sessionStorage entry is consumed exactly once.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!onLaunchSessionDirect) return;
+    const pendingSlotId = window.sessionStorage.getItem(
+      "eac_pending_strength_focus_slot_id",
+    );
+    if (!pendingSlotId) return;
+    if (!effectiveSlots.length || sessionsById.size === 0) return; // wait for data
+    window.sessionStorage.removeItem("eac_pending_strength_focus_slot_id");
+    const slot = effectiveSlots.find((s) => s.id === pendingSlotId);
+    if (!slot?.session_template_id) return;
+    const session = sessionsById.get(slot.session_template_id);
+    if (!session) return;
+    onLaunchSessionDirect(session);
+  }, [effectiveSlots, sessionsById, onLaunchSessionDirect]);
+
   // ── Competitions ────────────────────────────────────────────────────────────
   const { competitionsByWeek, getDayCompetitions } = useCompetitionsByWeek(athleteId);
 
@@ -275,6 +299,7 @@ export function MyPlanTab({ athleteId, onSelectSession }: MyPlanTabProps) {
             competitions={weekCompetitions}
             getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
             onSelectSession={onSelectSession}
+            onLaunchSessionDirect={onLaunchSessionDirect}
             onSelectCompetition={setSelectedCompetition}
           />
         );
