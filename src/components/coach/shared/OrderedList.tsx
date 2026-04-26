@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowUp, ArrowDown, Trash2, GripVertical } from "lucide-react";
 
-interface DragDropListProps<T> {
+interface OrderedListProps<T> {
   items: T[];
   renderItem: (item: T, index: number) => React.ReactNode;
   onMoveUp: (index: number) => void;
@@ -11,7 +11,7 @@ interface DragDropListProps<T> {
   className?: string;
 }
 
-export function DragDropList<T>({
+export function OrderedList<T>({
   items,
   renderItem,
   onMoveUp,
@@ -19,7 +19,7 @@ export function DragDropList<T>({
   onDelete,
   showControls = true,
   className = "",
-}: DragDropListProps<T>) {
+}: OrderedListProps<T>) {
   return (
     <div className={className}>
       {items.map((item, index) => (
