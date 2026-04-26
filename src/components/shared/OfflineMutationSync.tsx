@@ -15,10 +15,27 @@ type QueuedStrengthCompletionPayload = UpdateStrengthRunInput & {
   logs?: SetLogEntry[];
 };
 
+type QueuedStrengthSetLogPayload = {
+  run_id: number;
+  exercise_id: number;
+  set_index?: number | null;
+  reps?: number | null;
+  weight?: number | null;
+  difficulty?: number | null;
+  athlete_id?: number | string | null;
+  athlete_name?: string | null;
+};
+
 function isQueuedStrengthCompletion(
   mutation: QueuedMutation,
 ): mutation is QueuedMutation & { payload: QueuedStrengthCompletionPayload } {
   return mutation.type === "strength-run-completed" || mutation.type === "updateRun";
+}
+
+function isQueuedStrengthSetLog(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedStrengthSetLogPayload } {
+  return mutation.type === "strength-set-log";
 }
 
 async function getRemoteRunLogCount(runId: number): Promise<number | null> {
@@ -99,16 +116,24 @@ export function OfflineMutationSync() {
 
     try {
       for (const mutation of queue) {
-        if (!isQueuedStrengthCompletion(mutation)) {
+        // Dispatch by type. Each branch is responsible for its own retry /
+        // remove logic; unrecognised types are dropped so the queue does not
+        // grow indefinitely from forgotten mutation kinds.
+        try {
+          if (isQueuedStrengthCompletion(mutation)) {
+            await replayStrengthCompletion(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedStrengthSetLog(mutation)) {
+            await api.logStrengthSet(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
           console.warn("[offline-sync] Unsupported queued mutation:", mutation.type);
           removeQueueItem(mutation.id);
-          continue;
-        }
-
-        try {
-          await replayStrengthCompletion(mutation.payload);
-          removeQueueItem(mutation.id);
-          syncedCount += 1;
         } catch (itemError) {
           lastError = itemError;
           console.error(

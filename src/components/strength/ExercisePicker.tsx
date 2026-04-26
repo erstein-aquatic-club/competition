@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
-import { Search, Dumbbell, X } from "lucide-react";
-import { cn, stripAccents } from "@/lib/utils";
+import { Search, X } from "lucide-react";
+import { stripAccents } from "@/lib/utils";
+import { ExerciseGif } from "./ExerciseGif";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { Exercise } from "@/lib/api";
 
 interface ExercisePickerProps {
@@ -23,6 +25,7 @@ export function ExercisePicker({
   title = "Choisir un exercice",
 }: ExercisePickerProps) {
   const [search, setSearch] = useState("");
+  const isOnline = useOnlineStatus();
 
   const filtered = useMemo(() => {
     const q = stripAccents(search.trim().toLowerCase());
@@ -87,21 +90,13 @@ export function ExercisePicker({
                 className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:scale-[0.98]"
                 onClick={() => { onSelect(exercise); onOpenChange(false); setSearch(""); }}
               >
-                {exercise.illustration_gif ? (
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted/20">
-                    <img
-                      src={exercise.illustration_gif}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/20">
-                    <Dumbbell className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
+                <ExerciseGif
+                  src={exercise.illustration_gif}
+                  alt=""
+                  offline={!isOnline}
+                  className="h-10 w-10 shrink-0 rounded-lg border"
+                  imgClassName="object-cover"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{exercise.nom_exercice}</p>
                   {exercise.description && (

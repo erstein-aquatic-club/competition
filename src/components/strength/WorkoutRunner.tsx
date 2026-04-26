@@ -19,15 +19,16 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
-  Dumbbell,
   RotateCcw,
   StickyNote,
   Trophy,
+  WifiOff,
   X,
 } from "lucide-react";
 import { BottomActionBar } from "@/components/shared/BottomActionBar";
 import { ScaleSelector5 } from "@/components/shared/ScaleSelector5";
 import { ExercisePicker } from "@/components/strength/ExercisePicker";
+import { ExerciseGif } from "@/components/strength/ExerciseGif";
 import { RestScreen } from "./RestScreen";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -563,6 +564,13 @@ export function WorkoutRunner({
   const handleValidateSet = async () => {
     if (!currentBlock) return;
     if (isLoggingRef.current) return;
+    // Defensive guard against a substitute → validate race: when session.items
+    // is swapped under us, currentSetIndex can briefly point past the new
+    // exercise's set count before the useEffect resets it. Validating in that
+    // window would write a phantom log at a stale set_index and immediately
+    // skip the new exercise. Bail out instead — the next render reconciles.
+    const blockSets = currentBlock.sets ?? 0;
+    if (blockSets > 0 && currentSetIndex > blockSets) return;
     if (currentLoggedSet) {
       if (currentSetIndex >= currentBlock.sets) {
         await advanceExercise();
@@ -831,6 +839,20 @@ export function WorkoutRunner({
           </button>
         </div>
       )}
+      {/* Offline banner — appears only while offline so the swimmer knows
+          set logs are buffered locally rather than silently failing. */}
+      {!isOnline && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900 dark:text-amber-200"
+        >
+          <WifiOff className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">
+            Hors ligne — tes séries sont sauvegardées et seront synchronisées dès la reconnexion.
+          </span>
+        </div>
+      )}
       <div className="space-y-3">
         {/* Ligne 1 : GIF + titre + note + exit */}
         <div className="flex items-center gap-3">
@@ -843,18 +865,13 @@ export function WorkoutRunner({
             }}
             className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-card shadow-sm"
           >
-            {currentExerciseDef?.illustration_gif ? (
-              <img
-                src={currentExerciseDef.illustration_gif}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
-              />
-            ) : (
-              <Dumbbell className="h-5 w-5 text-muted-foreground" />
-            )}
+            <ExerciseGif
+              src={currentExerciseDef?.illustration_gif}
+              alt=""
+              offline={!isOnline}
+              className="h-full w-full rounded-full"
+              imgClassName="object-cover"
+            />
           </button>
           <h2 className="flex-1 min-w-0 text-lg font-semibold tracking-tight truncate">
             {currentExerciseDef?.nom_exercice ?? "Exercice"}
@@ -1116,11 +1133,12 @@ export function WorkoutRunner({
               >
                 <X className="h-4 w-4" />
               </button>
-              <img
+              <ExerciseGif
                 src={currentExerciseDef.illustration_gif}
                 alt=""
-                className="max-h-[80dvh] w-auto max-w-[92vw] rounded-2xl"
-                loading="lazy"
+                offline={!isOnline}
+                className="max-h-[80dvh] max-w-[92vw] rounded-2xl"
+                imgClassName="max-h-[80dvh] w-auto max-w-[92vw]"
               />
             </div>
           </div>

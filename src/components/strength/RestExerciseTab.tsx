@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
-import { Dumbbell, StickyNote, Pencil } from "lucide-react";
+import { StickyNote, Pencil } from "lucide-react";
+import { ExerciseGif } from "./ExerciseGif";
 import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 
 export interface RestExerciseTabProps {
@@ -59,21 +60,13 @@ export function RestExerciseTab({
 
       {/* GIF illustration */}
       <div className="flex justify-center">
-        {exercise?.illustration_gif ? (
-          <div className="max-h-[220px] w-full max-w-[300px] overflow-hidden rounded-2xl border border-border/50 bg-muted/20 shadow-sm">
-            <img
-              src={exercise.illustration_gif}
-              alt={exercise.nom_exercice}
-              className="h-full w-full object-contain max-h-[220px]"
-              loading="eager"
-              decoding="async"
-            />
-          </div>
-        ) : (
-          <div className="flex h-[170px] w-full max-w-[300px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/30">
-            <Dumbbell className="h-10 w-10 text-muted-foreground/40" />
-          </div>
-        )}
+        <ExerciseGif
+          src={exercise?.illustration_gif}
+          alt={exercise?.nom_exercice ?? ""}
+          className="h-[220px] w-full max-w-[300px] rounded-2xl border border-border/50 shadow-sm"
+          imgClassName="object-contain"
+          iconClassName="h-10 w-10"
+        />
       </div>
 
       {/* Exercise name */}

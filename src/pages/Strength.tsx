@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, StrengthCycleType, StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -14,6 +14,8 @@ import { SessionDetailPreview } from "@/components/strength/SessionDetailPreview
 import { HistoryTable } from "@/components/strength/HistoryTable";
 import { useStrengthState } from "@/hooks/useStrengthState";
 import { orderStrengthItems } from "@/components/strength/utils";
+import { localStorageGet } from "@/lib/api/localStorage";
+import { STORAGE_KEYS } from "@/lib/api/client";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
@@ -191,6 +193,7 @@ export default function Strength() {
   } = useStrengthState({ athleteKey: historyAthleteKey });
 
   const isOnline = useOnlineStatus();
+  const wasOfflineRef = useRef(false);
 
   // Show recovery toast when a focus session is restored from localStorage
   useEffect(() => {
@@ -201,6 +204,32 @@ export default function Strength() {
       });
     }
   }, [wasRestored, toast]);
+
+  // Background reconcile on offline → online while a run is active. Without
+  // this, set logs that landed only in localStorage during an offline patch
+  // would not reach the server until the user finally hits "Terminer" — and
+  // would be lost if the user never finishes (closes tab, switches device).
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+      return;
+    }
+    if (!wasOfflineRef.current) return;
+    wasOfflineRef.current = false;
+    if (!activeRunId || !activeRunLogs || activeRunLogs.length === 0) return;
+    void api
+      .reconcileStrengthRunLogs({
+        runId: activeRunId,
+        logs: activeRunLogs,
+        athleteId: userId ?? null,
+        athleteName: user ?? null,
+      })
+      .catch((err) => {
+        // Silent — reconcile will run again at finish. Surface only via console
+        // so a degraded reconcile (e.g. RLS error) shows up in support traces.
+        console.warn("[strength] background reconcile failed:", err);
+      });
+  }, [isOnline, activeRunId, activeRunLogs, userId, user]);
 
   const cycleOptions: Array<{ value: StrengthCycleType; label: string }> = [
     { value: "endurance", label: "Endurance" },
@@ -223,6 +252,14 @@ export default function Strength() {
   const { data: exercises, error: exercisesError, refetch: refetchExercises } = useQuery({
     queryKey: ["exercises"],
     queryFn: () => api.getExercises(),
+    // Hydrate immediately from the localStorage mirror written by
+    // api.getExercises so a PWA cold-start in focus mode (no network) still
+    // resolves exercise names + GIF URLs without spinning on the skeleton.
+    initialData: () => {
+      const cached = localStorageGet(STORAGE_KEYS.EXERCISES) as Exercise[] | null;
+      return Array.isArray(cached) && cached.length > 0 ? cached : undefined;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const isListLoading = assignmentsLoading || catalogLoading;
@@ -272,18 +309,22 @@ export default function Strength() {
     });
   };
 
-  // Task 12: Add exercise handler
+  // Task 12: Add exercise handler — uses cycle-aware defaults so an exercise
+  // added mid-session inherits the same prescription a planned one would (sets
+  // / reps / rest / %1RM from the chosen cycle). Falls back to neutral defaults
+  // only when the exercise definition has no cycle params.
   const handleAddExercise = (exercise: Exercise) => {
+    const params = resolveExerciseParams(exercise, cycleType);
     setActiveSession((prev) => {
       if (!prev) return prev;
       const newItem = {
         exercise_id: exercise.id,
         exercise_name: exercise.nom_exercice,
         order_index: (prev.items?.length ?? 0),
-        sets: 3,
-        reps: 10,
-        rest_seconds: 90,
-        percent_1rm: 0,
+        sets: params.sets ?? 3,
+        reps: params.reps ?? 10,
+        rest_seconds: params.restSeries ?? 90,
+        percent_1rm: params.percent1rm ?? 0,
         cycle_type: cycleType,
       };
       return { ...prev, items: [...(prev.items ?? []), newItem] };
@@ -691,11 +732,30 @@ export default function Strength() {
                 if (!activeRunId) return;
                 // Always persist locally first — triggers localStorage write via useStrengthState
                 setActiveRunLogs((prev) => [...(prev ?? []), ...blockLogs]);
-                if (!isOnline) return;
-                // Fire-and-forget: don't block WorkoutRunner while network is slow
-                // isLoggingRef lock is released immediately so the next set can be validated
-                blockLogs.forEach((log: SetLogEntry, index: number) =>
-                  logStrengthSet.mutate({
+                // If offline, queue the set for replay so the per-set log is
+                // not lost if the user finishes online from a different device
+                // or if the reconcile-at-finish step never runs.
+                if (!isOnline) {
+                  blockLogs.forEach((log: SetLogEntry, index: number) =>
+                    enqueue("strength-set-log", {
+                      run_id: activeRunId,
+                      exercise_id: log.exercise_id,
+                      set_index: log.set_number ?? index + 1,
+                      reps: log.reps ?? null,
+                      weight: log.weight ?? null,
+                      difficulty: log.difficulty ?? null,
+                      athlete_id: userId ?? null,
+                      athlete_name: user ?? null,
+                    } as Record<string, unknown>),
+                  );
+                  return;
+                }
+                // Online fire-and-forget: don't block WorkoutRunner while
+                // network is slow. On error we enqueue so a transient blip
+                // (TLS reset, 503) doesn't silently drop a set — the
+                // OfflineMutationSync replay path picks it up.
+                blockLogs.forEach((log: SetLogEntry, index: number) => {
+                  const payload = {
                     run_id: activeRunId,
                     exercise_id: log.exercise_id,
                     set_index: log.set_number ?? index + 1,
@@ -704,8 +764,13 @@ export default function Strength() {
                     difficulty: log.difficulty ?? null,
                     athlete_id: userId ?? null,
                     athlete_name: user ?? null,
-                  }),
-                );
+                  };
+                  logStrengthSet.mutate(payload, {
+                    onError: () => {
+                      enqueue("strength-set-log", payload as Record<string, unknown>);
+                    },
+                  });
+                });
               }}
               onProgress={async (progressPct) => {
                 if (!activeRunId) return;

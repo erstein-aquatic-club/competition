@@ -138,7 +138,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/competition/RoutinesTab.tsx` | Onglet routines (templates, steps, assignation par course) | ~530 lignes |
 | `src/components/competition/TimelineTab.tsx` | Onglet Jour J (fusion chronologique courses + routines) | ~235 lignes |
 | `src/components/competition/ChecklistTab.tsx` | Onglet checklist (templates, progress bar, toggle) | ~415 lignes |
-| `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) | |
+| `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) — utilise ExerciseGif offline-aware (§170) | |
+| `src/components/strength/ExerciseGif.tsx` | Composant `<img>` partagé focus muscu : key={src} + skeleton + onError fallback Dumbbell/ImageOff offline-aware (§170) | 83 lignes |
 | `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur — consomme strength_planning_* BDD avec fallback cycles Phase 1 (§156+§157) | 325 lignes |
 | `src/components/strength/MyPlanWeekCard.tsx` | Carte semaine collapse/expand : rail dot, header S/dates/phase/chips compétitions, grille 7j (§156) | 215 lignes |
 | `src/components/strength/MyPlanSessionSheet.tsx` | Bottom Sheet aperçu séance muscu (titre, phase badge, liste items, Lancer) (§156) | 103 lignes |

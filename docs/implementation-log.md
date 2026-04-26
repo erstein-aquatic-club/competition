@@ -4,6 +4,66 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §170 — Audit robustesse focus muscu (substitution + offline + GIF) (2026-04-26)
+
+**Contexte :** un nageur a rapporté qu'en mode focus, le changement d'exercices "n'a pas fonctionné" et que les GIFs affichés étaient "complètement erronés", possiblement sur réseau dégradé. Audit complet du flow Mon plan → SessionDetailPreview → focus → substitute/add/log/finish, online et offline.
+
+**Diagnostic — 8 défauts de robustesse identifiés :**
+
+1. **GIFs sans état de chargement / fallback** (`<img>` brut) : pendant qu'une nouvelle URL charge (substitution ou réseau lent), l'ancien GIF reste visible et masque la transition → impression de "GIF erroné". Sur erreur réseau, broken icon silencieux.
+2. **`handleAddExercise` ignore le cycle** : `sets:3, reps:10, rest:90, %1RM:0` en dur, alors que `handleSubstitute` utilise déjà `resolveExerciseParams(ex, cycle)`. Un exercice ajouté en plein focus "force" héritait des prescriptions endurance.
+3. **Race substitute → validate** : la substitution change `session.items` mais le `useEffect` qui réinitialise `currentSetIndex` ne fire qu'au prochain render. Tap "Valider" dans la fenêtre 1-frame pouvait skipper le nouvel exercice (set_index obsolète).
+4. **Catalogue `exercises` non persisté** : React Query in-memory uniquement. PWA cold-start offline → squelette infini ou GIF/noms vides en focus.
+5. **`logStrengthSet` fire-and-forget silencieux** : un échec transitoire (TLS reset, 503) en mode focus ne reqêteait pas, le log n'arrivait sur le serveur qu'au reconcile-on-finish — perdu si l'utilisateur ne finit pas.
+6. **Indicateur online = dot 2px invisible** : aucun feedback marqué quand le réseau coupe en pleine séance.
+7. **Reconcile uniquement au finish** : pas de rattrapage des logs locaux quand le réseau revient en cours de séance.
+8. **Aucun test sur substitute mid-session ni add-exercise**.
+
+**Changements réalisés :**
+
+- **NEW `src/components/strength/ExerciseGif.tsx`** (87 lignes) : composant unique réutilisable. `key={src}` force un re-mount du `<img>` quand l'URL change (élimine le "ghost" pixel) ; états `loading/loaded/error` explicites avec `onLoad`/`onError` ; skeleton `animate-pulse` pendant le chargement ; fallback `Dumbbell` (online) ou `ImageOff` (offline) sur src absent ou erreur.
+- **`WorkoutRunner.tsx`** : header thumbnail + lightbox plein écran migrés sur `ExerciseGif`. Bandeau offline ambre persistant sous l'exit bar (`!isOnline` → "Hors ligne — tes séries sont sauvegardées et seront synchronisées dès la reconnexion."). Guard défensif dans `handleValidateSet` : `if (currentSetIndex > currentBlock.sets) return;` — bloque la fenêtre de race substitute/validate.
+- **`RestExerciseTab.tsx`** + **`ExercisePicker.tsx`** : migrés sur `ExerciseGif` (offline-aware via `useOnlineStatus()` dans le picker).
+- **`Strength.tsx`** :
+  - `handleAddExercise` aligné sur `handleSubstitute` — utilise `resolveExerciseParams(exercise, cycleType)` et fall-back uniquement si la définition n'a aucun paramètre cycle.
+  - `useQuery(['exercises'])` reçoit `initialData` depuis le miroir localStorage + `staleTime: 5 min` → focus rendu immédiatement à froid offline.
+  - `onLogSets` : si offline → `enqueue("strength-set-log", payload)`. Si online → `mutate(payload, { onError: () => enqueue(...) })` — la queue ramasse les échecs transitoires.
+  - Nouveau `useEffect` détecte la transition offline → online avec un `activeRunId` et déclenche `api.reconcileStrengthRunLogs(...)` en background — les logs cumulés en local rejoignent le serveur sans attendre la fin de séance.
+- **`src/lib/api/strength.ts`** : `getExercises()` mire le résultat Supabase dans `localStorage[STORAGE_KEYS.EXERCISES]` à chaque succès, et lit ce miroir comme fallback si la requête réseau échoue.
+- **`src/components/shared/OfflineMutationSync.tsx`** : nouveau type `strength-set-log` reconnu par le sync, rejoué via `api.logStrengthSet(payload)`. Boucle de dispatch refactorée pour ajouter des types proprement (chaque branche est responsable de `removeQueueItem`/`markRetry`).
+
+**Fichiers modifiés :**
+- NEW : `src/components/strength/ExerciseGif.tsx` (87 lignes)
+- NEW : `src/components/strength/__tests__/ExerciseGif.test.tsx` (4 tests : fallback null, offline ImageOff, src valide, skeleton initial)
+- MODIFIED : `src/components/strength/WorkoutRunner.tsx` (+33 / -22 — bandeau offline, guard race, ExerciseGif, retrait import `Dumbbell` non utilisé)
+- MODIFIED : `src/components/strength/RestExerciseTab.tsx` (+3 / -16 — bloc img → ExerciseGif)
+- MODIFIED : `src/components/strength/ExercisePicker.tsx` (+5 / -19 — bloc img → ExerciseGif + `useOnlineStatus`)
+- MODIFIED : `src/pages/Strength.tsx` (+76 / -14 — handleAddExercise aligné, retry queue, background reconcile, hydratation localStorage)
+- MODIFIED : `src/lib/api/strength.ts` (+15 / -4 — mirror localStorage + fallback offline pour `getExercises`)
+- MODIFIED : `src/components/shared/OfflineMutationSync.tsx` (+30 / -10 — dispatch typé + nouveau handler `strength-set-log`)
+- MODIFIED : `src/pages/__tests__/StrengthRunner.test.tsx` (+62 — 4 tests purs sur `resolveSetNumber` / `resolveNextStep` couvrant le scénario substitute mid-session)
+
+**Tests :**
+- `npx tsc --noEmit` → 0 erreur ✅
+- `npm test` → **333/333 passants** (325 → 333, +8)
+- Aucun test RLS (aucune policy ni migration touchée — uniquement client + Edge non concernés)
+
+**Décisions :**
+- **Composant `ExerciseGif` mutualisé** plutôt que patcher chaque `<img>` séparément : 4 sites d'appel partagent maintenant exactement le même comportement loading/error/offline. Ajouter un futur consommateur (RunDetailSheet, SessionSummary, page coach) c'est un import.
+- **`key={src}` plutôt qu'une mémo `useState` interne** : le navigateur sait gérer le swap d'URL si on lui donne un nouvel élément ; force-remount élimine la couleur fantôme sans logique custom.
+- **Guard défensif dans `handleValidateSet`** plutôt que `flushSync` dans `handleSubstitute` : la solution chirurgicale, zéro changement de pattern React, évite tout impact sur le bouton dans le 99 % des cas hors-race.
+- **`enqueue` sur l'erreur (online) ET sur l'offline** : un seul code path pour la résilience plutôt que deux. Le `OfflineMutationSync` rejoue dès la reconnexion (event `online`) ou immédiatement si la mutation est enqueue alors qu'on est déjà online (event `eac-offline-queue-updated`).
+- **Mirror localStorage du catalogue dans `getExercises`** plutôt qu'un persister React Query global : zéro dépendance ajoutée, comportement explicite, pas d'effet de bord sur les autres queries.
+- **Background reconcile sans toast** : silencieux côté UI pour ne pas casser l'effort en cours ; le log console couvre le debug support.
+
+**Limites / non couvert :**
+- Les GIFs eux-mêmes ne sont pas pré-cachés sur disque par un service worker : sur première vue offline d'un exercice qu'on n'a jamais vu, le placeholder `Dumbbell`/`ImageOff` est ce que le nageur voit. Un cache SW (Workbox `StaleWhileRevalidate` sur `*.gif`) est le prochain palier de robustesse — pas dans ce patch (touche au SW = risque cache permanent, voir CLAUDE.md § Cache bust).
+- Le miroir `STORAGE_KEYS.EXERCISES` n'a pas de TTL applicatif : si un exercice est supprimé en BDD, il reste en cache jusqu'à ce que le nageur soit en ligne et que la query refetch (`staleTime: 5 min` + invalidations existantes le couvrent en pratique).
+- `useOnlineStatus` reste basé sur `navigator.onLine` (peut être trompé par captive portal / LAN sans Internet) — couvrir ce cas demanderait un health-check périodique. Hors scope.
+- Aucun test d'intégration React Testing Library n'a été ajouté (le projet n'en utilise pas) — les tests ajoutés sont purs (`renderToStaticMarkup` + helpers exportés). Le scénario substitute mid-session est validé par `resolveNextStep`, pas par simulation utilisateur.
+
+---
+
 ## §169 — Records club filtrés par appartenance historique au club (2026-04-25)
 
 **Contexte :** les records EAC agrégeaient toutes les performances FFN des nageurs actifs, sans tenir compte du club d'appartenance au moment de la performance. Conséquence : un nageur arrivé d'un autre club apportait son palmarès historique au palmarès EAC, ce qui le faussait. La FFN expose le club au moment de la performance dans la vue "Performances" (`nat_recherche.php?...&idopt=prf`) qu'on parsait déjà mais sans le capter.

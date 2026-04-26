@@ -48,9 +48,22 @@ import { localStorageGet, localStorageSave } from './localStorage';
 
 export async function getExercises(): Promise<Exercise[]> {
   if (canUseSupabase()) {
-    const { data, error } = await supabase.from("dim_exercices").select("*");
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(mapDbExerciseToApi);
+    try {
+      const { data, error } = await supabase.from("dim_exercices").select("*");
+      if (error) throw new Error(error.message);
+      const list = (data ?? []).map(mapDbExerciseToApi);
+      // Mirror the catalog into localStorage so a focus session opened after a
+      // PWA cold-start with no network can still resolve exercise names + GIF
+      // URLs (the GIFs themselves are cached by the browser HTTP cache).
+      localStorageSave(STORAGE_KEYS.EXERCISES, list);
+      return list;
+    } catch (err) {
+      const cached = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+      if (Array.isArray(cached) && cached.length > 0) {
+        return cached.map((exercise: any) => normalizeExercise(exercise));
+      }
+      throw err;
+    }
   }
   const exercises = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
   const list = Array.isArray(exercises) ? exercises : [];

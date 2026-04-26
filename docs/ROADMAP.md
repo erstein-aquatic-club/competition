@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §169 — Records club filtrés par appartenance historique au club (2026-04-25)*
+*Dernière mise à jour : §170 — Audit robustesse focus muscu (substitution + offline + GIF) (2026-04-26)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

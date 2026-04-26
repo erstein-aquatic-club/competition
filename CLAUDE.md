@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §169 (Records club filtrés par appartenance historique au club : ajout colonne `swimmer_performances.club_name` + index partiel, `app_settings.home_club_name` configurable, parser FFN capte la cellule club via walk-from-end + break-on-button, `recalculateClubRecords` filtre sur égalité stricte. Edge functions `ffn-performances` v64 + `import-club-records` v74. Backfill via re-import full mode. Tests 325/325, +4 tests sur fixture HTML réelle + edge cases synthétiques).
+Dernière entrée en date : §170 (Audit robustesse focus muscu : nouveau composant `ExerciseGif` mutualisé — `key={src}` + skeleton + onError fallback Dumbbell/ImageOff, monté dans WorkoutRunner header+lightbox, RestExerciseTab et ExercisePicker. Bandeau offline persistant ambré dans WorkoutRunner. Guard défensif `handleValidateSet` contre la race substitute→validate. `handleAddExercise` aligné sur `resolveExerciseParams(ex, cycleType)` comme substitute. Catalogue `exercises` mirroré dans localStorage par `getExercises` + hydratation `initialData` côté Strength.tsx. Per-set `enqueue('strength-set-log')` sur erreur online OU offline. Background reconcile `reconcileStrengthRunLogs` à la transition offline→online avec `activeRunId`. `OfflineMutationSync` étendu pour rejouer `strength-set-log`. Tests 333/333, +8 tests sur ExerciseGif et resolveNextStep substitute scenario).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
