@@ -10,7 +10,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 - **Frontend** : React 19, TypeScript, Vite 7, Tailwind CSS 4, Radix UI/Shadcn (55 composants), Zustand 5, React Query 5, Wouter (hash routing)
 - **Backend** : Supabase (PostgreSQL, Auth, Edge Functions Deno)
 - **Déploiement** : GitHub Pages (frontend), Supabase Cloud (backend)
-- **Tests** : Vitest, 27 fichiers de tests
+- **Tests** : Vitest, 31 fichiers de tests
 
 ## Architecture
 
@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet (99 chantiers, tous livrés)** : `docs/ROADMAP.md` + `docs/implementation-log.md`.
 
-Dernière entrée en date : §170 (Audit robustesse focus muscu : nouveau composant `ExerciseGif` mutualisé — `key={src}` + skeleton + onError fallback Dumbbell/ImageOff, monté dans WorkoutRunner header+lightbox, RestExerciseTab et ExercisePicker. Bandeau offline persistant ambré dans WorkoutRunner. Guard défensif `handleValidateSet` contre la race substitute→validate. `handleAddExercise` aligné sur `resolveExerciseParams(ex, cycleType)` comme substitute. Catalogue `exercises` mirroré dans localStorage par `getExercises` + hydratation `initialData` côté Strength.tsx. Per-set `enqueue('strength-set-log')` sur erreur online OU offline. Background reconcile `reconcileStrengthRunLogs` à la transition offline→online avec `activeRunId`. `OfflineMutationSync` étendu pour rejouer `strength-set-log`. Tests 333/333, +8 tests sur ExerciseGif et resolveNextStep substitute scenario).
+Dernière entrée en date : §171 (Audit robustesse infrastructure — auth/session, offline queue, RLS, RPC atomicity, PWA. 10 commits livrés couvrant P0 cross-coach assignment hijack (RLS migration 00145), assignment_id forgé dans save_strength_run_atomic (migration 00146), perte silencieuse de set sur quota localStorage iOS, NetworkFirst /auth (fix vers NetworkOnly). P1 fixes : INITIAL_SESSION/null iOS PWA, refresh visibilitychange, offline mutex module-level, classification erreurs transitoires, RPC withTimeout 10/15s, PWA gating UpdateNotification (skipWaiting=false), push handler foreground postMessage. 4 fichiers de tests Vitest ajoutés (+12 tests, 335 total). Tasks RLS Phase 3 du plan skippées car Docker non disponible).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

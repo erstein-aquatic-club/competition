@@ -4,6 +4,79 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §171 — Audit robustesse infrastructure : auth/session, offline queue, RLS, RPC atomicity, PWA (2026-04-26)
+
+**Contexte :** Audit transversal des couches critiques non métier (rapport en tête de session du 2026-04-26). Top 3 risques P0 identifiés : (1) cross-coach assignment hijack via `assignments_write FOR ALL`, (2) perte silencieuse d'un set offline si quota localStorage saturé (iOS Safari), (3) NetworkFirst sur `/auth/*` qui peut servir un ancien JWT. Plus 6 P1 (race INITIAL_SESSION/null iOS PWA, timer iOS suspendu, double drain queue, 5xx tué après 5 retries, RPC sans timeout, skipWaiting mid-session) + 1 P2 (push handler foreground).
+
+Plan complet : `docs/plans/2026-04-26-infrastructure-robustness-fixes.md`. Ordre numérique vs chronologique : §171 conduit en parallèle de §170 (audit muscu focus, même date), comble le trou laissé entre §170 et §172 (audit chemin nageur).
+
+**Changements (10 commits sur worktree `audit-robustness-§171`) :**
+
+*Phase 1 — P0 sécurité/données*
+- **RLS `session_assignments`** : split de `assignments_write FOR ALL` en `assignments_insert` (coach/admin), `assignments_update`/`assignments_delete` (admin OU coach owner via `assigned_by = app_user_id()`). Migration `00145_assignments_write_ownership.sql` appliquée via MCP. Mirroir du pattern §102 sur `training_slots`.
+- **RPC `save_strength_run_atomic`** : ajout d'un check authz sur `assignment_id` — l'assignation doit cibler `v_target_athlete_id` (sauf admin). Bloque le marquage "completed" forgé d'une assignation d'un autre nageur. Migration `00146_save_strength_run_assignment_authz.sql`.
+- **Offline queue `enqueue`** : try/catch autour du `localStorage.setItem`, retry après purge du miroir catalogue (`suivi_natation_exercises`), nouveau type d'erreur `OfflineQueueQuotaError`. Wrapping des 4 appels enqueue dans `Strength.tsx` avec toasts destructifs et non-navigation vers `summary` en cas d'échec quota.
+- **PWA `/auth/*`** : `NetworkFirst` → `NetworkOnly` dans `vite.config.ts` (cache `supabase-auth-no-cache` purement nominatif). Empêche le SW de servir un ancien JWT.
+
+*Phase 2 — P1 robustness*
+- **Auth `INITIAL_SESSION/null`** : extraction de `handleAuthEvent` (exporté pour tests) + helper `hasStoredSupabaseToken`. Sur iOS PWA, un `INITIAL_SESSION` avec session=null peut arriver pendant la réhydratation GoTrue → on ignore l'événement si un token est encore en localStorage.
+- **Auth `visibilitychange`** : listener qui force `refreshSession()` si elapsed > 50 min, AVANT que React Query ne fetche après retour foreground iOS. Le timer 60s est suspendu en background.
+- **Offline drain mutex** : extraction dans `src/lib/offlineSync.ts` (`runSyncOnce` + `__resetMutex`). Module-level, immune aux double-mount StrictMode et aux triggers concurrents (online+queue-updated+login).
+- **Offline transient errors** : nouvelle fonction `isTransientError(err)` dans `offlineQueue.ts` (matche "Failed to fetch", "network", "timeout", 5xx). Dans `OfflineMutationSync` catch loop, `continue` sans incrémenter `retryCount` si transient — évite de poisoner après 5 indispos Supabase.
+- **RPC withTimeout** : helper exporté `withTimeout(promise, ms, label)` dans `client.ts`. Wrapping de `log_strength_set_atomic` (10s) et `save_strength_run_atomic` (15s). Le timeout remonte au caller via le pattern existant `onError → enqueue`.
+- **PWA gating** : `clientsClaim: false` + `skipWaiting: false` + `registerType: 'prompt'` + `immediate: false`. Le nouveau SW attend que l'utilisateur clique "Mettre à jour" via UpdateNotification. `applyUpdate` appelle `updateSW(true)` (skipWaiting + reload contrôlé). Plus de page blanche mid-session.
+
+*Phase 2 — P2*
+- **Push handler foreground** : `clients.matchAll({ type: 'window', includeUncontrolled: true })` dans le `push` event. Si un client est `focused`, postMessage le payload (`{ type: 'eac-push', payload }`) au lieu de showNotification — évite le double signal OS+in-app.
+
+**Fichiers modifiés / créés :**
+- NEW : `supabase/migrations/00145_assignments_write_ownership.sql` (~40 LOC)
+- NEW : `supabase/migrations/00146_save_strength_run_assignment_authz.sql` (~115 LOC)
+- MODIFIED : `src/lib/auth.ts` (444 → 492 LOC, +10%)
+- MODIFIED : `src/lib/offlineQueue.ts` (114 → 144 LOC, +26%)
+- NEW : `src/lib/offlineSync.ts` (25 LOC)
+- MODIFIED : `src/lib/api/client.ts` (ajout `withTimeout`)
+- MODIFIED : `src/lib/api/strength.ts` (1531 → 1534 LOC)
+- MODIFIED : `src/components/shared/OfflineMutationSync.tsx` (193 → 194 LOC)
+- MODIFIED : `src/pages/Strength.tsx` (wrapping enqueue quota)
+- MODIFIED : `src/main.tsx` (registerSW prompt mode)
+- MODIFIED : `vite.config.ts` (workbox config — NetworkOnly /auth/*, skipWaiting:false)
+- MODIFIED : `public/push-handler.js` (foreground gating via postMessage)
+
+**Tests :**
+- NEW : `src/lib/__tests__/offlineQueue.test.ts` (5 tests)
+- NEW : `src/lib/__tests__/auth-state.test.ts` (3 tests)
+- NEW : `src/lib/__tests__/offlineSync.test.ts` (8 tests)
+- NEW : `src/lib/api/__tests__/withTimeout.test.ts` (4 tests)
+- Total : 335 tests (vs 333 baseline §170). 1 échec pré-existant `transformers.test.ts` non lié.
+- `npx tsc --noEmit` → 0 erreur. Build production OK.
+
+**Backlog — Tasks RLS skippées (Docker non lancé sur la machine de dev) :**
+
+Les 5 tasks suivantes sont écrites dans le plan mais non exécutées dans cette session. À reprendre dès Docker disponible :
+
+- Task 2 — Test RLS cross-coach `session_assignments` : couvre la migration 00145 (vérifier qu'Eve ne peut pas modifier les assignations de Carol)
+- Task 4 — Test RPC `save_strength_run_atomic` authz : couvre la migration 00146 (assignation forgée → reject)
+- Task 14 — Test RLS `chrono_records` (P0 #3 audit, locker `auth.uid()` direct)
+- Task 15 — Tests RLS `one_rm_records` / `app_settings` / `push_subscriptions`
+- Task 16 — Tests RLS `pain_reports` / `wellness_checks` / `objectives`
+
+Les migrations 00145 et 00146 ont été **appliquées en prod** sans test RLS local — risque résiduel. Comportement vérifié manuellement via `pg_get_functiondef` et `pg_policy` queries.
+
+**Décisions :**
+- §171 vs §173 : kept §171 (déjà dans les SHA commits + SQL comments + worktree name). Comble le trou §170→§172.
+- `clientsClaim: false` : impact UX = update apparent moins immédiat, mais mid-session blank pages prévenues.
+- Quota localStorage : purge `suivi_natation_exercises` (catalogue rebuildable depuis Supabase) avant de raise, plutôt que drop la queue.
+- Erreurs transitoires : seuil `5xx in message` plutôt que parser `error.code`/`status` — Supabase JS expose le message en string.
+
+**Limites / non couvert :**
+- Pas de tests d'intégration RLS sur les migrations 00145/00146 dans cette session (Docker absent).
+- `push-handler.js` postMessage : aucun handler React n'écoute encore `'eac-push'` côté client — la notif foreground est silencieuse pour l'instant. Task de suivi : ajouter un `useInAppPushBridge` dans `src/main.tsx` ou similaire.
+- L'audit identifie 75 tables avec RLS mais seulement 10 ont des tests — couverture RLS reste à ~13% après ces fixes (les 3 lots de tests Phase 3 du plan non exécutés).
+- Mitigation iOS PWA `visibilitychange` non testée sur device réel — protocole manuel doc en `docs/qa/2026-04-26-audit-robustness-manual-tests.md`.
+
+---
+
 ## §170 — Audit robustesse focus muscu (substitution + offline + GIF) (2026-04-26)
 
 **Contexte :** un nageur a rapporté qu'en mode focus, le changement d'exercices "n'a pas fonctionné" et que les GIFs affichés étaient "complètement erronés", possiblement sur réseau dégradé. Audit complet du flow Mon plan → SessionDetailPreview → focus → substitute/add/log/finish, online et offline.

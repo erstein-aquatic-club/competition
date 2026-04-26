@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §170 — Audit robustesse focus muscu (substitution + offline + GIF) (2026-04-26)*
+*Dernière mise à jour : §171 — Audit robustesse infrastructure : auth/session, offline queue, RLS, RPC atomicity, PWA (2026-04-26)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -113,6 +113,8 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | §167 | Audit perf global — Sprint 1 (quick-wins 0-régression) | `exportSessionPdf` lazy import, `Promise.all` dans `getAthletes` + `renameSwimCatalogFolder`, `CacheWarmer` prefetch `["groups"]`, suppression `apiRequest`/`getQueryFn` morts, `key` stable dans `SuiviSaison` | 2026-04-23 | ✅ Livré |
 | §168 | Test fence pour futur refactor `CoachTrainingSlotsScreen` (couche 1/4) | Extraction helpers purs (`slotTiming`, `weekDates`, `slotDisplay`, `swimLibraryContext`) + fixtures canoniques (`makeTrainingSlot`, `makeSlotInstance`, etc.) + 41 tests unitaires. CoachTrainingSlotsScreen.tsx : 3308 → 3174 lignes, comportement inchangé | 2026-04-23 | ✅ Livré |
 | §169 | Records club filtrés par appartenance historique au club | Capture `club_name` depuis cellule club FFN dans le parser partagé, ajout colonne `swimmer_performances.club_name` + index partiel, `app_settings.home_club_name` configurable, filtre `recalculateClubRecords` sur égalité stricte. Walk-from-end + break-on-button structurel pour gérer cellule club vide. Compteur `skipped_other_club` ajouté à `RecalcStats`. Edge functions `ffn-performances` v64 + `import-club-records` v74. Re-import full post-migration (backfill via MCP `pg_net.http_post`). +4 tests, 325/325. | 2026-04-25 | ✅ Livré |
+| §170 | Audit robustesse focus muscu (substitution + offline + GIF) | Nouveau composant `ExerciseGif` mutualisé (`key={src}` + skeleton + onError fallback). Bandeau offline ambré WorkoutRunner. Guard race substitute→validate. `handleAddExercise` aligné sur `resolveExerciseParams`. Catalogue `exercises` mirroré localStorage. Per-set `enqueue('strength-set-log')` online+offline. Background reconcile transition offline→online. `OfflineMutationSync` étendu `strength-set-log`. +8 tests, 333/333. | 2026-04-26 | ✅ Livré |
+| §171 | Audit robustesse infrastructure : auth/session, offline queue, RLS, RPC atomicity, PWA | Split policy `assignments_write` → insert/update/delete owner-based (migration 00145). Authz `assignment_id` dans `save_strength_run_atomic` (migration 00146). `enqueue` try/catch QuotaExceeded + purge catalogue. PWA `/auth/*` NetworkOnly. Auth INITIAL_SESSION/null guard iOS. `visibilitychange` refresh 50min. Offline mutex module-level. `isTransientError` no-poison. `withTimeout` RPC 10/15s. PWA gating skipWaiting=false. Push handler foreground postMessage. +12 tests (4 fichiers), 335 total. | 2026-04-26 | ✅ Livré |
 
 ---
 
