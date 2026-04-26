@@ -394,6 +394,8 @@ export default function StrengthCatalog() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTargetAthleteId, setAssignTargetAthleteId] = useState<number | null>(null);
   const [assignAfterSaveId, setAssignAfterSaveId] = useState<number | null>(null);
+  const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
+  const [newStrengthFolderName, setNewStrengthFolderName] = useState("");
 
   const handleGifUpload = async (media: File | Blob, isGif: boolean, setter: (url: string) => void) => {
     const maxSize = 10 * 1024 * 1024;
@@ -924,12 +926,16 @@ export default function StrengthCatalog() {
               <Checkbox
                 id="warmup-flag-edit"
                 checked={editingExercise.exercise_type === "warmup"}
-                onCheckedChange={(checked) =>
+                onCheckedChange={(checked) => {
+                  const isWarmup = checked === true;
                   setEditingExercise({
                     ...editingExercise,
-                    exercise_type: checked === true ? "warmup" : "strength",
-                  })
-                }
+                    exercise_type: isWarmup ? "warmup" : "strength",
+                    ...(isWarmup
+                      ? {}
+                      : { warmup_reps: null, warmup_duration: null }),
+                  });
+                }}
               />
               <Label htmlFor="warmup-flag-edit">Exercice d'échauffement (warmup)</Label>
             </div>
@@ -1038,12 +1044,16 @@ export default function StrengthCatalog() {
             <Checkbox
               id="warmup-flag"
               checked={newExercise.exercise_type === "warmup"}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked) => {
+                const isWarmup = checked === true;
                 setNewExercise({
                   ...newExercise,
-                  exercise_type: checked === true ? "warmup" : "strength",
-                })
-              }
+                  exercise_type: isWarmup ? "warmup" : "strength",
+                  ...(isWarmup
+                    ? {}
+                    : { warmup_reps: null, warmup_duration: null }),
+                });
+              }}
             />
             <Label htmlFor="warmup-flag">Exercice d'échauffement (warmup)</Label>
           </div>
@@ -1322,10 +1332,7 @@ export default function StrengthCatalog() {
           {catalogTab !== "plans" && (
             <button
               type="button"
-              onClick={() => {
-                const name = prompt("Nom du dossier");
-                if (name?.trim()) createFolder.mutate({ name: name.trim(), type: catalogTab === "sessions" ? "session" : "exercise" });
-              }}
+              onClick={() => setShowCreateFolderDialog(true)}
               className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
             >
               <FolderPlus className="h-4 w-4" /> Dossier
@@ -1550,6 +1557,58 @@ export default function StrengthCatalog() {
           />
         </Suspense>
       )}
+
+      <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nouveau dossier</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Nom du dossier"
+              value={newStrengthFolderName}
+              onChange={(e) => setNewStrengthFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newStrengthFolderName.trim()) {
+                  createFolder.mutate({
+                    name: newStrengthFolderName.trim(),
+                    type: catalogTab === "sessions" ? "session" : "exercise",
+                  });
+                  setShowCreateFolderDialog(false);
+                  setNewStrengthFolderName("");
+                }
+              }}
+              autoFocus
+              className="rounded-2xl"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateFolderDialog(false);
+                  setNewStrengthFolderName("");
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!newStrengthFolderName.trim()) return;
+                  createFolder.mutate({
+                    name: newStrengthFolderName.trim(),
+                    type: catalogTab === "sessions" ? "session" : "exercise",
+                  });
+                  setShowCreateFolderDialog(false);
+                  setNewStrengthFolderName("");
+                }}
+                disabled={!newStrengthFolderName.trim()}
+              >
+                Créer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent>
