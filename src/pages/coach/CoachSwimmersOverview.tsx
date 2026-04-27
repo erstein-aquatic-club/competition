@@ -509,7 +509,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
       ) : null}
 
       {/* Sort buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Trier :</span>
         {([
           { key: "name" as const, label: "Nom" },
