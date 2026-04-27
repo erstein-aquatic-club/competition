@@ -299,7 +299,6 @@ export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }:
             competitions={weekCompetitions}
             getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
             onSelectSession={onSelectSession}
-            onLaunchSessionDirect={onLaunchSessionDirect}
             onSelectCompetition={setSelectedCompetition}
           />
         );
