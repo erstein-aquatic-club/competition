@@ -266,6 +266,11 @@ export default function Strength() {
       const cached = localStorageGet(STORAGE_KEYS.EXERCISES) as Exercise[] | null;
       return Array.isArray(cached) && cached.length > 0 ? cached : undefined;
     },
+    // 0 = treat the cached snapshot as already stale so React Query refetches
+    // on mount. Without this, staleTime keeps the localStorage mirror as
+    // "fresh" for 5 min, which hides exercises added since the last fetch
+    // (e.g. coach adds Hang Clean → swimmer in focus mode can't substitute).
+    initialDataUpdatedAt: 0,
     staleTime: 5 * 60 * 1000,
   });
 
