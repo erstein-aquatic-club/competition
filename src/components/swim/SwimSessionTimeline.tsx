@@ -67,11 +67,12 @@ const intensityTextMap: Record<string, string> = {
 };
 
 const strokeBadgeMap: Record<string, { label: string; className: string }> = {
-  Crawl: { label: "Crawl", className: "bg-sky-100 text-sky-800" },
+  NL: { label: "NL", className: "bg-sky-100 text-sky-800" },
   Dos: { label: "Dos", className: "bg-violet-100 text-violet-800" },
   Brasse: { label: "Brasse", className: "bg-emerald-100 text-emerald-800" },
   Pap: { label: "Pap", className: "bg-amber-100 text-amber-800" },
   "4 nages": { label: "4N", className: "bg-slate-100 text-slate-700" },
+  NAC: { label: "NAC", className: "bg-orange-100 text-orange-800" },
   "Spé": { label: "Spé", className: "bg-pink-100 text-pink-800" },
 };
 

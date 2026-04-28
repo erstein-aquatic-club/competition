@@ -47,11 +47,12 @@ const legacyIntensityMap: Record<string, (typeof intensityScale)[number]> = {
 export const strokeLabelMap: Record<string, string> = {
   pap: "Pap",
   papillon: "Pap",
-  crawl: "Crawl",
+  crawl: "NL",
   dos: "Dos",
   brasse: "Brasse",
   "4n": "4 nages",
   "4 nages": "4 nages",
+  nac: "NAC",
   spe: "Spé",
   "spé": "Spé",
 };

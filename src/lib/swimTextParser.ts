@@ -176,6 +176,8 @@ export function parseRestToken(tokens: string[]): RestResult | null {
 const STROKE_MAP: [RegExp, string][] = [
   [/\b4n\b/i, "4n"],
   [/\bqn\b/i, "4n"],
+  [/\bnage au choix\b/i, "nac"],
+  [/\bnac\b/i, "nac"],
   [/\bcrawl\b/i, "crawl"],
   [/\bcr\b/i, "crawl"],
   [/\bnl\b/i, "crawl"],
@@ -193,7 +195,6 @@ const STROKE_TYPE_MAP: [RegExp, string][] = [
   [/\beduc\b/i, "educ"],
   [/\bjbes\b/i, "jambes"],
   [/\bjambes\b/i, "jambes"],
-  [/\bnac\b/i, "nc"],
   [/\bnc\b/i, "nc"],
 ];
 

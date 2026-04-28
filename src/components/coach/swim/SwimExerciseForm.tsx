@@ -44,8 +44,9 @@ const strokeOptions = [
   { value: "pap", label: "Papillon" },
   { value: "dos", label: "Dos" },
   { value: "brasse", label: "Brasse" },
-  { value: "crawl", label: "Crawl" },
+  { value: "crawl", label: "Nage Libre" },
   { value: "4n", label: "4 nages" },
+  { value: "nac", label: "NAC" },
   { value: "spe", label: "Spé" },
 ];
 
