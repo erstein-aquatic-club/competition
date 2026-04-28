@@ -4,7 +4,25 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
-## §182 — Rattrapage tests RLS reportés post-audit robustesse : §174 P0 cross-coach + RPC authz + fix 5 tests cassés strength_planning (2026-04-26)
+## §183 — Export PDF séance pour les nageurs (réutilisation générateur coach) (2026-04-28)
+
+**Contexte :** Le PDF "bord de bassin" est livré côté coach depuis §165/§166 (`src/lib/export-session-pdf.ts`). Demande utilisateur : permettre au nageur de télécharger le **même PDF** depuis sa page de détail de séance assignée (`SwimSessionView`), sans dupliquer le générateur.
+
+**Changements :**
+- `src/lib/export-session-pdf.ts` — refacto signature : remplacement du paramètre `SlotInstance` (typé coach uniquement) par un type générique `SessionHeaderInfo` exporté `{ date, timeRange?, location?, groups?, filenameSlug? }`. `drawMetadataBand` consomme la nouvelle shape avec ignore gracieux des valeurs nulles (déjà géré via `.filter(Boolean)` mais désormais étendu au texte horaire seul). Helper `formatTime` renommé en export `formatTimeForPdfHeader` (réutilisé par le call site coach). Nom de fichier dérivé du slug optionnel ou fallback `seance-{YYYYMMDD}.pdf`.
+- `src/pages/coach/SlotSessionSheet.tsx` — adapté l'appel existant : mappe `SlotInstance` → `SessionHeaderInfo` (date, "07:30 – 09:00", lieu, groupes joints) et passe `filenameSlug: coach-seance-{YYYYMMDD}` pour préserver l'ancien nom de fichier coach.
+- `src/pages/SwimSessionView.tsx` — nouveau bouton `FileDown` (icône lucide) ajouté à côté du `ShareMenu` dans la toolbar du header, visible uniquement quand `assignment` est résolu. Handler `handleExportPdf` : fetch du `SwimSessionTemplate` via `getSwimSessionById(session_id)` mis en cache React Query (clé `["swim-session-preview", sessionId]` partagée avec le coach pour réutiliser le cache si présent), mapping `assigned_slot` → "Matin"/"Soir" (pas d'horaire précis disponible côté nageur), pas de `location` ni `groups` (non embarqués dans `Assignment`). Spinner `Loader2` pendant génération, toast destructif sur erreur, `setExportingPdf(false)` dans `finally`.
+
+**Fichiers modifiés :** `src/lib/export-session-pdf.ts`, `src/pages/coach/SlotSessionSheet.tsx`, `src/pages/SwimSessionView.tsx` (aucun nouveau fichier de code).
+
+**Tests :** `npx tsc --noEmit` clean, `npm test --run` 367 pass / 1 fail pré-existant non lié (`transformers.test.ts:18` documenté en §181). Validation manuelle reportée à utilisateur (parcours nageur → ouvrir séance assignée → bouton PDF dans header → fichier `seance-YYYYMMDD.pdf` téléchargé, header bandeau gris affiche date + "Matin"/"Soir", reste du PDF identique à la version coach).
+
+**Décisions :**
+- Refacto vs duplication : un seul générateur, deux call sites avec adaptateurs triviaux. Évite la divergence visuelle/fonctionnelle entre les deux PDFs.
+- `SessionHeaderInfo` accepte des champs optionnels nullable car le bandeau gère déjà gracieusement l'absence (filter Boolean) — le visuel s'adapte sans branche `if/else` côté nageur.
+- Pas de fetch du `training_slot` côté nageur pour récupérer horaire/lieu (data dispo en théorie via `assignment.training_slot_id`) : la séance assignée n'est pas garantie liée à un slot précis, et le label "Matin"/"Soir" suffit pour le contexte d'impression.
+
+**Limites :** Le bouton n'apparaît pas dans `SharedSwimSession` (lien partagé public) — choix produit explicite (option 1 du brainstorming). Extension triviale si demandée plus tard.
 
 **Contexte :** Les chantiers §173/§174/§179 ont laissé plusieurs tests RLS reportés faute de Docker disponible au moment de l'exécution. Audit du backlog avant ouverture d'un nouveau chantier : 5 échecs pré-existants dans `strength_planning.test.ts` (introduits en §157, jamais corrigés) + tests jamais écrits pour les migrations 00145 (cross-coach `session_assignments`) et 00146 (RPC `save_strength_run_atomic` authz). Phase 1 (fix baseline) + Phase 2 (couverture P0 sécu) menées en bloc. Phase 3 (chrono_records, one_rm_records, push_subscriptions, pain_reports, etc.) reportée à un chantier dédié vu son volume.
 

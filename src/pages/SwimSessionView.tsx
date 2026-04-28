@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ChevronLeft, AlertCircle, Share2, Save, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, AlertCircle, Share2, Save, Loader2, Plus, Trash2, FileDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { api, Assignment, SwimSessionItem } from "@/lib/api";
 import type { SwimExerciseLog, SwimExerciseLogInput } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { generateShareToken } from "@/lib/api/swim";
+import { generateShareToken, getSwimSessionById } from "@/lib/api/swim";
 import { supabase } from "@/lib/supabase";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 
@@ -267,6 +267,43 @@ export default function SwimSessionView() {
     },
   });
 
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!assignment) return;
+    setExportingPdf(true);
+    try {
+      const session = await queryClient.fetchQuery({
+        queryKey: ["swim-session-preview", assignment.session_id],
+        queryFn: () => getSwimSessionById(assignment.session_id),
+        staleTime: 5 * 60 * 1000,
+      });
+      if (!session) throw new Error("Séance introuvable");
+      const dateOnly = (assignment.assigned_date ?? "").slice(0, 10);
+      const slotLabel =
+        assignment.assigned_slot === "morning"
+          ? "Matin"
+          : assignment.assigned_slot === "evening"
+            ? "Soir"
+            : null;
+      const dateSlug = dateOnly.replaceAll("-", "");
+      const { exportSessionPdf } = await import("@/lib/export-session-pdf");
+      await exportSessionPdf(session, {
+        date: dateOnly,
+        timeRange: slotLabel,
+        filenameSlug: `seance-${dateSlug}`,
+      });
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  }, [assignment, queryClient, toast]);
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
@@ -298,6 +335,21 @@ export default function SwimSessionView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {assignment ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              aria-label="Télécharger la séance en PDF"
+            >
+              {exportingPdf ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <FileDown className="h-5 w-5" />
+              )}
+            </Button>
+          ) : null}
           {assignment ? (
             <ShareMenu
               onOpen={async () => {

@@ -275,8 +275,15 @@ export default function SlotSessionSheet({
           staleTime: 5 * 60 * 1000,
         }));
       if (!session) throw new Error("Session introuvable");
-      const { exportSessionPdf } = await import("@/lib/export-session-pdf");
-      await exportSessionPdf(session, instance);
+      const { exportSessionPdf, formatTimeForPdfHeader } = await import("@/lib/export-session-pdf");
+      const dateSlug = instance.date.replaceAll("-", "");
+      await exportSessionPdf(session, {
+        date: instance.date,
+        timeRange: `${formatTimeForPdfHeader(instance.slot.start_time)} – ${formatTimeForPdfHeader(instance.slot.end_time)}`,
+        location: instance.slot.location,
+        groups: instance.groups.map((g) => g.group_name).join(", "),
+        filenameSlug: `coach-seance-${dateSlug}`,
+      });
     } catch {
       toast({
         title: "Erreur",

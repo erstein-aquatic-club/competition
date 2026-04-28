@@ -2,8 +2,15 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import eacLogoUrl from "@assets/logo-eac.png";
 import type { SwimSessionTemplate } from "@/lib/api/types";
-import type { SlotInstance } from "@/hooks/useSlotCalendar";
 import type { SwimPayloadFields } from "@/lib/types";
+
+export type SessionHeaderInfo = {
+  date: string;
+  timeRange?: string | null;
+  location?: string | null;
+  groups?: string | null;
+  filenameSlug?: string;
+};
 import {
   groupItemsByBlock,
   normalizeIntensity,
@@ -35,7 +42,7 @@ function formatDateFr(iso: string): string {
   return `${dayName} ${d} ${monthName} ${y}`;
 }
 
-function formatTime(hhmm: string): string {
+export function formatTimeForPdfHeader(hhmm: string): string {
   return hhmm.slice(0, 5);
 }
 
@@ -95,7 +102,7 @@ function drawPageHeader(doc: jsPDF, logoDataUrl: string | null, pageWidth: numbe
 
 function drawMetadataBand(
   doc: jsPDF,
-  instance: SlotInstance,
+  header: SessionHeaderInfo,
   pageWidth: number,
   startY: number,
 ): number {
@@ -103,21 +110,23 @@ function drawMetadataBand(
   doc.setFillColor(...GRAY_BG);
   doc.rect(0, startY, pageWidth, H, "F");
 
-  const dateStr = formatDateFr(instance.date);
-  const timeStr = `${formatTime(instance.slot.start_time)} – ${formatTime(instance.slot.end_time)}`;
-  const locationStr = instance.slot.location ?? "";
-  const groupStr = instance.groups.map((g) => g.group_name).join(", ");
+  const dateStr = formatDateFr(header.date);
+  const timeStr = (header.timeRange ?? "").trim();
+  const locationStr = (header.location ?? "").trim();
+  const groupStr = (header.groups ?? "").trim();
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9.5);
   doc.setTextColor(...CHARCOAL);
   doc.text(dateStr, 10, startY + 5.5);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...TEXT_MUTED);
   const metaLine = [timeStr, locationStr].filter(Boolean).join("   ·   ");
-  doc.text(metaLine, 10, startY + 11);
+  if (metaLine) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text(metaLine, 10, startY + 11);
+  }
 
   if (groupStr) {
     doc.setFont("helvetica", "normal");
@@ -191,7 +200,7 @@ function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number): void {
 
 export async function exportSessionPdf(
   session: SwimSessionTemplate,
-  instance: SlotInstance,
+  header: SessionHeaderInfo,
 ): Promise<void> {
   const items = session.items ?? [];
   const blocks = groupItemsByBlock(items);
@@ -235,7 +244,7 @@ export async function exportSessionPdf(
   drawFooter(doc, pageWidth, pageHeight);
 
   let curY = HEADER_H;
-  curY = drawMetadataBand(doc, instance, pageWidth, curY);
+  curY = drawMetadataBand(doc, header, pageWidth, curY);
   curY = drawSessionTitleRow(doc, session.name || "Séance", session.description, totalDistance, pageWidth, curY);
   curY += MARGIN_GAP;
 
@@ -429,6 +438,7 @@ export async function exportSessionPdf(
     },
   });
 
-  const dateSlug = instance.date.replaceAll("-", "");
-  doc.save(`coach-seance-${dateSlug}.pdf`);
+  const dateSlug = header.date.replaceAll("-", "");
+  const fileName = header.filenameSlug ?? `seance-${dateSlug}`;
+  doc.save(`${fileName}.pdf`);
 }
