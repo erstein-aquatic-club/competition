@@ -24,6 +24,8 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Limites :** Le bouton n'apparaît pas dans `SharedSwimSession` (lien partagé public) — choix produit explicite (option 1 du brainstorming). Extension triviale si demandée plus tard.
 
+**Polish suivant (même chantier) :** Refonte typographique des lignes "Modalités" dans le PDF — passage italique + gris pâle 5.5pt à regular + `TEXT_DARK` 7pt min (lecture confortable même quand le scaling auto compresse). Préfixe "↳" remplacé par label sémantique "Modalités · ". Padding vertical augmenté (top 0.8→1.8mm, bottom 1.2→2.2mm) pour aérer la séparation avec l'exercice du dessus. Ajout d'une fine barre verticale rouge EAC (1.2mm × hauteur ligne) à gauche via `didDrawCell` — détectée par `cellContent.startsWith("Modalités · ")` pour ne pas matcher les lignes alternées. Aucun nouveau test (rendu PDF non testable unitairement, validation manuelle requise).
+
 **Contexte :** Les chantiers §173/§174/§179 ont laissé plusieurs tests RLS reportés faute de Docker disponible au moment de l'exécution. Audit du backlog avant ouverture d'un nouveau chantier : 5 échecs pré-existants dans `strength_planning.test.ts` (introduits en §157, jamais corrigés) + tests jamais écrits pour les migrations 00145 (cross-coach `session_assignments`) et 00146 (RPC `save_strength_run_atomic` authz). Phase 1 (fix baseline) + Phase 2 (couverture P0 sécu) menées en bloc. Phase 3 (chrono_records, one_rm_records, push_subscriptions, pain_reports, etc.) reportée à un chantier dédié vu son volume.
 
 **Phase 1 — Fix baseline `strength_planning.test.ts` (5 échecs pré-existants) :**

@@ -328,14 +328,15 @@ export async function exportSessionPdf(
       if (notes) {
         body.push([
           {
-            content: `↳  ${notes}`,
+            content: `Modalités · ${notes}`,
             colSpan: 5,
             styles: {
-              fontStyle: "italic",
-              textColor: TEXT_MUTED,
+              fontStyle: "normal",
+              textColor: TEXT_DARK,
               fillColor: ROW_ALT,
-              fontSize: Math.max(5.5, fontSize - 1.5),
-              cellPadding: { top: 0.8, right: 4, bottom: 1.2, left: 12 },
+              fontSize: Math.max(7, fontSize - 0.5),
+              lineColor: EAC_RED,
+              cellPadding: { top: 1.8, right: 4, bottom: 2.2, left: 14 },
             },
           },
         ]);
@@ -424,6 +425,15 @@ export async function exportSessionPdf(
           data.cell.x + data.cell.width,
           data.cell.y + data.cell.height,
         );
+
+        // Accent rouge à gauche des lignes "Modalités"
+        const raw = data.cell.raw as { content?: string } | string | undefined;
+        const cellContent =
+          typeof raw === "string" ? raw : (raw?.content ?? "");
+        if (typeof cellContent === "string" && cellContent.startsWith("Modalités · ")) {
+          doc.setFillColor(...EAC_RED);
+          doc.rect(data.cell.x + 8, data.cell.y + 0.6, 1.2, data.cell.height - 1.2, "F");
+        }
       }
       if (data.section === "head") {
         doc.setFillColor(...EAC_RED);
