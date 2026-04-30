@@ -3,6 +3,7 @@ import {
   DEFAULT_ZONES,
   pacePer100m,
   zoneTime,
+  getDistanceRows,
   type Stroke,
   type Zone,
   type ZoneConfig,
@@ -62,5 +63,35 @@ describe("zoneTime", () => {
     expect(t(z.v1_pct)).toBeGreaterThan(t(z.v2_pct));
     expect(t(z.v2_pct)).toBeGreaterThan(t(z.v3_pct));
     expect(t(z.v3_pct)).toBeGreaterThan(t(z.max_pct));
+  });
+});
+
+describe("getDistanceRows", () => {
+  // Single-stroke events (NL/Dos/Brasse/Pap)
+  it.each([
+    [50,   ["NL", "Dos", "Brasse", "Pap"], [15, 20, 25, 50]],
+    [100,  ["NL", "Dos", "Brasse", "Pap"], [15, 25, 50, 75, 100]],
+    [200,  ["NL", "Dos", "Brasse", "Pap"], [25, 50, 100, 150, 200]],
+    [400,  ["NL"],                          [50, 100, 200, 300, 400]],
+    [800,  ["NL"],                          [100, 200, 400, 600, 800]],
+    [1500, ["NL"],                          [100, 200, 400, 800, 1200, 1500]],
+  ])("distance %i for %j strokes returns %j", (dist, strokes, expected) => {
+    for (const stroke of strokes as Array<"NL"|"Dos"|"Brasse"|"Pap">) {
+      expect(getDistanceRows(dist as number, stroke)).toEqual(expected);
+    }
+  });
+
+  // 4N
+  it.each([
+    [100, [25, 50, 75, 100]],
+    [200, [50, 100, 150, 200]],
+    [400, [100, 200, 300, 400]],
+  ])("4N distance %i returns %j", (dist, expected) => {
+    expect(getDistanceRows(dist as number, "4N")).toEqual(expected);
+  });
+
+  it("returns empty array for unsupported (distance, stroke) combo", () => {
+    expect(getDistanceRows(50, "4N")).toEqual([]);
+    expect(getDistanceRows(800, "Brasse")).toEqual([]);
   });
 });

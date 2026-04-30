@@ -27,3 +27,27 @@ export function pacePer100m(targetTimeMs: number, targetDistanceM: number): numb
 export function zoneTime(distanceM: number, pacePer100mMs: number, zonePct: number): number {
   return Math.round((pacePer100mMs * distanceM * zonePct) / (100 * 100));
 }
+
+const ROWS_BY_DIST_MULTI: Record<number, number[]> = {
+  50:  [15, 20, 25, 50],
+  100: [15, 25, 50, 75, 100],
+  200: [25, 50, 100, 150, 200],
+};
+
+const ROWS_BY_DIST_NL_ONLY: Record<number, number[]> = {
+  400:  [50, 100, 200, 300, 400],
+  800:  [100, 200, 400, 600, 800],
+  1500: [100, 200, 400, 800, 1200, 1500],
+};
+
+const ROWS_BY_DIST_4N: Record<number, number[]> = {
+  100: [25, 50, 75, 100],
+  200: [50, 100, 150, 200],
+  400: [100, 200, 300, 400],
+};
+
+export function getDistanceRows(targetDistanceM: number, stroke: Stroke): number[] {
+  if (stroke === "4N") return ROWS_BY_DIST_4N[targetDistanceM] ?? [];
+  if (stroke === "NL") return { ...ROWS_BY_DIST_MULTI, ...ROWS_BY_DIST_NL_ONLY }[targetDistanceM] ?? [];
+  return ROWS_BY_DIST_MULTI[targetDistanceM] ?? [];
+}
