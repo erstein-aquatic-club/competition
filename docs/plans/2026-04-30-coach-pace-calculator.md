@@ -470,57 +470,73 @@ git commit -m "test(rls): mirror §184 schema in test harness"
 
 **Step 1: Failing test**
 
+> ⚠️ **Pattern obligatoire : `node:test` + `mock.module`, PAS Vitest.**
+> `npm test` utilise `node --test --experimental-test-module-mocks`. Ne pas utiliser `vi.mock`/`vi.fn`/`expect`.
+> Voir `src/lib/api/__tests__/assignments.test.ts` pour le pattern de référence.
+
 ```ts
 // src/lib/api/__tests__/pace-zones.test.ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it, before, beforeEach } from "node:test";
+import { mock } from "node:test";
 
-vi.mock("../client", () => ({
-  supabase: {
-    from: vi.fn(),
-    auth: { getUser: vi.fn() },
-  },
-  canUseSupabase: () => true,
-}));
+let fromImpl: (...args: unknown[]) => unknown;
+let getUserImpl: () => unknown;
 
-import * as client from "../client";
-import { getMyPaceZones, upsertMyPaceZones } from "../pace-zones";
-import { DEFAULT_ZONES } from "@/lib/paceCalculator";
+before(async () => {
+  const real = await import("../client.ts");
+  mock.module("../client.ts", {
+    namedExports: {
+      ...real,
+      canUseSupabase: () => true,
+      supabase: {
+        from: (...args: unknown[]) => fromImpl(...args),
+        auth: { getUser: () => getUserImpl() },
+      },
+    },
+  });
+});
+
+beforeEach(() => {
+  fromImpl = () => { throw new Error("fromImpl not configured"); };
+  getUserImpl = () => { throw new Error("getUserImpl not configured"); };
+});
 
 describe("pace-zones API", () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it("returns DEFAULT_ZONES when no row exists", async () => {
-    (client.supabase.from as any).mockReturnValue({
+    fromImpl = () => ({
       select: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
     });
-    expect(await getMyPaceZones()).toEqual(DEFAULT_ZONES);
+    const { getMyPaceZones } = await import("../pace-zones.ts");
+    const { DEFAULT_ZONES } = await import("../../paceCalculator.ts");
+    assert.deepEqual(await getMyPaceZones(), DEFAULT_ZONES);
   });
 
   it("returns the persisted row when present", async () => {
-    (client.supabase.from as any).mockReturnValue({
-      select: () => ({
-        maybeSingle: () => Promise.resolve({
-          data: { v0_pct: 145, v1_pct: 132, v2_pct: 116, v3_pct: 111, max_pct: 106 },
-          error: null,
-        }),
-      }),
+    const row = { v0_pct: 145, v1_pct: 132, v2_pct: 116, v3_pct: 111, max_pct: 106 };
+    fromImpl = () => ({
+      select: () => ({ maybeSingle: () => Promise.resolve({ data: row, error: null }) }),
     });
-    expect(await getMyPaceZones()).toEqual({
-      v0_pct: 145, v1_pct: 132, v2_pct: 116, v3_pct: 111, max_pct: 106,
-    });
+    const { getMyPaceZones } = await import("../pace-zones.ts");
+    assert.deepEqual(await getMyPaceZones(), row);
   });
 
-  it("upsert calls supabase.from('coach_pace_zones').upsert with coach_id", async () => {
-    (client.supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: "coach-uuid" } },
+  it("upsertMyPaceZones calls supabase upsert with coach_id and onConflict", async () => {
+    getUserImpl = () => Promise.resolve({ data: { user: { id: "coach-uuid" } } });
+    let capturedRow: Record<string, unknown> | undefined;
+    let capturedOpts: Record<string, unknown> | undefined;
+    fromImpl = () => ({
+      upsert: (row: unknown, opts: unknown) => {
+        capturedRow = row as Record<string, unknown>;
+        capturedOpts = opts as Record<string, unknown>;
+        return { select: () => ({ single: () => Promise.resolve({ data: {}, error: null }) }) };
+      },
     });
-    const upsert = vi.fn().mockReturnValue({ select: () => ({ single: () => Promise.resolve({ data: {}, error: null }) }) });
-    (client.supabase.from as any).mockReturnValue({ upsert });
+    const { upsertMyPaceZones } = await import("../pace-zones.ts");
     await upsertMyPaceZones({ v0_pct: 140, v1_pct: 130, v2_pct: 115, v3_pct: 110, max_pct: 105 });
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ coach_id: "coach-uuid", v0_pct: 140 }),
-      expect.objectContaining({ onConflict: "coach_id" }),
-    );
+    assert.equal(capturedRow?.coach_id, "coach-uuid");
+    assert.equal(capturedRow?.v0_pct, 140);
+    assert.equal(capturedOpts?.onConflict, "coach_id");
   });
 });
 ```
