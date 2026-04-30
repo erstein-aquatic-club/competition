@@ -459,3 +459,32 @@ export {
   type SwimmerBriefingSession,
   type AttendanceStatus,
 } from './coach-quickview';
+
+// §184 — Coach Manual Swimmers (extended)
+export {
+  listManualSwimmers,
+  createManualSwimmer,
+  updateManualSwimmer,
+  deleteManualSwimmer,
+  type CoachManualSwimmer,
+} from './coach-manual-swimmers';
+
+// §184 — Pace Calculator API
+export {
+  getMyPaceZones,
+  upsertMyPaceZones,
+} from './pace-zones';
+
+export {
+  listMyPaceTargets,
+  upsertPaceTarget,
+  deletePaceTarget,
+  type PaceTarget,
+  type SwimmerRef,
+} from './pace-targets';
+
+export {
+  createPaceShareLink,
+  getPaceSharePayload,
+  type PaceSharePayload,
+} from './pace-share';

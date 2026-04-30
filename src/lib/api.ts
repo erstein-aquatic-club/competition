@@ -379,6 +379,28 @@ import {
 } from "./api/coach-comments";
 
 import {
+  listManualSwimmers as _listManualSwimmers,
+  createManualSwimmer as _createManualSwimmer,
+  updateManualSwimmer as _updateManualSwimmer,
+  deleteManualSwimmer as _deleteManualSwimmer,
+  type CoachManualSwimmer,
+} from "./api/coach-manual-swimmers";
+import {
+  getMyPaceZones as _getMyPaceZones,
+  upsertMyPaceZones as _upsertMyPaceZones,
+} from "./api/pace-zones";
+import {
+  listMyPaceTargets as _listMyPaceTargets,
+  upsertPaceTarget as _upsertPaceTarget,
+  deletePaceTarget as _deletePaceTarget,
+  type SwimmerRef,
+} from "./api/pace-targets";
+import {
+  createPaceShareLink as _createPaceShareLink,
+  getPaceSharePayload as _getPaceSharePayload,
+} from "./api/pace-share";
+
+import {
   getStrengthPlanningSlots as _getStrengthPlanningSlots,
   upsertStrengthPlanningSlot as _upsertStrengthPlanningSlot,
   deleteStrengthPlanningSlot as _deleteStrengthPlanningSlot,
@@ -965,4 +987,23 @@ export const api = {
   async upsertStrengthPlanningWeekMeta(input: Parameters<typeof _upsertStrengthPlanningWeekMeta>[0]) { return _upsertStrengthPlanningWeekMeta(input); },
   async getStrengthPlanningWeekOverrides(opts: Parameters<typeof _getStrengthPlanningWeekOverrides>[0]) { return _getStrengthPlanningWeekOverrides(opts); },
   async upsertStrengthPlanningWeekOverride(input: Parameters<typeof _upsertStrengthPlanningWeekOverride>[0]) { return _upsertStrengthPlanningWeekOverride(input); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — §184 Coach Manual Swimmers (extended)
+  // ══════════════════════════════════════════════════════════════════
+  async listManualSwimmers() { return _listManualSwimmers(); },
+  async createManualSwimmer(displayName: string, opts?: Parameters<typeof _createManualSwimmer>[1]) { return _createManualSwimmer(displayName, opts); },
+  async updateManualSwimmer(id: string, patch: Parameters<typeof _updateManualSwimmer>[1]) { return _updateManualSwimmer(id, patch); },
+  async deleteManualSwimmer(id: string) { return _deleteManualSwimmer(id); },
+
+  // ══════════════════════════════════════════════════════════════════
+  // DELEGATION STUBS — §184 Pace Calculator
+  // ══════════════════════════════════════════════════════════════════
+  async getMyPaceZones() { return _getMyPaceZones(); },
+  async upsertMyPaceZones(zones: Parameters<typeof _upsertMyPaceZones>[0]) { return _upsertMyPaceZones(zones); },
+  async listMyPaceTargets() { return _listMyPaceTargets(); },
+  async upsertPaceTarget(args: Parameters<typeof _upsertPaceTarget>[0]) { return _upsertPaceTarget(args); },
+  async deletePaceTarget(id: string) { return _deletePaceTarget(id); },
+  async createPaceShareLink(swimmer: SwimmerRef) { return _createPaceShareLink(swimmer); },
+  async getPaceSharePayload(token: string) { return _getPaceSharePayload(token); },
 };
