@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useMyTeam } from "../../hooks/useMyTeam";
 import { Play, Plus, Minus, X, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -17,7 +18,6 @@ import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
 import type { AthleteSummary } from "../../lib/api/types";
 import {
-  listManualSwimmers,
   createManualSwimmer,
   deleteManualSwimmer,
 } from "../../lib/api/coach-manual-swimmers";
@@ -588,13 +588,13 @@ function ManualsTabBody({
   dispatch: React.Dispatch<ChronoAction>;
 }) {
   const queryClient = useQueryClient();
-  const { data: manuals = [], isLoading } = useQuery({
-    queryKey: ["coach_manual_swimmers"],
-    queryFn: listManualSwimmers,
-  });
+  const { manuals, isLoading } = useMyTeam();
   const delMutation = useMutation({
     mutationFn: deleteManualSwimmer,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["coach_manual_swimmers"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-manual-swimmers"] });
+      queryClient.invalidateQueries({ queryKey: ["my-team"] });
+    },
   });
   // Local pulse feedback : which manual was added last (for a brief "✓ ajouté" tag).
   const [justAdded, setJustAdded] = useState<string | null>(null);
@@ -640,7 +640,7 @@ function ManualsTabBody({
                   type: "ADD_SWIMMER",
                   swimmer: buildManualSwimmer({
                     manualId: crypto.randomUUID(),
-                    displayName: m.display_name,
+                    displayName: m.displayName,
                     lane: addLane,
                   }),
                 });
@@ -655,11 +655,11 @@ function ManualsTabBody({
               }`}
             >
               <SwimmerAvatar
-                swimmer={{ displayName: m.display_name, avatarUrl: null }}
+                swimmer={{ displayName: m.displayName, avatarUrl: null }}
                 size="sm"
                 className="shrink-0"
               />
-              <span className="flex-1 truncate">{m.display_name}</span>
+              <span className="flex-1 truncate">{m.displayName}</span>
               {pulse && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0 animate-in fade-in slide-in-from-right-1 duration-300">
                   <Check className="h-3 w-3" />
@@ -669,10 +669,10 @@ function ManualsTabBody({
             </button>
             <button
               type="button"
-              onClick={() => delMutation.mutate(m.id)}
+              onClick={() => m.manualId && delMutation.mutate(m.manualId)}
               disabled={delMutation.isPending}
               className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
-              aria-label={`Supprimer ${m.display_name}`}
+              aria-label={`Supprimer ${m.displayName}`}
             >
               <Trash2 className="h-4 w-4" />
             </button>
