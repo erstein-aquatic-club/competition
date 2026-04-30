@@ -46,6 +46,33 @@ const ROWS_BY_DIST_4N: Record<number, number[]> = {
   400: [100, 200, 300, 400],
 };
 
+export function formatPaceTime(ms: number): string {
+  const rounded = Math.round(ms / 100) * 100;
+  const totalSeconds = rounded / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds - minutes * 60;
+  if (minutes === 0) {
+    return seconds.toFixed(1);
+  }
+  return `${minutes}:${seconds.toFixed(1).padStart(4, "0")}`;
+}
+
+const PACE_RE = /^(?:(\d{1,2}):)?(\d{1,2})(?:\.(\d{1,2}))?$/;
+
+export function parsePaceTime(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const m = trimmed.match(PACE_RE);
+  if (!m) return null;
+  const minutes = m[1] ? parseInt(m[1], 10) : 0;
+  const seconds = parseInt(m[2], 10);
+  const decimals = m[3] ? parseInt(m[3].padEnd(2, "0").slice(0, 2), 10) : 0;
+  // when minutes component present, seconds must be < 60; bare "65" is total seconds
+  if (m[1] !== undefined && seconds >= 60) return null;
+  if (minutes < 0 || seconds < 0 || decimals < 0) return null;
+  return minutes * 60_000 + seconds * 1_000 + decimals * 10;
+}
+
 export function getDistanceRows(targetDistanceM: number, stroke: Stroke): number[] {
   if (stroke === "4N") return ROWS_BY_DIST_4N[targetDistanceM] ?? [];
   if (stroke === "NL") return { ...ROWS_BY_DIST_MULTI, ...ROWS_BY_DIST_NL_ONLY }[targetDistanceM] ?? [];

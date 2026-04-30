@@ -95,3 +95,41 @@ describe("getDistanceRows", () => {
     expect(getDistanceRows(800, "Brasse")).toEqual([]);
   });
 });
+
+import { formatPaceTime, parsePaceTime } from "../lib/paceCalculator";
+
+describe("formatPaceTime", () => {
+  it("under 1 min → ss.x", () => {
+    expect(formatPaceTime(45_500)).toBe("45.5");
+    expect(formatPaceTime(8_300)).toBe("8.3");
+  });
+  it("≥ 1 min → m:ss.x with zero-padded seconds", () => {
+    expect(formatPaceTime(65_400)).toBe("1:05.4");
+    expect(formatPaceTime(125_900)).toBe("2:05.9");
+    expect(formatPaceTime(600_000)).toBe("10:00.0");
+  });
+  it("rounds half-up to nearest 100 ms", () => {
+    expect(formatPaceTime(65_449)).toBe("1:05.4");
+    expect(formatPaceTime(65_450)).toBe("1:05.5");
+  });
+});
+
+describe("parsePaceTime", () => {
+  it.each([
+    ["1:05",     65_000],
+    ["1:05.4",   65_400],
+    ["01:05.40", 65_400],
+    ["65.4",     65_400],
+    ["65",       65_000],
+    [" 1:05.4 ", 65_400],
+  ])("parses %s → %i ms", (s, ms) => {
+    expect(parsePaceTime(s)).toBe(ms);
+  });
+
+  it("returns null on invalid input", () => {
+    expect(parsePaceTime("")).toBeNull();
+    expect(parsePaceTime("abc")).toBeNull();
+    expect(parsePaceTime("1:60")).toBeNull();
+    expect(parsePaceTime("-1")).toBeNull();
+  });
+});
