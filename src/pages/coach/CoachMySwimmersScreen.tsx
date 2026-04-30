@@ -8,6 +8,7 @@ import CoachSectionHeader from "./CoachSectionHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, UserPlus, UserMinus, Users } from "lucide-react";
+import { Search, UserPlus, UserMinus, Users, UserRoundPlus, Pencil, Trash2 } from "lucide-react";
+import { useMyTeam } from "@/hooks/useMyTeam";
+import { ManualSwimmerDialog } from "@/components/coach/ManualSwimmerDialog";
+import { deleteManualSwimmer } from "@/lib/api/coach-manual-swimmers";
+import type { CoachManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -189,6 +194,8 @@ export default function CoachMySwimmersScreen({
 
   const [search, setSearch] = useState("");
   const [removingSwimmer, setRemovingSwimmer] = useState<AthleteSummary | null>(null);
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [editingManual, setEditingManual] = useState<CoachManualSwimmer | undefined>(undefined);
 
   // ── Data fetching ────────────────────────────────────────────
 
@@ -210,6 +217,17 @@ export default function CoachMySwimmersScreen({
   });
 
   // ── Mutations ────────────────────────────────────────────────
+
+  // ── useMyTeam (coach-only) ───────────────────────────────────
+  const { team, accounts: teamAccounts, manuals: teamManuals } = useMyTeam(isAdmin ? [] : athletes);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteManualSwimmer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-manual-swimmers"] });
+      queryClient.invalidateQueries({ queryKey: ["my-team"] });
+    },
+  });
 
   const invalidateKeys = () => {
     queryClient.invalidateQueries({ queryKey: ["all-assignments"] });
@@ -377,48 +395,131 @@ export default function CoachMySwimmersScreen({
 
       {/* ── Coach View ───────────────────────────────────────── */}
       {!isLoading && !isAdmin && (
-        <>
-          {/* My swimmers */}
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                Mes nageurs
-              </h3>
+        <Tabs defaultValue="team" className="space-y-4">
+          <TabsList className="w-full">
+            <TabsTrigger value="team" className="flex-1 gap-1.5">
+              Mon équipe
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {mySwimmers.length}
+                {team.length}
               </Badge>
-            </div>
-            {mySwimmers.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                {search ? "Aucun nageur correspondant." : "Aucun nageur pris en charge."}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {mySwimmers.map((athlete) => (
-                  <SwimmerRow
-                    key={athlete.id}
-                    athlete={athlete}
-                    actionLabel="Retirer"
-                    actionVariant="destructive"
-                    actionIcon={UserMinus}
-                    onAction={() => setRemovingSwimmer(athlete)}
-                    isPending={isPending}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Available swimmers */}
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                Nageurs disponibles
-              </h3>
+            </TabsTrigger>
+            <TabsTrigger value="available" className="flex-1 gap-1.5">
+              Disponibles
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 {availableSwimmers.length}
               </Badge>
-            </div>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Tab Mon équipe ─────────────────────────────────── */}
+          <TabsContent value="team" className="space-y-4 mt-0">
+
+            {/* CTA ajout nageur sans compte */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 border-dashed"
+              onClick={() => { setEditingManual(undefined); setManualDialogOpen(true); }}
+            >
+              <UserRoundPlus className="h-4 w-4" />
+              Ajouter un nageur sans compte
+            </Button>
+
+            {/* Nageurs avec compte */}
+            {teamAccounts.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                    Avec compte
+                  </h3>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {teamAccounts.length}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {mySwimmers.map((athlete) => (
+                    <SwimmerRow
+                      key={athlete.id}
+                      athlete={athlete}
+                      actionLabel="Retirer"
+                      actionVariant="destructive"
+                      actionIcon={UserMinus}
+                      onAction={() => setRemovingSwimmer(athlete)}
+                      isPending={isPending}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Nageurs sans compte (manuels) */}
+            {teamManuals.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                    Sans compte
+                  </h3>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {teamManuals.length}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {teamManuals.map((m) => {
+                    const raw = assignments.find(() => false); // manual swimmers have no assignment
+                    void raw;
+                    return (
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/30"
+                      >
+                        <div className="h-10 w-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          {m.displayName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate">{m.displayName}</p>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 mt-0.5 text-muted-foreground">
+                            Sans compte
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              const raw = { id: m.manualId!, coach_id: "", display_name: m.displayName, birthdate: m.birthdate ?? null, sex: m.sex ?? null, created_at: "" };
+                              setEditingManual(raw);
+                              setManualDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => m.manualId && deleteMutation.mutate(m.manualId)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {team.length === 0 && (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                {search ? "Aucun nageur correspondant." : "Votre équipe est vide. Ajoutez des nageurs ci-dessus."}
+              </p>
+            )}
+          </TabsContent>
+
+          {/* ── Tab Disponibles ────────────────────────────────── */}
+          <TabsContent value="available" className="space-y-2 mt-0">
             {availableSwimmers.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 {search ? "Aucun nageur correspondant." : "Tous les nageurs sont pris en charge."}
@@ -438,8 +539,8 @@ export default function CoachMySwimmersScreen({
                 ))}
               </div>
             )}
-          </section>
-        </>
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* ── Admin View ───────────────────────────────────────── */}
@@ -521,6 +622,13 @@ export default function CoachMySwimmersScreen({
           })()}
         </>
       )}
+
+      {/* ── Manual swimmer dialog ────────────────────────────── */}
+      <ManualSwimmerDialog
+        open={manualDialogOpen}
+        onOpenChange={setManualDialogOpen}
+        swimmer={editingManual}
+      />
 
       {/* ── Remove confirmation dialog ──────────────────────── */}
       <AlertDialog
