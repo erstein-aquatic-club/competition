@@ -989,3 +989,82 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public._test_save_strength_run_authz(integer, integer) TO authenticated;
+
+-- =============================================================================
+-- §184 — Coach Pace Calculator + Mon équipe
+-- Keep in sync with migration 00148_pace_calculator_and_team.sql
+-- Note: no FK to auth.users (no auth schema in test env) — coach_id is plain UUID
+-- =============================================================================
+
+-- (a) Étendre coach_manual_swimmers
+ALTER TABLE public.coach_manual_swimmers
+  ADD COLUMN IF NOT EXISTS birthdate date,
+  ADD COLUMN IF NOT EXISTS sex char(1) CHECK (sex IN ('M','F'));
+
+CREATE POLICY "coach_manual_swimmers_update_own"
+  ON public.coach_manual_swimmers FOR UPDATE
+  USING (coach_id = (SELECT auth.uid()))
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+
+-- (b) coach_pace_zones
+CREATE TABLE public.coach_pace_zones (
+  coach_id   uuid PRIMARY KEY,
+  v0_pct     int NOT NULL DEFAULT 140 CHECK (v0_pct BETWEEN 100 AND 200),
+  v1_pct     int NOT NULL DEFAULT 130 CHECK (v1_pct BETWEEN 100 AND 200),
+  v2_pct     int NOT NULL DEFAULT 115 CHECK (v2_pct BETWEEN 100 AND 200),
+  v3_pct     int NOT NULL DEFAULT 110 CHECK (v3_pct BETWEEN 100 AND 200),
+  max_pct    int NOT NULL DEFAULT 105 CHECK (max_pct BETWEEN 100 AND 200),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (v0_pct >= v1_pct AND v1_pct >= v2_pct AND v2_pct >= v3_pct AND v3_pct >= max_pct)
+);
+ALTER TABLE public.coach_pace_zones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "coach_pace_zones_select_own"
+  ON public.coach_pace_zones FOR SELECT
+  USING (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_pace_zones_insert_own"
+  ON public.coach_pace_zones FOR INSERT
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_pace_zones_update_own"
+  ON public.coach_pace_zones FOR UPDATE
+  USING  (coach_id = (SELECT auth.uid()))
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+
+-- (c) coach_pace_targets
+CREATE TABLE public.coach_pace_targets (
+  id                   uuid    PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id             uuid    NOT NULL,
+  swimmer_account_id   bigint  REFERENCES public.users(id) ON DELETE CASCADE,
+  swimmer_manual_id    uuid    REFERENCES public.coach_manual_swimmers(id) ON DELETE CASCADE,
+  stroke               text    NOT NULL CHECK (stroke IN ('NL','Dos','Brasse','Pap','4N')),
+  target_distance_m    int     NOT NULL CHECK (target_distance_m IN (50,100,200,400,800,1500)),
+  target_time_ms       int     NOT NULL CHECK (target_time_ms > 0),
+  updated_at           timestamptz NOT NULL DEFAULT now(),
+  CHECK ((swimmer_account_id IS NULL) <> (swimmer_manual_id IS NULL))
+);
+CREATE UNIQUE INDEX uq_pace_targets_account
+  ON public.coach_pace_targets (coach_id, swimmer_account_id, stroke, target_distance_m)
+  WHERE swimmer_account_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_pace_targets_manual
+  ON public.coach_pace_targets (coach_id, swimmer_manual_id, stroke, target_distance_m)
+  WHERE swimmer_manual_id IS NOT NULL;
+ALTER TABLE public.coach_pace_targets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "coach_pace_targets_all_own"
+  ON public.coach_pace_targets FOR ALL
+  USING  (coach_id = (SELECT auth.uid()))
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+
+-- (d) pace_share_links
+CREATE TABLE public.pace_share_links (
+  token                uuid    PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id             uuid    NOT NULL,
+  swimmer_account_id   bigint  REFERENCES public.users(id) ON DELETE CASCADE,
+  swimmer_manual_id    uuid    REFERENCES public.coach_manual_swimmers(id) ON DELETE CASCADE,
+  expires_at           timestamptz NOT NULL DEFAULT (now() + INTERVAL '30 days'),
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  CHECK ((swimmer_account_id IS NULL) <> (swimmer_manual_id IS NULL))
+);
+ALTER TABLE public.pace_share_links ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "pace_share_links_owner_all"
+  ON public.pace_share_links FOR ALL
+  USING  (coach_id = (SELECT auth.uid()))
+  WITH CHECK (coach_id = (SELECT auth.uid()));
