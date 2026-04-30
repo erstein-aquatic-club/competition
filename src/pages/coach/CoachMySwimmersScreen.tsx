@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -179,6 +180,20 @@ function AdminSwimmerRow({
 }
 
 // ---------------------------------------------------------------------------
+// Deep-link helper (exported for unit tests)
+// ---------------------------------------------------------------------------
+
+export function parseDeepLinkAction(hash: string): { action: string | null; cleanPath: string } {
+  const qIdx = hash.indexOf("?");
+  const params = new URLSearchParams(qIdx >= 0 ? hash.slice(qIdx) : "");
+  const action = params.get("action");
+  params.delete("action");
+  const pathPart = (qIdx >= 0 ? hash.slice(0, qIdx) : hash).replace(/^#/, "");
+  const query = params.toString();
+  return { action, cleanPath: query ? `${pathPart}?${query}` : pathPart };
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -191,11 +206,22 @@ export default function CoachMySwimmersScreen({
   const userId = useAuth((s) => s.userId);
   const queryClient = useQueryClient();
   const isAdmin = role === "admin";
+  const [, navigate] = useLocation();
 
   const [search, setSearch] = useState("");
   const [removingSwimmer, setRemovingSwimmer] = useState<AthleteSummary | null>(null);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [editingManual, setEditingManual] = useState<CoachManualSwimmer | undefined>(undefined);
+
+  // Deep-link: ?action=new-manual opens ManualSwimmerDialog on mount
+  useEffect(() => {
+    const { action, cleanPath } = parseDeepLinkAction(window.location.hash);
+    if (action !== "new-manual") return;
+    setManualDialogOpen(true);
+    setEditingManual(undefined);
+    navigate(cleanPath, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Data fetching ────────────────────────────────────────────
 

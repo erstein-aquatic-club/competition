@@ -10,6 +10,24 @@ describe("CoachMySwimmersScreen — importability", () => {
   });
 });
 
+describe("parseDeepLinkAction — deep-link helper", () => {
+  it("opens dialog on mount when ?action=new-manual is present", async () => {
+    const { parseDeepLinkAction } = await import("../CoachMySwimmersScreen");
+    const { action } = parseDeepLinkAction("#/coach?section=swimmers&action=new-manual");
+    expect(action).toBe("new-manual");
+    const { action: noAction } = parseDeepLinkAction("#/coach?section=swimmers");
+    expect(noAction).toBeNull();
+  });
+
+  it("removes the param after opening", async () => {
+    const { parseDeepLinkAction } = await import("../CoachMySwimmersScreen");
+    const { cleanPath } = parseDeepLinkAction("#/coach?section=swimmers&action=new-manual");
+    expect(cleanPath).toBe("/coach?section=swimmers");
+    const { cleanPath: noQuery } = parseDeepLinkAction("#/coach?action=new-manual");
+    expect(noQuery).toBe("/coach");
+  });
+});
+
 describe("ManualSwimmerDialog — importability", () => {
   it("is a function component", async () => {
     const mod = await import("@/components/coach/ManualSwimmerDialog");
