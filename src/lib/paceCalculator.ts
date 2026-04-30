@@ -16,3 +16,14 @@ export const DEFAULT_ZONES: ZoneConfig = {
   v3_pct: 110,
   max_pct: 105,
 };
+
+export function pacePer100m(targetTimeMs: number, targetDistanceM: number): number {
+  if (targetDistanceM <= 0) {
+    throw new Error("targetDistanceM must be > 0");
+  }
+  return Math.round((targetTimeMs * 100) / targetDistanceM);
+}
+
+export function zoneTime(distanceM: number, pacePer100mMs: number, zonePct: number): number {
+  return Math.round((pacePer100mMs * distanceM * zonePct) / (100 * 100));
+}
