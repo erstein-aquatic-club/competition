@@ -14,8 +14,8 @@ Le document `regles_calcul_allures_natation.docx` (audit §1, cohérence vérifi
 |---|---|---|
 | C1 | La table FFN §185 reste en place, comme **couche d'affichage post-calcul** uniquement (transposition 50↔25 pour repère bord de bassin). Le moteur de calcul travaille en référence 50m. | Le doc traite uniquement les courbes en bassin 50m. Les conversions inter-bassins sont un aide à la lecture, pas un input du calcul. |
 | C2 | Les coefficients k_allure du doc remplacent les défauts actuels. | Le coach valide la pertinence métier des valeurs du doc. |
-| C3 | Migration soft via feature flag `pace_model_v2` par coach, off par défaut. | Préserve les cibles existantes des coachs en prod. Bascule explicite. |
-| C4 | Zone V4 ajoutée (entre V3 et MAX), optionnelle ≥200m. | Doc §4. Un V4=0.98 (50m) ou 0.985 (200m) est essentiel pour piloter les séries très rapides sans saut V3→MAX trop large. |
+| C3 | Bascule directe v1 → v2 sans feature flag. La table `coach_pace_zones` v1 est **droppée et recréée** en schema v2. Les cibles `coach_pace_targets` sont préservées (leur input ne change pas). | Aucun coach n'a réellement calibré ses zones v1 en production (smoke test interne uniquement). Pas de dette à porter. |
+| C4 | Zone V4 ajoutée (entre V3 et MAX). Désactivée par défaut sur 400m / 800m / 1500m mais activable manuellement par le coach via toggle dans le drawer Zones. | Doc §4 : V3 (0.96/0.97) → MAX (1.00) suffit comme contraste sur longue distance. V4 reste utile sur 50m/100m. |
 | C5 | Calculs internes en **secondes** (float), affichage en `mm:ss.cc`. Stockage DB en **ms** (int) pour cohérence avec le reste de l'app. | Précision suffisante (1 ms < 0.01 s d'affichage). Aligné avec §184. |
 
 ## 3. Modèle calculatoire
@@ -139,7 +139,7 @@ Ex : 125m d'un 200 4N = 50 papillon (complet) + 50 dos (complet) + 25 brasse (in
 ### 3.6. Cas non couverts par le doc
 
 - **100 4N** : le doc ne le mentionne pas. Décision : accepter la cible, mais désactiver le toggle 25↔50 (pas de FFN) et utiliser une segmentation 25m/nage avec les poids `(0.218, 0.250, 0.290, 0.242)`. À valider en review métier.
-- **NAC, Spé** (utilisés ailleurs dans l'app) : hors scope §186. Si une cible NAC/Spé existe en DB, fallback sur le modèle linéaire v1 + warning UX.
+- **NAC, Spé** (utilisés ailleurs dans l'app) : hors scope §186. Refusés à la création d'une cible avec un message UX clair "Nage non gérée par le modèle d'allures, utilisez NL/Dos/Brasse/Pap/4N". Pas de fallback linéaire (le modèle v1 est supprimé).
 
 ## 4. Distances de répétition affichées (doc §3.3)
 
@@ -163,10 +163,12 @@ Le coach peut **ajouter des distances ad-hoc** via un input "+", interpolation l
 ### 5.1. Migration `00151_pace_model_v2.sql`
 
 ```sql
--- (a) Refonte coach_pace_zones : passage à un modèle par famille × zone
--- L'ancienne table coach_pace_zones (1 row par coach, 5 colonnes pct) est dépréciée mais conservée
--- pendant la transition (le feature flag détermine quel modèle est lu).
-CREATE TABLE coach_pace_zones_v2 (
+-- (a) Refonte coach_pace_zones : passage à un modèle par famille × zone.
+-- L'ancienne structure (1 row par coach, 5 colonnes pct) est droppée et recréée
+-- avec le shape v2. Aucune donnée à préserver : pas de calibrations utilisateurs en prod.
+DROP TABLE IF EXISTS coach_pace_zones CASCADE;
+
+CREATE TABLE coach_pace_zones (
   coach_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   event_family text NOT NULL CHECK (event_family IN ('50m','100m','200m','400m','800m_1500m')),
   zone text NOT NULL CHECK (zone IN ('V0','V1','V2','V3','V4','MAX')),
@@ -174,8 +176,16 @@ CREATE TABLE coach_pace_zones_v2 (
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (coach_id, event_family, zone)
 );
-ALTER TABLE coach_pace_zones_v2 ENABLE ROW LEVEL SECURITY;
--- Policies miroir de coach_pace_zones (SELECT/INSERT/UPDATE own).
+ALTER TABLE coach_pace_zones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "coach_pace_zones_select_own"
+  ON coach_pace_zones FOR SELECT USING (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_pace_zones_insert_own"
+  ON coach_pace_zones FOR INSERT WITH CHECK (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_pace_zones_update_own"
+  ON coach_pace_zones FOR UPDATE USING (coach_id = (SELECT auth.uid()))
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_pace_zones_delete_own"
+  ON coach_pace_zones FOR DELETE USING (coach_id = (SELECT auth.uid()));
 
 -- (b) Table de ratios de référence (read-only, seedée, partagée)
 CREATE TABLE pace_ratios_base (
@@ -209,15 +219,9 @@ CREATE TABLE coach_stroke_adjustments (
 ALTER TABLE coach_stroke_adjustments ENABLE ROW LEVEL SECURITY;
 -- Policies miroir.
 
--- (e) Feature flag par coach
-ALTER TABLE coach_pace_zones
-  ADD COLUMN IF NOT EXISTS pace_model_version int NOT NULL DEFAULT 1
-    CHECK (pace_model_version IN (1, 2));
--- Quand un coach passe à 2, le calculateur lit coach_pace_zones_v2 + ratios + adjustments.
--- Quand 1, comportement §184 inchangé.
-
--- (f) Mapping nages : alias crawl <-> NL pour cohérence avec le reste de l'app
+-- (e) Mapping nages : alias crawl <-> NL pour cohérence avec le reste de l'app
 -- Pas de migration de données : l'aliasing est géré côté code (NL → crawl en interne).
+-- Pas de feature flag : bascule directe vers le modèle v2.
 ```
 
 ### 5.2. Stockage des cibles (`coach_pace_targets`)
@@ -308,21 +312,19 @@ export function validateMatrix(matrix: {
 
 ### 6.2. Côté Supabase API
 
-- `src/lib/api/pace-zones-v2.ts` : CRUD sur `coach_pace_zones_v2`
+- `src/lib/api/pace-zones.ts` : CRUD sur `coach_pace_zones` (réécrit, l'ancienne version est remplacée)
 - `src/lib/api/pace-ratios.ts` : SELECT seul sur `pace_ratios_base` (cache Vite via React Query, staleTime infinity)
 - `src/lib/api/pace-stroke-adjustments.ts` : SELECT global + read/upsert override par coach (`coach_stroke_adjustments`)
-- `src/lib/api/coach-pace-model.ts` : read/upsert du flag `pace_model_version` sur `coach_pace_zones` (1 → 2)
+<!-- supprimé : pas de flag de version, bascule directe vers v2 -->
+- `src/hooks/useCoachPaceZones.ts` : lit les zones, insère les défauts du doc si absent (idempotent), expose un setter qui upsert + invalide
 
 ## 7. UI
 
-### 7.1. Compatibilité v1 / v2
+### 7.1. Bascule directe v2
 
-Le `CoachPaceCalculatorScreen` détecte `pace_model_version` du coach :
+Le `CoachPaceCalculatorScreen` rend toujours le modèle v2. Pas de fallback v1, pas de bandeau de migration. Si une cible existante était stockée avec un input compatible v1, elle est rendue avec les courbes v2 sans intervention.
 
-- Si `1` : rendu actuel (modèle linéaire). Bandeau d'info `[Nouveau modèle disponible — Migrer]` qui ouvre une modale d'explication + bouton "Activer le modèle v2".
-- Si `2` : rendu nouveau (matrices étendues, V4 affichée selon famille, segments 4N).
-
-L'option de revenir à v1 reste disponible pendant 30 jours après bascule (sécurité).
+**Note** : le coach perd ses éventuelles personnalisations de zones v1 (defaults 140/130/115/110/105). Acceptable car aucun coach n'a calibré v1 en production hors smoke test interne.
 
 ### 7.2. Drawer "Zones"
 
@@ -346,30 +348,25 @@ Footer matrice :
 
 > Modèle non-linéaire v2 (basé sur `regles_calcul_allures_natation.docx`). Coefficients à calibrer par tests individuels — voir §187.
 
-## 8. Stratégie de migration & feature flag
+## 8. Stratégie de migration
 
-### 8.1. Comportement par défaut
+### 8.1. Bascule directe v2
 
-- **Coachs existants** : flag à `1` au déploiement → comportement §184 inchangé. Pas de surprise UX.
-- **Nouveaux coachs** : flag à `2` par défaut (à confirmer — soit on bascule tous immédiatement à `2`, soit on attend un premier batch de retours coach).
+- Migration `00151` droppe la table `coach_pace_zones` v1 et la recrée en v2.
+- Pas de feature flag, pas d'opt-in coach.
+- Toutes les `coach_pace_targets` existantes sont préservées (leur input ne change pas) et rendues avec les courbes v2 dès la livraison.
 
-### 8.2. Bascule v1 → v2
+### 8.2. Initialisation des zones par coach
 
-Quand un coach clique "Activer modèle v2" :
+Quand un coach ouvre le calculateur d'allures pour la première fois après §186, le hook `useCoachPaceZones` :
 
-1. Insertion des défauts doc dans `coach_pace_zones_v2` (5 familles × 6 zones = 30 rows)
-2. Insertion `coach_pace_zones.pace_model_version = 2`
-3. Toast "Vous utilisez désormais le modèle v2. Vos cibles existantes sont préservées."
-4. Les cibles sont recalculées à la volée avec le nouveau modèle.
+1. Tente de lire les zones du coach.
+2. Si aucune zone n'existe (cas par défaut post-migration), insère les 25 lignes des défauts du doc en une seule transaction (5 familles × 5 zones obligatoires V0..V3..MAX, V4 n'est créée que si activée).
+3. Cache React Query, staleTime infinity.
 
-### 8.3. Bascule v2 → v1 (retour)
+### 8.3. Pas de retour arrière
 
-- Disponible 30 jours après v1→v2.
-- Au-delà, masquée (mais réactivable en support si besoin).
-
-### 8.4. Préservation des cibles existantes
-
-`coach_pace_targets` n'est pas modifiée. Les coachs ne perdent rien — la matrice change d'aspect, pas la donnée d'entrée.
+Une fois la migration appliquée, le modèle v1 est définitivement perdu. Aucun mécanisme de fallback n'est exposé en UI.
 
 ## 9. Tests
 
@@ -392,28 +389,29 @@ Quand un coach clique "Activer modèle v2" :
 
 ### 9.2. RLS
 
-- `supabase/tests/rls/coach_pace_zones_v2.test.ts` : isolation cross-coach
+- `supabase/tests/rls/coach_pace_zones.test.ts` : isolation cross-coach
 - `supabase/tests/rls/coach_stroke_adjustments.test.ts` : idem
 - `pace_ratios_base` : pas de test RLS (table publique read-only) ; vérification fixture initiale via SQL test
 
 ### 9.3. Composants
 
-- `PaceMatrix.test.tsx` : ajouter cas modèle v2, V4 visible/masquée, cellules conformes aux exemples doc
-- `CoachPaceCalculatorScreen.test.tsx` : flag `pace_model_version=2` → render v2 ; toggle bascule → mutation
-- `PaceZonesSettings.test.tsx` : tabs par famille, V4 désactivable sur 200m
+- `PaceMatrix.test.tsx` : V4 visible 50m/100m, masquée 400m/800m/1500m sauf si activée, cellules conformes aux exemples doc §12
+- `CoachPaceCalculatorScreen.test.tsx` : initialisation des zones par défaut au premier rendu, render des matrices v2
+- `PaceZonesSettings.test.tsx` : tabs par famille, toggle V4 par famille, validation `V0 < V1 < ... < MAX` (en speed coefficients)
 
 ### 9.4. Non-régression
 
-- Coachs `pace_model_version=1` : tests existants §184/§185 doivent tous rester verts.
+- Tests UI §184/§185 portant sur `PaceMatrix`, `SwimmerPaceCard`, `CoachPaceCalculatorScreen` doivent être réécrits/adaptés (changement de contrat). Les tests "façade" (export PDF, partage, persistance des cibles) doivent rester verts sans modification.
+- Pool conversion §185 : intacte. La FFN reste appliquée en post-calcul sur le temps v2.
 
 ## 10. Plan de livraison (ordre suggéré)
 
 1. **Migration 00151** + seeds des tables de référence (ratios, adjustments)
 2. **Module pur `paceCalculatorV2.ts`** + tests unitaires complets (TDD strict)
-3. **API modules** (zones-v2, ratios, stroke-adjustments, pace-model)
-4. **Hooks** (`useCoachPaceModel`, lecture flag + helpers)
-5. **Refonte composants** (`PaceMatrix` v2, `PaceZonesSettings` tabs, nouveau `PaceStrokeAdjustments`)
-6. **Page coach** : intégration flag + bascule
+3. **API modules** (refonte `pace-zones.ts`, nouveaux `pace-ratios.ts`, `pace-stroke-adjustments.ts`)
+4. **Hooks** (`useCoachPaceZones` avec init défauts idempotente, `usePaceRatios`, `useCoachStrokeAdjustments`)
+5. **Refonte composants** (`PaceMatrix` v2, `PaceZonesSettings` tabs par famille + V4 togglable, nouveau `PaceStrokeAdjustments`)
+6. **Page coach** : remplacement des composants v1 par v2 dans `CoachPaceCalculatorScreen`
 7. **4N segmenté** : composant `Pace4NSegmentMatrix.tsx` + intégration
 8. **Tests RLS** + tests composants
 9. **Doc** : §186 entry dans implementation-log + update CLAUDE.md / files-map
@@ -423,7 +421,7 @@ Quand un coach clique "Activer modèle v2" :
 | Risque | Mitigation |
 |---|---|
 | Exemples doc §12 non reproduits exactement | Travail TDD : chaque cellule du tableau exemple = un test unitaire. Ajustement des arrondis si écart. |
-| Bascule v1→v2 perd ou corrompt des cibles | Pas de modification de `coach_pace_targets`. Seules les zones changent. Rollback simple via flag. |
+| Bascule v1→v2 perd ou corrompt des cibles | Pas de modification de `coach_pace_targets`. Seules les zones changent (DROP + recréation). Aucun rollback prévu — accepté car v1 n'a pas de calibration utilisateur en prod. |
 | 4N segmenté trop complexe pour V1 | Livrable en sous-phase si besoin (4N = §186b en cas de scope explosion) |
 | mS doc en plages, pas en valeurs uniques | Médiane des plages utilisée comme défaut, override coach disponible |
 | Performance : 30 rows zones + 6 ratios + 20 adjustments × 100 cibles = beaucoup de calculs front | Memoize les tables côté React Query (staleTime infinity sur ratios + adjustments globaux) |
