@@ -6,101 +6,158 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  pacePer100m,
-  zoneTime,
-  formatPaceTime,
-  getDistanceRows,
-} from "../../../lib/paceCalculator";
-import type { Stroke, ZoneConfig } from "../../../lib/paceCalculator";
-import {
-  convertTargetTime,
-  FFN_DISCLAIMER,
-} from "../../../lib/poolConversion";
-import type { PoolSize, Sex } from "../../../lib/poolConversion";
+  eventFamily,
+  computeTMax,
+  computeZoneTime,
+  getDistanceRowsV2,
+  type StrokeV2,
+  type StrokeAdjustmentOverrides,
+  type ZoneCoefficientsOverride,
+} from "@/lib/paceCalculatorV2";
+import type { EventFamily, Zone } from "@/lib/paceData";
+import { convertTargetTime } from "@/lib/poolConversion";
+import type { PoolSize, Sex } from "@/lib/poolConversion";
+import type { Stroke } from "@/lib/paceCalculator";
+
+type SingleStroke = "crawl" | "dos" | "brasse" | "papillon";
 
 interface Props {
   targetTimeMs: number;
   targetDistanceM: number;
-  stroke: Stroke;
-  zones: ZoneConfig;
-  swimmerSex?: Sex | null;
-  targetPool?: PoolSize;
+  stroke: StrokeV2;
+  swimmerSex: "M" | "F" | null;
+  targetPool: "25m" | "50m";
+  zones: Record<EventFamily, Partial<Record<Zone, number>>>;
+  strokeAdjustments: Record<SingleStroke, Record<EventFamily, number>>;
+  v4EnabledForFamily: boolean;
 }
 
-const ZONE_COLS = [
-  { key: "v0_pct" as const, label: "V0", colorClass: "text-intensity-1" },
-  { key: "v1_pct" as const, label: "V1", colorClass: "text-intensity-2" },
-  { key: "v2_pct" as const, label: "V2", colorClass: "text-intensity-3" },
-  { key: "v3_pct" as const, label: "V3", colorClass: "text-intensity-4" },
-  { key: "max_pct" as const, label: "Max", colorClass: "text-intensity-5" },
-] as const;
+const STROKE_V2_TO_POOL: Record<StrokeV2, Stroke> = {
+  crawl: "NL",
+  dos: "Dos",
+  brasse: "Brasse",
+  papillon: "Pap",
+  "4N": "4N",
+};
 
-function disabledReason(
-  stroke: Stroke,
-  distanceM: number,
-  sex: Sex | null | undefined,
-): string {
-  if (!sex) return "Conversion 25m↔50m indisponible — sexe du nageur non renseigné";
-  const probe = convertTargetTime({
-    targetTimeMs: 60_000, fromPool: "50m", toPool: "25m",
-    stroke, distanceM, sex,
-  });
-  if (probe === null) return "Conversion FFN non définie pour cette épreuve";
-  return "";
+interface ZoneCol {
+  zone: Zone;
+  label: string;
+  headerCls: string;
+  cellBold: boolean;
+}
+
+function buildCols(family: EventFamily, v4Enabled: boolean): ZoneCol[] {
+  const cols: ZoneCol[] = [
+    { zone: "V0",  label: "V0",  headerCls: "text-sky-500",    cellBold: false },
+    { zone: "V1",  label: "V1",  headerCls: "text-teal-500",   cellBold: false },
+    { zone: "V2",  label: "V2",  headerCls: "text-green-500",  cellBold: false },
+    { zone: "V3",  label: "V3",  headerCls: "text-amber-500",  cellBold: false },
+  ];
+  const showV4 = family === "50m" || family === "100m" || v4Enabled;
+  if (showV4) {
+    cols.push({ zone: "V4", label: "V4", headerCls: "text-orange-500", cellBold: false });
+  }
+  cols.push({ zone: "MAX", label: "MAX", headerCls: "text-red-500", cellBold: true });
+  return cols;
+}
+
+function fmtTime(s: number): string {
+  if (s < 60) return s.toFixed(1);
+  const m = Math.floor(s / 60);
+  const rem = (s - m * 60).toFixed(1).padStart(4, "0");
+  return `${m}:${rem}`;
 }
 
 export function PaceMatrix({
   targetTimeMs,
   targetDistanceM,
   stroke,
-  zones,
   swimmerSex,
-  targetPool = "50m",
+  targetPool,
+  zones,
+  strokeAdjustments,
+  v4EnabledForFamily,
 }: Props) {
   const [viewPool, setViewPool] = useState<PoolSize>(targetPool);
-  const rows = getDistanceRows(targetDistanceM, stroke);
 
-  if (rows.length === 0) {
+  if (stroke === "4N") {
     return (
-      <div className="flex items-center justify-center py-8 text-xs uppercase tracking-widest text-muted-foreground/50">
-        Combinaison nage/distance non gérée
+      <div className="text-sm text-muted-foreground text-center py-6">
+        Les épreuves 4 nages utilisent une matrice segmentée.
+        Voir le composant Pace4NSegmentMatrix.
       </div>
     );
   }
 
-  // Compute effective time for the viewed pool.
-  let effectiveTimeMs = targetTimeMs;
-  let conversionFailed = false;
+  const family = eventFamily(targetDistanceM);
+  const rows = getDistanceRowsV2(targetDistanceM, stroke);
+  const cols = buildCols(family, v4EnabledForFamily);
+  const poolStroke = STROKE_V2_TO_POOL[stroke];
+  const otherPool: PoolSize = viewPool === "50m" ? "25m" : "50m";
+
+  // Pool conversion: convert the target event time once for the whole matrix
+  let effectiveMs = targetTimeMs;
+  let conversionApplied = false;
   if (viewPool !== targetPool) {
     const converted = convertTargetTime({
       targetTimeMs,
       fromPool: targetPool,
       toPool: viewPool,
-      stroke,
+      stroke: poolStroke,
       distanceM: targetDistanceM,
       sex: swimmerSex,
     });
-    if (converted === null) {
-      conversionFailed = true;
-      // Fall back to original — but toggle should have been disabled; defensive
-    } else {
-      effectiveTimeMs = converted;
+    if (converted !== null) {
+      effectiveMs = converted;
+      conversionApplied = true;
     }
   }
 
-  const pace = pacePer100m(effectiveTimeMs, targetDistanceM);
-  const otherPool: PoolSize = viewPool === "50m" ? "25m" : "50m";
-  const reason = disabledReason(stroke, targetDistanceM, swimmerSex);
-  const otherDisabled = reason !== "";
+  // Reason why the other-pool toggle button should be disabled
+  const toggleDisabledReason = (): string => {
+    if (!swimmerSex) return "Profil nageur·euse requis pour la conversion de bassin";
+    const probe = convertTargetTime({
+      targetTimeMs,
+      fromPool: targetPool,
+      toPool: otherPool,
+      stroke: poolStroke,
+      distanceM: targetDistanceM,
+      sex: swimmerSex,
+    });
+    return probe === null ? "Conversion FFN non définie pour cette épreuve" : "";
+  };
+  const disabledReason = toggleDisabledReason();
+
+  function cellTimeStr(d: number, zone: Zone): string {
+    try {
+      const tMax = computeTMax({
+        Tobj_s: effectiveMs / 1000,
+        D: targetDistanceM,
+        d,
+        stroke: stroke as SingleStroke,
+        adjustmentOverrides: strokeAdjustments as StrokeAdjustmentOverrides,
+      });
+      const tZone = computeZoneTime({
+        tMax_s: tMax,
+        zone,
+        family,
+        coefficientsOverride: zones as ZoneCoefficientsOverride,
+      });
+      return fmtTime(tZone);
+    } catch {
+      return "—";
+    }
+  }
 
   return (
     <TooltipProvider>
-      <div className="space-y-1">
-        {/* Bassin toggle */}
-        <div className="flex items-center gap-1">
+      <div className="space-y-2">
+        {/* Pool toggle */}
+        <div className="flex items-center gap-1.5">
           {(["50m", "25m"] as const).map((p) => {
-            const isActive  = viewPool === p;
-            const isDisabled = !isActive && otherDisabled;
+            const isActive = viewPool === p;
+            const isDisabled = !isActive && disabledReason !== "";
             const btn = (
               <button
                 key={p}
@@ -119,42 +176,41 @@ export function PaceMatrix({
                 {p}
               </button>
             );
-
             if (isDisabled) {
               return (
                 <Tooltip key={p}>
                   <TooltipTrigger asChild>{btn}</TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[220px] text-xs">
-                    {reason}
+                  <TooltipContent side="top" className="max-w-[240px] text-xs">
+                    {disabledReason}
                   </TooltipContent>
                 </Tooltip>
               );
             }
             return btn;
           })}
-          {viewPool !== targetPool && !conversionFailed && (
+          {conversionApplied && (
             <span className="ml-1 text-[9px] uppercase tracking-widest text-muted-foreground/40">
               converti
             </span>
           )}
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
+        {/* Matrix table */}
+        <div className="overflow-x-auto rounded-md border border-border/30">
+          <table className="w-full border-collapse text-left min-w-[320px]">
             <thead>
-              <tr className="border-b border-border/40">
+              <tr className="border-b border-border/40 bg-muted/30">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 bg-background py-2 pr-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60 min-w-[48px]"
+                  className="sticky left-0 z-10 bg-muted/30 py-2 pr-2 pl-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60 min-w-[44px]"
                 >
                   m
                 </th>
-                {ZONE_COLS.map(({ label, colorClass }) => (
+                {cols.map(({ zone, label, headerCls }) => (
                   <th
-                    key={label}
+                    key={zone}
                     scope="col"
-                    className={`py-2 px-3 text-[10px] font-semibold uppercase tracking-widest ${colorClass} text-right whitespace-nowrap min-w-[64px]`}
+                    className={`py-2 px-2 text-[10px] font-bold uppercase tracking-widest ${headerCls} text-right min-w-[56px]`}
                   >
                     {label}
                   </th>
@@ -162,31 +218,50 @@ export function PaceMatrix({
               </tr>
             </thead>
             <tbody>
-              {rows.map((dist, i) => (
-                <tr
-                  key={dist}
-                  className={`border-b border-border/20 ${i % 2 === 0 ? "" : "bg-muted/20"}`}
-                >
-                  <td className="sticky left-0 z-10 bg-background py-[9px] pr-3 text-[11px] font-medium tabular-nums text-muted-foreground/70 min-h-[36px]">
-                    {dist % 1000 === 0 ? `${dist / 1000}k` : dist}
-                  </td>
-                  {ZONE_COLS.map(({ key, label }) => (
+              {rows.map((d) => {
+                const isTargetRow = d === targetDistanceM;
+                return (
+                  <tr
+                    key={d}
+                    className={[
+                      "border-b border-border/20 transition-colors",
+                      isTargetRow ? "bg-primary/5" : "hover:bg-muted/20",
+                    ].join(" ")}
+                  >
                     <td
-                      key={label}
-                      className="py-[9px] px-3 font-mono text-[13px] tabular-nums text-right text-foreground"
+                      className={[
+                        "sticky left-0 z-10 py-[9px] pr-2 pl-3 text-[11px] tabular-nums min-h-[36px]",
+                        isTargetRow
+                          ? "bg-primary/5 font-semibold text-foreground"
+                          : "bg-background text-muted-foreground/70",
+                      ].join(" ")}
                     >
-                      {formatPaceTime(zoneTime(dist, pace, zones[key]))}
+                      {d >= 1000 ? `${d / 1000}k` : d}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {cols.map(({ zone, cellBold }) => (
+                      <td
+                        key={zone}
+                        className={[
+                          "py-[9px] px-2 font-mono text-[13px] tabular-nums text-right",
+                          cellBold
+                            ? "font-bold text-foreground"
+                            : "text-foreground/80",
+                        ].join(" ")}
+                      >
+                        {cellTimeStr(d, zone)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* FFN disclaimer */}
-        <p className="text-[9px] text-muted-foreground/40 text-center pt-0.5">
-          {FFN_DISCLAIMER}
+        {/* Disclaimer */}
+        <p className="text-[9px] text-muted-foreground/40 text-center leading-tight pt-0.5">
+          Modèle non-linéaire v2 (basé sur regles_calcul_allures_natation.docx).
+          Coefficients à calibrer par tests individuels — voir §187.
         </p>
       </div>
     </TooltipProvider>
