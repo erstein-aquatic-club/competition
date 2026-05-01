@@ -1,0 +1,1 @@
+import{r as i,s as n}from"./index-D8ivfkMZ.js";async function m(r,e,a,t=!1){if(!i())return[];const{data:o,error:s}=await n.rpc("get_swimmer_sessions",{p_user_id:r,p_from:e,p_to:a,p_include_drafts:t});if(s)throw new Error(s.message);return o??[]}export{m as g};
