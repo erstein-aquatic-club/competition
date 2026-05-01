@@ -247,9 +247,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/hooks/dashboard/useFeedbackDraft.ts` | État draft feedback isolé (§112) | ~109 lignes |
 | `src/components/coach/CompetitionDayBanner.tsx` | Bandeau compétition vue semaine coach (§114) | ~56 lignes |
 | `src/components/coach/CompetitionQuickSheet.tsx` | Quick sheet résumé compétition (§114) | ~91 lignes |
-| `supabase/tests/schema.sql` | Schéma hand-crafted minimal pour tests RLS (§121, élargi §124/§126/§182 stub `_test_save_strength_run_authz`) | ~991 lignes |
+| `supabase/tests/schema.sql` | Schéma hand-crafted minimal pour tests RLS (§121, élargi §124/§126/§182/§184-§185 — pace tables + get_pace_share_payload avec swimmer_sex) | 1121 lignes |
 | `supabase/tests/seed.sql` | Fixtures tests RLS (§121) | ~25 lignes |
-| `supabase/tests/rls/_helpers.ts` | Harness Vitest : pool pg, resetDb, asUser, asServiceRole (§121) | ~90 lignes |
+| `supabase/tests/rls/_helpers.ts` | Harness Vitest : pool pg, resetDb, asUser, asServiceRole, asAnon (§121, §184) | 135 lignes |
 | `supabase/tests/rls/dim_sessions.test.ts` | Regression tests §113 + coverage CRUD dim_sessions (§121) | ~160 lignes |
 | `supabase/tests/rls/interviews.test.ts` | Tests RLS 6 policies stateful §74-§75 (§123) | ~285 lignes |
 | `supabase/tests/rls/coach_manual_swimmers.test.ts` | Tests RLS CRUD + isolation inter-coach (§126) | ~110 lignes |
@@ -268,4 +268,14 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/export-session-pdf.ts` | Génère un PDF A4 d'une séance natation (jsPDF + branding EAC, pour bord de bassin) | ~434 |
 | `src/lib/design-tokens.ts` | Design tokens (couleurs, espacements) | ~254 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | ~670 lignes |
+| `src/lib/poolConversion.ts` | Table FFN de conversion bassin 50m↔25m (17 entrées, sex-dépendant) + `convertTargetTime` + `getPoolMajorationMs` (§185) | 78 lignes |
+| `src/__tests__/poolConversion.test.ts` | 17 tests `node:test` — majorations FFN, no-op, round-trips, nulls, sex fallback (§185) | 165 lignes |
+| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–Max) avec toggle bassin 50m/25m + Tooltip disabled + disclaimer FFN (§184-§185) | 194 lignes |
+| `src/components/coach/pace/PaceTargetForm.tsx` | Formulaire cible d'allure (nage + distance + temps + bassin toggle) embarqué dans SwimmerPaceCard (§184-§185) | 182 lignes |
+| `src/lib/api/pace-targets.ts` | CRUD cibles d'allures via RPC `upsert_pace_target` (§184) — inclut `target_pool_size` (§185) | 62 lignes |
+| `src/lib/api/pace-share.ts` | Création/lecture liens partage allures (`pace_share_links`) — inclut `swimmer_sex` dans payload (§185) | 47 lignes |
+| `supabase/tests/rls/coach_pace_zones.test.ts` | Tests RLS coach_pace_zones : SELECT isolation + INSERT/UPDATE upsert + DELETE refus (§184 Phase 10) | 120 lignes |
+| `supabase/tests/rls/coach_pace_targets.test.ts` | Tests RLS coach_pace_targets : isolation coach + upsert + DELETE + anon blocked (§184 Phase 10) | 159 lignes |
+| `supabase/tests/rls/coach_manual_swimmers_update.test.ts` | Tests RLS UPDATE/DELETE sur coach_manual_swimmers + isolation cross-coach (§184 Phase 10) | 94 lignes |
+| `supabase/tests/rls/pace_share_links.test.ts` | Tests RLS pace_share_links : INSERT/SELECT/DELETE + token partage anon read (§184 Phase 10) | 139 lignes |
 | `docs/claude/files-map.md` | Annuaire détaillé des fichiers du projet (chargé à la demande) | |

@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §183 — Export PDF séance pour les nageurs : refacto `exportSessionPdf` (signature générique `SessionHeaderInfo`) + bouton `FileDown` dans `SwimSessionView` à côté du `ShareMenu`. Coach call site adapté sans changement visuel. (2026-04-28)*
+*Dernière mise à jour : §185 — Bassin 50m/25m cibles d'allures : migration `00150` (`target_pool_size` + `upsert_pace_target` `p_pool_size` + `get_pace_share_payload` avec `swimmer_sex`) + `poolConversion.ts` (table FFN 17 entrées) + toggle bassin `PaceMatrix` + toggle form `PaceTargetForm` + 4 fichiers tests RLS Phase 10. (2026-05-01)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

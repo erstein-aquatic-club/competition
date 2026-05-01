@@ -4,6 +4,83 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §185 — Bassin 50m / 25m sur les cibles d'allures (conversion FFN) (2026-05-01)
+
+**Contexte :** Le calculateur d'allures coach (§184) ne distinguait pas le bassin de référence. Un nageur en 25m a des allures différentes. Demande : ajouter `target_pool_size` sur chaque cible, toggle 50m/25m dans la matrice avec conversion FFN (table de majorations officielles), et exposer `swimmer_sex` dans le payload partagé pour que la page publique puisse convertir.
+
+### Changements
+
+**DB — migration `00150_pace_targets_pool_size`** (appliquée via MCP) :
+- `ALTER TABLE coach_pace_targets ADD COLUMN target_pool_size text NOT NULL DEFAULT '50m' CHECK (IN ('25m','50m'))` — rétrocompact, toutes les cibles existantes passent à 50m.
+- `upsert_pace_target` recréé avec paramètre `p_pool_size text DEFAULT '50m'` (4e param, avant les DEFAULT NULL). Ancienne signature 5-arg droppée (`DROP FUNCTION IF EXISTS upsert_pace_target(text, int, int, bigint, uuid)`).
+- `get_pace_share_payload` mis à jour : `swimmer_sex` extrait depuis `user_profiles` (account) ou `coach_manual_swimmers` (manual) et inclus dans le JSONB retourné.
+
+**Backend JS (`src/lib/api/`)** :
+- `pace-targets.ts` : `PaceTarget` type + `upsertPaceTarget` intègrent `target_pool_size: PoolSize`.
+- `pace-share.ts` : `PaceSharePayload` ajoute `swimmer_sex?: Sex | null`.
+
+**Logique pure (`src/lib/poolConversion.ts`)** — NEW :
+- `FFN_TABLE` : 17 entrées stroke×distance×sex (données FFN officielles). `100 4N` absent volontairement (pas de conversion FFN standard).
+- `getPoolMajorationMs(stroke, distanceM, sex)` → nombre ms ou `null` si conversion impossible.
+- `convertTargetTime({targetTimeMs, fromPool, toPool, stroke, distanceM, sex})` → ms convertis ou `null`. No-op si `fromPool === toPool`. Sex `null/undefined` → `null`.
+- `FFN_DISCLAIMER` : constante texte disclaimer footer.
+
+**Tests** (`src/__tests__/poolConversion.test.ts`) — 17 tests node:test : majorations getPoolMajorationMs, no-op identique bassin, 50→25, 25→50, round-trips exacts, null on unknown stroke, null on sex absent.
+
+**Frontend** :
+- `PaceTargetForm.tsx` : toggle inline [50m | 25m] (2 boutons `<button>` stylisés cohérents avec les selects existants). `onSubmit` passe `target_pool_size`.
+- `PaceMatrix.tsx` : header toggle [50m | 25m] avec état local `viewPool` (init = `targetPool` prop). Quand `viewPool !== targetPool`, calcule `convertTargetTime()`. Si null → bouton de l'autre bassin disabled + Tooltip explicatif. Footer disclaimer FFN.
+- `SwimmerPaceCard.tsx` : `PaceMatrix` reçoit `swimmerSex={swimmer.sex}` + `targetPool={target.target_pool_size}`. `formatTargetLabel` inclut le bassin.
+- `export-pace-pdf.ts` : titre section inclut `Bassin ${poolLabel}`.
+- `SharedPaceMatrix.tsx` : `formatTargetLabel` inclut bassin. `PaceMatrix` reçoit `swimmerSex` + `targetPool`.
+- `CoachPaceCalculatorScreen.tsx` : `upsertMutation` inclut `target_pool_size`.
+
+**Tests RLS intégration** (Phase 10 §184, sur main) :
+- `supabase/tests/rls/_helpers.ts` : ajout `asAnon<T>()`.
+- `supabase/tests/rls/coach_pace_zones.test.ts` (120 lignes, 8 tests).
+- `supabase/tests/rls/coach_pace_targets.test.ts` (159 lignes, 9 tests).
+- `supabase/tests/rls/coach_manual_swimmers_update.test.ts` (94 lignes, 5 tests).
+- `supabase/tests/rls/pace_share_links.test.ts` (139 lignes, 7 tests).
+- `supabase/tests/schema.sql` : `target_pool_size` column + `get_pace_share_payload` avec `swimmer_sex`.
+
+### Fichiers modifiés
+
+`supabase/migrations/00150_pace_targets_pool_size.sql` (NEW, 127 lignes)
+`src/lib/poolConversion.ts` (NEW, 78 lignes)
+`src/__tests__/poolConversion.test.ts` (NEW, 165 lignes)
+`src/lib/api/pace-targets.ts` (+6)
+`src/lib/api/pace-share.ts` (+2)
+`src/components/coach/pace/PaceTargetForm.tsx` (+55)
+`src/components/coach/pace/PaceMatrix.tsx` (+80 env.)
+`src/components/coach/pace/SwimmerPaceCard.tsx` (+7)
+`src/lib/export-pace-pdf.ts` (+3)
+`src/pages/SharedPaceMatrix.tsx` (+9)
+`src/pages/coach/CoachPaceCalculatorScreen.tsx` (+7)
+`supabase/tests/rls/_helpers.ts` (asAnon ajouté)
+`supabase/tests/schema.sql` (target_pool_size + swimmer_sex dans RPC)
+`supabase/tests/rls/coach_pace_zones.test.ts` (NEW)
+`supabase/tests/rls/coach_pace_targets.test.ts` (NEW)
+`supabase/tests/rls/coach_manual_swimmers_update.test.ts` (NEW)
+`supabase/tests/rls/pace_share_links.test.ts` (NEW)
+
+### Tests
+
+`node:test` : 17 tests poolConversion (tous pass). RLS Phase 10 : 4 nouveaux fichiers, 29 tests (run sous Docker non vérifié dans cette session — schéma.sql mis à jour pour cohérence).
+
+### Décisions
+
+- Paramètre `p_pool_size` en 4e position (avant les DEFAULT NULL) pour respecter la règle PostgreSQL `42P13`.
+- `100 4N` absent de `FFN_TABLE` : pas de conversion FFN officielle pour cet événement → `null` correct, toggle grisé.
+- Toggle bassin côté `PaceMatrix` est **local** (état view) — il ne modifie pas la cible persistée, seulement l'affichage converti.
+- `swimmer_sex NULL` pour account swimmers dans le schéma de test (pas de `user_profiles` dans le schéma hand-crafted) — comportement correct, toggle grisé sur page partagée.
+
+### Limites
+
+- RLS tests Phase 10 créés mais non exécutés contre Docker dans cette session (Docker non disponible). À valider au prochain run `npm run test:rls`.
+- Pas d'interface "voir la cible convertie dans l'autre bassin" depuis la liste coach — la conversion est visible uniquement dans la matrice expandée.
+
+---
+
 ## §183 — Export PDF séance pour les nageurs (réutilisation générateur coach) (2026-04-28)
 
 **Contexte :** Le PDF "bord de bassin" est livré côté coach depuis §165/§166 (`src/lib/export-session-pdf.ts`). Demande utilisateur : permettre au nageur de télécharger le **même PDF** depuis sa page de détail de séance assignée (`SwimSessionView`), sans dupliquer le générateur.
