@@ -1038,6 +1038,7 @@ CREATE TABLE public.coach_pace_targets (
   stroke               text    NOT NULL CHECK (stroke IN ('NL','Dos','Brasse','Pap','4N')),
   target_distance_m    int     NOT NULL CHECK (target_distance_m IN (50,100,200,400,800,1500)),
   target_time_ms       int     NOT NULL CHECK (target_time_ms > 0),
+  target_pool_size     text    NOT NULL DEFAULT '50m' CHECK (target_pool_size IN ('25m','50m')),
   updated_at           timestamptz NOT NULL DEFAULT now(),
   CHECK ((swimmer_account_id IS NULL) <> (swimmer_manual_id IS NULL))
 );
@@ -1069,8 +1070,9 @@ CREATE POLICY "pace_share_links_owner_all"
   USING  (coach_id = (SELECT auth.uid()))
   WITH CHECK (coach_id = (SELECT auth.uid()));
 
--- §184 — RPC get_pace_share_payload (mirror of migration 00148)
+-- §184/185 — RPC get_pace_share_payload (mirror of migrations 00148+00150)
 -- SECURITY DEFINER bypasses RLS — callable by anon.
+-- Note: no user_profiles in test schema → swimmer_sex is NULL for account swimmers.
 CREATE OR REPLACE FUNCTION get_pace_share_payload(token_in uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
@@ -1079,6 +1081,7 @@ AS $$
 DECLARE
   link          record;
   swimmer_name  text;
+  swimmer_sex   text;
   zones         jsonb;
   targets       jsonb;
 BEGIN
@@ -1088,8 +1091,11 @@ BEGIN
 
   IF link.swimmer_account_id IS NOT NULL THEN
     SELECT display_name INTO swimmer_name FROM users WHERE id = link.swimmer_account_id;
+    swimmer_sex := NULL;
   ELSE
-    SELECT display_name INTO swimmer_name FROM coach_manual_swimmers WHERE id = link.swimmer_manual_id;
+    SELECT display_name, sex
+      INTO swimmer_name, swimmer_sex
+      FROM coach_manual_swimmers WHERE id = link.swimmer_manual_id;
   END IF;
 
   SELECT row_to_json(z)::jsonb INTO zones
@@ -1106,6 +1112,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'swimmer_name', swimmer_name,
+    'swimmer_sex',  swimmer_sex,
     'zones',        COALESCE(zones,   '{}'::jsonb),
     'targets',      COALESCE(targets, '[]'::jsonb)
   );

@@ -67,8 +67,8 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
   const targets = targetsQuery.data ?? [];
 
   const upsertMutation = useMutation({
-    mutationFn: (args: { ref: SwimmerRef; stroke: Stroke; target_distance_m: number; target_time_ms: number }) =>
-      upsertPaceTarget({ swimmer: args.ref, stroke: args.stroke, target_distance_m: args.target_distance_m, target_time_ms: args.target_time_ms }),
+    mutationFn: (args: { ref: SwimmerRef; stroke: Stroke; target_distance_m: number; target_time_ms: number; target_pool_size: PaceTarget["target_pool_size"] }) =>
+      upsertPaceTarget({ swimmer: args.ref, stroke: args.stroke, target_distance_m: args.target_distance_m, target_time_ms: args.target_time_ms, target_pool_size: args.target_pool_size }),
     onMutate: async (args) => {
       await qc.cancelQueries({ queryKey: ["pace-targets"] });
       const prev = qc.getQueryData<PaceTarget[]>(["pace-targets"]) ?? [];
@@ -80,6 +80,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
         stroke: args.stroke,
         target_distance_m: args.target_distance_m,
         target_time_ms: args.target_time_ms,
+        target_pool_size: args.target_pool_size,
         updated_at: new Date().toISOString(),
       };
       const existing = prev.findIndex(
@@ -181,7 +182,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
               swimmer={swimmer}
               targets={targets.filter((t) => belongsTo(t, swimmer))}
               zones={zones}
-              onUpsertTarget={(ref, v) => upsertMutation.mutate({ ref, ...v })}
+              onUpsertTarget={(ref, v) => upsertMutation.mutate({ ref, stroke: v.stroke, target_distance_m: v.target_distance_m, target_time_ms: v.target_time_ms, target_pool_size: v.target_pool_size })}
               onDeleteTarget={(id) => deleteMutation.mutate(id)}
               onExportPdf={async () => {
                 setExportingPdfId(swimmer.id);
