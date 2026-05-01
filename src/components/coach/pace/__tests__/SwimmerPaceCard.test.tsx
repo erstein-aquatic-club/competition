@@ -48,7 +48,7 @@ function renderCard(swimmer: TeamMember, targets: PaceTarget[], open = false) {
         onUpsertTarget: () => {},
         onDeleteTarget: () => {},
         onExportPdf: () => {},
-        onShare: () => {},
+        onShare: async () => ({ url: "https://example.com/#/share/pace/tok" }),
       }),
     ),
   );

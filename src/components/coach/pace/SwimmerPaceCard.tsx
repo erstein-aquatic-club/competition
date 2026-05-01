@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileDown, Share2, Plus, Trash2 } from "lucide-react";
+import { FileDown, Loader2, Share2, Plus, Trash2 } from "lucide-react";
 import { PaceMatrix } from "./PaceMatrix";
 import { PaceTargetForm } from "./PaceTargetForm";
+import { ShareMenu } from "@/components/shared/ShareMenu";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
 import type { ZoneConfig } from "@/lib/paceCalculator";
@@ -57,8 +58,9 @@ interface Props {
     v: { stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number },
   ) => void;
   onDeleteTarget: (id: string) => void;
-  onExportPdf: () => void;
-  onShare: () => void;
+  onExportPdf: () => void | Promise<void>;
+  onShare?: () => Promise<{ url: string }>;
+  isPdfExporting?: boolean;
 }
 
 export function SwimmerPaceCard({
@@ -69,6 +71,7 @@ export function SwimmerPaceCard({
   onDeleteTarget,
   onExportPdf,
   onShare,
+  isPdfExporting = false,
 }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const hue = nameToHue(swimmer.displayName);
@@ -113,20 +116,35 @@ export function SwimmerPaceCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={onExportPdf}
+              onClick={() => void onExportPdf()}
+              disabled={isPdfExporting}
               title="Exporter PDF"
             >
-              <FileDown className="h-3.5 w-3.5" />
+              {isPdfExporting
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <FileDown className="h-3.5 w-3.5" />
+              }
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={onShare}
-              title="Partager"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-            </Button>
+            <ShareMenu
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  title="Partager"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </Button>
+              }
+              onOpen={onShare ? async () => {
+                const { url } = await onShare();
+                return {
+                  url,
+                  title: `Allures de ${swimmer.displayName}`,
+                  text: `Voir les allures de ${swimmer.displayName} — expire dans 30 jours`,
+                };
+              } : undefined}
+            />
           </span>
         </div>
       </AccordionTrigger>

@@ -92,6 +92,7 @@ const RecordsAdmin = lazyWithRetry(() => import("@/pages/RecordsAdmin"));
 const RecordsClub = lazyWithRetry(() => import("@/pages/RecordsClub"));
 const SwimSessionView = lazyWithRetry(() => import("@/pages/SwimSessionView"));
 const SharedSwimSession = lazyWithRetry(() => import("@/pages/SharedSwimSession"));
+const SharedPaceMatrix = lazyWithRetry(() => import("@/pages/SharedPaceMatrix"));
 const CoachSwimmerDetail = lazyWithRetry(() => import("@/pages/coach/CoachSwimmerDetail"));
 const SwimPlanningDemo = lazyWithRetry(() => import("@/pages/coach/SwimPlanningDemo"));
 const StrengthPlanningScreen = lazyWithRetry(() => import("@/pages/coach/StrengthPlanningScreen"));
@@ -250,6 +251,7 @@ function AppRouter() {
             <Route path="/reset-password" component={ResetPassword} />
             <Route path="/login-debug" component={LoginDebug} />
             <Route path="/s/:token" component={SharedSwimSession} />
+            <Route path="/share/pace/:token" component={SharedPaceMatrix} />
             <Route path="/" component={Login} />
             <Route path="/:rest*" component={() => <Redirect to="/" />} />
           </Switch>
@@ -293,6 +295,7 @@ function AppRouter() {
             <Route path="/swim-session" component={SwimSessionView} />
             <Route path="/swim-notes" component={SwimNotes} />
             <Route path="/s/:token" component={SharedSwimSession} />
+            <Route path="/share/pace/:token" component={SharedPaceMatrix} />
             <Route path="/report/:userId/:month" component={MonthlyReport} />
             <Route path="/suivi/semaine" component={SuiviSemaine} />
             <Route path="/suivi/objectifs" component={SuiviObjectifs} />
