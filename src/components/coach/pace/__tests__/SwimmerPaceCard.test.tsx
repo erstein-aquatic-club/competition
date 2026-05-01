@@ -125,3 +125,25 @@ describe("SwimmerPaceCard — static render", () => {
     assert.ok(!html.includes("cible"), "no badge with 0 targets");
   });
 });
+
+describe("SwimmerPaceCard — trigger design P6 (distance + stroke + time)", () => {
+  it("trigger contient distance, stroke et temps formaté (open=true)", () => {
+    const targets = [makeTarget({ id: "t1", stroke: "NL", target_distance_m: 100, target_time_ms: 60_000 })];
+    const html = renderCard(accountSwimmer, targets, true);
+    assert.ok(html.includes("100m"), "distance '100m' présente dans le trigger");
+    assert.ok(html.includes("NL"), "badge stroke 'NL' présent");
+    assert.ok(html.includes("1:00.0"), "temps '1:00.0' présent dans la pill mono");
+  });
+
+  it("badge NL porte une classe 'blue'", () => {
+    const targets = [makeTarget({ id: "t1", stroke: "NL", target_distance_m: 100 })];
+    const html = renderCard(accountSwimmer, targets, true);
+    assert.ok(html.includes("blue"), "classe blue appliquée au badge NL");
+  });
+
+  it("distance 1500m formatée en '1.5km'", () => {
+    const targets = [makeTarget({ id: "t1", stroke: "NL", target_distance_m: 1500 })];
+    const html = renderCard(accountSwimmer, targets, true);
+    assert.ok(html.includes("1.5km"), "distance ≥1000m formatée en km");
+  });
+});

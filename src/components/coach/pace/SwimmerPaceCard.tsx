@@ -60,6 +60,17 @@ function formatTargetPillLabel(t: PaceTarget): string {
   return `${formatTargetLabel(t)} · ${formatPaceTime(t.target_time_ms)}`;
 }
 
+function strokeBadgeCls(stroke: string): string {
+  switch (stroke) {
+    case "NL":     return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    case "Dos":    return "bg-sky-500/10 text-sky-600 dark:text-sky-400";
+    case "Brasse": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    case "Pap":    return "bg-violet-500/10 text-violet-600 dark:text-violet-400";
+    case "4N":     return "bg-orange-500/10 text-orange-600 dark:text-orange-400";
+    default:       return "bg-muted/50 text-muted-foreground";
+  }
+}
+
 interface Props {
   swimmer: TeamMember;
   targets: PaceTarget[];
@@ -203,9 +214,20 @@ export function SwimmerPaceCard({
                       className="overflow-hidden rounded-md border border-border/30 bg-muted/5"
                     >
                       <div className="flex items-center">
-                        <AccordionPrimitive.Trigger className="group flex flex-1 items-center gap-2 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:bg-muted/20">
-                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                          {formatTargetPillLabel(target)}
+                        <AccordionPrimitive.Trigger className="group flex min-h-[44px] flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/20">
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/25 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                          <span className="text-[15px] font-bold tabular-nums leading-none text-foreground">
+                            {target.target_distance_m >= 1000
+                              ? `${target.target_distance_m / 1000}km`
+                              : `${target.target_distance_m}m`}
+                          </span>
+                          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${strokeBadgeCls(target.stroke)}`}>
+                            {target.stroke}
+                          </span>
+                          <span className="flex-1" />
+                          <span className="shrink-0 rounded bg-muted/40 px-2 py-1 font-mono text-[12px] tabular-nums text-foreground/60">
+                            {formatPaceTime(target.target_time_ms)}
+                          </span>
                         </AccordionPrimitive.Trigger>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
