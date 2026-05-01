@@ -27,6 +27,26 @@ beforeEach(() => {
   rpcImpl = () => { throw new Error("rpcImpl not configured for this test"); };
 });
 
+describe("buildShareUrl — hash routing (P8)", () => {
+  it("base subpath → URL avec hash pour GitHub Pages", async () => {
+    const { buildShareUrl } = await import("../pace-share.ts");
+    const url = buildShareUrl("abc-token", "https://host.github.io/competition/");
+    assert.equal(url, "https://host.github.io/competition/#/share/pace/abc-token");
+  });
+
+  it("base racine → URL correcte en dev", async () => {
+    const { buildShareUrl } = await import("../pace-share.ts");
+    const url = buildShareUrl("abc-token", "http://localhost:8080/");
+    assert.equal(url, "http://localhost:8080/#/share/pace/abc-token");
+  });
+
+  it("URL contient /#/share/pace/ (hash routing)", async () => {
+    const { buildShareUrl } = await import("../pace-share.ts");
+    const url = buildShareUrl("tok", "https://host.github.io/competition/");
+    assert.ok(url.includes("/#/share/pace/"), `URL doit contenir /#/share/pace/, got: ${url}`);
+  });
+});
+
 describe("pace-share API", () => {
   describe("createPaceShareLink", () => {
     it("inserts a row and returns token + url for account swimmer", async () => {

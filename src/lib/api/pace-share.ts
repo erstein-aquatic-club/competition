@@ -4,6 +4,12 @@ import type { ZoneConfig } from "../paceCalculator";
 import type { PaceTarget } from "./pace-targets";
 import type { Sex } from "../poolConversion";
 
+/** Pure helper — exported for testing. Preserves the full base path (needed for GitHub Pages subdirectory). */
+export function buildShareUrl(token: string, base?: string): string {
+  const b = base ?? (typeof window !== "undefined" ? window.location.href.split("#")[0] : "");
+  return `${b}#/share/pace/${token}`;
+}
+
 export interface PaceSharePayload {
   swimmer_name: string;
   swimmer_sex?: Sex | null;
@@ -32,8 +38,7 @@ export async function createPaceShareLink(
   if (error) throw new Error(error.message);
 
   const token = (data as { token: string }).token;
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const url = `${origin}/#/share/pace/${token}`;
+  const url = buildShareUrl(token);
   return { token, url };
 }
 
