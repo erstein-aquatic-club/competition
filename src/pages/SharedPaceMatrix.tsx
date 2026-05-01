@@ -7,6 +7,17 @@ import { AlertCircle, Gauge } from "lucide-react";
 import { getPaceSharePayload } from "@/lib/api/pace-share";
 import { PaceMatrix } from "@/components/coach/pace/PaceMatrix";
 import type { PaceSharePayload } from "@/lib/api/pace-share";
+import { normalizeStroke } from "@/lib/paceCalculatorV2";
+import { ZONE_COEFFICIENTS, STROKE_ADJUSTMENTS_DEFAULT, type EventFamily, type Zone } from "@/lib/paceData";
+
+// Fallback v2 zones (Task 28 will consume zones_v2 from the share payload)
+const FALLBACK_ZONES: Record<EventFamily, Partial<Record<Zone, number>>> = {
+  "50m":        { V0: ZONE_COEFFICIENTS["50m"].V0,        V1: ZONE_COEFFICIENTS["50m"].V1,        V2: ZONE_COEFFICIENTS["50m"].V2,        V3: ZONE_COEFFICIENTS["50m"].V3,        V4: ZONE_COEFFICIENTS["50m"].V4 ?? undefined,        MAX: ZONE_COEFFICIENTS["50m"].MAX },
+  "100m":       { V0: ZONE_COEFFICIENTS["100m"].V0,       V1: ZONE_COEFFICIENTS["100m"].V1,       V2: ZONE_COEFFICIENTS["100m"].V2,       V3: ZONE_COEFFICIENTS["100m"].V3,       V4: ZONE_COEFFICIENTS["100m"].V4 ?? undefined,       MAX: ZONE_COEFFICIENTS["100m"].MAX },
+  "200m":       { V0: ZONE_COEFFICIENTS["200m"].V0,       V1: ZONE_COEFFICIENTS["200m"].V1,       V2: ZONE_COEFFICIENTS["200m"].V2,       V3: ZONE_COEFFICIENTS["200m"].V3,       V4: ZONE_COEFFICIENTS["200m"].V4 ?? undefined,       MAX: ZONE_COEFFICIENTS["200m"].MAX },
+  "400m":       { V0: ZONE_COEFFICIENTS["400m"].V0,       V1: ZONE_COEFFICIENTS["400m"].V1,       V2: ZONE_COEFFICIENTS["400m"].V2,       V3: ZONE_COEFFICIENTS["400m"].V3,       MAX: ZONE_COEFFICIENTS["400m"].MAX },
+  "800m_1500m": { V0: ZONE_COEFFICIENTS["800m_1500m"].V0, V1: ZONE_COEFFICIENTS["800m_1500m"].V1, V2: ZONE_COEFFICIENTS["800m_1500m"].V2, V3: ZONE_COEFFICIENTS["800m_1500m"].V3, MAX: ZONE_COEFFICIENTS["800m_1500m"].MAX },
+};
 
 function formatTargetLabel(stroke: string, distM: number, poolSize?: string): string {
   const dist = distM >= 1000 ? `${distM / 1000} km` : `${distM} m`;
@@ -108,10 +119,12 @@ export default function SharedPaceMatrix() {
                   <PaceMatrix
                     targetTimeMs={target.target_time_ms}
                     targetDistanceM={target.target_distance_m}
-                    stroke={target.stroke}
-                    zones={data.zones}
-                    swimmerSex={data.swimmer_sex}
+                    stroke={normalizeStroke(target.stroke)}
+                    zones={FALLBACK_ZONES}
+                    strokeAdjustments={STROKE_ADJUSTMENTS_DEFAULT}
+                    swimmerSex={data.swimmer_sex ?? null}
                     targetPool={target.target_pool_size}
+                    v4EnabledForFamily={false}
                   />
                 </AccordionContent>
               </AccordionItem>
