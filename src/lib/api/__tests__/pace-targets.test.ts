@@ -4,7 +4,7 @@ import { mock } from "node:test";
 import type { PaceTarget, SwimmerRef } from "../pace-targets.ts";
 
 let fromImpl: (...args: unknown[]) => unknown;
-let getUserImpl: () => unknown;
+let rpcImpl: (...args: unknown[]) => unknown;
 
 const mockTarget = (overrides: Partial<PaceTarget> = {}): PaceTarget => ({
   id: "t1",
@@ -26,7 +26,7 @@ before(async () => {
       canUseSupabase: () => true,
       supabase: {
         from: (...args: unknown[]) => fromImpl(...args),
-        auth: { getUser: () => getUserImpl() },
+        rpc: (...args: unknown[]) => rpcImpl(...args),
       },
     },
   });
@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   fromImpl = () => { throw new Error("fromImpl not configured for this test"); };
-  getUserImpl = () => { throw new Error("getUserImpl not configured for this test"); };
+  rpcImpl = () => { throw new Error("rpcImpl not configured for this test"); };
 });
 
 describe("pace-targets API", () => {
@@ -65,52 +65,41 @@ describe("pace-targets API", () => {
   });
 
   describe("upsertPaceTarget — account swimmer", () => {
-    it("calls upsert with onConflict uq_pace_targets_account", async () => {
-      getUserImpl = () => Promise.resolve({ data: { user: { id: "coach-uuid" } } });
-      let capturedRow: Record<string, unknown> | undefined;
-      let capturedOpts: Record<string, unknown> | undefined;
-      fromImpl = () => ({
-        upsert: (row: unknown, opts: unknown) => {
-          capturedRow = row as Record<string, unknown>;
-          capturedOpts = opts as Record<string, unknown>;
-          return { select: () => ({ single: () => Promise.resolve({ data: mockTarget(), error: null }) }) };
-        },
-      });
+    it("calls rpc upsert_pace_target with account params", async () => {
+      let capturedFn: unknown;
+      let capturedArgs: Record<string, unknown> | undefined;
+      rpcImpl = (fn: unknown, args: unknown) => {
+        capturedFn = fn;
+        capturedArgs = args as Record<string, unknown>;
+        return Promise.resolve({ data: mockTarget(), error: null });
+      };
       const { upsertPaceTarget } = await import("../pace-targets.ts");
       const swimmer: SwimmerRef = { kind: "account", accountId: 42 };
       await upsertPaceTarget({ swimmer, stroke: "NL", target_distance_m: 100, target_time_ms: 65_000 });
-      assert.equal(capturedRow?.coach_id, "coach-uuid");
-      assert.equal(capturedRow?.swimmer_account_id, 42);
-      assert.equal(capturedRow?.swimmer_manual_id, null);
-      assert.equal(capturedOpts?.onConflict, "uq_pace_targets_account");
+      assert.equal(capturedFn, "upsert_pace_target");
+      assert.equal(capturedArgs?.p_swimmer_account_id, 42);
+      assert.equal(capturedArgs?.p_swimmer_manual_id, null);
+      assert.equal(capturedArgs?.p_stroke, "NL");
+      assert.equal(capturedArgs?.p_distance_m, 100);
+      assert.equal(capturedArgs?.p_time_ms, 65_000);
     });
   });
 
   describe("upsertPaceTarget — manual swimmer", () => {
-    it("calls upsert with onConflict uq_pace_targets_manual", async () => {
-      getUserImpl = () => Promise.resolve({ data: { user: { id: "coach-uuid" } } });
-      let capturedRow: Record<string, unknown> | undefined;
-      let capturedOpts: Record<string, unknown> | undefined;
-      fromImpl = () => ({
-        upsert: (row: unknown, opts: unknown) => {
-          capturedRow = row as Record<string, unknown>;
-          capturedOpts = opts as Record<string, unknown>;
-          return {
-            select: () => ({
-              single: () => Promise.resolve({
-                data: mockTarget({ swimmer_account_id: null, swimmer_manual_id: "manual-uuid" }),
-                error: null,
-              }),
-            }),
-          };
-        },
-      });
+    it("calls rpc upsert_pace_target with manual params", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      rpcImpl = (_fn: unknown, args: unknown) => {
+        capturedArgs = args as Record<string, unknown>;
+        return Promise.resolve({
+          data: mockTarget({ swimmer_account_id: null, swimmer_manual_id: "manual-uuid" }),
+          error: null,
+        });
+      };
       const { upsertPaceTarget } = await import("../pace-targets.ts");
       const swimmer: SwimmerRef = { kind: "manual", manualId: "manual-uuid" };
       await upsertPaceTarget({ swimmer, stroke: "NL", target_distance_m: 100, target_time_ms: 65_000 });
-      assert.equal(capturedRow?.swimmer_manual_id, "manual-uuid");
-      assert.equal(capturedRow?.swimmer_account_id, null);
-      assert.equal(capturedOpts?.onConflict, "uq_pace_targets_manual");
+      assert.equal(capturedArgs?.p_swimmer_manual_id, "manual-uuid");
+      assert.equal(capturedArgs?.p_swimmer_account_id, null);
     });
   });
 

@@ -33,29 +33,17 @@ export async function upsertPaceTarget(args: {
   target_time_ms: number;
 }): Promise<PaceTarget> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Non authentifié");
 
   const { swimmer, stroke, target_distance_m, target_time_ms } = args;
   const isAccount = swimmer.kind === "account";
 
-  const row = {
-    coach_id: user.id,
-    swimmer_account_id: isAccount ? swimmer.accountId : null,
-    swimmer_manual_id: !isAccount ? swimmer.manualId : null,
-    stroke,
-    target_distance_m,
-    target_time_ms,
-    updated_at: new Date().toISOString(),
-  };
-
-  const conflictIndex = isAccount ? "uq_pace_targets_account" : "uq_pace_targets_manual";
-
-  const { data, error } = await supabase
-    .from("coach_pace_targets")
-    .upsert(row, { onConflict: conflictIndex })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("upsert_pace_target", {
+    p_stroke: stroke,
+    p_distance_m: target_distance_m,
+    p_time_ms: target_time_ms,
+    p_swimmer_account_id: isAccount ? swimmer.accountId : null,
+    p_swimmer_manual_id: !isAccount ? (swimmer as { kind: "manual"; manualId: string }).manualId : null,
+  });
   if (error) throw new Error(error.message);
   return data as PaceTarget;
 }
