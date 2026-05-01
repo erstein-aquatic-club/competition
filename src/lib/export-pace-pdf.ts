@@ -6,6 +6,7 @@
  */
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import eacLogoUrl from "@assets/logo-eac.png";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import type { PaceTarget } from "@/lib/api/pace-targets";
 import type { EventFamily, Zone } from "@/lib/paceData";
@@ -677,6 +678,106 @@ function draw4NSection({
 
 // ─── Page header with swimmer info ───────────────────────────────────────────
 
+
+// ─── EAC branding ─────────────────────────────────────────────────────────────
+const EAC_RED: [number, number, number] = [227, 6, 19];
+const EAC_RED_LIGHT: [number, number, number] = [237, 40, 52];
+const EAC_DARK_RED: [number, number, number] = [180, 4, 14];
+const EAC_HEADER_H = 22;
+
+async function loadEacLogoAsDataUrl(): Promise<string | null> {
+  try {
+    const response = await fetch(eacLogoUrl);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function drawEacBrandedHeader(
+  doc: jsPDF,
+  pageWidth: number,
+  logoDataUrl: string | null,
+  swimmerName: string,
+  coachName: string | undefined,
+): number {
+  // Banner EAC red
+  doc.setFillColor(...EAC_RED);
+  doc.rect(0, 0, pageWidth, EAC_HEADER_H, "F");
+  doc.setFillColor(...EAC_DARK_RED);
+  doc.rect(0, 0, pageWidth, 1.2, "F");
+  // Decorative triangles right side
+  doc.setFillColor(...EAC_RED_LIGHT);
+  for (let i = 0; i < 6; i++) {
+    const x = pageWidth - 80 + i * 18;
+    doc.triangle(x, 0, x + 45, 0, x + 22, EAC_HEADER_H, "F");
+  }
+  // Logo
+  const logoSize = 16;
+  const logoPad = 1.5;
+  const logoX = 8;
+  const logoY = (EAC_HEADER_H - logoSize) / 2;
+  if (logoDataUrl) {
+    try {
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(
+        logoX - logoPad,
+        logoY - logoPad,
+        logoSize + logoPad * 2,
+        logoSize + logoPad * 2,
+        2,
+        2,
+        "F",
+      );
+      doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoSize, logoSize);
+    } catch {
+      /* continue without logo */
+    }
+  }
+  const textX = logoDataUrl ? logoX + logoSize + logoPad + 5 : 12;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text("ERSTEIN AQUATIC CLUB", textX, 9);
+  doc.setDrawColor(255, 180, 180);
+  doc.setLineWidth(0.15);
+  doc.line(textX, 11, textX + 68, 11);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.text("ALLURES D'ENTRAÎNEMENT", textX, 16);
+  doc.setFillColor(...PDF_GENERAL.CHARCOAL);
+  doc.rect(0, EAC_HEADER_H, pageWidth, 0.4, "F");
+
+  // Sub-band swimmer + coach (greyish bar)
+  const subY = EAC_HEADER_H + 0.4;
+  const subH = 9;
+  doc.setFillColor(245, 246, 250);
+  doc.rect(0, subY, pageWidth, subH, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...PDF_GENERAL.CHARCOAL);
+  doc.text(swimmerName, MARGIN, subY + 5.5);
+  if (coachName) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_GENERAL.TEXT_MUTED);
+    const dateStr = new Date().toLocaleDateString("fr-FR");
+    doc.text(`Coach : ${coachName} · ${dateStr}`, pageWidth - MARGIN, subY + 5.5, { align: "right" });
+  }
+  doc.setDrawColor(...PDF_GENERAL.BORDER_LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(0, subY + subH, pageWidth, subH + subY);
+
+  return EAC_HEADER_H + 0.4 + subH; // total header height
+}
+
 function drawSwimmerPageHeader(
   doc: jsPDF,
   swimmerName: string,
@@ -714,10 +815,11 @@ export async function exportPacePdf(args: {
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  drawSwimmerPageHeader(doc, swimmer.displayName, coachName);
+  const logoDataUrl = await loadEacLogoAsDataUrl();
+  const headerH = drawEacBrandedHeader(doc, PAGE_W, logoDataUrl, swimmer.displayName, coachName);
   drawPageFooter(doc, coachName);
 
-  let cursorY = 14 + 4;
+  let cursorY = headerH + 4;
 
   const sortedTargets = [...targets].sort((a, b) => {
     if (a.stroke < b.stroke) return -1;
