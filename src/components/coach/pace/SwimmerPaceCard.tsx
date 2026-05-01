@@ -17,12 +17,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileDown, Loader2, Share2, Plus, Trash2 } from "lucide-react";
+import { FileDown, Loader2, Share2, Plus, Trash2, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { PaceMatrix } from "./PaceMatrix";
 import { Pace4NSegmentMatrix } from "./Pace4NSegmentMatrix";
 import { PaceTargetForm } from "./PaceTargetForm";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 import { normalizeStroke, eventFamily } from "@/lib/paceCalculatorV2";
+import { formatPaceTime } from "@/lib/paceCalculator";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
 import type { EventFamily, Zone } from "@/lib/paceData";
@@ -54,6 +56,10 @@ function formatTargetLabel(t: PaceTarget): string {
   return `${t.stroke} ${dist} · ${pool}`;
 }
 
+function formatTargetPillLabel(t: PaceTarget): string {
+  return `${formatTargetLabel(t)} · ${formatPaceTime(t.target_time_ms)}`;
+}
+
 interface Props {
   swimmer: TeamMember;
   targets: PaceTarget[];
@@ -83,6 +89,9 @@ export function SwimmerPaceCard({
   isPdfExporting = false,
 }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [openTargetIds, setOpenTargetIds] = useState<string[]>(
+    () => targets.length > 0 ? [targets[0].id] : [],
+  );
   const hue = nameToHue(swimmer.displayName);
   const ref = buildSwimmerRef(swimmer);
 
@@ -160,75 +169,109 @@ export function SwimmerPaceCard({
 
       <AccordionContent className="pb-4">
         <div className="space-y-4 pt-1">
-          {/* Target list */}
-          {targets.map((target) => {
-            const is4NMatrix =
-              target.stroke === "4N" &&
-              (target.target_distance_m === 200 || target.target_distance_m === 400);
-            return (
-              <div key={target.id} className="rounded-md border border-border/30 bg-muted/10 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                    {formatTargetLabel(target)}
-                  </span>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground/50 hover:text-destructive"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer la cible ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          La cible {formatTargetLabel(target)} de {swimmer.displayName} sera
-                          définitivement supprimée.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() => onDeleteTarget(target.id)}
-                        >
-                          Supprimer
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-                {is4NMatrix ? (
-                  <Pace4NSegmentMatrix
-                    targetTimeMs={target.target_time_ms}
-                    targetDistanceM={target.target_distance_m as 200 | 400}
-                    swimmerSex={swimmer.sex ?? null}
-                    targetPool={target.target_pool_size}
-                    zones={zones}
-                    strokeAdjustments={strokeAdjustments}
-                  />
-                ) : (
-                  <PaceMatrix
-                    targetTimeMs={target.target_time_ms}
-                    targetDistanceM={target.target_distance_m}
-                    stroke={normalizeStroke(target.stroke)}
-                    zones={zones}
-                    strokeAdjustments={strokeAdjustments}
-                    swimmerSex={swimmer.sex ?? null}
-                    targetPool={target.target_pool_size}
-                    v4EnabledForFamily={
-                      target.stroke === "4N"
-                        ? false
-                        : v4ByFamily[eventFamily(target.target_distance_m)]
-                    }
-                  />
-                )}
-              </div>
-            );
-          })}
+          {/* Target accordion */}
+          {targets.length > 0 && (
+            <div className="space-y-1">
+              {targets.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenTargetIds(
+                      openTargetIds.length === targets.length ? [] : targets.map((t) => t.id),
+                    )
+                  }
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground/50 transition-colors hover:text-muted-foreground/80"
+                >
+                  <ChevronsUpDown className="h-2.5 w-2.5" />
+                  {openTargetIds.length === targets.length ? "Replier" : "Tout déplier"}
+                </button>
+              )}
+              <AccordionPrimitive.Root
+                type="multiple"
+                value={openTargetIds}
+                onValueChange={setOpenTargetIds}
+                className="space-y-1"
+              >
+                {targets.map((target) => {
+                  const is4NMatrix =
+                    target.stroke === "4N" &&
+                    (target.target_distance_m === 200 || target.target_distance_m === 400);
+                  return (
+                    <AccordionPrimitive.Item
+                      key={target.id}
+                      value={target.id}
+                      className="overflow-hidden rounded-md border border-border/30 bg-muted/5"
+                    >
+                      <div className="flex items-center">
+                        <AccordionPrimitive.Trigger className="group flex flex-1 items-center gap-2 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-widest text-muted-foreground transition-colors hover:bg-muted/20">
+                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                          {formatTargetPillLabel(target)}
+                        </AccordionPrimitive.Trigger>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 shrink-0 rounded-none text-muted-foreground/30 hover:bg-destructive/5 hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer la cible ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                La cible {formatTargetLabel(target)} de {swimmer.displayName} sera
+                                définitivement supprimée.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => onDeleteTarget(target.id)}
+                              >
+                                Supprimer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                      <AccordionPrimitive.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                        <div className="px-3 pb-3 pt-1">
+                          {is4NMatrix ? (
+                            <Pace4NSegmentMatrix
+                              targetTimeMs={target.target_time_ms}
+                              targetDistanceM={target.target_distance_m as 200 | 400}
+                              swimmerSex={swimmer.sex ?? null}
+                              targetPool={target.target_pool_size}
+                              zones={zones}
+                              strokeAdjustments={strokeAdjustments}
+                            />
+                          ) : (
+                            <PaceMatrix
+                              targetTimeMs={target.target_time_ms}
+                              targetDistanceM={target.target_distance_m}
+                              stroke={normalizeStroke(target.stroke)}
+                              zones={zones}
+                              strokeAdjustments={strokeAdjustments}
+                              swimmerSex={swimmer.sex ?? null}
+                              targetPool={target.target_pool_size}
+                              v4EnabledForFamily={
+                                target.stroke === "4N"
+                                  ? false
+                                  : v4ByFamily[eventFamily(target.target_distance_m)]
+                              }
+                            />
+                          )}
+                        </div>
+                      </AccordionPrimitive.Content>
+                    </AccordionPrimitive.Item>
+                  );
+                })}
+              </AccordionPrimitive.Root>
+            </div>
+          )}
 
           {/* Inline add form */}
           {showAddForm ? (
