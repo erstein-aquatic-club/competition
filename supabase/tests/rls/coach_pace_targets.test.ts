@@ -138,6 +138,45 @@ describe("coach_pace_targets RLS (§184)", () => {
     expect(updated).toBe(1);
   });
 
+  it("INSERT without target_pool_size → defaults to '50m'", async () => {
+    const poolSize = await asUser(CAROL, async (c) => {
+      const r = await c.query(
+        `INSERT INTO coach_pace_targets
+           (coach_id, swimmer_account_id, swimmer_manual_id, stroke, target_distance_m, target_time_ms)
+         VALUES ($1, $2, NULL, 'Brasse', 200, 160000) RETURNING target_pool_size`,
+        [CAROL_UID, ALICE_ID],
+      );
+      return r.rows[0].target_pool_size;
+    });
+    expect(poolSize).toBe("50m");
+  });
+
+  it("INSERT with target_pool_size = '25m' → persisted correctly", async () => {
+    const poolSize = await asUser(CAROL, async (c) => {
+      const r = await c.query(
+        `INSERT INTO coach_pace_targets
+           (coach_id, swimmer_account_id, swimmer_manual_id, stroke, target_distance_m, target_time_ms, target_pool_size)
+         VALUES ($1, $2, NULL, 'Brasse', 400, 320000, '25m') RETURNING target_pool_size`,
+        [CAROL_UID, ALICE_ID],
+      );
+      return r.rows[0].target_pool_size;
+    });
+    expect(poolSize).toBe("25m");
+  });
+
+  it("INSERT with invalid target_pool_size → CHECK error", async () => {
+    await expect(
+      asUser(CAROL, async (c) => {
+        await c.query(
+          `INSERT INTO coach_pace_targets
+             (coach_id, swimmer_account_id, swimmer_manual_id, stroke, target_distance_m, target_time_ms, target_pool_size)
+           VALUES ($1, $2, NULL, 'Brasse', 800, 640000, '33m')`,
+          [CAROL_UID, ALICE_ID],
+        );
+      }),
+    ).rejects.toThrow(/check/i);
+  });
+
   it("idempotent upsert via ON CONFLICT partial index → replaces target_time_ms", async () => {
     // First upsert: inserts the row via service role (seed already done above).
     // Second upsert: should update target_time_ms to 75000.
