@@ -20,44 +20,83 @@ before(async () => {
 });
 
 beforeEach(() => {
-  fromImpl = () => { throw new Error("fromImpl not configured for this test"); };
-  getUserImpl = () => { throw new Error("getUserImpl not configured for this test"); };
+  fromImpl = () => { throw new Error("fromImpl not configured"); };
+  getUserImpl = () => { throw new Error("getUserImpl not configured"); };
 });
 
-describe("pace-zones API", () => {
-  it("returns DEFAULT_ZONES when no row exists", async () => {
+describe("pace-zones API v2", () => {
+  it("getMyPaceZonesV2 returns {} when DB is empty", async () => {
     fromImpl = () => ({
-      select: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+      select: () => Promise.resolve({ data: [], error: null }),
     });
-    const { getMyPaceZones } = await import("../pace-zones.ts");
-    const { DEFAULT_ZONES } = await import("../../paceCalculator.ts");
-    assert.deepEqual(await getMyPaceZones(), DEFAULT_ZONES);
+    const { getMyPaceZonesV2 } = await import("../pace-zones.ts");
+    assert.deepEqual(await getMyPaceZonesV2(), {});
   });
 
-  it("returns the persisted row when present", async () => {
-    const row = { v0_pct: 145, v1_pct: 132, v2_pct: 116, v3_pct: 111, max_pct: 106 };
+  it("getMyPaceZonesV2 reconstructs nested map from rows", async () => {
     fromImpl = () => ({
-      select: () => ({ maybeSingle: () => Promise.resolve({ data: row, error: null }) }),
+      select: () => Promise.resolve({
+        data: [
+          { event_family: "50m", zone: "V0", k_value: 0.70 },
+          { event_family: "50m", zone: "MAX", k_value: 1.00 },
+          { event_family: "100m", zone: "V1", k_value: 0.80 },
+        ],
+        error: null,
+      }),
     });
-    const { getMyPaceZones } = await import("../pace-zones.ts");
-    assert.deepEqual(await getMyPaceZones(), row);
+    const { getMyPaceZonesV2 } = await import("../pace-zones.ts");
+    const result = await getMyPaceZonesV2();
+    assert.deepEqual(result["50m"], { V0: 0.70, MAX: 1.00 });
+    assert.deepEqual(result["100m"], { V1: 0.80 });
   });
 
-  it("upsertMyPaceZones calls supabase upsert with coach_id and onConflict", async () => {
+  it("upsertPaceZoneCell calls .upsert with correct onConflict", async () => {
     getUserImpl = () => Promise.resolve({ data: { user: { id: "coach-uuid" } } });
-    let capturedRow: Record<string, unknown> | undefined;
+    let capturedPayload: Record<string, unknown> | undefined;
     let capturedOpts: Record<string, unknown> | undefined;
     fromImpl = () => ({
-      upsert: (row: unknown, opts: unknown) => {
-        capturedRow = row as Record<string, unknown>;
+      upsert: (payload: unknown, opts: unknown) => {
+        capturedPayload = payload as Record<string, unknown>;
         capturedOpts = opts as Record<string, unknown>;
-        return { select: () => ({ single: () => Promise.resolve({ data: {}, error: null }) }) };
+        return Promise.resolve({ error: null });
       },
     });
-    const { upsertMyPaceZones } = await import("../pace-zones.ts");
-    await upsertMyPaceZones({ v0_pct: 140, v1_pct: 130, v2_pct: 115, v3_pct: 110, max_pct: 105 });
-    assert.equal(capturedRow?.coach_id, "coach-uuid");
-    assert.equal(capturedRow?.v0_pct, 140);
-    assert.equal(capturedOpts?.onConflict, "coach_id");
+    const { upsertPaceZoneCell } = await import("../pace-zones.ts");
+    await upsertPaceZoneCell({ event_family: "50m", zone: "V0", k_value: 0.70 });
+    assert.equal(capturedPayload?.coach_id, "coach-uuid");
+    assert.equal(capturedPayload?.event_family, "50m");
+    assert.equal(capturedPayload?.zone, "V0");
+    assert.equal(capturedPayload?.k_value, 0.70);
+    assert.equal(capturedOpts?.onConflict, "coach_id,event_family,zone");
+  });
+
+  it("resetMyPaceZonesToDefaults inserts 27 rows (50m+100m=6 each, rest=5)", async () => {
+    getUserImpl = () => Promise.resolve({ data: { user: { id: "coach-uuid" } } });
+    let insertedRows: unknown[] = [];
+    let deleteCalled = false;
+    fromImpl = () => ({
+      delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      insert: (rows: unknown[]) => { insertedRows = rows; return Promise.resolve({ error: null }); },
+    });
+    // reset deleteCalled tracking via wrapping fromImpl
+    fromImpl = (table: unknown) => {
+      return {
+        delete: () => { deleteCalled = true; return { eq: () => Promise.resolve({ error: null }) }; },
+        insert: (rows: unknown[]) => { insertedRows = rows; return Promise.resolve({ error: null }); },
+      };
+    };
+    const { resetMyPaceZonesToDefaults } = await import("../pace-zones.ts");
+    await resetMyPaceZonesToDefaults();
+    assert.ok(deleteCalled, "delete was called");
+    assert.equal(insertedRows.length, 27, `expected 27 rows, got ${insertedRows.length}`);
+  });
+
+  it("initMyPaceZonesIfMissing returns false when rows exist", async () => {
+    fromImpl = () => ({
+      select: (_cols: unknown, opts: unknown) => Promise.resolve({ count: 5, error: null }),
+    });
+    const { initMyPaceZonesIfMissing } = await import("../pace-zones.ts");
+    const result = await initMyPaceZonesIfMissing();
+    assert.equal(result, false);
   });
 });
