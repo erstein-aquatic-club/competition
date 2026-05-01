@@ -46,7 +46,8 @@ function formatTargetLabel(t: PaceTarget): string {
   const dist = t.target_distance_m >= 1000
     ? `${t.target_distance_m / 1000} km`
     : `${t.target_distance_m} m`;
-  return `${t.stroke} ${dist}`;
+  const pool = t.target_pool_size ?? "50m";
+  return `${t.stroke} ${dist} · ${pool}`;
 }
 
 interface Props {
@@ -55,7 +56,7 @@ interface Props {
   zones: ZoneConfig;
   onUpsertTarget: (
     ref: SwimmerRef,
-    v: { stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number },
+    v: { stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number; target_pool_size: PaceTarget["target_pool_size"] },
   ) => void;
   onDeleteTarget: (id: string) => void;
   onExportPdf: () => void | Promise<void>;
@@ -193,6 +194,8 @@ export function SwimmerPaceCard({
                 targetDistanceM={target.target_distance_m}
                 stroke={target.stroke}
                 zones={zones}
+                swimmerSex={swimmer.sex}
+                targetPool={target.target_pool_size}
               />
             </div>
           ))}

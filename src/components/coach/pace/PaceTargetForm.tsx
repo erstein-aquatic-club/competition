@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { parsePaceTime, formatPaceTime } from "../../../lib/paceCalculator";
 import type { Stroke } from "../../../lib/paceCalculator";
+import type { PoolSize } from "../../../lib/poolConversion";
 
 export const DISTANCES_BY_STROKE: Record<Stroke, number[]> = {
   NL:     [50, 100, 200, 400, 800, 1500],
@@ -29,19 +30,30 @@ const STROKE_OPTIONS: { value: Stroke; label: string }[] = [
 ];
 
 interface Props {
-  initial?: { stroke: Stroke; target_distance_m: number; target_time_ms: number };
-  onSubmit: (v: { stroke: Stroke; target_distance_m: number; target_time_ms: number }) => void;
+  initial?: {
+    stroke: Stroke;
+    target_distance_m: number;
+    target_time_ms: number;
+    target_pool_size?: PoolSize;
+  };
+  onSubmit: (v: {
+    stroke: Stroke;
+    target_distance_m: number;
+    target_time_ms: number;
+    target_pool_size: PoolSize;
+  }) => void;
   onCancel: () => void;
 }
 
 export function PaceTargetForm({ initial, onSubmit, onCancel }: Props) {
-  const [stroke, setStroke] = useState<Stroke | "">(initial?.stroke ?? "");
+  const [stroke, setStroke]     = useState<Stroke | "">(initial?.stroke ?? "");
   const [distance, setDistance] = useState<string>(
     initial?.target_distance_m ? String(initial.target_distance_m) : "",
   );
-  const [timeStr, setTimeStr] = useState<string>(
+  const [timeStr, setTimeStr]   = useState<string>(
     initial?.target_time_ms ? formatPaceTime(initial.target_time_ms) : "",
   );
+  const [poolSize, setPoolSize] = useState<PoolSize>(initial?.target_pool_size ?? "50m");
   const [timeTouched, setTimeTouched] = useState(false);
 
   useEffect(() => {
@@ -50,15 +62,20 @@ export function PaceTargetForm({ initial, onSubmit, onCancel }: Props) {
     if (!valid.includes(Number(distance))) setDistance("");
   }, [stroke]);
 
-  const parsedMs = parsePaceTime(timeStr);
+  const parsedMs  = parsePaceTime(timeStr);
   const distOptions = stroke ? DISTANCES_BY_STROKE[stroke] : [];
-  const isValid = stroke !== "" && distance !== "" && parsedMs !== null;
+  const isValid   = stroke !== "" && distance !== "" && parsedMs !== null;
   const showTimeError = timeTouched && timeStr.length > 0 && parsedMs === null;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isValid || !stroke) return;
-    onSubmit({ stroke, target_distance_m: Number(distance), target_time_ms: parsedMs! });
+    onSubmit({
+      stroke,
+      target_distance_m: Number(distance),
+      target_time_ms: parsedMs!,
+      target_pool_size: poolSize,
+    });
   }
 
   return (
@@ -98,6 +115,30 @@ export function PaceTargetForm({ initial, onSubmit, onCancel }: Props) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      {/* Bassin toggle — 2 boutons compacts, plus lisible qu'un 3e Select sur mobile */}
+      <div className="space-y-1.5">
+        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground/70">
+          Bassin
+        </Label>
+        <div className="flex gap-1.5">
+          {(["50m", "25m"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPoolSize(p)}
+              className={[
+                "h-8 flex-1 rounded-md border text-sm font-medium transition-colors",
+                poolSize === p
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+              ].join(" ")}
+            >
+              {p}
+            </button>
+          ))}
         </div>
       </div>
 

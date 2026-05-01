@@ -154,10 +154,11 @@ export async function exportPacePdf(args: {
       : `${target_distance_m} m`;
     const refPace = formatPaceTime(pacePer100m(target_time_ms, target_distance_m));
 
+    const poolLabel = (target.target_pool_size ?? "50m").toUpperCase();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...TEXT_DARK);
-    doc.text(`${stroke} · ${distLabel}`.toUpperCase(), MARGIN, cursorY + 5);
+    doc.text(`${stroke} · ${distLabel} · Bassin ${poolLabel}`.toUpperCase(), MARGIN, cursorY + 5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...TEXT_MUTED);

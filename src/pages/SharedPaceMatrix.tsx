@@ -8,9 +8,10 @@ import { getPaceSharePayload } from "@/lib/api/pace-share";
 import { PaceMatrix } from "@/components/coach/pace/PaceMatrix";
 import type { PaceSharePayload } from "@/lib/api/pace-share";
 
-function formatTargetLabel(stroke: string, distM: number): string {
+function formatTargetLabel(stroke: string, distM: number, poolSize?: string): string {
   const dist = distM >= 1000 ? `${distM / 1000} km` : `${distM} m`;
-  return `${stroke} ${dist}`;
+  const pool = poolSize ?? "50m";
+  return `${stroke} ${dist} · ${pool}`;
 }
 
 export default function SharedPaceMatrix() {
@@ -101,7 +102,7 @@ export default function SharedPaceMatrix() {
             {sortedTargets.map((target) => (
               <AccordionItem key={target.id} value={target.id} className="border-b border-border/30">
                 <AccordionTrigger className="hover:no-underline px-0 py-3 text-sm font-semibold">
-                  {formatTargetLabel(target.stroke, target.target_distance_m)}
+                  {formatTargetLabel(target.stroke, target.target_distance_m, target.target_pool_size)}
                 </AccordionTrigger>
                 <AccordionContent className="pb-4">
                   <PaceMatrix
@@ -109,6 +110,8 @@ export default function SharedPaceMatrix() {
                     targetDistanceM={target.target_distance_m}
                     stroke={target.stroke}
                     zones={data.zones}
+                    swimmerSex={data.swimmer_sex}
+                    targetPool={target.target_pool_size}
                   />
                 </AccordionContent>
               </AccordionItem>
