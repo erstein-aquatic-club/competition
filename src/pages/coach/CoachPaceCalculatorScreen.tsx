@@ -32,6 +32,26 @@ const TOGGLABLE_FAMILIES: { family: EventFamily; label: string }[] = [
   { family: "800m_1500m", label: "800m+" },
 ];
 
+/** Pure function — exported for unit testing. */
+export function buildSelectedMembers(
+  team: TeamMember[],
+  effectiveSelectedIds: string[],
+  crossAthletes: AthleteSummary[],
+): TeamMember[] {
+  const teamById = new Set(team.map((m) => m.id));
+  const teamSelected = team.filter((m) => effectiveSelectedIds.includes(m.id));
+  const crossSelected = effectiveSelectedIds
+    .filter((id) => !teamById.has(id) && id.startsWith("account-"))
+    .map((id): TeamMember | null => {
+      const accountId = parseInt(id.replace("account-", ""), 10);
+      const athlete = crossAthletes.find((a) => a.id === accountId);
+      if (!athlete) return null;
+      return { kind: "account", id, accountId, displayName: athlete.display_name };
+    })
+    .filter((m): m is TeamMember => m !== null);
+  return [...teamSelected, ...crossSelected];
+}
+
 export function belongsTo(target: PaceTarget, swimmer: TeamMember): boolean {
   return swimmer.kind === "account"
     ? target.swimmer_account_id === swimmer.accountId
@@ -147,15 +167,15 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
     onSettled: () => qc.invalidateQueries({ queryKey: ["pace-targets"] }),
   });
 
+  const crossAthletes = allAthletes ?? athletes;
   const effectiveSelectedIds = useMemo(
     () => (selectedIds.length === 0 && team.length > 0 ? team.map((m) => m.id) : selectedIds),
     [selectedIds, team],
   );
   const selectedMembers = useMemo(
-    () => team.filter((m) => effectiveSelectedIds.includes(m.id)),
-    [team, effectiveSelectedIds],
+    () => buildSelectedMembers(team, effectiveSelectedIds, crossAthletes),
+    [team, effectiveSelectedIds, crossAthletes],
   );
-  const crossAthletes = allAthletes ?? athletes;
 
   return (
     <div className="space-y-4 pb-24">

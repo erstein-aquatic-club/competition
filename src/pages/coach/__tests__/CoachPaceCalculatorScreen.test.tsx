@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { PaceTarget } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
+import type { AthleteSummary } from "@/lib/api/types";
 
 // Full render requires QueryClient + Supabase — covered by manual E2E.
 // Regression §184-bugfix: accordion open state is now controlled via openSwimmerIds
@@ -55,6 +56,42 @@ describe("belongsTo — target → swimmer matching", () => {
     const filtered = targets.filter((t) => belongsTo(t, swimmer));
     expect(filtered).toHaveLength(2);
     expect(filtered.map((t) => t.id)).toEqual(["t1", "t3"]);
+  });
+});
+
+describe("buildSelectedMembers — cross-team inclusion (P7)", () => {
+  it("team member dans selectedIds → inclus", async () => {
+    const { buildSelectedMembers } = await import("../CoachPaceCalculatorScreen");
+    const team: TeamMember[] = [{ kind: "account", id: "account-1", accountId: 1, displayName: "Sara" }];
+    const result = buildSelectedMembers(team, ["account-1"], []);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("account-1");
+  });
+
+  it("cross-team athlete dans selectedIds → card créée à partir de allAthletes", async () => {
+    const { buildSelectedMembers } = await import("../CoachPaceCalculatorScreen");
+    const team: TeamMember[] = [{ kind: "account", id: "account-1", accountId: 1, displayName: "Sara" }];
+    const crossAthletes: AthleteSummary[] = [{ id: 99, display_name: "Léo Cross" }];
+    const result = buildSelectedMembers(team, ["account-1", "account-99"], crossAthletes);
+    expect(result).toHaveLength(2);
+    expect(result.some((m) => m.id === "account-99" && m.displayName === "Léo Cross")).toBe(true);
+  });
+
+  it("cross-team id inconnu (absent de allAthletes) → ignoré silencieusement", async () => {
+    const { buildSelectedMembers } = await import("../CoachPaceCalculatorScreen");
+    const result = buildSelectedMembers([], ["account-999"], []);
+    expect(result).toHaveLength(0);
+  });
+
+  it("team member non sélectionné → absent du résultat", async () => {
+    const { buildSelectedMembers } = await import("../CoachPaceCalculatorScreen");
+    const team: TeamMember[] = [
+      { kind: "account", id: "account-1", accountId: 1, displayName: "Sara" },
+      { kind: "account", id: "account-2", accountId: 2, displayName: "Léo" },
+    ];
+    const result = buildSelectedMembers(team, ["account-1"], []);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("account-1");
   });
 });
 
