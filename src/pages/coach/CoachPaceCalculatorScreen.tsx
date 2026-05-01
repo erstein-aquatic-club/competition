@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { Accordion } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ import { useCoachPaceZonesV2 } from "@/hooks/useCoachPaceZonesV2";
 import { useCoachStrokeAdjustments } from "@/hooks/useCoachStrokeAdjustments";
 import { listMyPaceTargets, upsertPaceTarget, deletePaceTarget } from "@/lib/api/pace-targets";
 import { ZONE_COEFFICIENTS, type EventFamily, type Zone } from "@/lib/paceData";
-import { DEFAULT_ZONES } from "@/lib/paceCalculator"; // TODO Task 27: remove when pdf supports v2 zones
 import { exportPacePdf as exportPacePdfFn } from "@/lib/export-pace-pdf";
 import { downloadBlob } from "@/lib/downloadBlob";
 import { createPaceShareLink } from "@/lib/api/pace-share";
@@ -90,6 +90,7 @@ interface Props {
 
 export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBack }: Props) {
   const qc = useQueryClient();
+  const coachName = useAuth((s) => s.user) ?? undefined;
   const { team, isLoading: teamLoading } = useMyTeam(athletes);
   const [selectedIds, setSelectedIds] = useState<string[]>(() => team.map((m) => m.id));
   const [zonesOpen, setZonesOpen] = useState(false);
@@ -279,13 +280,16 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
                 upsertMutation.mutate({ ref, stroke: v.stroke, target_distance_m: v.target_distance_m, target_time_ms: v.target_time_ms, target_pool_size: v.target_pool_size })
               }
               onDeleteTarget={(id) => deleteMutation.mutate(id)}
-              onExportPdf={async () => {
+              onExportPdf={async (pool) => {
                 setExportingPdfId(swimmer.id);
                 try {
                   const blob = await exportPacePdfFn({
                     swimmer,
                     targets: targets.filter((t) => belongsTo(t, swimmer)),
-                    zones: DEFAULT_ZONES, // TODO Task 27: upgrade to v2 zones
+                    zones: fullZones,
+                    strokeAdjustments: adjustHook.adjustments,
+                    outputPool: pool,
+                    coachName,
                   });
                   downloadBlob(blob, `allures-${swimmer.displayName.toLowerCase().replace(/\s+/g, "-")}.pdf`);
                 } catch (err) {

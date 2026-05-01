@@ -21,6 +21,7 @@ import { FileDown, Loader2, Share2, Plus, Trash2, ChevronDown, ChevronsUpDown } 
 import { PaceMatrix } from "./PaceMatrix";
 import { Pace4NSegmentMatrix } from "./Pace4NSegmentMatrix";
 import { PaceTargetForm } from "./PaceTargetForm";
+import { PdfExportDialog } from "./PdfExportDialog";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 import { normalizeStroke, eventFamily } from "@/lib/paceCalculatorV2";
 import { formatPaceTime } from "@/lib/paceCalculator";
@@ -82,7 +83,7 @@ interface Props {
     v: { stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number; target_pool_size: PaceTarget["target_pool_size"] },
   ) => void;
   onDeleteTarget: (id: string) => void;
-  onExportPdf: () => void | Promise<void>;
+  onExportPdf: (pool: "25m" | "50m") => void | Promise<void>;
   onShare?: () => Promise<{ url: string }>;
   isPdfExporting?: boolean;
 }
@@ -100,6 +101,7 @@ export function SwimmerPaceCard({
   isPdfExporting = false,
 }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [openTargetIds, setOpenTargetIds] = useState<string[]>(
     () => targets.length > 0 ? [targets[0].id] : [],
   );
@@ -145,7 +147,7 @@ export function SwimmerPaceCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={() => void onExportPdf()}
+              onClick={() => setPdfDialogOpen(true)}
               disabled={isPdfExporting}
               title="Exporter PDF"
             >
@@ -322,6 +324,16 @@ export function SwimmerPaceCard({
           )}
         </div>
       </AccordionContent>
+      <PdfExportDialog
+        open={pdfDialogOpen}
+        onOpenChange={setPdfDialogOpen}
+        swimmerName={swimmer.displayName}
+        targets={targets}
+        onConfirm={async (pool: "25m" | "50m") => {
+          await onExportPdf(pool);
+          setPdfDialogOpen(false);
+        }}
+      />
     </AccordionItem>
   );
 }
