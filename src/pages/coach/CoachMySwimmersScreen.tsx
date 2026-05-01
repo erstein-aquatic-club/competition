@@ -9,7 +9,6 @@ import CoachSectionHeader from "./CoachSectionHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +29,7 @@ import {
 import { Search, UserPlus, UserMinus, Users, UserRoundPlus, Pencil, Trash2 } from "lucide-react";
 import { useMyTeam } from "@/hooks/useMyTeam";
 import { ManualSwimmerDialog } from "@/components/coach/ManualSwimmerDialog";
+import { AddSwimmerToTeamDialog } from "@/components/coach/AddSwimmerToTeamDialog";
 import { deleteManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 import type { CoachManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 
@@ -211,6 +211,7 @@ export default function CoachMySwimmersScreen({
   const [search, setSearch] = useState("");
   const [removingSwimmer, setRemovingSwimmer] = useState<AthleteSummary | null>(null);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingManual, setEditingManual] = useState<CoachManualSwimmer | undefined>(undefined);
 
   // Deep-link: ?action=new-manual opens ManualSwimmerDialog on mount
@@ -372,13 +373,13 @@ export default function CoachMySwimmersScreen({
   return (
     <div className="space-y-5 pb-6">
       <CoachSectionHeader
-        title="Gérer mes nageurs"
+        title="Mon équipe"
         description={
           isLoading
             ? "Chargement..."
             : isAdmin
             ? `${athletes.length} nageur${athletes.length !== 1 ? "s" : ""} — vue admin`
-            : `${mySwimmers.length} nageur${mySwimmers.length !== 1 ? "s" : ""} pris en charge`
+            : `${team.length} nageur${team.length !== 1 ? "s" : ""} dans ton équipe`
         }
         onBack={onBack}
         actions={
@@ -421,34 +422,15 @@ export default function CoachMySwimmersScreen({
 
       {/* ── Coach View ───────────────────────────────────────── */}
       {!isLoading && !isAdmin && (
-        <Tabs defaultValue="team" className="space-y-4">
-          <TabsList className="w-full">
-            <TabsTrigger value="team" className="flex-1 gap-1.5">
-              Mon équipe
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {team.length}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="available" className="flex-1 gap-1.5">
-              Disponibles
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {availableSwimmers.length}
-              </Badge>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* ── Tab Mon équipe ─────────────────────────────────── */}
-          <TabsContent value="team" className="space-y-4 mt-0">
-
-            {/* CTA ajout nageur sans compte */}
+        <div className="space-y-4">
+            {/* CTA unifié : ajout nageur (compte du club ou sans compte) */}
             <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2 border-dashed"
-              onClick={() => { setEditingManual(undefined); setManualDialogOpen(true); }}
+              size="lg"
+              className="w-full gap-2"
+              onClick={() => setAddDialogOpen(true)}
             >
-              <UserRoundPlus className="h-4 w-4" />
-              Ajouter un nageur sans compte
+              <UserPlus className="h-4 w-4" />
+              Ajouter un nageur à mon équipe
             </Button>
 
             {/* Nageurs avec compte */}
@@ -542,31 +524,7 @@ export default function CoachMySwimmersScreen({
                 {search ? "Aucun nageur correspondant." : "Votre équipe est vide. Ajoutez des nageurs ci-dessus."}
               </p>
             )}
-          </TabsContent>
-
-          {/* ── Tab Disponibles ────────────────────────────────── */}
-          <TabsContent value="available" className="space-y-2 mt-0">
-            {availableSwimmers.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                {search ? "Aucun nageur correspondant." : "Tous les nageurs sont pris en charge."}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {availableSwimmers.map((athlete) => (
-                  <SwimmerRow
-                    key={athlete.id}
-                    athlete={athlete}
-                    actionLabel="Prendre en charge"
-                    actionVariant="default"
-                    actionIcon={UserPlus}
-                    onAction={() => athlete.id != null && handleAssign(athlete.id)}
-                    isPending={isPending}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+        </div>
       )}
 
       {/* ── Admin View ───────────────────────────────────────── */}
@@ -649,11 +607,23 @@ export default function CoachMySwimmersScreen({
         </>
       )}
 
-      {/* ── Manual swimmer dialog ────────────────────────────── */}
+      {/* ── Manual swimmer dialog (édition uniquement post-§186) ─ */}
       <ManualSwimmerDialog
         open={manualDialogOpen}
         onOpenChange={setManualDialogOpen}
         swimmer={editingManual}
+      />
+
+      {/* ── Add swimmer to team dialog (création unifiée) ───── */}
+      <AddSwimmerToTeamDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        availableSwimmers={availableSwimmers}
+        onAssignAccount={(id) => {
+          handleAssign(id);
+          setAddDialogOpen(false);
+        }}
+        isAssigning={assignMutation.isPending}
       />
 
       {/* ── Remove confirmation dialog ──────────────────────── */}
