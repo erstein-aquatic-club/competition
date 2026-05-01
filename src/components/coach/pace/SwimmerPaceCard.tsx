@@ -102,9 +102,7 @@ export function SwimmerPaceCard({
 }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  const [openTargetIds, setOpenTargetIds] = useState<string[]>(
-    () => targets.length > 0 ? [targets[0].id] : [],
-  );
+  const [openTargetIds, setOpenTargetIds] = useState<string[]>([]);
   const hue = nameToHue(swimmer.displayName);
   const ref = buildSwimmerRef(swimmer);
 
