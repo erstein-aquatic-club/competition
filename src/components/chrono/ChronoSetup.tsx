@@ -1,9 +1,8 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useMyTeam } from "../../hooks/useMyTeam";
-import { Play, Plus, Minus, X, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves, ChevronRight, ChevronDown } from "lucide-react";
+import { Play, Plus, Minus, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Switch } from "../ui/switch";
 import {
   Sheet,
   SheetContent,
@@ -12,7 +11,7 @@ import {
 } from "../ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { WAVE_COLORS, DISTANCE_PRESETS, SPLIT_PRESETS, buildRegisteredSwimmer, buildManualSwimmer } from "../../lib/chrono-types";
 import type { ChronoState } from "../../lib/chrono-types";
 import type { ChronoAction } from "../../lib/chrono-reducer";
@@ -41,9 +40,19 @@ export default function ChronoSetup({
   const maxWaves = isMobile ? 2 : 6;
   const [addLane, setAddLane] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [showAll, setShowAll] = useState(false);
-  const [activeTab, setActiveTab] = useState<"club" | "manuals">("club");
-  const displayAthletes = showAll && allAthletes ? allAthletes : athletes;
+  const [activeTab, setActiveTab] = useState<"team" | "club">("team");
+  const [justAddedManual, setJustAddedManual] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { manuals, isLoading: manualsLoading } = useMyTeam();
+  const delManualMutation = useMutation({
+    mutationFn: deleteManualSwimmer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-manual-swimmers"] });
+      queryClient.invalidateQueries({ queryKey: ["my-team"] });
+    },
+  });
+  const hasClubTab = !!allAthletes && allAthletes.length > athletes.length;
+  const displayAthletes = activeTab === "club" && allAthletes ? allAthletes : athletes;
 
   const assignedKeys = useMemo(
     () => new Set(state.swimmers.map((s) => s.key)),
@@ -97,6 +106,11 @@ export default function ChronoSetup({
     return groups;
   }, [displayAthletes, search]);
 
+  const filteredManuals = useMemo(() => {
+    const lower = search.toLowerCase();
+    return manuals.filter((m) => m.displayName.toLowerCase().includes(lower));
+  }, [manuals, search]);
+
   /** Count of swimmers currently in the target lane (for limit display). */
   const laneCount = useMemo(
     () => (addLane == null ? 0 : state.swimmers.filter((s) => s.lane === addLane).length),
@@ -139,6 +153,15 @@ export default function ChronoSetup({
     return parts.join(" · ");
   }, [state.swimmers.length, state.totalDistanceM, state.splitDistanceM]);
 
+  // First swimmer in a lane → wave 1, second → wave 2, etc. (capped at maxWaves).
+  const computeNextWave = useCallback(
+    (lane: number) => {
+      const inLane = state.swimmers.filter((s) => s.lane === lane).length;
+      return Math.min(inLane + 1, maxWaves);
+    },
+    [state.swimmers, maxWaves],
+  );
+
   const handleAddSwimmer = (a: AthleteSummary) => {
     if (a.id == null || addLane == null || laneFull) return;
     dispatch({
@@ -147,17 +170,32 @@ export default function ChronoSetup({
         athleteId: a.id,
         displayName: a.display_name,
         avatarUrl: a.avatar_url ?? null,
-        wave: 1,
+        wave: computeNextWave(addLane),
         lane: addLane,
       }),
     });
     // Keep sheet open for batch-add.
   };
 
+  const handleAddManual = (m: { id: string; manualId?: string; displayName: string }) => {
+    if (addLane == null || laneFull) return;
+    dispatch({
+      type: "ADD_SWIMMER",
+      swimmer: buildManualSwimmer({
+        manualId: crypto.randomUUID(),
+        displayName: m.displayName,
+        wave: computeNextWave(addLane),
+        lane: addLane,
+      }),
+    });
+    setJustAddedManual(m.id);
+    setTimeout(() => setJustAddedManual((curr) => (curr === m.id ? null : curr)), 900);
+  };
+
   const closeAddSheet = () => {
     setAddLane(null);
     setSearch("");
-    setActiveTab("club");
+    setActiveTab("team");
   };
 
   return (
@@ -410,41 +448,168 @@ export default function ChronoSetup({
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "club" | "manuals")} className="flex-1 flex flex-col overflow-hidden mt-4">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "team" | "club")} className="flex-1 flex flex-col overflow-hidden mt-4">
             <TabsList className="grid grid-cols-2 w-full h-auto p-1 gap-0.5">
-              <TabsTrigger value="club" className="gap-1.5 py-2.5 text-xs">
+              <TabsTrigger value="team" className="gap-1.5 py-2.5 text-xs">
                 <Users className="h-3.5 w-3.5" />
-                Club
+                Mon équipe
               </TabsTrigger>
-              <TabsTrigger value="manuals" className="gap-1.5 py-2.5 text-xs">
-                <BookmarkPlus className="h-3.5 w-3.5" />
-                Mémorisés
+              <TabsTrigger value="club" className="gap-1.5 py-2.5 text-xs" disabled={!hasClubTab}>
+                <Users className="h-3.5 w-3.5" />
+                Tout le club
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="club" className="flex-1 overflow-y-auto">
+            {/* Search input — shared across tabs */}
+            <div className="relative mt-3">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <TabsContent value="team" className="flex-1 overflow-y-auto">
               <div className="flex flex-col gap-4 pt-2">
-                {/* Search input */}
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
+                {/* Manuals section */}
+                {manualsLoading ? (
+                  <div className="flex items-center justify-center py-4 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : filteredManuals.length > 0 ? (
+                  <div>
+                    <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <BookmarkPlus className="h-3 w-3" />
+                      Mémorisés
+                    </div>
+                    <ul className="flex flex-col divide-y divide-border/60">
+                      {filteredManuals.map((m) => {
+                        const pulse = justAddedManual === m.id;
+                        return (
+                          <li key={m.id} className="flex items-center group">
+                            <button
+                              type="button"
+                              disabled={laneFull}
+                              onClick={() => handleAddManual(m)}
+                              className={`flex flex-1 min-h-[48px] items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                                laneFull
+                                  ? "cursor-not-allowed text-muted-foreground/40"
+                                  : "hover:bg-muted active:bg-muted/60"
+                              }`}
+                            >
+                              <SwimmerAvatar
+                                swimmer={{ displayName: m.displayName, avatarUrl: null }}
+                                size="sm"
+                                className="shrink-0"
+                              />
+                              <span className="flex-1 truncate">{m.displayName}</span>
+                              {pulse && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0 animate-in fade-in slide-in-from-right-1 duration-300">
+                                  <Check className="h-3 w-3" />
+                                  ajouté
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => m.manualId && delManualMutation.mutate(m.manualId)}
+                              disabled={delManualMutation.isPending}
+                              className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
+                              aria-label={`Supprimer ${m.displayName}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {/* Grouped athlete list (coach's linked accounts) */}
+                <div className="flex flex-col gap-4">
+                  {Array.from(groupedAthletes.entries()).map(
+                    ([group, members]) => (
+                      <div key={group}>
+                        <div className="mb-1 text-xs font-medium text-muted-foreground">
+                          {group}
+                        </div>
+                        <div className="flex flex-col">
+                          {members.map((a) => {
+                            const isAssigned =
+                              a.id != null && assignedKeys.has(`a:${a.id}`);
+                            const disabled = isAssigned || laneFull;
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => handleAddSwimmer(a)}
+                                className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                                  disabled
+                                    ? "cursor-not-allowed"
+                                    : "hover:bg-muted active:bg-muted/60"
+                                } ${
+                                  isAssigned
+                                    ? "text-muted-foreground"
+                                    : disabled
+                                    ? "text-muted-foreground/50"
+                                    : "text-foreground"
+                                }`}
+                              >
+                                <SwimmerAvatar
+                                  swimmer={{ displayName: a.display_name, avatarUrl: a.avatar_url ?? null }}
+                                  size="sm"
+                                  className="mr-2 shrink-0"
+                                />
+                                <span className="flex-1 truncate">{a.display_name}</span>
+                                {isAssigned && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0">
+                                    <Check className="h-3 w-3" />
+                                    ajouté
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  {!manualsLoading && filteredManuals.length === 0 && groupedAthletes.size === 0 && (
+                    <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {search ? "Aucun nageur trouvé" : "Aucun nageur dans votre équipe"}
+                      </p>
+                      {!search && hasClubTab && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("club")}
+                          className="text-xs text-primary hover:underline cursor-pointer"
+                        >
+                          Voir tout le club →
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Club-wide toggle */}
-                {allAthletes && allAthletes.length > athletes.length && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Switch checked={showAll} onCheckedChange={setShowAll} />
-                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Tout le club</span>
-                  </label>
-                )}
+                {/* Manage manuals link */}
+                <a
+                  href="#/coach?section=swimmers&action=new-manual"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Gérer mon équipe →
+                </a>
+              </div>
+            </TabsContent>
 
-                {/* Grouped athlete list */}
+            <TabsContent value="club" className="flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-4 pt-2">
+                {/* All-club athlete list */}
                 <div className="flex flex-col gap-4">
                   {Array.from(groupedAthletes.entries()).map(
                     ([group, members]) => (
@@ -502,16 +667,6 @@ export default function ChronoSetup({
                 </div>
               </div>
             </TabsContent>
-
-            <TabsContent value="manuals" className="flex-1 overflow-y-auto mt-3">
-              {addLane !== null && (
-                <ManualsTabBody
-                  addLane={addLane}
-                  laneFull={laneFull}
-                  dispatch={dispatch}
-                />
-              )}
-            </TabsContent>
           </Tabs>
 
           {/* ── Sticky footer — batch-add summary + close ── */}
@@ -555,114 +710,6 @@ export default function ChronoSetup({
         </Button>
       </div>
     </div>
-  );
-}
-
-function ManualsTabBody({
-  addLane,
-  laneFull,
-  dispatch,
-}: {
-  addLane: number;
-  laneFull: boolean;
-  dispatch: React.Dispatch<ChronoAction>;
-}) {
-  const queryClient = useQueryClient();
-  const { manuals, isLoading } = useMyTeam();
-  const delMutation = useMutation({
-    mutationFn: deleteManualSwimmer,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-manual-swimmers"] });
-      queryClient.invalidateQueries({ queryKey: ["my-team"] });
-    },
-  });
-  // Local pulse feedback : which manual was added last (for a brief "✓ ajouté" tag).
-  const [justAdded, setJustAdded] = useState<string | null>(null);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-10 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-      </div>
-    );
-  }
-
-  if (manuals.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-10 px-4 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <BookmarkPlus className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">Aucun nageur mémorisé</p>
-          <p className="text-xs text-muted-foreground leading-relaxed max-w-[240px]">
-            Gérez votre équipe depuis l'écran dédié pour ajouter des nageurs sans compte.
-          </p>
-        </div>
-        <a
-          href="#/coach?section=swimmers&action=new-manual"
-          className="inline-flex items-center gap-1.5 mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Gérer mon équipe →
-        </a>
-      </div>
-    );
-  }
-  return (
-    <ul className="flex flex-col divide-y divide-border/60">
-      {manuals.map(m => {
-        const pulse = justAdded === m.id;
-        return (
-          <li key={m.id} className="flex items-center group">
-            <button
-              type="button"
-              disabled={laneFull}
-              onClick={() => {
-                dispatch({
-                  type: "ADD_SWIMMER",
-                  swimmer: buildManualSwimmer({
-                    manualId: crypto.randomUUID(),
-                    displayName: m.displayName,
-                    lane: addLane,
-                  }),
-                });
-                setJustAdded(m.id);
-                // Reset the "just added" pulse after a beat — purely visual feedback.
-                setTimeout(() => setJustAdded((curr) => (curr === m.id ? null : curr)), 900);
-              }}
-              className={`flex flex-1 min-h-[48px] items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
-                laneFull
-                  ? "cursor-not-allowed text-muted-foreground/40"
-                  : "hover:bg-muted active:bg-muted/60"
-              }`}
-            >
-              <SwimmerAvatar
-                swimmer={{ displayName: m.displayName, avatarUrl: null }}
-                size="sm"
-                className="shrink-0"
-              />
-              <span className="flex-1 truncate">{m.displayName}</span>
-              {pulse && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0 animate-in fade-in slide-in-from-right-1 duration-300">
-                  <Check className="h-3 w-3" />
-                  ajouté
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => m.manualId && delMutation.mutate(m.manualId)}
-              disabled={delMutation.isPending}
-              className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
-              aria-label={`Supprimer ${m.displayName}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

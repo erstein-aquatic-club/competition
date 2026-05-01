@@ -4,6 +4,45 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §189 — Chrono setup : équipe coach par défaut + vagues auto par ligne (2026-05-01)
+
+> Note : §186-§188 sont réservés pour la refonte du modèle d'allures pace-v2 (commits `feat(pace-v2):...` déjà sur `main`, docs à venir). Ce chantier prend donc le numéro §189.
+
+**Contexte :** Sur la vue Chrono coach, deux frictions UX :
+1. Les nageurs mémorisés (sans compte) sont cachés dans un onglet séparé "Mémorisés", obligeant le coach à switcher d'onglet pour les ajouter alors qu'ils font partie de son équipe au même titre que les comptes rattachés.
+2. Quand on ajoute plusieurs nageurs dans une même ligne, ils sont tous mis en vague 1 par défaut, ce qui n'a aucun sens physique (collision sur la même ligne au même top de départ). Le coach doit alors cycler manuellement chaque chip pour ré-attribuer V2, V3…
+
+**Objectif :** Que l'onglet par défaut affiche l'équipe entière du coach (manuels + comptes rattachés) et que l'ajout sur une ligne incrémente automatiquement la vague (1er nageur = V1, 2e = V2, etc., capé à `maxWaves`).
+
+### Changements
+
+**`src/components/chrono/ChronoSetup.tsx`** :
+
+- **Refonte des onglets** : `"club" | "manuals"` → `"team" | "club"`, défaut = `"team"`. L'onglet "Mon équipe" liste les manuels (section "Mémorisés" en tête, avec bouton supprimer) **et** les comptes rattachés (groupés par `group_label`). L'onglet "Tout le club" remplace le toggle Switch précédent et n'apparaît que si `allAthletes.length > athletes.length` (sinon il est `disabled`). La barre de recherche est partagée entre les deux onglets (filtrage simultané manuels + accounts dans "Mon équipe").
+- **`computeNextWave(lane)`** : nouvelle fonction `useCallback` qui retourne `Math.min(swimmersInLane.length + 1, maxWaves)`. Utilisée par `handleAddSwimmer` (registered) et `handleAddManual` (extrait de l'ex-`ManualsTabBody`) à la place du `wave: 1` hardcodé. Sur mobile `maxWaves=2` (cap sur V2), desktop `maxWaves=6`.
+- **`ManualsTabBody` supprimé** (107 lignes) : la logique fetch (`useMyTeam`), mutation delete (`deleteManualSwimmer`), state `justAdded`, et JSX manuel ont été remontés dans le parent. Le hook `useMyTeam()` est maintenant appelé une fois en haut, partagé entre les deux onglets.
+- **Empty state amélioré** : si l'équipe est vide ET pas de recherche active, affiche "Aucun nageur dans votre équipe" avec un lien direct "Voir tout le club →" qui switche sur l'onglet club (uniquement si `hasClubTab`). Le lien "Gérer mon équipe →" vers `#/coach?section=swimmers&action=new-manual` est conservé en bas du tab "Mon équipe".
+- Imports nettoyés : `Switch`, `useQuery`, `useRef`, `X` retirés (plus utilisés). `Plus` conservé (utilisé ailleurs).
+
+**Tests :**
+- 5 fichiers chrono concernés (`chrono-avatar-cache`, `chrono-reducer`, `chrono-save-queue`, `chrono-types`, `chronoXlsxExport`) tous verts.
+- `ChronoSetupManuals.test.ts` — non-régression `buildManualSwimmer` — toujours vert (le test ne rendait pas le composant, juste l'helper).
+- `npx tsc --noEmit` clean sur les modifications (les erreurs `target_pool_size` restantes sont pré-existantes du §185 sur les fichiers `.stories.tsx` non bloquants).
+- Échecs pré-existants conservés (5) : `SwimmerPaceCard`/`PdfExportDialog` (React import §183), `transformers.test.ts` (notés CLAUDE.md).
+
+### Décisions
+
+- **Tabs gardés (vs. vue plate avec switch)** : sur petit écran, tabs ≥ scroll. La séparation manuels/comptes en accordéon dans la même page rendait la barre de recherche moins efficace.
+- **Cap `maxWaves` plutôt que sans limite** : si un coach pousse 7 nageurs dans une ligne (desktop), les 7e+ restent en V6, à ré-assigner manuellement via le chip — plus utile que de créer une V7 invisible.
+- **Pas de "1er-clic-V1, 2e-clic-V2" sur déplacement (move)** : le `MOVE_SWIMMER` ne touche pas la vague. Si un coach déplace un nageur d'une ligne à une autre, sa vague ne change pas (le coach a déjà choisi explicitement la vague). Seul l'**ajout** déclenche la vague auto.
+
+### Limites / suivi
+
+- Si le coach ajoute → supprime → ré-ajoute, le nouvel ajout se base sur le `length` actuel (le trou est comblé). C'est intentionnel (le coach voit le résultat dans la chip de vague immédiatement et peut ajuster).
+- L'onglet "Tout le club" ne montre **pas** les manuels (par design : les manuels appartiennent au coach, pas au club). Si le coach veut ré-utiliser un manuel, il revient sur "Mon équipe".
+
+**Fichiers modifiés :** `src/components/chrono/ChronoSetup.tsx` (1070 → 1116, +4%, pas de mise à jour files-map.md requise).
+
 ## §185 — Bassin 50m / 25m sur les cibles d'allures (conversion FFN) (2026-05-01)
 
 **Contexte :** Le calculateur d'allures coach (§184) ne distinguait pas le bassin de référence. Un nageur en 25m a des allures différentes. Demande : ajouter `target_pool_size` sur chaque cible, toggle 50m/25m dans la matrice avec conversion FFN (table de majorations officielles), et exposer `swimmer_sex` dans le payload partagé pour que la page publique puisse convertir.
