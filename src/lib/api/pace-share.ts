@@ -13,7 +13,8 @@ export function buildShareUrl(token: string, base?: string): string {
 export interface PaceSharePayload {
   swimmer_name: string;
   swimmer_sex?: Sex | null;
-  zones: ZoneConfig;
+  zones?: ZoneConfig;
+  zones_v2?: Record<string, Record<string, number>>;
   targets: PaceTarget[];
 }
 
