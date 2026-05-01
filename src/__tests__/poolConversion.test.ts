@@ -147,19 +147,20 @@ describe("convertTargetTime — null cases", () => {
     assert.equal(result, null);
   });
 
-  it("sex undefined → null", () => {
+  it("sex undefined → moyenne M/F (1350 ms pour 100 NL)", () => {
     const result = convertTargetTime({
       targetTimeMs: 60_000, fromPool: "50m", toPool: "25m",
       stroke: "NL", distanceM: 100, sex: undefined,
     });
-    assert.equal(result, null);
+    // moyenne((1200+1500)/2) = 1350ms → 60000 − 1350 = 58650
+    assert.equal(result, 58_650);
   });
 
-  it("sex null → null", () => {
+  it("sex null → moyenne M/F (1350 ms pour 100 NL)", () => {
     const result = convertTargetTime({
       targetTimeMs: 60_000, fromPool: "50m", toPool: "25m",
       stroke: "NL", distanceM: 100, sex: null,
     });
-    assert.equal(result, null);
+    assert.equal(result, 58_650);
   });
 });

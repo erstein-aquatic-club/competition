@@ -103,7 +103,7 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
     );
   });
 
-  it("swimmerSex=null → bouton 25m disabled", () => {
+  it("swimmerSex=null → bouton 25m cliquable (conversion moyenne M/F)", () => {
     const html = render({
       ...BASE_PROPS,
       targetTimeMs: 51_450,
@@ -111,8 +111,8 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
       stroke: "crawl",
       swimmerSex: null,
     });
-    // The disabled button for 25m should have disabled attribute
-    assert.ok(html.includes("disabled"), "bouton 25m doit être disabled sans sexe");
+    // Avec sexe inconnu, on utilise la moyenne M/F → le bouton n'est pas disabled
+    assert.ok(!html.includes("cursor-not-allowed"), "bouton 25m ne doit pas être grisé sans sexe");
   });
 
   it("distance cible (d=D) présente comme ligne dans le tableau", () => {
