@@ -1006,16 +1006,14 @@ CREATE POLICY "coach_manual_swimmers_update_own"
   USING (coach_id = (SELECT auth.uid()))
   WITH CHECK (coach_id = (SELECT auth.uid()));
 
--- (b) coach_pace_zones
-CREATE TABLE public.coach_pace_zones (
-  coach_id   uuid PRIMARY KEY,
-  v0_pct     int NOT NULL DEFAULT 140 CHECK (v0_pct BETWEEN 100 AND 200),
-  v1_pct     int NOT NULL DEFAULT 130 CHECK (v1_pct BETWEEN 100 AND 200),
-  v2_pct     int NOT NULL DEFAULT 115 CHECK (v2_pct BETWEEN 100 AND 200),
-  v3_pct     int NOT NULL DEFAULT 110 CHECK (v3_pct BETWEEN 100 AND 200),
-  max_pct    int NOT NULL DEFAULT 105 CHECK (max_pct BETWEEN 100 AND 200),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (v0_pct >= v1_pct AND v1_pct >= v2_pct AND v2_pct >= v3_pct AND v3_pct >= max_pct)
+-- (b) coach_pace_zones — §186 v2 : multi-row par (coach_id, event_family, zone)
+CREATE TABLE IF NOT EXISTS public.coach_pace_zones (
+  coach_id     uuid NOT NULL,
+  event_family text NOT NULL CHECK (event_family IN ('50m','100m','200m','400m','800m_1500m')),
+  zone         text NOT NULL CHECK (zone IN ('V0','V1','V2','V3','V4','MAX')),
+  k_value      numeric(5,4) NOT NULL CHECK (k_value > 0 AND k_value <= 1),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (coach_id, event_family, zone)
 );
 ALTER TABLE public.coach_pace_zones ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "coach_pace_zones_select_own"
@@ -1028,6 +1026,33 @@ CREATE POLICY "coach_pace_zones_update_own"
   ON public.coach_pace_zones FOR UPDATE
   USING  (coach_id = (SELECT auth.uid()))
   WITH CHECK (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_pace_zones_delete_own"
+  ON public.coach_pace_zones FOR DELETE
+  USING (coach_id = (SELECT auth.uid()));
+
+-- (b2) coach_stroke_adjustments — §186 : override coach des mS par nage/famille
+CREATE TABLE IF NOT EXISTS public.coach_stroke_adjustments (
+  coach_id     uuid NOT NULL,
+  stroke       text NOT NULL CHECK (stroke IN ('crawl','dos','brasse','papillon')),
+  event_family text NOT NULL CHECK (event_family IN ('50m','100m','200m','400m','800m_1500m')),
+  m_value      numeric(5,4) NOT NULL CHECK (m_value >= -0.20 AND m_value <= 0.20),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (coach_id, stroke, event_family)
+);
+ALTER TABLE public.coach_stroke_adjustments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "coach_stroke_adj_select_own"
+  ON public.coach_stroke_adjustments FOR SELECT
+  USING (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_stroke_adj_insert_own"
+  ON public.coach_stroke_adjustments FOR INSERT
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_stroke_adj_update_own"
+  ON public.coach_stroke_adjustments FOR UPDATE
+  USING (coach_id = (SELECT auth.uid()))
+  WITH CHECK (coach_id = (SELECT auth.uid()));
+CREATE POLICY "coach_stroke_adj_delete_own"
+  ON public.coach_stroke_adjustments FOR DELETE
+  USING (coach_id = (SELECT auth.uid()));
 
 -- (c) coach_pace_targets
 CREATE TABLE public.coach_pace_targets (
@@ -1070,9 +1095,9 @@ CREATE POLICY "pace_share_links_owner_all"
   USING  (coach_id = (SELECT auth.uid()))
   WITH CHECK (coach_id = (SELECT auth.uid()));
 
--- §184/185 — RPC get_pace_share_payload (mirror of migrations 00148+00150)
+-- §186 — RPC get_pace_share_payload v2 (mirror of migration 00152)
 -- SECURITY DEFINER bypasses RLS — callable by anon.
--- Note: no user_profiles in test schema → swimmer_sex is NULL for account swimmers.
+-- Note: no user_profiles in test schema → swimmer_sex NULL for account swimmers.
 CREATE OR REPLACE FUNCTION get_pace_share_payload(token_in uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
@@ -1082,7 +1107,7 @@ DECLARE
   link          record;
   swimmer_name  text;
   swimmer_sex   text;
-  zones         jsonb;
+  zones_v2      jsonb;
   targets       jsonb;
 BEGIN
   SELECT * INTO link FROM pace_share_links
@@ -1098,8 +1123,12 @@ BEGIN
       FROM coach_manual_swimmers WHERE id = link.swimmer_manual_id;
   END IF;
 
-  SELECT row_to_json(z)::jsonb INTO zones
-    FROM coach_pace_zones z WHERE coach_id = link.coach_id;
+  SELECT jsonb_object_agg(event_family, family_zones) INTO zones_v2
+    FROM (
+      SELECT event_family, jsonb_object_agg(zone, k_value) AS family_zones
+        FROM coach_pace_zones WHERE coach_id = link.coach_id
+        GROUP BY event_family
+    ) t;
 
   SELECT jsonb_agg(t) INTO targets
     FROM coach_pace_targets t
@@ -1113,8 +1142,8 @@ BEGIN
   RETURN jsonb_build_object(
     'swimmer_name', swimmer_name,
     'swimmer_sex',  swimmer_sex,
-    'zones',        COALESCE(zones,   '{}'::jsonb),
-    'targets',      COALESCE(targets, '[]'::jsonb)
+    'zones_v2',     COALESCE(zones_v2, '{}'::jsonb),
+    'targets',      COALESCE(targets,  '[]'::jsonb)
   );
 END;
 $$;
