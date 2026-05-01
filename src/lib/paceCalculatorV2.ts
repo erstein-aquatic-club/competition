@@ -165,6 +165,7 @@ export function compute4NCumulative(args: {
     if (d_cumulative >= consumed + seg.segment_distance) {
       total_time += Tobj_4N_s * seg.weight;
       consumed += seg.segment_distance;
+      if (consumed >= d_cumulative) break;
     } else {
       const d_internal = d_cumulative - consumed;
       total_time += compute4NSegment({
