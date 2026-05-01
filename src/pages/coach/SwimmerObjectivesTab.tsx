@@ -42,6 +42,27 @@ import {
 } from "@/lib/objectiveHelpers";
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
 import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
+import { setPacePrefill } from "@/lib/pace-prefill-handoff";
+import type { ParsedObjectiveTarget } from "@/lib/objective-pace-link";
+
+export function handlePaceLinkClick(
+  parsed: ParsedObjectiveTarget,
+  swimmerAccountId: number,
+  target_time_ms: number,
+  storage: Storage = (typeof window !== "undefined" ? sessionStorage : ({} as Storage)),
+): string {
+  setPacePrefill(
+    {
+      swimmer_account_id: swimmerAccountId,
+      stroke: parsed.stroke,
+      target_distance_m: parsed.distance,
+      target_time_ms,
+      target_pool_size: parsed.pool_size,
+    },
+    storage,
+  );
+  return "#/coach?section=pace-calculator";
+}
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -555,6 +576,12 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
                 performances={performances}
                 onClick={obj.event_code ? () => setProgressionObj(obj) : () => handleEdit(obj)}
                 onEdit={obj.event_code ? () => handleEdit(obj) : undefined}
+                context="coach"
+                swimmerAccountId={athleteId}
+                onPaceLink={(parsed, accountId, time_ms) => {
+                  const target = handlePaceLinkClick(parsed, accountId, time_ms);
+                  window.location.hash = target;
+                }}
               />
             ))}
           </ObjectiveGrid>
