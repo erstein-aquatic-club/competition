@@ -270,10 +270,25 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | ~670 lignes |
 | `src/lib/poolConversion.ts` | Table FFN de conversion bassin 50m↔25m (17 entrées, sex-dépendant) + `convertTargetTime` + `getPoolMajorationMs` (§185) | 78 lignes |
 | `src/__tests__/poolConversion.test.ts` | 17 tests `node:test` — majorations FFN, no-op, round-trips, nulls, sex fallback (§185) | 165 lignes |
-| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–Max) avec toggle bassin 50m/25m + Tooltip disabled + disclaimer FFN (§184-§185) | 194 lignes |
+| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–MAX) — modèle non-linéaire pace-v2 + V4 conditionnel (toggle 400m/800m/1500m) + toggle bassin 50m/25m + disclaimer FFN (§184-§186) | 268 lignes |
 | `src/components/coach/pace/PaceTargetForm.tsx` | Formulaire cible d'allure (nage + distance + temps + bassin toggle) embarqué dans SwimmerPaceCard (§184-§185) | 182 lignes |
+| `src/components/coach/pace/Pace4NSegmentMatrix.tsx` | Matrice 4N segmentée par nage (NL/Dos/Brasse/Pap) avec poids selon doc §9 (§186) | 269 lignes |
+| `src/components/coach/pace/PaceStrokeAdjustments.tsx` | Drawer overrides mS coach par nage × famille (`coach_stroke_adjustments`, bornes ±0.20) (§186) | 238 lignes |
+| `src/components/coach/pace/PaceZonesSettings.tsx` | Drawer config zones v2 par famille × zone (V0/V1/V2/V3/V4/MAX) — refonte schema multi-row (§186) | 343 lignes |
+| `src/components/coach/pace/SwimmerPaceCard.tsx` | Accordéon nageur — propage zones_v2 + strokeAdjustments + v4ByFamily ; sous-accordions repliables par cible (§186) | 244 lignes |
+| `src/components/coach/pace/PdfExportDialog.tsx` | Dialog pré-export PDF avec toggle 25m/50m (§186) | 116 lignes |
+| `src/components/coach/AddSwimmerToTeamDialog.tsx` | Vue unique team-creation unifiée — refonte 'Mon équipe' (§186) | 233 lignes |
+| `src/lib/paceCalculatorV2.ts` | Moteur pur non-linéaire pace-v2 — `t_allure(d) = (Tobj × R_base × A_nage + Δ_mesure) / k_allure` (§186) | 238 lignes |
+| `src/lib/paceData.ts` | Tables data pures — `R_base(D, d)`, `A_nage(D, d, S)`, `k_allure(family, zone)` selon doc métier (§186) | 96 lignes |
+| `src/lib/pdfPalette.ts` | Palette colorée pour export PDF (zones V0–MAX cohérentes avec écran) (§186) | 57 lignes |
+| `src/lib/export-pace-pdf.ts` | Export PDF allures — refonte palette colorée + branding EAC (rouge + logo + club) + bassin d'origine + flèche conversion + footer épuré (§186) | 906 lignes |
 | `src/lib/api/pace-targets.ts` | CRUD cibles d'allures via RPC `upsert_pace_target` (§184) — inclut `target_pool_size` (§185) | 62 lignes |
-| `src/lib/api/pace-share.ts` | Création/lecture liens partage allures (`pace_share_links`) — inclut `swimmer_sex` dans payload (§185) | 47 lignes |
+| `src/lib/api/pace-share.ts` | Création/lecture liens partage allures (`pace_share_links`) — inclut `swimmer_sex` dans payload (§185), zones_v2 (§186) | 47 lignes |
+| `src/lib/api/pace-zones.ts` | CRUD zones v2 (multi-row family × zone) — `useCoachPaceZonesV2` shape (§186) | 126 lignes |
+| `src/lib/api/pace-stroke-adjustments.ts` | CRUD overrides mS coach par nage × famille (§186) | 49 lignes |
+| `src/lib/api/coaches.ts` | Liste des coaches pour vue Allures cross-coach (§186) | 30 lignes |
+| `src/hooks/useCoachPaceZonesV2.ts` | Hook React Query schema v2 + `deletePaceZoneCell` (§186) | 71 lignes |
+| `src/hooks/useCoachStrokeAdjustments.ts` | Hook React Query overrides mS coach (§186) | 60 lignes |
 | `supabase/tests/rls/coach_pace_zones.test.ts` | Tests RLS coach_pace_zones : SELECT isolation + INSERT/UPDATE upsert + DELETE refus (§184 Phase 10) | 120 lignes |
 | `supabase/tests/rls/coach_pace_targets.test.ts` | Tests RLS coach_pace_targets : isolation coach + upsert + DELETE + anon blocked (§184 Phase 10) | 159 lignes |
 | `supabase/tests/rls/coach_manual_swimmers_update.test.ts` | Tests RLS UPDATE/DELETE sur coach_manual_swimmers + isolation cross-coach (§184 Phase 10) | 94 lignes |

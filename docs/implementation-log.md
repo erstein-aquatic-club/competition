@@ -6,8 +6,6 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ## §189 — Chrono setup : équipe coach par défaut + vagues auto par ligne (2026-05-01)
 
-> Note : §186-§188 sont réservés pour la refonte du modèle d'allures pace-v2 (commits `feat(pace-v2):...` déjà sur `main`, docs à venir). Ce chantier prend donc le numéro §189.
-
 **Contexte :** Sur la vue Chrono coach, deux frictions UX :
 1. Les nageurs mémorisés (sans compte) sont cachés dans un onglet séparé "Mémorisés", obligeant le coach à switcher d'onglet pour les ajouter alors qu'ils font partie de son équipe au même titre que les comptes rattachés.
 2. Quand on ajoute plusieurs nageurs dans une même ligne, ils sont tous mis en vague 1 par défaut, ce qui n'a aucun sens physique (collision sur la même ligne au même top de départ). Le coach doit alors cycler manuellement chaque chip pour ré-attribuer V2, V3…
@@ -42,6 +40,79 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 - L'onglet "Tout le club" ne montre **pas** les manuels (par design : les manuels appartiennent au coach, pas au club). Si le coach veut ré-utiliser un manuel, il revient sur "Mon équipe".
 
 **Fichiers modifiés :** `src/components/chrono/ChronoSetup.tsx` (1070 → 1116, +4%, pas de mise à jour files-map.md requise).
+
+## §186 — Pace Model v2 : refonte non-linéaire du calcul d'allures (2026-05-01) — rétrospectif
+
+**Contexte :** Le calculateur d'allures livré en §184/§185 utilisait un modèle linéaire `t_zone(d) = pace_par_100m × d × pct/100`. Trop grossier pour les distances de sprint (départ, vitesse pure, décélération créent une courbe non-linéaire) et ne reflète pas la spécificité par nage et par épreuve. Le doc métier `regles_calcul_allures_natation.docx` propose un modèle non-linéaire paramétré par épreuve-cible × nage × contexte. §186 implémente ce modèle.
+
+### Décisions de conception
+
+| # | Décision | Justification |
+|---|---|---|
+| C1 | Table FFN §185 reste en couche d'affichage post-calcul (transposition 50↔25m). Moteur en référence 50m. | Le doc traite uniquement les courbes en bassin 50m. La conversion FFN est aide-lecture, pas input. |
+| C2 | Coefficients k_allure du doc remplacent les défauts §184. | Validation métier coach. |
+| C3 | Bascule directe v1 → v2 sans feature flag. Table `coach_pace_zones` v1 droppée et recréée en schema v2. Cibles `coach_pace_targets` préservées. | Aucun coach n'avait calibré ses zones v1 en prod (smoke test interne uniquement). |
+| C4 | Zone V4 ajoutée entre V3 et MAX. Désactivée par défaut sur 400m/800m/1500m, toggle manuel dans le drawer Zones. | Doc §4 : V3→MAX suffit comme contraste sur longue distance, V4 utile sur 50m/100m. |
+| C5 | Calculs internes en secondes (float), affichage `mm:ss.cc`, stockage DB en ms (int). | Précision suffisante (1ms < 0.01s d'affichage), aligné §184. |
+
+### Migrations DB (toutes appliquées prod via MCP)
+
+- **`00151_pace_model_v2`** : DROP `coach_pace_zones` v1 + recréation schema v2 multi-row `(coach_id, event_family ∈ {50m,100m,200m,400m,800m_1500m}, zone ∈ {V0,V1,V2,V3,V4,MAX}, k_value)` + nouvelle table `coach_stroke_adjustments` `(coach_id, stroke ∈ {crawl,dos,brasse,papillon}, event_family, m_value bornée [-0.20, +0.20])`. RLS owner-based sur les 4 ops (SELECT/INSERT/UPDATE/DELETE) pour les deux tables.
+- **`00152_pace_share_payload_v2`** : RPC `get_pace_share_payload(token uuid)` SECURITY DEFINER refonte pour produire `zones_v2 jsonb` (objet `{event_family: {zone: k_value}}`) au lieu d'une row unique. Compatible avec la page partagée publique anon.
+- **`00153_pace_team_coach_visibility`** : RPC `list_manual_swimmers_for_coach(p_coach_id integer)` SECURITY DEFINER pour vue Allures cross-coach. Permet à un coach de consulter l'équipe d'un autre coach via app_user_id (bigint), workaround au stockage `coach_id uuid` dans `coach_manual_swimmers`.
+
+### Architecture moteur
+
+**Formule non-linéaire** : `t_allure(d) = (Tobj × R_base(D, d) × A_nage(D, d, S) + Δ_mesure(d)) / k_allure(famille_D, zone)`
+
+- **Module pur `paceCalculatorV2.ts`** (238 LOC) : calcul des matrices pace × zones × distances, sans I/O. Consomme `RatioTable`, `StrokeAdjustments`, `ZonesV2`, `V4ByFamily` en input pur.
+- **Module data `paceData.ts`** (96 LOC) : tables hard-codées `R_base(D, d)`, `A_nage(D, d, S)`, `k_allure(family, zone)` extraites du doc métier. Aucun I/O, aucune dépendance React.
+- Tests unit `paceCalculatorV2.test.ts` (285 LOC) + `paceData.test.ts` (143 LOC) couvrent les exemples doc (NL/Dos/Brasse/Pap × 50/100/200/400m).
+
+### Refonte UI
+
+**Composants nouveaux :**
+- `Pace4NSegmentMatrix.tsx` (269 LOC) — matrice 4N segmentée par nage avec poids du doc §9.
+- `PaceStrokeAdjustments.tsx` (238 LOC) — drawer pour ajuster les overrides `m_value` par nage × famille (sliders avec bornes ±0.20).
+- `PdfExportDialog.tsx` (116 LOC) — dialog pré-export avec toggle 25m/50m, palette colorée alignée écran.
+- `AddSwimmerToTeamDialog.tsx` (233 LOC) — vue unique team-creation unifiée (refonte 'Mon équipe').
+
+**Composants refondus** (>30% delta) :
+- `PaceMatrix.tsx` (194 → 268 LOC, +38%) — modèle non-linéaire + V4 conditionnel + toggle 400m/800m + toolbar responsive mobile.
+- `PaceZonesSettings.tsx` (343 LOC) — refonte schema v2 (multi-row family × zone).
+- `SwimmerPaceCard.tsx` (244 LOC) — propage zones + strokeAdjustments + v4ByFamily ; sous-accordions repliables par cible (Task 24).
+- `CoachPaceCalculatorScreen.tsx` (220 LOC) — wire zones + adjustments + V4 toggle + sélecteur coach (équipe par défaut = coach connecté).
+- `SharedPaceMatrix.tsx` — consume `zones_v2` + Pace4NSegmentMatrix pour cibles 4N.
+- `export-pace-pdf.ts` (906 LOC) — palette colorée + branding EAC restauré (rouge + logo + club) + bassin d'origine + flèche conversion + footer épuré + cible affichée en `mm:ss.cc`.
+
+**API + hooks :**
+- `pace-zones.ts` — refonte schema v2 + `deletePaceZoneCell`.
+- `pace-stroke-adjustments.ts` (49 LOC) — CRUD overrides mS.
+- `coaches.ts` (30 LOC) — listing pour vue cross-coach.
+- `useCoachPaceZonesV2.ts` (71 LOC), `useCoachStrokeAdjustments.ts` (60 LOC).
+- `useMyTeam.ts` (+49 LOC) — nouvelle fonction `useTeamForCoach(coachId, allAthletes?)` pour vue Allures avec sélecteur de coach.
+- `pdfPalette.ts` (57 LOC) — palette unifiée écran/PDF.
+
+### Couverture tests
+
+- **Unit moteur** : `paceCalculatorV2.test.ts` (285), `paceData.test.ts` (143), `pdfPalette.test.ts` (65), `export-pace-pdf.test.ts` (185).
+- **Hooks** : `useCoachPaceZonesV2.test.ts` (124), `useCoachStrokeAdjustments.test.ts` (75).
+- **API** : `pace-stroke-adjustments.test.ts` (88), `pace-zones.test.ts` (102 +84), `pace-share.test.ts` (+20).
+- **Composants** : `Pace4NSegmentMatrix.test.tsx` (111), `PaceStrokeAdjustments.test.tsx` (85), `PaceMatrix.test.tsx` (177 −53), `PaceZonesSettings.test.tsx` (134 −63), `SwimmerPaceCard.test.tsx` (44 −14), `SharedPaceMatrix.test.tsx` (111 +57).
+- **RLS** : tests existants `coach_pace_zones` / `coach_pace_targets` adaptés au schema v2 dans `supabase/tests/schema.sql` (+63 LOC).
+
+### Volume
+
+- **30+ commits `feat(pace-v2):`** (de `a59088467 Phase 1 — tables data pures` à `b393005c4 refonte 'Mon équipe'`).
+- **+5337 / −773 LOC** sur 49 fichiers code/test/SQL.
+- **3 migrations DB** appliquées prod (00151, 00152, 00153, vérifiées via `mcp__plugin_supabase_supabase__list_migrations`).
+- **Déployé** : tous les workflows `Deploy to GitHub Pages` `completed success` jusqu'à `b393005c4`.
+
+### Limites / suivi
+
+- **§187 révisé** (designé, pas livré) — affinement individuel des courbes par nageur via slider unique `[0.90, 1.10]` (cf. `docs/plans/2026-05-01-pace-individual-calibration-187-revised-design.md`).
+- **§188 ré-attribué** (designé, pas livré) — lier objectifs nageur ↔ allures via bouton 1-clic + parser `event_code` (cf. `docs/plans/2026-05-01-objectives-pace-link-188-design.md`).
+- Anciens designs §187 (calibration par tests) et §188 (audit trail) **archivés** dans `docs/plans/archived/`.
 
 ## §185 — Bassin 50m / 25m sur les cibles d'allures (conversion FFN) (2026-05-01)
 
