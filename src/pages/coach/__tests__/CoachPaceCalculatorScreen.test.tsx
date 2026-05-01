@@ -19,7 +19,7 @@ describe("belongsTo — target → swimmer matching", () => {
     const swimmer: TeamMember = { kind: "account", id: "account-42", accountId: 42, displayName: "Sara" };
     const target: PaceTarget = {
       id: "t1", coach_id: "c", swimmer_account_id: 42, swimmer_manual_id: null,
-      stroke: "NL", target_distance_m: 100, target_time_ms: 60000, updated_at: "2026-01-01",
+      stroke: "NL", target_distance_m: 100, target_time_ms: 60000, target_pool_size: "50m", updated_at: "2026-01-01",
     };
     expect(belongsTo(target, swimmer)).toBe(true);
   });
@@ -29,7 +29,7 @@ describe("belongsTo — target → swimmer matching", () => {
     const swimmer: TeamMember = { kind: "account", id: "account-99", accountId: 99, displayName: "Léo" };
     const target: PaceTarget = {
       id: "t2", coach_id: "c", swimmer_account_id: 42, swimmer_manual_id: null,
-      stroke: "NL", target_distance_m: 100, target_time_ms: 60000, updated_at: "2026-01-01",
+      stroke: "NL", target_distance_m: 100, target_time_ms: 60000, target_pool_size: "50m", updated_at: "2026-01-01",
     };
     expect(belongsTo(target, swimmer)).toBe(false);
   });
@@ -39,7 +39,7 @@ describe("belongsTo — target → swimmer matching", () => {
     const swimmer: TeamMember = { kind: "manual", id: "manual-abc", manualId: "abc-uuid", displayName: "Inv." };
     const target: PaceTarget = {
       id: "t3", coach_id: "c", swimmer_account_id: null, swimmer_manual_id: "abc-uuid",
-      stroke: "Dos", target_distance_m: 50, target_time_ms: 30000, updated_at: "2026-01-01",
+      stroke: "Dos", target_distance_m: 50, target_time_ms: 30000, target_pool_size: "50m", updated_at: "2026-01-01",
     };
     expect(belongsTo(target, swimmer)).toBe(true);
   });
@@ -48,9 +48,9 @@ describe("belongsTo — target → swimmer matching", () => {
     const { belongsTo } = await import("../CoachPaceCalculatorScreen");
     const swimmer: TeamMember = { kind: "account", id: "account-1", accountId: 1, displayName: "A" };
     const targets: PaceTarget[] = [
-      { id: "t1", coach_id: "c", swimmer_account_id: 1, swimmer_manual_id: null, stroke: "NL", target_distance_m: 100, target_time_ms: 60000, updated_at: "" },
-      { id: "t2", coach_id: "c", swimmer_account_id: 2, swimmer_manual_id: null, stroke: "NL", target_distance_m: 100, target_time_ms: 60000, updated_at: "" },
-      { id: "t3", coach_id: "c", swimmer_account_id: 1, swimmer_manual_id: null, stroke: "Dos", target_distance_m: 50, target_time_ms: 30000, updated_at: "" },
+      { id: "t1", coach_id: "c", swimmer_account_id: 1, swimmer_manual_id: null, stroke: "NL", target_distance_m: 100, target_time_ms: 60000, target_pool_size: "50m", updated_at: "" },
+      { id: "t2", coach_id: "c", swimmer_account_id: 2, swimmer_manual_id: null, stroke: "NL", target_distance_m: 100, target_time_ms: 60000, target_pool_size: "50m", updated_at: "" },
+      { id: "t3", coach_id: "c", swimmer_account_id: 1, swimmer_manual_id: null, stroke: "Dos", target_distance_m: 50, target_time_ms: 30000, target_pool_size: "50m", updated_at: "" },
     ];
     const filtered = targets.filter((t) => belongsTo(t, swimmer));
     expect(filtered).toHaveLength(2);
@@ -85,6 +85,7 @@ describe("accordion open state — regression §184 UX bugfix", () => {
       stroke: "NL",
       target_distance_m: 100,
       target_time_ms: 65000,
+      target_pool_size: "50m",
       updated_at: new Date().toISOString(),
     };
     expect(belongsTo(optimistic, swimmer)).toBe(true);
