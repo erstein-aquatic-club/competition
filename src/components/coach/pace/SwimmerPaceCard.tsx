@@ -24,7 +24,7 @@ import { PaceTargetForm } from "./PaceTargetForm";
 import { PdfExportDialog } from "./PdfExportDialog";
 import { ShareMenu } from "@/components/shared/ShareMenu";
 import { normalizeStroke, eventFamily } from "@/lib/paceCalculatorV2";
-import { formatPaceTime } from "@/lib/paceCalculator";
+import { formatPaceTimeCs } from "@/lib/paceCalculator";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
@@ -58,7 +58,7 @@ function formatTargetLabel(t: PaceTarget): string {
 }
 
 function formatTargetPillLabel(t: PaceTarget): string {
-  return `${formatTargetLabel(t)} · ${formatPaceTime(t.target_time_ms)}`;
+  return `${formatTargetLabel(t)} · ${formatPaceTimeCs(t.target_time_ms)}`;
 }
 
 function strokeBadgeCls(stroke: string): string {
@@ -228,7 +228,7 @@ export function SwimmerPaceCard({
                           </span>
                           <span className="flex-1" />
                           <span className="shrink-0 rounded bg-muted/40 px-2 py-1 font-mono text-[12px] tabular-nums text-foreground/60">
-                            {formatPaceTime(target.target_time_ms)}
+                            {formatPaceTimeCs(target.target_time_ms)}
                           </span>
                         </AccordionPrimitive.Trigger>
                         <AlertDialog>

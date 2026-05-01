@@ -46,6 +46,17 @@ const ROWS_BY_DIST_4N: Record<number, number[]> = {
   400: [100, 200, 300, 400],
 };
 
+export function formatPaceTimeCs(ms: number): string {
+  const rounded = Math.round(ms / 10) * 10;
+  const totalSeconds = rounded / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds - minutes * 60;
+  if (minutes === 0) {
+    return seconds.toFixed(2);
+  }
+  return `${minutes}:${seconds.toFixed(2).padStart(5, "0")}`;
+}
+
 export function formatPaceTime(ms: number): string {
   const rounded = Math.round(ms / 100) * 100;
   const totalSeconds = rounded / 1000;

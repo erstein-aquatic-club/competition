@@ -66,6 +66,15 @@ function fmtTime(s: number): string {
   return `${m}:${rem}`;
 }
 
+/** Format seconds → mm:ss.cc or ss.cc (centièmes — pour les temps cibles). */
+function fmtTimeCs(s: number): string {
+  if (s <= 0) return "—";
+  if (s < 60) return s.toFixed(2);
+  const m = Math.floor(s / 60);
+  const rem = (s - m * 60).toFixed(2).padStart(5, "0");
+  return `${m}:${rem}`;
+}
+
 /** Collect zones ordered for a family, optionally skip V4 if not in data. */
 function getZoneCols(
   family: EventFamily,
@@ -173,7 +182,7 @@ function drawSingleSection({
   doc.text(distLabel, MARGIN + BADGE_W + 3, bandY + 7);
 
   // Pill temps
-  const timeStr = fmtTime(Tobj_s);
+  const timeStr = fmtTimeCs(Tobj_s);
   const PILL_X = MARGIN + BADGE_W + 3 + 28;
   const PILL_W = 28;
   const PILL_H = 8;
@@ -370,7 +379,7 @@ function draw4NSection({
   doc.text(distLabel, MARGIN + BADGE_W + 3, bandY + 7);
 
   // Pill temps
-  const timeStr = fmtTime(Tobj_s);
+  const timeStr = fmtTimeCs(Tobj_s);
   const PILL_X = MARGIN + BADGE_W + 3 + 28;
   const PILL_W = 28;
   const PILL_H = 8;

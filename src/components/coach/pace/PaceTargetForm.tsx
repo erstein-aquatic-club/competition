@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { parsePaceTime, formatPaceTime } from "../../../lib/paceCalculator";
+import { parsePaceTime, formatPaceTimeCs } from "../../../lib/paceCalculator";
 import type { Stroke } from "../../../lib/paceCalculator";
 import type { PoolSize } from "../../../lib/poolConversion";
 
@@ -51,7 +51,7 @@ export function PaceTargetForm({ initial, onSubmit, onCancel }: Props) {
     initial?.target_distance_m ? String(initial.target_distance_m) : "",
   );
   const [timeStr, setTimeStr]   = useState<string>(
-    initial?.target_time_ms ? formatPaceTime(initial.target_time_ms) : "",
+    initial?.target_time_ms ? formatPaceTimeCs(initial.target_time_ms) : "",
   );
   const [poolSize, setPoolSize] = useState<PoolSize>(initial?.target_pool_size ?? "50m");
   const [timeTouched, setTimeTouched] = useState(false);
@@ -161,7 +161,7 @@ export function PaceTargetForm({ initial, onSubmit, onCancel }: Props) {
         />
         {parsedMs !== null && (
           <p className="text-[11px] tabular-nums text-muted-foreground">
-            = {formatPaceTime(parsedMs)}
+            = {formatPaceTimeCs(parsedMs)}
           </p>
         )}
         {showTimeError && (
