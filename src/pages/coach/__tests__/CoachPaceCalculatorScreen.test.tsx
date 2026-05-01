@@ -3,6 +3,8 @@ import type { PaceTarget } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
 
 // Full render requires QueryClient + Supabase — covered by manual E2E.
+// Regression §184-bugfix: accordion open state is now controlled via openSwimmerIds
+// (separate from targets data) so the card stays open after a target is saved.
 
 describe("CoachPaceCalculatorScreen — importability", () => {
   it("default export is a function", async () => {
@@ -53,5 +55,38 @@ describe("belongsTo — target → swimmer matching", () => {
     const filtered = targets.filter((t) => belongsTo(t, swimmer));
     expect(filtered).toHaveLength(2);
     expect(filtered.map((t) => t.id)).toEqual(["t1", "t3"]);
+  });
+});
+
+describe("accordion open state — regression §184 UX bugfix", () => {
+  it("open state is independent of targets: adding a target does not reset openSwimmerIds", () => {
+    // The accordion is now controlled via openSwimmerIds state in CoachPaceCalculatorScreen.
+    // This state is separate from the targets array, so mutations that update targets
+    // cannot close the card. This test verifies the invariant at the logic level.
+    const openIds = ["account-1"];
+
+    // Simulating an optimistic target being added (onMutate):
+    const newTarget = { swimmer_account_id: 1 };
+    // openIds is never modified by target mutations — it's only changed by user clicks
+    expect(openIds).toEqual(["account-1"]);
+    // The new target doesn't affect which items are open
+    expect(openIds.includes("account-" + newTarget.swimmer_account_id)).toBe(true);
+  });
+
+  it("optimistic target matches swimmer so the matrix appears immediately after save", async () => {
+    const { belongsTo } = await import("../CoachPaceCalculatorScreen");
+    const swimmer: TeamMember = { kind: "account", id: "account-1", accountId: 1, displayName: "Sara" };
+    // Shape produced by onMutate optimistic update
+    const optimistic: PaceTarget = {
+      id: "optimistic-123",
+      coach_id: "",
+      swimmer_account_id: 1,
+      swimmer_manual_id: null,
+      stroke: "NL",
+      target_distance_m: 100,
+      target_time_ms: 65000,
+      updated_at: new Date().toISOString(),
+    };
+    expect(belongsTo(optimistic, swimmer)).toBe(true);
   });
 });

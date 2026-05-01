@@ -13,6 +13,9 @@ import { useMyTeam } from "@/hooks/useMyTeam";
 import { getMyPaceZones, upsertMyPaceZones } from "@/lib/api/pace-zones";
 import { listMyPaceTargets, upsertPaceTarget, deletePaceTarget } from "@/lib/api/pace-targets";
 import { DEFAULT_ZONES } from "@/lib/paceCalculator";
+import { exportPacePdf } from "@/lib/export-pace-pdf";
+import { downloadBlob } from "@/lib/downloadBlob";
+import { createPaceShareLink } from "@/lib/api/pace-share";
 import type { AthleteSummary } from "@/lib/api/types";
 import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
@@ -45,6 +48,9 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
   const { team, isLoading: teamLoading } = useMyTeam(athletes);
   const [selectedIds, setSelectedIds] = useState<string[]>(() => team.map((m) => m.id));
   const [zonesOpen, setZonesOpen] = useState(false);
+  const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
+  // Controlled accordion: persists across Accordion unmount/remount (teamLoading ternary)
+  const [openSwimmerIds, setOpenSwimmerIds] = useState<string[]>([]);
 
   const zonesQuery = useQuery({
     queryKey: ["pace-zones"],
@@ -163,7 +169,12 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
           ))}
         </div>
       ) : (
-        <Accordion type="multiple" className="space-y-0">
+        <Accordion
+          type="multiple"
+          value={openSwimmerIds}
+          onValueChange={setOpenSwimmerIds}
+          className="space-y-0"
+        >
           {selectedMembers.map((swimmer) => (
             <SwimmerPaceCard
               key={swimmer.id}
@@ -172,8 +183,24 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
               zones={zones}
               onUpsertTarget={(ref, v) => upsertMutation.mutate({ ref, ...v })}
               onDeleteTarget={(id) => deleteMutation.mutate(id)}
-              onExportPdf={() => {}}
-              onShare={() => {}}
+              onExportPdf={async () => {
+                setExportingPdfId(swimmer.id);
+                try {
+                  const blob = await exportPacePdf({
+                    swimmer,
+                    targets: targets.filter((t) => belongsTo(t, swimmer)),
+                    zones,
+                  });
+                  const slug = swimmer.displayName.toLowerCase().replace(/\s+/g, "-");
+                  downloadBlob(blob, `allures-${slug}.pdf`);
+                } catch (err) {
+                  console.error("PDF export failed", err);
+                } finally {
+                  setExportingPdfId(null);
+                }
+              }}
+              isPdfExporting={exportingPdfId === swimmer.id}
+              onShare={() => createPaceShareLink(buildSwimmerRef(swimmer))}
             />
           ))}
         </Accordion>
