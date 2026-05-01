@@ -386,9 +386,19 @@ import {
   type CoachManualSwimmer,
 } from "./api/coach-manual-swimmers";
 import {
+  getMyPaceZonesV2 as _getMyPaceZonesV2,
+  upsertPaceZoneCell as _upsertPaceZoneCell,
+  resetMyPaceZonesToDefaults as _resetMyPaceZonesToDefaults,
+  initMyPaceZonesIfMissing as _initMyPaceZonesIfMissing,
+  // deprecated v1 stubs
   getMyPaceZones as _getMyPaceZones,
   upsertMyPaceZones as _upsertMyPaceZones,
 } from "./api/pace-zones";
+import {
+  getMyStrokeAdjustments as _getMyStrokeAdjustments,
+  upsertStrokeAdjustment as _upsertStrokeAdjustment,
+  resetMyStrokeAdjustments as _resetMyStrokeAdjustments,
+} from "./api/pace-stroke-adjustments";
 import {
   listMyPaceTargets as _listMyPaceTargets,
   upsertPaceTarget as _upsertPaceTarget,
@@ -997,8 +1007,16 @@ export const api = {
   async deleteManualSwimmer(id: string) { return _deleteManualSwimmer(id); },
 
   // ══════════════════════════════════════════════════════════════════
-  // DELEGATION STUBS — §184 Pace Calculator
+  // DELEGATION STUBS — §186 Pace Calculator v2
   // ══════════════════════════════════════════════════════════════════
+  async getMyPaceZonesV2() { return _getMyPaceZonesV2(); },
+  async upsertPaceZoneCell(args: Parameters<typeof _upsertPaceZoneCell>[0]) { return _upsertPaceZoneCell(args); },
+  async resetMyPaceZonesToDefaults() { return _resetMyPaceZonesToDefaults(); },
+  async initMyPaceZonesIfMissing() { return _initMyPaceZonesIfMissing(); },
+  async getMyStrokeAdjustments() { return _getMyStrokeAdjustments(); },
+  async upsertStrokeAdjustment(args: Parameters<typeof _upsertStrokeAdjustment>[0]) { return _upsertStrokeAdjustment(args); },
+  async resetMyStrokeAdjustments() { return _resetMyStrokeAdjustments(); },
+  // §184 deprecated stubs (removed when CoachPaceCalculatorScreen refondu Phase 6)
   async getMyPaceZones() { return _getMyPaceZones(); },
   async upsertMyPaceZones(zones: Parameters<typeof _upsertMyPaceZones>[0]) { return _upsertMyPaceZones(zones); },
   async listMyPaceTargets() { return _listMyPaceTargets(); },

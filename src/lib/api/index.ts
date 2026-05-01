@@ -469,11 +469,25 @@ export {
   type CoachManualSwimmer,
 } from './coach-manual-swimmers';
 
-// §184 — Pace Calculator API
+// §184/§186 — Pace Calculator API
 export {
+  // v2 (§186)
+  getMyPaceZonesV2,
+  upsertPaceZoneCell,
+  resetMyPaceZonesToDefaults,
+  initMyPaceZonesIfMissing,
+  type ZoneRow,
+  // v1 deprecated stubs — removed when CoachPaceCalculatorScreen is rewritten (Phase 6)
   getMyPaceZones,
   upsertMyPaceZones,
 } from './pace-zones';
+
+export {
+  getMyStrokeAdjustments,
+  upsertStrokeAdjustment,
+  resetMyStrokeAdjustments,
+  type StrokeAdjustmentRow,
+} from './pace-stroke-adjustments';
 
 export {
   listMyPaceTargets,
