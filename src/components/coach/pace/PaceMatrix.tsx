@@ -116,7 +116,6 @@ export function PaceMatrix({
 
   // Reason why the other-pool toggle button should be disabled
   const toggleDisabledReason = (): string => {
-    if (!swimmerSex) return "Profil nageur·euse requis pour la conversion de bassin";
     const probe = convertTargetTime({
       targetTimeMs,
       fromPool: targetPool,
