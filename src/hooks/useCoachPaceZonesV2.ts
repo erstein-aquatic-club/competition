@@ -25,8 +25,7 @@ export function computeToggleV4Action(
 ): { action: "upsert"; k_value: number } | { action: "delete" } | null {
   const hasV4 = currentZones?.[family]?.["V4"] !== undefined;
   if (hasV4) return { action: "delete" };
-  const k = ZONE_COEFFICIENTS[family].V4;
-  if (k === null) return null;
+  const k = ZONE_COEFFICIENTS[family].V4 ?? 0.985;
   return { action: "upsert", k_value: k };
 }
 

@@ -47,7 +47,7 @@ function mergeZonesWithDefaults(
     const defaults: Partial<Record<Zone, number>> = {
       V0: c.V0, V1: c.V1, V2: c.V2, V3: c.V3, MAX: c.MAX,
     };
-    if (c.V4 !== null) defaults.V4 = c.V4;
+    if ((f === "50m" || f === "100m") && c.V4 !== null) defaults.V4 = c.V4;
     result[f] = { ...defaults, ...(raw?.[f] ?? {}) };
   }
   return result;
@@ -164,36 +164,36 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
         onBack={onBack}
         actions={
           <div className="flex items-center gap-1.5">
-            <Badge variant="secondary" className="text-xs font-normal">
-              Équipe ({effectiveSelectedIds.length})
+            <Badge variant="secondary" className="shrink-0 text-xs font-normal">
+              <span className="hidden sm:inline">Équipe </span>({effectiveSelectedIds.length})
             </Badge>
 
             <Button
               variant="outline"
               size="sm"
-              className="h-7 gap-1.5 text-xs"
+              className="h-7 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3"
               onClick={() => setZonesOpen(true)}
             >
               <SlidersHorizontal className="h-3 w-3" />
-              Zones
-              <ZonesPreview zones={fullZones} />
+              <span className="hidden sm:inline">Zones</span>
+              <span className="hidden sm:inline"><ZonesPreview zones={fullZones} /></span>
             </Button>
 
             <Button
               variant="outline"
               size="sm"
-              className="h-7 gap-1.5 text-xs"
+              className="h-7 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3"
               onClick={() => setAdjustmentsOpen(true)}
             >
               <Waves className="h-3 w-3" />
-              Ajust.
+              <span className="hidden sm:inline">Ajust.</span>
             </Button>
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3">
                   <Zap className="h-3 w-3" />
-                  V4
+                  <span className="hidden sm:inline">V4</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-44 p-3" align="end">

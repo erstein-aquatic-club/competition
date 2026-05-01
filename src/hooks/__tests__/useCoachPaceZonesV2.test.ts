@@ -71,16 +71,31 @@ describe("computeToggleV4Action", () => {
     assert.equal(result?.action, "delete");
   });
 
-  it("400m → null (V4 non disponible pour cette famille)", async () => {
+  it("400m sans V4 → upsert avec k=0.985 (fallback)", async () => {
     const { computeToggleV4Action } = await import("../useCoachPaceZonesV2.ts");
     const result = computeToggleV4Action("400m", {});
-    assert.equal(result, null);
+    assert.ok(result !== null, "400m doit retourner upsert, pas null");
+    assert.equal(result!.action, "upsert");
+    assert.ok(
+      Math.abs((result as { action: "upsert"; k_value: number }).k_value - 0.985) < 0.0001,
+      `k_value attendu 0.985, reçu ${(result as { action: "upsert"; k_value: number }).k_value}`,
+    );
   });
 
-  it("800m_1500m → null (V4 non disponible)", async () => {
+  it("400m avec V4 déjà en DB → delete (re-toggle)", async () => {
+    const { computeToggleV4Action } = await import("../useCoachPaceZonesV2.ts");
+    const result = computeToggleV4Action("400m", { "400m": { "V4": 0.985 } });
+    assert.equal(result?.action, "delete");
+  });
+
+  it("800m_1500m sans V4 → upsert avec k=0.985 (fallback)", async () => {
     const { computeToggleV4Action } = await import("../useCoachPaceZonesV2.ts");
     const result = computeToggleV4Action("800m_1500m", {});
-    assert.equal(result, null);
+    assert.ok(result !== null, "800m_1500m doit retourner upsert, pas null");
+    assert.equal(result!.action, "upsert");
+    assert.ok(
+      Math.abs((result as { action: "upsert"; k_value: number }).k_value - 0.985) < 0.0001,
+    );
   });
 
   it("50m sans V4 → upsert avec k=0.98", async () => {
