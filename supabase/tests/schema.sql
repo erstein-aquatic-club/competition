@@ -1068,3 +1068,47 @@ CREATE POLICY "pace_share_links_owner_all"
   ON public.pace_share_links FOR ALL
   USING  (coach_id = (SELECT auth.uid()))
   WITH CHECK (coach_id = (SELECT auth.uid()));
+
+-- §184 — RPC get_pace_share_payload (mirror of migration 00148)
+-- SECURITY DEFINER bypasses RLS — callable by anon.
+CREATE OR REPLACE FUNCTION get_pace_share_payload(token_in uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  link          record;
+  swimmer_name  text;
+  zones         jsonb;
+  targets       jsonb;
+BEGIN
+  SELECT * INTO link FROM pace_share_links
+   WHERE token = token_in AND expires_at > now();
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  IF link.swimmer_account_id IS NOT NULL THEN
+    SELECT display_name INTO swimmer_name FROM users WHERE id = link.swimmer_account_id;
+  ELSE
+    SELECT display_name INTO swimmer_name FROM coach_manual_swimmers WHERE id = link.swimmer_manual_id;
+  END IF;
+
+  SELECT row_to_json(z)::jsonb INTO zones
+    FROM coach_pace_zones z WHERE coach_id = link.coach_id;
+
+  SELECT jsonb_agg(t) INTO targets
+    FROM coach_pace_targets t
+   WHERE coach_id = link.coach_id
+     AND (
+       (swimmer_account_id IS NOT NULL AND swimmer_account_id = link.swimmer_account_id)
+       OR
+       (swimmer_manual_id IS NOT NULL AND swimmer_manual_id = link.swimmer_manual_id)
+     );
+
+  RETURN jsonb_build_object(
+    'swimmer_name', swimmer_name,
+    'zones',        COALESCE(zones,   '{}'::jsonb),
+    'targets',      COALESCE(targets, '[]'::jsonb)
+  );
+END;
+$$;
+GRANT EXECUTE ON FUNCTION get_pace_share_payload(uuid) TO anon, authenticated;

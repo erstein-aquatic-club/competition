@@ -117,3 +117,19 @@ export async function asServiceRole<T>(
     client.release();
   }
 }
+
+/** Run as the `anon` role with no JWT claims (auth.uid() = NULL).
+ *  Use for testing public/unauthenticated access paths. Always rolls back. */
+export async function asAnon<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL ROLE anon");
+    return await fn(client);
+  } finally {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+  }
+}
