@@ -19,11 +19,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileDown, Loader2, Share2, Plus, Trash2 } from "lucide-react";
 import { PaceMatrix } from "./PaceMatrix";
+import { Pace4NSegmentMatrix } from "./Pace4NSegmentMatrix";
 import { PaceTargetForm } from "./PaceTargetForm";
 import { ShareMenu } from "@/components/shared/ShareMenu";
+import { normalizeStroke, eventFamily } from "@/lib/paceCalculatorV2";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
-import type { ZoneConfig } from "@/lib/paceCalculator";
+import type { EventFamily, Zone } from "@/lib/paceData";
+
+type SingleStroke = "crawl" | "dos" | "brasse" | "papillon";
 
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -53,7 +57,9 @@ function formatTargetLabel(t: PaceTarget): string {
 interface Props {
   swimmer: TeamMember;
   targets: PaceTarget[];
-  zones: ZoneConfig;
+  zones: Record<EventFamily, Partial<Record<Zone, number>>>;
+  strokeAdjustments: Record<SingleStroke, Record<EventFamily, number>>;
+  v4ByFamily: Record<EventFamily, boolean>;
   onUpsertTarget: (
     ref: SwimmerRef,
     v: { stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number; target_pool_size: PaceTarget["target_pool_size"] },
@@ -68,6 +74,8 @@ export function SwimmerPaceCard({
   swimmer,
   targets,
   zones,
+  strokeAdjustments,
+  v4ByFamily,
   onUpsertTarget,
   onDeleteTarget,
   onExportPdf,
@@ -153,52 +161,74 @@ export function SwimmerPaceCard({
       <AccordionContent className="pb-4">
         <div className="space-y-4 pt-1">
           {/* Target list */}
-          {targets.map((target) => (
-            <div key={target.id} className="rounded-md border border-border/30 bg-muted/10 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                  {formatTargetLabel(target)}
-                </span>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground/50 hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Supprimer la cible ?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        La cible {formatTargetLabel(target)} de {swimmer.displayName} sera
-                        définitivement supprimée.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annuler</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => onDeleteTarget(target.id)}
+          {targets.map((target) => {
+            const is4NMatrix =
+              target.stroke === "4N" &&
+              (target.target_distance_m === 200 || target.target_distance_m === 400);
+            return (
+              <div key={target.id} className="rounded-md border border-border/30 bg-muted/10 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                    {formatTargetLabel(target)}
+                  </span>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground/50 hover:text-destructive"
                       >
-                        Supprimer
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Supprimer la cible ?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          La cible {formatTargetLabel(target)} de {swimmer.displayName} sera
+                          définitivement supprimée.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => onDeleteTarget(target.id)}
+                        >
+                          Supprimer
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+                {is4NMatrix ? (
+                  <Pace4NSegmentMatrix
+                    targetTimeMs={target.target_time_ms}
+                    targetDistanceM={target.target_distance_m as 200 | 400}
+                    swimmerSex={swimmer.sex ?? null}
+                    targetPool={target.target_pool_size}
+                    zones={zones}
+                    strokeAdjustments={strokeAdjustments}
+                  />
+                ) : (
+                  <PaceMatrix
+                    targetTimeMs={target.target_time_ms}
+                    targetDistanceM={target.target_distance_m}
+                    stroke={normalizeStroke(target.stroke)}
+                    zones={zones}
+                    strokeAdjustments={strokeAdjustments}
+                    swimmerSex={swimmer.sex ?? null}
+                    targetPool={target.target_pool_size}
+                    v4EnabledForFamily={
+                      target.stroke === "4N"
+                        ? false
+                        : v4ByFamily[eventFamily(target.target_distance_m)]
+                    }
+                  />
+                )}
               </div>
-              <PaceMatrix
-                targetTimeMs={target.target_time_ms}
-                targetDistanceM={target.target_distance_m}
-                stroke={target.stroke}
-                zones={zones}
-                swimmerSex={swimmer.sex}
-                targetPool={target.target_pool_size}
-              />
-            </div>
-          ))}
+            );
+          })}
 
           {/* Inline add form */}
           {showAddForm ? (

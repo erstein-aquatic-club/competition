@@ -4,9 +4,21 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { Accordion } from "@/components/ui/accordion";
 import { SwimmerPaceCard, getInitials, buildSwimmerRef } from "../SwimmerPaceCard";
-import { DEFAULT_ZONES } from "../../../../lib/paceCalculator";
+import { STROKE_ADJUSTMENTS_DEFAULT, type EventFamily, type Zone } from "../../../../lib/paceData";
 import type { TeamMember } from "../../../../hooks/useMyTeam";
 import type { PaceTarget } from "../../../../lib/api/pace-targets";
+
+const DEFAULT_ZONES_V2: Record<EventFamily, Partial<Record<Zone, number>>> = {
+  "50m":        { V0: 0.70, V1: 0.78, V2: 0.86, V3: 0.94, V4: 0.98,  MAX: 1.00 },
+  "100m":       { V0: 0.72, V1: 0.80, V2: 0.88, V3: 0.95, V4: 0.98,  MAX: 1.00 },
+  "200m":       { V0: 0.74, V1: 0.82, V2: 0.90, V3: 0.96, V4: 0.985, MAX: 1.00 },
+  "400m":       { V0: 0.76, V1: 0.84, V2: 0.91, V3: 0.96,            MAX: 1.00 },
+  "800m_1500m": { V0: 0.78, V1: 0.86, V2: 0.92, V3: 0.97,            MAX: 1.00 },
+};
+
+const DEFAULT_V4_BY_FAMILY: Record<EventFamily, boolean> = {
+  "50m": true, "100m": true, "200m": false, "400m": false, "800m_1500m": false,
+};
 
 const accountSwimmer: TeamMember = {
   kind: "account",
@@ -31,6 +43,7 @@ function makeTarget(overrides: Partial<PaceTarget> = {}): PaceTarget {
     stroke: "NL",
     target_distance_m: 100,
     target_time_ms: 60_000,
+    target_pool_size: "50m",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
   };
@@ -44,7 +57,9 @@ function renderCard(swimmer: TeamMember, targets: PaceTarget[], open = false) {
       createElement(SwimmerPaceCard, {
         swimmer,
         targets,
-        zones: DEFAULT_ZONES,
+        zones: DEFAULT_ZONES_V2,
+        strokeAdjustments: STROKE_ADJUSTMENTS_DEFAULT,
+        v4ByFamily: DEFAULT_V4_BY_FAMILY,
         onUpsertTarget: () => {},
         onDeleteTarget: () => {},
         onExportPdf: () => {},
@@ -98,13 +113,10 @@ describe("SwimmerPaceCard — static render", () => {
       makeTarget({ id: "t2", stroke: "Dos", target_distance_m: 50 }),
       makeTarget({ id: "t3", stroke: "Brasse", target_distance_m: 200 }),
     ];
-    // Render with accordion open so AccordionContent is in the DOM
     const html = renderCard(accountSwimmer, targets, true);
-    // Each target card shows its label in content: "NL 100 m", "Dos 50 m", "Brasse 200 m"
     assert.ok(html.includes("NL"), "NL target label present");
     assert.ok(html.includes("Dos"), "Dos target label present");
     assert.ok(html.includes("Brasse"), "Brasse target label present");
-    // Count badge in trigger
     assert.ok(html.includes("3 cibles"), "count badge shows 3");
   });
 
