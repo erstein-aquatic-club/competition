@@ -98,14 +98,9 @@ const DIST_COL_W = 22;
 
 function drawPageFooter(doc: jsPDF, coachName?: string): void {
   const y = PAGE_H - 10;
-  doc.setFont("helvetica", "italic");
   doc.setFontSize(6);
   doc.setTextColor(...PDF_GENERAL.TEXT_MUTED);
-  doc.text(
-    "Modèle non-linéaire v2 — régles_calcul_allures_natation.docx",
-    MARGIN,
-    y,
-  );
+  doc.setFont("helvetica", "normal");
   const dateStr = new Date().toLocaleDateString("fr-FR");
   const right = coachName ? `${dateStr} · Coach : ${coachName}` : dateStr;
   doc.setFont("helvetica", "normal");
@@ -182,8 +177,8 @@ function drawSingleSection({
   doc.setTextColor(...PDF_GENERAL.CHARCOAL);
   doc.text(distLabel, MARGIN + BADGE_W + 3, bandY + 7);
 
-  // Pill temps
-  const timeStr = fmtTimeCs(Tobj_s);
+  // Pill temps — ORIGINAL time (bassin d'origine de la cible)
+  const originalTimeStr = fmtTimeCs(target.target_time_ms / 1000);
   const PILL_X = MARGIN + BADGE_W + 3 + 28;
   const PILL_W = 28;
   const PILL_H = 8;
@@ -194,12 +189,21 @@ function drawSingleSection({
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...PDF_GENERAL.CHARCOAL);
-  doc.text(timeStr, PILL_X + PILL_W / 2, bandY + 5.3, { align: "center" });
+  doc.text(originalTimeStr, PILL_X + PILL_W / 2, bandY + 5.3, { align: "center" });
 
-  // Label bassin
-  const poolLabel = notConvertibleNote
-    ? notConvertibleNote
-    : `Bassin ${effectivePool}`;
+  // Label bassin (origine) + arrow + converted (si conversion appliquée)
+  const targetPool = target.target_pool_size ?? "50m";
+  const conversionApplied =
+    effectivePool !== targetPool && !notConvertibleNote;
+  let poolLabel: string;
+  if (notConvertibleNote) {
+    poolLabel = notConvertibleNote;
+  } else if (conversionApplied) {
+    const convStr = fmtTimeCs(Tobj_s);
+    poolLabel = `Bassin ${targetPool}  →  ${convStr} bassin ${effectivePool} (conv.)`;
+  } else {
+    poolLabel = `Bassin ${targetPool}`;
+  }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...PDF_GENERAL.TEXT_MUTED);
@@ -379,8 +383,8 @@ function draw4NSection({
   doc.setTextColor(...PDF_GENERAL.CHARCOAL);
   doc.text(distLabel, MARGIN + BADGE_W + 3, bandY + 7);
 
-  // Pill temps
-  const timeStr = fmtTimeCs(Tobj_s);
+  // Pill temps — ORIGINAL time (bassin d'origine de la cible)
+  const originalTimeStr4N = fmtTimeCs(target.target_time_ms / 1000);
   const PILL_X = MARGIN + BADGE_W + 3 + 28;
   const PILL_W = 28;
   const PILL_H = 8;
@@ -391,11 +395,20 @@ function draw4NSection({
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...PDF_GENERAL.CHARCOAL);
-  doc.text(timeStr, PILL_X + PILL_W / 2, bandY + 5.3, { align: "center" });
+  doc.text(originalTimeStr4N, PILL_X + PILL_W / 2, bandY + 5.3, { align: "center" });
 
-  const poolLabel = notConvertibleNote
-    ? notConvertibleNote
-    : `Bassin ${effectivePool}`;
+  const targetPool4N = target.target_pool_size ?? "50m";
+  const conversionApplied4N =
+    effectivePool !== targetPool4N && !notConvertibleNote;
+  let poolLabel: string;
+  if (notConvertibleNote) {
+    poolLabel = notConvertibleNote;
+  } else if (conversionApplied4N) {
+    const convStr = fmtTimeCs(Tobj_s);
+    poolLabel = `Bassin ${targetPool4N}  →  ${convStr} bassin ${effectivePool} (conv.)`;
+  } else {
+    poolLabel = `Bassin ${targetPool4N}`;
+  }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...PDF_GENERAL.TEXT_MUTED);
