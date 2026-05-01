@@ -50,6 +50,7 @@ const CoachChronoScreen = lazyWithRetry(() => import("./coach/CoachChronoScreen"
 const CoachChronoHistoryScreen = lazyWithRetry(() => import("./coach/CoachChronoHistoryScreen"));
 const CoachMySwimmersScreen = lazyWithRetry(() => import("./coach/CoachMySwimmersScreen"));
 const CoachCommentsScreen = lazyWithRetry(() => import("./coach/CoachCommentsScreen"));
+const CoachPaceCalculatorScreen = lazyWithRetry(() => import("./coach/CoachPaceCalculatorScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
 import type { LocalStrengthRun } from "@/lib/types";
 type KpiLookbackPeriod = 7 | 30 | 365;
@@ -993,7 +994,8 @@ export default function Coach() {
     activeSection === "week" ||
     activeSection === "groups" ||
     activeSection === "chrono" ||
-    activeSection === "my-swimmers";
+    activeSection === "my-swimmers" ||
+    activeSection === "pace-calculator";
   const shouldLoadGroups =
     activeSection === "home" ||
     activeSection === "week" ||
@@ -1315,6 +1317,16 @@ export default function Coach() {
           <CoachCommentsScreen
             onBack={() => setRouteState({ section: "home" })}
             onOpenAthlete={handleOpenAthlete}
+          />
+        </Suspense>
+      ) : null}
+
+      {activeSection === "pace-calculator" ? (
+        <Suspense fallback={<PageSkeleton />}>
+          <CoachPaceCalculatorScreen
+            athletes={athletes}
+            allAthletes={athletes}
+            onBack={() => setRouteState({ section: "home" })}
           />
         </Suspense>
       ) : null}

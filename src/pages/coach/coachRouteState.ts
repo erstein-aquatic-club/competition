@@ -11,6 +11,7 @@ export const COACH_SECTIONS = [
   "chrono-history",
   "my-swimmers",
   "comments",
+  "pace-calculator",
 ] as const;
 
 export const COACH_COMMS_TABS = ["notifications", "sms", "historique"] as const;
