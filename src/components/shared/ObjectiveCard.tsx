@@ -8,8 +8,8 @@
  * CoachObjectivesScreen, AthleteInterviewsSection, SwimmerInterviewsTab.
  */
 
-import type { ReactNode } from "react";
-import { Pencil } from "lucide-react";
+import React, { type ReactNode } from "react";
+import { Calculator, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Objective } from "@/lib/api";
 import {
@@ -20,6 +20,10 @@ import {
   computeProgress,
   STROKE_COLORS,
 } from "@/lib/objectiveHelpers";
+import {
+  parseObjectiveForPace,
+  type ParsedObjectiveTarget,
+} from "@/lib/objective-pace-link";
 
 // ── Stroke colors (top border) ──────────────────────────────────
 
@@ -142,6 +146,16 @@ export type ObjectiveCardProps = {
   onEdit?: () => void;
   compact?: boolean;
   showCoachBadge?: boolean;
+  /** When "coach", a "→ Allures" button is rendered to prefill the pace calculator. Defaults to "swimmer" (button hidden). */
+  context?: "coach" | "swimmer";
+  /** Numeric account id of the swimmer; required to enable the pace link button. */
+  swimmerAccountId?: number;
+  /** Callback fired when the pace link button is clicked with parsed target shape and target time in ms. */
+  onPaceLink?: (
+    parsed: ParsedObjectiveTarget,
+    swimmerAccountId: number,
+    target_time_ms: number,
+  ) => void;
 };
 
 // ── Component ───────────────────────────────────────────────────
@@ -153,6 +167,9 @@ export function ObjectiveCard({
   onEdit,
   compact = false,
   showCoachBadge = false,
+  context = "swimmer",
+  swimmerAccountId,
+  onPaceLink,
 }: ObjectiveCardProps) {
   const hasChrono = !!objective.event_code;
   const stroke = hasChrono ? strokeFromCode(objective.event_code!) : null;
@@ -299,7 +316,55 @@ export function ObjectiveCard({
             <p className="text-[10px] text-muted-foreground/40 italic">Objectif qualitatif</p>
           </div>
         )}
+
+        {/* Pace link button (coach context only) */}
+        {context === "coach" && (() => {
+          const parsed = parseObjectiveForPace(objective.event_code, objective.pool_length);
+          const canCalculate =
+            !!parsed && objective.target_time_seconds != null && swimmerAccountId != null;
+          const tooltipText = !objective.event_code
+            ? "Code épreuve manquant"
+            : !parsed
+              ? `Code épreuve "${objective.event_code}" non reconnu`
+              : objective.target_time_seconds == null
+                ? "Temps cible manquant"
+                : swimmerAccountId == null
+                  ? "Nageur sans compte (manuel) — non lié aux allures"
+                  : "Pré-remplir le calculateur d'allures";
+          return (
+            <button
+              type="button"
+              disabled={!canCalculate}
+              title={tooltipText}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (
+                  canCalculate &&
+                  parsed &&
+                  onPaceLink &&
+                  swimmerAccountId != null &&
+                  objective.target_time_seconds != null
+                ) {
+                  onPaceLink(
+                    parsed,
+                    swimmerAccountId,
+                    Math.round(objective.target_time_seconds * 1000),
+                  );
+                }
+              }}
+              className={[
+                "mt-2 inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium",
+                canCalculate ? "hover:bg-muted" : "cursor-not-allowed opacity-50",
+              ].join(" ")}
+            >
+              <Calculator className="h-3.5 w-3.5" />
+              → Allures
+            </button>
+          );
+        })()}
       </div>
     </Tag>
   );
 }
+
+export default ObjectiveCard;
