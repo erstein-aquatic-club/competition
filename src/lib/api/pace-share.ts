@@ -2,9 +2,11 @@ import { supabase, canUseSupabase } from "./client";
 import type { SwimmerRef } from "./pace-targets";
 import type { ZoneConfig } from "../paceCalculator";
 import type { PaceTarget } from "./pace-targets";
+import type { Sex } from "../poolConversion";
 
 export interface PaceSharePayload {
   swimmer_name: string;
+  swimmer_sex?: Sex | null;
   zones: ZoneConfig;
   targets: PaceTarget[];
 }

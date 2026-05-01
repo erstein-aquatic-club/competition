@@ -14,6 +14,7 @@ const mockTarget = (overrides: Partial<PaceTarget> = {}): PaceTarget => ({
   stroke: "NL",
   target_distance_m: 100,
   target_time_ms: 65_000,
+  target_pool_size: "50m",
   updated_at: "2026-04-30T00:00:00Z",
   ...overrides,
 });
@@ -82,6 +83,21 @@ describe("pace-targets API", () => {
       assert.equal(capturedArgs?.p_stroke, "NL");
       assert.equal(capturedArgs?.p_distance_m, 100);
       assert.equal(capturedArgs?.p_time_ms, 65_000);
+      assert.equal(capturedArgs?.p_pool_size, "50m");
+    });
+  });
+
+  describe("upsertPaceTarget — target_pool_size '25m'", () => {
+    it("passes p_pool_size '25m' to rpc when specified", async () => {
+      let capturedArgs: Record<string, unknown> | undefined;
+      rpcImpl = (_fn: unknown, args: unknown) => {
+        capturedArgs = args as Record<string, unknown>;
+        return Promise.resolve({ data: mockTarget({ target_pool_size: "25m" }), error: null });
+      };
+      const { upsertPaceTarget } = await import("../pace-targets.ts");
+      const swimmer: SwimmerRef = { kind: "account", accountId: 42 };
+      await upsertPaceTarget({ swimmer, stroke: "NL", target_distance_m: 100, target_time_ms: 58_500, target_pool_size: "25m" });
+      assert.equal(capturedArgs?.p_pool_size, "25m");
     });
   });
 

@@ -1,5 +1,6 @@
 import { supabase, canUseSupabase } from "./client";
 import type { Stroke } from "../paceCalculator";
+import type { PoolSize } from "../poolConversion";
 
 export interface PaceTarget {
   id: string;
@@ -9,6 +10,7 @@ export interface PaceTarget {
   stroke: Stroke;
   target_distance_m: number;
   target_time_ms: number;
+  target_pool_size: PoolSize;
   updated_at: string;
 }
 
@@ -31,16 +33,18 @@ export async function upsertPaceTarget(args: {
   stroke: Stroke;
   target_distance_m: number;
   target_time_ms: number;
+  target_pool_size?: PoolSize;
 }): Promise<PaceTarget> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
 
-  const { swimmer, stroke, target_distance_m, target_time_ms } = args;
+  const { swimmer, stroke, target_distance_m, target_time_ms, target_pool_size = "50m" } = args;
   const isAccount = swimmer.kind === "account";
 
   const { data, error } = await supabase.rpc("upsert_pace_target", {
     p_stroke: stroke,
     p_distance_m: target_distance_m,
     p_time_ms: target_time_ms,
+    p_pool_size: target_pool_size,
     p_swimmer_account_id: isAccount ? swimmer.accountId : null,
     p_swimmer_manual_id: !isAccount ? (swimmer as { kind: "manual"; manualId: string }).manualId : null,
   });
