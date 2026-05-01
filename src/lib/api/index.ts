@@ -474,6 +474,7 @@ export {
   // v2 (§186)
   getMyPaceZonesV2,
   upsertPaceZoneCell,
+  deletePaceZoneCell,
   resetMyPaceZonesToDefaults,
   initMyPaceZonesIfMissing,
   type ZoneRow,

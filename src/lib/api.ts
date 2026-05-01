@@ -388,6 +388,7 @@ import {
 import {
   getMyPaceZonesV2 as _getMyPaceZonesV2,
   upsertPaceZoneCell as _upsertPaceZoneCell,
+  deletePaceZoneCell as _deletePaceZoneCell,
   resetMyPaceZonesToDefaults as _resetMyPaceZonesToDefaults,
   initMyPaceZonesIfMissing as _initMyPaceZonesIfMissing,
   // deprecated v1 stubs
@@ -1011,6 +1012,7 @@ export const api = {
   // ══════════════════════════════════════════════════════════════════
   async getMyPaceZonesV2() { return _getMyPaceZonesV2(); },
   async upsertPaceZoneCell(args: Parameters<typeof _upsertPaceZoneCell>[0]) { return _upsertPaceZoneCell(args); },
+  async deletePaceZoneCell(args: Parameters<typeof _deletePaceZoneCell>[0]) { return _deletePaceZoneCell(args); },
   async resetMyPaceZonesToDefaults() { return _resetMyPaceZonesToDefaults(); },
   async initMyPaceZonesIfMissing() { return _initMyPaceZonesIfMissing(); },
   async getMyStrokeAdjustments() { return _getMyStrokeAdjustments(); },

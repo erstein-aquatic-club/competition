@@ -69,6 +69,23 @@ export async function upsertPaceZoneCell(args: {
   if (error) throw new Error(error.message);
 }
 
+/** Deletes a single (family, zone) cell for the current coach (used by toggleV4). */
+export async function deletePaceZoneCell(args: {
+  event_family: EventFamily;
+  zone: Zone;
+}): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase not available");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non authentifié");
+  const { error } = await supabase
+    .from("coach_pace_zones")
+    .delete()
+    .eq("coach_id", user.id)
+    .eq("event_family", args.event_family)
+    .eq("zone", args.zone);
+  if (error) throw new Error(error.message);
+}
+
 /** Resets all zones to doc defaults (DELETE all + bulk INSERT 27 rows). */
 export async function resetMyPaceZonesToDefaults(): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
