@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getMySwimmers } from "@/lib/api/coach-assignments";
-import { listManualSwimmers, type CoachManualSwimmer } from "@/lib/api/coach-manual-swimmers";
+import { getMySwimmers, getSwimmerIdsForCoach } from "@/lib/api/coach-assignments";
+import { listManualSwimmers, listManualSwimmersForCoach, type CoachManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 import type { AthleteSummary } from "@/lib/api/types";
 
 export interface TeamMember {
@@ -67,6 +67,51 @@ export function useMyTeam(allAthletes?: AthleteSummary[]): {
   const isLoading = idsQuery.isLoading || manualsQuery.isLoading;
   const error = (idsQuery.error || manualsQuery.error) as Error | null;
 
+  if (isLoading || error || !idsQuery.data || !manualsQuery.data) {
+    return { team: [], accounts: [], manuals: [], isLoading, error };
+  }
+
+  const athletes = allAthletes ?? [];
+  const built = buildTeam(idsQuery.data, athletes, manualsQuery.data);
+  return { ...built, isLoading: false, error: null };
+}
+
+
+/**
+ * Renvoie l'équipe d'un coach donné (par bigint id). Utilisé par la vue
+ * Allures avec sélecteur de coach (§186).
+ *
+ * Si coachId est `null`/undefined, retourne une équipe vide (utiliser
+ * useMyTeam pour le coach connecté).
+ */
+export function useTeamForCoach(
+  coachId: number | null | undefined,
+  allAthletes?: AthleteSummary[],
+): {
+  team: TeamMember[];
+  accounts: TeamMember[];
+  manuals: TeamMember[];
+  isLoading: boolean;
+  error: Error | null;
+} {
+  const idsQuery = useQuery({
+    queryKey: ["coach-swimmer-ids", coachId],
+    queryFn: () => getSwimmerIdsForCoach(coachId as number),
+    enabled: typeof coachId === "number",
+  });
+
+  const manualsQuery = useQuery({
+    queryKey: ["coach-manual-swimmers", coachId],
+    queryFn: () => listManualSwimmersForCoach(coachId as number),
+    enabled: typeof coachId === "number",
+  });
+
+  const isLoading = idsQuery.isLoading || manualsQuery.isLoading;
+  const error = (idsQuery.error || manualsQuery.error) as Error | null;
+
+  if (typeof coachId !== "number") {
+    return { team: [], accounts: [], manuals: [], isLoading: false, error: null };
+  }
   if (isLoading || error || !idsQuery.data || !manualsQuery.data) {
     return { team: [], accounts: [], manuals: [], isLoading, error };
   }

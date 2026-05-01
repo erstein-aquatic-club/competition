@@ -9,11 +9,12 @@ import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SlidersHorizontal, Waves, Zap } from "lucide-react";
 import CoachSectionHeader from "./CoachSectionHeader";
-import { PaceTeamPanel } from "@/components/coach/pace/PaceTeamPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaceZonesSettings } from "@/components/coach/pace/PaceZonesSettings";
 import { PaceStrokeAdjustments } from "@/components/coach/pace/PaceStrokeAdjustments";
 import { SwimmerPaceCard, buildSwimmerRef } from "@/components/coach/pace/SwimmerPaceCard";
-import { useMyTeam } from "@/hooks/useMyTeam";
+import { useTeamForCoach } from "@/hooks/useMyTeam";
+import { listActiveCoaches } from "@/lib/api/coaches";
 import { useCoachPaceZonesV2 } from "@/hooks/useCoachPaceZonesV2";
 import { useCoachStrokeAdjustments } from "@/hooks/useCoachStrokeAdjustments";
 import { listMyPaceTargets, upsertPaceTarget, deletePaceTarget } from "@/lib/api/pace-targets";
@@ -91,8 +92,16 @@ interface Props {
 export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBack }: Props) {
   const qc = useQueryClient();
   const coachName = useAuth((s) => s.user) ?? undefined;
-  const { team, isLoading: teamLoading } = useMyTeam(athletes);
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => team.map((m) => m.id));
+  const connectedCoachId = useAuth((s) => s.userId);
+  const [selectedCoachId, setSelectedCoachId] = useState<number | null>(null);
+  const effectiveCoachId = selectedCoachId ?? connectedCoachId;
+  const coachesQuery = useQuery({
+    queryKey: ["active-coaches"],
+    queryFn: listActiveCoaches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const coaches = coachesQuery.data ?? [];
+  const { team, isLoading: teamLoading } = useTeamForCoach(effectiveCoachId, athletes);
   const [zonesOpen, setZonesOpen] = useState(false);
   const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
   const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
@@ -168,15 +177,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
     onSettled: () => qc.invalidateQueries({ queryKey: ["pace-targets"] }),
   });
 
-  const crossAthletes = allAthletes ?? athletes;
-  const effectiveSelectedIds = useMemo(
-    () => (selectedIds.length === 0 && team.length > 0 ? team.map((m) => m.id) : selectedIds),
-    [selectedIds, team],
-  );
-  const selectedMembers = useMemo(
-    () => buildSelectedMembers(team, effectiveSelectedIds, crossAthletes),
-    [team, effectiveSelectedIds, crossAthletes],
-  );
+
 
   return (
     <div className="space-y-4 pb-24">
@@ -186,7 +187,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
         actions={
           <div className="flex items-center gap-1.5">
             <Badge variant="secondary" className="shrink-0 text-xs font-normal">
-              <span className="hidden sm:inline">Équipe </span>({effectiveSelectedIds.length})
+              <span className="hidden sm:inline">Équipe </span>({team.length})
             </Badge>
 
             <Button
@@ -248,12 +249,31 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
         }
       />
 
-      <PaceTeamPanel
-        team={team}
-        allAthletes={crossAthletes}
-        selectedIds={effectiveSelectedIds}
-        onChange={setSelectedIds}
-      />
+      {/* Coach selector — défaut = coach connecté */}
+      <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Équipe :
+        </span>
+        <Select
+          value={effectiveCoachId !== null && effectiveCoachId !== undefined ? String(effectiveCoachId) : ""}
+          onValueChange={(v) => setSelectedCoachId(v ? Number(v) : null)}
+        >
+          <SelectTrigger className="h-9 flex-1 max-w-xs">
+            <SelectValue placeholder="Sélectionner un coach…" />
+          </SelectTrigger>
+          <SelectContent>
+            {coaches.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.display_name}
+                {c.id === connectedCoachId ? " (moi)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">
+          {team.length} nageur{team.length !== 1 ? "s" : ""}
+        </span>
+      </div>
 
       {teamLoading || targetsQuery.isLoading ? (
         <div className="space-y-3">
@@ -268,7 +288,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
           onValueChange={setOpenSwimmerIds}
           className="space-y-0"
         >
-          {selectedMembers.map((swimmer) => (
+          {team.map((swimmer) => (
             <SwimmerPaceCard
               key={swimmer.id}
               swimmer={swimmer}

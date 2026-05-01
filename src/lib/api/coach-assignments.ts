@@ -105,3 +105,17 @@ export async function getSwimmerCoachHistory(
   if (error) throw new Error(error.message);
   return (data ?? []) as CoachSwimmerHistory[];
 }
+
+/**
+ * Returns swimmer IDs assigned to a SPECIFIC coach.
+ * Lecture ouverte aux coachs/admins (cf. policy csa_select).
+ */
+export async function getSwimmerIdsForCoach(coachId: number): Promise<number[]> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase
+    .from('coach_swimmer_assignments')
+    .select('swimmer_id')
+    .eq('coach_id', coachId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row: any) => row.swimmer_id as number);
+}

@@ -69,3 +69,17 @@ export async function deleteManualSwimmer(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Returns manual swimmers for a SPECIFIC coach (cross-coach lookup).
+ * Utilise la RPC SECURITY DEFINER `list_manual_swimmers_for_coach`
+ * qui joint via auth.users.raw_app_meta_data->>'app_user_id'.
+ * Coach ID = bigint (users.id), pas l'auth uuid.
+ */
+export async function listManualSwimmersForCoach(coachIdApp: number): Promise<CoachManualSwimmer[]> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase
+    .rpc("list_manual_swimmers_for_coach", { p_coach_id: coachIdApp });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CoachManualSwimmer[];
+}
