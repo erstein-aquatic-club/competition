@@ -33,17 +33,22 @@ export async function getMyPlannedAbsences(): Promise<PlannedAbsence[]> {
 
 export async function setPlannedAbsence(date: string, reason?: string | null): Promise<PlannedAbsence> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  // RLS ensures user can only insert for their own user_id
-  // We need to get the current user's integer ID from app_user_id
   const { data: { session } } = await supabase.auth.getSession();
   const appUserId = session?.user?.app_metadata?.app_user_id;
   if (!appUserId) throw new Error("User ID not found");
+  // Migration 00128 dropped the simple UNIQUE(user_id,date) constraint and replaced it
+  // with an expression-based index COALESCE(scheduled_slot,'all'), which PostgREST cannot
+  // reference via onConflict column names. Use DELETE+INSERT instead.
+  const { error: delError } = await supabase
+    .from("planned_absences")
+    .delete()
+    .eq("user_id", appUserId)
+    .eq("date", date)
+    .is("scheduled_slot", null);
+  if (delError) throw new Error(delError.message);
   const { data, error } = await supabase
     .from("planned_absences")
-    .upsert(
-      { user_id: appUserId, date, reason: reason ?? null },
-      { onConflict: "user_id,date" },
-    )
+    .insert({ user_id: appUserId, date, reason: reason ?? null })
     .select()
     .single();
   if (error) throw new Error(error.message);
