@@ -30,6 +30,7 @@ interface Props {
   zones: Record<EventFamily, Partial<Record<Zone, number>>>;
   strokeAdjustments: Record<SingleStroke, Record<EventFamily, number>>;
   v4EnabledForFamily: boolean;
+  compact?: boolean;
 }
 
 const STROKE_V2_TO_POOL: Record<StrokeV2, Stroke> = {
@@ -78,6 +79,7 @@ export function PaceMatrix({
   zones,
   strokeAdjustments,
   v4EnabledForFamily,
+  compact = false,
 }: Props) {
   const [viewPool, setViewPool] = useState<PoolSize>(targetPool);
 
@@ -152,8 +154,8 @@ export function PaceMatrix({
   return (
     <TooltipProvider>
       <div className="space-y-2">
-        {/* Pool toggle */}
-        <div className="flex items-center gap-1.5">
+        {/* Pool toggle — hidden in compact mode */}
+        {!compact && <div className="flex items-center gap-1.5">
           {(["50m", "25m"] as const).map((p) => {
             const isActive = viewPool === p;
             const isDisabled = !isActive && disabledReason !== "";
@@ -192,7 +194,7 @@ export function PaceMatrix({
               converti
             </span>
           )}
-        </div>
+        </div>}
 
         {/* Matrix table */}
         <div className="overflow-x-auto rounded-md border border-border/30">
