@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import SwimmerWeekSlots from "@/components/shared/SwimmerWeekSlots";
+import SwimmerWeekMatrixCard from "@/components/shared/SwimmerWeekMatrixCard";
 import { WellnessBanner } from "@/components/wellness/WellnessBanner";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
 import { format } from "date-fns";
@@ -759,7 +760,12 @@ export default function SwimmerHome() {
           </div>
         </motion.div>
 
-        {/* Section G — Ma semaine */}
+        {/* Section G — Ma semaine (compact matrix) */}
+        <motion.div variants={slideUp}>
+          <SwimmerWeekMatrixCard />
+        </motion.div>
+
+        {/* Section G-bis — Ma semaine (vue détaillée) */}
         <motion.div variants={slideUp}>
           <SwimmerWeekSlots swimmerSlots={swimmerSlots ?? []} />
         </motion.div>

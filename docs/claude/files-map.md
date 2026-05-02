@@ -229,7 +229,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/profile/AthletePerformanceHub.tsx` | Hub performances athlète | ~546 lignes |
 | `src/components/profile/SwimmerMessagesView.tsx` | Vue messages nageur | ~338 lignes |
 | `src/components/profile/BadgesGrid.tsx` | Grille badges/achievements | ~228 lignes |
-| `src/components/shared/SwimmerWeekSlots.tsx` | Créneaux semaine nageur | ~563 lignes |
+| `src/components/shared/SwimmerWeekSlots.tsx` | Créneaux semaine nageur (vue détaillée jour par jour, swipe semaine) | ~563 lignes |
+| `src/components/shared/SwimmerWeekMatrixCard.tsx` | Card "Ma semaine" compacte nageur — matrice 7j × matin/aprèm avec état ressentis + assignation coach (§190) | 434 lignes |
+| `src/components/shared/swimmerWeekMatrix.ts` | Helpers purs `classifyCell` + `foldCellStates` pour SwimmerWeekMatrixCard (§190) | 70 lignes |
 | `src/components/strength/SessionDetailPreview.tsx` | Aperçu détail séance muscu | ~382 lignes |
 | `src/components/strength/SessionList.tsx` | Liste séances muscu | ~399 lignes |
 | `src/components/strength/ExerciseProgressChart.tsx` | Graphe progression exercice | ~335 lignes |

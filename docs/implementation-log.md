@@ -4,6 +4,58 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190 — Card "Ma semaine" compacte côté nageur (2026-05-02)
+
+**Contexte :** La page d'accueil nageur (`SwimmerHome.tsx` Section G) affichait uniquement la vue détaillée `SwimmerWeekSlots` (jour par jour, défilable). Pas de vue d'ensemble rapide pour répondre à deux questions courantes : "où en suis-je sur mes ressentis cette semaine ?" et "quels créneaux ont une séance coach assignée ?". Le coach a la matrice compacte 7 jours × matin/aprèm depuis §B de `Coach.tsx` ; le nageur ne l'avait pas.
+
+**Objectif :** Ajouter une card compacte "Ma semaine" en tête de la Section G, similaire visuellement à celle du coach mais centrée sur les besoins nageur : état d'assignation par cellule + état du ressenti (saisi / oublié / à venir). Conserver la vue détaillée existante en dessous.
+
+### Changements
+
+**`src/components/shared/swimmerWeekMatrix.ts`** (nouveau, 70 lignes) :
+- Pure helper `classifyCell({state, hasAssignment, hasFeedback, isPast, isToday})` retourne un `CellState` : `none | unassigned | assigned-future | assigned-today | done | missed-feedback | past-no-session`.
+- `foldCellStates(states)` : agrège plusieurs slots du même demi-jour selon priorité `missed-feedback > unassigned > assigned-today > assigned-future > done > past-no-session > none`.
+- Drafts et `cancelled` traités comme "no-session" (invisibles au nageur).
+- Choix produit (validé) : créneau passé sans séance coach assignée = neutre (`past-no-session`), pas de signal "ressenti oublié".
+
+**`src/components/shared/__tests__/swimmerWeekMatrix.test.ts`** (nouveau, 108 lignes) :
+- 9 tests `classifyCell` (chaque état + edge cases draft/cancelled/undefined).
+- 7 tests `foldCellStates` (priorités, edge cases tableau vide).
+- TDD : tests écrits avant le module.
+
+**`src/components/shared/SwimmerWeekMatrixCard.tsx`** (nouveau, 434 lignes) :
+- Hook `useSlotCalendar()` (réutilisé) → instances par date avec `state` et `assignment`.
+- Query React Query `["sessions", userId ?? user]` (même clé que `SwimmerHome` → dedupe via cache) → liste des sessions loggées (= ressentis saisis).
+- Lookup `(assignmentIds, slotKeys)` identique à `buildTodaySessionCompletionLookup` du SwimmerHome existant (compatibilité fallback `date__slot` quand `assignment_id` absent).
+- Grille 7 colonnes × 2 lignes (Matin / Aprèm), agrège les multiples slots d'un même demi-jour via `foldCellStates`.
+- Cellules visuellement distinctes : carré sky pour assigné futur, carré primary pour aujourd'hui, vert + check pour fait, rouge + alert pour ressenti manquant, dashed amber pour empty futur, simple dot gris pour past-no-session.
+- Compteur badge `n×` quand un demi-jour contient ≥ 2 slots.
+- Footer : `{donePast} / {plannedPast} séances faites` à gauche ; à droite, message contextuel — `{missedCount} ressentis à compléter` (rose) / `Tout est à jour` (emerald) / `{assignedFutureCount} séances à venir` (sky) / `Aucun créneau cette semaine` (muted).
+- Tap sur la card → `navigate("/natation")` (calendrier détaillé).
+
+**`src/pages/SwimmerHome.tsx`** (+6 lignes) :
+- Import `SwimmerWeekMatrixCard`.
+- Section G dédoublée : matrix card compacte au-dessus, `SwimmerWeekSlots` détaillé en-dessous. Choix produit (validé) : conserver les deux pour l'instant.
+
+### Tests
+- 633 → 649 pass (+16 tests : 9 `classifyCell` + 7 `foldCellStates`).
+- 1 fail pré-existant inchangé (`transformers.test.ts`).
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Réutilisation `useSlotCalendar`** plutôt que nouvelle requête : même résolution de slots que la vue détaillée existante (group-level, pas individual). Ne dégrade pas l'accuracy par rapport à ce que voit déjà le nageur.
+- **Réutilisation de la clé `["sessions", userId ?? user]`** : dedupe via cache React Query → coût zéro en bande passante car déjà chargé par `SwimmerHome` Section C.
+- **Pas de navigation semaine ±1 dans la card** (YAGNI) : le swipe vit dans `/natation`. La card est volontairement "semaine en cours uniquement".
+- **Pas de toggle Groupe/Perso** : la card couvre l'assignation coach, pas les créneaux personnels (qui ont leur propre vue dans `SwimmerWeekSlots`).
+- **Helper pur extrait** dans un fichier séparé (.ts vs .tsx du composant) : permet le test unitaire sans monter React.
+
+### Limites
+
+- Pas de différenciation visuelle swim vs muscu dans les cellules (icône surcouche). Reporté.
+- Pas de deep-link vers le slot manquant le plus ancien depuis le footer "ressentis à compléter" — tap → calendrier semaine en cours uniquement.
+- La logique `assignment_source` (individual / subgroup / group) du RPC `get_swimmer_sessions` n'est pas consultée : `useSlotCalendar` ne tient compte que des assignations group-level, comme `SwimmerWeekSlots`. Si une séance est assignée individuellement à un nageur sans group-level fallback, elle n'apparaîtra pas dans la matrice (bug parent, hors scope §190).
+
 ## §189-ext — Drawer objectif unifié Allures + Progression (2026-05-02)
 
 **Contexte :** Extension du design §189. Les matrices d'allures (`PaceMatrixInline`) étaient affichées inline sous chaque `ObjectiveCard` dans la vue objectifs nageur, rendant la page lourde et peu lisible sur mobile. Ce patch remplace l'affichage inline par un drawer unifié qui s'ouvre au clic sur l'objectif, avec un toggle [Allures | Progression].
