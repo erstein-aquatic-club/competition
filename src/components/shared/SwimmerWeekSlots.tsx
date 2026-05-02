@@ -363,7 +363,7 @@ export default function SwimmerWeekSlots({
       {/* Section header */}
       <div className="flex items-center justify-between">
         <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Ma semaine
+          Créneaux semaine
         </h2>
         {hasPersoSlots && (
           <ModePill mode={mode} onChange={setMode} />
@@ -418,6 +418,7 @@ export default function SwimmerWeekSlots({
       ) : mode === "groupe" ? (
         <div className="space-y-3">
           {weekDates.map((dateIso) => {
+            if (dateIso < today) return null;
             const slots = visibleGroupByDate.get(dateIso);
             if (!slots || slots.length === 0) return null;
             const isToday = dateIso === today;
@@ -477,6 +478,7 @@ export default function SwimmerWeekSlots({
         /* Personal mode */
         <div className="space-y-3">
           {weekDates.map((dateIso) => {
+            if (dateIso < today) return null;
             const slots = personalByDate.get(dateIso);
             if (!slots || slots.length === 0) return null;
             const isToday = dateIso === today;
