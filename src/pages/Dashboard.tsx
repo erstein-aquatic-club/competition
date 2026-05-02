@@ -362,6 +362,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["my-planned-absences"] });
+      void queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
       toast({ title: "Jour marqué indisponible" });
     },
     onError: (_err, _vars, context) => {
@@ -382,6 +383,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["my-planned-absences"] });
+      void queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
       toast({ title: "Disponibilité restaurée" });
     },
     onError: (_err, _vars, context) => {

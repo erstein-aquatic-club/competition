@@ -512,6 +512,7 @@ export default function SuiviSemaine() {
       api.setPlannedAbsence(date, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
+      queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
       toast({ title: "Absence enregistree" });
     },
   });
@@ -520,6 +521,7 @@ export default function SuiviSemaine() {
     mutationFn: (date: string) => api.removePlannedAbsence(date),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
+      queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
       toast({ title: "Absence annulee" });
     },
   });
