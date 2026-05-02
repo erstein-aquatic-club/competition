@@ -43,6 +43,22 @@ import {
 } from "@/lib/objectiveHelpers";
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
 import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
+import PaceMatrixInline from "@/components/coach/pace/PaceMatrixInline";
+import { parseObjectiveForPace } from "@/lib/objective-pace-link";
+import { listMyPaceTargets, type PaceTarget } from "@/lib/api/pace-targets";
+import { findMatchingTarget } from "@/hooks/useTargetForObjective";
+
+export function shouldRenderInlineMatrix(args: {
+  objective: Objective;
+  swimmerAccountId: number | null;
+  matchingTarget: PaceTarget | null;
+}): boolean {
+  return !!(
+    args.objective.target_time_seconds &&
+    args.swimmerAccountId != null &&
+    args.matchingTarget
+  );
+}
 
 type Props = {
   onBack?: () => void;
@@ -86,6 +102,15 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
     enabled: !!userId,
   });
   const iuf = profile?.ffn_iuf ?? null;
+  const swimmerAccountId: number | null = profile?.id ?? null;
+
+  const { data: paceTargets = [] } = useQuery({
+    queryKey: ["pace-targets-for-swimmer", swimmerAccountId],
+    queryFn: listMyPaceTargets,
+    enabled: swimmerAccountId != null,
+    staleTime: 30_000,
+  });
+
   const perfFromDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 360);
@@ -288,24 +313,56 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
       {/* All objectives in a single grid */}
       {(coachObjectives.length > 0 || personalObjectives.length > 0) && (
         <ObjectiveGrid>
-          {coachObjectives.map((obj) => (
-            <ObjectiveCard
-              key={obj.id}
-              objective={obj}
-              performances={performances}
-              showCoachBadge
-              onClick={obj.event_code ? () => setProgressionObj(obj) : undefined}
-            />
-          ))}
-          {personalObjectives.map((obj) => (
-            <ObjectiveCard
-              key={obj.id}
-              objective={obj}
-              performances={performances}
-              onClick={obj.event_code ? () => setProgressionObj(obj) : () => openEdit(obj)}
-              onEdit={obj.event_code ? () => openEdit(obj) : undefined}
-            />
-          ))}
+          {coachObjectives.map((obj) => {
+            const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+            const matchingTarget = findMatchingTarget(paceTargets, swimmerAccountId ?? -1, parsed);
+            return (
+              <div key={obj.id}>
+                <ObjectiveCard
+                  objective={obj}
+                  performances={performances}
+                  showCoachBadge
+                  onClick={obj.event_code ? () => setProgressionObj(obj) : undefined}
+                />
+                {shouldRenderInlineMatrix({ objective: obj, swimmerAccountId, matchingTarget }) && matchingTarget && (
+                  <div className="mt-2 rounded-lg border border-border bg-card/40 p-3">
+                    <PaceMatrixInline
+                      targetTimeMs={matchingTarget.target_time_ms}
+                      targetDistance={matchingTarget.target_distance_m}
+                      stroke={matchingTarget.stroke}
+                      targetPoolSize={matchingTarget.target_pool_size}
+                      swimmerSex={null}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {personalObjectives.map((obj) => {
+            const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+            const matchingTarget = findMatchingTarget(paceTargets, swimmerAccountId ?? -1, parsed);
+            return (
+              <div key={obj.id}>
+                <ObjectiveCard
+                  objective={obj}
+                  performances={performances}
+                  onClick={obj.event_code ? () => setProgressionObj(obj) : () => openEdit(obj)}
+                  onEdit={obj.event_code ? () => openEdit(obj) : undefined}
+                />
+                {shouldRenderInlineMatrix({ objective: obj, swimmerAccountId, matchingTarget }) && matchingTarget && (
+                  <div className="mt-2 rounded-lg border border-border bg-card/40 p-3">
+                    <PaceMatrixInline
+                      targetTimeMs={matchingTarget.target_time_ms}
+                      targetDistance={matchingTarget.target_distance_m}
+                      stroke={matchingTarget.stroke}
+                      targetPoolSize={matchingTarget.target_pool_size}
+                      swimmerSex={null}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </ObjectiveGrid>
       )}
 
