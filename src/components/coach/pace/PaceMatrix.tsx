@@ -196,14 +196,14 @@ export function PaceMatrix({
           )}
         </div>}
 
-        {/* Matrix table */}
-        <div className="overflow-x-auto rounded-md border border-border/30">
-          <table className="w-full border-collapse text-left min-w-[320px] bg-card">
+        {/* Matrix table — table-fixed+w-full distributes columns across available width, no horizontal scroll */}
+        <div className="rounded-md border border-border/30 overflow-hidden">
+          <table className="w-full table-fixed border-collapse text-left bg-card">
             <thead>
               <tr className="border-b border-border/40 bg-muted/30">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 bg-card border-r border-border/40 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] py-2.5 pr-3 pl-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 min-w-[48px]"
+                  className="w-10 py-2 pl-3 pr-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50"
                 >
                   m
                 </th>
@@ -211,7 +211,7 @@ export function PaceMatrix({
                   <th
                     key={zone}
                     scope="col"
-                    className={`py-2.5 px-3 text-[10px] font-bold uppercase tracking-widest ${headerCls} text-right min-w-[60px]`}
+                    className={`py-2 px-1 text-[10px] font-bold uppercase tracking-widest ${headerCls} text-right`}
                   >
                     {label}
                   </th>
@@ -231,7 +231,7 @@ export function PaceMatrix({
                   >
                     <td
                       className={[
-                        "sticky left-0 z-10 bg-card border-r border-border/40 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] py-3 pr-3 text-[12px] tabular-nums font-medium",
+                        "py-2.5 pr-2 text-[12px] tabular-nums font-medium",
                         isTargetRow
                           ? "pl-2 border-l-[3px] border-l-primary text-primary font-bold"
                           : "pl-3 text-muted-foreground/70",
@@ -243,7 +243,7 @@ export function PaceMatrix({
                       <td
                         key={zone}
                         className={[
-                          "py-3 px-3 font-mono text-[13px] tabular-nums text-right",
+                          "py-2.5 px-1 font-mono text-[11px] tabular-nums text-right",
                           cellBold
                             ? "font-bold text-foreground"
                             : "text-foreground/80",

@@ -50,7 +50,7 @@ export function ObjectiveDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-3xl">
+      <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto overscroll-none rounded-t-3xl">
         <SheetHeader className="text-left">
           <SheetTitle>{eventLabel(objective.event_code)}</SheetTitle>
         </SheetHeader>
