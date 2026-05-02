@@ -657,12 +657,6 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
                 performances={performances}
                 onClick={obj.event_code ? () => openDetail(obj) : () => handleEdit(obj)}
                 onEdit={obj.event_code ? () => handleEdit(obj) : undefined}
-                context="coach"
-                swimmerAccountId={athleteId}
-                onPaceLink={(parsed, accountId, time_ms) => {
-                  const target = handlePaceLinkClick(parsed, accountId, time_ms);
-                  window.location.hash = target;
-                }}
               />
             ))}
           </ObjectiveGrid>
