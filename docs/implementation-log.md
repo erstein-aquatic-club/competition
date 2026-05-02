@@ -4,6 +4,29 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190-ui — SwimmerHome : "Ma semaine" remplace "Aujourd'hui" sous Bien-être (2026-05-02)
+
+**Contexte :** Choix produit. La Section C "Aujourd'hui" (cards par session du jour avec badges Fait/À faire/Lancer) faisait doublon avec la matrice 7j × matin/aprèm en Section G : la matrice donne déjà l'info "ressenti saisi pour aujourd'hui" + une vue plus large. La section "Aujourd'hui" gardait l'utilisateur dans le focus court terme alors que la home se veut un dashboard de la semaine.
+
+**Changement :** Suppression de la Section C "Aujourd'hui" et déplacement de la `SwimmerWeekMatrixCard` à sa place (juste sous la Section B Bien-être). La vue détaillée `SwimmerWeekSlots` reste en Section G en bas de page.
+
+### Changements
+
+**`src/pages/SwimmerHome.tsx`** (~770 → 673 lignes) :
+- Suppression du bloc JSX Section C entier (cards par `todaySession`, branches Fait/À faire/Lancer/Coffee jour de repos).
+- `SwimmerWeekMatrixCard` montée directement après `<Sheet>` du Wellness, en première position après Bien-être.
+- Section G dédoublée du §190 nettoyée : ne reste que `SwimmerWeekSlots` (vue détaillée).
+- Helpers exportés `buildTodaySessionCompletionLookup` + `isTodaySessionLogged` conservés (utilisés par `src/pages/__tests__/SwimmerHome.test.ts`, et par le composant `SwimmerWeekMatrixCard` indirectement via la lookup réimplémentée localement). Les useMemos / queries qui alimentaient la Section C restent en place : ils servent maintenant à priming le cache react-query (clé `["sessions", userId ?? user]` partagée avec `SwimmerWeekMatrixCard`).
+
+### Tests
+- 19 tests `SwimmerHome` + `swimmerWeekMatrix` passants.
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Pas de cleanup agressif des useMemos** : `todaySessions`, `todaySwimmerSessions`, etc. ne sont plus rendus mais leurs queries continuent à priming le cache (pas de re-fetch si un autre composant en a besoin). Coût mémoire négligeable. Cleanup massif reporté à un patch dédié si la file devient bruyante.
+- **Pas de modification des helpers exportés** : ils ont des tests dédiés ; les supprimer cassait `SwimmerHome.test.ts`. Garder l'export même non-utilisé en interne est OK (re-utilisable, et la dette est isolée).
+
 ## §190-fix3 — Card "Ma semaine" : exclure les séances muscu (2026-05-02)
 
 **Contexte :** L'utilisateur a précisé que la card "Ma semaine" doit afficher uniquement les séances natation. Les séances muscu sont déjà visibles via `MyPlanWeekCard` côté Strength + Section "Aujourd'hui".

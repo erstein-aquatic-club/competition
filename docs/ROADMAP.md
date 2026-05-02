@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §190-fix3 livré — card "Ma semaine" nageur filtrée sur `slot_session_type === "swim"` (les séances muscu ne s'affichent plus, déjà couvertes par `MyPlanWeekCard`). §187 (slider affinement) designé mais pas livré. (2026-05-02)*
+*Dernière mise à jour : §190-ui livré — `SwimmerWeekMatrixCard` remplace la Section C "Aujourd'hui" sur la home nageur, juste sous Bien-être. La matrice couvre déjà l'info "ressenti saisi aujourd'hui". `SwimmerWeekSlots` reste en bas. §187 (slider affinement) designé mais pas livré. (2026-05-02)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -130,6 +130,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | §190-fix | Card "Ma semaine" nageur : per-swimmer resolution via `get_swimmer_sessions` | Le §190 initial réutilisait `useSlotCalendar` (résolution group-level), affichant des slots où la séance coach était assignée à un sous-groupe ou un nageur individuel n'incluant pas l'utilisateur courant. Bascule vers l'RPC `getSwimmerSessions(userId, mondayIso, sundayIso, false)` — résolution `individual > subgroup > group` + filtre `is_absent` + `log_session_id` canonique pour le ressenti. `SwimmerWeekMatrixCard.tsx` 434 → 415 LOC. Suppression de la query `api.getSessions` (remplacée par `log_session_id` du RPC). 16 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
 | §190-fix2 | Card "Ma semaine" : feedback lookup via `api.getSessions` (correction §190-fix) | Le RPC `get_swimmer_sessions` (migration 00132 ligne 253) retourne `NULL::uuid AS log_session_id` inconditionnellement → tous les créneaux passés assignés affichaient "ressenti manquant". Réintroduction de la query `api.getSessions` (clé partagée avec SwimmerHome, dedupe cache) + helpers `buildCompletionLookup` / `rowHasFeedback` (match `assignment_id` priorité, fallback `(date, bucket)` avec mapping `"Matin"/"Soir"` → `"morning"/"evening"`). `SwimmerWeekMatrixCard.tsx` 415 → 459 LOC. 16 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
 | §190-fix3 | Card "Ma semaine" : exclure les séances muscu | Filtre `row.slot_session_type !== "swim"` ajouté dans la boucle d'indexation `byDateBucket` de `SwimmerWeekMatrixCard.tsx`. Les rows strength sont ignorées dès l'indexation : ne comptent ni dans le total ni dans `plannedPast/donePast/missedCount`. La muscu reste visible via `MyPlanWeekCard` côté Strength + Section "Aujourd'hui". 16 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
+| §190-ui | SwimmerHome : "Ma semaine" remplace "Aujourd'hui" sous Bien-être | Suppression du bloc JSX Section C "Aujourd'hui" (cards par `todaySession` avec badges Fait/À faire/Lancer/Jour de repos). `SwimmerWeekMatrixCard` déplacée à sa place, juste sous la Section B Bien-être. La vue détaillée `SwimmerWeekSlots` reste en Section G. `SwimmerHome.tsx` ~770 → 673 LOC. Helpers exportés et useMemos / queries préservés pour les tests + cache priming. 19 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
 
 ---
 

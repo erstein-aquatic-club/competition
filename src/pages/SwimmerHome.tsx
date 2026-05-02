@@ -555,106 +555,9 @@ export default function SwimmerHome() {
           </SheetContent>
         </Sheet>
 
-        {/* Section C — Aujourd'hui */}
+        {/* Section C — Ma semaine (matrix compacte, remplace l'ancienne "Aujourd'hui") */}
         <motion.div variants={slideUp}>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-2">
-            Aujourd'hui
-          </p>
-          {todaySessions.length === 0 ? (
-            <Card className="p-4 bg-gradient-to-br from-sky-50/50 to-blue-50/30 dark:from-sky-950/20 dark:to-blue-950/10 border-sky-100/60 dark:border-sky-900/30">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100/80 dark:bg-sky-900/30">
-                  <Coffee className="h-5 w-5 text-sky-600 dark:text-sky-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">Jour de repos</p>
-                  <p className="text-xs text-muted-foreground/70">Profite bien de ta journée</p>
-                </div>
-              </div>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {todaySessions.map((session) => {
-                const logged = isSessionLogged(session);
-                const SlotIcon = session.slotKey === "AM" ? Sun : Moon;
-                const TypeIcon = session.isMuscu ? Dumbbell : Waves;
-
-                return (
-                  <Card
-                    key={session.id}
-                    className={`relative overflow-hidden p-3 cursor-pointer transition-all hover:bg-accent/50 active:scale-[0.98] ${
-                      session.isMuscu
-                        ? "border-l-[3px] border-l-amber-500"
-                        : "border-l-[3px] border-l-primary"
-                    }`}
-                    onClick={() => {
-                      if (session.isMuscu) {
-                        navigate("/strength");
-                      } else {
-                        navigate("/natation?open=today");
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                          session.isMuscu
-                            ? "bg-amber-500/10"
-                            : "bg-primary/10"
-                        }`}
-                      >
-                        <TypeIcon
-                          className={`h-5 w-5 ${
-                            session.isMuscu ? "text-amber-600 dark:text-amber-400" : "text-primary"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <SlotIcon className="h-3 w-3 text-muted-foreground/70" />
-                          <span className="text-xs text-muted-foreground font-medium">
-                            {session.slotKey === "AM" ? "Matin" : "Soir"}
-                            {session.slotTime && ` · ${session.slotTime}`}
-                          </span>
-                        </div>
-                        <p className="text-sm font-semibold truncate mt-0.5">
-                          {session.isEmpty ? "Entraînement libre" : session.title}
-                        </p>
-                        {session.km != null && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {fmtKm(session.km)} km
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="shrink-0">
-                        {logged ? (
-                          <div className="flex h-7 items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5">
-                            <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                              Fait
-                            </span>
-                          </div>
-                        ) : session.isMuscu ? (
-                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2.5 py-1 rounded-full">
-                            Lancer
-                          </span>
-                        ) : (
-                          <div className="flex h-7 items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5">
-                            <Clock className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
-                            <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">
-                              A faire
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+          <SwimmerWeekMatrixCard />
         </motion.div>
 
         {/* Section D — Prochaine compétition (conditional) */}
@@ -760,12 +663,7 @@ export default function SwimmerHome() {
           </div>
         </motion.div>
 
-        {/* Section G — Ma semaine (compact matrix) */}
-        <motion.div variants={slideUp}>
-          <SwimmerWeekMatrixCard />
-        </motion.div>
-
-        {/* Section G-bis — Ma semaine (vue détaillée) */}
+        {/* Section G — Ma semaine (vue détaillée) */}
         <motion.div variants={slideUp}>
           <SwimmerWeekSlots swimmerSlots={swimmerSlots ?? []} />
         </motion.div>
