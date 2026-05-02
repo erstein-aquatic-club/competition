@@ -518,13 +518,13 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
     enabled: !!athleteId,
   });
 
-  const hasSyncedRef = useRef(false);
+  const syncedForAthleteRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (objectivesLoading || paceTargetsLoading) return;
     if (!athleteId || objectives.length === 0) return;
-    if (hasSyncedRef.current) return;
-    hasSyncedRef.current = true;
+    if (syncedForAthleteRef.current === athleteId) return;
+    syncedForAthleteRef.current = athleteId;
 
     const missing = objectives.filter((obj) => {
       const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
@@ -535,16 +535,21 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
 
     void Promise.allSettled(
       missing.map((obj) => {
-        const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length)!;
+        const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+        if (!parsed || obj.target_time_seconds == null) return Promise.resolve();
         return upsertPaceTarget({
           swimmer: { kind: "account", accountId: athleteId },
           stroke: parsed.stroke,
           target_distance_m: parsed.distance,
-          target_time_ms: obj.target_time_seconds! * 1000,
+          target_time_ms: obj.target_time_seconds * 1000,
           target_pool_size: parsed.pool_size,
         });
       }),
-    ).then(() => {
+    ).then((results) => {
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        console.warn(`[pace-autosync] ${failed.length}/${results.length} upserts failed`);
+      }
       void queryClient.invalidateQueries({ queryKey: ["pace-targets"] });
     });
   }, [objectivesLoading, paceTargetsLoading, objectives, paceTargets, athleteId, queryClient]);
