@@ -166,7 +166,7 @@ export function PaceMatrix({
                 disabled={isDisabled}
                 onClick={() => !isDisabled && setViewPool(p)}
                 className={[
-                  "h-6 rounded px-2.5 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                  "h-7 rounded px-3 text-[10px] font-semibold uppercase tracking-wider transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground"
                     : isDisabled
@@ -198,12 +198,12 @@ export function PaceMatrix({
 
         {/* Matrix table */}
         <div className="overflow-x-auto rounded-md border border-border/30">
-          <table className="w-full border-collapse text-left min-w-[320px]">
+          <table className="w-full border-collapse text-left min-w-[320px] bg-card">
             <thead>
               <tr className="border-b border-border/40 bg-muted/30">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 bg-muted/30 py-2 pr-2 pl-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60 min-w-[44px]"
+                  className="sticky left-0 z-10 bg-card border-r border-border/40 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] py-2.5 pr-3 pl-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 min-w-[48px]"
                 >
                   m
                 </th>
@@ -211,7 +211,7 @@ export function PaceMatrix({
                   <th
                     key={zone}
                     scope="col"
-                    className={`py-2 px-2 text-[10px] font-bold uppercase tracking-widest ${headerCls} text-right min-w-[56px]`}
+                    className={`py-2.5 px-3 text-[10px] font-bold uppercase tracking-widest ${headerCls} text-right min-w-[60px]`}
                   >
                     {label}
                   </th>
@@ -225,16 +225,16 @@ export function PaceMatrix({
                   <tr
                     key={d}
                     className={[
-                      "border-b border-border/20 transition-colors",
-                      isTargetRow ? "bg-primary/5" : "hover:bg-muted/20",
+                      "border-b border-border/20 last:border-0",
+                      isTargetRow ? "bg-primary/5" : "",
                     ].join(" ")}
                   >
                     <td
                       className={[
-                        "sticky left-0 z-10 py-[9px] pr-2 pl-3 text-[11px] tabular-nums min-h-[36px]",
+                        "sticky left-0 z-10 bg-card border-r border-border/40 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] py-3 pr-3 text-[12px] tabular-nums font-medium",
                         isTargetRow
-                          ? "bg-primary/5 font-semibold text-foreground"
-                          : "bg-background text-muted-foreground/70",
+                          ? "pl-2 border-l-[3px] border-l-primary text-primary font-bold"
+                          : "pl-3 text-muted-foreground/70",
                       ].join(" ")}
                     >
                       {d >= 1000 ? `${d / 1000}k` : d}
@@ -243,7 +243,7 @@ export function PaceMatrix({
                       <td
                         key={zone}
                         className={[
-                          "py-[9px] px-2 font-mono text-[13px] tabular-nums text-right",
+                          "py-3 px-3 font-mono text-[13px] tabular-nums text-right",
                           cellBold
                             ? "font-bold text-foreground"
                             : "text-foreground/80",
