@@ -41,11 +41,12 @@ import {
   parseTime,
 } from "@/lib/objectiveHelpers";
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
-import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
+import { ObjectiveDetailSheet } from "@/components/shared/ObjectiveDetailSheet";
 import { setPacePrefill } from "@/lib/pace-prefill-handoff";
 import { parseObjectiveForPace, shouldAutoSyncToPaceTarget } from "@/lib/objective-pace-link";
 import type { ParsedObjectiveTarget } from "@/lib/objective-pace-link";
-import { upsertPaceTarget, listMyPaceTargets } from "@/lib/api/pace-targets";
+import { upsertPaceTarget, listMyPaceTargets, type PaceTarget } from "@/lib/api/pace-targets";
+import { findMatchingTarget } from "@/hooks/useTargetForObjective";
 import type { QueryClient } from "@tanstack/react-query";
 
 export function handlePaceLinkClick(
@@ -471,7 +472,8 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
-  const [progressionObj, setProgressionObj] = useState<Objective | null>(null);
+  const [detailObj, setDetailObj] = useState<Objective | null>(null);
+  const [detailMatchingTarget, setDetailMatchingTarget] = useState<PaceTarget | null>(null);
 
   // Resolve the auth UUID for the athlete
   const { data: athleteAuthId, isLoading: authIdLoading } = useQuery({
@@ -553,6 +555,13 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
       void queryClient.invalidateQueries({ queryKey: ["pace-targets"] });
     });
   }, [objectivesLoading, paceTargetsLoading, objectives, paceTargets, athleteId, queryClient]);
+
+  const openDetail = (obj: Objective) => {
+    const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+    const target = findMatchingTarget(paceTargets, athleteId, parsed);
+    setDetailMatchingTarget(target);
+    setDetailObj(obj);
+  };
 
   const handleCreate = () => {
     setEditingObj(null);
@@ -646,7 +655,7 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
                 key={obj.id}
                 objective={obj}
                 performances={performances}
-                onClick={obj.event_code ? () => setProgressionObj(obj) : () => handleEdit(obj)}
+                onClick={obj.event_code ? () => openDetail(obj) : () => handleEdit(obj)}
                 onEdit={obj.event_code ? () => handleEdit(obj) : undefined}
                 context="coach"
                 swimmerAccountId={athleteId}
@@ -676,18 +685,13 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
         />
       )}
 
-      {/* Progression sheet */}
-      {progressionObj?.event_code && (
-        <EventProgressionSheet
-          open={!!progressionObj}
-          onOpenChange={(open) => { if (!open) setProgressionObj(null); }}
-          eventCode={progressionObj.event_code}
-          poolLength={(progressionObj.pool_length === 50 ? 50 : 25) as 25 | 50}
-          iuf={athleteIuf}
-          targetTime={progressionObj.target_time_seconds}
-          athleteName={athleteName}
-        />
-      )}
+      <ObjectiveDetailSheet
+        open={!!detailObj}
+        onOpenChange={(open) => { if (!open) { setDetailObj(null); setDetailMatchingTarget(null); } }}
+        objective={detailObj}
+        matchingTarget={detailMatchingTarget}
+        iuf={athleteIuf}
+      />
     </div>
   );
 };
