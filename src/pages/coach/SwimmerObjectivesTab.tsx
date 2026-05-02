@@ -43,7 +43,10 @@ import {
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
 import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
 import { setPacePrefill } from "@/lib/pace-prefill-handoff";
+import { parseObjectiveForPace } from "@/lib/objective-pace-link";
 import type { ParsedObjectiveTarget } from "@/lib/objective-pace-link";
+import { upsertPaceTarget, listMyPaceTargets } from "@/lib/api/pace-targets";
+import type { QueryClient } from "@tanstack/react-query";
 
 export function handlePaceLinkClick(
   parsed: ParsedObjectiveTarget,
@@ -62,6 +65,27 @@ export function handlePaceLinkClick(
     storage,
   );
   return "#/coach?section=pace-calculator";
+}
+
+export async function autoSyncPaceTarget(
+  obj: { event_code?: string | null; pool_length?: number | null; target_time_seconds?: number | null },
+  athleteAccountId: number,
+  queryClient: QueryClient,
+): Promise<void> {
+  const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+  if (!parsed || obj.target_time_seconds == null) return;
+  try {
+    await upsertPaceTarget({
+      swimmer: { kind: "account", accountId: athleteAccountId },
+      stroke: parsed.stroke,
+      target_distance_m: parsed.distance,
+      target_time_ms: obj.target_time_seconds * 1000,
+      target_pool_size: parsed.pool_size,
+    });
+    void queryClient.invalidateQueries({ queryKey: ["pace-targets"] });
+  } catch {
+    // silent — pace sync is best-effort
+  }
 }
 
 // ── Types ───────────────────────────────────────────────────────
@@ -94,6 +118,7 @@ type ObjectiveFormProps = {
   objective?: Objective | null;
   athleteName: string;
   athleteAuthId: string;
+  athleteAccountId: number;
   competitions: Competition[];
 };
 
@@ -103,6 +128,7 @@ const ObjectiveFormSheet = ({
   objective,
   athleteName,
   athleteAuthId,
+  athleteAccountId,
   competitions,
 }: ObjectiveFormProps) => {
   const { toast } = useToast();
@@ -145,9 +171,10 @@ const ObjectiveFormSheet = ({
 
   const createMutation = useMutation({
     mutationFn: (input: ObjectiveInput) => api.createObjective(input),
-    onSuccess: () => {
+    onSuccess: (data: Objective) => {
       toast({ title: "Objectif créé" });
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
+      void autoSyncPaceTarget(data, athleteAccountId, queryClient);
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -162,9 +189,10 @@ const ObjectiveFormSheet = ({
   const updateMutation = useMutation({
     mutationFn: (input: Partial<ObjectiveInput>) =>
       api.updateObjective(objective!.id, input),
-    onSuccess: () => {
+    onSuccess: (data: Objective) => {
       toast({ title: "Objectif mis à jour" });
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
+      void autoSyncPaceTarget(data, athleteAccountId, queryClient);
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -599,6 +627,7 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
           objective={editingObj}
           athleteName={athleteName}
           athleteAuthId={athleteAuthId}
+          athleteAccountId={athleteId}
           competitions={competitions}
         />
       )}
