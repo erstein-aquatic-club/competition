@@ -247,9 +247,10 @@ export default function SwimmerWeekMatrixCard() {
     let assignedFutureCount = 0;
     let totalSlots = 0;
 
-    // Index relevant rows by date+bucket
+    // Index relevant rows by date+bucket — swim only (muscu is shown elsewhere).
     const byDateBucket = new Map<string, SwimmerSession[]>();
     for (const row of rows) {
+      if (row.slot_session_type !== "swim") continue;
       // Skip absences — the swimmer is excused, the slot doesn't apply this day.
       if (row.is_absent) continue;
       const key = `${row.scheduled_date}__${row.bucket}`;

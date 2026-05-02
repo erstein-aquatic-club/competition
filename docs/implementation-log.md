@@ -4,6 +4,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190-fix3 — Card "Ma semaine" : exclure les séances muscu (2026-05-02)
+
+**Contexte :** L'utilisateur a précisé que la card "Ma semaine" doit afficher uniquement les séances natation. Les séances muscu sont déjà visibles via `MyPlanWeekCard` côté Strength + Section "Aujourd'hui".
+
+**Changement :** Filtre `row.slot_session_type !== "swim"` ajouté dans la boucle d'indexation `byDateBucket` de `SwimmerWeekMatrixCard.tsx`. Les rows strength sont ignorées dès l'indexation : ne comptent ni dans le total, ni dans plannedPast/donePast/missedCount.
+
+### Tests
+- 16 tests pure helper inchangés (passants).
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Filtrage côté front, pas côté RPC** : on garde la même query (peut être réutilisée par d'autres composants à l'avenir si une vue unifiée swim+strength devenait pertinente).
+- **`slot_session_type` plutôt que filtre sur location** : champ explicite du RPC, robuste aux changements de nommage de location ("Salle", "Gym", etc.).
+
 ## §190-fix2 — Card "Ma semaine" : feedback lookup via api.getSessions (2026-05-02)
 
 **Contexte :** Régression du §190-fix. La card affichait des points rouges "ressenti manquant" sur tous les créneaux passés assignés, même quand le nageur avait bel et bien saisi son ressenti.
