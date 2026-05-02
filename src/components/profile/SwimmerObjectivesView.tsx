@@ -42,23 +42,10 @@ import {
   parseTime,
 } from "@/lib/objectiveHelpers";
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
-import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
-import PaceMatrixInline from "@/components/coach/pace/PaceMatrixInline";
+import { ObjectiveDetailSheet } from "@/components/shared/ObjectiveDetailSheet";
 import { parseObjectiveForPace } from "@/lib/objective-pace-link";
 import { listMyPaceTargets, type PaceTarget } from "@/lib/api/pace-targets";
 import { findMatchingTarget } from "@/hooks/useTargetForObjective";
-
-export function shouldRenderInlineMatrix(args: {
-  objective: Objective;
-  swimmerAccountId: number | null;
-  matchingTarget: PaceTarget | null;
-}): boolean {
-  return !!(
-    args.objective.target_time_seconds &&
-    args.swimmerAccountId != null &&
-    args.matchingTarget
-  );
-}
 
 type Props = {
   onBack?: () => void;
@@ -73,7 +60,8 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Objective | null>(null);
-  const [progressionObj, setProgressionObj] = useState<Objective | null>(null);
+  const [detailObj, setDetailObj] = useState<Objective | null>(null);
+  const [detailMatchingTarget, setDetailMatchingTarget] = useState<PaceTarget | null>(null);
 
   // Get current auth user UUID
   const { data: authUser } = useQuery({
@@ -167,6 +155,13 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
     );
     setText(obj.text ?? "");
     setShowForm(true);
+  };
+
+  const openDetail = (obj: Objective) => {
+    const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+    const target = findMatchingTarget(paceTargets, swimmerAccountId ?? -1, parsed);
+    setDetailMatchingTarget(target);
+    setDetailObj(obj);
   };
 
   // ── Mutations ──
@@ -313,56 +308,24 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
       {/* All objectives in a single grid */}
       {(coachObjectives.length > 0 || personalObjectives.length > 0) && (
         <ObjectiveGrid>
-          {coachObjectives.map((obj) => {
-            const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
-            const matchingTarget = findMatchingTarget(paceTargets, swimmerAccountId ?? -1, parsed);
-            return (
-              <div key={obj.id}>
-                <ObjectiveCard
-                  objective={obj}
-                  performances={performances}
-                  showCoachBadge
-                  onClick={obj.event_code ? () => setProgressionObj(obj) : undefined}
-                />
-                {shouldRenderInlineMatrix({ objective: obj, swimmerAccountId, matchingTarget }) && matchingTarget && (
-                  <div className="mt-2 rounded-lg border border-border bg-card/40 p-3">
-                    <PaceMatrixInline
-                      targetTimeMs={matchingTarget.target_time_ms}
-                      targetDistance={matchingTarget.target_distance_m}
-                      stroke={matchingTarget.stroke}
-                      targetPoolSize={matchingTarget.target_pool_size}
-                      swimmerSex={null}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {personalObjectives.map((obj) => {
-            const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
-            const matchingTarget = findMatchingTarget(paceTargets, swimmerAccountId ?? -1, parsed);
-            return (
-              <div key={obj.id}>
-                <ObjectiveCard
-                  objective={obj}
-                  performances={performances}
-                  onClick={obj.event_code ? () => setProgressionObj(obj) : () => openEdit(obj)}
-                  onEdit={obj.event_code ? () => openEdit(obj) : undefined}
-                />
-                {shouldRenderInlineMatrix({ objective: obj, swimmerAccountId, matchingTarget }) && matchingTarget && (
-                  <div className="mt-2 rounded-lg border border-border bg-card/40 p-3">
-                    <PaceMatrixInline
-                      targetTimeMs={matchingTarget.target_time_ms}
-                      targetDistance={matchingTarget.target_distance_m}
-                      stroke={matchingTarget.stroke}
-                      targetPoolSize={matchingTarget.target_pool_size}
-                      swimmerSex={null}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {coachObjectives.map((obj) => (
+            <ObjectiveCard
+              key={obj.id}
+              objective={obj}
+              performances={performances}
+              showCoachBadge
+              onClick={obj.event_code ? () => openDetail(obj) : undefined}
+            />
+          ))}
+          {personalObjectives.map((obj) => (
+            <ObjectiveCard
+              key={obj.id}
+              objective={obj}
+              performances={performances}
+              onClick={obj.event_code ? () => openDetail(obj) : () => openEdit(obj)}
+              onEdit={obj.event_code ? () => openEdit(obj) : undefined}
+            />
+          ))}
         </ObjectiveGrid>
       )}
 
@@ -516,19 +479,13 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Progression sheet */}
-      {progressionObj?.event_code && (
-        <EventProgressionSheet
-          open={!!progressionObj}
-          onOpenChange={(open) => { if (!open) setProgressionObj(null); }}
-          eventCode={progressionObj.event_code}
-          poolLength={(progressionObj.pool_length === 50 ? 50 : 25) as 25 | 50}
-          iuf={iuf}
-          targetTime={progressionObj.target_time_seconds}
-        />
-      )}
+      <ObjectiveDetailSheet
+        open={!!detailObj}
+        onOpenChange={(open) => { if (!open) setDetailObj(null); }}
+        objective={detailObj}
+        matchingTarget={detailMatchingTarget}
+        iuf={iuf}
+      />
     </div>
   );
 }
-
-// ObjectiveCard replaced by shared import from @/components/shared/ObjectiveCard
