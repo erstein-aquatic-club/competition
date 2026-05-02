@@ -38,3 +38,24 @@ export function parseObjectiveForPace(
   const pool_size: PoolSize = pool_length === 25 ? "25m" : "50m";
   return { stroke, distance, pool_size };
 }
+
+export function shouldAutoSyncToPaceTarget(
+  objective: { target_time_seconds?: number | null },
+  parsed: ParsedObjectiveTarget | null,
+  existingTargets: Array<{
+    swimmer_account_id: number | null;
+    stroke: string;
+    target_distance_m: number;
+    target_pool_size: string;
+  }>,
+  athleteId: number,
+): boolean {
+  if (!parsed || objective.target_time_seconds == null) return false;
+  return !existingTargets.some(
+    (t) =>
+      t.swimmer_account_id === athleteId &&
+      t.stroke === parsed.stroke &&
+      t.target_distance_m === parsed.distance &&
+      t.target_pool_size === parsed.pool_size,
+  );
+}

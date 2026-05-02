@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseObjectiveForPace } from "../objective-pace-link";
+import { parseObjectiveForPace, shouldAutoSyncToPaceTarget } from "../objective-pace-link";
 
 describe("parseObjectiveForPace", () => {
   it("parses 100NL with pool_length=50 → 100m NL 50m", () => {
@@ -33,5 +33,27 @@ describe("parseObjectiveForPace", () => {
   it("preserves distance for the long-distance codes", () => {
     assert.equal(parseObjectiveForPace("800NL", 50)?.distance, 800);
     assert.equal(parseObjectiveForPace("1500NL", 50)?.distance, 1500);
+  });
+});
+
+const parsed = { stroke: "NL" as const, distance: 100, pool_size: "50m" as const };
+const target = { swimmer_account_id: 42, stroke: "NL", target_distance_m: 100, target_pool_size: "50m" };
+
+describe("shouldAutoSyncToPaceTarget", () => {
+  it("returns false when parsed is null", () => {
+    assert.equal(shouldAutoSyncToPaceTarget({ target_time_seconds: 60 }, null, [], 42), false);
+  });
+  it("returns false when target_time_seconds is null", () => {
+    assert.equal(shouldAutoSyncToPaceTarget({ target_time_seconds: null }, parsed, [], 42), false);
+  });
+  it("returns false when matching target already exists for this athlete", () => {
+    assert.equal(shouldAutoSyncToPaceTarget({ target_time_seconds: 60 }, parsed, [target], 42), false);
+  });
+  it("returns true when no matching target exists", () => {
+    assert.equal(shouldAutoSyncToPaceTarget({ target_time_seconds: 60 }, parsed, [], 42), true);
+  });
+  it("returns true when existing target belongs to a different athlete", () => {
+    const other = { ...target, swimmer_account_id: 99 };
+    assert.equal(shouldAutoSyncToPaceTarget({ target_time_seconds: 60 }, parsed, [other], 42), true);
   });
 });
