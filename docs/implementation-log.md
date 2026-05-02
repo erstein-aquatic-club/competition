@@ -4,6 +4,29 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190-ui3 — SwimmerHome : remplacer la card "Prochaine compétition" par l'`InlineBanner` du calendrier (2026-05-02)
+
+**Contexte :** Le §190-ui2 ajoutait un compteur "N séances avant" dans une card custom. L'utilisateur a demandé de réutiliser directement la bannière `InlineBanner` du calendrier pour cohérence visuelle (mêmes couleurs, même layout, même comportement).
+
+**Changement :** La card amber custom (Trophy + J-X badge + name + location + ligne meta avec courses/séances/checklist) est remplacée par un seul `<InlineBanner variant="amber" />` avec les props `label`/`badge`/`sublabel`/`subbadge`. Comportement identique au calendrier : tap → navigation vers `/competition/:id`.
+
+### Changements
+
+**`src/pages/SwimmerHome.tsx`** (710 → 669 lignes) :
+- Import `InlineBanner` depuis `@/components/shared/InlineBanner`.
+- Remplacement de la `<Card>` custom de la Section D par un `<InlineBanner>` paramétré (icon `<Trophy />`, badge `J-X` ou `"Aujourd'hui"`, sublabel = location, subbadge = `N séance(s)`).
+- Suppression : import `MapPin` (uniquement utilisé dans la card custom), queries `["competition-races"]` + `["competition-checklist"]`, memo `checklistProgress` (toutes feedaient l'ancienne ligne meta supprimée).
+- La page de détail compétition (`/competition/:id`, atteinte après tap) fetchera les races/checklist à la demande — pas de régression utilisateur.
+
+### Tests
+- 3 tests `SwimmerHome` passants.
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Suppression des queries races/checklist** : elles ne servaient plus qu'à afficher des compteurs sur la home. La page détail compétition les recharge à la demande. Économie de 2 requêtes au mount.
+- **Pas de chevron côté droit** : `InlineBanner` n'expose pas de chevron `aria-hidden` natif ; le badge `J-X` aligné à droite remplit ce rôle visuel. Cohérent avec le rendu calendrier.
+
 ## §190-ui2 — SwimmerHome : compteur séances restantes sur card "Prochaine compétition" (2026-05-02)
 
 **Contexte :** La vue calendrier nageur (`Dashboard.tsx`) affiche déjà un bandeau avec la prochaine compétition + le nombre de séances d'entraînement restantes avant l'échéance (calculé via `computeTrainingDaysRemaining` dans `lib/date.ts`). L'utilisateur a demandé de surfacer la même info sur la card "Prochaine compétition" du SwimmerHome (Section D) pour qu'elle soit visible sans aller dans le calendrier.

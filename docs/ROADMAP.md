@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §190-ui2 livré — card "Prochaine compétition" sur SwimmerHome affiche `N séance(s) avant` (même logique que le bandeau du calendrier). §187 (slider affinement) designé mais pas livré. (2026-05-02)*
+*Dernière mise à jour : §190-ui3 livré — Section "Prochaine compétition" du SwimmerHome utilise désormais l'`InlineBanner` partagé du calendrier (cohérence visuelle, économie de 2 queries races/checklist). §187 (slider affinement) designé mais pas livré. (2026-05-02)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 
@@ -132,6 +132,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | §190-fix3 | Card "Ma semaine" : exclure les séances muscu | Filtre `row.slot_session_type !== "swim"` ajouté dans la boucle d'indexation `byDateBucket` de `SwimmerWeekMatrixCard.tsx`. Les rows strength sont ignorées dès l'indexation : ne comptent ni dans le total ni dans `plannedPast/donePast/missedCount`. La muscu reste visible via `MyPlanWeekCard` côté Strength + Section "Aujourd'hui". 16 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
 | §190-ui | SwimmerHome : "Ma semaine" remplace "Aujourd'hui" sous Bien-être | Suppression du bloc JSX Section C "Aujourd'hui" (cards par `todaySession` avec badges Fait/À faire/Lancer/Jour de repos). `SwimmerWeekMatrixCard` déplacée à sa place, juste sous la Section B Bien-être. La vue détaillée `SwimmerWeekSlots` reste en Section G. `SwimmerHome.tsx` ~770 → 673 LOC. Helpers exportés et useMemos / queries préservés pour les tests + cache priming. 19 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
 | §190-ui2 | SwimmerHome : compteur "N séances avant" sur card Prochaine compétition | Réutilise `computeTrainingDaysRemaining` de `lib/date.ts` (même fonction que le bandeau du calendrier). Query `["my-planned-absences"]` (clé partagée avec Dashboard → dedupe cache, gated `enabled: !!nextCompetition`). `presenceDefaults` lu depuis localStorage avec la clé `swim-dashboard-v2:...:presenceDefaults` écrite par Dashboard, fallback `initPresenceDefaults()` (tous les jours AM/PM ON) si jamais ouvert le calendrier. Affichage `N séance(s) avant` dans la 3e ligne de la card, en `font-semibold` pour mettre en évidence. `SwimmerHome.tsx` 673 → 710 LOC. 3 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
+| §190-ui3 | SwimmerHome : Section D utilise l'`InlineBanner` partagé du calendrier | Remplacement de la `<Card>` custom amber (Trophy + J-X badge + name + location + ligne meta avec courses/séances/checklist) par un seul `<InlineBanner variant="amber" />` (props `label`/`badge="J-X"`/`sublabel=location`/`subbadge="N séance(s)"`). Suppression : import `MapPin`, queries `["competition-races"]` + `["competition-checklist"]`, memo `checklistProgress`. La page détail recharge les races/checklist à la demande. `SwimmerHome.tsx` 710 → 669 LOC. 3 tests inchangés. `npx tsc` clean. | 2026-05-02 | ✅ Livré |
 
 ---
 

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import SwimmerWeekSlots from "@/components/shared/SwimmerWeekSlots";
 import SwimmerWeekMatrixCard from "@/components/shared/SwimmerWeekMatrixCard";
+import { InlineBanner } from "@/components/shared/InlineBanner";
 import { WellnessBanner } from "@/components/wellness/WellnessBanner";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
 import { format } from "date-fns";
@@ -33,7 +34,6 @@ import {
   FileText,
   BarChart3,
   MessageCircle,
-  MapPin,
   ChevronRight,
   Coffee,
 } from "lucide-react";
@@ -450,26 +450,6 @@ export default function SwimmerHome() {
     return { ...comp, daysUntil };
   }, [competitions, myCompetitionIds]);
 
-  // Competition detail data (races + checklist)
-  const { data: compRaces } = useQuery({
-    queryKey: ["competition-races", nextCompetition?.id],
-    queryFn: () => api.getCompetitionRaces(nextCompetition!.id),
-    enabled: !!nextCompetition,
-  });
-
-  const { data: compChecklist } = useQuery({
-    queryKey: ["competition-checklist", nextCompetition?.id],
-    queryFn: () => api.getCompetitionChecklist(nextCompetition!.id),
-    enabled: !!nextCompetition,
-  });
-
-  const checklistProgress = useMemo(() => {
-    if (!compChecklist || !Array.isArray(compChecklist)) return null;
-    const total = compChecklist.length;
-    const done = compChecklist.filter((c: any) => c.checked).length;
-    return { done, total };
-  }, [compChecklist]);
-
   // Training-days-remaining banner (matches Dashboard.tsx logic)
   const { data: myAbsences = [] } = useQuery({
     queryKey: ["my-planned-absences"],
@@ -596,54 +576,29 @@ export default function SwimmerHome() {
           <SwimmerWeekMatrixCard />
         </motion.div>
 
-        {/* Section D — Prochaine compétition (conditional) */}
+        {/* Section D — Prochaine compétition (banner réutilisé du calendrier) */}
         {nextCompetition && (
           <motion.div variants={slideUp}>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-2">
               Prochaine compétition
             </p>
-            <Card
-              className="p-4 cursor-pointer transition-all hover:bg-amber-50/40 dark:hover:bg-amber-950/20 active:scale-[0.98] border-amber-200/60 dark:border-amber-800/40 bg-gradient-to-br from-amber-50/40 to-orange-50/20 dark:from-amber-950/15 dark:to-orange-950/10"
+            <InlineBanner
+              variant="amber"
+              icon={<Trophy />}
+              label={nextCompetition.name}
+              badge={
+                nextCompetition.daysUntil === 0
+                  ? "Aujourd'hui"
+                  : `J-${nextCompetition.daysUntil}`
+              }
+              sublabel={nextCompetition.location}
+              subbadge={
+                trainingDaysRemaining != null && trainingDaysRemaining > 0
+                  ? `${trainingDaysRemaining} séance${trainingDaysRemaining > 1 ? "s" : ""}`
+                  : undefined
+              }
               onClick={() => navigate(`/competition/${nextCompetition.id}`)}
-            >
-              <div className="flex items-start gap-3">
-                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 dark:bg-amber-500/20">
-                  <Trophy className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                  <span className="absolute -top-1.5 -right-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-500 text-[11px] font-extrabold text-white px-1 shadow-sm">
-                    {nextCompetition.daysUntil === 0 ? "J" : `J-${nextCompetition.daysUntil}`}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold truncate text-amber-950 dark:text-amber-100">
-                    {nextCompetition.name}
-                  </p>
-                  {nextCompetition.location && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3 w-3 text-amber-600/60 dark:text-amber-400/60" />
-                      <span className="text-xs text-amber-800/70 dark:text-amber-300/60 truncate">
-                        {nextCompetition.location}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-amber-700/70 dark:text-amber-400/60">
-                    {compRaces && compRaces.length > 0 && (
-                      <span>{compRaces.length} course{compRaces.length > 1 ? "s" : ""}</span>
-                    )}
-                    {trainingDaysRemaining != null && trainingDaysRemaining > 0 && (
-                      <span className="font-semibold text-amber-800/80 dark:text-amber-300/70">
-                        {trainingDaysRemaining} séance{trainingDaysRemaining > 1 ? "s" : ""} avant
-                      </span>
-                    )}
-                    {checklistProgress && (
-                      <span>
-                        Checklist {checklistProgress.done}/{checklistProgress.total}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-amber-400 dark:text-amber-500 mt-1 shrink-0" />
-              </div>
-            </Card>
+            />
           </motion.div>
         )}
 
