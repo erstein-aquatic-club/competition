@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
-import { X, Waves, Power, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine, Dumbbell } from "lucide-react";
+import { X, Waves, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine, Dumbbell } from "lucide-react";
 import { useLocation } from "wouter";
 import { BottomActionBar, type SaveState } from "@/components/shared/BottomActionBar";
 import {
@@ -413,7 +413,6 @@ interface FeedbackDrawerProps {
   logsBySessionId: Record<string, Session>;
   getLogForSession?: (sessionId: string) => Session | undefined;
   onClose: () => void;
-  onDayOffAll: () => void;
   onOpenSession: (sessionId: string) => void;
   onCloseSession: () => void;
   onToggleDetails: () => void;
@@ -453,7 +452,6 @@ export function FeedbackDrawer({
   logsBySessionId,
   getLogForSession: getLogForSessionProp,
   onClose,
-  onDayOffAll,
   onOpenSession,
   onCloseSession,
   onToggleDetails,
@@ -668,9 +666,6 @@ export function FeedbackDrawer({
                     </div>
                   </div>
 
-                  <IconButton onClick={onDayOffAll} label="OFF (absent journée)" tone="dark" disabled={isPending}>
-                    <Power className="h-5 w-5" />
-                  </IconButton>
                 </div>
 
                 {!activeSession ? (

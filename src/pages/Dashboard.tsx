@@ -1056,7 +1056,6 @@ export default function Dashboard() {
           logsBySessionId={logsBySessionId}
           getLogForSession={getLogForSession}
           onClose={closeDay}
-          onDayOffAll={dayOffAll}
           onOpenSession={openSession}
           onCloseSession={() => {
             setActiveSessionId(null);
