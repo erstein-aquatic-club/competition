@@ -2,6 +2,38 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+## 🟢 Resume status (2026-05-02)
+
+**Tasks livrées (A1 → B3) — commits sur `main`, non encore push :**
+
+| Task | Status | Commit | Notes |
+|------|--------|--------|-------|
+| A1 — `parseObjectiveForPace` helper | ✅ | `f46ec36ae` | 5/5 tests green, code-review approved |
+| B1 — sessionStorage handoff | ✅ | `9c5ba8d94` | 4/4 tests green, approved |
+| B2 — Bouton → Allures sur ObjectiveCard | ✅ | `68c05391f` | 4/4 tests green, +`export default` ajouté + `e.stopPropagation()` (justifié) |
+| B3 — Wire SwimmerObjectivesTab | ✅ | `9e89564f0` | 1/1 test green, approved |
+| B4 — Consume prefill (CoachPaceCalculatorScreen) | ⏸ **À FAIRE** | — | Tentative précédente échouée par limit org + working tree pollué (artefact de `git stash --theirs` lors du pull §186). Working tree restauré propre 2026-05-02. |
+| C1 — `useTargetForObjective` hook | ⏸ pending | — | |
+| C2 — `PaceMatrixInline` wrapper | ⏸ pending | — | |
+| C3 — Inline matrix sous ObjectiveCard nageur | ⏸ pending | — | |
+| D1 — Update CLAUDE/ROADMAP/log/files-map | ⏸ pending | — | |
+| D2 — Smoke test UI + push origin | ⏸ pending | — | |
+
+**Pré-conditions à vérifier au début de la nouvelle session :**
+
+1. `git log --oneline -5` doit montrer `9e89564f0 feat(pace-link): §188 — wire ObjectiveCard onPaceLink in SwimmerObjectivesTab` en tête (HEAD).
+2. `git status --short` ne doit PAS montrer `CoachPaceCalculatorScreen.tsx` ni `SwimmerPaceCard.tsx` modifiés. Si oui, c'est un artefact à `git restore`. Les `?? docs/...` (PDF, docx, plan abandonné) sont des fichiers user à laisser intacts.
+3. `npm test -- --run src/lib/__tests__/objective-pace-link.test.ts src/lib/__tests__/pace-prefill-handoff.test.ts src/components/shared/__tests__/ObjectiveCard.paceLink.test.tsx src/pages/coach/__tests__/SwimmerObjectivesTab.paceLink.test.tsx` → tous green (sauf 1 fail pré-existant `transformers.test.ts`).
+
+**Points de vigilance pour B4 :**
+- `CoachPaceCalculatorScreen.tsx` côté `main` actuel = **version §186 complète** avec `useTeamForCoach`, `useCoachPaceZonesV2`, `useCoachStrokeAdjustments`, `listActiveCoaches`, `PaceStrokeAdjustments`, `EventFamily`/`Zone` de `paceData`, `buildSelectedMembers` exporté, V4 toggles. Le plan ci-dessous (§ Task B4) a été écrit avant que ces variables soient stabilisées — **vérifier les vrais noms de state/queries dans le fichier actuel** avant d'implémenter (`teamLoading`, `targetsQuery`, `setOpenSwimmerIds`, mutation existante pour `upsertPaceTarget`, etc.).
+- L'implementer ajoutera UNIQUEMENT 4 morceaux : (a) imports `useEffect`+`toast`+`consumePacePrefill`+`PacePrefillPayload`, (b) export `type ConsumeResult`, (c) export `function selectAccordionTargetForPrefill` (pure), (d) un `useEffect` dans le component qui consomme le prefill via la fonction pure et déclenche un toast + accordion open + mutation.
+- **Critique** : `git add` UNIQUEMENT les 2 fichiers cibles (`CoachPaceCalculatorScreen.tsx` + nouveau test). NE PAS utiliser `-A`.
+
+**Nouvelle session : utiliser `superpowers:subagent-driven-development` ou `superpowers:executing-plans` à partir de Task B4 ci-dessous.** Les tâches A1-B3 sont déjà cochées et n'ont plus à être ré-exécutées.
+
+---
+
 **Goal:** Eliminer la double-saisie objectif/cible via un bouton 1-clic côté coach (préremplit le calculateur d'allures à partir d'un objectif) et afficher la matrice d'allures inline sur les `ObjectiveCard` côté nageur quand une cible correspond.
 
 **Architecture:**
