@@ -38,6 +38,7 @@ export function ObjectiveDetailSheet({
   if (!objective?.event_code) return null;
 
   const hasTarget = matchingTarget != null;
+  // Default to 25m when pool_length is unknown — mirrors SwimmerObjectivesView convention
   const poolLength: 25 | 50 = objective.pool_length === 50 ? 50 : 25;
 
   return (
