@@ -4,6 +4,33 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190-fix — Card "Ma semaine" : utiliser get_swimmer_sessions (2026-05-02)
+
+**Contexte :** Le §190 initial réutilisait `useSlotCalendar` qui résout les assignations au niveau **groupe** (via `slot.assignments[].group_id`). Conséquence : un slot apparaissait dans la card même quand la séance coach était assignée à un sous-groupe ou à un nageur individuel qui n'incluait pas l'utilisateur courant. Le compteur "X séances faites" comptabilisait des slots non concernés.
+
+**Correctif :** Bascule vers `getSwimmerSessions(userId, mondayIso, sundayIso, false)` — l'RPC canonique qui résout les assignations dans l'ordre `individual > subgroup > group` du point de vue d'un nageur donné, et expose `is_absent` + `log_session_id` directement.
+
+### Changements
+
+**`src/components/shared/SwimmerWeekMatrixCard.tsx`** (434 → 415 lignes) :
+- Remplacement de `useSlotCalendar()` + cross-référence `api.getSessions` par une seule query `["swimmer-sessions-week", userId, mondayIso, sundayIso]`.
+- Index direct des rows par `(scheduled_date, bucket)` — `bucket` est fourni par l'RPC (`"morning" | "evening"`), plus besoin de calculer depuis `start_time`.
+- `is_absent === true` → ligne ignorée (pas de slot pour ce nageur ce jour).
+- `assignment_id != null` → slot avec séance coach assignée pour ce nageur (résolu individuel/sub/group).
+- `log_session_id != null` → ressenti saisi (canonique, plus besoin de la query séparée `api.getSessions`).
+- Helpers `addDaysIso` + `buildWeekDates` inlinés (les `useSlotCalendar` versions ne sont pas exportées).
+- Footer "Aucun créneau cette semaine" → "Aucune séance cette semaine" (cohérence terminologique : la card ne montre que les slots où le nageur est attendu).
+
+### Tests
+- 16 tests pure helper (`classifyCell` + `foldCellStates`) — inchangés et passants.
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Source de vérité unique** : `get_swimmer_sessions` est la canonique pour "ce que doit voir un nageur". Le coach card peut continuer d'utiliser `useSlotCalendar` (vue globale plat groupe) ; le nageur a maintenant la sienne.
+- **Suppression de la query `api.getSessions`** : `log_session_id` du RPC remplace exactement ce signal. Économie d'une requête réseau côté nageur.
+- **Limite levée** : la note "individual / subgroup assignments may not appear" du §190 initial est résolue.
+
 ## §190 — Card "Ma semaine" compacte côté nageur (2026-05-02)
 
 **Contexte :** La page d'accueil nageur (`SwimmerHome.tsx` Section G) affichait uniquement la vue détaillée `SwimmerWeekSlots` (jour par jour, défilable). Pas de vue d'ensemble rapide pour répondre à deux questions courantes : "où en suis-je sur mes ressentis cette semaine ?" et "quels créneaux ont une séance coach assignée ?". Le coach a la matrice compacte 7 jours × matin/aprèm depuis §B de `Coach.tsx` ; le nageur ne l'avait pas.

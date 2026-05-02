@@ -2,8 +2,12 @@
  * SwimmerWeekMatrixCard — Compact at-a-glance "Ma semaine" card for the swimmer
  * home page. Mirrors the matrix layout of the coach card on Coach.tsx so a
  * swimmer can scan in one glance:
- *   • which slots have a coach session assigned vs. empty;
+ *   • which slots have a coach session actually planned for THIS swimmer;
  *   • which past sessions are missing a feedback (ressenti).
+ *
+ * Data source: get_swimmer_sessions RPC (per-swimmer resolution including
+ * individual / subgroup / group precedence and absences). Slots that don't
+ * apply to this swimmer this week never appear.
  *
  * Tap → /natation (the detailed swim calendar).
  */
@@ -12,9 +16,9 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api";
-import type { Session } from "@/lib/api";
-import { useSlotCalendar, getSlotScheduleBucket, type SlotInstance } from "@/hooks/useSlotCalendar";
+import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
+import type { SwimmerSession } from "@/lib/api/types";
+import { getMondayOfWeek } from "@/hooks/useSlotCalendar";
 import {
   AlertCircle,
   Check,
@@ -39,45 +43,21 @@ function todayIso(): string {
   return `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}`;
 }
 
-function isVisibleAssignmentInstance(inst: SlotInstance): boolean {
-  return inst.state === "published" && inst.assignment != null;
+function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function buildWeekDates(mondayIso: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDaysIso(mondayIso, i));
 }
 
 type CellInfo = {
   state: CellState;
   count: number;
 };
-
-function buildCompletionLookup(sessions: Session[] | undefined | null): {
-  assignmentIds: Set<number>;
-  slotKeys: Set<string>;
-} {
-  const assignmentIds = new Set<number>();
-  const slotKeys = new Set<string>();
-  for (const s of Array.isArray(sessions) ? sessions : []) {
-    if (typeof s.assignment_id === "number" && Number.isFinite(s.assignment_id)) {
-      assignmentIds.add(s.assignment_id);
-    }
-    const iso = String(s.date ?? "").slice(0, 10);
-    if (!iso) continue;
-    const slot = s.slot === "Soir" ? "PM" : "AM";
-    slotKeys.add(`${iso}__${slot}`);
-  }
-  return { assignmentIds, slotKeys };
-}
-
-function hasFeedbackFor(
-  inst: SlotInstance,
-  bucket: "morning" | "evening",
-  lookup: { assignmentIds: Set<number>; slotKeys: Set<string> },
-): boolean {
-  const assignmentId = inst.assignment?.id;
-  if (typeof assignmentId === "number" && lookup.assignmentIds.has(assignmentId)) {
-    return true;
-  }
-  const slot = bucket === "morning" ? "AM" : "PM";
-  return lookup.slotKeys.has(`${inst.date}__${slot}`);
-}
 
 function CellDot({ state, count, isToday }: { state: CellState; count: number; isToday: boolean }) {
   const ringClass = isToday ? "ring-1 ring-primary/30 ring-offset-1 ring-offset-card" : "";
@@ -188,18 +168,20 @@ function CellDot({ state, count, isToday }: { state: CellState; count: number; i
 
 export default function SwimmerWeekMatrixCard() {
   const userId = useAuth((s) => s.userId);
-  const user = useAuth((s) => s.user);
   const [, navigate] = useLocation();
 
-  const { mondayIso, weekDates, instancesByDate, isLoading } = useSlotCalendar();
+  const mondayIso = useMemo(() => getMondayOfWeek(0), []);
+  const sundayIso = useMemo(() => addDaysIso(mondayIso, 6), [mondayIso]);
+  const weekDates = useMemo(() => buildWeekDates(mondayIso), [mondayIso]);
 
-  // Reuse the same query key as SwimmerHome — react-query dedupes.
-  const { data: sessions } = useQuery({
-    queryKey: ["sessions", userId ?? user],
-    queryFn: () => api.getSessions(user!, userId),
-    enabled: !!user,
+  const { data: rawRows, isLoading } = useQuery({
+    queryKey: ["swimmer-sessions-week", userId, mondayIso, sundayIso],
+    queryFn: () => getSwimmerSessions(userId!, mondayIso, sundayIso, false),
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
   });
 
+  const rows: SwimmerSession[] = useMemo(() => rawRows ?? [], [rawRows]);
   const today = useMemo(() => todayIso(), []);
 
   const todayIndex = useMemo(() => {
@@ -212,8 +194,6 @@ export default function SwimmerWeekMatrixCard() {
     return diff;
   }, [mondayIso]);
 
-  const completionLookup = useMemo(() => buildCompletionLookup(sessions), [sessions]);
-
   const grid = useMemo(() => {
     const morning: CellInfo[] = [];
     const evening: CellInfo[] = [];
@@ -223,62 +203,63 @@ export default function SwimmerWeekMatrixCard() {
     let assignedFutureCount = 0;
     let totalSlots = 0;
 
+    // Index relevant rows by date+bucket
+    const byDateBucket = new Map<string, SwimmerSession[]>();
+    for (const row of rows) {
+      // Skip absences — the swimmer is excused, the slot doesn't apply this day.
+      if (row.is_absent) continue;
+      const key = `${row.scheduled_date}__${row.bucket}`;
+      const list = byDateBucket.get(key) ?? [];
+      list.push(row);
+      byDateBucket.set(key, list);
+    }
+
     for (let i = 0; i < weekDates.length; i += 1) {
       const dateIso = weekDates[i];
-      const dayInstances = instancesByDate.get(dateIso) ?? [];
       const isPastDay = dateIso < today;
       const isTodayDay = dateIso === today;
 
-      const morningStates: CellState[] = [];
-      const eveningStates: CellState[] = [];
-      let morningCount = 0;
-      let eveningCount = 0;
+      for (const bucket of ["morning", "evening"] as const) {
+        const list = byDateBucket.get(`${dateIso}__${bucket}`) ?? [];
+        const cellStates: CellState[] = [];
+        const count = list.length;
 
-      for (const inst of dayInstances) {
-        const bucket = getSlotScheduleBucket(inst.slot.start_time);
-        if (bucket === null) continue;
-        totalSlots += 1;
+        for (const row of list) {
+          totalSlots += 1;
+          const hasAssignment = row.assignment_id != null;
+          const hasFeedback = hasAssignment && row.log_session_id != null;
 
-        const hasAssignment = isVisibleAssignmentInstance(inst);
-        const hasFeedback = hasAssignment
-          ? hasFeedbackFor(inst, bucket, completionLookup)
-          : false;
+          const cellState = classifyCell({
+            // The RPC returns rows for slots that apply to the swimmer, so any
+            // row implies an existing "published"-equivalent slot context.
+            state: "published",
+            hasAssignment,
+            hasFeedback,
+            isPast: isPastDay,
+            isToday: isTodayDay,
+          });
 
-        const cellState = classifyCell({
-          state: inst.state,
-          hasAssignment,
-          hasFeedback,
-          isPast: isPastDay,
-          isToday: isTodayDay,
-        });
-
-        if (hasAssignment) {
-          if (isPastDay) {
-            plannedPast += 1;
-            if (hasFeedback) donePast += 1;
-            else missedCount += 1;
-          } else {
-            assignedFutureCount += 1;
+          if (hasAssignment) {
+            if (isPastDay) {
+              plannedPast += 1;
+              if (hasFeedback) donePast += 1;
+              else missedCount += 1;
+            } else {
+              assignedFutureCount += 1;
+            }
           }
+
+          cellStates.push(cellState);
         }
 
-        if (bucket === "morning") {
-          morningStates.push(cellState);
-          morningCount += 1;
-        } else {
-          eveningStates.push(cellState);
-          eveningCount += 1;
-        }
+        const cell: CellInfo = {
+          state: cellStates.length > 0 ? foldCellStates(cellStates) : "none",
+          count,
+        };
+
+        if (bucket === "morning") morning.push(cell);
+        else evening.push(cell);
       }
-
-      morning.push({
-        state: morningStates.length > 0 ? foldCellStates(morningStates) : "none",
-        count: morningCount,
-      });
-      evening.push({
-        state: eveningStates.length > 0 ? foldCellStates(eveningStates) : "none",
-        count: eveningCount,
-      });
     }
 
     return {
@@ -290,7 +271,7 @@ export default function SwimmerWeekMatrixCard() {
       assignedFutureCount,
       totalSlots,
     };
-  }, [weekDates, instancesByDate, completionLookup, today]);
+  }, [rows, weekDates, today]);
 
   const handleTap = () => navigate("/natation");
 
@@ -406,7 +387,7 @@ export default function SwimmerWeekMatrixCard() {
           </div>
           {grid.totalSlots === 0 ? (
             <span className="text-[11px] italic text-muted-foreground">
-              Aucun créneau cette semaine
+              Aucune séance cette semaine
             </span>
           ) : grid.missedCount > 0 ? (
             <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400">
