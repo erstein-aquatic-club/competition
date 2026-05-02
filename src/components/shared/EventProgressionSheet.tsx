@@ -77,6 +77,7 @@ export type EventProgressionSheetProps = {
 };
 
 // ── EventProgressionContent ──────────────────────────────────────
+// Callers are responsible for rendering the event title and providing top spacing.
 
 export function EventProgressionContent({
   eventCode,
