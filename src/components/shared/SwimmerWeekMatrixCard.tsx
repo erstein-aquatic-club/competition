@@ -16,6 +16,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
+import type { Session } from "@/lib/api";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import type { SwimmerSession } from "@/lib/api/types";
 import { getMondayOfWeek } from "@/hooks/useSlotCalendar";
@@ -58,6 +60,33 @@ type CellInfo = {
   state: CellState;
   count: number;
 };
+
+type CompletionLookup = {
+  assignmentIds: Set<number>;
+  slotKeys: Set<string>;
+};
+
+function buildCompletionLookup(sessions: Session[] | undefined | null): CompletionLookup {
+  const assignmentIds = new Set<number>();
+  const slotKeys = new Set<string>();
+  for (const s of Array.isArray(sessions) ? sessions : []) {
+    if (typeof s.assignment_id === "number" && Number.isFinite(s.assignment_id)) {
+      assignmentIds.add(s.assignment_id);
+    }
+    const iso = String(s.date ?? "").slice(0, 10);
+    if (!iso) continue;
+    const bucket = s.slot === "Soir" ? "evening" : "morning";
+    slotKeys.add(`${iso}__${bucket}`);
+  }
+  return { assignmentIds, slotKeys };
+}
+
+function rowHasFeedback(row: SwimmerSession, lookup: CompletionLookup): boolean {
+  if (typeof row.assignment_id === "number" && lookup.assignmentIds.has(row.assignment_id)) {
+    return true;
+  }
+  return lookup.slotKeys.has(`${row.scheduled_date}__${row.bucket}`);
+}
 
 function CellDot({ state, count, isToday }: { state: CellState; count: number; isToday: boolean }) {
   const ringClass = isToday ? "ring-1 ring-primary/30 ring-offset-1 ring-offset-card" : "";
@@ -168,6 +197,7 @@ function CellDot({ state, count, isToday }: { state: CellState; count: number; i
 
 export default function SwimmerWeekMatrixCard() {
   const userId = useAuth((s) => s.userId);
+  const user = useAuth((s) => s.user);
   const [, navigate] = useLocation();
 
   const mondayIso = useMemo(() => getMondayOfWeek(0), []);
@@ -180,6 +210,20 @@ export default function SwimmerWeekMatrixCard() {
     enabled: !!userId,
     staleTime: 2 * 60 * 1000,
   });
+
+  // The get_swimmer_sessions RPC returns log_session_id = NULL unconditionally
+  // (migration 00132), so we cross-reference with the swimmer's logged sessions
+  // to detect feedback presence. Same query key as SwimmerHome → cache dedupe.
+  const { data: loggedSessions } = useQuery({
+    queryKey: ["sessions", userId ?? user],
+    queryFn: () => api.getSessions(user!, userId),
+    enabled: !!user,
+  });
+
+  const completionLookup = useMemo(
+    () => buildCompletionLookup(loggedSessions),
+    [loggedSessions],
+  );
 
   const rows: SwimmerSession[] = useMemo(() => rawRows ?? [], [rawRows]);
   const today = useMemo(() => todayIso(), []);
@@ -227,7 +271,7 @@ export default function SwimmerWeekMatrixCard() {
         for (const row of list) {
           totalSlots += 1;
           const hasAssignment = row.assignment_id != null;
-          const hasFeedback = hasAssignment && row.log_session_id != null;
+          const hasFeedback = hasAssignment && rowHasFeedback(row, completionLookup);
 
           const cellState = classifyCell({
             // The RPC returns rows for slots that apply to the swimmer, so any
@@ -271,7 +315,7 @@ export default function SwimmerWeekMatrixCard() {
       assignedFutureCount,
       totalSlots,
     };
-  }, [rows, weekDates, today]);
+  }, [rows, weekDates, today, completionLookup]);
 
   const handleTap = () => navigate("/natation");
 

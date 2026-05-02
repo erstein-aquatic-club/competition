@@ -4,6 +4,37 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190-fix2 — Card "Ma semaine" : feedback lookup via api.getSessions (2026-05-02)
+
+**Contexte :** Régression du §190-fix. La card affichait des points rouges "ressenti manquant" sur tous les créneaux passés assignés, même quand le nageur avait bel et bien saisi son ressenti.
+
+**Cause racine :** Le RPC `get_swimmer_sessions` (migration 00132) retourne `NULL::uuid AS log_session_id` de manière inconditionnelle (ligne 253) — il ne fait pas de jointure vers la table de sessions loggées. Ma logique côté front `row.log_session_id != null` était donc toujours `false`. Le compteur "2 partout" rapporté par l'utilisateur s'explique : un nageur a typiquement swim + strength dans le même bucket → 2 lignes RPC, les deux flagués `missed-feedback`.
+
+**Correctif :** Réintroduction de la query `api.getSessions` (clé `["sessions", userId ?? user]` partagée avec SwimmerHome → cache dedupe) pour détecter les ressentis saisis. Garde `get_swimmer_sessions` comme source canonique pour la résolution per-swimmer (individual / subgroup / group). Match par `assignment_id` en priorité, fallback sur `(date, bucket)`.
+
+### Changements
+
+**`src/components/shared/SwimmerWeekMatrixCard.tsx`** (415 → 459 lignes) :
+- Réimport `api` + type `Session`.
+- Ajout de la query `["sessions", userId ?? user]` (même clé que SwimmerHome → mutualisation cache).
+- Helpers locaux : `buildCompletionLookup(sessions)` → `{assignmentIds: Set, slotKeys: Set}`, `rowHasFeedback(row, lookup)` → bool.
+- Le bucket de `Session.slot` est `"Matin" | "Soir"` (FR), mappé sur `"morning" | "evening"` du RPC pour le slotKeys lookup.
+- `hasFeedback = hasAssignment && rowHasFeedback(row, completionLookup)` — remplace `row.log_session_id != null`.
+
+### Tests
+- 16 tests pure helper inchangés (passants).
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Pas de fix RPC** : aurait nécessité une migration et une jointure complexe vers `dim_sessions` (table actuelle) ou la nouvelle table de sessions. Cross-référence côté front est plus rapide à livrer et n'ajoute pas de requête (la query existe déjà dans SwimmerHome).
+- **Match assignment_id en priorité** : un Session peut avoir un `assignment_id` qui pointe sur l'assignment réelle, ce qui est plus précis que le fallback `(date, bucket)` quand un nageur a swim + strength le même demi-jour.
+- **Fallback `(date, bucket)`** : couvre les Session legacy sans `assignment_id` ou les saisies "libres" sans rattachement explicite.
+
+### Limites
+
+- Si un nageur a swim + strength dans le même bucket et n'a saisi qu'un seul des deux ressentis (sans `assignment_id` distinct), le fallback `(date, bucket)` marquera les DEUX comme "fait". À surveiller — pour l'instant, la majorité des Session ont un `assignment_id` (depuis §54 slot-centric).
+
 ## §190-fix — Card "Ma semaine" : utiliser get_swimmer_sessions (2026-05-02)
 
 **Contexte :** Le §190 initial réutilisait `useSlotCalendar` qui résout les assignations au niveau **groupe** (via `slot.assignments[].group_id`). Conséquence : un slot apparaissait dans la card même quand la séance coach était assignée à un sous-groupe ou à un nageur individuel qui n'incluait pas l'utilisateur courant. Le compteur "X séances faites" comptabilisait des slots non concernés.
