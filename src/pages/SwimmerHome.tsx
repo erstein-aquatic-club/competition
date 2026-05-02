@@ -39,6 +39,12 @@ import {
 } from "lucide-react";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import type { SwimmerSession, SwimmerTrainingSlot } from "@/lib/api/types";
+import { computeTrainingDaysRemaining } from "@/lib/date";
+import {
+  initPresenceDefaults,
+  safeJsonParse,
+  type PresenceDefaults,
+} from "@/hooks/dashboard/internal";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -464,6 +470,36 @@ export default function SwimmerHome() {
     return { done, total };
   }, [compChecklist]);
 
+  // Training-days-remaining banner (matches Dashboard.tsx logic)
+  const { data: myAbsences = [] } = useQuery({
+    queryKey: ["my-planned-absences"],
+    queryFn: () => api.getMyPlannedAbsences(),
+    enabled: !!nextCompetition,
+  });
+
+  const absenceDates = useMemo(
+    () => new Set(myAbsences.map((a) => a.date)),
+    [myAbsences],
+  );
+
+  // Read same localStorage presenceDefaults that Dashboard.tsx writes
+  const presenceDefaults = useMemo<PresenceDefaults>(() => {
+    if (typeof window === "undefined") return initPresenceDefaults();
+    const key = `swim-dashboard-v2:${userId ?? user ?? "anon"}:presenceDefaults`;
+    const saved = safeJsonParse<PresenceDefaults>(window.localStorage.getItem(key));
+    return saved ?? initPresenceDefaults();
+  }, [userId, user]);
+
+  const trainingDaysRemaining = useMemo(() => {
+    if (!nextCompetition) return null;
+    return computeTrainingDaysRemaining({
+      compDate: nextCompetition.date.slice(0, 10),
+      assignments: assignments as { assigned_date?: string }[] | undefined,
+      absenceDates,
+      presenceDefaults,
+    });
+  }, [nextCompetition, assignments, absenceDates, presenceDefaults]);
+
   // ── Section E: Coach messages ────────────────────────────────
   const { data: notificationsResult } = useQuery({
     queryKey: ["notifications-home", userId],
@@ -592,6 +628,11 @@ export default function SwimmerHome() {
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-amber-700/70 dark:text-amber-400/60">
                     {compRaces && compRaces.length > 0 && (
                       <span>{compRaces.length} course{compRaces.length > 1 ? "s" : ""}</span>
+                    )}
+                    {trainingDaysRemaining != null && trainingDaysRemaining > 0 && (
+                      <span className="font-semibold text-amber-800/80 dark:text-amber-300/70">
+                        {trainingDaysRemaining} séance{trainingDaysRemaining > 1 ? "s" : ""} avant
+                      </span>
                     )}
                     {checklistProgress && (
                       <span>

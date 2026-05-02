@@ -4,6 +4,33 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §190-ui2 — SwimmerHome : compteur séances restantes sur card "Prochaine compétition" (2026-05-02)
+
+**Contexte :** La vue calendrier nageur (`Dashboard.tsx`) affiche déjà un bandeau avec la prochaine compétition + le nombre de séances d'entraînement restantes avant l'échéance (calculé via `computeTrainingDaysRemaining` dans `lib/date.ts`). L'utilisateur a demandé de surfacer la même info sur la card "Prochaine compétition" du SwimmerHome (Section D) pour qu'elle soit visible sans aller dans le calendrier.
+
+**Changement :** Ajout de la même logique de calcul sur SwimmerHome — query `["my-planned-absences"]` (clé partagée avec Dashboard → cache dedupe), lecture des `presenceDefaults` depuis `localStorage` (clé `swim-dashboard-v2:${userId ?? user ?? "anon"}:presenceDefaults` écrite par Dashboard), et appel à `computeTrainingDaysRemaining`. Affiché dans la 3e ligne d'infos de la card (entre `N courses` et `Checklist X/Y`) au format `N séance(s) avant`.
+
+### Changements
+
+**`src/pages/SwimmerHome.tsx`** (673 → 710 lignes) :
+- Imports ajoutés : `computeTrainingDaysRemaining` (`@/lib/date`), `initPresenceDefaults` + `safeJsonParse` + type `PresenceDefaults` (`@/hooks/dashboard/internal`).
+- Query `["my-planned-absences"]` (gated `enabled: !!nextCompetition` pour éviter une fetch inutile sans compétition).
+- `absenceDates: Set<string>` dérivé.
+- `presenceDefaults` lu depuis localStorage avec la même clé que Dashboard, fallback `initPresenceDefaults()` si rien.
+- `trainingDaysRemaining: number | null` calculé via la même fonction pure que Dashboard.
+- Rendu dans la 3e ligne de la card en `<span className="font-semibold text-amber-800/80 dark:text-amber-300/70">` pour souligner l'info clé.
+
+### Tests
+- 3 tests `SwimmerHome` passants.
+- `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Pas de centralisation dans un hook partagé** : la logique fait ~15 lignes, et l'extraction prématurée alourdirait sans bénéfice. Si une 3e page ajoute le même besoin, on extrait.
+- **Lecture localStorage côté SwimmerHome** : Dashboard.tsx est l'écrivain canonique de `presenceDefaults` (le nageur les configure dans le calendrier). SwimmerHome n'écrit pas — pas de risque de désync. Si le nageur n'a jamais ouvert le calendrier, fallback sur "tous les jours actifs AM/PM" via `initPresenceDefaults()`.
+- **Position "avant" plutôt que "restantes"** : "12 séances avant" se lit naturellement après "Compétition J-15" sans ambiguïté.
+- **Gate `enabled: !!nextCompetition`** sur la query absences : économise une requête si l'utilisateur n'a pas de compétition à 30 jours.
+
 ## §190-ui — SwimmerHome : "Ma semaine" remplace "Aujourd'hui" sous Bien-être (2026-05-02)
 
 **Contexte :** Choix produit. La Section C "Aujourd'hui" (cards par session du jour avec badges Fait/À faire/Lancer) faisait doublon avec la matrice 7j × matin/aprèm en Section G : la matrice donne déjà l'info "ressenti saisi pour aujourd'hui" + une vue plus large. La section "Aujourd'hui" gardait l'utilisateur dans le focus court terme alors que la home se veut un dashboard de la semaine.
