@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Accordion } from "@/components/ui/accordion";
@@ -25,6 +25,8 @@ import { createPaceShareLink } from "@/lib/api/pace-share";
 import type { AthleteSummary } from "@/lib/api/types";
 import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
+import { consumePacePrefill, type PacePrefillPayload } from "@/lib/pace-prefill-handoff";
+import { toast } from "sonner";
 
 const FAMILIES: EventFamily[] = ["50m", "100m", "200m", "400m", "800m_1500m"];
 const TOGGLABLE_FAMILIES: { family: EventFamily; label: string }[] = [
@@ -32,6 +34,33 @@ const TOGGLABLE_FAMILIES: { family: EventFamily; label: string }[] = [
   { family: "400m", label: "400m" },
   { family: "800m_1500m", label: "800m+" },
 ];
+
+export type ConsumeResult =
+  | { kind: "open-existing"; swimmerAccordionId: string; targetId: string }
+  | { kind: "open-create"; swimmerAccordionId: string; payload: PacePrefillPayload }
+  | { kind: "unknown-swimmer" };
+
+export function selectAccordionTargetForPrefill(args: {
+  payload: PacePrefillPayload;
+  team: Array<{ id: string; kind: string; accountId?: number }>;
+  targets: PaceTarget[];
+}): ConsumeResult {
+  const { payload, team, targets } = args;
+  const member = team.find(
+    (m) => m.kind === "account" && m.accountId === payload.swimmer_account_id,
+  );
+  if (!member) return { kind: "unknown-swimmer" };
+  const existing = targets.find((t) =>
+    t.swimmer_account_id === payload.swimmer_account_id &&
+    t.stroke === payload.stroke &&
+    t.target_distance_m === payload.target_distance_m &&
+    t.target_pool_size === payload.target_pool_size,
+  );
+  if (existing) {
+    return { kind: "open-existing", swimmerAccordionId: member.id, targetId: existing.id };
+  }
+  return { kind: "open-create", swimmerAccordionId: member.id, payload };
+}
 
 /** Pure function — exported for unit testing. */
 export function buildSelectedMembers(
@@ -177,7 +206,36 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
     onSettled: () => qc.invalidateQueries({ queryKey: ["pace-targets"] }),
   });
 
-
+  useEffect(() => {
+    if (teamLoading || targetsQuery.isLoading) return;
+    const payload = consumePacePrefill();
+    if (!payload) return;
+    const result = selectAccordionTargetForPrefill({
+      payload,
+      team,
+      targets: targetsQuery.data ?? [],
+    });
+    if (result.kind === "unknown-swimmer") {
+      toast.error("Nageur introuvable dans votre équipe");
+      return;
+    }
+    setOpenSwimmerIds((prev) =>
+      prev.includes(result.swimmerAccordionId) ? prev : [...prev, result.swimmerAccordionId],
+    );
+    if (result.kind === "open-existing") {
+      toast.success("Cible déjà calibrée — modification possible");
+    } else {
+      upsertMutation.mutate({
+        ref: { kind: "account", accountId: payload.swimmer_account_id },
+        stroke: payload.stroke,
+        target_distance_m: payload.target_distance_m,
+        target_time_ms: payload.target_time_ms,
+        target_pool_size: payload.target_pool_size,
+      });
+      toast.success("Cible créée depuis l'objectif");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamLoading, targetsQuery.isLoading]);
 
   return (
     <div className="space-y-4 pb-24">
