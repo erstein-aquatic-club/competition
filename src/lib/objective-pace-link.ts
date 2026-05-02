@@ -44,9 +44,9 @@ export function shouldAutoSyncToPaceTarget(
   parsed: ParsedObjectiveTarget | null,
   existingTargets: Array<{
     swimmer_account_id: number | null;
-    stroke: string;
+    stroke: Stroke;
     target_distance_m: number;
-    target_pool_size: string;
+    target_pool_size: PoolSize;
   }>,
   athleteId: number,
 ): boolean {
