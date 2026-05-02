@@ -4,6 +4,46 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §188-ext — Sync auto allures ↔ objectifs nageur (2026-05-02)
+
+**Contexte :** Extension directe de §188. Après avoir rendu les allures visibles depuis la vue objectifs, la double-saisie subsistait côté coach : définir un objectif chrono (event_code + temps cible) ne créait pas automatiquement la cible d'allures correspondante. Le coach devait soit cliquer "→ Allures" pour pre-remplir le calculateur, soit saisir manuellement. Ce patch automatise la création/mise à jour silencieuse de la cible d'allures dès que l'objectif est sauvegardé.
+
+**Objectif :** Quand un coach crée ou modifie un objectif nageur avec un `event_code` parseable et un `target_time_seconds` non-null, upsert automatiquement (silencieux, sans toast) la cible d'allures via l'RPC `upsert_pace_target`. Également, au chargement de l'onglet objectifs, rattrapage rétroactif des objectifs existants sans cible correspondante.
+
+### Changements
+
+**`src/lib/objective-pace-link.ts`** (+20 lignes) :
+- NEW `shouldAutoSyncToPaceTarget(objective)` : prédicat pur — retourne `true` si `parseObjectiveForPace(event_code)` réussit ET `target_time_seconds` est non-null. Guards null-safe sur `event_code` et `target_time_seconds`.
+
+**`src/lib/__tests__/objective-pace-link.test.ts`** (+5 tests) :
+- `shouldAutoSyncToPaceTarget` : vrai si event_code parseable + time non-null, faux si event_code null, faux si event_code non-parsable, faux si time null, vrai pour différents formats valides (100NL, 200DOS, 400NP).
+
+**`src/pages/coach/SwimmerObjectivesTab.tsx`** (+~60 lignes net, 635→695 LOC) :
+- Export `autoSyncPaceTarget(objective, athleteAccountId)` : async, appelle `parseObjectiveForPace` + `upsertPaceTarget` (RPC Supabase), silencieux (pas de toast success, console.warn sur erreur).
+- Prop `athleteAccountId` ajoutée sur le composant.
+- Query `paceTargets` via `listMyPaceTargets` (React Query, filtrée côté JS sur `swimmer_account_id`).
+- `syncedForAthleteRef` (`useRef<string | null>`) : guard par ID nageur pour que le useEffect rétroactif ne tourne qu'une fois par changement de nageur, évite les re-sync en boucle sur invalidation query.
+- `useEffect` rétroactif : au mount ou changement `athleteAccountId`, itère les objectifs existants, filtre via `shouldAutoSyncToPaceTarget`, appelle `autoSyncPaceTarget` pour chacun sans cible trouvée dans `paceTargets`.
+- `createMutation.onSuccess` et `updateMutation.onSuccess` : appel de `autoSyncPaceTarget` si `shouldAutoSyncToPaceTarget` passe (prospectif).
+
+**`src/pages/coach/__tests__/SwimmerObjectivesTab.autoSync.test.ts`** (nouveau, 62 LOC) :
+- 3 tests : appelle `upsertPaceTarget` si event_code parseable + time non-null, ne l'appelle pas si event_code null, ne l'appelle pas si time null.
+
+### Tests
+
++8 tests (5 `shouldAutoSyncToPaceTarget` + 3 `autoSyncPaceTarget`). Tous passants. `npx tsc --noEmit` clean.
+
+### Décisions
+
+- **Sync silencieuse** : pas de toast success pour ne pas parasiter le workflow coach. `console.warn` sur erreur réseau pour trace sans bloquer l'UX.
+- **Upsert idempotent** : `upsert_pace_target` RPC utilise une clé unique `(coach_id, swimmer_account_id, stroke, distance, pool_size)` → relancer ne crée pas de doublon.
+- **`syncedForAthleteRef`** : correction multi-nageur — sans ce guard, le `useEffect` se déclencherait à chaque invalidation query (ex: après l'upsert lui-même), créant une boucle infinie. Réinitialisé si `athleteAccountId` change.
+- **Chemin prospectif + rétroactif** : le prospectif couvre les nouvelles saisies ; le rétroactif rattrape les objectifs créés avant §188-ext (ou hors du formulaire).
+
+### Limites
+
+- `listMyPaceTargets` charge toutes les cibles du coach (non filtrées par nageur côté SQL) — filtrage JS sur `swimmer_account_id`. Acceptable à l'échelle actuelle (~50 nageurs max).
+
 ## §188 — Lier objectifs nageur ↔ allures (2026-05-02)
 
 **Contexte :** Double-saisie coach : définir un objectif (event_code + temps cible) puis recréer manuellement la même cible dans le calculateur d'allures. Côté nageur : la matrice d'allures n'est jamais visible depuis la page Objectifs, obligeant à naviguer vers une autre page.
