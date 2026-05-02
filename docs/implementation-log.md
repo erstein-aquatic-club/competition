@@ -4,6 +4,46 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §188 — Lier objectifs nageur ↔ allures (2026-05-02)
+
+**Contexte :** Double-saisie coach : définir un objectif (event_code + temps cible) puis recréer manuellement la même cible dans le calculateur d'allures. Côté nageur : la matrice d'allures n'est jamais visible depuis la page Objectifs, obligeant à naviguer vers une autre page.
+
+**Objectif :** Bouton "→ Allures" sur chaque `ObjectiveCard` côté coach (1 clic pré-remplit le calculateur). Côté nageur : si une cible d'allures correspond à l'objectif, afficher la matrice compacte directement sous la carte.
+
+### Changements
+
+**Phase A — Helper pur `parseObjectiveForPace`**
+- NEW `src/lib/objective-pace-link.ts` (40 lignes) : parse `event_code` compact FFN (`"100NL"`, `"200DOS"`, etc.) → `{ stroke: Stroke, distance: number, pool_size: PoolSize }`. Retourne null si non-parsable.
+- NEW `src/lib/__tests__/objective-pace-link.test.ts` : 5 tests `node:test`.
+
+**Phase B — Coach : bouton + handoff + consume**
+- NEW `src/lib/pace-prefill-handoff.ts` (50 lignes) : `setPacePrefill` / `consumePacePrefill` via `sessionStorage` (clé `eac-pace-prefill-v1`). Consume-once (clear after read), validation payload.
+- NEW `src/lib/__tests__/pace-prefill-handoff.test.ts` : 4 tests.
+- MOD `src/components/shared/ObjectiveCard.tsx` : props `context`, `swimmerAccountId`, `onPaceLink` ; bouton "→ Allures" (icon Calculator) visible uniquement si `context="coach"`, disabled si event_code non-parsable ou temps null.
+- NEW `src/components/shared/__tests__/ObjectiveCard.paceLink.test.tsx` : 4 tests.
+- MOD `src/pages/coach/SwimmerObjectivesTab.tsx` : export `handlePaceLinkClick` (pure) — écrit le prefill et retourne le hash URL cible.
+- NEW `src/pages/coach/__tests__/SwimmerObjectivesTab.paceLink.test.tsx` : 1 test.
+- MOD `src/pages/coach/CoachPaceCalculatorScreen.tsx` (220→405 lignes) : export `type ConsumeResult` + `selectAccordionTargetForPrefill` (pure) ; `useEffect` qui consomme le prefill au mount (quand team + targets chargés), ouvre l'accordéon du nageur, upsert ou affiche toast "déjà calibrée".
+- NEW `src/pages/coach/__tests__/CoachPaceCalculatorScreen.prefill.test.tsx` : 3 tests (avec `mock.module("@/lib/export-pace-pdf")` pour contourner l'alias `@assets` Vite-only).
+
+**Phase C — Nageur : matrice inline**
+- NEW `src/hooks/useTargetForObjective.ts` (39 lignes) : `findMatchingTarget` (pure, tri updated_at desc) + hook `useTargetForObjective` (React Query).
+- NEW `src/hooks/__tests__/useTargetForObjective.test.ts` : 5 tests.
+- MOD `src/components/coach/pace/PaceMatrix.tsx` (268→270 lignes) : prop `compact?: boolean` — masque le pool toggle en mode compact.
+- NEW `src/components/coach/pace/PaceMatrixInline.tsx` (46 lignes) : wrapper compact autour de `PaceMatrix`, convertit `Stroke` → `StrokeV2` via `normalizeStroke`, utilise zones et ajustements par défaut.
+- NEW `src/components/coach/pace/__tests__/PaceMatrixInline.test.tsx` : 1 test.
+- MOD `src/components/profile/SwimmerObjectivesView.tsx` (~530→534 lignes) : export `shouldRenderInlineMatrix` (pure) ; fetch `listMyPaceTargets` unique au composant ; `PaceMatrixInline` injecté sous chaque `ObjectiveCard` si match.
+- NEW `src/components/profile/__tests__/SwimmerObjectivesView.paceLink.test.tsx` : 4 tests.
+
+### Tests
+627 pass (+ 13 nets), 1 fail pré-existant (`transformers.test.ts`). `npx tsc --noEmit` clean.
+
+### Décisions
+- Pas de migration DB : sync passive (coach reclique si objectif change).
+- `swimmerSex=null` dans la vue nageur : compact mode sans toggle bassin → conversion FFN non déclenchée.
+- `mock.module("@/lib/export-pace-pdf")` dans le test B4 : l'alias `@assets/logo-eac.png` (Vite-only) n'est pas résolvable en dehors de Vite ; on mocke le module entier.
+- Hooks-in-map évité en C3 : fetch unique des targets au niveau composant + `findMatchingTarget` dans les callbacks `.map()`.
+
 ## §189 — Chrono setup : équipe coach par défaut + vagues auto par ligne (2026-05-01)
 
 **Contexte :** Sur la vue Chrono coach, deux frictions UX :

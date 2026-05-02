@@ -77,7 +77,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/swimmer-kpis/LoadMini.tsx` | KPI charge : grille km 7j/28j / séances / RPE moyen (§152) | 34 lignes |
 | `src/components/coach/swimmer-kpis/ObjectiveChips.tsx` | Chips objectifs (event_code + temps) max 4 (§152) | 37 lignes |
 | `src/pages/coach/SwimmerFeedbackTab.tsx` | Onglet ressentis (liste chronologique sessions) | ~120 lignes |
-| `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) | ~574 lignes |
+| `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) — export `handlePaceLinkClick` (handoff sessionStorage, §188) | ~574 lignes |
+| `src/pages/coach/CoachPaceCalculatorScreen.tsx` | Calculateur d'allures coach — sélecteur coach, accordéon nageurs, upsert/delete cibles, export PDF, prefill depuis objectif via `selectAccordionTargetForPrefill` + `useEffect` (§186-§188) | 405 lignes |
 | `src/pages/coach/CoachGroupsScreen.tsx` | UI gestion groupes temporaires (stages) | ~1012 lignes |
 | `src/pages/coach/CoachCompetitionsScreen.tsx` | UI compétitions coach + assignations + SMS | ~834 lignes |
 | `src/pages/coach/CoachWeekView.tsx` | Wrapper toggle semaine/mois (calendrier unifié) (§92), prop `initialWeekDate` pour deep-link (§145) | ~130 lignes |
@@ -98,7 +99,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/shared/ObjectiveCard.tsx` | Composant partagé objectifs (ring SVG, grid 2x2, compact) | ~260 lignes |
 | `src/lib/objectiveHelpers.ts` | Helpers partagés objectifs (FFN_EVENTS, formatTime) | ~40 lignes |
 | `src/lib/imageUtils.ts` | Compression image Canvas (avatar upload, WebP/JPEG ≤200KB) | ~95 lignes |
-| `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) | ~530 lignes |
+| `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) — affiche `PaceMatrixInline` sous les objectifs matchant une cible (§188) | 534 lignes |
 | `src/pages/coach/CoachSmsScreen.tsx` | Écran SMS généraliste coach (groupe/nageur) | ~190 lignes |
 | `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) — inclut les mutations quick-compose + assign-from-library (§142) | ~3174 lignes |
 | `src/pages/coach/lib/slotTiming.ts` | Pures : constantes timeline + timeToPx/durationPx/durationLabel (§168) | 48 lignes |
@@ -270,7 +271,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | ~670 lignes |
 | `src/lib/poolConversion.ts` | Table FFN de conversion bassin 50m↔25m (17 entrées, sex-dépendant) + `convertTargetTime` + `getPoolMajorationMs` (§185) | 78 lignes |
 | `src/__tests__/poolConversion.test.ts` | 17 tests `node:test` — majorations FFN, no-op, round-trips, nulls, sex fallback (§185) | 165 lignes |
-| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–MAX) — modèle non-linéaire pace-v2 + V4 conditionnel (toggle 400m/800m/1500m) + toggle bassin 50m/25m + disclaimer FFN (§184-§186) | 268 lignes |
+| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–MAX) — modèle non-linéaire pace-v2 + V4 conditionnel + toggle bassin 50m/25m + prop `compact` (masque toolbar, §188) | 270 lignes |
+| `src/components/coach/pace/PaceMatrixInline.tsx` | Wrapper compact de `PaceMatrix` (lecture seule, sans toggle bassin) — utilisé sous `ObjectiveCard` nageur (§188) | 46 lignes |
 | `src/components/coach/pace/PaceTargetForm.tsx` | Formulaire cible d'allure (nage + distance + temps + bassin toggle) embarqué dans SwimmerPaceCard (§184-§185) | 182 lignes |
 | `src/components/coach/pace/Pace4NSegmentMatrix.tsx` | Matrice 4N segmentée par nage (NL/Dos/Brasse/Pap) avec poids selon doc §9 (§186) | 269 lignes |
 | `src/components/coach/pace/PaceStrokeAdjustments.tsx` | Drawer overrides mS coach par nage × famille (`coach_stroke_adjustments`, bornes ±0.20) (§186) | 238 lignes |
@@ -282,11 +284,14 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/paceData.ts` | Tables data pures — `R_base(D, d)`, `A_nage(D, d, S)`, `k_allure(family, zone)` selon doc métier (§186) | 96 lignes |
 | `src/lib/pdfPalette.ts` | Palette colorée pour export PDF (zones V0–MAX cohérentes avec écran) (§186) | 57 lignes |
 | `src/lib/export-pace-pdf.ts` | Export PDF allures — refonte palette colorée + branding EAC (rouge + logo + club) + bassin d'origine + flèche conversion + footer épuré (§186) | 906 lignes |
+| `src/lib/objective-pace-link.ts` | Parse `event_code` compact FFN (`"100NL"` etc.) → `{ stroke, distance, pool_size }` — utilisé par bouton coach + matrice nageur (§188) | 40 lignes |
+| `src/lib/pace-prefill-handoff.ts` | Handoff sessionStorage coach→calculateur : `setPacePrefill` / `consumePacePrefill` (consume-once, §188) | 50 lignes |
 | `src/lib/api/pace-targets.ts` | CRUD cibles d'allures via RPC `upsert_pace_target` (§184) — inclut `target_pool_size` (§185) | 62 lignes |
 | `src/lib/api/pace-share.ts` | Création/lecture liens partage allures (`pace_share_links`) — inclut `swimmer_sex` dans payload (§185), zones_v2 (§186) | 47 lignes |
 | `src/lib/api/pace-zones.ts` | CRUD zones v2 (multi-row family × zone) — `useCoachPaceZonesV2` shape (§186) | 126 lignes |
 | `src/lib/api/pace-stroke-adjustments.ts` | CRUD overrides mS coach par nage × famille (§186) | 49 lignes |
 | `src/lib/api/coaches.ts` | Liste des coaches pour vue Allures cross-coach (§186) | 30 lignes |
+| `src/hooks/useTargetForObjective.ts` | `findMatchingTarget` (pure, tri updated_at desc) + hook React Query cibles nageur par swimmer_account_id (§188) | 39 lignes |
 | `src/hooks/useCoachPaceZonesV2.ts` | Hook React Query schema v2 + `deletePaceZoneCell` (§186) | 71 lignes |
 | `src/hooks/useCoachStrokeAdjustments.ts` | Hook React Query overrides mS coach (§186) | 60 lignes |
 | `supabase/tests/rls/coach_pace_zones.test.ts` | Tests RLS coach_pace_zones : SELECT isolation + INSERT/UPDATE upsert + DELETE refus (§184 Phase 10) | 120 lignes |
