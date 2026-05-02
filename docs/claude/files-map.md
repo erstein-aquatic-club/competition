@@ -97,9 +97,10 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/share/buildShareOptions.ts` | Fonction pure options partage selon payload + capacités navigateur (§133) | ~38 lignes |
 | `src/lib/share/shareActions.ts` | Side-effects partage (WhatsApp, clipboard, native, download) (§133) | ~47 lignes |
 | `src/components/shared/ObjectiveCard.tsx` | Composant partagé objectifs (ring SVG, grid 2x2, compact) | ~260 lignes |
+| `src/components/shared/ObjectiveDetailSheet.tsx` | Drawer objectif nageur (Radix Sheet bottom) — toggle [Allures\|Progression] : `PaceMatrixInline` ou `EventProgressionContent` selon onglet (§189-ext) | 94 lignes |
 | `src/lib/objectiveHelpers.ts` | Helpers partagés objectifs (FFN_EVENTS, formatTime) | ~40 lignes |
 | `src/lib/imageUtils.ts` | Compression image Canvas (avatar upload, WebP/JPEG ≤200KB) | ~95 lignes |
-| `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) — affiche `PaceMatrixInline` sous les objectifs matchant une cible (§188) | 534 lignes |
+| `src/components/profile/SwimmerObjectivesView.tsx` | Vue objectifs nageur (lecture coach + CRUD perso) — clic objectif ouvre `ObjectiveDetailSheet` (§189-ext) | 493 lignes |
 | `src/pages/coach/CoachSmsScreen.tsx` | Écran SMS généraliste coach (groupe/nageur) | ~190 lignes |
 | `src/pages/coach/CoachTrainingSlotsScreen.tsx` | Écran gestion créneaux d'entraînement (coach) — inclut les mutations quick-compose + assign-from-library (§142) | ~3174 lignes |
 | `src/pages/coach/lib/slotTiming.ts` | Pures : constantes timeline + timeToPx/durationPx/durationLabel (§168) | 48 lignes |

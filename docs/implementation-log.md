@@ -4,6 +4,59 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §189-ext — Drawer objectif unifié Allures + Progression (2026-05-02)
+
+**Contexte :** Extension du design §189. Les matrices d'allures (`PaceMatrixInline`) étaient affichées inline sous chaque `ObjectiveCard` dans la vue objectifs nageur, rendant la page lourde et peu lisible sur mobile. Ce patch remplace l'affichage inline par un drawer unifié qui s'ouvre au clic sur l'objectif, avec un toggle [Allures | Progression].
+
+**Objectif :** Supprimer les matrices inline, créer un `ObjectiveDetailSheet` (Radix Sheet bottom) avec onglet Allures (`PaceMatrixInline`) et onglet Progression (`EventProgressionContent`). L'onglet par défaut est "Allures" ; le toggle est masqué si aucune cible n'existe (cas normalement impossible depuis §188-ext).
+
+### Changements
+
+**`src/components/shared/EventProgressionSheet.tsx`** (403→437 lignes) :
+- NEW export `EventProgressionContentProps` type
+- NEW export `EventProgressionContent` : toute la logique/JSX extraite sans le wrapper `<Sheet>`. Prop `active?: boolean` gate les queries React Query (`enabled: (active ?? true) && !!iuf`). Rendu : `<div className="space-y-4">` avec subtitle inline en première ligne.
+- `EventProgressionSheet` réduit à ~25 lignes : thin wrapper `<Sheet>` + `<EventProgressionContent active={open} />`.
+- Import `SheetDescription` supprimé.
+
+**`src/components/shared/ObjectiveDetailSheet.tsx`** (nouveau, 94 lignes) :
+- Props : `open`, `onOpenChange`, `objective: Objective | null`, `matchingTarget: PaceTarget | null`, `iuf: string | null`
+- State `tab: "allures" | "progression"`, reset à `"allures"` à chaque ouverture (`useEffect` sur `open`).
+- Guard `if (!objective?.event_code) return null`.
+- Sheet bottom `max-h-[90dvh] overflow-y-auto rounded-t-3xl`.
+- Header : `eventLabel(objective.event_code)` comme titre.
+- `ToggleGroup` [Allures | Progression] affiché uniquement si `matchingTarget != null`.
+- Tab "allures" → `<PaceMatrixInline>` ; sinon → `<EventProgressionContent active={...}>`.
+- Default `poolLength` à 25m si `pool_length` non-50 (convention identique à `SwimmerObjectivesView`).
+
+**`src/components/shared/__tests__/ObjectiveDetailSheet.test.tsx`** (nouveau, 56 lignes) :
+- 2 tests `renderToString` + `mock.module` : toggle présent si `matchingTarget` non-null, absent sinon.
+- Fixtures typées (`Objective`, `PaceTarget`) — pas de `as any`.
+
+**`src/components/profile/SwimmerObjectivesView.tsx`** (534→493 lignes) :
+- Supprimé : export `shouldRenderInlineMatrix`, state `progressionObj`, imports `PaceMatrixInline` + `EventProgressionSheet`.
+- Supprimé : blocs `<div key={obj.id}><ObjectiveCard/><PaceMatrixInline/></div>` dans les deux maps.
+- Ajouté : state `detailObj: Objective | null` + `detailMatchingTarget: PaceTarget | null`.
+- Ajouté : helper `openDetail(obj)` — calcule `matchingTarget` via `findMatchingTarget` (guard `swimmerAccountId != null` explicite), puis `setDetailMatchingTarget` + `setDetailObj`.
+- `onClick` coach : `obj.event_code ? () => openDetail(obj) : undefined`.
+- `onClick` perso : `obj.event_code ? () => openDetail(obj) : () => openEdit(obj)`.
+- `<ObjectiveDetailSheet>` rendu inconditionnellement, contrôlé par `open={!!detailObj}`.
+- `onOpenChange` reset les deux states (`setDetailObj(null)` + `setDetailMatchingTarget(null)`).
+
+**`src/components/profile/__tests__/SwimmerObjectivesView.paceLink.test.tsx`** (supprimé) :
+- 4 tests `shouldRenderInlineMatrix` supprimés (fonction supprimée).
+
+### Tests
+
+- 637 → 633 pass (−4 supprimés `shouldRenderInlineMatrix`, +2 `ObjectiveDetailSheet`)
+- 1 fail pré-existant inchangé (`transformers.test.ts`)
+- `npx tsc --noEmit` clean
+
+### Décisions
+
+- Approche A retenue (nouveau composant `ObjectiveDetailSheet` + extraction `EventProgressionContent`) — rétrocompatible avec tous les callsites existants de `EventProgressionSheet`.
+- Toggle masqué si `matchingTarget == null` (edge case théorique depuis §188-ext auto-sync).
+- `detailMatchingTarget` calculé au clic (pas en render loop) pour éviter les calculs inutiles sur chaque objectif.
+
 ## §188-ext — Sync auto allures ↔ objectifs nageur (2026-05-02)
 
 **Contexte :** Extension directe de §188. Après avoir rendu les allures visibles depuis la vue objectifs, la double-saisie subsistait côté coach : définir un objectif chrono (event_code + temps cible) ne créait pas automatiquement la cible d'allures correspondante. Le coach devait soit cliquer "→ Allures" pour pre-remplir le calculateur, soit saisir manuellement. Ce patch automatise la création/mise à jour silencieuse de la cible d'allures dès que l'objectif est sauvegardé.
