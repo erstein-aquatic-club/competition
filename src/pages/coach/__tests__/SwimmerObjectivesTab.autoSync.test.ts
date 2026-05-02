@@ -17,6 +17,7 @@ before(async () => {
 describe("autoSyncPaceTarget", () => {
   it("calls upsertPaceTarget when objective has parseable chrono target", async () => {
     upsertCalled = [];
+    invalidateCalled = [];
     const { autoSyncPaceTarget } = await import("../SwimmerObjectivesTab");
     const fakeQC = { invalidateQueries: (args: unknown) => { invalidateCalled.push(args); } };
     await autoSyncPaceTarget(
@@ -31,6 +32,8 @@ describe("autoSyncPaceTarget", () => {
     assert.equal(arg.target_distance_m, 100);
     assert.equal(arg.target_time_ms, 65_000);
     assert.equal(arg.target_pool_size, "50m");
+    assert.equal(invalidateCalled.length, 1);
+    assert.deepEqual(invalidateCalled[0], { queryKey: ["pace-targets"] });
   });
 
   it("does not call upsertPaceTarget when event_code is not parseable", async () => {
