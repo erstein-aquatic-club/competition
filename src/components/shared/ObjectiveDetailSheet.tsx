@@ -11,6 +11,7 @@ import type { PaceTarget } from "@/lib/api/pace-targets";
 import PaceMatrixInline from "@/components/coach/pace/PaceMatrixInline";
 import { EventProgressionContent } from "@/components/shared/EventProgressionSheet";
 import { eventLabel } from "@/lib/objectiveHelpers";
+import { parseObjectiveForPace } from "@/lib/objective-pace-link";
 
 type Tab = "allures" | "progression";
 
@@ -37,7 +38,13 @@ export function ObjectiveDetailSheet({
 
   if (!objective?.event_code) return null;
 
-  const hasTarget = matchingTarget != null;
+  const parsed = parseObjectiveForPace(objective.event_code, objective.pool_length);
+  const targetTimeMs = parsed != null && objective.target_time_seconds != null
+    ? objective.target_time_seconds * 1000
+    : null;
+  // Toggle shown when objective is parseable + has a target time — no DB target required
+  const canShowAllures = parsed != null && targetTimeMs != null;
+
   // Default to 25m when pool_length is unknown — mirrors SwimmerObjectivesView convention
   const poolLength: 25 | 50 = objective.pool_length === 50 ? 50 : 25;
 
@@ -48,7 +55,7 @@ export function ObjectiveDetailSheet({
           <SheetTitle>{eventLabel(objective.event_code)}</SheetTitle>
         </SheetHeader>
 
-        {hasTarget && (
+        {canShowAllures && (
           <div className="mt-4">
             <ToggleGroup
               type="single"
@@ -70,13 +77,14 @@ export function ObjectiveDetailSheet({
         )}
 
         <div className="mt-4">
-          {hasTarget && tab === "allures" ? (
+          {canShowAllures && tab === "allures" && parsed && targetTimeMs != null ? (
             <PaceMatrixInline
-              targetTimeMs={matchingTarget.target_time_ms}
-              targetDistance={matchingTarget.target_distance_m}
-              stroke={matchingTarget.stroke}
-              targetPoolSize={matchingTarget.target_pool_size}
+              targetTimeMs={targetTimeMs}
+              targetDistance={parsed.distance}
+              stroke={parsed.stroke}
+              targetPoolSize={matchingTarget?.target_pool_size ?? parsed.pool_size}
               swimmerSex={null}
+              compact={false}
             />
           ) : (
             <EventProgressionContent
@@ -84,7 +92,7 @@ export function ObjectiveDetailSheet({
               poolLength={poolLength}
               iuf={iuf}
               targetTime={objective.target_time_seconds}
-              active={tab === "progression" || !hasTarget}
+              active={tab === "progression" || !canShowAllures}
             />
           )}
         </div>

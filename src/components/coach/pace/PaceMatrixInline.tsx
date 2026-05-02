@@ -22,10 +22,10 @@ interface Props {
   stroke: Stroke;
   targetPoolSize: PoolSize;
   swimmerSex: "M" | "F" | null;
+  compact?: boolean;
 }
 
-/** Lecture seule, pas de pool toggle, hauteur compacte. Utilisé sous ObjectiveCard nageur. */
-export default function PaceMatrixInline({ targetTimeMs, targetDistance, stroke, targetPoolSize, swimmerSex }: Props) {
+export default function PaceMatrixInline({ targetTimeMs, targetDistance, stroke, targetPoolSize, swimmerSex, compact = true }: Props) {
   const strokeV2 = normalizeStroke(stroke);
   const family = eventFamily(targetDistance);
   const v4EnabledForFamily = family === "50m" || family === "100m";
@@ -40,7 +40,7 @@ export default function PaceMatrixInline({ targetTimeMs, targetDistance, stroke,
       zones={DEFAULT_ZONES}
       strokeAdjustments={STROKE_ADJUSTMENTS_DEFAULT}
       v4EnabledForFamily={v4EnabledForFamily}
-      compact
+      compact={compact}
     />
   );
 }
