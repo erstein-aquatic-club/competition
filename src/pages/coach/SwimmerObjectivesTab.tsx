@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Objective, ObjectiveInput, Competition } from "@/lib/api";
@@ -43,7 +43,7 @@ import {
 import { ObjectiveCard, ObjectiveGrid } from "@/components/shared/ObjectiveCard";
 import { EventProgressionSheet } from "@/components/shared/EventProgressionSheet";
 import { setPacePrefill } from "@/lib/pace-prefill-handoff";
-import { parseObjectiveForPace } from "@/lib/objective-pace-link";
+import { parseObjectiveForPace, shouldAutoSyncToPaceTarget } from "@/lib/objective-pace-link";
 import type { ParsedObjectiveTarget } from "@/lib/objective-pace-link";
 import { upsertPaceTarget, listMyPaceTargets } from "@/lib/api/pace-targets";
 import type { QueryClient } from "@tanstack/react-query";
@@ -468,6 +468,7 @@ const ObjectiveFormSheet = ({
 // ── Main Component ──────────────────────────────────────────────
 
 const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) => {
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingObj, setEditingObj] = useState<Objective | null>(null);
   const [progressionObj, setProgressionObj] = useState<Objective | null>(null);
@@ -509,6 +510,44 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
     queryFn: () => api.getSwimmerPerformances({ iuf: athleteIuf!, fromDate: perfFromDate }),
     enabled: !!athleteIuf,
   });
+
+  const { data: paceTargets = [], isLoading: paceTargetsLoading } = useQuery({
+    queryKey: ["pace-targets"],
+    queryFn: listMyPaceTargets,
+    staleTime: 30_000,
+    enabled: !!athleteId,
+  });
+
+  const hasSyncedRef = useRef(false);
+
+  useEffect(() => {
+    if (objectivesLoading || paceTargetsLoading) return;
+    if (!athleteId || objectives.length === 0) return;
+    if (hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
+
+    const missing = objectives.filter((obj) => {
+      const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+      return shouldAutoSyncToPaceTarget(obj, parsed, paceTargets, athleteId);
+    });
+
+    if (missing.length === 0) return;
+
+    void Promise.allSettled(
+      missing.map((obj) => {
+        const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length)!;
+        return upsertPaceTarget({
+          swimmer: { kind: "account", accountId: athleteId },
+          stroke: parsed.stroke,
+          target_distance_m: parsed.distance,
+          target_time_ms: obj.target_time_seconds! * 1000,
+          target_pool_size: parsed.pool_size,
+        });
+      }),
+    ).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ["pace-targets"] });
+    });
+  }, [objectivesLoading, paceTargetsLoading, objectives, paceTargets, athleteId, queryClient]);
 
   const handleCreate = () => {
     setEditingObj(null);
