@@ -159,7 +159,9 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
 
   const openDetail = (obj: Objective) => {
     const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
-    const target = findMatchingTarget(paceTargets, swimmerAccountId ?? -1, parsed);
+    const target = swimmerAccountId != null
+      ? findMatchingTarget(paceTargets, swimmerAccountId, parsed)
+      : null;
     setDetailMatchingTarget(target);
     setDetailObj(obj);
   };
@@ -481,7 +483,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
 
       <ObjectiveDetailSheet
         open={!!detailObj}
-        onOpenChange={(open) => { if (!open) setDetailObj(null); }}
+        onOpenChange={(open) => { if (!open) { setDetailObj(null); setDetailMatchingTarget(null); } }}
         objective={detailObj}
         matchingTarget={detailMatchingTarget}
         iuf={iuf}
