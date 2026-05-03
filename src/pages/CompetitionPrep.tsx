@@ -56,7 +56,7 @@ type CompetitionTab = "courses" | "routines" | "timeline" | "checklist";
 /* ── Main component ───────────────────────────────────────── */
 
 export default function CompetitionPrep() {
-  const [, params] = useRoute("/competition/:id");
+  const [, params] = useRoute("/competition/:id/prep");
   const [, navigate] = useLocation();
   const competitionId = params?.id ?? null;
 
