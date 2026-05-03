@@ -42,7 +42,7 @@ Validées par l'utilisateur via 6 questions (voir `docs/plans/2026-05-03-competi
 
 - Header (commun, repris de l'ancien CompetitionDetail) : back arrow + nom + badge J-X / Aujourd'hui / Terminée + dates (`formatDateRange`) + lieu (MapPin) + description.
 - Section athlete : table 4 colonnes Épreuve | Cible | PB 12 mois | Δ. Delta rouge si > 0 (effort restant), emerald si < 0 (marge), muted si null. Skeleton pendant fetch (queries gating + auth bootstrap), empty state avec CTA `/profile?section=objectives`.
-- Section coach/comité/admin : liste participants triée groupe ASC → nom ASC, "Sans groupe" en queue. Avatar 8x8 (image ou initiales 2 lettres), badge "N obj" si > 0 sinon em-dash. Tap → `/profile/:athleteId`. Tap target ≥ 48px.
+- Section coach/comité/admin : liste participants triée groupe ASC → nom ASC, "Sans groupe" en queue. Avatar 8x8 (image ou initiales 2 lettres). Tap → `/coach/swimmer/:athleteId` (page CoachSwimmerDetail existante). Tap target ≥ 48px. Le badge "N obj" initialement prévu a été retiré post-final-review : `objectives.athlete_id` est un UUID (FK auth.users) tandis que `competition_assignments.athlete_id` est numérique (FK users) — bridging UUID→numeric côté client via `Number(uuid)` rendait NaN systématiquement. Reportée à un futur RPC `get_objectives_counts_by_competition(competition_id)` (mêmes pattern que `get_objectives_counts_by_user` migration 00039).
 - CTA sticky bottom : `Button` h-11 → `navigate(\`/competition/${id}/prep\`)`.
 - Adaptation rôle via `useAuth((s) => s.role) ?? "athlete"`. `role === "athlete"` → InfoMyObjectives, sinon → InfoParticipants.
 

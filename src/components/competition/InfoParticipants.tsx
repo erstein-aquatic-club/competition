@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 import { api } from "@/lib/api";
 import { groupAndSortAssignments, type ParticipantProfile } from "./info-helpers";
 import { Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface Props {
   competitionId: string;
@@ -23,12 +22,7 @@ export default function InfoParticipants({ competitionId }: Props) {
     queryFn: () => api.getAthletes(),
   });
 
-  const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
-    queryKey: ["competition-objectives", competitionId],
-    queryFn: () => api.getObjectivesByCompetition(competitionId),
-  });
-
-  const isLoading = assignmentsLoading || athletesLoading || objectivesLoading;
+  const isLoading = assignmentsLoading || athletesLoading;
 
   const profilesByUserId = useMemo(() => {
     const map = new Map<number, ParticipantProfile>();
@@ -44,20 +38,9 @@ export default function InfoParticipants({ competitionId }: Props) {
     return map;
   }, [athletes]);
 
-  const objectivesByAthlete = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const o of objectives) {
-      const id = Number(o.athlete_id);
-      if (Number.isFinite(id)) {
-        map.set(id, (map.get(id) ?? 0) + 1);
-      }
-    }
-    return map;
-  }, [objectives]);
-
   const rows = useMemo(
-    () => groupAndSortAssignments(assignments, profilesByUserId, objectivesByAthlete),
-    [assignments, profilesByUserId, objectivesByAthlete],
+    () => groupAndSortAssignments(assignments, profilesByUserId, new Map()),
+    [assignments, profilesByUserId],
   );
 
   if (isLoading) {
@@ -95,7 +78,7 @@ export default function InfoParticipants({ competitionId }: Props) {
             <li key={row.athleteId}>
               <button
                 type="button"
-                onClick={() => navigate(`/profile/${row.athleteId}`)}
+                onClick={() => navigate(`/coach/swimmer/${row.athleteId}`)}
                 className="w-full flex items-center gap-3 py-2 hover:bg-muted/40 rounded-md px-2 -mx-2 transition min-h-[48px]"
               >
                 <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
@@ -111,13 +94,6 @@ export default function InfoParticipants({ competitionId }: Props) {
                   <p className="text-xs font-medium truncate">{row.displayName}</p>
                   <p className="text-[10px] text-muted-foreground truncate">{row.groupLabel}</p>
                 </div>
-                {row.objectivesCount > 0 ? (
-                  <Badge variant="secondary" className="text-[10px] shrink-0">
-                    {row.objectivesCount} obj
-                  </Badge>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground shrink-0">—</span>
-                )}
               </button>
             </li>
           ))}
