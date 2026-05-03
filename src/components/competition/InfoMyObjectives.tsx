@@ -17,7 +17,7 @@ interface Props {
 export default function InfoMyObjectives({ competitionId, userId, userUuid }: Props) {
   const [, navigate] = useLocation();
 
-  const { data: objectives = [] } = useQuery({
+  const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
     queryKey: ["my-objectives", userUuid],
     queryFn: () => (userUuid ? api.getObjectives(userUuid) : Promise.resolve([])),
     enabled: !!userUuid,
@@ -35,7 +35,7 @@ export default function InfoMyObjectives({ competitionId, userId, userUuid }: Pr
     return d.toISOString().slice(0, 10);
   }, []);
 
-  const { data: perfs = [] } = useQuery({
+  const { data: perfs = [], isLoading: perfsLoading } = useQuery({
     queryKey: ["swimmer-performances-rolling-12m", userId, fromDateIso],
     queryFn: () =>
       userId
@@ -49,6 +49,25 @@ export default function InfoMyObjectives({ competitionId, userId, userUuid }: Pr
     [competitionObjectives, perfs],
   );
 
+  const isAuthBootstrapping = userUuid == null || userId == null;
+  const isInitialLoading = isAuthBootstrapping || objectivesLoading || perfsLoading;
+
+  if (isInitialLoading) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Mes objectifs</h2>
+        </div>
+        <div className="space-y-2">
+          <div className="h-8 rounded-md bg-muted/40 animate-pulse" />
+          <div className="h-8 rounded-md bg-muted/40 animate-pulse" />
+          <div className="h-8 rounded-md bg-muted/40 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   if (competitionObjectives.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-4">
@@ -57,15 +76,15 @@ export default function InfoMyObjectives({ competitionId, userId, userUuid }: Pr
           <h2 className="text-sm font-semibold">Mes objectifs</h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Aucun objectif défini sur cette compétition.{" "}
-          <button
-            type="button"
-            onClick={() => navigate("/profile?section=objectives")}
-            className="underline hover:text-foreground"
-          >
-            En définir un
-          </button>
+          Aucun objectif défini sur cette compétition.
         </p>
+        <button
+          type="button"
+          onClick={() => navigate("/profile?section=objectives")}
+          className="mt-3 inline-flex h-10 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
+        >
+          En définir un
+        </button>
       </div>
     );
   }
