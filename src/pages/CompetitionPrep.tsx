@@ -220,7 +220,7 @@ export default function CompetitionPrep() {
       <div className="flex items-start gap-3">
         <button
           type="button"
-          onClick={() => window.history.length > 1 ? window.history.back() : navigate("/")}
+          onClick={() => navigate(`/competition/${competition.id}`)}
           className="mt-0.5 h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition shrink-0"
           aria-label="Retour"
         >
