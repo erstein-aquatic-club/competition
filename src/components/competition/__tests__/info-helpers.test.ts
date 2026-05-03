@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { computeObjectivePerfRow } from "../info-helpers";
-import type { Objective, SwimmerPerformance } from "@/lib/api/types";
+import { computeObjectivePerfRow, groupAndSortAssignments } from "../info-helpers";
+import type { Objective, SwimmerPerformance, CompetitionAssignment } from "@/lib/api/types";
 
 const baseObjective = (over: Partial<Objective> = {}): Objective => ({
   id: "o1",
@@ -66,5 +66,60 @@ describe("computeObjectivePerfRow", () => {
       [perf({ pool_length: 50, time_seconds: 24.10 })],
     );
     expect(row.pbSeconds).toBeNull();
+  });
+});
+
+interface TestProfile {
+  user_id: number;
+  display_name: string;
+  group_label: string | null;
+  avatar_url: string | null;
+}
+
+describe("groupAndSortAssignments", () => {
+  const a = (id: number): CompetitionAssignment => ({
+    id,
+    competition_id: "c1",
+    athlete_id: id,
+    assigned_at: null,
+  });
+
+  it("sorts by group ASC then name ASC", () => {
+    const profiles = new Map<number, TestProfile>([
+      [1, { user_id: 1, display_name: "Charlie", group_label: "Compet M", avatar_url: null }],
+      [2, { user_id: 2, display_name: "Alice", group_label: "Compet F", avatar_url: null }],
+      [3, { user_id: 3, display_name: "Bob", group_label: "Compet F", avatar_url: null }],
+    ]);
+    const objectivesByAthlete = new Map<number, number>();
+    const rows = groupAndSortAssignments(
+      [a(1), a(2), a(3)],
+      profiles,
+      objectivesByAthlete,
+    );
+    expect(rows.map((r) => r.displayName)).toEqual(["Alice", "Bob", "Charlie"]);
+  });
+
+  it("attaches objectives count from map", () => {
+    const profiles = new Map<number, TestProfile>([
+      [1, { user_id: 1, display_name: "Alice", group_label: "G1", avatar_url: null }],
+    ]);
+    const objectivesByAthlete = new Map<number, number>([[1, 3]]);
+    const [row] = groupAndSortAssignments([a(1)], profiles, objectivesByAthlete);
+    expect(row.objectivesCount).toBe(3);
+  });
+
+  it("buckets athletes without group into 'Sans groupe' at the end", () => {
+    const profiles = new Map<number, TestProfile>([
+      [1, { user_id: 1, display_name: "Alice", group_label: null, avatar_url: null }],
+      [2, { user_id: 2, display_name: "Bob", group_label: "G1", avatar_url: null }],
+    ]);
+    const rows = groupAndSortAssignments([a(1), a(2)], profiles, new Map());
+    expect(rows.map((r) => r.groupLabel)).toEqual(["G1", "Sans groupe"]);
+  });
+
+  it("skips assignments whose profile is missing", () => {
+    const profiles = new Map<number, TestProfile>();
+    const rows = groupAndSortAssignments([a(1)], profiles, new Map());
+    expect(rows).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import type { Objective, SwimmerPerformance } from "@/lib/api/types";
+import type { Objective, SwimmerPerformance, CompetitionAssignment } from "@/lib/api/types";
 
 export interface ObjectivePerfRow {
   objectiveId: string;
@@ -39,4 +39,48 @@ export function computeObjectivePerfRow(
     deltaSeconds,
     text: objective.text ?? null,
   };
+}
+
+export interface ParticipantProfile {
+  user_id: number;
+  display_name: string;
+  group_label: string | null;
+  avatar_url: string | null;
+}
+
+export interface ParticipantRow {
+  athleteId: number;
+  displayName: string;
+  groupLabel: string;
+  avatarUrl: string | null;
+  objectivesCount: number;
+}
+
+const NO_GROUP_BUCKET = "Sans groupe";
+
+export function groupAndSortAssignments(
+  assignments: CompetitionAssignment[],
+  profilesByUserId: Map<number, ParticipantProfile>,
+  objectivesByAthlete: Map<number, number>,
+): ParticipantRow[] {
+  const rows: ParticipantRow[] = [];
+  for (const assignment of assignments) {
+    const profile = profilesByUserId.get(assignment.athlete_id);
+    if (!profile) continue;
+    rows.push({
+      athleteId: assignment.athlete_id,
+      displayName: profile.display_name,
+      groupLabel: profile.group_label ?? NO_GROUP_BUCKET,
+      avatarUrl: profile.avatar_url,
+      objectivesCount: objectivesByAthlete.get(assignment.athlete_id) ?? 0,
+    });
+  }
+  rows.sort((a, b) => {
+    const aLast = a.groupLabel === NO_GROUP_BUCKET;
+    const bLast = b.groupLabel === NO_GROUP_BUCKET;
+    if (aLast !== bLast) return aLast ? 1 : -1;
+    if (a.groupLabel !== b.groupLabel) return a.groupLabel.localeCompare(b.groupLabel, "fr");
+    return a.displayName.localeCompare(b.displayName, "fr");
+  });
+  return rows;
 }
