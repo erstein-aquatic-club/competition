@@ -96,7 +96,7 @@ const SharedPaceMatrix = lazyWithRetry(() => import("@/pages/SharedPaceMatrix"))
 const CoachSwimmerDetail = lazyWithRetry(() => import("@/pages/coach/CoachSwimmerDetail"));
 const SwimPlanningDemo = lazyWithRetry(() => import("@/pages/coach/SwimPlanningDemo"));
 const StrengthPlanningScreen = lazyWithRetry(() => import("@/pages/coach/StrengthPlanningScreen"));
-const CompetitionDetail = lazyWithRetry(() => import("@/pages/CompetitionDetail"));
+const CompetitionPrep = lazyWithRetry(() => import("@/pages/CompetitionPrep"));
 const SwimNotes = lazyWithRetry(() => import("@/pages/SwimNotes"));
 const MonthlyReport = lazyWithRetry(() => import("@/pages/MonthlyReport"));
 const SwimmerHome = lazyWithRetry(() => import("@/pages/SwimmerHome"));
@@ -280,7 +280,8 @@ function AppRouter() {
             <Route path="/natation" component={Dashboard} />
             <Route path="/progress"><Redirect to="/suivi/progression" /></Route>
             <Route path="/hall-of-fame" component={FEATURES.hallOfFame ? HallOfFame : ComingSoon} />
-            <Route path="/competition/:id" component={CompetitionDetail} />
+            <Route path="/competition/:id/prep" component={CompetitionPrep} />
+            <Route path="/competition/:id" component={CompetitionPrep} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
             <Route path="/coach/swim-planning" component={SwimPlanningDemo} />
             <Route path="/coach/strength-planning" component={StrengthPlanningScreen} />
