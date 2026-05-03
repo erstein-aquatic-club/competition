@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §190-ui3 livré — Section "Prochaine compétition" du SwimmerHome utilise désormais l'`InlineBanner` partagé du calendrier (cohérence visuelle, économie de 2 queries races/checklist). §187 (slider affinement) designé mais pas livré. (2026-05-02)*
+*Dernière mise à jour : §191 livré — Vue info compétition au tap sur la bannière (`/competition/:id`) remplace la landing prep tabs (déplacée sur `/competition/:id/prep`). Header avec J-X + section adaptée au rôle (`InfoMyObjectives` nageur / `InfoParticipants` coach-comité-admin) + CTA sticky "Préparer la compétition". 2 helpers purs TDD (10 tests), 2 composants UI, swap routes Wouter, fix critique post-review (`useAuth.user` est displayName, pas UUID). §187 (slider affinement) designé mais pas livré. (2026-05-03)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

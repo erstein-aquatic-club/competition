@@ -135,7 +135,11 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/hooks/useCoachEventsTimeline.ts` | Hook timeline échéances coach (fetch + normalisation) | ~130 lignes |
 | `src/components/coach/CoachEventsTimeline.tsx` | Timeline verticale échéances coach (compétitions, entretiens, cycles) | ~260 lignes |
 | `src/lib/api/competition-prep.ts` | API compétition nageur (races, routines, checklists) | ~325 lignes |
-| `src/pages/CompetitionDetail.tsx` | Page détail compétition nageur (header + 4 onglets) | ~210 lignes |
+| `src/pages/CompetitionDetail.tsx` | **Vue info compétition** (header J-X + section adaptée au rôle InfoMyObjectives/InfoParticipants + CTA Préparer sticky). Landing par défaut sur `/competition/:id`. | 150 lignes |
+| `src/pages/CompetitionPrep.tsx` | Page préparation compétition (4 onglets Check/Courses/Routines/Jour J). Mountée sur `/competition/:id/prep`. Ancien `CompetitionDetail` renommé §191. | 324 lignes |
+| `src/components/competition/info-helpers.ts` | Helpers purs `computeObjectivePerfRow` + `groupAndSortAssignments` (vue info compétition §191). | 86 lignes |
+| `src/components/competition/InfoMyObjectives.tsx` | Section nageur de la vue info compétition (table objectifs + PB 12 mois glissants + delta cible). | 138 lignes |
+| `src/components/competition/InfoParticipants.tsx` | Section coach/comité/admin de la vue info compétition (liste participants triée groupe puis nom, badge objectifs). | 128 lignes |
 | `src/components/competition/RacesTab.tsx` | Onglet courses (CRUD épreuves, Sheet, couleur nage) | ~380 lignes |
 | `src/components/competition/RoutinesTab.tsx` | Onglet routines (templates, steps, assignation par course) | ~530 lignes |
 | `src/components/competition/TimelineTab.tsx` | Onglet Jour J (fusion chronologique courses + routines) | ~235 lignes |

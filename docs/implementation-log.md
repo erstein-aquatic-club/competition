@@ -4,6 +4,86 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §191 — Vue info compétition : nouvelle landing au tap sur la bannière (2026-05-03)
+
+**Contexte :** Le tap sur la bannière compétition (InlineBanner amber dans `SwimmerHome` §190-ui3 et dans le calendrier `Dashboard`) ouvrait directement `/competition/:id` qui affichait le menu de **préparation** à 4 tabs (Check / Courses / Routines / Jour J). Immédiatement actionnable mais pas d'aperçu informationnel ("c'est quoi ce meet, où ça se passe, qu'est-ce que je dois y faire, qui y va"). L'utilisateur a demandé d'introduire une vue info qui devienne la landing par défaut, avec un lien vers la page prep actuelle.
+
+### Décisions de brainstorm
+
+Validées par l'utilisateur via 6 questions (voir `docs/plans/2026-05-03-competition-info-view-design.md`) :
+- **Tous les rôles** voient la nouvelle vue info (nageur, coach, comité, admin) avec contenu adapté.
+- **Routing** : `/competition/:id` → vue info (NEW), `/competition/:id/prep` → tabs prep (déplacés). 1 tap CTA "Préparer la compétition →" pour aller en prep.
+- **Contenu** : header (a), section objectifs + PB 12 mois (c+g) côté nageur, liste participants avec compteur d'objectifs (e+c) côté coach/comité, CTA prep visible pour tous (h).
+- Sections d/b/f écartées (pas de progression checklist, pas de "mes courses", pas de routines en preview).
+
+### Changements
+
+**Nouveaux fichiers**
+
+| Fichier | Rôle | LOC |
+|---|---|---|
+| `src/pages/CompetitionDetail.tsx` (réécrit) | Vue info : header J-X + section adaptée au rôle + CTA sticky | 150 |
+| `src/pages/CompetitionPrep.tsx` (renommé depuis l'ancien CompetitionDetail) | Tabs prep, comportement identique au pré-§191, `useRoute` mis à jour vers `/competition/:id/prep` | 324 |
+| `src/components/competition/info-helpers.ts` | Helpers purs `computeObjectivePerfRow` + `groupAndSortAssignments` | 86 |
+| `src/components/competition/InfoMyObjectives.tsx` | Section nageur (table objectifs + PB 12 mois + delta cible, skeleton, empty state) | 138 |
+| `src/components/competition/InfoParticipants.tsx` | Section coach/comité (liste participants, badge objectifs, skeleton, empty state) | 128 |
+| `src/components/competition/__tests__/info-helpers.test.ts` | 10 tests TDD purs (6 sur computeObjectivePerfRow, 4 sur groupAndSortAssignments) | 127 |
+
+**Fichiers modifiés**
+
+| Fichier | Changement |
+|---|---|
+| `src/App.tsx` | Ajout import `CompetitionDetail` (+ `CompetitionPrep` du Task 1). Route `/competition/:id/prep` BEFORE `/competition/:id`. |
+| `src/lib/api/objectives.ts` | NEW `getObjectivesByCompetition(competitionId)` (server-filtered query, ~18 LOC). |
+| `src/lib/api/index.ts` | Re-export de `getObjectivesByCompetition`. |
+| `src/lib/api.ts` | Façade legacy : import alias + delegate `api.getObjectivesByCompetition`. |
+
+**Composition de la vue info**
+
+- Header (commun, repris de l'ancien CompetitionDetail) : back arrow + nom + badge J-X / Aujourd'hui / Terminée + dates (`formatDateRange`) + lieu (MapPin) + description.
+- Section athlete : table 4 colonnes Épreuve | Cible | PB 12 mois | Δ. Delta rouge si > 0 (effort restant), emerald si < 0 (marge), muted si null. Skeleton pendant fetch (queries gating + auth bootstrap), empty state avec CTA `/profile?section=objectives`.
+- Section coach/comité/admin : liste participants triée groupe ASC → nom ASC, "Sans groupe" en queue. Avatar 8x8 (image ou initiales 2 lettres), badge "N obj" si > 0 sinon em-dash. Tap → `/profile/:athleteId`. Tap target ≥ 48px.
+- CTA sticky bottom : `Button` h-11 → `navigate(\`/competition/${id}/prep\`)`.
+- Adaptation rôle via `useAuth((s) => s.role) ?? "athlete"`. `role === "athlete"` → InfoMyObjectives, sinon → InfoParticipants.
+
+### Sous-traitance subagents
+
+Exécuté en mode `superpowers:subagent-driven-development` : 8 tasks dispatchées, chacune avec un implementer + un spec/quality reviewer. 2 boucles de fix sur Task 4 (loading skeleton + tap target ≥ 40px) et Task 6 (bug critique `useAuth.user` = displayName ≠ UUID, breaking le path objectives — corrigé en bascule sur `api.getAthleteObjectives()` no-arg qui résout l'UUID via `supabase.auth.getUser()` côté serveur).
+
+### Tests
+
+- TDD strict sur les 2 helpers purs (10 tests verts post-implémentation, échec confirmé pré-implémentation).
+- Suite globale : 651 tests, 650 verts, 1 échec **pré-existant** (`transformers.test.ts > buildRunUpdatePayload keeps completed run ressentis`, documenté dans MEMORY.md), 0 régression sur la vue info.
+- `npx tsc --noEmit` clean après chaque task.
+- Tests RLS : non concernés (aucune migration SQL, aucune modification de policy).
+
+### Décisions / pièges
+
+- **`useAuth.user` est le displayName, pas l'UUID auth** : piège classique. Le composant `InfoMyObjectives` est passé en `getAthleteObjectives()` no-arg qui appelle `supabase.auth.getUser()` côté serveur — élimine la classe d'erreur "qu'est-ce que `s.user` ?" pour ce callsite.
+- **`useRoute("/competition/:id")` dans CompetitionPrep** : Wouter fait du pattern matching exact. Avec le swap de Task 6, CompetitionPrep est mounted via `/competition/:id/prep`, donc on a dû changer `useRoute` vers `/competition/:id/prep` pour que `params.id` se résolve.
+- **Cache key partagée `["athletes"]`** : InfoParticipants utilise `api.getAthletes()` pour récupérer la liste roster avec groupe + avatar — clé déjà utilisée par 9+ écrans coach, donc cache hit immédiat sur la vue info.
+- **Empty state CTA tap target ≥ 40px** : extrait du `<p text-xs>` parent et passé en `<button h-10>` stand-alone après review (Apple HIG, cohérence §181).
+- **Skeleton pendant auth bootstrap** : `isAuthBootstrapping = userId == null` couvre la fenêtre où la session n'est pas encore hydratée — évite le flicker "PB —" sur les colonnes alors que les perfs sont juste pas encore arrivées.
+- **Tous les call sites externes (`SwimmerHome` banner, `Dashboard` calendrier, push notif `data.url`) atterrissent désormais sur la vue info** sans modification — l'URL `/competition/:id` est inchangée côté caller.
+
+### Limites / dette résiduelle
+
+- Pas de section "Mes courses" (point b écarté) ni progression checklist (d) ni routines preview (f). Accessibles via le CTA "Préparer la compétition".
+- Push notif "🏊 50 NL — Échauffement c'est parti !" atterrit sur info au lieu de routines (Task 6 a conservé `data.url: #/competition/${id}`). 2 taps pour aller à la timeline (info → CTA). Acceptable. Si UX problème, modifier `data.url` vers `/prep` à terme.
+- `getObjectives` (avec arg UUID) reste exposé dans la façade pour usage futur (par ex. coach views) — pas supprimé, juste pas utilisé par cette vue.
+
+### Commits
+
+8 commits sur `main` (séquence subagent-driven, voir `docs/plans/2026-05-03-competition-info-view-plan.md`) :
+1. `63b1ba208` — refactor: rename CompetitionDetail → CompetitionPrep + route alias
+2. `5e23c4fdb` — feat: helper computeObjectivePerfRow + tests
+3. `9fa5b507` — feat: helper groupAndSortAssignments + tests
+4. `87301a0b` + `bd599ad39` — feat + fix: InfoMyObjectives (skeleton + tap target)
+5. `2feb900ed` — feat: InfoParticipants + getObjectivesByCompetition
+6. `52c244861` + `6b3eec684` — feat + fix: vue info devient la landing (+ fix UUID)
+7. `56d903b31` — refactor: back arrow CompetitionPrep → /competition/:id
+8. (ce commit) — docs §191
+
 ## §190-ui3 — SwimmerHome : remplacer la card "Prochaine compétition" par l'`InlineBanner` du calendrier (2026-05-02)
 
 **Contexte :** Le §190-ui2 ajoutait un compteur "N séances avant" dans une card custom. L'utilisateur a demandé de réutiliser directement la bannière `InlineBanner` du calendrier pour cohérence visuelle (mêmes couleurs, même layout, même comportement).
