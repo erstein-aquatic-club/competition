@@ -236,6 +236,7 @@ export {
 export {
   getObjectives,
   getAthleteObjectives,
+  getObjectivesByCompetition,
   createObjective,
   updateObjective,
   deleteObjective,

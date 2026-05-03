@@ -82,3 +82,23 @@ export async function getObjectivesCountsByUser(): Promise<Map<number, number>> 
   }
   return map;
 }
+
+export async function getObjectivesByCompetition(competitionId: string): Promise<Objective[]> {
+  if (!canUseSupabase()) return [];
+  const { data, error } = await supabase
+    .from("objectives")
+    .select("*")
+    .eq("competition_id", competitionId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    athlete_id: row.athlete_id,
+    competition_id: row.competition_id,
+    event_code: row.event_code,
+    pool_length: row.pool_length,
+    target_time_seconds: row.target_time_seconds != null ? Number(row.target_time_seconds) : null,
+    text: row.text,
+    created_by: row.created_by,
+    created_at: row.created_at,
+  })) as Objective[];
+}

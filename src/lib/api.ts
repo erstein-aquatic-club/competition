@@ -250,6 +250,7 @@ import {
 import {
   getObjectives as _getObjectives,
   getAthleteObjectives as _getAthleteObjectives,
+  getObjectivesByCompetition as _getObjectivesByCompetition,
   createObjective as _createObjective,
   updateObjective as _updateObjective,
   deleteObjective as _deleteObjective,
@@ -863,6 +864,7 @@ export const api = {
   // ══════════════════════════════════════════════════════════════════
   async getObjectives(athleteId?: string) { return _getObjectives(athleteId); },
   async getAthleteObjectives() { return _getAthleteObjectives(); },
+  async getObjectivesByCompetition(competitionId: string) { return _getObjectivesByCompetition(competitionId); },
   async createObjective(input: Parameters<typeof _createObjective>[0]) { return _createObjective(input); },
   async updateObjective(id: string, input: Parameters<typeof _updateObjective>[1]) { return _updateObjective(id, input); },
   async deleteObjective(id: string) { return _deleteObjective(id); },
