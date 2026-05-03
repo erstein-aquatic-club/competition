@@ -10,17 +10,14 @@ interface Props {
   competitionId: string;
   /** numeric user_id used to fetch swimmer_performances rows */
   userId: number | null;
-  /** Supabase auth UUID used to fetch objectives */
-  userUuid: string | null;
 }
 
-export default function InfoMyObjectives({ competitionId, userId, userUuid }: Props) {
+export default function InfoMyObjectives({ competitionId, userId }: Props) {
   const [, navigate] = useLocation();
 
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
-    queryKey: ["my-objectives", userUuid],
-    queryFn: () => (userUuid ? api.getObjectives(userUuid) : Promise.resolve([])),
-    enabled: !!userUuid,
+    queryKey: ["athlete-objectives"],
+    queryFn: () => api.getAthleteObjectives(),
   });
 
   const competitionObjectives = useMemo(
@@ -49,7 +46,7 @@ export default function InfoMyObjectives({ competitionId, userId, userUuid }: Pr
     [competitionObjectives, perfs],
   );
 
-  const isAuthBootstrapping = userUuid == null || userId == null;
+  const isAuthBootstrapping = userId == null;
   const isInitialLoading = isAuthBootstrapping || objectivesLoading || perfsLoading;
 
   if (isInitialLoading) {

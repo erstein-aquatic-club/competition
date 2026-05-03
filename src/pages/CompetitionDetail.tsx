@@ -42,7 +42,6 @@ export default function CompetitionDetail() {
   const [, navigate] = useLocation();
   const competitionId = params?.id ?? null;
 
-  const userUuid = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
   const role = useAuth((s) => s.role) ?? "athlete";
 
@@ -128,7 +127,6 @@ export default function CompetitionDetail() {
         <InfoMyObjectives
           competitionId={competition.id}
           userId={userId}
-          userUuid={userUuid}
         />
       ) : (
         <InfoParticipants competitionId={competition.id} />
