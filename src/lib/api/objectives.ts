@@ -9,9 +9,12 @@ export async function getObjectives(athleteId?: string): Promise<Objective[]> {
   if (!canUseSupabase()) return [];
 
   // Query 1: objectives + competitions (legacy 1:1 embed for back-compat fields)
+  // Disambiguate the FK: PostgREST sees two paths to competitions since §193
+  // (legacy objectives.competition_id + new objective_competitions join). We
+  // pin the embed to the legacy direct FK explicitly.
   let query = supabase
     .from("objectives")
-    .select("*, competitions(name, date)")
+    .select("*, competitions!objectives_competition_id_fkey(name, date)")
     .order("created_at", { ascending: false });
   if (athleteId) {
     query = query.eq("athlete_id", athleteId);
