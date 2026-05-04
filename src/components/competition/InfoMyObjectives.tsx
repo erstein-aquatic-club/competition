@@ -26,10 +26,11 @@ export default function InfoMyObjectives({
   // Gate on authUid: getAthleteObjectives throws when auth not ready (avoids
   // caching empty arrays under the shared ["athlete-objectives"] key).
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
-    queryKey: ["athlete-objectives"],
+    queryKey: ["athlete-objectives", authUid],
     queryFn: () => api.getAthleteObjectives(),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 
   const competitionObjectives = useMemo(

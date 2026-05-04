@@ -60,10 +60,11 @@ export default function AddObjectiveSheet({
   // the query fires too early, caches `[]` under ["athlete-objectives"], and
   // the Lier tab stays at 0 forever (cohérent avec SwimmerObjectivesView §192).
   const { data: allObjectives = [] } = useQuery({
-    queryKey: ["athlete-objectives"],
+    queryKey: ["athlete-objectives", authUid],
     queryFn: () => api.getAthleteObjectives(),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 
   const linkable = useMemo(
