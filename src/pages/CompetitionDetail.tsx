@@ -53,14 +53,18 @@ export default function CompetitionDetail() {
 
   // Supabase auth UUID — required by AddObjectiveSheet to write athlete_id.
   // Note: useAuth(s => s.user) is a displayName, NOT the auth UUID (§191 trap).
-  const { data: authUid = null } = useQuery({
-    queryKey: ["auth-uid"],
+  // Use the same cache key ["auth-user"] as SwimmerObjectivesView so the
+  // resolution is shared across views (avoid duplicate getUser() round-trips
+  // and stale-cache divergence between profile + competition pages).
+  const { data: authUser } = useQuery({
+    queryKey: ["auth-user"],
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
-      return data.user?.id ?? null;
+      return data.user;
     },
     staleTime: 5 * 60 * 1000,
   });
+  const authUid = authUser?.id ?? null;
 
   const competition = useMemo(
     () => competitions.find((c) => c.id === competitionId) ?? null,

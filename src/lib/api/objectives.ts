@@ -64,7 +64,12 @@ export async function getObjectives(athleteId?: string): Promise<Objective[]> {
 export async function getAthleteObjectives(): Promise<Objective[]> {
   if (!canUseSupabase()) return [];
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  // Throw on missing user instead of returning [] so React Query treats it
+  // as an error (no success cache pollution). Without this, a query firing
+  // during the auth-bootstrap window would cache an empty array under the
+  // shared ["athlete-objectives"] key and never refresh, leaving views like
+  // AddObjectiveSheet showing 0 linkable objectives forever.
+  if (!user) throw new Error("Auth session not ready");
   return getObjectives(user.id);
 }
 
