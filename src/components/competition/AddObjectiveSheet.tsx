@@ -85,10 +85,8 @@ export default function AddObjectiveSheet({
 
   /* ── Tab state ─────────────────────────────────── */
   const [tab, setTab] = useState<"create" | "link">("create");
-  // If linkable list is empty after fetch, force tab back to "create"
-  useEffect(() => {
-    if (linkable.length === 0 && tab === "link") setTab("create");
-  }, [linkable.length, tab]);
+  // (Auto-fallback to "create" disabled while debug panel is in place — user
+  // needs to be able to open the Lier tab to see the diagnostic.)
 
   /* ── Create form state ─────────────────────────── */
   const [objType, setObjType] = useState<ObjectiveType>("chrono");
@@ -213,11 +211,7 @@ export default function AddObjectiveSheet({
               <Trophy className="mr-1.5 h-3.5 w-3.5" />
               Créer un nouveau
             </TabsTrigger>
-            <TabsTrigger
-              value="link"
-              className="text-xs"
-              disabled={linkable.length === 0}
-            >
+            <TabsTrigger value="link" className="text-xs">
               <Link2 className="mr-1.5 h-3.5 w-3.5" />
               Lier un existant ({linkable.length})
             </TabsTrigger>
@@ -315,6 +309,22 @@ export default function AddObjectiveSheet({
 
           {/* ── Link tab ─────────────────────── */}
           <TabsContent value="link" className="mt-4 space-y-4">
+            {/* DEBUG (§193 diag) — temporary visible diagnostic */}
+            <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-900/10 p-2 text-[10px] font-mono leading-tight text-amber-900 dark:text-amber-200 break-all">
+              <div>authUid: {authUid ?? "null"}</div>
+              <div>compId: {competitionId}</div>
+              <div>allObjectives.length: {allObjectives.length}</div>
+              <div>linkable.length: {linkable.length}</div>
+              <div className="mt-1">objectives:</div>
+              {allObjectives.map((o) => (
+                <div key={o.id} className="ml-2">
+                  • {o.event_code ?? "?"} | comp_ids=[
+                  {(o.competition_ids ?? []).join(", ") || "—"}]
+                  {o.competition_id ? ` legacy=${o.competition_id.slice(0, 8)}` : ""}
+                </div>
+              ))}
+            </div>
+
             {linkable.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 Tu n'as pas d'objectif libre à lier.

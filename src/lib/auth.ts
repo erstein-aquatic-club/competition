@@ -404,7 +404,11 @@ export function handleAuthEvent(event: string, session: Session | null) {
     startRefreshTimer();
 
     if (state.isLoaded && state.user) {
+      // Always rehydrate authUid from the freshest session.user.id, even
+      // when we only intend to refresh tokens — the in-memory authUid may
+      // be null (older code path didn't store it).
       useAuth.setState({
+        authUid: session.user?.id ?? state.authUid ?? null,
         accessToken: session.access_token,
         refreshToken: session.refresh_token,
       });
