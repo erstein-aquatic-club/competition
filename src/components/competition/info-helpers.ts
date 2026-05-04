@@ -85,6 +85,11 @@ export function groupAndSortAssignments(
   return rows;
 }
 
-export function selectLinkableObjectives(objectives: Objective[]): Objective[] {
-  return objectives.filter((o) => o.competition_id == null);
+export function selectLinkableForCompetition(
+  objectives: Objective[],
+  currentCompetitionId: string,
+): Objective[] {
+  return objectives.filter(
+    (o) => !o.competition_ids.includes(currentCompetitionId),
+  );
 }

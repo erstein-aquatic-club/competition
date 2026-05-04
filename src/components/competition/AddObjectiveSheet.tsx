@@ -29,7 +29,7 @@ import {
   parseTime,
   formatTime,
 } from "@/lib/objectiveHelpers";
-import { selectLinkableObjectives } from "./info-helpers";
+import { selectLinkableForCompetition } from "./info-helpers";
 import type { Objective, ObjectiveInput } from "@/lib/api/types";
 import { Trophy, Link2 } from "lucide-react";
 
@@ -61,9 +61,20 @@ export default function AddObjectiveSheet({
   });
 
   const linkable = useMemo(
-    () => selectLinkableObjectives(allObjectives),
-    [allObjectives],
+    () => selectLinkableForCompetition(allObjectives, competitionId),
+    [allObjectives, competitionId],
   );
+
+  /* ── Competitions query (for multi-comp badges in summary) ── */
+  const { data: competitions = [] } = useQuery({
+    queryKey: ["competitions"],
+    queryFn: () => api.getCompetitions(),
+  });
+  const competitionNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of competitions) m.set(c.id, c.name);
+    return m;
+  }, [competitions]);
 
   /* ── Tab state ─────────────────────────────────── */
   const [tab, setTab] = useState<"create" | "link">("create");
@@ -116,7 +127,7 @@ export default function AddObjectiveSheet({
 
   const linkMut = useMutation({
     mutationFn: (id: string) =>
-      api.updateObjective(id, { competition_id: competitionId }),
+      api.linkObjectiveToCompetition(id, competitionId),
     onSuccess: () => {
       toast({ title: "Objectif lié à la compétition" });
       invalidate();
@@ -318,7 +329,7 @@ export default function AddObjectiveSheet({
                       value={obj.id}
                       className="mt-0.5"
                     />
-                    <ObjectiveSummary obj={obj} />
+                    <ObjectiveSummary obj={obj} competitionNameById={competitionNameById} />
                   </Label>
                 ))}
               </RadioGroup>
@@ -339,7 +350,13 @@ export default function AddObjectiveSheet({
   );
 }
 
-function ObjectiveSummary({ obj }: { obj: Objective }) {
+function ObjectiveSummary({
+  obj,
+  competitionNameById,
+}: {
+  obj: Objective;
+  competitionNameById: Map<string, string>;
+}) {
   const lines: string[] = [];
   if (obj.event_code) {
     const target =
@@ -354,6 +371,11 @@ function ObjectiveSummary({ obj }: { obj: Objective }) {
   }
   if (obj.text) lines.push(obj.text);
   if (lines.length === 0) lines.push("(objectif vide)");
+
+  const linkedNames = obj.competition_ids
+    .map((cid) => competitionNameById.get(cid))
+    .filter((n): n is string => Boolean(n));
+
   return (
     <div className="min-w-0 flex-1 text-xs">
       {lines.map((l, i) => (
@@ -366,6 +388,11 @@ function ObjectiveSummary({ obj }: { obj: Objective }) {
           {l}
         </p>
       ))}
+      {linkedNames.length > 0 && (
+        <p className="mt-1 text-[10px] text-muted-foreground/80 truncate">
+          Déjà lié à : {linkedNames.join(", ")}
+        </p>
+      )}
     </div>
   );
 }

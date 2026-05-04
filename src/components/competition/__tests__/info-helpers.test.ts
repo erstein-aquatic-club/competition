@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { computeObjectivePerfRow, groupAndSortAssignments, selectLinkableObjectives } from "../info-helpers";
+import { computeObjectivePerfRow, groupAndSortAssignments, selectLinkableForCompetition } from "../info-helpers";
 import type { Objective, SwimmerPerformance, CompetitionAssignment } from "@/lib/api/types";
 
 const baseObjective = (over: Partial<Objective> = {}): Objective => ({
   id: "o1",
   athlete_id: "a1",
   competition_id: "c1",
+  competition_ids: ["c1"],
   event_code: "50_FREE",
   pool_length: 50,
   target_time_seconds: 24.5,
@@ -124,11 +125,12 @@ describe("groupAndSortAssignments", () => {
   });
 });
 
-describe("selectLinkableObjectives", () => {
+describe("selectLinkableForCompetition", () => {
   const obj = (over: Partial<Objective> = {}): Objective => ({
     id: "x",
     athlete_id: "a1",
     competition_id: null,
+    competition_ids: [],
     event_code: null,
     pool_length: null,
     target_time_seconds: null,
@@ -136,26 +138,42 @@ describe("selectLinkableObjectives", () => {
     ...over,
   });
 
-  it("keeps objectives with competition_id null", () => {
-    const out = selectLinkableObjectives([obj({ id: "1" }), obj({ id: "2", competition_id: "c1" })]);
-    expect(out.map((o) => o.id)).toEqual(["1"]);
+  it("excludes objectives already linked to the current competition", () => {
+    const out = selectLinkableForCompetition(
+      [
+        obj({ id: "1", competition_ids: ["c1"] }),
+        obj({ id: "2", competition_ids: ["c2"] }),
+        obj({ id: "3", competition_ids: [] }),
+      ],
+      "c1",
+    );
+    expect(out.map((o) => o.id)).toEqual(["2", "3"]);
   });
 
-  it("treats undefined competition_id as linkable", () => {
-    const o = obj({ id: "u" });
-    delete (o as any).competition_id;
-    const out = selectLinkableObjectives([o]);
-    expect(out.map((o) => o.id)).toEqual(["u"]);
+  it("keeps objectives linked to other competitions", () => {
+    const out = selectLinkableForCompetition(
+      [obj({ id: "a", competition_ids: ["c2", "c3"] })],
+      "c1",
+    );
+    expect(out.map((o) => o.id)).toEqual(["a"]);
+  });
+
+  it("keeps objectives with empty competition_ids", () => {
+    const out = selectLinkableForCompetition(
+      [obj({ id: "a", competition_ids: [] })],
+      "c1",
+    );
+    expect(out).toHaveLength(1);
   });
 
   it("returns an empty array when input is empty", () => {
-    expect(selectLinkableObjectives([])).toEqual([]);
+    expect(selectLinkableForCompetition([], "c1")).toEqual([]);
   });
 
   it("preserves input order", () => {
     const a = obj({ id: "a" });
     const b = obj({ id: "b" });
     const c = obj({ id: "c" });
-    expect(selectLinkableObjectives([a, b, c]).map((o) => o.id)).toEqual(["a", "b", "c"]);
+    expect(selectLinkableForCompetition([a, b, c], "x").map((o) => o.id)).toEqual(["a", "b", "c"]);
   });
 });

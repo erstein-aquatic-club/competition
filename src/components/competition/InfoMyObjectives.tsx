@@ -29,7 +29,7 @@ export default function InfoMyObjectives({
   });
 
   const competitionObjectives = useMemo(
-    () => objectives.filter((o) => o.competition_id === competitionId),
+    () => objectives.filter((o) => o.competition_ids.includes(competitionId)),
     [objectives, competitionId],
   );
 
