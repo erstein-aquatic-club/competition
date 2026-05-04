@@ -1,4 +1,5 @@
 import type { Objective, SwimmerPerformance, CompetitionAssignment } from "@/lib/api/types";
+import { findBestTime } from "@/lib/objectiveHelpers";
 
 export interface ObjectivePerfRow {
   objectiveId: string;
@@ -19,13 +20,9 @@ export function computeObjectivePerfRow(
   const poolLength = objective.pool_length ?? null;
   const targetSeconds = objective.target_time_seconds ?? null;
 
-  const matching = perfs.filter(
-    (p) =>
-      p.event_code === eventCode &&
-      (poolLength == null || p.pool_length === poolLength),
-  );
-  const pbSeconds =
-    matching.length > 0 ? Math.min(...matching.map((p) => p.time_seconds)) : null;
+  const pbSeconds = eventCode
+    ? findBestTime(perfs, eventCode, poolLength)
+    : null;
 
   const deltaSeconds =
     targetSeconds != null && pbSeconds != null ? pbSeconds - targetSeconds : null;

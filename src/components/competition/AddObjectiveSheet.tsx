@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   FFN_EVENTS,
@@ -61,15 +61,7 @@ export default function AddObjectiveSheet({
   // the Lier tab stays at 0 forever (cohérent avec SwimmerObjectivesView §192).
   // Use authUid (sync from Zustand) directly — bypass getAthleteObjectives()
   // which calls supabase.auth.getUser() async (can race / null-out).
-  const {
-    data: allObjectives = [],
-    isLoading: objectivesLoading,
-    isFetching: objectivesFetching,
-    isError: objectivesIsError,
-    error: objectivesError,
-    fetchStatus: objectivesFetchStatus,
-    status: objectivesStatus,
-  } = useQuery({
+  const { data: allObjectives = [] } = useQuery({
     queryKey: ["athlete-objectives", authUid],
     queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
@@ -95,8 +87,9 @@ export default function AddObjectiveSheet({
 
   /* ── Tab state ─────────────────────────────────── */
   const [tab, setTab] = useState<"create" | "link">("create");
-  // (Auto-fallback to "create" disabled while debug panel is in place — user
-  // needs to be able to open the Lier tab to see the diagnostic.)
+  useEffect(() => {
+    if (linkable.length === 0 && tab === "link") setTab("create");
+  }, [linkable.length, tab]);
 
   /* ── Create form state ─────────────────────────── */
   const [objType, setObjType] = useState<ObjectiveType>("chrono");
@@ -106,22 +99,7 @@ export default function AddObjectiveSheet({
   const [text, setText] = useState("");
 
   /* ── Link form state ───────────────────────────── */
-  const [selectedObjId, setSelectedObjId] = useState<string | null>(null);
-
-  /* ── DEBUG: independent API call to bypass React Query ── */
-  const [debugDirect, setDebugDirect] = useState<string>("not-run");
-  useEffect(() => {
-    if (!open || !authUid) return;
-    setDebugDirect("running...");
-    api
-      .getObjectives(authUid)
-      .then((res) => {
-        setDebugDirect(`OK len=${res.length} ids=${res.map((o) => o.event_code).join(",")}`);
-      })
-      .catch((err: Error) => {
-        setDebugDirect(`ERR: ${err.message}`);
-      });
-  }, [open, authUid]);
+  const [selectedObjIds, setSelectedObjIds] = useState<Set<string>>(new Set());
 
   /* ── Reset on close ────────────────────────────── */
   useEffect(() => {
@@ -132,7 +110,7 @@ export default function AddObjectiveSheet({
       setPoolLength("50");
       setTargetTime("");
       setText("");
-      setSelectedObjId(null);
+      setSelectedObjIds(new Set());
     }
   }, [open]);
 
@@ -156,10 +134,20 @@ export default function AddObjectiveSheet({
   });
 
   const linkMut = useMutation({
-    mutationFn: (id: string) =>
-      api.linkObjectiveToCompetition(id, competitionId),
-    onSuccess: () => {
-      toast({ title: "Objectif lié à la compétition" });
+    mutationFn: async (ids: string[]) => {
+      // Sequential to surface individual errors clearly; could be Promise.all
+      // if we want parallelism. Idempotent UPSERT means retries are safe.
+      for (const id of ids) {
+        await api.linkObjectiveToCompetition(id, competitionId);
+      }
+    },
+    onSuccess: (_data, ids) => {
+      toast({
+        title:
+          ids.length === 1
+            ? "Objectif lié à la compétition"
+            : `${ids.length} objectifs liés à la compétition`,
+      });
       invalidate();
       onOpenChange(false);
     },
@@ -212,8 +200,8 @@ export default function AddObjectiveSheet({
   };
 
   const handleLink = () => {
-    if (!selectedObjId) return;
-    linkMut.mutate(selectedObjId);
+    if (selectedObjIds.size === 0) return;
+    linkMut.mutate(Array.from(selectedObjIds));
   };
 
   /* ── Render ────────────────────────────────────── */
@@ -236,7 +224,11 @@ export default function AddObjectiveSheet({
               <Trophy className="mr-1.5 h-3.5 w-3.5" />
               Créer un nouveau
             </TabsTrigger>
-            <TabsTrigger value="link" className="text-xs">
+            <TabsTrigger
+              value="link"
+              className="text-xs"
+              disabled={linkable.length === 0}
+            >
               <Link2 className="mr-1.5 h-3.5 w-3.5" />
               Lier un existant ({linkable.length})
             </TabsTrigger>
@@ -334,70 +326,48 @@ export default function AddObjectiveSheet({
 
           {/* ── Link tab ─────────────────────── */}
           <TabsContent value="link" className="mt-4 space-y-4">
-            {/* DEBUG (§193 diag) — temporary visible diagnostic */}
-            <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-900/10 p-2 text-[10px] font-mono leading-tight text-amber-900 dark:text-amber-200 break-all">
-              <div>authUid: {authUid ?? "null"}</div>
-              <div>compId: {competitionId}</div>
-              <div>
-                status={objectivesStatus} | fetchStatus={objectivesFetchStatus}
-              </div>
-              <div>
-                isLoading={String(objectivesLoading)} | isFetching=
-                {String(objectivesFetching)} | isError=
-                {String(objectivesIsError)}
-              </div>
-              {objectivesError && (
-                <div className="text-rose-600 dark:text-rose-400">
-                  ERROR: {(objectivesError as Error).message}
-                </div>
-              )}
-              <div>allObjectives.length: {allObjectives.length}</div>
-              <div>linkable.length: {linkable.length}</div>
-              <div className="mt-1 break-all">debug-direct: {debugDirect}</div>
-              <div className="mt-1">objectives:</div>
-              {allObjectives.map((o) => (
-                <div key={o.id} className="ml-2">
-                  • {o.event_code ?? "?"} | comp_ids=[
-                  {(o.competition_ids ?? []).join(", ") || "—"}]
-                  {o.competition_id ? ` legacy=${o.competition_id.slice(0, 8)}` : ""}
-                </div>
-              ))}
-            </div>
-
             {linkable.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 Tu n'as pas d'objectif libre à lier.
               </p>
             ) : (
-              <RadioGroup
-                value={selectedObjId ?? ""}
-                onValueChange={setSelectedObjId}
-                className="space-y-2"
-              >
+              <div className="space-y-2">
                 {linkable.map((obj) => (
                   <Label
                     key={obj.id}
                     htmlFor={`obj-${obj.id}`}
                     className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 cursor-pointer hover:bg-muted/40 transition"
                   >
-                    <RadioGroupItem
+                    <Checkbox
                       id={`obj-${obj.id}`}
-                      value={obj.id}
+                      checked={selectedObjIds.has(obj.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedObjIds((prev) => {
+                          const next = new Set(prev);
+                          if (checked) next.add(obj.id);
+                          else next.delete(obj.id);
+                          return next;
+                        });
+                      }}
                       className="mt-0.5"
                     />
                     <ObjectiveSummary obj={obj} competitionNameById={competitionNameById} />
                   </Label>
                 ))}
-              </RadioGroup>
+              </div>
             )}
 
             <Button
               type="button"
               className="w-full h-11"
               onClick={handleLink}
-              disabled={!selectedObjId || isPending}
+              disabled={selectedObjIds.size === 0 || isPending}
             >
-              {linkMut.isPending ? "Liaison..." : "Lier à cette compétition"}
+              {linkMut.isPending
+                ? "Liaison..."
+                : selectedObjIds.size <= 1
+                  ? "Lier à cette compétition"
+                  : `Lier ${selectedObjIds.size} objectifs à cette compétition`}
             </Button>
           </TabsContent>
         </Tabs>

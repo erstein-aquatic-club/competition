@@ -7,7 +7,7 @@ const baseObjective = (over: Partial<Objective> = {}): Objective => ({
   athlete_id: "a1",
   competition_id: "c1",
   competition_ids: ["c1"],
-  event_code: "50_FREE",
+  event_code: "50NL",
   pool_length: 50,
   target_time_seconds: 24.5,
   text: null,
@@ -18,7 +18,7 @@ const perf = (over: Partial<SwimmerPerformance> = {}): SwimmerPerformance => ({
   id: 1,
   user_id: 1,
   swimmer_iuf: "X",
-  event_code: "50_FREE",
+  event_code: "50 NL",
   pool_length: 50,
   time_seconds: 24.82,
   competition_date: "2025-12-01",
@@ -39,7 +39,7 @@ describe("computeObjectivePerfRow", () => {
   });
 
   it("returns null pb when no perf matches event_code+poolLength", () => {
-    const row = computeObjectivePerfRow(baseObjective(), [perf({ event_code: "100_FREE" })]);
+    const row = computeObjectivePerfRow(baseObjective(), [perf({ event_code: "100 Pap." })]);
     expect(row.pbSeconds).toBeNull();
     expect(row.deltaSeconds).toBeNull();
   });
