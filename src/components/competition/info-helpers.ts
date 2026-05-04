@@ -89,7 +89,13 @@ export function selectLinkableForCompetition(
   objectives: Objective[],
   currentCompetitionId: string,
 ): Objective[] {
-  return objectives.filter(
-    (o) => !o.competition_ids.includes(currentCompetitionId),
-  );
+  return objectives.filter((o) => {
+    // Back-compat: exclude if the legacy 1:1 column matches (objects not
+    // yet migrated to the join table).
+    if (o.competition_id === currentCompetitionId) return false;
+    // Defensive: tolerate competition_ids missing or non-array (stale cache,
+    // partial fetch, fallback path) — treat as not linked → linkable.
+    const ids = Array.isArray(o.competition_ids) ? o.competition_ids : [];
+    return !ids.includes(currentCompetitionId);
+  });
 }

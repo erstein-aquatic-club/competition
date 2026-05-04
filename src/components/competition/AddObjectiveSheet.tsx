@@ -55,9 +55,15 @@ export default function AddObjectiveSheet({
   const { toast } = useToast();
 
   /* ── Linkable objectives query ─────────────────── */
+  // Gate on authUid: getAthleteObjectives() relies on supabase.auth.getUser()
+  // which returns null during the auth-bootstrap window. Without this gate,
+  // the query fires too early, caches `[]` under ["athlete-objectives"], and
+  // the Lier tab stays at 0 forever (cohérent avec SwimmerObjectivesView §192).
   const { data: allObjectives = [] } = useQuery({
     queryKey: ["athlete-objectives"],
     queryFn: () => api.getAthleteObjectives(),
+    enabled: !!authUid,
+    staleTime: 5 * 60 * 1000,
   });
 
   const linkable = useMemo(
