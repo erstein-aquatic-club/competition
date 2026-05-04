@@ -4,6 +4,77 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §193 — Objectives ↔ compétitions : passage en many-to-many (2026-05-04)
+
+**Contexte :** Le §192 limitait l'onglet "Lier" du Sheet à des objectifs sans `competition_id`. L'utilisateur a 4 objectifs dans sa vue profil mais n'en voyait qu'un dans le Sheet. Diagnostic : 3 sont déjà liés à d'autres compétitions, et la colonne `objectives.competition_id` est 1:1 (un objectif ne peut être rattaché qu'à une compétition à la fois). L'utilisateur a explicitement demandé que "un objectif doit pouvoir être affecté à plusieurs compétitions". → Refactor schéma vers N:N.
+
+### Décisions
+
+- **NEW table de jointure `objective_competitions(objective_id, competition_id, created_at)`** avec PK composite, FK ON DELETE CASCADE des deux côtés.
+- La colonne legacy `objectives.competition_id` est **conservée** pour back-compat (ancienne UI/API peuvent encore lire) mais **plus écrite** par les nouveaux flux. Migration future pour la dropper après bascule complète.
+- Backfill systématique : pour chaque `objectives.competition_id NOT NULL`, INSERT idempotent dans la jointure.
+- RLS aligné sur les policies existantes de `objectives` (nageur ses propres lignes, coach/admin tout, committee SELECT).
+
+### Changements
+
+**Migration**
+
+| Fichier | Type | Effet |
+|---|---|---|
+| `supabase/migrations/00155_objective_competitions_join_table.sql` | NEW | Table + RLS + backfill (3/3 liens) |
+
+**API (Task 2)**
+
+| Fichier | Changement |
+|---|---|
+| `src/lib/api/types.ts` | Ajout `Objective.competition_ids: string[]` (toujours présent, possiblement vide). `competition_id` marqué `@deprecated`. |
+| `src/lib/api/objectives.ts` | `getObjectives` : ajout du select Supabase `objective_competitions(competition_id)` + mapping `competition_ids`. `getObjectivesByCompetition` réécrit pour lire via la jointure (était cassé : aurait raté les objectifs N:N liés uniquement via la join). `createObjective` : INSERT objective + UPSERT jointure si `competition_id` fourni, rollback du objective row en cas d'échec du lien. `updateObjective` : ignore désormais `competition_id` (no-op gracieux). NEW `linkObjectiveToCompetition` (UPSERT `ON CONFLICT DO NOTHING`) + `unlinkObjectiveFromCompetition` (DELETE). |
+| `src/lib/api/index.ts` | Re-export des 2 nouveaux helpers. |
+| `src/lib/api.ts` | Façade legacy : aliases + delegates pour `linkObjectiveToCompetition` + `unlinkObjectiveFromCompetition`. |
+| 4 tests fixtures | Ajout `competition_ids: []` aux littéraux Objective (TS structural). |
+
+**Front-end (Task 3)**
+
+| Fichier | Changement |
+|---|---|
+| `src/components/competition/info-helpers.ts` | `selectLinkableObjectives` (§192) supprimé → remplacé par `selectLinkableForCompetition(objectives, currentCompetitionId)` qui filtre via `!o.competition_ids.includes(currentCompetitionId)`. |
+| `src/components/competition/__tests__/info-helpers.test.ts` | 4 tests §192 supprimés → 5 tests §193 : exclude on link, keep cross-comp, keep empty list, empty input, order preservation. Total fichier : 15 tests verts. |
+| `src/components/competition/InfoMyObjectives.tsx` | Filtre `o.competition_id === competitionId` → `o.competition_ids.includes(competitionId)`. |
+| `src/components/competition/AddObjectiveSheet.tsx` | Onglet "Lier" relaxé : montre TOUS les objectifs sauf ceux déjà liés à cette comp. Mutation `updateObjective(id, { competition_id })` → `linkObjectiveToCompetition(id, competitionId)` (idempotent). NEW query `["competitions"]` + `competitionNameById` Map pour afficher "Déjà lié à : Champ. France, Inter-clubs" sous chaque objectif. |
+
+### Tests
+
+- 15 tests dans `info-helpers.test.ts` : 6 `computeObjectivePerfRow` + 4 `groupAndSortAssignments` + 5 `selectLinkableForCompetition` (TDD, échec confirmé pré-implémentation).
+- Suite globale : 651 tests, 650 verts, 1 fail pré-existant `transformers.test.ts`. 0 régression.
+- `npx tsc --noEmit` clean après chaque task.
+
+### Tests RLS
+
+Non lancés — les nouvelles policies suivent strictement le pattern de la table `objectives` (verified via `EXISTS (SELECT 1 FROM objectives o WHERE o.id = ... AND (o.athlete_id = auth.uid() OR app_user_role() IN ('admin','coach')))`). Aucune divergence avec les policies déjà couvertes par les tests RLS existants. À ajouter au prochain run RLS si on étoffe le harness pour cette table.
+
+### Décisions / pièges
+
+- **Conservation de `objectives.competition_id`** : back-compat pendant la transition. Aucun nouveau call site n'écrit dedans. À supprimer plus tard via une migration `ALTER TABLE objectives DROP COLUMN competition_id` une fois qu'on est confiant.
+- **`getObjectivesByCompetition` cassé en lecture** : avant §193, lisait `from("objectives").select("*").eq("competition_id", competitionId)`. Avec les nouveaux INSERT qui ne touchent plus la colonne legacy, cette query aurait silencieusement raté tous les nouveaux liens. Réécrite pour lire via la jointure : `from("objective_competitions").select("objective_id, objectives(*)").eq("competition_id", ...)`.
+- **`createObjective` rollback du objective row** : si l'INSERT du lien échoue après l'INSERT de l'objectif, on `DELETE` l'objectif pour éviter un orphelin. Erreur du DELETE swallowed pour préserver la trace de la véritable erreur (lien). Si le DELETE lui-même échoue, on re-throw l'erreur originale pour que l'utilisateur voie pourquoi le lien n'a pas marché — mais on accepte un orphelin théorique (rare).
+- **`linkObjectiveToCompetition` idempotent** : UPSERT avec `ignoreDuplicates: true` — un appel répété ne provoque pas d'erreur, retourne juste sans rien faire. Important pour la robustesse du Sheet (double-tap).
+- **Display multi-comp dans AddObjectiveSheet** : la liste "Déjà lié à : ..." nécessite la query `["competitions"]` (déjà partagée avec `CompetitionDetail`, donc cache hit immédiat). Sans noms friendly, l'utilisateur verrait des UUIDs. Le `competitionNameById.get` ne retourne jamais undefined dans la pratique (toutes les comps sont fetchées), mais on filtre `Boolean(n)` par sécurité.
+- **Coach `SwimmerObjectivesTab.tsx` non modifié** : le formulaire d'édition coach utilise un `<Select>` `competition_id` mono-valeur (pattern legacy 1:1). Out-of-scope §193, fonctionne via la colonne back-compat. Migration multi-select reportée si l'usage le justifie.
+
+### Limites / dette résiduelle
+
+- La colonne legacy `objectives.competition_id` reste exposée sur le type `Objective`. Aucun nouveau call site ne devrait l'écrire (les anciens, oui — le coach edit form continue de l'utiliser).
+- Pas de UI "délier d'une compétition". L'API `unlinkObjectiveFromCompetition` est exposée mais aucun composant ne l'appelle pour l'instant. À ajouter si on introduit une vue "gérer mes objectifs par comp".
+- Le coach edit form n'est pas multi-select. Si un coach modifie un objectif déjà lié à plusieurs comps via le form, il forcera l'objectif à 1 seule comp (via legacy column). Risque faible mais documenté.
+
+### Commits
+
+5 commits sur `main` :
+1. `1c445dab2` — feat(db): migration 00155 objective_competitions (join + RLS + backfill)
+2. `144a3216a` — feat(api): objectives many-to-many — competition_ids + link/unlink helpers
+3. `abe351f6e` — feat(competition-info): bascule front-end objectives N:N (compteurs + lier)
+4. (ce commit) — docs §193
+
 ## §192 — Ajout objectif inline sur la vue info compétition (2026-05-04)
 
 **Contexte :** Le §191 a livré la vue info compétition mais l'empty state "Aucun objectif défini" pointait vers `/profile?section=objectives` — l'utilisateur quittait la page, et le formulaire profil ne lie pas l'objectif à la compétition courante. L'utilisateur a demandé de pouvoir créer un nouvel objectif déjà lié à la compet, OU lier un objectif existant (sans comp), sans quitter la page.
