@@ -7,22 +7,49 @@ import type { Objective, ObjectiveInput } from "./types";
 
 export async function getObjectives(athleteId?: string): Promise<Objective[]> {
   if (!canUseSupabase()) return [];
+
+  // Query 1: objectives + competitions (legacy 1:1 embed for back-compat fields)
   let query = supabase
     .from("objectives")
-    .select("*, competitions(name, date), objective_competitions(competition_id)")
+    .select("*, competitions(name, date)")
     .order("created_at", { ascending: false });
   if (athleteId) {
     query = query.eq("athlete_id", athleteId);
   }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row: any) => ({
+  const objectives = data ?? [];
+
+  // Query 2: join table — fetched separately so a stale PostgREST schema
+  // cache for the new objective_competitions relation doesn't break the
+  // whole objectives flow. We filter by the same scope (athlete or all).
+  const objectiveIds = objectives.map((o: any) => o.id).filter(Boolean);
+  let linksByObjective = new Map<string, string[]>();
+  if (objectiveIds.length > 0) {
+    const { data: linkData, error: linkErr } = await supabase
+      .from("objective_competitions")
+      .select("objective_id, competition_id")
+      .in("objective_id", objectiveIds);
+    if (linkErr) {
+      // Tolerate schema/RLS hiccups: log and proceed with empty competition_ids.
+      // The legacy column on objectives is still populated for old rows so
+      // back-compat callers keep working; new callers see [] (graceful).
+      // eslint-disable-next-line no-console
+      console.warn("[getObjectives] objective_competitions fetch failed:", linkErr.message);
+    } else {
+      for (const row of linkData ?? []) {
+        const list = linksByObjective.get(row.objective_id) ?? [];
+        list.push(row.competition_id);
+        linksByObjective.set(row.objective_id, list);
+      }
+    }
+  }
+
+  return objectives.map((row: any) => ({
     id: row.id,
     athlete_id: row.athlete_id,
     competition_id: row.competition_id,
-    competition_ids: Array.isArray(row.objective_competitions)
-      ? row.objective_competitions.map((j: any) => j.competition_id).filter(Boolean)
-      : [],
+    competition_ids: linksByObjective.get(row.id) ?? [],
     event_code: row.event_code,
     pool_length: row.pool_length,
     target_time_seconds: row.target_time_seconds != null ? Number(row.target_time_seconds) : null,
