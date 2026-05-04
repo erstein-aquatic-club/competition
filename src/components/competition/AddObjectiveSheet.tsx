@@ -61,7 +61,15 @@ export default function AddObjectiveSheet({
   // the Lier tab stays at 0 forever (cohérent avec SwimmerObjectivesView §192).
   // Use authUid (sync from Zustand) directly — bypass getAthleteObjectives()
   // which calls supabase.auth.getUser() async (can race / null-out).
-  const { data: allObjectives = [] } = useQuery({
+  const {
+    data: allObjectives = [],
+    isLoading: objectivesLoading,
+    isFetching: objectivesFetching,
+    isError: objectivesIsError,
+    error: objectivesError,
+    fetchStatus: objectivesFetchStatus,
+    status: objectivesStatus,
+  } = useQuery({
     queryKey: ["athlete-objectives", authUid],
     queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
@@ -99,6 +107,21 @@ export default function AddObjectiveSheet({
 
   /* ── Link form state ───────────────────────────── */
   const [selectedObjId, setSelectedObjId] = useState<string | null>(null);
+
+  /* ── DEBUG: independent API call to bypass React Query ── */
+  const [debugDirect, setDebugDirect] = useState<string>("not-run");
+  useEffect(() => {
+    if (!open || !authUid) return;
+    setDebugDirect("running...");
+    api
+      .getObjectives(authUid)
+      .then((res) => {
+        setDebugDirect(`OK len=${res.length} ids=${res.map((o) => o.event_code).join(",")}`);
+      })
+      .catch((err: Error) => {
+        setDebugDirect(`ERR: ${err.message}`);
+      });
+  }, [open, authUid]);
 
   /* ── Reset on close ────────────────────────────── */
   useEffect(() => {
@@ -315,8 +338,22 @@ export default function AddObjectiveSheet({
             <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-900/10 p-2 text-[10px] font-mono leading-tight text-amber-900 dark:text-amber-200 break-all">
               <div>authUid: {authUid ?? "null"}</div>
               <div>compId: {competitionId}</div>
+              <div>
+                status={objectivesStatus} | fetchStatus={objectivesFetchStatus}
+              </div>
+              <div>
+                isLoading={String(objectivesLoading)} | isFetching=
+                {String(objectivesFetching)} | isError=
+                {String(objectivesIsError)}
+              </div>
+              {objectivesError && (
+                <div className="text-rose-600 dark:text-rose-400">
+                  ERROR: {(objectivesError as Error).message}
+                </div>
+              )}
               <div>allObjectives.length: {allObjectives.length}</div>
               <div>linkable.length: {linkable.length}</div>
+              <div className="mt-1 break-all">debug-direct: {debugDirect}</div>
               <div className="mt-1">objectives:</div>
               {allObjectives.map((o) => (
                 <div key={o.id} className="ml-2">
