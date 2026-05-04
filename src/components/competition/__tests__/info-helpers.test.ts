@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeObjectivePerfRow, groupAndSortAssignments } from "../info-helpers";
+import { computeObjectivePerfRow, groupAndSortAssignments, selectLinkableObjectives } from "../info-helpers";
 import type { Objective, SwimmerPerformance, CompetitionAssignment } from "@/lib/api/types";
 
 const baseObjective = (over: Partial<Objective> = {}): Objective => ({
@@ -121,5 +121,41 @@ describe("groupAndSortAssignments", () => {
     const profiles = new Map<number, TestProfile>();
     const rows = groupAndSortAssignments([a(1)], profiles, new Map());
     expect(rows).toEqual([]);
+  });
+});
+
+describe("selectLinkableObjectives", () => {
+  const obj = (over: Partial<Objective> = {}): Objective => ({
+    id: "x",
+    athlete_id: "a1",
+    competition_id: null,
+    event_code: null,
+    pool_length: null,
+    target_time_seconds: null,
+    text: null,
+    ...over,
+  });
+
+  it("keeps objectives with competition_id null", () => {
+    const out = selectLinkableObjectives([obj({ id: "1" }), obj({ id: "2", competition_id: "c1" })]);
+    expect(out.map((o) => o.id)).toEqual(["1"]);
+  });
+
+  it("treats undefined competition_id as linkable", () => {
+    const o = obj({ id: "u" });
+    delete (o as any).competition_id;
+    const out = selectLinkableObjectives([o]);
+    expect(out.map((o) => o.id)).toEqual(["u"]);
+  });
+
+  it("returns an empty array when input is empty", () => {
+    expect(selectLinkableObjectives([])).toEqual([]);
+  });
+
+  it("preserves input order", () => {
+    const a = obj({ id: "a" });
+    const b = obj({ id: "b" });
+    const c = obj({ id: "c" });
+    expect(selectLinkableObjectives([a, b, c]).map((o) => o.id)).toEqual(["a", "b", "c"]);
   });
 });
