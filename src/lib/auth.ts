@@ -94,6 +94,8 @@ export const refreshStoredAccessToken = async (): Promise<string | null> => {
 
 interface AuthState {
   user: string | null;
+  /** Supabase auth UUID (auth.users.id), populated from session.user.id. */
+  authUid: string | null;
   userId: number | null;
   role: string | null;
   isApproved: boolean | null;
@@ -122,6 +124,7 @@ interface AuthState {
 
 export const useAuth = create<AuthState>((set) => ({
   user: null,
+  authUid: null,
   userId: null,
   role: null,
   isApproved: null,
@@ -140,6 +143,7 @@ export const useAuth = create<AuthState>((set) => ({
     const requiresApproval = requiresApprovalForRole(role);
     set({
       user: displayName,
+      authUid: supabaseUser?.id ?? null,
       userId,
       role,
       isApproved: requiresApproval ? null : true,
@@ -155,6 +159,9 @@ export const useAuth = create<AuthState>((set) => ({
     const requiresApproval = requiresApprovalForRole(resolvedRole);
     set({
       user,
+      // legacy login path doesn't carry the auth UUID — leave nullish so
+      // consumers fall back to supabase.auth.getUser() if needed
+      authUid: null,
       accessToken,
       refreshToken,
       userId: userId ?? null,
@@ -171,6 +178,7 @@ export const useAuth = create<AuthState>((set) => ({
     setStorageValue(COACH_SELECTED_ATHLETE_NAME_KEY, null);
     set({
       user: null,
+      authUid: null,
       userId: null,
       role: null,
       isApproved: null,
@@ -207,6 +215,7 @@ export const useAuth = create<AuthState>((set) => ({
     if (error || !data.session) {
       set({
         user: null,
+        authUid: null,
         userId: null,
         role: null,
         isApproved: null,
@@ -292,6 +301,7 @@ export const useAuth = create<AuthState>((set) => ({
 
     set({
       user: displayName,
+      authUid: supabaseUser?.id ?? null,
       userId,
       role,
       isApproved,
@@ -366,6 +376,7 @@ export function handleAuthEvent(event: string, session: Session | null) {
     setStorageValue(COACH_SELECTED_ATHLETE_NAME_KEY, null);
     useAuth.setState({
       user: null,
+      authUid: null,
       userId: null,
       role: null,
       isApproved: null,
@@ -414,6 +425,7 @@ export function handleAuthEvent(event: string, session: Session | null) {
 
   useAuth.setState({
     user: null,
+    authUid: null,
     userId: null,
     role: null,
     isApproved: null,

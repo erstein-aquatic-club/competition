@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { supabase } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 import InfoMyObjectives from "@/components/competition/InfoMyObjectives";
 import InfoParticipants from "@/components/competition/InfoParticipants";
@@ -45,26 +44,15 @@ export default function CompetitionDetail() {
 
   const userId = useAuth((s) => s.userId);
   const role = useAuth((s) => s.role) ?? "athlete";
+  // authUid is hydrated synchronously from the Supabase session in the
+  // Zustand store (loginFromSession + loadUser). Avoids the auth-bootstrap
+  // race that an async useQuery(supabase.auth.getUser) would have.
+  const authUid = useAuth((s) => s.authUid);
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
     queryFn: () => api.getCompetitions(),
   });
-
-  // Supabase auth UUID — required by AddObjectiveSheet to write athlete_id.
-  // Note: useAuth(s => s.user) is a displayName, NOT the auth UUID (§191 trap).
-  // Use the same cache key ["auth-user"] as SwimmerObjectivesView so the
-  // resolution is shared across views (avoid duplicate getUser() round-trips
-  // and stale-cache divergence between profile + competition pages).
-  const { data: authUser } = useQuery({
-    queryKey: ["auth-user"],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      return data.user;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  const authUid = authUser?.id ?? null;
 
   const competition = useMemo(
     () => competitions.find((c) => c.id === competitionId) ?? null,
