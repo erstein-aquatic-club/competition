@@ -23,11 +23,13 @@ export default function InfoMyObjectives({
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Gate on authUid: getAthleteObjectives throws when auth not ready (avoids
-  // caching empty arrays under the shared ["athlete-objectives"] key).
+  // Use authUid (synchronous from Zustand store) directly instead of
+  // getAthleteObjectives() which does an async supabase.auth.getUser()
+  // that can race / return null and silently produce []. We have the UUID
+  // already; just pass it.
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
     queryKey: ["athlete-objectives", authUid],
-    queryFn: () => api.getAthleteObjectives(),
+    queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: "always",

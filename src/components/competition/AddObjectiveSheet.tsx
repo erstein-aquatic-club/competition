@@ -59,9 +59,11 @@ export default function AddObjectiveSheet({
   // which returns null during the auth-bootstrap window. Without this gate,
   // the query fires too early, caches `[]` under ["athlete-objectives"], and
   // the Lier tab stays at 0 forever (cohérent avec SwimmerObjectivesView §192).
+  // Use authUid (sync from Zustand) directly — bypass getAthleteObjectives()
+  // which calls supabase.auth.getUser() async (can race / null-out).
   const { data: allObjectives = [] } = useQuery({
     queryKey: ["athlete-objectives", authUid],
-    queryFn: () => api.getAthleteObjectives(),
+    queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: "always",

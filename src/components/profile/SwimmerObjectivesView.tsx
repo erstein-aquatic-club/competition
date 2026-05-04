@@ -76,7 +76,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   // Get objectives for current athlete
   const { data: objectives = [], isLoading } = useQuery({
     queryKey: ["athlete-objectives", authUid],
-    queryFn: () => api.getAthleteObjectives(),
+    queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: "always",
