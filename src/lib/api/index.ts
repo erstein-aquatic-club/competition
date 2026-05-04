@@ -237,6 +237,8 @@ export {
   getObjectives,
   getAthleteObjectives,
   getObjectivesByCompetition,
+  linkObjectiveToCompetition,
+  unlinkObjectiveFromCompetition,
   createObjective,
   updateObjective,
   deleteObjective,

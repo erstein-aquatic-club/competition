@@ -8,6 +8,7 @@ import type { Objective } from "@/lib/api";
 const baseObjective: Objective = {
   id: "obj-1",
   athlete_id: "auth-uuid",
+  competition_ids: [],
   event_code: "100NL",
   pool_length: 50,
   target_time_seconds: 65.5,

@@ -9,7 +9,7 @@ export async function getObjectives(athleteId?: string): Promise<Objective[]> {
   if (!canUseSupabase()) return [];
   let query = supabase
     .from("objectives")
-    .select("*, competitions(name, date)")
+    .select("*, competitions(name, date), objective_competitions(competition_id)")
     .order("created_at", { ascending: false });
   if (athleteId) {
     query = query.eq("athlete_id", athleteId);
@@ -20,6 +20,9 @@ export async function getObjectives(athleteId?: string): Promise<Objective[]> {
     id: row.id,
     athlete_id: row.athlete_id,
     competition_id: row.competition_id,
+    competition_ids: Array.isArray(row.objective_competitions)
+      ? row.objective_competitions.map((j: any) => j.competition_id).filter(Boolean)
+      : [],
     event_code: row.event_code,
     pool_length: row.pool_length,
     target_time_seconds: row.target_time_seconds != null ? Number(row.target_time_seconds) : null,
@@ -41,20 +44,49 @@ export async function getAthleteObjectives(): Promise<Objective[]> {
 export async function createObjective(input: ObjectiveInput): Promise<Objective> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Insert into objectives. We stop writing to the legacy competition_id column
+  // and rely entirely on the join table going forward. Existing rows in
+  // production keep their column populated for back-compat.
+  const { competition_id, ...rest } = input;
   const { data, error } = await supabase
     .from("objectives")
-    .insert({ ...input, created_by: user?.id })
+    .insert({ ...rest, created_by: user?.id })
     .select()
     .single();
   if (error) throw new Error(error.message);
-  return data as Objective;
+
+  // If a competition was specified, create the link row.
+  if (competition_id) {
+    const { error: linkErr } = await supabase
+      .from("objective_competitions")
+      .upsert(
+        { objective_id: data.id, competition_id },
+        { onConflict: "objective_id,competition_id", ignoreDuplicates: true },
+      );
+    if (linkErr) {
+      // Best-effort cleanup: roll back the objective row we just created so
+      // we don't leave orphans. Errors here are surfaced to the caller.
+      await supabase.from("objectives").delete().eq("id", data.id);
+      throw new Error(`Lien compétition échoué : ${linkErr.message}`);
+    }
+  }
+
+  return {
+    ...(data as Objective),
+    competition_ids: competition_id ? [competition_id] : [],
+  };
 }
 
 export async function updateObjective(id: string, input: Partial<ObjectiveInput>): Promise<Objective> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
+  // Note: competition_id is no longer updated via this path. Use
+  // linkObjectiveToCompetition / unlinkObjectiveFromCompetition instead.
+  const { competition_id: _ignored, ...rest } = input;
+  void _ignored;
   const { data, error } = await supabase
     .from("objectives")
-    .update(input)
+    .update(rest)
     .eq("id", id)
     .select()
     .single();
@@ -86,19 +118,57 @@ export async function getObjectivesCountsByUser(): Promise<Map<number, number>> 
 export async function getObjectivesByCompetition(competitionId: string): Promise<Objective[]> {
   if (!canUseSupabase()) return [];
   const { data, error } = await supabase
-    .from("objectives")
-    .select("*")
+    .from("objective_competitions")
+    .select("objective_id, objectives(*)")
     .eq("competition_id", competitionId);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    athlete_id: row.athlete_id,
-    competition_id: row.competition_id,
-    event_code: row.event_code,
-    pool_length: row.pool_length,
-    target_time_seconds: row.target_time_seconds != null ? Number(row.target_time_seconds) : null,
-    text: row.text,
-    created_by: row.created_by,
-    created_at: row.created_at,
-  })) as Objective[];
+  return (data ?? [])
+    .map((row: any) => row.objectives)
+    .filter(Boolean)
+    .map((row: any) => ({
+      id: row.id,
+      athlete_id: row.athlete_id,
+      competition_id: row.competition_id,
+      competition_ids: [], // Not joined here; consumers needing the full link list should call getObjectives.
+      event_code: row.event_code,
+      pool_length: row.pool_length,
+      target_time_seconds: row.target_time_seconds != null ? Number(row.target_time_seconds) : null,
+      text: row.text,
+      created_by: row.created_by,
+      created_at: row.created_at,
+    })) as Objective[];
+}
+
+/**
+ * Lien idempotent entre un objectif et une compétition (join table).
+ * INSERT ... ON CONFLICT DO NOTHING.
+ */
+export async function linkObjectiveToCompetition(
+  objectiveId: string,
+  competitionId: string,
+): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase not available");
+  const { error } = await supabase
+    .from("objective_competitions")
+    .upsert({ objective_id: objectiveId, competition_id: competitionId }, {
+      onConflict: "objective_id,competition_id",
+      ignoreDuplicates: true,
+    });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Délie un objectif d'une compétition donnée. No-op si pas lié.
+ */
+export async function unlinkObjectiveFromCompetition(
+  objectiveId: string,
+  competitionId: string,
+): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase not available");
+  const { error } = await supabase
+    .from("objective_competitions")
+    .delete()
+    .eq("objective_id", objectiveId)
+    .eq("competition_id", competitionId);
+  if (error) throw new Error(error.message);
 }

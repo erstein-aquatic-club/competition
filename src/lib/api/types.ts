@@ -513,7 +513,10 @@ export interface CompetitionAssignment {
 export interface Objective {
   id: string;
   athlete_id: string;
+  /** @deprecated kept for back-compat; use competition_ids instead. */
   competition_id?: string | null;
+  /** All competitions linked to this objective via the join table (always present, possibly empty). */
+  competition_ids: string[];
   event_code?: string | null;
   pool_length?: number | null;
   target_time_seconds?: number | null;

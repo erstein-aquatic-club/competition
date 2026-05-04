@@ -32,7 +32,7 @@ before(async () => {
 describe("ObjectiveDetailSheet", () => {
   it("affiche le toggle Allures/Progression quand l'objectif est parseable avec un temps cible", async () => {
     const { ObjectiveDetailSheet } = await import("../ObjectiveDetailSheet");
-    const obj: Objective = { id: "1", athlete_id: "a1", event_code: "100NL", pool_length: 50, target_time_seconds: 65 };
+    const obj: Objective = { id: "1", athlete_id: "a1", competition_ids: [], event_code: "100NL", pool_length: 50, target_time_seconds: 65 };
     const html = renderToString(
       React.createElement(ObjectiveDetailSheet, {
         open: true, onOpenChange: () => {}, objective: obj, matchingTarget: null, iuf: null,
@@ -44,7 +44,7 @@ describe("ObjectiveDetailSheet", () => {
 
   it("n'affiche pas le toggle quand target_time_seconds est null", async () => {
     const { ObjectiveDetailSheet } = await import("../ObjectiveDetailSheet");
-    const obj: Objective = { id: "1", athlete_id: "a1", event_code: "100NL", pool_length: 50, target_time_seconds: null };
+    const obj: Objective = { id: "1", athlete_id: "a1", competition_ids: [], event_code: "100NL", pool_length: 50, target_time_seconds: null };
     const html = renderToString(
       React.createElement(ObjectiveDetailSheet, {
         open: true, onOpenChange: () => {}, objective: obj, matchingTarget: null, iuf: null,

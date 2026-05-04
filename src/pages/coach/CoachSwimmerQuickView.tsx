@@ -115,7 +115,7 @@ export type QuickViewContentProps = {
 };
 
 function toObjective(o: SwimmerBriefingObjective): Objective {
-  return { id: o.id, athlete_id: '', event_code: o.event_code ?? null, target_time_seconds: o.target_time_seconds ?? null, text: o.text ?? null, pool_length: null };
+  return { id: o.id, athlete_id: '', competition_ids: [], event_code: o.event_code ?? null, target_time_seconds: o.target_time_seconds ?? null, text: o.text ?? null, pool_length: null };
 }
 
 export function QuickViewContent({ briefing, onBack, onAttendance, onComment, onAssign }: QuickViewContentProps) {
