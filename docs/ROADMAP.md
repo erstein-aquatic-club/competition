@@ -1,6 +1,6 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §191 livré — Vue info compétition au tap sur la bannière (`/competition/:id`) remplace la landing prep tabs (déplacée sur `/competition/:id/prep`). Header avec J-X + section adaptée au rôle (`InfoMyObjectives` nageur / `InfoParticipants` coach-comité-admin) + CTA sticky "Préparer la compétition". 2 helpers purs TDD (10 tests), 2 composants UI, swap routes Wouter, fix critique post-review (`useAuth.user` est displayName, pas UUID). §187 (slider affinement) designé mais pas livré. (2026-05-03)*
+*Dernière mise à jour : §192 livré — Ajout objectif inline sur la vue info compétition. Sheet bottom à 2 onglets (Créer/Lier) ouvert depuis l'empty state ("Ajouter un objectif") ou le header de section (bouton "+ Objectif"). L'onglet "Créer" reproduit le form du profil avec `competition_id` pré-rempli ; l'onglet "Lier" radio-sélectionne un objectif sans comp et appelle `updateObjective(id, { competition_id })`. Helper pur `selectLinkableObjectives` (4 tests TDD). `useQuery(["auth-uid"])` dans CompetitionDetail pour récupérer l'UUID auth (fix §191). §187 (slider affinement) designé mais pas livré. (2026-05-04)*
 
 Ce document décrit les fonctionnalités à implémenter. Il sert de référence pour reprendre le développement dans une future conversation.
 

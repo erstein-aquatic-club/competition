@@ -4,6 +4,71 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §192 — Ajout objectif inline sur la vue info compétition (2026-05-04)
+
+**Contexte :** Le §191 a livré la vue info compétition mais l'empty state "Aucun objectif défini" pointait vers `/profile?section=objectives` — l'utilisateur quittait la page, et le formulaire profil ne lie pas l'objectif à la compétition courante. L'utilisateur a demandé de pouvoir créer un nouvel objectif déjà lié à la compet, OU lier un objectif existant (sans comp), sans quitter la page.
+
+### Décisions de brainstorm
+
+Validées via design compact (`docs/plans/2026-05-04-add-objective-inline-design.md`) :
+- Sheet bottom (cohérent avec `SwimmerObjectivesView`) à 2 onglets : `[ Créer un nouveau ] [ Lier un existant ]`
+- Onglet par défaut : "Créer". Onglet "Lier" disabled si 0 candidat (compteur dans le label).
+- Bouton "+ Objectif" ajouté dans le header de la section quand non-vide ; remplacement de la CTA empty state.
+- "Lier" filtre les objectifs sans `competition_id` (helper pur `selectLinkableObjectives`).
+- Pas de réattribution multi-comp (cas rare). Pas de bulk linking. Pas de modification depuis le Sheet (édition reste dans le profil).
+
+### Changements
+
+**Nouveaux fichiers**
+
+| Fichier | Rôle | LOC |
+|---|---|---|
+| `src/components/competition/AddObjectiveSheet.tsx` | Sheet bottom 2 onglets, mutations create/link, reset à la fermeture | 371 |
+
+**Fichiers modifiés**
+
+| Fichier | Changement |
+|---|---|
+| `src/components/competition/info-helpers.ts` | Helper pur `selectLinkableObjectives(objectives)` (+4 LOC, 4 tests TDD) |
+| `src/components/competition/__tests__/info-helpers.test.ts` | `describe("selectLinkableObjectives")` avec 4 tests : null/undefined/empty/order |
+| `src/components/competition/InfoMyObjectives.tsx` | Empty state CTA → ouvre Sheet (au lieu de naviguer). Bouton "+ Objectif" en header section. Sheet rendu dans les 3 branches (skeleton/empty/populated). Suppression `useLocation`. (138 → 173 LOC) |
+| `src/pages/CompetitionDetail.tsx` | Nouveau `useQuery(["auth-uid"])` qui appelle `supabase.auth.getUser()` — passe `authUid` UUID réel au Sheet (évite le piège §191 où `useAuth.user` est le displayName). Passe aussi `competitionName`. (151 → 164 LOC) |
+
+### Mutations
+
+- **Créer** : `api.createObjective({ athlete_id: authUid, competition_id, event_code, pool_length, target_time_seconds, text })`. Validation reproduite depuis `SwimmerObjectivesView` (épreuve requise si chrono, format `m:ss:cc`, texte requis si type texte).
+- **Lier** : `api.updateObjective(id, { competition_id })`. Update partiel Supabase — préserve les autres champs.
+- Les deux invalident `["athlete-objectives"]` → la table de `InfoMyObjectives` se rafraîchit immédiatement.
+
+### Tests
+
+- 4 tests TDD purs sur `selectLinkableObjectives` : `competition_id == null`, `undefined`, tableau vide, ordre préservé.
+- Suite globale : 654 tests, 653 verts, 1 fail pré-existant `transformers.test.ts`. 0 régression.
+- `npx tsc --noEmit` clean après chaque task.
+- Tests RLS : non concernés (pas de migration, pas de policy).
+
+### Décisions / pièges
+
+- **Form dupliqué entre `SwimmerObjectivesView` et `AddObjectiveSheet`** : accepté pour cette itération. DRY plus tard si on en ajoute un 3e.
+- **`authUid` via `supabase.auth.getUser()` + React Query (`staleTime: 5min`)** plutôt que `useAuth.user` — leçon §191 baked in. Commentaire explicite dans `CompetitionDetail.tsx` pour éviter la régression future.
+- **Sheet rendu dans les 3 branches** (skeleton/empty/populated) via const partagée `sheet` + fragments. Cheap quand fermé.
+- **Reset complet à la fermeture** (tab, type, event, pool, time, text, selectedObjId) via `useEffect` sur `open` — évite le state leak entre ouvertures pour des compets différentes.
+
+### Limites / dette résiduelle
+
+- Pas de réattribution multi-comp (déplacer un objectif d'une comp A à une comp B). Cas rare, pas demandé.
+- Pas de coach-side création depuis cette section (la section athlete-only).
+- Le form de création reste dupliqué avec `SwimmerObjectivesView`. Refactor en composant partagé reportable.
+
+### Commits
+
+4 commits sur `main` :
+1. `592f1e11c` — docs(plans): design ajout objectif inline (§192)
+2. `d635b9508` — feat(competition-info): pure helper selectLinkableObjectives + tests
+3. `65fb11686` — feat(competition-info): AddObjectiveSheet (Sheet bottom 2 onglets)
+4. `180cc04d6` — feat(competition-info): InfoMyObjectives wire AddObjectiveSheet inline
+5. (ce commit) — docs §192
+
 ## §191 — Vue info compétition : nouvelle landing au tap sur la bannière (2026-05-03)
 
 **Contexte :** Le tap sur la bannière compétition (InlineBanner amber dans `SwimmerHome` §190-ui3 et dans le calendrier `Dashboard`) ouvrait directement `/competition/:id` qui affichait le menu de **préparation** à 4 tabs (Check / Courses / Routines / Jour J). Immédiatement actionnable mais pas d'aperçu informationnel ("c'est quoi ce meet, où ça se passe, qu'est-ce que je dois y faire, qui y va"). L'utilisateur a demandé d'introduire une vue info qui devienne la landing par défaut, avec un lien vers la page prep actuelle.
