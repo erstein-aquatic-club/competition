@@ -73,7 +73,53 @@ Non lancés — les nouvelles policies suivent strictement le pattern de la tabl
 1. `1c445dab2` — feat(db): migration 00155 objective_competitions (join + RLS + backfill)
 2. `144a3216a` — feat(api): objectives many-to-many — competition_ids + link/unlink helpers
 3. `abe351f6e` — feat(competition-info): bascule front-end objectives N:N (compteurs + lier)
-4. (ce commit) — docs §193
+4. `342394baf` — fix: désambiguïse l'embed objectives→competitions (FK explicite)
+5. `73713fd33` — feat: multi-select Lier + fix PB 12 mois + nettoyage debug
+6. (ce commit) — docs §193
+
+### Suite & corrections post-livraison
+
+Plusieurs bugs sont apparus après la livraison initiale, dont la cause racine n'a été identifiée qu'au prix d'un panneau debug visible (commits `c62db9e58` + `8b57729fe`). Bilan :
+
+#### Bug 1 — "0 objectif liable" partout
+Symptôme : la vue info compétition (table objectifs) ET l'onglet "Lier un existant" du Sheet affichaient 0 objectif, même pour les utilisateurs ayant des objectifs en BDD.
+
+Diagnostic via panneau debug ambre (rendu dans le Sheet avec `authUid`, `compId`, `allObjectives.length`, `linkable.length`, `error.message`, `debug-direct` = appel API isolé du React Query) :
+```
+ERROR: Could not embed because more than one relationship was found
+       for 'objectives' and 'competitions'
+```
+
+**Cause racine** : depuis la migration 00155 (table `objective_competitions`), PostgREST voyait deux chemins FK entre `objectives` et `competitions` :
+- direct via `objectives.competition_id` (legacy 1:1)
+- via `objective_competitions.competition_id → competitions.id` (nouveau N:N)
+
+L'embed implicite `.select('*, competitions(name, date)')` dans `getObjectives()` était devenu ambigu → PostgREST refusait → React Query catch silencieux → `data: undefined` → fallback `[]` → 0 partout.
+
+**Fix** (`342394baf`) : pin explicite à la FK legacy via la syntaxe PostgREST `competitions!objectives_competition_id_fkey(name, date)`.
+
+#### Bug 2 — Cache pollution `["athlete-objectives"]`
+
+Pendant l'auth bootstrap, plusieurs queries firaient avant que la session Supabase soit hydratée → `getAthleteObjectives()` retournait `[]` → React Query cachait ce `[]` sous la clé partagée → jamais rafraîchi (staleTime 5 min). Symptôme superposé au bug 1 mais résiduel.
+
+**Fixes empilés** : `getAthleteObjectives()` throw au lieu de retourner `[]` quand user null. `useAuth.authUid` exposé synchroniquement dans le store Zustand (depuis `session.user.id` dans `loginFromSession` + `loadUser`). Cache key versionnée `["athlete-objectives", authUid]`. `refetchOnMount: 'always'`. Auth state listener met aussi à jour `authUid` au token refresh. **Bypass complet** : les call sites appellent directement `api.getObjectives(authUid)` au lieu de `getAthleteObjectives()` (UUID synchrone du store).
+
+#### Bug 3 — PB 12 mois et delta toujours "—"
+
+Cause : `swimmer_performances` stocke `event_code` au format FFN (`"50 NL"`, `"100 Pap."`) tandis que `objectives.event_code` utilise le format compact (`"50NL"`, `"100PAP"`). Le filtre `===` strict dans `computeObjectivePerfRow` ne matchait jamais.
+
+**Fix** (`73713fd33`) : `computeObjectivePerfRow` utilise désormais `findBestTime(perfs, eventCode, poolLength)` de `objectiveHelpers.ts` qui bridge les deux formats via `EVENT_CODE_TO_NAMES` (mapping objective → liste de noms FFN possibles). Tests fixtures alignés sur les codes réels.
+
+#### Enhancement — Multi-select Lier
+
+Demande utilisateur post-livraison initiale : pouvoir cocher plusieurs objectifs en une fois. `RadioGroup` → `Checkbox` (shadcn). État `Set<string>`. Mutation séquentielle (UPSERT idempotent, retries safe). Bouton dynamique : "Lier à cette compétition" pour 1, "Lier N objectifs à cette compétition" pour N>1. Toast adapté.
+
+### Leçons
+
+- **PostgREST embed disambiguation est silencieux côté client** : l'erreur backend était dans `error.message` mais React Query la cachait dans le state error, jamais affichée. Sans le panneau debug, impossible à voir.
+- **Une migration N:N qui ajoute une seconde FK vers une table déjà liée** → vérifier tous les call sites `.select("*, table(...)")` et pin explicitement la FK.
+- **Le cache React Query peut survivre des fixes** : un cache `[]` populé par du vieux code reste valide tant que `staleTime` n'est pas atteint. Bumper la cache key (avec un param utilisateur) est plus rapide qu'attendre 5 min.
+- **Auth UUID synchrone dans le store > async getUser()** : le UUID auth est dans la session, qui est dans localStorage, qui est lue à l'init. Pas besoin d'async.
 
 ## §192 — Ajout objectif inline sur la vue info compétition (2026-05-04)
 
