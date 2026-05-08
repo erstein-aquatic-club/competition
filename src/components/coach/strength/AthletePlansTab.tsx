@@ -38,12 +38,12 @@ import { EmptyState } from "@/components/shared/EmptyState";
 
 /* ---------- colour palette for cycle left borders ---------- */
 const CYCLE_COLORS = [
-  "bg-red-500",
+  "bg-status-error",
   "bg-orange-500",
   "bg-blue-500",
-  "bg-green-500",
+  "bg-status-success",
   "bg-violet-500",
-  "bg-amber-500",
+  "bg-status-warning",
 ];
 
 /* ---------- helpers ---------- */
@@ -62,12 +62,12 @@ function nameToColor(name: string) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   const colors = [
-    "bg-red-500/15 text-red-700",
+    "bg-status-error-bg text-status-error",
     "bg-orange-500/15 text-orange-700",
     "bg-blue-500/15 text-blue-700",
-    "bg-green-500/15 text-green-700",
+    "bg-status-success-bg text-status-success",
     "bg-violet-500/15 text-violet-700",
-    "bg-amber-500/15 text-amber-700",
+    "bg-status-warning-bg text-status-warning",
     "bg-pink-500/15 text-pink-700",
     "bg-teal-500/15 text-teal-700",
   ];
@@ -630,11 +630,11 @@ function AthletePlanDetail({
 /* ── Day slot definitions ── */
 const WEEK_DAYS: { key: string; label: string; full: string; color: string }[] = [
   { key: "lun", label: "Lun", full: "Lundi", color: "bg-sky-500/15 text-sky-700" },
-  { key: "mar", label: "Mar", full: "Mardi", color: "bg-emerald-500/15 text-emerald-700" },
-  { key: "mer", label: "Mer", full: "Mercredi", color: "bg-amber-500/15 text-amber-700" },
+  { key: "mar", label: "Mar", full: "Mardi", color: "bg-status-success-bg text-status-success" },
+  { key: "mer", label: "Mer", full: "Mercredi", color: "bg-status-warning-bg text-status-warning" },
   { key: "jeu", label: "Jeu", full: "Jeudi", color: "bg-violet-500/15 text-violet-700" },
   { key: "ven", label: "Ven", full: "Vendredi", color: "bg-orange-500/15 text-orange-700" },
-  { key: "sam", label: "Sam", full: "Samedi", color: "bg-rose-500/15 text-rose-700" },
+  { key: "sam", label: "Sam", full: "Samedi", color: "bg-status-error-bg text-status-error" },
 ];
 
 function matchDay(title: string | undefined | null): string | null {
@@ -814,7 +814,7 @@ function CycleCard({
                     type="button"
                     onClick={() => onAssignSession(session)}
                     disabled={assignPending}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-green-600 shrink-0"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-status-success shrink-0"
                     aria-label="Assigner"
                   >
                     {assignPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CalendarPlus className="h-3 w-3" />}
@@ -866,11 +866,11 @@ function CycleCard({
 /* ---------- day-of-week badge extraction ---------- */
 const DAY_PATTERNS: [RegExp, string, string][] = [
   [/^lun/i, "Lun", "bg-blue-500/15 text-blue-700"],
-  [/^mar/i, "Mar", "bg-green-500/15 text-green-700"],
-  [/^mer/i, "Mer", "bg-amber-500/15 text-amber-700"],
+  [/^mar/i, "Mar", "bg-status-success-bg text-status-success"],
+  [/^mer/i, "Mer", "bg-status-warning-bg text-status-warning"],
   [/^jeu/i, "Jeu", "bg-violet-500/15 text-violet-700"],
   [/^ven/i, "Ven", "bg-orange-500/15 text-orange-700"],
-  [/^sam/i, "Sam", "bg-red-500/15 text-red-700"],
+  [/^sam/i, "Sam", "bg-status-error-bg text-status-error"],
   [/^dim/i, "Dim", "bg-gray-500/15 text-gray-700"],
 ];
 
@@ -929,7 +929,7 @@ function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending
           type="button"
           onClick={onAssign}
           disabled={assignPending}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-green-600"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-status-success"
           aria-label="Assigner pour aujourd'hui"
           title="Assigner pour aujourd'hui"
         >

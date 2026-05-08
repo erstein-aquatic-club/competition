@@ -4,6 +4,52 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §222 — Caves hardcodes top 3 post-audit pass 2 (Chantier C suite) (2026-05-08)
+
+**Contexte :** suite à l'audit pass 2 (§215, `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md`) qui a identifié 3 "caves" de hardcodes color non touchées par les Chantiers C précédents (§202+§205+§209) : `CoachTrainingSlotsScreen.tsx` (36 hits), `AthletePlansTab.tsx` (22 hits), `FeedbackDrawer.tsx` (16 hits) = 74 hits combinés. Drapeau racine #3 (tokens sémantiques vs hardcodes Tailwind) ciblé. 3 sub-agents sonnet en parallèle (1 par fichier), zéro overlap.
+
+**Migrations appliquées (-26 hits) :**
+
+- **`AthletePlansTab.tsx` 22 → 8** (-14, dont 3 hits faits manuellement par l'utilisateur en parallèle, 11 par sub-agent — tous identiques en sortie) :
+  - `CYCLE_COLORS` (3) : red/green/amber → `status-error/success/warning`
+  - `nameToColor` palette (3) : red/green/amber → `status-error-bg/success-bg/warning-bg`
+  - `WEEK_DAYS` (3) : emerald/amber/rose → `status-success-bg/warning-bg/error-bg`
+  - `DAY_PATTERNS` (3) : green/amber/red → idem
+  - 2 boutons assign : `text-green-600` → `text-status-success`
+  - **Conservés 8 hits catégoriels** : orange/blue/sky (no token équivalent — couleurs d'identité jour de semaine).
+
+- **`FeedbackDrawer.tsx` 16 → 9** (-7) :
+  - L.258-259 badges delta kilométrage : green/amber → `status-success-bg/warning-bg`
+  - L.849, L.1127 icônes "En attente" : `text-orange-900` → `text-status-warning`
+  - L.1202-1204 bannière "Note du coach" : `bg-blue-50/text-blue-800/border-blue-400` → `bg-intensity-prog-bg/text-intensity-prog/border-intensity-prog` (token bleu sémantique de progression)
+  - **Conservés 9 hits catégoriels** : sky pour état "absent" (4 occurrences), orange pour identité "musculation" (4), bg-sky-50 bannière info (1).
+
+- **`CoachTrainingSlotsScreen.tsx` 36 → 31** (-5, conservatif vu identité catégorielle dominante) :
+  - L.488 `text-blue-600 dark:text-blue-300` → `text-tag-swim-text` (toggle natation actif)
+  - L.653, L.660, L.1008, L.1015 sélection coach : emerald-500/* → `status-success/*` (4 hits)
+  - **Conservés 31 hits catégoriels documentés** avec commentaires `TODO §223` :
+    - blue (11) : type natation — pas de token `tag-swim-stroke`
+    - amber (10) : musculation/strength — pas de token `tag-strength`
+    - orange (5) : badge "Modifié" override — pas de token `override-accent`
+    - rose (5) : indicateurs compétition — pas de token `rank-competition`
+
+**Total cumulé Chantier C** : 94 (§199-§209) + 26 (§222) = **120 hardcodes status remplacés sur 16 fichiers** + ~48 cas catégoriels intelligemment laissés.
+
+**§223 prévu :** créer les 4 tokens manquants (`tag-swim-stroke`, `tag-strength`, `override-accent`, `rank-competition`) dans `index.css` + migrer les 31 catégoriels documentés TODO. Estimé ~3-4h.
+
+**Vérifications :**
+- `npx tsc --noEmit` : ✅ clean
+- `npm test` : 684/685 pass + 1 fail pré-existant (`buildRunUpdatePayload keeps completed run ressentis` — non lié, hérité §214)
+- Diff `git status` : 3 fichiers modifiés (les 3 caves) + 2 fichiers doc (`docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md`, `docs/implementation-log.md`).
+
+**Hors scope §222** :
+- §216-§221 (chantiers utilisateur en parallèle) committés sur main avant §222.
+- §215 audit pass 2 (rapport d'audit lecture seule) bundlé dans le commit §222 car causalement lié (audit → caves identifiées).
+- P0 transverses (`select.tsx h-9`, `Coach.tsx:1151` typo, cluster `AthletePlansTab.tsx:807,815,913,922,935,943` h-7) reportés à §224.
+- 31 hits catégoriels TODO reportés à §223 (création tokens manquants).
+
+**Fichiers modifiés (3)** : `src/components/coach/strength/AthletePlansTab.tsx`, `src/components/dashboard/FeedbackDrawer.tsx`, `src/pages/coach/CoachTrainingSlotsScreen.tsx`. **Doc** : `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md` (NEW, ~280 lignes — rapport audit pass 2), `docs/implementation-log.md` (entrée §215 audit + §222 caves), `CLAUDE.md` (ligne "Dernier § livré"), `docs/ROADMAP.md`.
+
 ## §221 — Fix chargement lent des GIFs exercices dans SessionDetailPreview (2026-05-08)
 
 **Contexte :** Les animations GIF des exercices (icône 44×44 dans la liste + preview agrandie) mettaient plusieurs secondes à s'afficher dans la vue nageur > muscu > mon plan > aperçu de séance.

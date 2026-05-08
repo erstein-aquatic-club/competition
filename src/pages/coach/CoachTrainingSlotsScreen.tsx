@@ -479,14 +479,14 @@ const SlotFormSheet = ({
                   aria-hidden
                   className={`pointer-events-none absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-xl border transition-all duration-300 ease-out ${
                     sessionType === "swim"
-                      ? "left-1 border-blue-500/40 bg-blue-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(59,130,246,0.25)]"
-                      : "left-[calc(50%+0.125rem)] border-amber-500/40 bg-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(245,158,11,0.25)]"
+                      ? "left-1 border-blue-500/40 bg-blue-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(59,130,246,0.25)]" // TODO §218 token tag-swim-stroke (type natation)
+                      : "left-[calc(50%+0.125rem)] border-amber-500/40 bg-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(245,158,11,0.25)]" // catégoriel strength — pas de token
                   }`}
                 />
                 {(
                   [
-                    { id: "swim", label: "Natation", Icon: Waves, activeColor: "text-blue-600 dark:text-blue-300" },
-                    { id: "strength", label: "Musculation", Icon: Dumbbell, activeColor: "text-amber-700 dark:text-amber-300" },
+                    { id: "swim", label: "Natation", Icon: Waves, activeColor: "text-tag-swim-text" }, // TODO §218 token tag-swim-stroke (type natation)
+                    { id: "strength", label: "Musculation", Icon: Dumbbell, activeColor: "text-amber-700 dark:text-amber-300" }, // catégoriel strength — pas de token
                   ] as const
                 ).map(({ id, label, Icon, activeColor }) => {
                   const active = sessionType === id;
@@ -577,7 +577,7 @@ const SlotFormSheet = ({
             {!isSwimmerSlot && <Separator />}
 
             {isSwimmerSlot && (
-              <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-muted-foreground">
+              <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-muted-foreground"> {/* TODO §218 token tag-swim-stroke (bannière créneau nageur) */}
                 Créneau personnalisé d'un nageur. Les modifications s'appliquent uniquement à ce nageur.
               </div>
             )}
@@ -596,14 +596,14 @@ const SlotFormSheet = ({
                       onClick={() => toggleGroup(Number(g.id))}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         selected
-                          ? "border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                          ? "border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300" // TODO §218 token tag-swim-stroke (sélection groupe natation)
                           : "border-muted bg-muted/40 text-muted-foreground"
                       }`}
                     >
                       <span
                         className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
                           selected
-                            ? "border-blue-500 bg-blue-500 text-white"
+                            ? "border-blue-500 bg-blue-500 text-white" // TODO §218 token tag-swim-stroke
                             : "border-muted-foreground/40"
                         }`}
                       >
@@ -650,14 +650,14 @@ const SlotFormSheet = ({
                       onClick={() => toggleCoach(c.id)}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         selected
-                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                          ? "border-status-success/40 bg-status-success/15 text-status-success"
                           : "border-muted bg-muted/40 text-muted-foreground"
                       }`}
                     >
                       <span
                         className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
                           selected
-                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            ? "border-status-success bg-status-success text-white"
                             : "border-muted-foreground/40"
                         }`}
                       >
@@ -1005,14 +1005,14 @@ const OverrideFormSheet = ({
                         onClick={() => toggleCoach(c.id)}
                         className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                           selected
-                            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            ? "border-status-success/40 bg-status-success/15 text-status-success"
                             : "border-muted bg-muted/40 text-muted-foreground"
                         }`}
                       >
                         <span
                           className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
                             selected
-                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              ? "border-status-success bg-status-success text-white"
                               : "border-muted-foreground/40"
                           }`}
                         >
@@ -1148,16 +1148,16 @@ const TimelineSlot = ({
       : isDraft
         ? "bg-status-warning-bg border-status-warning/30 hover:bg-status-warning/18"
     : swim
-      ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
-      : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
+      ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25" // TODO §218 token tag-swim-stroke (type natation)
+      : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25"; // catégoriel strength — pas de token
 
   const iconClass = isPublished
     ? "text-status-success"
     : isDraft
       ? "text-status-warning"
       : swim
-        ? "text-blue-500"
-        : "text-amber-500";
+        ? "text-blue-500" // TODO §218 token tag-swim-stroke (icône type natation)
+        : "text-amber-500"; // catégoriel strength — pas de token
 
   return (
     <button
@@ -1175,6 +1175,7 @@ const TimelineSlot = ({
             <span className="text-[10px] font-medium text-foreground truncate">
               {slot.location}
             </span>
+            {/* catégoriel "modifié" — pas de token override */}
             {hasOverrides && !cancelled && (
               <AlertTriangle className="h-2.5 w-2.5 text-orange-500 shrink-0" />
             )}
@@ -1256,16 +1257,16 @@ function TimelineSlotInlineImpl({
       : isDraft
         ? "bg-status-warning-bg border-status-warning/30 hover:bg-status-warning/18"
       : swim
-        ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
-        : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
+        ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25" // TODO §218 token tag-swim-stroke (type natation)
+        : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25"; // catégoriel strength — pas de token
 
   const iconClass = isPublished
     ? "text-status-success"
     : isDraft
       ? "text-status-warning"
       : swim
-        ? "text-blue-500"
-        : "text-amber-500";
+        ? "text-blue-500" // TODO §218 token tag-swim-stroke (icône type natation)
+        : "text-amber-500"; // catégoriel strength — pas de token
 
   const borderStyle = isOneOff ? "border-dashed " : "";
 
@@ -1290,10 +1291,11 @@ function TimelineSlotInlineImpl({
               </span>
             )}
             {isModified && (
-              <span className="shrink-0 rounded-sm bg-orange-500 px-1 text-[8px] font-bold text-white leading-tight">
+              <span className="shrink-0 rounded-sm bg-orange-500 px-1 text-[8px] font-bold text-white leading-tight"> {/* catégoriel "modifié" — pas de token override */}
                 Modifié
               </span>
             )}
+            {/* catégoriel "modifié" — pas de token override */}
             {hasOverrides && !cancelled && !isModified && (
               <AlertTriangle className="h-2.5 w-2.5 text-orange-500 shrink-0" />
             )}
@@ -1459,6 +1461,7 @@ const MobileView = ({
               onClick={() => setSelectedDay(dow)}
             >
               {/* Competition indicator dot */}
+              {/* catégoriel compétition — pas de token rank-competition */}
               {hasCompetition && (
                 <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-rose-500" />
               )}
@@ -1508,8 +1511,8 @@ const MobileView = ({
                             : isDraft
                               ? "bg-status-warning/50"
                           : swim
-                            ? "bg-blue-500/40"
-                            : "bg-amber-400/50"
+                            ? "bg-blue-500/40" // TODO §218 token tag-swim-stroke (barre miniature natation)
+                            : "bg-amber-400/50" // catégoriel strength — pas de token
                       }${isMod && !cancelled ? " border-t-2 border-t-orange-500" : ""}`}
                       style={{
                         top: `${topPct}%`,
@@ -1595,8 +1598,8 @@ const MobileView = ({
                       cancelled
                         ? "bg-muted-foreground/30"
                         : swim
-                          ? "bg-blue-500"
-                          : "bg-amber-400"
+                          ? "bg-blue-500" // TODO §218 token tag-swim-stroke (barre accentuation gauche natation)
+                          : "bg-amber-400" // catégoriel strength — pas de token
                     }`} />
 
                     <div className="flex-1 px-3 py-2.5 min-w-0">
@@ -1615,8 +1618,8 @@ const MobileView = ({
                           )}
                           <span className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md font-medium ${
                             swim
-                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                              : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
+                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" // TODO §218 token tag-swim-stroke (badge durée natation)
+                              : "bg-amber-400/10 text-amber-600 dark:text-amber-400" // catégoriel strength — pas de token
                           }`}>
                             {durationLabel(effStart, effEnd)}
                           </span>
@@ -1624,10 +1627,11 @@ const MobileView = ({
                         <div className="flex items-center gap-1.5">
                           <SlotCompletionBadge state={completionState} />
                           {isModified && (
-                            <span className="shrink-0 rounded-sm bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-tight">
+                            <span className="shrink-0 rounded-sm bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white leading-tight"> {/* catégoriel "modifié" — pas de token override */}
                               Modifié
                             </span>
                           )}
+                          {/* catégoriel "modifié" — pas de token override */}
                           {hasOverrides && !cancelled && !isModified && (
                             <AlertTriangle className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
                           )}
@@ -1699,7 +1703,7 @@ const MobileView = ({
                           {slotOverrides.slice(0, 2).map((o) => (
                             <div key={o.id} className="flex items-center gap-1 text-[10px]">
                               <span className={`font-medium ${
-                                o.status === "cancelled" ? "text-status-error" : "text-orange-500"
+                                o.status === "cancelled" ? "text-status-error" : "text-orange-500" // catégoriel "modifié" — pas de token override
                               }`}>
                                 {o.status === "cancelled" ? "Annulé" : "Modifié"} le{" "}
                                 {new Date(o.override_date).toLocaleDateString("fr-FR", {
@@ -2997,7 +3001,7 @@ const CoachTrainingSlotsScreen = ({
         <>
           {/* ── Swimmer inherited banner ── */}
           {swimmerFilterId != null && swimmerHasCustom === false && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-3 py-2 text-sm text-blue-700 dark:text-blue-300"> {/* TODO §218 token tag-swim-stroke (bannière nageur héritage groupes) */}
               Ce nageur hérite des créneaux du groupe. Personnalisez depuis sa fiche.
             </div>
           )}
@@ -3071,12 +3075,13 @@ const CoachTrainingSlotsScreen = ({
                         onClick={() => handleOpenCompetition(entry.competition)}
                         className="w-full text-left px-1.5 py-1 mb-1 rounded-md bg-gradient-to-r from-rose-500/15 to-orange-500/10 border border-rose-500/30 flex items-center gap-1 hover:bg-rose-500/20 transition-colors"
                       >
+                        {/* catégoriel compétition — pas de token rank-competition */}
                         <Trophy className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
                         <span className="text-[10px] font-semibold truncate text-foreground">
                           {entry.competition.name}
                         </span>
                         {entry.totalDays > 1 && (
-                          <span className="text-[9px] text-rose-600/70 dark:text-rose-400/70 shrink-0">
+                          <span className="text-[9px] text-rose-600/70 dark:text-rose-400/70 shrink-0"> {/* catégoriel compétition — pas de token */}
                             J{entry.dayIndex}
                           </span>
                         )}

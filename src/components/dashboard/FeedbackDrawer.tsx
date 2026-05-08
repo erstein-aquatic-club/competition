@@ -255,8 +255,8 @@ function DistanceStepper({ plannedMeters, valueMeters, onChange, disabled }: Dis
           <div className={cn(
             "text-xs font-semibold px-2 py-0.5 rounded-full",
             delta > 0
-              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-              : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+              ? "bg-status-success-bg text-status-success"
+              : "bg-status-warning-bg text-status-warning"
           )}>
             {delta > 0 ? `+${delta}m` : `${delta}m`}
           </div>
@@ -846,7 +846,7 @@ export function FeedbackDrawer({
                                   </span>
                                 )}
                                 {needsAction && (
-                                  <span className="inline-flex items-center text-orange-900">
+                                  <span className="inline-flex items-center text-status-warning">
                                     <Circle className="h-4 w-4" />
                                     <span className="sr-only">En attente</span>
                                   </span>
@@ -1124,7 +1124,7 @@ export function FeedbackDrawer({
                                       <span className="sr-only">Absent</span>
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center text-orange-900">
+                                    <span className="inline-flex items-center text-status-warning">
                                       <Circle className="h-4 w-4" />
                                       <span className="sr-only">En attente</span>
                                     </span>
@@ -1199,9 +1199,9 @@ export function FeedbackDrawer({
 
                             {/* Coach notes */}
                             {getLog(activeSession.id)?.coach_notes && (
-                              <div className="mx-3 mb-3 rounded-2xl bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-400 p-3">
-                                <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
-                                <p className="text-xs text-blue-800 dark:text-blue-300 mt-0.5">{getLog(activeSession.id)?.coach_notes}</p>
+                              <div className="mx-3 mb-3 rounded-2xl bg-intensity-prog-bg border-l-4 border-intensity-prog p-3">
+                                <p className="text-[10px] font-semibold text-intensity-prog">Note du coach</p>
+                                <p className="text-xs text-foreground/80 mt-0.5">{getLog(activeSession.id)?.coach_notes}</p>
                               </div>
                             )}
 
