@@ -279,7 +279,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
               type="button"
               className={`flex flex-col items-center py-2 transition-colors relative ${
                 dayAbsence
-                  ? isSelected ? "bg-red-500/8" : "bg-red-500/5"
+                  ? isSelected ? "bg-status-error/8" : "bg-status-error/5"
                   : isSelected
                     ? "bg-primary/8"
                     : "hover:bg-muted/50 active:bg-muted"
@@ -288,12 +288,12 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
             >
               {/* Day label */}
               <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                dayAbsence ? "text-red-500" : isToday ? "text-primary" : "text-muted-foreground"
+                dayAbsence ? "text-status-error" : isToday ? "text-primary" : "text-muted-foreground"
               }`}>
                 {DAYS_SHORT[dow - 1]}
               </span>
               <span className={`text-[9px] tabular-nums ${
-                dayAbsence ? "text-red-400" : "text-muted-foreground/60"
+                dayAbsence ? "text-status-error" : "text-muted-foreground/60"
               }`}>
                 {dayNum}
               </span>
@@ -301,7 +301,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
               {/* Slot count dot */}
               <span className={`relative text-xs font-bold tabular-nums mt-0.5 h-7 w-7 flex items-center justify-center rounded-full ${
                 dayAbsence
-                  ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                  ? "bg-status-error/15 text-status-error"
                   : isToday
                     ? "bg-primary text-primary-foreground"
                     : isSelected
@@ -362,12 +362,12 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
 
         {/* Absence banner */}
         {absenceByDay.get(selectedDay) && (
-          <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 px-3 py-2 flex items-start gap-2">
-            <Ban className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="rounded-lg border border-status-error/20 bg-status-error-bg px-3 py-2 flex items-start gap-2">
+            <Ban className="h-4 w-4 text-status-error flex-shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-red-700 dark:text-red-300">Absence déclarée</p>
+              <p className="text-sm font-medium text-status-error">Absence déclarée</p>
               {absenceByDay.get(selectedDay)?.reason && (
-                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5">
+                <p className="text-xs text-status-error/80 mt-0.5">
                   {absenceByDay.get(selectedDay)!.reason}
                 </p>
               )}

@@ -134,7 +134,7 @@ function DeltaBadge({ value, suffix = "" }: { value: number; suffix?: string }) 
   );
   const positive = value > 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${positive ? "text-emerald-600" : "text-rose-600"}`}>
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${positive ? "text-status-success" : "text-status-error"}`}>
       {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {positive ? "+" : ""}{value}{suffix}
     </span>
@@ -225,7 +225,7 @@ function Sparkline({ values, height = 40 }: { values: number[]; height?: number 
         stroke="currentColor"
         strokeWidth="1"
         strokeDasharray="4 4"
-        className="text-rose-400"
+        className="text-status-error"
         opacity={0.5}
       />
     </svg>
@@ -233,13 +233,13 @@ function Sparkline({ values, height = 40 }: { values: number[]; height?: number 
 }
 
 function ReportAcwrBadge({ value }: { value: number }) {
-  let color = "bg-amber-100 text-amber-800";
+  let color = "bg-status-warning-bg text-status-warning";
   let label = "Attention";
   if (value >= 0.8 && value <= 1.3) {
-    color = "bg-emerald-100 text-emerald-800";
+    color = "bg-status-success-bg text-status-success";
     label = "Optimal";
   } else if (value > 1.5 || value < 0.5) {
-    color = "bg-rose-100 text-rose-800";
+    color = "bg-status-error-bg text-status-error";
     label = "Danger";
   }
   return (

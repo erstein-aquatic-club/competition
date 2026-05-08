@@ -4,6 +4,42 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §209 — Clôture Chantier C : 3 derniers fichiers top 15 (2026-05-08)
+
+**Contexte :** suite §202+§205. Fin de la migration Chantier C sur les 3 derniers fichiers du top 15 contributeurs hardcodes selon audit shared. Sub-agent sonnet.
+
+**Changements (10 migrations sur 2 fichiers, 1 fichier 100% catégoriel)** :
+
+| Fichier | Hits avant | Migrés | Laissés (catégoriels) |
+|---|---|---|---|
+| `components/coach/SwimmerSlotsTab.tsx` | 11 | 6 | 5 — `amber-*` code couleur catégoriel swim/muscu |
+| `pages/MonthlyReport.tsx` | 15 | 4 | 9 — `STROKE_COLORS` palette nages, iconColor sections, badge yellow brand |
+| `components/coach/pace/Pace4NSegmentMatrix.tsx` | 3 | 0 | 3 — palette identité (`STROKE_META.brasse`, `ZONE_COLS` zones V0→sky/V1→teal/V2→green/V3→amber/V4→orange/MAX→red gradient intentionnel) |
+
+**Cas migrés** :
+- **SwimmerSlotsTab** : toutes les `red-*` liées à l'état "Absence déclarée" (bg jour sélectionné/non-sélectionné, label jour, numéro jour, badge count bg+text, banner border+bg+text).
+- **MonthlyReport** : `DeltaBadge` emerald→success + rose→error (delta positif/négatif), Sparkline ligne seuil rose-400→error, `ReportAcwrBadge` 3 zones amber/emerald/rose → warning/success/error.
+
+**Cas laissés volontairement** :
+- `SwimmerSlotsTab` : `bg-amber-400/50`, `bg-amber-400`, `bg-amber-400/10 text-amber-600`, `bg-amber-400` legend (line 531), `bg-blue-500` — code couleur catégoriel **type de séance** (bleu=swim vs amber=musculation).
+- `MonthlyReport` : `STROKE_COLORS` palette identité nages (NL/DOS=emerald, BR=amber, PAP=rose, QN=violet, EDU=cyan) ; `iconColor` sections (rose=wellness, amber=objectifs, yellow=badges) ; badge yellow brand pour badges débloqués.
+- `Pace4NSegmentMatrix` : palette nage Brasse + palette zones d'allure (gradient V0→MAX intentionnel, identité visuelle métier).
+
+**Total cumulé Chantier C** (depuis §199) :
+- **§199** : InlineBanner tokenisé, -25 hardcodes.
+- **§202** : top 5 fichiers, 37 migrations sur 4 fichiers (CoachTrainingSlotsScreen 37→17, Coach 34→5, CoachSwimmersOverview 21→0, SwimmerInterviewsTab 20→6) ; AthletePlansTab tous catégoriels.
+- **§205** : rang 6-12, 22 migrations sur 6 fichiers (SuiviSemaine, FeedbackDrawer, AthleteInterviewsSection, RunDetailSheet, SwimmerFeedbackTab, RacesTab).
+- **§209** : rang 10-14, 10 migrations sur 2 fichiers + 1 fichier 100% catégoriel.
+- **TOTAL : 94 hardcodes status remplacés sur 13 fichiers** + 17 cas catégoriels intelligemment laissés (palette nages, zones d'allure, identités brand muscu/coach/compétition, nav icons décoratifs).
+
+**Effet** : dark mode désormais cohérent sur tout le top 15 grâce aux tokens `--status-*-bg` qui ont des valeurs alternatives dans `.dark` (vs avant : double classe `bg-amber-50/50 dark:bg-amber-950/10` parfois divergente entre fichiers).
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass + 1 fail pré-existant.
+
+**Fichiers modifiés (2)** : SwimmerSlotsTab.tsx, MonthlyReport.tsx.
+
+---
+
 ## §208 — Évolution `CoachSectionHeader` iOS-style (2026-05-08)
 
 **Contexte :** suite §206. Audit shared (`docs/audits/2026-05-08-ui-ux-audit-ios.md`) recommandait d'aligner le composant partagé `CoachSectionHeader` sur le pattern iOS HIG (back button icon-only h-11 au lieu de `Button variant="ghost" size="sm"` avec icône + texte "Retour"). Sub-agent sonnet.
