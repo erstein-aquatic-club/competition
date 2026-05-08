@@ -63,6 +63,8 @@ export function formatRelativeDate(value: string, now: Date = new Date()): strin
   if (Number.isNaN(date.getTime())) return value;
 
   const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 0) return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}`;
+
   const diffMin = Math.floor(diffMs / 60_000);
   const diffH = Math.floor(diffMs / 3_600_000);
 
@@ -74,10 +76,11 @@ export function formatRelativeDate(value: string, now: Date = new Date()): strin
   const yesterdayStr = toISODate(yesterdayDate);
   const dateStr = toISODate(date);
 
+  // Comparaison en heure locale — suppose client et serveur dans la même TZ
   if (dateStr === yesterdayStr) return "hier";
 
   const diffDays = Math.floor(diffMs / 86_400_000);
   if (diffDays < 7) return DAY_ABBRS[date.getDay()];
 
-  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}`;
 }

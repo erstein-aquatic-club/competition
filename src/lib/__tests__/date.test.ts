@@ -45,3 +45,8 @@ test("formatRelativeDate — plus de 7 jours → jj/mm", () => {
 test("formatRelativeDate — date invalide → string brut", () => {
   assert.equal(formatRelativeDate("not-a-date", NOW), "not-a-date");
 });
+
+test("formatRelativeDate — date future → jj/mm", () => {
+  const future = new Date(NOW.getTime() + 60_000).toISOString(); // dans 1 minute
+  assert.equal(formatRelativeDate(future, NOW), "08/05");
+});
