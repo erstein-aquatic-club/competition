@@ -268,6 +268,17 @@ body {
   z-index: var(--z-index-toast);
 }
 
+/* Brand-moment opt-in: Oswald uppercase italic.
+   Reserved for hero/branding contexts (Login hero, Podium, Records leaderboard,
+   competition cover banners). Default headings stay sentence-case for an
+   iOS-HIG-aligned read across the rest of the app. See §197 detox. */
+@utility heading-display {
+  @apply font-display tracking-tight uppercase italic;
+}
+@utility btn-eac-display {
+  @apply tracking-wide font-bold uppercase;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -275,13 +286,11 @@ body {
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+  /* iOS-HIG aligned default heading: sentence-case, sans-serif, semibold.
+     Brand-moment surfaces opt-in via .heading-display (or ad-hoc font-display
+     classes already present on Login hero, RecordsClub, etc.). */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight uppercase italic;
-  }
-  
-  /* EAC Style Buttons */
-  button {
-    @apply tracking-wide font-bold uppercase;
+    @apply font-semibold tracking-tight;
   }
 }
 

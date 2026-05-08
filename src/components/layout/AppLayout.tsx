@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/auth";
 const eacLogo = `${import.meta.env.BASE_URL}logo-eac.webp`;
 import { getNavItemsForRole } from "@/components/layout/navItems";
 import { OfflineDetector } from "@/components/shared/OfflineDetector";
-import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { OfflineSyncBanner } from "@/components/shared/OfflineSyncBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
 import { UserCircle } from "lucide-react";
@@ -116,7 +115,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background md:pt-16">
-      <OfflineBanner />
+      {/* §198 QW1 — OfflineBanner statique retiré au profit du pill flottant
+          OfflineDetector (rendu plus iOS-like, position safe-area-aware).
+          OfflineSyncBanner reste car il signale la sync de mutations en attente,
+          rôle distinct de la simple détection réseau. */}
       <OfflineSyncBanner />
       <OfflineDetector />
       <InstallPrompt />

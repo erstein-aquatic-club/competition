@@ -28,6 +28,7 @@ import {
   Waves,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import { formatRelativeDate } from "@/lib/date";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
 import { buildCoachHash, parseCoachHashLocation, type CoachSection } from "./coach/coachRouteState";
 
@@ -204,16 +205,8 @@ function formatDateIso(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatRelativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "maintenant";
-  if (mins < 60) return `il y a ${mins}min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `il y a ${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `il y a ${days}j`;
-}
+// §198 QW6 — formatRelativeTime local supprimé, on utilise formatRelativeDate
+// (de src/lib/date.ts, §196) qui ajoute hier/lun./jj/mm pour lisibilité accrue.
 
 // ── CoachHome — "Ma semaine" dashboard ────────────────────────────────────
 const CoachHome = ({
@@ -789,7 +782,7 @@ const CoachHome = ({
                         {c.athlete_name}
                       </span>
                       <span className="text-[10px] text-muted-foreground shrink-0">
-                        {formatRelativeTime(c.created_at)}
+                        {formatRelativeDate(c.created_at)}
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">

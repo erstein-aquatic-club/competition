@@ -265,7 +265,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
           </Button>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                 Mon plan
               </h2>
               <p className="text-sm text-muted-foreground">

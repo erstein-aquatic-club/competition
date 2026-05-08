@@ -635,7 +635,7 @@ export function FeedbackDrawer({
                     <Waves className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-display font-bold uppercase italic tracking-tight text-primary">{dayLabelFR(selectedDate)}</div>
+                    <div className="truncate text-sm font-semibold tracking-tight text-foreground">{dayLabelFR(selectedDate)}</div>
                   </div>
                 </div>
                 <IconButton onClick={onClose} label="Fermer">

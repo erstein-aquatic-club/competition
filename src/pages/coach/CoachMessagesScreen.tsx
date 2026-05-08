@@ -146,12 +146,12 @@ const CoachMessagesScreen = ({
       {/* Header */}
       <div>
         {onBack ? (
-          <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={onBack}>
+          <Button variant="ghost" className="-ml-2 mb-2" onClick={onBack}>
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Retour
           </Button>
         ) : null}
-        <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           Envoyer un message
         </h2>
       </div>

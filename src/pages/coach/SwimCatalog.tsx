@@ -864,7 +864,7 @@ export default function SwimCatalog({
       >
         <DialogContent className="max-w-4xl">
           <div className="pb-2">
-            <span className="text-lg font-display font-bold uppercase tracking-tight">
+            <span className="text-lg font-semibold tracking-tight">
               {selectedSession?.name}
             </span>
           </div>

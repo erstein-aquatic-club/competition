@@ -466,7 +466,7 @@ export default function RecordsAdmin() {
   if (!canAccess) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-display font-bold uppercase italic text-primary">Records club</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Records club</h1>
         <p className="text-sm text-muted-foreground">Accès réservé aux coachs.</p>
       </div>
     );
@@ -477,7 +477,7 @@ export default function RecordsAdmin() {
       {/* Header */}
       <div className="space-y-3">
         <div>
-          <h1 className="text-2xl font-display font-bold uppercase italic text-primary">Records club</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Records club</h1>
           <p className="text-sm text-muted-foreground">
             Import des performances FFN et gestion des nageurs.
           </p>

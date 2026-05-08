@@ -529,8 +529,12 @@ export default function SwimmerHome() {
           </h1>
           <p className="text-[13px] text-muted-foreground/80 capitalize mt-0.5">{today}</p>
         </div>
-        <button onClick={() => navigate("/profile")} className="shrink-0">
-          <Avatar className="h-9 w-9 ring-2 ring-primary/25 shadow-md shadow-primary/10">
+        <button
+          onClick={() => navigate("/profile")}
+          className="shrink-0 inline-flex items-center justify-center h-11 w-11 rounded-full active:scale-95 transition"
+          aria-label="Mon profil"
+        >
+          <Avatar className="h-11 w-11 ring-2 ring-primary/25 shadow-md shadow-primary/10">
             <AvatarImage src={profile?.avatar_url ?? undefined} />
             <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
               {firstName?.[0]?.toUpperCase() ?? "?"}
@@ -602,37 +606,26 @@ export default function SwimmerHome() {
           </motion.div>
         )}
 
-        {/* Section E — Messages coach (conditional) */}
+        {/* Section E — Messages coach (conditional)
+            §199 Chantier B — refondu sur InlineBanner muted (cohérent avec
+            Section B/D ; ex-Card gradient violet baroque retirée). */}
         {unreadCount > 0 && (
           <motion.div variants={slideUp}>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-2">
               Messages
             </p>
-            <Card
-              className="p-4 cursor-pointer transition-all hover:bg-violet-50/60 dark:hover:bg-violet-950/30 active:scale-[0.98] border-violet-200/60 dark:border-violet-800/40 bg-gradient-to-br from-violet-50/50 to-purple-50/30 dark:from-violet-950/20 dark:to-purple-950/10"
+            <InlineBanner
+              variant="info"
+              icon={<MessageCircle />}
+              label={`${unreadCount} message${unreadCount > 1 ? "s" : ""} non lu${unreadCount > 1 ? "s" : ""}`}
+              badge={unreadCount}
+              sublabel={
+                latestUnread
+                  ? `${latestUnread.title}${latestUnread.message ? ` — ${latestUnread.message}` : ""}`
+                  : undefined
+              }
               onClick={() => navigate("/profile?section=messages")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 dark:bg-violet-500/20">
-                  <MessageCircle className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-                  <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white px-1 shadow-sm">
-                    {unreadCount}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-violet-900 dark:text-violet-200">
-                    {unreadCount} message{unreadCount > 1 ? "s" : ""} non lu{unreadCount > 1 ? "s" : ""}
-                  </p>
-                  {latestUnread && (
-                    <p className="text-xs text-violet-700/60 dark:text-violet-300/50 truncate mt-0.5">
-                      {latestUnread.title}
-                      {latestUnread.message ? ` — ${latestUnread.message}` : ""}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight className="h-4 w-4 text-violet-400 dark:text-violet-500 shrink-0" />
-              </div>
-            </Card>
+            />
           </motion.div>
         )}
 

@@ -192,7 +192,7 @@ export default function AthleteInterviewsSection({
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Retour
           </Button>
-          <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
             Mes entretiens
           </h2>
           <p className="text-sm text-muted-foreground">

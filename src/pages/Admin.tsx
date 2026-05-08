@@ -452,7 +452,7 @@ export default function Admin() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-display font-bold uppercase italic text-primary">Administration</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Administration</h1>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ShieldCheck className="h-4 w-4 text-primary" />
           <span>Accès admin</span>

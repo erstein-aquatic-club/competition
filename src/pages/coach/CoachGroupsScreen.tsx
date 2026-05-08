@@ -470,7 +470,7 @@ const GroupDetailView = ({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Retour aux groupes
         </Button>
-        <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           {detail.name}
         </h2>
         <div className="flex items-center gap-2">

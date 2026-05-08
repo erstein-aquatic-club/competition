@@ -1,7 +1,18 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
-const scaleValues = [1, 2, 3, 4, 5];
+const scaleValues = [1, 2, 3, 4, 5] as const;
+
+// §198 QW5 — bascule sur les tokens semantic --color-intensity-{1..5}
+// (emerald → green → yellow → orange → red) au lieu d'un mono-rouge primary.
+// Restaure le canal visuel d'intensité que le composant prétendait offrir.
+const ACTIVE_BG: Record<number, string> = {
+  1: "bg-[hsl(var(--intensity-1))] border-[hsl(var(--intensity-1))]",
+  2: "bg-[hsl(var(--intensity-2))] border-[hsl(var(--intensity-2))]",
+  3: "bg-[hsl(var(--intensity-3))] border-[hsl(var(--intensity-3))]",
+  4: "bg-[hsl(var(--intensity-4))] border-[hsl(var(--intensity-4))]",
+  5: "bg-[hsl(var(--intensity-5))] border-[hsl(var(--intensity-5))]",
+};
 
 type ScaleSelector5Props = {
   value?: number | null;
@@ -34,10 +45,10 @@ export function ScaleSelector5({
             key={item}
             type="button"
             className={cn(
-              "flex items-center justify-center rounded-full border font-semibold transition",
+              "flex items-center justify-center rounded-full border font-semibold transition active:scale-95",
               sizeClasses,
               isActive
-                ? "border-primary bg-primary text-primary-foreground"
+                ? cn(ACTIVE_BG[item], "text-white shadow-sm")
                 : "border-muted-foreground/30 bg-background text-foreground",
               disabled && "opacity-60",
             )}

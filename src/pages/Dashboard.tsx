@@ -106,7 +106,7 @@ function DashboardHeaderContent({
         <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary text-primary-foreground">
           <Waves className="h-3.5 w-3.5" />
         </div>
-        <h1 className="text-lg font-display font-bold uppercase italic tracking-tight text-primary">Accueil</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">Accueil</h1>
       </div>
       <div className="flex items-center gap-2">
         <span className="hidden sm:inline text-xs font-mono font-semibold text-muted-foreground tabular-nums">{globalKm} km</span>
@@ -115,7 +115,7 @@ function DashboardHeaderContent({
           variant="outline"
           size="sm"
           onClick={onRecords}
-          className="h-8 rounded-xl border-primary/20 bg-primary/5 px-2.5 text-xs font-semibold text-primary hover:bg-primary/10"
+          className="min-h-11 md:min-h-9 rounded-xl border-primary/20 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
           aria-label="Mes records"
         >
           <Trophy className="mr-1 h-3.5 w-3.5" />
@@ -126,7 +126,7 @@ function DashboardHeaderContent({
           variant="outline"
           size="sm"
           onClick={onSettings}
-          className="h-8 rounded-xl border-primary/20 bg-primary/5 px-2.5 text-xs font-semibold text-primary hover:bg-primary/10"
+          className="min-h-11 md:min-h-9 rounded-xl border-primary/20 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
           aria-label="Présence hebdo"
         >
           <Settings2 className="mr-1 h-3.5 w-3.5" />
@@ -923,7 +923,7 @@ export default function Dashboard() {
 
         {/* Settings Dialog — compact weekly grid */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <DialogContent className="max-w-[340px] rounded-2xl p-5">
+          <DialogContent className="max-w-[calc(100vw-32px)] sm:max-w-[360px] rounded-2xl p-5">
             <DialogHeader className="pb-1">
               <DialogTitle className="text-base font-bold tracking-tight">Ma semaine type</DialogTitle>
               <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">

@@ -465,7 +465,7 @@ export default function AthletePerformanceHub({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display font-semibold uppercase italic text-foreground text-xl">
+              <h1 className="font-semibold tracking-tight text-foreground text-xl">
                 Mon suivi
               </h1>
               {groupLabel && (

@@ -518,7 +518,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pt-4 text-foreground">
         {/* Header */}
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-display font-bold uppercase italic">Administratif</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Administratif</h1>
           <div role="tablist" aria-label="Sections administratives" className="flex items-center gap-1 rounded-full border border-border bg-card p-1 text-xs font-extrabold">
             <button
               role="tab"

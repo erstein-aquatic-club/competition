@@ -811,7 +811,7 @@ export function WorkoutRunner({
           </CardContent>
           <CardFooter>
             <Button
-              className="w-full h-14 text-lg font-bold uppercase"
+              className="w-full h-14 text-base font-semibold"
               disabled={isFinishing}
               onClick={() => {
                 if (isFinishing) return;
@@ -825,7 +825,7 @@ export function WorkoutRunner({
                 if (draftKey) clearDraft(draftKey);
               }}
             >
-              {isFinishing ? "ENREGISTREMENT..." : "ENREGISTRER & FERMER"}
+              {isFinishing ? "Enregistrement…" : "Enregistrer & fermer"}
             </Button>
           </CardFooter>
         </Card>
@@ -983,13 +983,15 @@ export function WorkoutRunner({
             </span>
           )}
         </div>
+        {/* §199 Chantier B — cards focus adoucies : gradient + border-2 retirés
+            au profit d'un bg-secondary plat (cohérent avec le ton iOS sobre). */}
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            className="group relative rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-muted/30 p-4 text-left shadow-sm transition-all active:scale-[0.98] hover:border-primary/40 hover:shadow-md"
+            className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
             onClick={() => openInputSheet("weight")}
           >
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Charge</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Charge</div>
             <div className="mt-1 flex items-baseline gap-0.5">
               {isBodyweight(activeWeight) ? (
                 <span className="text-2xl font-bold tracking-tight">PDC</span>
@@ -1005,10 +1007,10 @@ export function WorkoutRunner({
           </button>
           <button
             type="button"
-            className="group relative rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-card to-muted/30 p-4 text-left shadow-sm transition-all active:scale-[0.98] hover:border-primary/40 hover:shadow-md"
+            className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
             onClick={() => openInputSheet("reps")}
           >
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Reps</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Reps</div>
             <div className="mt-1 flex items-baseline gap-0.5">
               <span className="text-3xl font-bold tabular-nums tracking-tight">
                 {activeReps || "—"}
@@ -1019,7 +1021,7 @@ export function WorkoutRunner({
         </div>
         {/* Optional difficulty selector (1-5) */}
         <div className="mt-3 flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Difficulté</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Difficulté</span>
           <div className="flex gap-1.5">
             {([1, 2, 3, 4, 5] as const).map((level) => {
               const selected = currentSetInputs[currentSetIndex - 1]?.difficulty === level;

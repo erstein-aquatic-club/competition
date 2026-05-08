@@ -4,6 +4,174 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §199 — Chantier B : Surface primitive + Sheet drag handle + tokenisation InlineBanner + adoucissement gradients (2026-05-08)
+
+**Contexte :** suite du plan d'audit UX (rapport §197 `docs/audits/2026-05-08-ui-ux-audit-ios.md`). Chantier B = primitive `Surface` partagée + harmonisation des sheets bottom (drag handle iOS + rounded-t-[22px]) + tokenisation `InlineBanner` (top contributeur hardcodes selon audit shared, 25 hits) + suppression des cards baroques signalées par l'audit (Section E SwimmerHome, cards focus WorkoutRunner).
+
+**Changements** :
+
+1. **NEW `src/components/shared/Surface.tsx`** (70 LOC) : primitive partagée qui unifie les ~8 variantes "card-like" recensées (Card shadcn, InlineBanner, ObjectiveCard full+compact, LoginInstallBanner, PushPermissionBanner, BottomActionBar, UpdateNotification). API `variant: "solid" | "glass" | "tinted" | "outline"` × `radius: "sm"=12px | "md"=16px | "lg"=22px` (radius UISheetPresentationController iOS 16+) + prop `interactive` qui ajoute `active:scale-[0.98]`. Pas encore migrée sur les call-sites — la primitive est posée pour les futurs §200+.
+
+2. **`src/components/ui/sheet.tsx`** :
+   - Variant `bottom` : ajout par défaut de `rounded-t-[22px]` + `pb-[max(1.5rem,env(safe-area-inset-bottom))]` (safe-area home indicator iPhone). Avant : aucun radius par défaut, chaque call-site improvisait.
+   - Drag handle visuel : barre 36×4 (`h-1 w-9`) `bg-muted-foreground/30` rendue en absolute top-2, centered, uniquement quand `side="bottom"`. Pattern UISheetPresentationController iOS 16+ — signal visuel de dismissable au swipe.
+
+3. **`src/components/shared/InlineBanner.tsx`** — tokenisation :
+   - 7 variants color hardcoded (`amber/red/blue/yellow/emerald/muted/destructive` avec `bg-amber-50`, `text-amber-700`, etc.) → 5 variants sémantiques iOS-aligned `info/success/warning/error/muted` qui consomment les tokens `--color-status-success/warning/error` + `--color-primary`.
+   - **Alias back-compat** : les 7 anciens variants (`amber → warning`, `red → error`, `yellow → warning`, `blue → info`, `emerald → success`, `destructive → error`, `muted` inchangé) restent disponibles pour ne casser aucun call-site existant. Migration progressive vers les variants sémantiques en §200+.
+   - Effet immédiat : -25 occurrences de classes Tailwind hardcoded sur le fichier le plus contributeur (cf. audit shared top 5).
+
+4. **`src/pages/SwimmerHome.tsx` Section E** (Messages coach) — refondue : Card violet baroque `bg-gradient-to-br from-violet-50/50 to-purple-50/30 dark:from-violet-950/20 dark:to-purple-950/10` + `border-violet-200/60` + badge "MessageCircle" custom + 3 niveaux de div imbriqués (~30 lignes JSX) → 1 seul `<InlineBanner variant="info" icon={<MessageCircle/>} label badge sublabel onClick />`. Cohérent avec Section B (WellnessBanner) et Section D (compétition InlineBanner amber). -22 lignes nettes.
+
+5. **`src/components/strength/WorkoutRunner.tsx` cards focus charge/reps** :
+   - `border-2 border-primary/20 bg-gradient-to-br from-card to-muted/30 shadow-sm` → `border border-border bg-secondary` (ton iOS sobre, plat).
+   - Hover/active : `hover:border-primary/40 hover:shadow-md` → `hover:bg-secondary/80`.
+   - Section labels Charge/Reps/Difficulté `text-[10px] font-bold` → `text-[11px] font-semibold` (alignement avec audit shared : 11px minimum lisibilité iOS).
+   - Le gradient cassait visuellement en dark mode (`from-card to-muted/30` n'avait pas de variante dark adaptée, signalé dans audit nageur §pages/Strength) — fix au passage.
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` : 683 pass, 1 fail pré-existant `transformers.test.ts:18` (déjà documenté §194). Aucune régression.
+
+**Limites (out of scope §199)** :
+- Migration `Surface` primitive vers les call-sites concrets (Card, ObjectiveCard, LoginInstallBanner, etc.) reportée — la primitive est juste posée.
+- Variants sémantiques `InlineBanner` : utilisée seulement dans SwimmerHome Section E. Migration des autres call-sites (~20 usages) reportée.
+- Drag handle sheet : pose visuelle seulement, le swipe-to-dismiss natif est délégué à Radix Dialog (déjà supporté).
+
+**Fichiers modifiés (5)** :
+- NEW `src/components/shared/Surface.tsx`
+- `src/components/ui/sheet.tsx`
+- `src/components/shared/InlineBanner.tsx`
+- `src/pages/SwimmerHome.tsx`
+- `src/components/strength/WorkoutRunner.tsx`
+
+---
+
+## §198 — Quick Wins QW1-QW8 du plan d'audit UX (2026-05-08)
+
+**Contexte :** suite du plan d'audit UX (rapport §197 `docs/audits/2026-05-08-ui-ux-audit-ios.md`). Les 8 quick wins identifiés (< 1h chacun) groupés en un seul § car techniquement indépendants.
+
+**Changements** :
+
+- **QW1 — Suppression doublon `OfflineBanner`** (`AppLayout.tsx:9,119`) : retrait de l'import + du rendu de `OfflineBanner` (encart amber statique) qui faisait doublon avec `OfflineDetector` (pill flottant top-12). `OfflineSyncBanner` (rôle distinct : signaler sync de mutations en attente) conservé. -1 bandeau visuel quand le réseau tombe.
+
+- **QW2 — `window.confirm` → `AlertDialog` Radix** (`SwimSessionView.tsx:394` historique → AlertDialog) : import `AlertDialog*` shadcn, ajout state `removeConfirmOpen`, remplacement de `window.confirm("Retirer cette séance de votre feed ?")` par un AlertDialog avec titre + description + boutons Annuler/Retirer (variant destructive). Pattern §181 (déjà appliqué dans SlotSessionSheet pour split_distance).
+
+- **QW3 — `pb-[env(safe-area-inset-bottom)]` sur sticky CTA** (3 fichiers) :
+  - `SwimSessionView.tsx:529` : `bottom-6` → `bottom-[max(1.5rem,env(safe-area-inset-bottom))]`.
+  - `CompetitionDetail.tsx:142` : ajout de `pb-[max(0.75rem,env(safe-area-inset-bottom))]` au wrapper sticky.
+  - `ChronoSetup.tsx:695` : idem ajout `pb-[max(0.75rem,env(safe-area-inset-bottom))]`.
+  Le CTA mangeait l'home indicator iPhone notch + Dynamic Island.
+
+- **QW4 — Tap targets header → ≥ 44px** (5 fichiers) :
+  - `Dashboard.tsx:118,128` (Records + Hebdo) : `h-8` → `min-h-11 md:min-h-9`.
+  - `SwimmerHome.tsx:533` Avatar : `h-9 w-9` → wrapper button `h-11 w-11 rounded-full active:scale-95` + `Avatar h-11 w-11`.
+  - `CoachCommentsScreen.tsx:150` back button : `className="h-8 w-8"` retiré → bascule sur le default du variant `size="icon"` qui est `h-11 w-11 md:h-9 md:w-9` (déjà correct, le custom le cassait).
+  - `CoachMessagesScreen.tsx:149` back button : `size="sm"` retiré → bascule sur le default `min-h-11 md:min-h-10`.
+
+- **QW5 — `ScaleSelector5` → tokens `--color-intensity-{1..5}`** (`ScaleSelector5.tsx:38-43`) : remplacement du mono-rouge primary par un mapping value 1→5 sur les tokens `--intensity-1..5` (emerald → green → yellow → orange → red). Restaure le canal visuel d'intensité que le composant prétendait offrir (audit shared : "valeur 1 et valeur 5 ont la même couleur"). Ajout `active:scale-95` micro-interaction.
+
+- **QW6 — Unification `formatRelativeTime` dupliqué** (`Coach.tsx:207-216` + `CoachCommentsScreen.tsx:29-38`) : suppression des helpers locaux, import et usage de `formatRelativeDate` (de `src/lib/date.ts`, créé en §196) qui ajoute "hier", noms de jour ("lun.", "mar.") et fallback `jj/mm`. Le format diverge légèrement ("à l'instant" au lieu de "maintenant", "il y a Xm" au lieu de "il y a Xmin", etc.) — formatage plus iOS-aligned, plus court.
+
+- **QW7 — Dashboard Settings dialog viewport** (`Dashboard.tsx:926`) : `max-w-[340px]` → `max-w-[calc(100vw-32px)] sm:max-w-[360px]`. iPhone SE (320px viewport) ne déborde plus du viewport en horizontal scroll.
+
+- **QW8 — Profile push toggle Button → Switch** (`Profile.tsx:14,723`) : import `Switch` shadcn. Bouton "Off"/"On" cryptique remplacé par un `<Switch checked={pushEnabled} onCheckedChange={() => handleTogglePush()}>` avec `aria-label` dynamique. Pattern iOS `UISwitch` standard.
+
+**Tests :** `npx tsc --noEmit` clean. Tests inchangés (683 pass + 1 fail pré-existant).
+
+**Fichiers modifiés (10)** :
+- `src/components/layout/AppLayout.tsx` (QW1)
+- `src/pages/SwimSessionView.tsx` (QW2 + QW3)
+- `src/pages/CompetitionDetail.tsx` (QW3)
+- `src/components/chrono/ChronoSetup.tsx` (QW3)
+- `src/pages/Dashboard.tsx` (QW4 + QW7)
+- `src/pages/SwimmerHome.tsx` (QW4)
+- `src/pages/coach/CoachCommentsScreen.tsx` (QW4 + QW6)
+- `src/pages/coach/CoachMessagesScreen.tsx` (QW4)
+- `src/components/shared/ScaleSelector5.tsx` (QW5)
+- `src/pages/Coach.tsx` (QW6)
+- `src/pages/Profile.tsx` (QW8)
+
+---
+
+## §197 — Audit UI/UX iOS-like + Chantier A : détox typo globale (2026-05-08)
+
+**Contexte :** demande utilisateur — *"audite toutes les interfaces nageur/coach […] j'aimerais être sûr de la cohérence […] modernes, iOS-like, épurées et ergonomiques."* Rapport d'audit complet livré dans `docs/audits/2026-05-08-ui-ux-audit-ios.md` (3 forks parallèles : nageur, coach, composants partagés ; 25+ surfaces auditées contre la grille iOS HIG). Verdict global 6/10. Trois drapeaux rouges racines identifiés : (1) règle `index.css:278-285` qui force `h1-h6 = font-display uppercase italic` + `button = uppercase tracking-wide font-bold` sur **toute** l'app, (2) tap targets sub-44px endémiques (~25 spots), (3) 94 fichiers utilisant des couleurs Tailwind hardcoded au lieu des tokens sémantiques (`status-*`, `intensity-*`) qui existent. Plan d'action 5 chantiers structurels + 8 quick wins, chemin critique ~8-10 jours.
+
+**Chantier A — Détox typo globale (livré dans ce §)**
+
+Single point of fix qui rebascule l'esthétique vers iOS HIG sentence-case sans toucher la logique métier. Risque faible (zéro changement comportemental).
+
+**Changements `src/index.css` :**
+- Retrait de `@layer base { h1-h6 { @apply font-display tracking-tight uppercase italic; } }` — la règle qui forçait toute l'app en Oswald uppercase italic.
+- Retrait de `@layer base { button { @apply tracking-wide font-bold uppercase; } }` — la règle qui forçait tous les CTA en majuscules.
+- Remplacement par `@layer base { h1-h6 { @apply font-semibold tracking-tight; } }` — base douce iOS HIG (sentence-case Inter, hiérarchie typo conservée par les `text-Nxl` ad-hoc).
+- NEW `@utility heading-display` + `@utility btn-eac-display` : opt-in pour brand moments futurs (Login hero, Hall of Fame, RecordsClub leaderboard, banner cover compétition).
+
+**Changements `src/components/shared/PageHeader.tsx` :**
+- Le titre `h1` passait `text-lg font-display font-bold uppercase italic tracking-tight text-primary` → désormais `text-lg font-semibold tracking-tight text-foreground truncate`. Le rouge primary disparaît du titre (réservé à l'action iOS HIG).
+- Subtitle `text-[10px]` → `text-xs` (sous le seuil de lisibilité iOS).
+- Ajout `truncate` pour éviter les retours ligne sur petits écrans.
+
+**Détox des call-sites avec `font-display uppercase italic` explicite local (17 sites)** :
+
+Pages :
+- `pages/Dashboard.tsx:109` — h1 "Accueil" (était "ACCUEIL" rouge italic).
+- `pages/SwimSessionView.tsx:334` — h1 "Détails".
+- `pages/Profile.tsx:633` — hero nom utilisateur (était "FRANÇOIS WAGNER" italique).
+- `pages/Comite.tsx:91` — h1 "Comité".
+- `pages/Admin.tsx:455` — h1 "Administration".
+- `pages/Administratif.tsx:521` — h1 "Administratif".
+- `pages/RecordsAdmin.tsx:469,480` — h1 "Records club" (×2).
+
+Coach :
+- `pages/coach/CoachMessagesScreen.tsx:154` — h2 "Envoyer un message".
+- `pages/coach/CoachSectionHeader.tsx:21` — composant partagé (impact transversal sur plusieurs pages coach via le composant).
+- `pages/coach/CoachGroupsScreen.tsx:473` — h2 nom groupe.
+- `pages/coach/CoachTrainingSlotsScreen.tsx:2771` — h2 "Créneaux".
+- `pages/coach/SwimCatalog.tsx:867` — span preview titre séance.
+
+Profil/dashboard nageur :
+- `components/profile/SwimmerMessagesView.tsx:209` — h2 "Messages".
+- `components/profile/SwimmerObjectivesView.tsx:268` — h2 "Mon plan".
+- `components/profile/AthletePerformanceHub.tsx:468` — h1 "Mon suivi".
+- `components/profile/AthleteInterviewsSection.tsx:195` — h2 "Mes entretiens".
+- `components/dashboard/FeedbackDrawer.tsx:638` — div day label.
+
+Strength :
+- `components/strength/WorkoutRunner.tsx:814,828` — bouton finish "ENREGISTRER & FERMER" → "Enregistrer & fermer" (texte source en MAJUSCULES brutes ne suivait plus la convention CSS, devait être détoxé manuellement). Classes `text-lg font-bold uppercase` → `text-base font-semibold`.
+
+**Pattern de remplacement uniforme** : `text-Nxl font-display font-bold uppercase italic text-primary` → `text-Nxl font-semibold tracking-tight text-foreground`.
+
+**Préservés (brand moments)** : `AppLayout.tsx:131` brand `SUIVI<NATATION>` (logo, texte source en majuscules + italic local volontaire), `AwaitingApproval.tsx`, `ComingSoon.tsx`, `SharedSwimSession.tsx` (vue publique externe, brand EAC), `WorkoutRunner.tsx:751` "Séance terminée !" (moment célébratif), `SessionSummary.tsx:58`, `RecordsClub.tsx:415` (label discret).
+
+**Effets cascade automatiques (sans intervention)** :
+- Tous les `<Button>` shadcn passent de `font-bold uppercase tracking-wide` (via la règle globale) à `font-medium` sentence-case (via le variant Button par défaut, ligne 8 de `ui/button.tsx`). Look iOS-like immédiat sur les 100+ boutons de l'app.
+- Les `<h1>`/`<h2>` qui n'avaient pas d'override local (et qui s'appuyaient sur la règle globale uniquement) passent en `font-semibold tracking-tight` sentence-case Inter.
+- `WellnessForm.tsx:252` — heures sommeil en `font-display` numerique → italic uppercase plus appliqué donc lisibilité numérique restaurée (problème identifié dans audit nageur, fix automatique).
+
+**Cible identifiée mais non couverte par ce §** : `WorkoutRunner.tsx:992,1011,1022` section labels Charge/Reps/Difficulté `text-[10px] font-bold uppercase tracking-wide` — pattern Section Group Header iOS Settings volontaire ; à monter en `text-[11px]` plus tard (audit suggère 11px minimum). `SwimSessionView.tsx:333` "Séance natation" `text-xs uppercase tracking-[0.2em]` idem.
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 683 pass + 1 fail pré-existant `transformers.test.ts:18` (déjà documenté depuis §194). Aucune régression.
+
+**Limites (out of scope §197)** :
+- Quick Wins QW1-QW8 du rapport (banner doublon Offline, sticky CTA safe-area, tap targets sub-44 audit massif, ScaleSelector intensity tokens) à attaquer dans §198+.
+- Chantier B (Surface primitive + harmonisation cards/sheets/radius) à venir.
+- Chantier C (tokens sémantiques contre 94 fichiers hardcoded) à venir.
+- Chantier D (`<CoachPageHeader>` + `<EmptyState>` + `<SystemBannerStack>`) à venir.
+- Chantier E (Sheets bottom standard iOS avec drag handle) à venir.
+
+**Fichiers modifiés (20)** :
+- `src/index.css`
+- `src/components/shared/PageHeader.tsx`
+- `src/pages/Dashboard.tsx`, `SwimSessionView.tsx`, `Profile.tsx`, `Comite.tsx`, `Admin.tsx`, `Administratif.tsx`, `RecordsAdmin.tsx`
+- `src/pages/coach/CoachMessagesScreen.tsx`, `CoachSectionHeader.tsx`, `CoachGroupsScreen.tsx`, `CoachTrainingSlotsScreen.tsx`, `SwimCatalog.tsx`
+- `src/components/profile/SwimmerMessagesView.tsx`, `SwimmerObjectivesView.tsx`, `AthletePerformanceHub.tsx`, `AthleteInterviewsSection.tsx`
+- `src/components/dashboard/FeedbackDrawer.tsx`
+- `src/components/strength/WorkoutRunner.tsx`
+
+**Fichier livrable nouveau** : `docs/audits/2026-05-08-ui-ux-audit-ios.md` (rapport d'audit complet, 280+ lignes).
+
+---
+
 ## §196 — Redesign vues Messages — iOS Mail light (2026-05-08)
 
 **Contexte :** Les deux vues "Messages" jugées trop chargées sur mobile. Vue nageur : pattern split (card détail fixe + liste) confus + trop de Cards. Vue coach : 3 Cards inutiles autour des champs.

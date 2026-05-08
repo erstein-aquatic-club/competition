@@ -139,7 +139,7 @@ export default function CompetitionDetail() {
       )}
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 z-10">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-10">
         <div className="mx-auto max-w-3xl">
           <Button
             type="button"

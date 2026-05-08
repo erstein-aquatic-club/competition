@@ -10,6 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { ExerciseLogInline } from "@/components/swim/ExerciseLogInline";
 import { api, Assignment, SwimSessionItem } from "@/lib/api";
@@ -85,6 +95,7 @@ export default function SwimSessionView() {
   const [manualLabel, setManualLabel] = useState("");
   const [manualReps, setManualReps] = useState(1);
   const [manualExpandedId, setManualExpandedId] = useState<number | null>(null);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 
   const assignmentId = useMemo(() => {
     // Read from window.location.hash because the hash-based router
@@ -331,7 +342,7 @@ export default function SwimSessionView() {
           </Button>
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Séance natation</div>
-            <h1 className="text-2xl font-display font-bold uppercase">Détails</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Détails</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -390,11 +401,7 @@ export default function SwimSessionView() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  const confirmed = window.confirm("Retirer cette séance de votre feed ?");
-                  if (!confirmed) return;
-                  deleteAssignmentMutation.mutate(assignment.id);
-                }}
+                onClick={() => setRemoveConfirmOpen(true)}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
                 Retirer de mon feed
@@ -526,7 +533,7 @@ export default function SwimSessionView() {
 
       {/* Sticky save button */}
       {dirty && (
-        <div className="fixed bottom-6 left-0 right-0 flex justify-center z-50 px-4">
+        <div className="fixed left-0 right-0 flex justify-center z-50 px-4 bottom-[max(1.5rem,env(safe-area-inset-bottom))]">
           <Button
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
@@ -541,6 +548,29 @@ export default function SwimSessionView() {
           </Button>
         </div>
       )}
+
+      {/* §198 QW2 — AlertDialog Radix au lieu de window.confirm (UX iOS-aligned). */}
+      <AlertDialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirer cette séance de votre feed ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous pourrez toujours la retrouver via votre coach si besoin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (assignment) deleteAssignmentMutation.mutate(assignment.id);
+              }}
+            >
+              Retirer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

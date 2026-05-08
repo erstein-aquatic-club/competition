@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
 import type { SwimmerComment } from "@/lib/api/coach-comments";
+import { formatRelativeDate } from "@/lib/date";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -24,17 +25,6 @@ function indicatorColor(mode: "hard" | "good", value: number | null | undefined)
   if (effective >= 4) return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400";
   if (effective >= 3) return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
   return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-}
-
-function formatRelativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "maintenant";
-  if (mins < 60) return `il y a ${mins}min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `il y a ${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `il y a ${days}j`;
 }
 
 function isAlertComment(c: SwimmerComment): boolean {
@@ -147,7 +137,7 @@ export default function CoachCommentsScreen({ onBack, onOpenAthlete }: Props) {
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack}>
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Retour">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -203,7 +193,7 @@ export default function CoachCommentsScreen({ onBack, onOpenAthlete }: Props) {
               {c.athlete_name}
             </span>
             <span className="ml-auto text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
-              {formatRelativeTime(c.created_at)}
+              {formatRelativeDate(c.created_at)}
             </span>
           </div>
 

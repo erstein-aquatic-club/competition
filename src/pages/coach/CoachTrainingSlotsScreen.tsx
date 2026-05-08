@@ -2768,7 +2768,7 @@ const CoachTrainingSlotsScreen = ({
               </Button>
             )}
             <div>
-              <h2 className="text-lg font-display font-semibold uppercase italic text-primary leading-tight">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground leading-tight">
                 Créneaux
               </h2>
               {slots.length > 0 && (

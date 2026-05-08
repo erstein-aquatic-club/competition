@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
@@ -630,7 +631,7 @@ export default function Profile() {
             <AvatarFallback className="text-lg">{(user || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-display font-bold uppercase italic text-accent-foreground truncate">{user}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-accent-foreground truncate">{user}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1">
               <Badge variant="secondary" className="text-xs">{roleLabel}</Badge>
               <span className="text-sm opacity-80">{groupLabel}</span>
@@ -714,14 +715,12 @@ export default function Profile() {
                       {pushEnabled ? "Activées" : "Désactivées"}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={pushEnabled ? "outline" : "default"}
-                    onClick={handleTogglePush}
+                  <Switch
+                    checked={pushEnabled}
                     disabled={pushLoading}
-                  >
-                    {pushLoading ? "..." : pushEnabled ? "Off" : "On"}
-                  </Button>
+                    onCheckedChange={() => handleTogglePush()}
+                    aria-label={pushEnabled ? "Désactiver les notifications push" : "Activer les notifications push"}
+                  />
                 </div>
               </div>
             ) : null}

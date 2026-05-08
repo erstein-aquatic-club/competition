@@ -98,6 +98,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/share/types.ts` | Types partage (`SharePayload`, `ShareOptionId`, `ShareOption`) (§133) | ~20 lignes |
 | `src/lib/share/buildShareOptions.ts` | Fonction pure options partage selon payload + capacités navigateur (§133) | ~38 lignes |
 | `src/lib/share/shareActions.ts` | Side-effects partage (WhatsApp, clipboard, native, download) (§133) | ~47 lignes |
+| `src/components/shared/Surface.tsx` | Primitive iOS-aligned (§199 Chantier B) — variant solid/glass/tinted/outline × radius sm=12/md=16/lg=22 + prop interactive ; vouée à unifier les ~8 variantes "card-like" recensées dans l'audit `docs/audits/2026-05-08-ui-ux-audit-ios.md` | 70 lignes |
 | `src/components/shared/ObjectiveCard.tsx` | Composant partagé objectifs (ring SVG, grid 2x2, compact) | ~260 lignes |
 | `src/components/shared/ObjectiveDetailSheet.tsx` | Drawer objectif nageur (Radix Sheet bottom) — toggle [Allures\|Progression] : `PaceMatrixInline` ou `EventProgressionContent` selon onglet (§189-ext) | 94 lignes |
 | `src/lib/objectiveHelpers.ts` | Helpers partagés objectifs (FFN_EVENTS, formatTime) | ~40 lignes |

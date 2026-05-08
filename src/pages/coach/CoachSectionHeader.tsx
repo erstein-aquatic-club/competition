@@ -18,7 +18,7 @@ const CoachSectionHeader = ({ title, description, onBack, actions }: CoachSectio
           Retour
         </Button>
       )}
-      <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">{title}</h2>
+      <h2 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </div>
     {actions ? <div className="flex items-center gap-2">{actions}</div> : null}

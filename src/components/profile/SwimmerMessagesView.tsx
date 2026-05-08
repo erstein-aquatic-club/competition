@@ -206,7 +206,7 @@ export default function SwimmerMessagesView({
           <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack} aria-label="Retour">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-xl font-display font-semibold uppercase italic text-primary">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">
             Messages
           </h2>
           {unreadCount > 0 ? (

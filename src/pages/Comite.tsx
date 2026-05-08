@@ -88,7 +88,7 @@ export default function Comite() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-display font-bold uppercase italic text-primary">Comité</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Comité</h1>
         <div className="text-sm text-muted-foreground">Tableau de bord shifts</div>
       </div>
 

@@ -3,42 +3,40 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 // ── Variant config ────────────────────────────────────────────
+// §199 Chantier B — refonte sur tokens sémantiques (--color-status-*).
+// Les anciens variants (amber/red/yellow/blue/emerald) restent comme alias
+// pour ne casser aucun call-site. À termes : tout doit migrer vers les
+// 4 variants sémantiques (info / success / warning / error / muted).
 
 const variants = {
-  amber: {
-    dot: "bg-amber-500",
-    text: "text-amber-700 dark:text-amber-300",
-    muted: "text-amber-600/70 dark:text-amber-400/60",
-    border: "border-amber-200/60 dark:border-amber-800/30",
-    bg: "bg-amber-50/50 dark:bg-amber-950/10",
+  // Variants sémantiques iOS-aligned ───────────────────────────
+  info: {
+    dot: "bg-primary",
+    text: "text-primary",
+    muted: "text-primary/70",
+    border: "border-primary/15",
+    bg: "bg-primary/5",
   },
-  red: {
-    dot: "bg-red-500",
-    text: "text-red-700 dark:text-red-300",
-    muted: "text-red-600/70 dark:text-red-400/60",
-    border: "border-red-200/60 dark:border-red-800/30",
-    bg: "bg-red-50/50 dark:bg-red-950/10",
+  success: {
+    dot: "bg-status-success",
+    text: "text-status-success",
+    muted: "text-status-success/70",
+    border: "border-status-success/20",
+    bg: "bg-status-success-bg",
   },
-  blue: {
-    dot: "bg-blue-500",
-    text: "text-blue-700 dark:text-blue-300",
-    muted: "text-blue-600/70 dark:text-blue-400/60",
-    border: "border-blue-200/60 dark:border-blue-800/30",
-    bg: "bg-blue-50/50 dark:bg-blue-950/10",
+  warning: {
+    dot: "bg-status-warning",
+    text: "text-status-warning",
+    muted: "text-status-warning/70",
+    border: "border-status-warning/20",
+    bg: "bg-status-warning-bg",
   },
-  yellow: {
-    dot: "bg-yellow-500",
-    text: "text-yellow-700 dark:text-yellow-300",
-    muted: "text-yellow-600/70 dark:text-yellow-400/60",
-    border: "border-yellow-200/60 dark:border-yellow-800/30",
-    bg: "bg-yellow-50/50 dark:bg-yellow-950/10",
-  },
-  emerald: {
-    dot: "bg-emerald-500",
-    text: "text-emerald-700 dark:text-emerald-300",
-    muted: "text-emerald-600/70 dark:text-emerald-400/60",
-    border: "border-emerald-200/60 dark:border-emerald-800/30",
-    bg: "bg-emerald-50/50 dark:bg-emerald-950/10",
+  error: {
+    dot: "bg-status-error",
+    text: "text-status-error",
+    muted: "text-status-error/70",
+    border: "border-status-error/20",
+    bg: "bg-status-error-bg",
   },
   muted: {
     dot: "bg-muted-foreground/40",
@@ -46,6 +44,42 @@ const variants = {
     muted: "text-muted-foreground",
     border: "border-border",
     bg: "bg-muted/30",
+  },
+  // Alias back-compat (à migrer progressivement vers sémantiques) ──
+  amber: {
+    dot: "bg-status-warning",
+    text: "text-status-warning",
+    muted: "text-status-warning/70",
+    border: "border-status-warning/20",
+    bg: "bg-status-warning-bg",
+  },
+  red: {
+    dot: "bg-status-error",
+    text: "text-status-error",
+    muted: "text-status-error/70",
+    border: "border-status-error/20",
+    bg: "bg-status-error-bg",
+  },
+  yellow: {
+    dot: "bg-status-warning",
+    text: "text-status-warning",
+    muted: "text-status-warning/70",
+    border: "border-status-warning/20",
+    bg: "bg-status-warning-bg",
+  },
+  blue: {
+    dot: "bg-primary",
+    text: "text-primary",
+    muted: "text-primary/70",
+    border: "border-primary/15",
+    bg: "bg-primary/5",
+  },
+  emerald: {
+    dot: "bg-status-success",
+    text: "text-status-success",
+    muted: "text-status-success/70",
+    border: "border-status-success/20",
+    bg: "bg-status-success-bg",
   },
   destructive: {
     dot: "bg-destructive",
