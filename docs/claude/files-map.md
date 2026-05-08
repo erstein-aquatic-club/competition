@@ -56,7 +56,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/__tests__/date.test.ts` | Tests unitaires des helpers de date (formatSwimSessionDefaultTitle, formatRelativeDate) | 52 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | |
 | `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |
-| `src/pages/Dashboard.tsx` | Calendrier natation nageur (ex-Accueil, route /natation) | ~1055 lignes |
+| `src/pages/Dashboard.tsx` | Orchestrateur natation nageur (route /natation) — queries, useDashboardState, navigation, banners, settings dialog inline (§216 split) | ~784 lignes |
 | `src/pages/Strength.tsx` | Module musculation nageur | ~921 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
@@ -223,6 +223,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach (formulaire épuré sans Cards, §196) | 244 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
+| `src/components/dashboard/DashboardCalendar.tsx` | Wrapper React.memo de CalendarHeader + CalendarGrid — isole le calendrier des re-renders d'écriture (§216) | 69 lignes |
+| `src/components/dashboard/DashboardFeedbackContainer.tsx` | Conteneur React.memo du FeedbackDrawer — possède saveState/draftState/alternativeOverride + 5 mutations + handlers markAbsent/markPresent/clearOverride/saveFeedback (§216) | 440 lignes |
 | `src/components/dashboard/SwimExerciseLogsHistory.tsx` | Historique logs exercices nage | ~505 lignes |
 | `src/components/coach/strength/AthletePlansTab.tsx` | Onglet plans athlète (coach muscu) | ~934 lignes |
 | `src/pages/coach/StrengthPlanningScreen.tsx` | Écran coach planification muscu (timeline groupe/nageur, picker séances, sheets détail/compétitions) (§160) | 1074 lignes |

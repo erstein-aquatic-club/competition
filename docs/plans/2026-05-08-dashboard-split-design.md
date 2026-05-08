@@ -1,4 +1,4 @@
-# §215 — Découpage Dashboard.tsx (Refacto B)
+# §216 — Découpage Dashboard.tsx (Refacto B)
 
 *Date : 2026-05-08 — Suite §214 (quick wins post-audit).*
 
@@ -34,7 +34,7 @@ src/pages/Dashboard.tsx                          ≈ 250 LOC (vs 1114)
 
 ### Frontière de state
 
-| State | Localisation actuelle | Localisation §215 | Pourquoi |
+| State | Localisation actuelle | Localisation §216 | Pourquoi |
 |---|---|---|---|
 | `saveState` | Dashboard | **DashboardFeedbackContainer** | Couplé au cycle save → ne re-render que le drawer |
 | `alternativeOverride` | Dashboard | **DashboardFeedbackContainer** | Reset après mutation success → couplé au drawer |
@@ -83,7 +83,7 @@ src/pages/Dashboard.tsx                          ≈ 250 LOC (vs 1114)
 - `npm test` : 684 pass (1 fail pré-existant `transformers.test.ts:18` non lié, reste).
 - Test manuel : ouvrir un feedback, taper dans les champs, vérifier en DevTools React Profiler que `<DashboardCalendar>` n'apparaît plus dans le commit tree.
 
-## Out of scope §215
+## Out of scope §216
 
 - Settings dialog extraction (validé non extrait pour ce §).
 - Refacto C — RPC `get_coach_kpis` (chantier dédié).

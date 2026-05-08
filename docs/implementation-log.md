@@ -4,6 +4,43 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §216 — Découpage Dashboard.tsx en orchestrateur + Calendar + FeedbackContainer (Refacto B) (2026-05-08)
+
+**Contexte :** suite §214 (audit perf/maintenabilité). Refacto B identifiée : `src/pages/Dashboard.tsx` (1114 LOC) re-rendait à chaque keystroke dans le drawer (`saveState`, `draftState`, `alternativeOverride` co-localisés). Cible : isoler le calendrier des re-renders d'écriture pour gagner -50 à -80% de renders calendrier pendant la saisie.
+
+§216 (et non §215) suite à conflit de numérotation avec un audit UI/UX en parallèle (§215 audit pass 2).
+
+**Architecture :**
+
+- `src/hooks/useDashboardState.ts` (262 → 251 LOC) : appel à `useFeedbackDraft` retiré du hook parent → délégué au container. `draftState` ne re-render plus Dashboard.
+- `<DashboardCalendar>` (memo, 69 LOC, NEW `src/components/dashboard/DashboardCalendar.tsx`) : wrapper `CalendarHeader` + `CalendarGrid`. Reçoit uniquement les props lecture-seule du calendrier.
+- `<DashboardFeedbackContainer>` (memo, 440 LOC, NEW `src/components/dashboard/DashboardFeedbackContainer.tsx`) : possède `saveState` + `alternativeOverride` (useState locaux), appelle `useFeedbackDraft` directement, héberge les 5 mutations (`deleteMutation`, `mutation`, `updateMutation`, `absenceMutation`, `removeAbsenceMutation`) et les 4 handlers (`markAbsent`, `markPresent`, `clearOverride`, `saveFeedback`). Reçoit drawer state + setters de Dashboard.
+- `src/pages/Dashboard.tsx` (1114 → 784 LOC) : orchestrateur. Queries, `useDashboardState`, navigation, banners, settings dialog inline (validé out of scope), keyboard nav effect. 4 nouveaux `useCallback`/`useMemo` ajoutés en fin de quality review pour stabiliser les props passées au container (`onOpenStrengthSession`, `absenceReason`, `strengthSessionsForSelectedDay`, `isAbsent`) — sans ces stabilisations le `React.memo` du container aurait été cassé par les inline arrows / `.find()` / `.get()` reconstruits chaque render.
+
+**Décisions clés :**
+
+- Pruning props `setAutoCloseArmed` et `authUuid` du container : confirmé sans usage interne. `setAutoCloseArmed` reste dans Dashboard (`closeDay`/`openDay`). `authUuid` re-fetché via `supabase.auth.getSession()` inline dans les mutations (pattern original préservé).
+- Settings dialog NON extrait (validé) : ~120 LOC pas un hot path perf, ouvert rarement, scope §216 focus Calendar + Drawer.
+- Helpers `parseSessionId`/`clampToStep`/`INDICATORS` dupliqués container (privés au flow). Acceptable (1 call-site), à lever en `lib/dashboard/sessionId.ts` si Strength/Coach parsent le même format.
+
+**Méthode :**
+
+- Brainstorming + design doc commité (`ca1ebabff` `docs(§215)` — l'ancien numéro avant renommage).
+- Plan d'implémentation détaillé (`docs/plans/2026-05-08-dashboard-split.md`).
+- Subagent-driven : 1 implementer Tasks 1-4 batchés (général-purpose) + 2 reviews (spec compliance + code quality) + fix critique (3 props inline) appliqué en main.
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (non lié, déjà documenté §214).
+
+**Validation perf attendue :** React DevTools Profiler doit montrer `<DashboardCalendar>` ABSENT des commits déclenchés par le typing dans le drawer. Test manuel à faire en prod par l'utilisateur.
+
+**Hors scope §216 :**
+
+- Settings dialog (validé inline).
+- Refactos A/C/D du plan d'audit (façade `api.ts:432-1039`, RPC `get_coach_kpis`, trio Records 3190 LOC). Reportés à des § dédiés.
+- Type `selectedDayStatus.slots` dupliqué dans 2 nouveaux fichiers — non bloquant (review code-quality).
+
+**Fichiers modifiés (2)** : `src/pages/Dashboard.tsx`, `src/hooks/useDashboardState.ts`. **Créés (2)** : `src/components/dashboard/DashboardCalendar.tsx`, `src/components/dashboard/DashboardFeedbackContainer.tsx`. **Doc** : `docs/plans/2026-05-08-dashboard-split-design.md`, `docs/plans/2026-05-08-dashboard-split.md` (plan d'implémentation), `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`, `docs/claude/files-map.md`.
+
 ## §214 — Quick wins perf + maintenabilité post-audit (2026-05-08)
 
 **Contexte :** suite à un audit double (code-simplifier + perf/fluidité) lancé en parallèle. Synthèse priorisée → 6 quick wins ROI immédiat regroupés dans une seule passe. Audits réalisés en lecture seule, recommandations validées avant implémentation.

@@ -19,7 +19,6 @@ import {
 import { useDashboardSessions } from "./dashboard/useDashboardSessions";
 import { useCompletionStatus } from "./dashboard/useCompletionStatus";
 import { useDayMetrics } from "./dashboard/useDayMetrics";
-import { useFeedbackDraft } from "./dashboard/useFeedbackDraft";
 
 // Re-export types consumers may import via this module.
 export type {
@@ -178,14 +177,6 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     getLogForSession,
   });
 
-  const { draftState, setDraftState } = useFeedbackDraft({
-    activeSessionId,
-    sessionsForSelectedDay,
-    otherGroupSessions,
-    assignments,
-    getLogForSession,
-  });
-
   // Reset view state when dock icon is tapped while already on this page
   useEffect(() => {
     const reset = () => {
@@ -227,7 +218,6 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     presenceDefaults,
     attendanceOverrideBySessionId,
     stableDurationMin,
-    draftState,
 
     // Computed
     gridDates,
@@ -253,7 +243,6 @@ export function useDashboardState({ sessions, assignments, userId, user, swimmer
     setPresenceDefaults,
     setAttendanceOverrideBySessionId,
     setStableDurationMin,
-    setDraftState,
     setAutoCloseArmed,
     startTransition,
     getSessionStatus,

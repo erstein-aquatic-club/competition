@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§214** — Quick wins perf + maintenabilité post-audit. 6 wins ROI immédiat : lazy `jspdf` dans Pace Calculator, closures inline CalendarGrid retirées (DayCell stable), 6 `staleTime` overrides incohérents supprimés, `src/lib/features.ts` mort supprimé, 11 helpers de date dupliqués centralisés dans `src/lib/date.ts` + fix bug TZ `weekDates`, logo PDF (373 Ko inliné) → runtime webp 7.7 Ko × 3 fichiers export. 19 fichiers, tsc clean.
+Dernier § livré : **§216** — Refacto B Dashboard.tsx (audit §214). Découpage 1114 → 784 LOC : `<DashboardCalendar>` (memo, 69 LOC) + `<DashboardFeedbackContainer>` (memo, 440 LOC, host saveState/draftState/alternativeOverride + 5 mutations). `useFeedbackDraft` sorti du hook parent. Calendrier ne re-render plus pendant la saisie feedback (-50 à -80% estimé). Settings dialog inline (validé). 4 fichiers + doc. tsc clean, 684 tests pass + 1 fail pré-existant non lié. (§215 réservé audit UI/UX parallèle.)
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

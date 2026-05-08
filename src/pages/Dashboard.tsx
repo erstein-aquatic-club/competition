@@ -1,18 +1,15 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { computeTrainingDaysRemaining } from "@/lib/date";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
-import type { Session, Competition, PlannedAbsence } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
 import { useDashboardState } from "@/hooks/useDashboardState";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CalendarHeader } from "@/components/dashboard/CalendarHeader";
-import { CalendarGrid } from "@/components/dashboard/CalendarGrid";
-import { FeedbackDrawer } from "@/components/dashboard/FeedbackDrawer";
+import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
+import { DashboardFeedbackContainer } from "@/components/dashboard/DashboardFeedbackContainer";
 import { InlineBanner } from "@/components/shared/InlineBanner";
 import {
   Settings2,
@@ -31,7 +28,6 @@ import { ChallengeProgressBar } from "@/components/shared/ChallengeProgressBar";
 import { getActiveChallenges } from "@/lib/api/challenges";
 import { fetchUserGroupIds } from "@/lib/api/client";
 import { useStrengthPlanByISO } from "@/hooks/useStrengthPlanByISO";
-import type { SaveState } from "@/components/shared/BottomActionBar";
 
 /**
  * Dashboard (swim) — UI based on maquette_accueil_calendrier_nageur_vite_react.jsx
@@ -51,14 +47,6 @@ const SLOTS = [
 ] as const;
 
 type SlotKey = (typeof SLOTS)[number]["key"];
-type IndicatorKey = "difficulty" | "fatigue_end" | "performance" | "engagement";
-
-const INDICATORS = [
-  { key: "difficulty" as const, label: "Difficulté", mode: "hard" as const },
-  { key: "fatigue_end" as const, label: "Fatigue fin", mode: "hard" as const },
-  { key: "performance" as const, label: "Perf perçue", mode: "good" as const },
-  { key: "engagement" as const, label: "Engagement", mode: "good" as const },
-];
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -74,20 +62,6 @@ function toISODate(d: Date) {
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-function parseSessionId(sessionId: string) {
-  const parts = String(sessionId).split("__");
-  const rawSlot = parts[1] || "";
-  // If it's a UUID (swimmer slot ID), determine AM/PM from the session context
-  // For now, return the raw value — callers that need a SlotKey should use the session's slotKey instead
-  const slotKey = (rawSlot === "AM" || rawSlot === "PM") ? rawSlot : "";
-  return { iso: parts[0], slotKey: slotKey as SlotKey | "", swimmerSlotId: rawSlot.length > 2 ? rawSlot : undefined };
-}
-
-function clampToStep(value: number, step: number) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.round(value / step) * step;
 }
 
 /** Shared inner content for the Dashboard page header (mobile fixed + desktop inline). */
@@ -140,19 +114,8 @@ function DashboardHeaderContent({
 export default function Dashboard() {
   const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
 
   const [, navigate] = useLocation();
-  const [saveState, setSaveState] = React.useState<SaveState>("idle");
-  // Override when swimmer picks an alternative session for a slot
-  const [alternativeOverride, setAlternativeOverride] = React.useState<{
-    sessionId: string;
-    assignmentId: number;
-    title: string;
-    km: number | null;
-  } | null>(null);
 
   // Get Supabase auth UUID for swim exercise logs.
   // We re-read on `onAuthStateChange` (not just `[user]`) because the
@@ -243,153 +206,6 @@ export default function Dashboard() {
     refetchAssignments();
   };
 
-  const deleteMutation = useMutation({
-    mutationFn: (sessionId: number) => api.deleteSession(sessionId),
-    onMutate: () => {
-      setSaveState("saving");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      toast({ title: "Séance supprimée", description: "La saisie a été supprimée." });
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 2000);
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de supprimer la séance.", variant: "destructive" });
-      setSaveState("error");
-      setTimeout(() => setSaveState("idle"), 3000);
-    },
-  });
-
-  const mutation = useMutation({
-    mutationFn: async (data: Omit<Session, "id" | "created_at"> & { _exerciseLogs?: import("@/lib/api").SwimExerciseLogInput[] }) => {
-      const { _exerciseLogs, ...sessionData } = data;
-      const result = await api.syncSession({ ...sessionData, athlete_name: user!, athlete_id: userId ?? undefined });
-      // Save exercise logs if any
-      if (_exerciseLogs && _exerciseLogs.length > 0 && result.sessionId) {
-        try {
-          const { data: authData } = await supabase.auth.getSession();
-          const authUid = authData.session?.user?.id;
-          if (authUid) {
-            await api.saveSwimExerciseLogs(result.sessionId, authUid, _exerciseLogs);
-          }
-        } catch (e) {
-          console.warn("[EAC] Failed to save exercise logs:", e);
-        }
-      }
-      return result;
-    },
-    onMutate: () => {
-      setSaveState("saving");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      toast({ title: "Séance enregistrée", description: "Vos données ont été synchronisées." });
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 2000);
-      setTimeout(() => {
-        setDrawerOpen(false);
-        setActiveSessionId(null);
-        setDetailsOpen(false);
-        setAlternativeOverride(null);
-      }, 1200);
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'enregistrer la séance.", variant: "destructive" });
-      setSaveState("error");
-      setTimeout(() => setSaveState("idle"), 3000);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (data: Session & { _exerciseLogs?: import("@/lib/api").SwimExerciseLogInput[] }) => {
-      const { _exerciseLogs, ...sessionData } = data;
-      const result = await api.updateSession(sessionData);
-      // Save exercise logs if any
-      if (_exerciseLogs && sessionData.id) {
-        try {
-          const { data: authData } = await supabase.auth.getSession();
-          const authUid = authData.session?.user?.id;
-          if (authUid) {
-            await api.saveSwimExerciseLogs(sessionData.id, authUid, _exerciseLogs);
-          }
-        } catch (e) {
-          console.error("[EAC] Failed to save exercise logs:", e);
-          throw e; // Re-throw to show error to user
-        }
-      }
-      return result;
-    },
-    onMutate: () => {
-      setSaveState("saving");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      toast({ title: "Séance mise à jour", description: "Votre saisie a été mise à jour." });
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 2000);
-      setTimeout(() => {
-        setDrawerOpen(false);
-        setActiveSessionId(null);
-        setDetailsOpen(false);
-        setAlternativeOverride(null);
-      }, 1200);
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour la séance.", variant: "destructive" });
-      setSaveState("error");
-      setTimeout(() => setSaveState("idle"), 3000);
-    },
-  });
-
-  const absenceMutation = useMutation({
-    mutationFn: ({ date, reason }: { date: string; reason?: string }) =>
-      api.setPlannedAbsence(date, reason),
-    onMutate: async ({ date, reason }) => {
-      await queryClient.cancelQueries({ queryKey: ["my-planned-absences"] });
-      const previous = queryClient.getQueryData<PlannedAbsence[]>(["my-planned-absences"]);
-      queryClient.setQueryData<PlannedAbsence[]>(["my-planned-absences"], (old) => [
-        ...(old ?? []),
-        { date, reason: reason ?? null } as PlannedAbsence,
-      ]);
-      return { previous };
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["my-planned-absences"] });
-      void queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
-      toast({ title: "Jour marqué indisponible" });
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(["my-planned-absences"], context.previous);
-      toast({ title: "Erreur", description: "Impossible de marquer ce jour indisponible.", variant: "destructive" });
-    },
-  });
-
-  const removeAbsenceMutation = useMutation({
-    mutationFn: (date: string) => api.removePlannedAbsence(date),
-    onMutate: async (date) => {
-      await queryClient.cancelQueries({ queryKey: ["my-planned-absences"] });
-      const previous = queryClient.getQueryData<PlannedAbsence[]>(["my-planned-absences"]);
-      queryClient.setQueryData<PlannedAbsence[]>(["my-planned-absences"], (old) =>
-        (old ?? []).filter((a) => a.date !== date),
-      );
-      return { previous };
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["my-planned-absences"] });
-      void queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
-      toast({ title: "Disponibilité restaurée" });
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(["my-planned-absences"], context.previous);
-      toast({ title: "Erreur", description: "Impossible de restaurer la disponibilité.", variant: "destructive" });
-    },
-  });
-
   const { data: swimmerSlots } = useQuery({
     queryKey: ['swimmer-slots', userId],
     queryFn: () => api.getSwimmerSlots(userId!),
@@ -409,9 +225,7 @@ export default function Dashboard() {
     selectedDayIndex,
     isPending,
     presenceDefaults,
-    attendanceOverrideBySessionId,
     stableDurationMin,
-    draftState,
     gridDates,
     completionByISO,
     selectedDate,
@@ -432,9 +246,7 @@ export default function Dashboard() {
     setPresenceDefaults,
     setAttendanceOverrideBySessionId,
     setStableDurationMin,
-    setDraftState,
     setAutoCloseArmed,
-    startTransition,
     getSessionStatus,
   } = state;
 
@@ -517,7 +329,6 @@ export default function Dashboard() {
     setDetailsOpen(false);
     setAutoCloseArmed(false);
     setSelectedDayIndex(null);
-    setAlternativeOverride(null);
   }, [setDrawerOpen, setActiveSessionId, setDetailsOpen, setAutoCloseArmed, setSelectedDayIndex]);
 
   const prevMonth = useCallback(() => {
@@ -552,132 +363,37 @@ export default function Dashboard() {
     setDetailsOpen(false);
   }, [setActiveSessionId, setDetailsOpen]);
 
-  const markAbsent = useCallback(
-    (sessionId: string) => {
-      startTransition(() => {
-        setAttendanceOverrideBySessionId((prev) => ({ ...prev, [sessionId]: "absent" }));
-      });
+  // §216 — handler stable + slices mémoisées pour préserver le React.memo
+  // de DashboardFeedbackContainer. Sans ça, l'inline arrow + les deux
+  // .find()/.get() inline créent de nouvelles refs à chaque render parent
+  // et le memo du container ne sert à rien (l'audit de quality review l'a
+  // attrapé : "Inline arrows defeat React.memo on DashboardFeedbackContainer").
+  const onOpenStrengthSession = useCallback((slotId: string) => {
+    try {
+      sessionStorage.setItem(
+        "eac_pending_strength_focus_slot_id",
+        String(slotId),
+      );
+    } catch {
+      /* private mode / quota → fall back to plain navigation */
+    }
+    navigate("/strength");
+  }, [navigate]);
 
-      const existing = getLogForSession(sessionId);
-      if (existing?.id) deleteMutation.mutate(Number(existing.id));
-    },
-    [deleteMutation, getLogForSession, startTransition, setAttendanceOverrideBySessionId]
+  const absenceReason = useMemo(
+    () => myAbsences.find((a) => a.date === selectedISO)?.reason ?? null,
+    [myAbsences, selectedISO],
   );
 
-  const markPresent = useCallback(
-    (sessionId: string) => {
-      startTransition(() => {
-        setAttendanceOverrideBySessionId((prev) => ({ ...prev, [sessionId]: "present" }));
-      });
-    },
-    [startTransition, setAttendanceOverrideBySessionId]
+  const strengthSessionsForSelectedDay = useMemo(
+    () => strengthResolvedByISO.get(selectedISO) ?? [],
+    [strengthResolvedByISO, selectedISO],
   );
 
-  const clearOverride = useCallback(
-    (sessionId: string) => {
-      startTransition(() => {
-        setAttendanceOverrideBySessionId((prev) => {
-          const next = { ...prev };
-          delete next[sessionId];
-          return next;
-        });
-      });
-    },
-    [startTransition, setAttendanceOverrideBySessionId]
+  const isAbsent = useMemo(
+    () => absenceDates.has(selectedISO),
+    [absenceDates, selectedISO],
   );
-
-  const dayOffAll = useCallback(() => {
-    const idsToOff = sessionsForSelectedDay
-      .map((s) => (getSessionStatus(s, selectedDate).expected ? s.id : null))
-      .filter(Boolean) as string[];
-
-    if (idsToOff.length === 0) return;
-
-    startTransition(() => {
-      setAttendanceOverrideBySessionId((prev) => {
-        const next = { ...prev };
-        for (const id of idsToOff) next[id] = "absent";
-        return next;
-      });
-
-      setActiveSessionId(null);
-      setDetailsOpen(false);
-    });
-
-    idsToOff.forEach((sid) => {
-      const existing = getLogForSession(sid);
-      if (existing?.id) deleteMutation.mutate(Number(existing.id));
-    });
-  }, [sessionsForSelectedDay, getSessionStatus, selectedDate, startTransition, getLogForSession, deleteMutation, setAttendanceOverrideBySessionId, setActiveSessionId, setDetailsOpen]);
-
-  const saveFeedback = useCallback(() => {
-    if (!activeSessionId) return;
-    if (!user) return;
-
-    const allFilled = INDICATORS.every((i) => Number.isInteger(draftState[i.key]));
-    if (!allFilled) return;
-
-    const { iso, slotKey: parsedSlotKey } = parseSessionId(activeSessionId);
-    // For new swimmer-slot IDs, look up the active session to get the actual slotKey (AM/PM)
-    const activeSession = sessionsForSelectedDay.find((s) => s.id === activeSessionId)
-      ?? otherGroupSessions.find((s) => s.id === activeSessionId);
-    const effectiveSlotKey = parsedSlotKey || activeSession?.slotKey || "AM";
-    const slotLabel = effectiveSlotKey === "PM" ? "Soir" : "Matin";
-
-    const distance = clampToStep(Number(draftState.distanceMeters ?? 0), 100);
-    const duration = clampToStep(Number(stableDurationMin), 15);
-
-    const strokeDistances: Record<string, number> = {};
-    for (const [key, val] of Object.entries(draftState.strokes)) {
-      const n = Number(val);
-      if (n > 0) strokeDistances[key] = n;
-    }
-
-    const payload = {
-      date: iso,
-      slot: slotLabel,
-      distance,
-      duration,
-      effort: Number(draftState.difficulty),
-      feeling: Number(draftState.fatigue_end),
-      performance: Number(draftState.performance),
-      engagement: Number(draftState.engagement),
-      comments: String(draftState.comment || "").slice(0, 400),
-      athlete_name: user!,
-      athlete_id: userId ?? undefined,
-      stroke_distances: Object.keys(strokeDistances).length > 0 ? strokeDistances : null,
-      assignment_id: alternativeOverride?.sessionId === activeSessionId
-        ? alternativeOverride.assignmentId
-        : activeSession?.assignmentId ?? null,
-    };
-
-    const existing = getLogForSession(activeSessionId);
-
-    // For updates, preserve the original assignment_id from the saved log
-    // (unless swimmer explicitly picked an alternative)
-    if (existing?.id && existing.assignment_id != null && !alternativeOverride) {
-      payload.assignment_id = existing.assignment_id;
-    }
-
-    startTransition(() => {
-      setAttendanceOverrideBySessionId((prev) => ({ ...prev, [activeSessionId]: "present" }));
-    });
-
-    if (existing?.id) {
-      updateMutation.mutate({
-        ...payload,
-        id: existing.id,
-        created_at: existing.created_at ?? new Date().toISOString(),
-        _exerciseLogs: draftState.exerciseLogs.length > 0 ? draftState.exerciseLogs : []
-      });
-    } else {
-      mutation.mutate({ ...payload, _exerciseLogs: draftState.exerciseLogs.length > 0 ? draftState.exerciseLogs : undefined });
-    }
-    // Drawer / session close is handled by mutation.onSuccess (with a 1.2s
-    // delay so the success toast lands). Closing here would also fire on
-    // mutation error → the swimmer would lose the drawer context with only
-    // an error toast as feedback.
-  }, [activeSessionId, user, userId, draftState, stableDurationMin, sessionsForSelectedDay, getLogForSession, startTransition, updateMutation, mutation, setAttendanceOverrideBySessionId, alternativeOverride]);
 
   const toggleDefaultPresence = useCallback((weekdayIdx: number, slotKey: SlotKey) => {
     setPresenceDefaults((prev) => ({
@@ -868,29 +584,23 @@ export default function Dashboard() {
         )}
 
         {/* Calendar */}
-        <div className="mt-3 rounded-3xl border border-border bg-card overflow-hidden">
-          <CalendarHeader
-            monthCursor={monthCursor}
-            selectedDayStatus={selectedDayStatus}
-            onPrevMonth={prevMonth}
-            onNextMonth={nextMonth}
-            onJumpToday={jumpToday}
-          />
-
-          <CalendarGrid
-            monthCursor={monthCursor}
-            gridDates={gridDates}
-            completionByISO={completionByISO}
-            strengthByISO={strengthByISO}
-            competitionDates={competitionDates}
-            absenceDates={absenceDates}
-            selectedISO={selectedISO}
-            selectedDayIndex={selectedDayIndex}
-            today={today}
-            onDayClick={openDay}
-            onKeyDown={handleCalendarKeyDown}
-          />
-        </div>
+        <DashboardCalendar
+          monthCursor={monthCursor}
+          selectedDayStatus={selectedDayStatus}
+          onPrevMonth={prevMonth}
+          onNextMonth={nextMonth}
+          onJumpToday={jumpToday}
+          gridDates={gridDates}
+          completionByISO={completionByISO}
+          strengthByISO={strengthByISO}
+          competitionDates={competitionDates}
+          absenceDates={absenceDates}
+          selectedISO={selectedISO}
+          selectedDayIndex={selectedDayIndex}
+          today={today}
+          onDayClick={openDay}
+          onKeyDown={handleCalendarKeyDown}
+        />
 
         {/* Link to swim notes page */}
         {authUuid && (
@@ -1038,74 +748,34 @@ export default function Dashboard() {
         </Dialog>
 
         {/* Feedback Drawer */}
-        <FeedbackDrawer
-          open={drawerOpen}
-          selectedDate={selectedDate}
-          sessionsForSelectedDay={sessionsForSelectedDay}
-          otherGroupSessions={otherGroupSessions}
-          selectedDayStatus={selectedDayStatus}
-          dayKm={dayKm}
+        <DashboardFeedbackContainer
+          drawerOpen={drawerOpen}
           activeSessionId={activeSessionId}
           detailsOpen={detailsOpen}
-          draftState={draftState}
-          saveState={saveState}
+          setActiveSessionId={setActiveSessionId}
+          setDetailsOpen={setDetailsOpen}
+          setDrawerOpen={setDrawerOpen}
+          onCloseDay={closeDay}
+          onOpenSession={openSession}
+          selectedDate={selectedDate}
+          selectedISO={selectedISO}
+          sessionsForSelectedDay={sessionsForSelectedDay}
+          otherGroupSessions={otherGroupSessions}
+          assignments={assignments}
+          selectedDayStatus={selectedDayStatus}
+          dayKm={dayKm}
           isPending={isPending}
           logsBySessionId={logsBySessionId}
           getLogForSession={getLogForSession}
-          onClose={closeDay}
-          onOpenSession={openSession}
-          onCloseSession={() => {
-            setActiveSessionId(null);
-            setDetailsOpen(false);
-          }}
-          onToggleDetails={() => setDetailsOpen((v) => !v)}
-          onMarkAbsent={markAbsent}
-          onMarkPresent={markPresent}
-          onClearOverride={clearOverride}
-          onSaveFeedback={saveFeedback}
-          onDeleteFeedback={(sessionId) => {
-            const existing = getLogForSession(sessionId);
-            if (existing?.id) {
-              deleteMutation.mutate(Number(existing.id));
-              setActiveSessionId(null);
-              setDetailsOpen(false);
-              setTimeout(() => {
-                setDrawerOpen(false);
-              }, 400);
-            }
-          }}
-          onDraftStateChange={setDraftState}
           getSessionStatus={getSessionStatus}
-          isAbsent={absenceDates.has(selectedISO)}
-          absenceReason={myAbsences.find((a) => a.date === selectedISO)?.reason ?? null}
-          onMarkDayAbsent={(reason) => absenceMutation.mutate({ date: selectedISO, reason })}
-          onRemoveDayAbsence={() => removeAbsenceMutation.mutate(selectedISO)}
-          onSwitchAlternative={(sessionId, assignmentId, title, km) => {
-            setAlternativeOverride({ sessionId, assignmentId, title, km });
-            openSession(sessionId);
-          }}
-          alternativeOverrideTitle={
-            alternativeOverride?.sessionId === activeSessionId
-              ? alternativeOverride.title
-              : null
-          }
-          strengthSessionsForSelectedDay={strengthResolvedByISO.get(selectedISO) ?? []}
-          onOpenStrengthSession={(slotId) => {
-            // Hand off to /strength via sessionStorage. Shallow approach:
-            // - keeps the Dashboard drawer free of focus-mode internals
-            // - preserves the rule "Mon plan reste le point d'entrée"
-            //   (Strength.tsx routes the swimmer onto MyPlanTab and surfaces
-            //   the matching session card)
-            try {
-              sessionStorage.setItem(
-                "eac_pending_strength_focus_slot_id",
-                String(slotId),
-              );
-            } catch {
-              /* private mode / quota → fall back to plain navigation */
-            }
-            navigate("/strength");
-          }}
+          isAbsent={isAbsent}
+          absenceReason={absenceReason}
+          strengthSessionsForSelectedDay={strengthSessionsForSelectedDay}
+          onOpenStrengthSession={onOpenStrengthSession}
+          user={user}
+          userId={userId}
+          setAttendanceOverrideBySessionId={setAttendanceOverrideBySessionId}
+          stableDurationMin={stableDurationMin}
         />
 
       </div>
