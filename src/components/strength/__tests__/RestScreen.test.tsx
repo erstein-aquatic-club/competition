@@ -41,7 +41,6 @@ const defaultProps = {
   nextBlock: null,
   targetWeight: 80,
   muscleTags: ["Pectoraux", "Triceps"],
-  note: null,
   items: [block],
   logs,
   exercises: [exercise],

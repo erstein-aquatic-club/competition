@@ -20,7 +20,6 @@ export interface RestScreenProps {
   nextBlock: StrengthSessionItem | null;
   targetWeight: number;
   muscleTags: string[];
-  note: string | null | undefined;
   items: StrengthSessionItem[];
   logs: SetLogEntry[];
   exercises: Exercise[];
@@ -53,7 +52,6 @@ export function RestScreen({
   nextBlock,
   targetWeight,
   muscleTags,
-  note,
   items,
   logs,
   exercises,
@@ -218,7 +216,6 @@ export function RestScreen({
               block={displayBlock}
               targetWeight={targetWeight}
               muscleTags={muscleTags}
-              note={note}
               isTransition={restType === "exercise"}
               athleteNote={athleteNote}
               exerciseId={exerciseId}

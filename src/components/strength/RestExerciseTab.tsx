@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { StickyNote, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { ExerciseGif } from "./ExerciseGif";
 import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 
@@ -8,7 +8,6 @@ export interface RestExerciseTabProps {
   block: StrengthSessionItem | null;
   targetWeight: number;
   muscleTags: string[];
-  note: string | null | undefined;
   isTransition: boolean;
   athleteNote: string;
   exerciseId: number;
@@ -25,7 +24,6 @@ export function RestExerciseTab({
   block,
   targetWeight,
   muscleTags,
-  note,
   isTransition,
   athleteNote,
   exerciseId,
@@ -104,19 +102,6 @@ export function RestExerciseTab({
           ))}
         </div>
       )}
-
-      {/* Coach notes */}
-      {note ? (
-        <div className="rounded-2xl bg-card border border-border/50 p-3.5 flex gap-2.5 items-start shadow-sm">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <StickyNote className="h-3.5 w-3.5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Note coach</p>
-            <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{note}</p>
-          </div>
-        </div>
-      ) : null}
 
       {/* Athlete note — editable */}
       {onUpdateNote && exerciseId > 0 && (

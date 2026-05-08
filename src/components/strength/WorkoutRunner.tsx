@@ -1061,11 +1061,11 @@ export function WorkoutRunner({
         </div>
       </Card>
 
-      {(currentBlock?.notes || currentExerciseDef?.description) && (
+      {currentExerciseDef?.description && (
         <div className="rounded-2xl border bg-muted/10 px-4 py-3">
-          <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">Notes</p>
+          <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">Description</p>
           <p className="text-sm text-muted-foreground">
-            {currentBlock?.notes || currentExerciseDef?.description}
+            {currentExerciseDef.description}
           </p>
         </div>
       )}
@@ -1119,7 +1119,6 @@ export function WorkoutRunner({
           nextBlock={nextBlock}
           targetWeight={targetWeight}
           muscleTags={muscleTags}
-          note={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? null}
           athleteNote={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? ""}
           exerciseId={currentBlock?.exercise_id ?? -1}
           onUpdateNote={onUpdateNote}

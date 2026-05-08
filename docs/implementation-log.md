@@ -4,6 +4,83 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §195 — Fix duplication note coach ↔ note athlète sur l'écran de repos muscu (2026-05-08)
+
+**Contexte :** plainte utilisateur — « Quand j'ajoute un commentaire athlete sur mon temps de pause en vue athlete focus, le texte se duplique dans la zone "notes coach" ». La vue focus muscu (`WorkoutRunner`) affiche un `RestScreen` entre chaque série, qui contient un onglet "Exercice" (`RestExerciseTab`) avec **deux** zones distinctes : "Note coach" (lecture seule, attachée à l'item de séance) et "Ma note" (textarea athlète éditable, persistée par exercice).
+
+### Cause racine
+
+Dans `WorkoutRunner.tsx:1122-1123`, les deux props pointaient sur la même source :
+
+```tsx
+note={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? null}      // ← prop "Note coach"
+athleteNote={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? ""} // ← prop "Ma note"
+```
+
+Or `exerciseNotes` est dérivé **exclusivement** de `one_rm_records.notes` côté athlète (`Strength.tsx:353-359`, `useMemo` qui réduit `oneRMs` en `Record<exerciseId, notes>`). Le textarea "Ma note" écrit dans cette même table via `updateNote` mutation (debounce 800 ms dans `RestExerciseTab.tsx:43-52`). Conséquence : à chaque frappe →
+
+1. `setLocalAthleteNote(value)` (mise à jour locale immédiate)
+2. 800 ms plus tard → `onUpdateNote(exerciseId, value)` → `updateNote.mutate({ exercise_id, notes })`
+3. UPDATE `one_rm_records.notes` → invalidation cache → `oneRMs` refetch
+4. `exerciseNotes` recalculé via `useMemo`
+5. `RestScreen` re-render avec `note={exerciseNotes[...]}` et `athleteNote={exerciseNotes[...]}` désormais identiques
+6. Les deux zones affichent le même texte (l'utilisateur croit que sa note s'est dupliquée dans la note coach).
+
+La vraie note coach pour un exercice de séance muscu est `StrengthSessionItem.notes` (champ saisi par le coach dans le builder de séance). C'est d'ailleurs ce que la **vue focus principale** (hors écran de repos) lit déjà à `WorkoutRunner.tsx:1064` :
+
+```tsx
+{(currentBlock?.notes || currentExerciseDef?.description) && (
+  <div className="...">
+    <p className="...">Notes</p>
+    <p>{currentBlock?.notes || currentExerciseDef?.description}</p>
+  </div>
+)}
+```
+
+L'incohérence ne touchait donc que le `RestScreen`.
+
+### Changement (fix initial)
+
+| Fichier | Changement |
+|---|---|
+| `src/components/strength/WorkoutRunner.tsx` | Ligne 1122 : `note={exerciseNotes?.[currentBlock?.exercise_id ?? -1] ?? null}` → `note={currentBlock?.notes ?? null}`. `athleteNote` inchangé (continue à lire `exerciseNotes`). 1 ligne. |
+
+### Cleanup associé (demandé par l'utilisateur)
+
+Suite au fix, l'utilisateur a demandé de **nettoyer tous les affichages "note coach"** côté athlète : « il n'y en a pas pour l'instant ». Le coach peut techniquement saisir des notes par exercice via le builder (`StrengthExerciseCard.tsx:160-167`, Textarea "Notes" → `StrengthSessionItem.notes`), mais en pratique aucune n'est saisie. Plutôt que d'afficher des zones vides, on retire l'UI côté athlète. La saisie côté builder est conservée intacte (au cas où la feature serait remise à plat plus tard, le JSX d'affichage est trivial à restaurer).
+
+| Fichier | Changement |
+|---|---|
+| `src/components/strength/WorkoutRunner.tsx` | Vue focus principale (avant ligne 1064) : `{(currentBlock?.notes \|\| currentExerciseDef?.description) && ...}` → `{currentExerciseDef?.description && ...}`. Le label "Notes" devient "Description" (cohérent avec la source réelle = description du catalogue d'exercices). Suppression de la prop `note={currentBlock?.notes ?? null}` du `<RestScreen>`. |
+| `src/components/strength/RestScreen.tsx` | Suppression de la prop `note: string \| null \| undefined` de l'interface, du destructuring et du passage à `<RestExerciseTab>`. |
+| `src/components/strength/RestExerciseTab.tsx` | Suppression de la prop `note`, de l'import `StickyNote` (lucide-react) et du bloc JSX "Note coach" complet (~12 lignes). |
+| `src/components/strength/__tests__/RestExerciseTab.test.tsx` | Suppression du test "renders coach notes" + retrait des `note={null}` des autres tests. |
+| `src/components/strength/__tests__/RestScreen.test.tsx` | Retrait de `note: null` du fixture défaut. |
+
+### Validation
+
+- `npx tsc --noEmit` clean.
+- Pas de test ajouté : `RestScreen.test.tsx` et `RestExerciseTab.test.tsx` utilisent `node:test` (pas vitest), donc invisibles dans `npm test` (mais bien typés par tsc).
+- Pas de migration DB, pas de nouvelle dépendance.
+- Le champ `StrengthSessionItem.notes` reste écrivable côté builder coach (`StrengthExerciseCard.tsx:160-167` Textarea "Notes" + `StrengthPlanningTimeline.tsx:394` aperçu coach). Aucune perte de feature côté coach.
+
+### Méthode
+
+`superpowers:systematic-debugging` Phase 1 (root cause) :
+
+1. Read `RestScreen.tsx` → confirme que les deux zones consomment des props distinctes (`note` et `athleteNote`).
+2. Read `RestExerciseTab.tsx` → "Note coach" affiche `note`, "Ma note" textarea écrit via `onUpdateNote(exerciseId, value)`.
+3. Grep `exerciseNotes` + `onUpdateNote` dans `WorkoutRunner.tsx` → mismatch de source identifié à la ligne 1122-1123.
+4. Read `Strength.tsx:353-359` → confirme que `exerciseNotes` est alimenté par `oneRMs.notes` (athlète).
+5. Read `WorkoutRunner.tsx:1064-1071` → confirme que la vue focus principale utilise déjà `currentBlock?.notes` pour la note coach.
+
+5 lectures ciblées, 0 agent spawné, fix d'une ligne. Phase 4 directe (pas besoin de Phase 2 patterns vu que le code voisin de la même page expose déjà le pattern correct).
+
+### Limites
+
+- Le textarea "Ma note" reste persisté dans `one_rm_records.notes` (par exercice, pas par séance). Si à terme le besoin émerge d'avoir une note athlète **par séance** (ou par série) plutôt que par exercice, ce sera un chantier séparé (nouvelle table ou nouveau champ).
+- Si un coach commence à saisir des notes par exercice via le builder, il faudra réintroduire l'affichage côté athlète (vue focus principale + écran de repos). Le code est trivialement restaurable depuis l'historique git.
+
 ## §194-vagueC — Tag SW per-notif + gate focused contextuel + fix auth 401 push-send (2026-05-08)
 
 **Contexte :** Vagues A et B livrées (centre vidé à 49 notifs visibles, push subscriptions désormais rafraîchies au boot). Vague C devait corriger 2 défauts UX du SW. **En vérifiant les logs Edge Function, découverte d'une cause racine majeure non identifiée à l'audit initial** : tous les appels webhook `push-send` (cron + triggers) retournaient **401 systématiquement** depuis au moins plusieurs jours. Cause : la vault key `push_edge_function_key` (utilisée par le trigger pg_net 00044) ne correspondait plus à l'env `SUPABASE_SERVICE_ROLE_KEY` côté Edge Function. Conséquence : **aucune notif automatique ne déclenchait de push** (wellness matin, slot reminder, assignations, interviews, swimmer comments → 401 silencieux). Seuls les broadcasts coach manuels (via `supabase.functions.invoke` avec JWT user) fonctionnaient. C'est l'explication structurelle de "pas systématiquement".

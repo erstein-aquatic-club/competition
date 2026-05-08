@@ -30,7 +30,6 @@ test("renders exercise name and prescription values", () => {
       block={block}
       targetWeight={80}
       muscleTags={[]}
-      note={null}
       isTransition={false}
       athleteNote=""
       exerciseId={1}
@@ -51,7 +50,6 @@ test("renders muscle tags", () => {
       block={block}
       targetWeight={0}
       muscleTags={["Pectoraux", "Triceps", "Épaules"]}
-      note={null}
       isTransition={false}
       athleteNote=""
       exerciseId={1}
@@ -63,26 +61,6 @@ test("renders muscle tags", () => {
   assert.ok(markup.includes("Épaules"), "should include muscle tag Épaules");
 });
 
-test("renders coach notes", () => {
-  const markup = renderToStaticMarkup(
-    <RestExerciseTab
-      exercise={exercise}
-      block={block}
-      targetWeight={0}
-      muscleTags={[]}
-      note="Contrôler la descente sur 3 secondes"
-      isTransition={false}
-      athleteNote=""
-      exerciseId={1}
-    />,
-  );
-
-  assert.ok(
-    markup.includes("Contrôler la descente sur 3 secondes"),
-    "should include coach note text",
-  );
-});
-
 test("shows 'Exercice en cours' when isTransition=false", () => {
   const markup = renderToStaticMarkup(
     <RestExerciseTab
@@ -90,7 +68,6 @@ test("shows 'Exercice en cours' when isTransition=false", () => {
       block={block}
       targetWeight={0}
       muscleTags={[]}
-      note={null}
       isTransition={false}
       athleteNote=""
       exerciseId={1}
@@ -114,7 +91,6 @@ test("shows 'Prochain exercice' when isTransition=true", () => {
       block={block}
       targetWeight={0}
       muscleTags={[]}
-      note={null}
       isTransition={true}
       athleteNote=""
       exerciseId={1}
