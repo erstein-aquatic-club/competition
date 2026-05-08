@@ -4,6 +4,38 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §206 — Fix crash Radix `SelectLabel` dans CoachMessagesScreen (2026-05-08)
+
+**Contexte :** retour utilisateur après tests visuels post-§204+§205. En cliquant sur le quick access "Comms" depuis le hub coach (`Coach.tsx:454`), l'ErrorBoundary attrape une erreur Radix UI : `\`SelectLabel\` must be used within \`SelectGroup\``. Bug latent (probablement présent depuis la refonte §196 ou un durcissement Radix récent), jamais déclenché car ce path n'avait pas été testé avec les versions actuelles.
+
+**Cause racine :**
+`CoachMessagesScreen.tsx:167-182` utilisait des fragments `<>...</>` autour des `<SelectLabel>` + `<SelectItem>` :
+```tsx
+{groupOptions.length ? (
+  <>
+    <SelectLabel>Groupes</SelectLabel>     // ❌ pas dans SelectGroup
+    {groupOptions.map((g) => <SelectItem .../>)}
+  </>
+) : null}
+```
+
+Radix UI exige depuis quelques versions que `SelectLabel` soit enfant direct de `SelectGroup` pour assurer l'accessibilité screen readers (label rattaché à un groupe ARIA).
+
+**Fix :**
+- Ligne 9 : ajout de `SelectGroup` à l'import depuis `@/components/ui/select`.
+- Lignes 167-182 : remplacement des fragments par `<SelectGroup>...</SelectGroup>` autour de chaque section (Groupes, Nageurs).
+
+**Pourquoi cela ne s'était pas vu en §196 :**
+La refonte §196 du composant CoachMessagesScreen avait conservé le pattern `<>...<SelectLabel>...</>` du code d'origine. Tests vitest n'exercent pas ce composant en `mount` complet (juste vérifient les hooks). `tsc --noEmit` passe car Radix accepte `SelectLabel` comme ReactNode. L'erreur est strictement runtime.
+
+**Tests :** `npx tsc --noEmit` clean. Pas de modif aux tests existants.
+
+**Fichiers modifiés (1)** : `src/pages/coach/CoachMessagesScreen.tsx`.
+
+**Investigation supplémentaire** : grep de tous les `SelectLabel` dans le codebase confirme que CoachMessagesScreen était le seul usage hors `ui/select.tsx` lui-même. Pas d'autre call-site à fixer.
+
+---
+
 ## §205 — Chantier C suite : migration hardcodes rang 6-12 (2026-05-08)
 
 **Contexte :** suite §202 (rang 1-5). Chantier C continue sur 6 fichiers de rang 6-12 du top contributeurs hardcodes selon audit shared. Sub-agent sonnet en parallèle de §204.

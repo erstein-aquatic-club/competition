@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type CoachMessagesScreenProps = {
   onBack?: () => void;
@@ -165,20 +165,20 @@ const CoachMessagesScreen = ({
           </SelectTrigger>
           <SelectContent>
             {groupOptions.length ? (
-              <>
+              <SelectGroup>
                 <SelectLabel>Groupes</SelectLabel>
                 {groupOptions.map((g) => (
                   <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
                 ))}
-              </>
+              </SelectGroup>
             ) : null}
             {athleteOptions.length ? (
-              <>
+              <SelectGroup>
                 <SelectLabel>Nageurs</SelectLabel>
                 {athleteOptions.map((a) => (
                   <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
                 ))}
-              </>
+              </SelectGroup>
             ) : null}
           </SelectContent>
         </Select>
