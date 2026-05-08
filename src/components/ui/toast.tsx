@@ -22,10 +22,10 @@ ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 // ── Dot color by variant ──────────────────────────────────────
 
 const dotColors = {
-  default: "bg-emerald-500",
-  destructive: "bg-red-500",
-  warning: "bg-amber-500",
-  info: "bg-blue-500",
+  default: "bg-status-success",
+  destructive: "bg-status-error",
+  warning: "bg-status-warning",
+  info: "bg-intensity-prog",
 } as const
 
 type ToastVariant = keyof typeof dotColors

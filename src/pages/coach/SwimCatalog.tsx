@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { SwimSessionBuilder } from "@/components/coach/swim/SwimSessionBuilder";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Loader2, Plus, Route, Search, Timer, Trash2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
@@ -832,10 +833,7 @@ export default function SwimCatalog({
 
         <div className="mt-4">
           {showArchive && !sessionsLoading && visibleSessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Archive className="h-10 w-10 mb-3 opacity-40" />
-              <p className="text-sm">Aucune séance archivée</p>
-            </div>
+            <EmptyState icon={<Archive />} title="Aucune séance archivée" />
           ) : (
           <SessionListView
             sessions={visibleSessions}

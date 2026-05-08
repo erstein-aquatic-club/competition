@@ -4,6 +4,31 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §225 — Polish post-audit (toast tokens + SwimCatalog empty state) (2026-05-08)
+
+**Contexte :** suite à l'audit pass 2 (§215). Polish bonus identifié dans le rapport : régression mineure `toast.tsx dotColors` (4 hardcodes `bg-emerald-500/red-500/amber-500/blue-500`) et empty state ad hoc dans SwimCatalog (4 lignes `<div Archive /><p>` au lieu d'`<EmptyState>`). Patch ciblé low-effort/high-cohérence.
+
+**Changements :**
+
+- `src/components/ui/toast.tsx:24-29` — `dotColors` map migrée vers tokens sémantiques :
+  - `default: bg-emerald-500` → `bg-status-success`
+  - `destructive: bg-red-500` → `bg-status-error`
+  - `warning: bg-amber-500` → `bg-status-warning`
+  - `info: bg-blue-500` → `bg-intensity-prog` (token bleu sémantique progression défini `index.css:148` HSL 220 70% 50%, déjà utilisé pour FeedbackDrawer banner Note du coach §222)
+- `src/pages/coach/SwimCatalog.tsx:834-838` — empty state archive ad hoc (`<div flex-col py-12><Archive h-10/><p text-sm/></div>`) → `<EmptyState icon={<Archive />} title="Aucune séance archivée" />` + ajout `import { EmptyState } from "@/components/shared/EmptyState"`. 5e call-site EmptyState (vs 4 initialement post-§203/§204) → adoption progressive.
+
+**Hors scope §225** :
+- `src/components/shared/SafeArea.tsx` suppression — Tailwind 4 ici ne dispose pas de `pb-safe`/`pt-safe` natif (le codebase utilise des arbitrary values `pb-[env(safe-area-inset-bottom)]`). La migration nécessite plus qu'un simple swap. Reportée.
+- `src/pages/coach/SwimCatalog.tsx:684-688` header "Coach / Création" inline → `<CoachSectionHeader>` — visuellement intrusif (CoachSectionHeader utilise `text-2xl` vs `text-base` actuel). Décision UX nécessaire avant migration. Reporté.
+- `src/components/shared/ObjectiveCard.tsx:31-37` `STROKE_BORDER_TOP` — nécessite création de tokens `--tag-stroke-{nl,dos,br,pap,qn}` (§226).
+
+**Vérifications :**
+- `npx tsc --noEmit` : ✅ clean
+- `npm test` : 684/685 pass + 1 fail pré-existant
+- Diff : 2 fichiers modifiés.
+
+**Fichiers modifiés (2)** : `src/components/ui/toast.tsx`, `src/pages/coach/SwimCatalog.tsx`. **Doc** : `docs/implementation-log.md`, `CLAUDE.md`, `docs/ROADMAP.md`.
+
 ## §224 — P0 transverses + typo régressions P1 post-audit pass 2 (2026-05-08)
 
 **Contexte :** suite à l'audit pass 2 (§215, `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md`). 4 régressions P0/P1 ciblées identifiées dans le rapport, 2 d'entre elles étant transverses (impact app-wide). Patch ciblé low-effort/high-ROI. Coach.tsx:1151 (5e régression P0 typo CardTitle uppercase italic fallback "Accès Coach") reporté à un § ultérieur car interférait avec §223 (RPC coach-KPIs) en parallèle.

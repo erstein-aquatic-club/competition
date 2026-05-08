@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§224** — P0 transverses post-audit pass 2 : SelectTrigger h-11 + cluster AthletePlansTab h-7→h-11 + 3 typo régressions sentence-case (AwaitingApproval, ComingSoon, SlotSessionSheet).
+Dernier § livré : **§225** — Polish post-audit : toast.tsx dotColors → status-* + intensity-prog, SwimCatalog empty state → EmptyState (5e call-site).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
