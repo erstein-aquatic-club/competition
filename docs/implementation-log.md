@@ -4,6 +4,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §196 — Redesign vues Messages — iOS Mail light (2026-05-08)
+
+**Contexte :** Les deux vues "Messages" jugées trop chargées sur mobile. Vue nageur : pattern split (card détail fixe + liste) confus + trop de Cards. Vue coach : 3 Cards inutiles autour des champs.
+
+**Changements :**
+- NEW helper `formatRelativeDate(value, now?)` dans `src/lib/date.ts` : format relatif (il y a Xm/Xh, hier, lun., jj/mm), guard date future (fallback jj/mm), commentaire TZ assumption, réutilise `pad2`. 7 tests dans `date.test.ts`.
+- `SwimmerMessagesView.tsx` (357 → 350 lignes) : suppression card détail fixe en haut ; accordion inline au tap (`isExpanded`) avec message complet + CTA conditionnel ; header épuré (ArrowLeft aria-label, h2, Badge unreadCount, Trash2 icon-only) ; dismiss par item (`handleDismissOne`, bouton X `absolute` hors du bouton principal, `e.stopPropagation`) ; `unreadCount` via `useMemo` ; `formatRelativeDate` à la place de l'ancien helper inline.
+- `CoachMessagesScreen.tsx` (264 → 244 lignes) : suppression des 3 Cards (Destinataire, Notification, Info) ; champs `Label`+field directs dans la page (`space-y-5`) ; Card info "appareils abonnés" retirée ; `text-2xl` aligné sur le pattern projet ; CTA sticky conservé avec classes `sm:` responsive.
+
+**Tests :** 683 pass, 1 fail pré-existant `transformers.test.ts`. `npx tsc --noEmit` clean.
+
+**Commits :** `792daec69` (formatRelativeDate), `0b73833a8` (fix guard+pad2), `ad1cabde9` (SwimmerMessagesView), `9f9a1aca2` (fix button nesting+memo), `2b707d543` (CoachMessagesScreen), `ba43616c1` (fix text-2xl+sm:)
+
+---
+
 ## §195 — Fix duplication note coach ↔ note athlète sur l'écran de repos muscu (2026-05-08)
 
 **Contexte :** plainte utilisateur — « Quand j'ajoute un commentaire athlete sur mon temps de pause en vue athlete focus, le texte se duplique dans la zone "notes coach" ». La vue focus muscu (`WorkoutRunner`) affiche un `RestScreen` entre chaque série, qui contient un onglet "Exercice" (`RestExerciseTab`) avec **deux** zones distinctes : "Note coach" (lecture seule, attachée à l'item de séance) et "Ma note" (textarea athlète éditable, persistée par exercice).

@@ -52,6 +52,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/offlineQueue.ts` | Queue localStorage pour mutations offline — `enqueue`, `getQueue`, `markRetry`, dispatche `eac-offline-queue-updated` (§162) | 113 lignes |
 | `src/components/shared/OfflineMutationSync.tsx` | Rejoue la queue offline au retour réseau ET sur `eac-offline-queue-updated` (§162) | 168 lignes |
 | `src/lib/features.ts` | Feature flags | 5 lignes |
+| `src/lib/date.ts` | Helpers de date : `formatSwimSessionDefaultTitle`, `toISODate`, `computeTrainingDaysRemaining`, `formatRelativeDate` (§196) | 86 lignes |
+| `src/lib/__tests__/date.test.ts` | Tests unitaires des helpers de date (formatSwimSessionDefaultTitle, formatRelativeDate) | 52 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | |
 | `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |
 | `src/pages/Dashboard.tsx` | Calendrier natation nageur (ex-Accueil, route /natation) | ~1055 lignes |
@@ -216,7 +218,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/SwimPlanningDemo.tsx` | Planning natation coach — sélecteur nageur/groupe + override mode (§153), consomme `useSwimPlanningAthleteMode` | ~1034 lignes |
 | `src/components/coach/swim/SwimPlanningTimeline.tsx` | Timeline semaines + micro-grille jour × créneau + chips filière (présentationnel, partagé coach/nageur) — ring+icon override, opacity inherited, `readOnly` (§153) | ~780 lignes |
 | `src/components/coach/swim/swimPlanningShared.ts` | Helpers/constantes partagés timeline swim (WeekInfo, DAY_ROWS, getMonday, generateWeeks, fmtDD_MM, isCurrentWeek) | ~75 lignes |
-| `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach | ~264 lignes |
+| `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach (formulaire épuré sans Cards, §196) | 244 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
 | `src/components/dashboard/SwimExerciseLogsHistory.tsx` | Historique logs exercices nage | ~505 lignes |
@@ -235,7 +237,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/TrainingLoadChart.tsx` | Graphe charge entraînement | ~291 lignes |
 | `src/components/coach/WellnessTrend.tsx` | Tendance wellness | ~289 lignes |
 | `src/components/profile/AthletePerformanceHub.tsx` | Hub performances athlète | ~546 lignes |
-| `src/components/profile/SwimmerMessagesView.tsx` | Vue messages nageur | ~338 lignes |
+| `src/components/profile/SwimmerMessagesView.tsx` | Vue messages nageur (accordion inline, dismiss par item, §196) | 350 lignes |
 | `src/components/profile/BadgesGrid.tsx` | Grille badges/achievements | ~228 lignes |
 | `src/components/shared/SwimmerWeekSlots.tsx` | Créneaux semaine nageur (vue détaillée jour par jour, swipe semaine) | ~563 lignes |
 | `src/components/shared/SwimmerWeekMatrixCard.tsx` | Card "Ma semaine" compacte nageur — slots via `get_swimmer_sessions` (per-swimmer) + ressentis via `api.getSessions` (RPC retourne `log_session_id=NULL` inconditionnel) (§190 + §190-fix + §190-fix2) | 459 lignes |
