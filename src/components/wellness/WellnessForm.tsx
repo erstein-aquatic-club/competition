@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Minus, Plus, Check, Moon, Smile, Battery, BatteryLow, Sparkles, Flame, Frown, Laugh, Wind, Zap, Bed, Bandage, Heart, type LucideIcon } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { upsertWellness, computeReadinessScore, getWellnessForDate } from "@/lib/api/wellness";
@@ -115,6 +115,9 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
   // Success state: show gauge after save
   const [savedScore, setSavedScore] = useState<number | null>(null);
 
+  // §211 — guard prefers-reduced-motion (skip slide-in pour accessibilité OS).
+  const reduceMotion = useReducedMotion();
+
   const stateMap: Record<string, [number, (v: number) => void]> = {
     sleep_quality: [sleepQuality, setSleepQuality],
     fatigue: [fatigue, setFatigue],
@@ -187,9 +190,9 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
   // ── Form view ────────────────────────────────────────────────
   return (
     <motion.div
-      variants={slideInFromBottom}
-      initial="hidden"
-      animate="visible"
+      variants={reduceMotion ? undefined : slideInFromBottom}
+      initial={reduceMotion ? false : "hidden"}
+      animate={reduceMotion ? false : "visible"}
       className="space-y-5 pb-4"
     >
       {/* 1-5 rated items */}

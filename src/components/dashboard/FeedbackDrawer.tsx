@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useDragControls } from "framer-motion";
+import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
 import { X, Waves, Check, Circle, UserX, FileText, UserCheck, Minus, Plus, Sun, Moon, ChevronDown, Trash2, MessageCircle, Clock, ChevronRight, PenLine, Dumbbell } from "lucide-react";
 import { useLocation } from "wouter";
 import { BottomActionBar, type SaveState } from "@/components/shared/BottomActionBar";
@@ -474,6 +474,8 @@ export function FeedbackDrawer({
   // Use getLogForSession helper if provided, fallback to direct lookup
   const getLog = getLogForSessionProp ?? ((id: string) => logsBySessionId[id]);
   const dragControls = useDragControls();
+  // §211 — guard prefers-reduced-motion (skip slide-in + stagger).
+  const reduceMotion = useReducedMotion();
   const [, setLocation] = useLocation();
   const [unexpectedExpanded, setUnexpectedExpanded] = useState(false);
   const [otherGroupExpanded, setOtherGroupExpanded] = useState(false);
@@ -603,10 +605,10 @@ export function FeedbackDrawer({
               // Desktop: drawer à droite
               "sm:right-0 sm:top-0 sm:left-auto sm:bottom-auto sm:h-full sm:w-full sm:max-w-xl sm:rounded-none"
             )}
-            variants={slideInFromBottom}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            variants={reduceMotion ? undefined : slideInFromBottom}
+            initial={reduceMotion ? false : "hidden"}
+            animate={reduceMotion ? false : "visible"}
+            exit={reduceMotion ? undefined : "exit"}
             drag="y"
             dragControls={dragControls}
             dragListener={false}
@@ -1218,9 +1220,9 @@ export function FeedbackDrawer({
 
                               <motion.div
                                 className="space-y-4"
-                                variants={staggerChildren}
-                                initial="hidden"
-                                animate="visible"
+                                variants={reduceMotion ? undefined : staggerChildren}
+                                initial={reduceMotion ? false : "hidden"}
+                                animate={reduceMotion ? false : "visible"}
                               >
                                 {INDICATORS.map((ind) => {
                                   const selected = draftState[ind.key];

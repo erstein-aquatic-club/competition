@@ -4,6 +4,67 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §211+§212+§213 — Polish bonus post-audit (2026-05-08)
+
+**Contexte :** suite §210 (Chantier D livré). Trois polish items non-structurels du plan d'audit, dispatchés en parallèle. §212+§213 réalisés par sub-agents sonnet, §211 réalisé en main (sub-agent stallé après 600s).
+
+### §211 — `prefers-reduced-motion` guards
+
+**Cible** : 3 fichiers les plus visibles avec animations stagger / slide-in (autres fichiers `motion.div` reportés à §214+).
+
+- `src/pages/SwimmerHome.tsx` — import `useReducedMotion` from framer-motion + `const reduceMotion = useReducedMotion()`. Stagger principal (lignes ~547-551) : `initial`/`animate`/`variants` conditionnés sur `reduceMotion ? undefined/false : staggerChildren/"hidden"/"visible"`.
+- `src/components/wellness/WellnessForm.tsx` — même pattern sur le `<motion.div>` racine du form (slideInFromBottom ligne 190).
+- `src/components/dashboard/FeedbackDrawer.tsx` — 2 spots : sheet bottom (ligne 606 slideInFromBottom + drag) et stagger interne indicateurs (ligne 1219). `exit="exit"` aussi guardé pour skip animation de fermeture.
+
+Pattern : `variants={reduceMotion ? undefined : staggerChildren}`. framer-motion respecte `false` pour initial/animate (skip animation, applique le state final immédiat).
+
+### §212 — Theme segmented control 3 segments
+
+**Cible** : `src/pages/Profile.tsx` `ThemeSelector` (~lignes 92-130).
+
+- Remplacement du `<Select>` shadcn dropdown (2 taps : ouvrir + choisir) par `<ToggleGroup type="single">` + 3× `<ToggleGroupItem>` (1 tap iOS-style).
+- Import `ToggleGroup, ToggleGroupItem` from `@/components/ui/toggle-group` (composant shadcn déjà présent dans le projet).
+- `handleChange` guarde `if (!value) return` (ToggleGroup peut fire `""` au déselect, on évite la déselection involontaire).
+- Labels `sr-only` sur mobile (`sr-only sm:not-sr-only sm:ml-1.5 text-xs`) → mobile = 3 icons, desktop = icon + label.
+- Active state : `data-[state=on]:bg-background data-[state=on]:shadow-sm` (pill iOS-style sélectionné).
+- `Select` import préservé (utilisé ailleurs dans Profile.tsx ligne ~748 pour group selection admin/coach).
+- Wrapper `rounded-2xl border border-border/70 bg-background/70 px-4 py-3` cohérence ProfileActionRow conservée.
+
+### §213 — Search bars clear button iOS-style
+
+**Cible** : 3 search inputs dans les bibliothèques coach.
+
+- `src/pages/coach/SwimCatalog.tsx` — search bar inline (input natif).
+- `src/pages/coach/StrengthCatalog.tsx` — search onglet "sessions" (input natif).
+- `src/components/coach/strength/AthletePlansTab.tsx` — search nageur (input natif).
+
+Pattern uniforme appliqué :
+```tsx
+<div className="relative flex-1">
+  <input ... className="... pr-7" />
+  {searchQuery && (
+    <button
+      type="button"
+      onClick={() => setSearchQuery("")}
+      className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      aria-label="Effacer la recherche"
+    >
+      <X className="h-3.5 w-3.5" />
+    </button>
+  )}
+</div>
+```
+
+Import `X` ajouté dans le bloc lucide-react existant des 3 fichiers.
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass + 1 fail pré-existant `transformers.test.ts:18` non lié.
+
+**Fichiers modifiés (7)** : SwimmerHome.tsx, WellnessForm.tsx, FeedbackDrawer.tsx (§211) + Profile.tsx (§212) + SwimCatalog.tsx, StrengthCatalog.tsx, AthletePlansTab.tsx (§213).
+
+**Limites (out of scope)** : autres call-sites motion.div (Records, Login, Progress, RunDetailSheet, SessionList, etc.) non guardés — à faire §214+ si besoin. Picker temps custom (m:s:cc) et badge counts bottom nav reportés.
+
+---
+
 ## §210 — SystemBannerStack : queue + priorité pour 4 bandeaux système (2026-05-08)
 
 **Contexte :** suite §198 QW1 (qui avait retiré le doublon `OfflineBanner`/`OfflineDetector`). L'audit shared (`docs/audits/2026-05-08-ui-ux-audit-ios.md`) signalait toujours un problème d'empilement : `UpdateNotification` et `InstallPrompt` ciblent **la même position `top-3`** → si les deux events arrivent ensemble, ils se superposent. Le Chantier D (audit) recommandait un manager unifié `<SystemBannerStack/>` qui n'affiche **qu'un seul banner à la fois** avec priorité fixe.

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,36 +96,37 @@ function ThemeSelector() {
   );
 
   const handleChange = (value: string) => {
+    if (!value) return; // ToggleGroup returns "" on deselect
     setTheme(value);
     localStorage.setItem("eac-theme", value);
     window.dispatchEvent(new Event("eac-theme-change"));
   };
 
-  const current = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[0];
-  const CurrentIcon = current.icon;
-
   return (
     <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-          <CurrentIcon className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Apparence</p>
-          <p className="text-xs text-muted-foreground">{current.label}</p>
-        </div>
-        <Select value={theme} onValueChange={handleChange}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {THEME_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">Apparence</span>
+        <ToggleGroup
+          type="single"
+          value={theme}
+          onValueChange={handleChange}
+          className="rounded-xl bg-muted p-0.5"
+        >
+          {THEME_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <ToggleGroupItem
+                key={opt.value}
+                value={opt.value}
+                aria-label={opt.label}
+                className="rounded-lg px-3 h-9 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              >
+                <Icon className="h-4 w-4" />
+                <span className="sr-only sm:not-sr-only sm:ml-1.5 text-xs">{opt.label}</span>
+              </ToggleGroupItem>
+            );
+          })}
+        </ToggleGroup>
       </div>
     </div>
   );

@@ -20,7 +20,7 @@ import { WellnessBanner } from "@/components/wellness/WellnessBanner";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { slideUp, staggerChildren } from "@/lib/animations";
 import {
   Waves,
@@ -518,6 +518,9 @@ export default function SwimmerHome() {
     [userId],
   );
 
+  // §211 — guard prefers-reduced-motion (skip stagger/slide pour accessibilité OS).
+  const reduceMotion = useReducedMotion();
+
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="mx-auto max-w-lg px-4 pb-4">
@@ -545,9 +548,9 @@ export default function SwimmerHome() {
 
       <motion.div
         className="space-y-5"
-        initial="hidden"
-        animate="visible"
-        variants={staggerChildren}
+        initial={reduceMotion ? false : "hidden"}
+        animate={reduceMotion ? false : "visible"}
+        variants={reduceMotion ? undefined : staggerChildren}
       >
         {/* Section B — Wellness du jour */}
         <motion.div variants={slideUp}>

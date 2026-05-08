@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { SwimSessionBuilder } from "@/components/coach/swim/SwimSessionBuilder";
-import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Loader2, Plus, Route, Search, Timer, Trash2 } from "lucide-react";
+import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Loader2, Plus, Route, Search, Timer, Trash2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useAuth } from "@/lib/auth";
@@ -735,13 +735,25 @@ export default function SwimCatalog({
 
         {/* Search */}
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Rechercher une séance"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="relative flex-1">
+            <input
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground pr-7"
+              placeholder="Rechercher une séance"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Effacer la recherche"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Folder chips + Archive link */}
