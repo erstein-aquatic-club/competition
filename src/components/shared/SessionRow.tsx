@@ -27,7 +27,7 @@ export function SessionRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left hover:bg-accent/50 transition-colors",
+        "group flex min-h-11 items-center gap-2.5 w-full rounded-lg px-2.5 py-2.5 text-left hover:bg-accent/50 transition-colors",
         className,
       )}
     >

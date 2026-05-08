@@ -4,6 +4,53 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §201 — Migration Surface primitive (3/5 composants) (2026-05-08)
+
+**Contexte :** suite §199 Chantier B. La primitive `Surface` posée mais non déployée. Migration partielle de 3 composants "card-like" du top contributeur audit shared. Sub-agent sonnet en parallèle de §200.
+
+**Changements** :
+- `PushPermissionBanner.tsx` : wrapper `rounded-xl border bg-background/95 shadow-lg backdrop-blur` → `<Surface variant="glass" radius="sm" className="...shadow-lg p-4..." />`. Le `border border-border/60` du variant glass remplace le border explicite original.
+- `LoginInstallBanner.tsx` : wrapper `rounded-xl border border-primary/20 bg-primary/5` → `<Surface variant="tinted" radius="sm" />`. Delta intentionnel : `border-primary/15` (Surface tinted) vs `border-primary/20` (original) — aligné sur le token.
+- `ObjectiveCard.tsx` mode **full uniquement** : wrapper `rounded-xl border shadow-sm bg-card border-t-[3px]` → `<Surface variant="solid" radius="sm" interactive className="...border-t-[3px] ${topBorder}..." />`. Mode `compact` (border-l-4) inchangé — trop spécifique, à refondre §202+.
+- `Surface.tsx` : ajout `import * as React from "react"` (corrige `ReferenceError` dans env test `node:test` + `renderToString`, problème latent depuis §199 jamais déclenché par les tests existants).
+
+**Refusés (raisons techniques)** :
+- `UpdateNotification.tsx` : wrapper est un `<motion.div>` framer-motion qui porte les props d'animation (`initial`/`animate`/`exit`/`transition`). Surface n'a pas de prop `as`/`asChild` — wrap intermédiaire aurait cassé l'animation. De plus `rounded-full` (pill) ne correspond à aucun radius standard de Surface.
+- `BottomActionBar.tsx` : wrapper utilise `rounded-t-2xl` (radius top-only). Surface ne supporte que des radius symétriques. Migration aurait produit un rendu non-équivalent (4 coins vs 2 en haut).
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass, 1 fail pré-existant.
+
+**Fichiers modifiés (4)** : `Surface.tsx`, `PushPermissionBanner.tsx`, `LoginInstallBanner.tsx`, `ObjectiveCard.tsx`.
+
+---
+
+## §200 — Audit massif tap targets ≥ 44px (2026-05-08)
+
+**Contexte :** suite §198 QW4 (audit shared signalait ~25 spots sub-44px endémiques). Sub-agent sonnet en parallèle de §201 pour batch-fix les ~12 spots restants identifiés dans le rapport `docs/audits/2026-05-08-ui-ux-audit-ios.md`. Apple HIG 44×44px minimum.
+
+**Changements (12 spots dans 10 fichiers)** :
+
+| Fichier | Ligne | Avant | Après |
+|---|---|---|---|
+| `pages/coach/CoachPaceCalculatorScreen.tsx` | 254, 265, 274 | `h-7` (×3 boutons Zones/Ajust./V4) | `h-11` |
+| `pages/coach/CoachPaceCalculatorScreen.tsx` | 298 | `<Switch className="scale-[0.7] origin-right">` | scale retiré |
+| `components/chrono/ChronoSetup.tsx` | 280, 288, 384, 396 | Steppers `h-10 w-10` (×4) | `h-11 w-11` |
+| `components/strength/WorkoutRunner.tsx` | 902, 913 | Replace + Exit `h-10 w-10` | `h-11 w-11` (cohérence avec difficulty 44 dans même composant) |
+| `components/coach/strength/AthletePlansTab.tsx` | 421, 443 | `size="sm"` (×2) | `size="default"` |
+| `components/wellness/WellnessForm.tsx` | 216 | Pills 1-5 `h-10` | `h-11` |
+| `pages/coach/SlotSessionSheet.tsx` | 1153 | library item sans min-h | `min-h-11` |
+| `components/shared/InfoBubble.tsx` | 30 | trigger `p-0.5` (~16px) | `min-h-11 min-w-11` |
+| `components/profile/SwimmerMessagesView.tsx` | 319 | dismiss `h-7 w-7` | `h-9 w-9` (limite mais bouton small-discret) |
+| `components/shared/ObjectiveDetailSheet.tsx` | 69, 72 | ToggleGroupItem `h-8` | `h-11` |
+| `components/shared/SessionRow.tsx` | 30 | `py-2` (~36px total) | `min-h-11 py-2.5` |
+| `components/ui/tabs.tsx` | 14, 30 | TabsList `h-9` + TabsTrigger no min-h | `min-h-11` sur les deux (préfère min-h pour ne pas casser desktop) |
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass, 1 fail pré-existant.
+
+**Fichiers modifiés (12)** : 10 listés ci-dessus + 2 hits multiples (CoachPace + ChronoSetup).
+
+---
+
 ## §199 — Chantier B : Surface primitive + Sheet drag handle + tokenisation InlineBanner + adoucissement gradients (2026-05-08)
 
 **Contexte :** suite du plan d'audit UX (rapport §197 `docs/audits/2026-05-08-ui-ux-audit-ios.md`). Chantier B = primitive `Surface` partagée + harmonisation des sheets bottom (drag handle iOS + rounded-t-[22px]) + tokenisation `InlineBanner` (top contributeur hardcodes selon audit shared, 25 hits) + suppression des cards baroques signalées par l'audit (Section E SwimmerHome, cards focus WorkoutRunner).

@@ -899,7 +899,7 @@ export function WorkoutRunner({
             isOnline ? "bg-emerald-500" : "bg-red-500"
           )} aria-label={isOnline ? "En ligne" : "Hors ligne"} />
           {onSubstitute && (
-            <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0"
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0"
               onClick={() => withFocusDisclaimer(() => setSubstitutePickerOpen(true))}
               aria-label="Remplacer l'exercice"
             >
@@ -910,7 +910,7 @@ export function WorkoutRunner({
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10 shrink-0"
+              className="h-11 w-11 shrink-0"
               aria-label="Quitter le focus"
               onClick={() => {
                 if (logs.length > 0) {

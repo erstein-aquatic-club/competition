@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Share, Plus } from "lucide-react";
+import { Surface } from "@/components/shared/Surface";
 
 const DISMISS_KEY = "eac-login-install-dismissed";
 
@@ -63,7 +64,11 @@ export function LoginInstallBanner() {
   if (!visible) return null;
 
   return (
-    <div className="w-full max-w-md mx-auto mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+    <Surface
+      variant="tinted"
+      radius="sm"
+      className="w-full max-w-md mx-auto mt-4 px-4 py-3"
+    >
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground">
@@ -102,6 +107,6 @@ export function LoginInstallBanner() {
           <X className="h-4 w-4" />
         </button>
       </div>
-    </div>
+    </Surface>
   );
 }

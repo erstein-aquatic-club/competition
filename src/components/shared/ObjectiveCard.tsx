@@ -24,6 +24,7 @@ import {
   parseObjectiveForPace,
   type ParsedObjectiveTarget,
 } from "@/lib/objective-pace-link";
+import { Surface } from "@/components/shared/Surface";
 
 // ── Stroke colors (top border) ──────────────────────────────────
 
@@ -231,12 +232,16 @@ export function ObjectiveCard({
 
   // ── Card (for grid layout) ──
   return (
-    <Tag
-      type={onClick ? "button" : undefined}
+    <Surface
+      variant="solid"
+      radius="sm"
+      interactive
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       className={[
-        "w-full text-left rounded-xl border shadow-sm bg-card overflow-hidden",
+        "w-full text-left overflow-hidden shadow-sm hover:shadow-md",
         topBorder ? `border-t-[3px] ${topBorder}` : "",
-        "transition-all hover:shadow-md active:scale-[0.98]",
+        "transition-all",
       ].join(" ")}
       onClick={onClick}
     >
@@ -363,7 +368,7 @@ export function ObjectiveCard({
           );
         })()}
       </div>
-    </Tag>
+    </Surface>
   );
 }
 

@@ -316,7 +316,7 @@ export default function SwimmerMessagesView({
                   <button
                     type="button"
                     onClick={() => handleDismissOne(notification.target_id!)}
-                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     aria-label="Masquer"
                   >
                     <X className="h-3.5 w-3.5" />

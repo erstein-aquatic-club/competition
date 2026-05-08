@@ -213,7 +213,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
                     type="button"
                     onClick={() => setValue(n)}
                     className={[
-                      "flex-1 h-10 rounded-xl border text-sm font-bold transition-all active:scale-95",
+                      "flex-1 h-11 rounded-xl border text-sm font-bold transition-all active:scale-95",
                       value === n
                         ? INTENSITY_CLASSES[colorIndex]
                         : "bg-muted border-border text-muted-foreground hover:bg-muted/70",

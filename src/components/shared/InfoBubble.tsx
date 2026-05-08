@@ -27,7 +27,7 @@ export default function InfoBubble({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground/60 hover:text-muted-foreground active:scale-90 transition-all touch-manipulation"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-0.5 text-muted-foreground/60 hover:text-muted-foreground active:scale-90 transition-all touch-manipulation"
           aria-label="Plus d'infos"
         >
           <Info style={{ width: size, height: size }} strokeWidth={2.5} />

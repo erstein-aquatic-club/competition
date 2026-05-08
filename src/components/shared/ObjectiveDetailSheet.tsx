@@ -66,10 +66,10 @@ export function ObjectiveDetailSheet({
               }}
               className="w-full"
             >
-              <ToggleGroupItem value="allures" className="flex-1 text-xs h-8">
+              <ToggleGroupItem value="allures" className="flex-1 text-xs h-11">
                 Allures
               </ToggleGroupItem>
-              <ToggleGroupItem value="progression" className="flex-1 text-xs h-8">
+              <ToggleGroupItem value="progression" className="flex-1 text-xs h-11">
                 Progression
               </ToggleGroupItem>
             </ToggleGroup>

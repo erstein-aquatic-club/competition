@@ -419,7 +419,7 @@ function AthletePlanDetail({
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
-          size="sm"
+          size="default"
           onClick={() => {
             if (rootFolders.length > 0) {
               createFolder.mutate({
@@ -441,7 +441,7 @@ function AthletePlanDetail({
         {rootFolders.length > 0 && (
           <Button
             variant="outline"
-            size="sm"
+            size="default"
             onClick={() =>
               setCopyDialog({
                 mode: "plan",

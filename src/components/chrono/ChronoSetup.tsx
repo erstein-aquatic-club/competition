@@ -277,7 +277,7 @@ export default function ChronoSetup({
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Séries :</span>
                 <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-10 w-10"
+                  <Button variant="outline" size="icon" className="h-11 w-11"
                     onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
                     disabled={state.seriesCount <= 0}
                   ><Minus className="h-3.5 w-3.5" /></Button>
@@ -285,7 +285,7 @@ export default function ChronoSetup({
                     onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
                     className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
                   />
-                  <Button variant="outline" size="icon" className="h-10 w-10"
+                  <Button variant="outline" size="icon" className="h-11 w-11"
                     onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
                   ><Plus className="h-3.5 w-3.5" /></Button>
                 </div>
@@ -381,7 +381,7 @@ export default function ChronoSetup({
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10"
+          className="h-11 w-11"
           onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })}
           disabled={state.laneCount <= 1}
         >
@@ -393,7 +393,7 @@ export default function ChronoSetup({
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10"
+          className="h-11 w-11"
           onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })}
           disabled={state.laneCount >= maxLanes}
         >

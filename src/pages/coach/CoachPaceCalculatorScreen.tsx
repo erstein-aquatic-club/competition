@@ -251,7 +251,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
             <Button
               variant="outline"
               size="sm"
-              className="h-7 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3"
+              className="h-11 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3"
               onClick={() => setZonesOpen(true)}
             >
               <SlidersHorizontal className="h-3 w-3" />
@@ -262,7 +262,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
             <Button
               variant="outline"
               size="sm"
-              className="h-7 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3"
+              className="h-11 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3"
               onClick={() => setAdjustmentsOpen(true)}
             >
               <Waves className="h-3 w-3" />
@@ -271,7 +271,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3">
+                <Button variant="outline" size="sm" className="h-11 gap-1 px-2 text-xs sm:gap-1.5 sm:px-3">
                   <Zap className="h-3 w-3" />
                   <span className="hidden sm:inline">V4</span>
                 </Button>
@@ -295,7 +295,7 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
                       <Switch
                         checked={v4ByFamily[family]}
                         onCheckedChange={() => zonesHook.toggleV4(family)}
-                        className="scale-[0.7] origin-right"
+                        className=""
                         aria-label={`Activer V4 pour ${label}`}
                       />
                     </div>
