@@ -119,8 +119,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/SwimmerSlotsTab.tsx` | Onglet Créneaux dans fiche nageur coach | ~374 lignes |
 | `src/lib/pwaHelpers.ts` | Détection plateforme, gate PWA | ~30 lignes |
 | `src/lib/lazyWithRetry.ts` | Util partagé `lazy()` avec retry chunk-loading PWA (§119) | ~30 lignes |
-| `src/lib/push.ts` | Subscription push, helpers VAPID | ~77 lignes |
-| `src/lib/pushHelpers.ts` | Fonctions pures push (urlBase64ToUint8Array) | ~37 lignes |
+| `src/lib/push.ts` | Subscription push, helpers VAPID + `refreshPushSubscription` (silent resync au boot, cooldown 7j, anti-cleanup 90j, anti-rotation endpoint) (§194 Vague B) | 166 lignes |
+| `src/lib/pushHelpers.ts` | Fonctions pures push : `urlBase64ToUint8Array`, `serializeSubscription`, `shouldRefreshPushSubscription` (cooldown), `shouldShowPushBanner` (reproposition 60j) (§194 Vague B) | 82 lignes |
+| `src/hooks/usePushSubscriptionRefresh.ts` | Hook qui appelle `refreshPushSubscription` au boot une fois par session, gated par cooldown localStorage 7j. Monté dans `PushBridge` (App.tsx) (§194 Vague B) | 56 lignes |
 | `src/lib/pushConfig.ts` | VAPID public key config | ~1 ligne |
 | `src/components/shared/PWAInstallGate.tsx` | Gate installation PWA mobile | ~130 lignes |
 | `src/components/shared/PushPermissionBanner.tsx` | Banner permission push post-login | ~70 lignes |

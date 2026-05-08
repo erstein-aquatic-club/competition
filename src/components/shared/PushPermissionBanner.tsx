@@ -3,8 +3,23 @@ import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { isPushSupported, getPushPermission, subscribeToPush, hasActivePushSubscription } from "@/lib/push";
+import { shouldShowPushBanner } from "@/lib/pushHelpers";
 
 const DISMISS_KEY = "eac-push-banner-dismissed";
+const DISMISS_AT_KEY = "eac-push-banner-dismissed-at";
+const REPROPOSE_AFTER_MS = 60 * 24 * 60 * 60 * 1000;
+
+function readDismissedAt(): number | null {
+  try {
+    if (localStorage.getItem(DISMISS_KEY) !== "true") return null;
+    const raw = localStorage.getItem(DISMISS_AT_KEY);
+    if (!raw) return 0; // legacy dismiss sans timestamp → considéré expiré
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return null;
+  }
+}
 
 export function PushPermissionBanner() {
   const [visible, setVisible] = useState(false);
@@ -16,7 +31,9 @@ export function PushPermissionBanner() {
     if (!user || !userId) return;
     if (!isPushSupported()) return;
     if (getPushPermission() === "denied") return;
-    if (localStorage.getItem(DISMISS_KEY) === "true") return;
+
+    const dismissedAt = readDismissedAt();
+    if (!shouldShowPushBanner(Date.now(), dismissedAt, REPROPOSE_AFTER_MS)) return;
 
     hasActivePushSubscription().then((active) => {
       if (!active && getPushPermission() !== "granted") {
@@ -34,7 +51,12 @@ export function PushPermissionBanner() {
   };
 
   const handleDismiss = () => {
-    localStorage.setItem(DISMISS_KEY, "true");
+    try {
+      localStorage.setItem(DISMISS_KEY, "true");
+      localStorage.setItem(DISMISS_AT_KEY, String(Date.now()));
+    } catch {
+      // best-effort
+    }
     setVisible(false);
   };
 

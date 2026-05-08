@@ -4,6 +4,60 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §194-vagueB — Resync push subscription auto + reset banner 60j (2026-05-08)
+
+**Contexte :** Vague A a réduit le centre de notifications de 82 %. Cette livraison attaque la 2e moitié de la plainte initiale — « les pushs n'arrivent pas systématiquement aux utilisateurs connectés ». Audit Phase 1 avait identifié 3 causes structurelles :
+
+1. **Cleanup silencieux à 90 j** : `cleanup_expired_notifications` (00085) supprime les `push_subscriptions` dont `updated_at < now - 90j`. `subscribeToPush` n'est appelé qu'à la 1ʳᵉ activation (banner one-shot dismissable) ou via toggle Profile manuel. Aucun rafraîchissement périodique → utilisateurs anciens perdent leur sub silencieusement.
+2. **Rotation d'endpoint Chrome/Firefox** : quand le browser renouvelle l'endpoint, l'ancien retourne 410 (push-send le supprime ✅) mais le nouveau n'est jamais resynchronisé en DB tant que l'utilisateur ne touche pas Profile.
+3. **`eac-push-banner-dismissed` permanent** : un dismiss = silence définitif. Si l'utilisateur perd ensuite sa sub (1) ou (2), aucun moyen de re-prompt sauf à passer manuellement par Profile.
+
+### Changements
+
+**Helpers purs**
+
+| Fichier | Type | Effet |
+|---|---|---|
+| `src/lib/pushHelpers.ts` | Edit (+44 LOC, total 82) | NEW `shouldRefreshPushSubscription(now, lastRefreshAt, intervalMs)` + `shouldShowPushBanner(now, dismissedAt, reproposeAfterMs)`. Pures, testables en Node sans mock. Gèrent les cas null / 0 (legacy dismiss sans timestamp) / NaN. |
+| `src/lib/__tests__/pushHelpers.test.ts` | NEW (80 LOC) | 10 tests TDD : null/0/NaN → refresh|show ; cas frontière (now - lastRefresh = intervalMs) inclus ; dismiss legacy traité comme expiré pour migration douce. |
+
+**API push**
+
+| Fichier | Changement |
+|---|---|
+| `src/lib/push.ts` | NEW `refreshPushSubscription(userId)` : ne prompt JAMAIS, no-op si permission ≠ granted ou subscription absente, sinon UPSERT (rafraîchit `updated_at`) + DELETE des autres endpoints du même user (rotation cleanup proactif). Retourne `{refreshed, reason}` pour debug. |
+
+**Hook + mount**
+
+| Fichier | Changement |
+|---|---|
+| `src/hooks/usePushSubscriptionRefresh.ts` | NEW (56 LOC). `useRef` anti-rerun + cooldown 7 j stocké dans `localStorage.eac-push-last-refresh`. Lit `userId` depuis `useAuth`. SSR-safe. |
+| `src/App.tsx` | Mount `usePushSubscriptionRefresh()` à côté de `useInAppPushBridge()` dans le composant `PushBridge`. |
+
+**Banner**
+
+| Fichier | Changement |
+|---|---|
+| `src/components/shared/PushPermissionBanner.tsx` | Lit `eac-push-banner-dismissed-at` (NEW key, timestamp) en plus de la legacy boolean key. Helper `readDismissedAt()` retourne null (jamais dismiss) / 0 (legacy dismiss sans timestamp = expiré) / number (timestamp). `handleDismiss` écrit désormais le timestamp. La logique de visibilité passe par `shouldShowPushBanner` → re-propose après 60 j ou pour les dismiss legacy. |
+
+### Impact attendu
+
+- Tout user avec push activé voit son `updated_at` rafraîchi au boot de l'app (max 1×/7 j) → impossible de tomber sous le seuil 90 j tant qu'il ouvre l'app.
+- Si Chrome/Firefox renouvelle l'endpoint, le hook le détecte et resync à la 1ʳᵉ ouverture suivante.
+- Tout user qui a dismiss le banner avant cette livraison verra le banner se ré-afficher à la 1ʳᵉ ouverture (clé legacy sans timestamp = expirée). À partir de cette ouverture, le dismiss redémarre un compteur 60 j.
+
+### Tests
+
+- `npx tsc --noEmit` : clean.
+- `npm test` : 662/663 (1 fail pré-existant `transformers.test.ts:18`, non lié).
+- 10 tests TDD sur les helpers purs (cooldown 7 j, reproposition 60 j, edge cases legacy/null/NaN).
+
+### Limites / suite
+
+- **Le hook ne couvre pas le cas où la permission n'est pas accordée.** Si l'utilisateur n'a jamais accepté, il n'est pas re-prompté par le hook (par design : pas de prompt silencieux). Le banner reste le seul vecteur d'activation, désormais ré-affiché tous les 60 j.
+- **Pas de monitoring serveur** des refresh : on ne sait pas combien de subscriptions sont effectivement rafraîchies au boot (Vague D potentielle si besoin de visibilité).
+- Vague C (tag SW per-notif au lieu de `eac-notification` partagé qui écrase les pushs rapprochées dans le tray, gate `clients[i].focused` contextuelle au lieu de suppression OS systématique) reportée — modification UX qui mérite §séparé.
+
 ## §194 — Vague A : doublon notif retiré + expiration auto sur triggers (2026-05-08)
 
 **Contexte :** Plainte utilisateur — « il y a trop de notifications tous les jours dans le centre de notifications mais les pushs n'arrivent pas systématiquement aux utilisateurs connectés ». Audit Phase 1 (systematic-debugging) a identifié 8 causes racines. Cette livraison attaque les 2 causes les plus rentables côté centre de notifications (Vague A). Push delivery (Vague B/C : refresh subscriptions, rotation endpoint, tag SW, gate focused) reportée.

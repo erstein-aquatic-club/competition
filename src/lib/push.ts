@@ -106,3 +106,61 @@ export async function hasActivePushSubscription(): Promise<boolean> {
   const subscription = await reg.pushManager.getSubscription();
   return subscription !== null;
 }
+
+/**
+ * §194 (Vague B) — Resync silencieux de la subscription en DB.
+ *
+ * Idempotent + jamais prompt. Appelé périodiquement (hook
+ * `usePushSubscriptionRefresh`) pour :
+ *   1. Rafraîchir `updated_at` → empêcher cleanup 90j (00085).
+ *   2. Détecter une rotation d'endpoint (Chrome/Firefox) et resync
+ *      avec un DELETE des anciens endpoints du même user.
+ *
+ * Ne demande JAMAIS la permission. Si la permission n'est pas accordée
+ * ou que le browser n'a pas de subscription active, no-op.
+ */
+export async function refreshPushSubscription(
+  userId: number,
+): Promise<{
+  refreshed: boolean;
+  reason?: "no-support" | "no-permission" | "no-browser-sub" | "error";
+}> {
+  if (!isPushSupported()) return { refreshed: false, reason: "no-support" };
+  if (Notification.permission !== "granted") {
+    return { refreshed: false, reason: "no-permission" };
+  }
+
+  const reg = await getPushRegistration();
+  if (!reg) return { refreshed: false, reason: "no-support" };
+
+  const subscription = await reg.pushManager.getSubscription();
+  if (!subscription) return { refreshed: false, reason: "no-browser-sub" };
+
+  const { endpoint, p256dh, auth } = serializeSubscription(subscription);
+  const deviceInfo = `${navigator.userAgent.slice(0, 100)}`;
+
+  const { error } = await supabase.from("push_subscriptions").upsert(
+    {
+      user_id: userId,
+      endpoint,
+      p256dh,
+      auth,
+      device_info: deviceInfo,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,endpoint" },
+  );
+
+  if (error) return { refreshed: false, reason: "error" };
+
+  // Rotation cleanup : si le browser a renouvelé l'endpoint, l'ancien row
+  // (même user_id, endpoint différent) reste mort en DB → push-send recevra
+  // 410 Gone et le supprimera de toute façon, mais on l'évite en avance.
+  await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("user_id", userId)
+    .neq("endpoint", endpoint);
+
+  return { refreshed: true };
+}

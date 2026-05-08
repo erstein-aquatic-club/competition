@@ -23,6 +23,7 @@ import { requiresApprovalForRole } from "@/lib/authRules";
 import { OfflineMutationSync } from "@/components/shared/OfflineMutationSync";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useInAppPushBridge } from "@/hooks/useInAppPushBridge";
+import { usePushSubscriptionRefresh } from "@/hooks/usePushSubscriptionRefresh";
 
 // Clear the reload flag on successful app load
 sessionStorage.removeItem('chunk_reload');
@@ -364,6 +365,7 @@ function DarkModeApplier() {
  */
 function PushBridge() {
   useInAppPushBridge();
+  usePushSubscriptionRefresh();
   return null;
 }
 
