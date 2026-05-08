@@ -9,28 +9,18 @@ import {
   readDismissedNotificationTargetIds,
 } from "@/lib/notificationsVisibility";
 import { resolveNotificationActionLabel, resolveNotificationHref } from "@/lib/notificationRouting";
+import { formatRelativeDate } from "@/lib/date";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { BellRing, ChevronRight, Dot, Inbox, ArrowLeft, Trash2 } from "lucide-react";
+import { ChevronRight, Inbox, ArrowLeft, Trash2, X } from "lucide-react";
 
 type Props = {
   userId: number;
   onBack: () => void;
   onOpenProfileSection: (section: "home" | "messages") => void;
 };
-
-function formatNotificationDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function SwimmerMessagesView({
   userId,
@@ -187,9 +177,12 @@ export default function SwimmerMessagesView({
           "Les notifications sont masquées sur cet appareil. Réessayez plus tard pour effacer définitivement.",
         variant: "destructive",
       });
-      // Log for debug
       console.error("[notifications_clear_all] failed", error);
     }
+  };
+
+  const handleDismissOne = (targetId: number) => {
+    setDismissedTargetIds((current) => Array.from(new Set([...current, targetId])));
   };
 
   const handleRestoreHiddenNotifications = () => {
@@ -201,48 +194,45 @@ export default function SwimmerMessagesView({
   };
 
   return (
-    <div className="space-y-5 pb-24">
-      <div className="space-y-1">
-        <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Retour
-        </Button>
+    <div className="space-y-4 pb-24">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
-            <BellRing className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">
-              Messages
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Détails des notifications reçues et accès rapide aux actions liées.
-            </p>
-          </div>
+          <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="text-xl font-display font-semibold uppercase italic text-primary">
+            Messages
+          </h2>
+          {notifications.filter((n) => !n.read).length > 0 ? (
+            <Badge className="rounded-full px-1.5 py-0 text-[11px] leading-5 h-5">
+              {notifications.filter((n) => !n.read).length}
+            </Badge>
+          ) : null}
         </div>
         {notifications.length > 0 ? (
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-1 w-fit"
-            onClick={() => {
-              void handleClearAll();
-            }}
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => { void handleClearAll(); }}
           >
             <Trash2 className="h-4 w-4" />
-            Effacer toutes les notifications
+            <span className="sr-only">Tout effacer</span>
           </Button>
         ) : null}
       </div>
 
+      {/* Loading skeletons */}
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {[1, 2, 3].map((item) => (
-            <div key={item} className="h-24 rounded-2xl border bg-card/60 animate-pulse motion-reduce:animate-none" />
+            <div key={item} className="h-14 rounded-xl border bg-card/60 animate-pulse motion-reduce:animate-none" />
           ))}
         </div>
       ) : null}
 
+      {/* Empty state */}
       {!isLoading && notifications.length === 0 ? (
         <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-primary/5">
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -268,86 +258,90 @@ export default function SwimmerMessagesView({
         </Card>
       ) : null}
 
-      {selectedNotification ? (
-        <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm">
-          <CardHeader className="gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={selectedNotification.read ? "outline" : "default"}>
-                {selectedNotification.read ? "Lu" : "Nouveau"}
-              </Badge>
-              <Badge variant="secondary">{selectedNotification.type || "message"}</Badge>
-              <span className="text-xs text-muted-foreground">
-                {formatNotificationDate(selectedNotification.date)}
-              </span>
-            </div>
-            <div>
-              <CardTitle className="text-lg">{selectedNotification.title}</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-relaxed text-foreground/80">
-                {selectedNotification.message || "Aucun détail supplémentaire."}
-              </CardDescription>
-            </div>
-          </CardHeader>
-          {resolveNotificationActionLabel(selectedNotification) ? (
-            <CardContent className="pt-0">
-              <Button
-                variant="outline"
-                className="w-full justify-between"
-                onClick={async () => {
-                  void selectNotification(selectedNotification);
-                  openNotificationDestination(selectedNotification);
-                }}
-              >
-                {resolveNotificationActionLabel(selectedNotification)}
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          ) : null}
-        </Card>
-      ) : null}
-
+      {/* List */}
       {notifications.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-1">
           {notifications.map((notification) => {
-            const isSelected = notification.target_id === selectedNotification?.target_id;
+            const isExpanded = notification.target_id === selectedNotification?.target_id;
             const actionLabel = resolveNotificationActionLabel(notification);
+            const isUnread = !notification.read;
+
             return (
-              <button
+              <div
                 key={notification.target_id ?? notification.id}
-                type="button"
-                onClick={() => handleNotificationPress(notification)}
-                className={`w-full rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  isSelected
-                    ? "border-primary/35 bg-primary/5 shadow-sm"
-                    : "border-border bg-card hover:border-primary/20 hover:bg-muted/40"
+                className={`group rounded-xl transition-colors ${
+                  isUnread ? "bg-primary/8" : "bg-transparent"
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <div className="pt-0.5">
-                    {notification.read ? (
-                      <Dot className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <div className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(227,6,19,0.08)]" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-semibold">{notification.title}</p>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {formatNotificationDate(notification.date)}
-                      </span>
+                <button
+                  type="button"
+                  onClick={() => handleNotificationPress(notification)}
+                  className="w-full px-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Unread dot */}
+                    <div className="mt-1.5 shrink-0 w-2">
+                      {isUnread ? (
+                        <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_3px_rgba(227,6,19,0.1)]" />
+                      ) : null}
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={`truncate text-sm ${isUnread ? "font-semibold" : "font-normal text-muted-foreground"}`}>
+                          {notification.title}
+                        </p>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {formatRelativeDate(notification.date)}
+                        </span>
+                      </div>
+                      {!isExpanded ? (
+                        <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
+                          {notification.message || "Aucun détail supplémentaire."}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {/* Dismiss button */}
+                    {notification.target_id != null ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDismissOne(notification.target_id!);
+                        }}
+                        className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        aria-label="Masquer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
+                </button>
+
+                {/* Inline expanded content */}
+                {isExpanded ? (
+                  <div className="mx-3 mb-3 rounded-xl border border-border/60 bg-card p-3 space-y-2">
+                    <p className="text-sm text-foreground/80 leading-relaxed">
                       {notification.message || "Aucun détail supplémentaire."}
                     </p>
                     {actionLabel ? (
-                      <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between"
+                        onClick={() => {
+                          void selectNotification(notification);
+                          openNotificationDestination(notification);
+                        }}
+                      >
                         {actionLabel}
                         <ChevronRight className="h-3.5 w-3.5" />
-                      </span>
+                      </Button>
                     ) : null}
                   </div>
-                </div>
-              </button>
+                ) : null}
+              </div>
             );
           })}
         </div>
