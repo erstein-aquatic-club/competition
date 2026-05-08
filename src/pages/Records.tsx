@@ -134,10 +134,10 @@ function InlineEditBar({
 const SkeletonRow = () => <div className="h-10 rounded-xl bg-muted animate-pulse motion-reduce:animate-none" />;
 
 const STROKE_CONFIG = [
-  { code: "NL",  label: "NL",  distances: [15, 50, 100, 200, 400, 800, 1500] },
-  { code: "DOS", label: "Dos", distances: [15, 50, 100, 200] },
-  { code: "BR",  label: "Bra", distances: [15, 50, 100, 200] },
-  { code: "PAP", label: "Pap", distances: [15, 50, 100, 200] },
+  { code: "NL",  label: "NL",  distances: [15, 25, 50, 100, 200, 400, 800, 1500] },
+  { code: "DOS", label: "Dos", distances: [15, 25, 50, 100, 200] },
+  { code: "BR",  label: "Bra", distances: [15, 25, 50, 100, 200] },
+  { code: "PAP", label: "Pap", distances: [15, 25, 50, 100, 200] },
   { code: "QN",  label: "4N",  distances: [200, 400] },
 ];
 
