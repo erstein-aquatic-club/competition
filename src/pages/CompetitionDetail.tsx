@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getCompetitions } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import InfoMyObjectives from "@/components/competition/InfoMyObjectives";
 import InfoParticipants from "@/components/competition/InfoParticipants";
@@ -52,7 +52,7 @@ export default function CompetitionDetail() {
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const competition = useMemo(

@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type ClubRecord, type ClubPerformanceRanked } from "@/lib/api";
+import {
+  type ClubRecord,
+  type ClubPerformanceRanked,
+  getImportLogs,
+  getClubRecords,
+  getClubRanking,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -203,7 +209,7 @@ export default function RecordsClub() {
   // Last import log
   const { data: lastImportLogs } = useQuery({
     queryKey: ["last-import"],
-    queryFn: () => api.getImportLogs({ limit: 1 }),
+    queryFn: () => getImportLogs({ limit: 1 }),
   });
 
   // Records
@@ -215,7 +221,7 @@ export default function RecordsClub() {
   } = useQuery({
     queryKey: ["club-records", pool, sex, ageFilter],
     queryFn: () =>
-      api.getClubRecords({
+      getClubRecords({
         pool_m: Number(pool),
         sex,
         age: ageValue,
@@ -238,7 +244,7 @@ export default function RecordsClub() {
     queryFn: () => {
       if (!expandedRankingKey) return [] as ClubPerformanceRanked[];
       const parts = expandedRankingKey.split("__");
-      return api.getClubRanking({
+      return getClubRanking({
         event_code: parts[0],
         pool_m: Number(parts[1]),
         sex: parts[2],
@@ -293,7 +299,7 @@ export default function RecordsClub() {
   const handleExportPdf = useCallback(async () => {
     setExporting(true);
     try {
-      const allRecords = await api.getClubRecords({});
+      const allRecords = await getClubRecords({});
       const { exportRecordsPdf } = await import("@/lib/export-records-pdf");
       await exportRecordsPdf(allRecords);
     } catch {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type SwimmerPerformance } from "@/lib/api";
+import { type SwimmerPerformance, getSwimmerPerformances } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -94,7 +94,7 @@ export function EventProgressionContent({
   // Fetch all-time performances for main pool (only while active)
   const { data: mainPerfs = [] } = useQuery<SwimmerPerformance[]>({
     queryKey: ["swimmer-performances-all", iuf, poolLength],
-    queryFn: () => api.getSwimmerPerformances({ iuf: iuf!, poolLength }),
+    queryFn: () => getSwimmerPerformances({ iuf: iuf!, poolLength }),
     enabled: (active ?? true) && !!iuf,
     staleTime: 5 * 60_000,
   });
@@ -102,7 +102,7 @@ export function EventProgressionContent({
   // Fetch all-time performances for other pool (lazy, for comparison toggle)
   const { data: otherPerfs = [] } = useQuery<SwimmerPerformance[]>({
     queryKey: ["swimmer-performances-all", iuf, otherPoolLen],
-    queryFn: () => api.getSwimmerPerformances({ iuf: iuf!, poolLength: otherPoolLen }),
+    queryFn: () => getSwimmerPerformances({ iuf: iuf!, poolLength: otherPoolLen }),
     enabled: (active ?? true) && !!iuf && comparePool,
     staleTime: 5 * 60_000,
   });

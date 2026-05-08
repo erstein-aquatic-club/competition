@@ -16,7 +16,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { getSessions } from "@/lib/api";
 import type { Session } from "@/lib/api";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import type { SwimmerSession } from "@/lib/api/types";
@@ -205,7 +205,7 @@ export default function SwimmerWeekMatrixCard() {
   // to detect feedback presence. Same query key as SwimmerHome → cache dedupe.
   const { data: loggedSessions } = useQuery({
     queryKey: ["sessions", userId ?? user],
-    queryFn: () => api.getSessions(user!, userId),
+    queryFn: () => getSessions(user!, userId),
     enabled: !!user,
   });
 

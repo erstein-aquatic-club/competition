@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getProfile,
+  getStrengthPlanningSlots,
+  getStrengthPlanningSlotOverrides,
+  getStrengthFolders,
+  getStrengthSessions,
+} from "@/lib/api";
 import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
 import { FolderOpen, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,7 +58,7 @@ export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }:
   // ── Profile (to get group_id) ───────────────────────────────────────────────
   const { data: profile } = useQuery({
     queryKey: ["profile", athleteId],
-    queryFn: () => api.getProfile({ userId: athleteId }),
+    queryFn: () => getProfile({ userId: athleteId }),
     staleTime: 5 * 60 * 1000,
   });
   const groupId = profile?.group_id ?? null;
@@ -62,7 +68,7 @@ export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }:
     queryKey: ["strength_planning_slots", groupId, weekStarts],
     queryFn: () =>
       groupId
-        ? api.getStrengthPlanningSlots({ groupId, weekStarts })
+        ? getStrengthPlanningSlots({ groupId, weekStarts })
         : Promise.resolve([]),
     enabled: groupId != null,
   });
@@ -70,7 +76,7 @@ export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }:
   const { data: athleteOverrides = [] } = useQuery({
     queryKey: ["strength_planning_slot_overrides", athleteId, weekStarts],
     queryFn: () =>
-      api.getStrengthPlanningSlotOverrides({ athleteId, weekStarts }),
+      getStrengthPlanningSlotOverrides({ athleteId, weekStarts }),
   });
 
   // Merge: athlete overrides take precedence over group slots
@@ -82,12 +88,12 @@ export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }:
   // ── Phase 1 fallback data (cycles-based) ────────────────────────────────────
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
-    queryFn: () => api.getStrengthFolders("session", { athleteId }),
+    queryFn: () => getStrengthFolders("session", { athleteId }),
   });
 
   const { data: allSessions = [] } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
   });
 
   // ── Hierarchy for Phase 1 fallback ─────────────────────────────────────────

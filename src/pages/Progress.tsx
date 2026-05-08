@@ -1,7 +1,16 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import {
+  getCompetitions,
+  getMyCompetitionIds,
+  getAssignments,
+  getPlannedAbsences,
+  getMyPlannedAbsences,
+  getSessions,
+  getStrengthHistory,
+  getStrengthHistoryAggregate,
+} from "@/lib/api";
 import { getWellnessRange } from "@/lib/api/wellness";
 import type { Competition, WellnessCheck } from "@/lib/api/types";
 import { computeTrainingDaysRemaining } from "@/lib/date";
@@ -201,17 +210,17 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
 
   const { data: competitions = [] } = useQuery<Competition[]>({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: myCompetitionIds } = useQuery<string[]>({
     queryKey: ["my-competition-ids", athleteKey],
-    queryFn: () => api.getMyCompetitionIds(athleteId),
+    queryFn: () => getMyCompetitionIds(athleteId),
   });
 
   const { data: assignments } = useQuery({
     queryKey: ["assignments", athleteKey],
-    queryFn: () => api.getAssignments(athleteName!, athleteId),
+    queryFn: () => getAssignments(athleteName!, athleteId),
     enabled: !!athleteName,
   });
 
@@ -219,8 +228,8 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
     queryKey: ["planned-absences", athleteKey],
     queryFn: () =>
       athleteId
-        ? api.getPlannedAbsences({ userId: athleteId })
-        : api.getMyPlannedAbsences(),
+        ? getPlannedAbsences({ userId: athleteId })
+        : getMyPlannedAbsences(),
   });
 
   const absenceDates = useMemo(() => {
@@ -229,14 +238,14 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
 
   const { data: sessions, isLoading: isSwimLoading } = useQuery({
     queryKey: ["sessions", athleteKey],
-    queryFn: () => api.getSessions(athleteName!, athleteId),
+    queryFn: () => getSessions(athleteName!, athleteId),
     enabled: !!athleteName,
   });
 
   const strengthHistoryQuery = useInfiniteQuery({
     queryKey: ["strength_history", athleteKey, "progress", historyStatus, historyFrom, historyTo],
     queryFn: ({ pageParam = 0 }) =>
-      api.getStrengthHistory(athleteName!, {
+      getStrengthHistory(athleteName!, {
         athleteId,
         limit: 10,
         offset: pageParam,
@@ -262,7 +271,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const { data: strengthHistorySummary, isLoading: isStrengthSummaryLoading } = useQuery({
     queryKey: ["strength_history_summary", athleteKey, "progress", strengthPeriodDays, strengthRangeFrom, strengthRangeTo],
     queryFn: () =>
-      api.getStrengthHistory(athleteName!, {
+      getStrengthHistory(athleteName!, {
         athleteId,
         limit: 200,
         order: "desc",
@@ -275,7 +284,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const { data: strengthAggregate, isLoading: isStrengthAggregateLoading } = useQuery({
     queryKey: ["strength_history_aggregate", athleteKey, "progress", strengthPeriodDays, strengthRangeFrom, strengthRangeTo],
     queryFn: () =>
-      api.getStrengthHistoryAggregate(athleteName!, {
+      getStrengthHistoryAggregate(athleteName!, {
         athleteId,
         period: "day",
         limit: 200,
@@ -289,7 +298,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const { data: strengthPrevAggregate } = useQuery({
     queryKey: ["strength_history_aggregate_prev", athleteKey, "progress", strengthPeriodDays, strengthPrevFrom, strengthPrevTo],
     queryFn: () =>
-      api.getStrengthHistoryAggregate(athleteName!, {
+      getStrengthHistoryAggregate(athleteName!, {
         athleteId,
         period: "day",
         limit: 200,

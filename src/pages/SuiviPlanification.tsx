@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
 import SwimPlanningAthleteView from "@/pages/coach/SwimPlanningAthleteView";
@@ -20,7 +20,7 @@ export default function SuiviPlanification() {
   // when the user lands here from the home screen.
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user, userId],
-    queryFn: () => api.getProfile({ displayName: user, userId }),
+    queryFn: () => getProfile({ displayName: user, userId }),
     enabled: !!user || !!userId,
     staleTime: 5 * 60_000,
   });

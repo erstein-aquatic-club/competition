@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getStrengthHistory, getExercises } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -41,7 +41,7 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
   const strengthHistoryQuery = useInfiniteQuery({
     queryKey: ["strength_history", athleteKey, historyStatus],
     queryFn: ({ pageParam = 0 }) =>
-      api.getStrengthHistory(athleteName!, {
+      getStrengthHistory(athleteName!, {
         athleteId: athleteId,
         limit: 10,
         offset: pageParam,
@@ -61,7 +61,7 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
   // Fetch exercises to get exercise names for the progression section
   const { data: exercises } = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises(),
+    queryFn: () => getExercises(),
   });
 
   const exerciseNames = useMemo(() => {

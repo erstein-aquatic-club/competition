@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getObjectives,
+  getCompetitions,
+  createObjective,
+  linkObjectiveToCompetition,
+} from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -63,7 +68,7 @@ export default function AddObjectiveSheet({
   // which calls supabase.auth.getUser() async (can race / null-out).
   const { data: allObjectives = [] } = useQuery({
     queryKey: ["athlete-objectives", authUid],
-    queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
+    queryFn: () => (authUid ? getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: "always",
@@ -77,7 +82,7 @@ export default function AddObjectiveSheet({
   /* ── Competitions query (for multi-comp badges in summary) ── */
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
   const competitionNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -119,7 +124,7 @@ export default function AddObjectiveSheet({
     queryClient.invalidateQueries({ queryKey: ["athlete-objectives"] });
 
   const createMut = useMutation({
-    mutationFn: (input: ObjectiveInput) => api.createObjective(input),
+    mutationFn: (input: ObjectiveInput) => createObjective(input),
     onSuccess: () => {
       toast({ title: "Objectif créé" });
       invalidate();
@@ -138,7 +143,7 @@ export default function AddObjectiveSheet({
       // Sequential to surface individual errors clearly; could be Promise.all
       // if we want parallelism. Idempotent UPSERT means retries are safe.
       for (const id of ids) {
-        await api.linkObjectiveToCompetition(id, competitionId);
+        await linkObjectiveToCompetition(id, competitionId);
       }
     },
     onSuccess: (_data, ids) => {

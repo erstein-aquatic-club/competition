@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getStrengthPlanningSlots,
+  getStrengthPlanningSlotOverrides,
+  getStrengthSessions,
+} from "@/lib/api";
 import type { StrengthSessionTemplate } from "@/lib/api/types";
 import {
   mergeStrengthSlots,
@@ -97,7 +101,7 @@ export function useStrengthPlanByISO(
     queryKey: ["strength_planning_slots", groupId, weekStarts],
     queryFn: () =>
       groupId
-        ? api.getStrengthPlanningSlots({ groupId, weekStarts })
+        ? getStrengthPlanningSlots({ groupId, weekStarts })
         : Promise.resolve([]),
     enabled: groupId != null,
     staleTime: 5 * 60 * 1000,
@@ -107,7 +111,7 @@ export function useStrengthPlanByISO(
     queryKey: ["strength_planning_slot_overrides", athleteId, weekStarts],
     queryFn: () =>
       athleteId != null
-        ? api.getStrengthPlanningSlotOverrides({ athleteId, weekStarts })
+        ? getStrengthPlanningSlotOverrides({ athleteId, weekStarts })
         : Promise.resolve([]),
     enabled: athleteId != null,
     staleTime: 5 * 60 * 1000,
@@ -146,7 +150,7 @@ export function useStrengthPlanByISO(
   // Shared queryKey with MyPlanTab → no duplicate fetch.
   const { data: catalog = [] } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
     enabled: planByISO.size > 0,
     staleTime: 5 * 60 * 1000,
   });

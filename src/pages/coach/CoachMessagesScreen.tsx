@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BellRing, SendHorizontal } from "lucide-react";
-import { api } from "@/lib/api";
+import { notifications_send } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,7 +111,7 @@ const CoachMessagesScreen = ({
     sendingRef.current = true;
     setSending(true);
     try {
-      await api.notifications_send({
+      await notifications_send({
         title: title.trim(),
         body: message.trim() || null,
         type: "message",

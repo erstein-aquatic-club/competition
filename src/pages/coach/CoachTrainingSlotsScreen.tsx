@@ -1,6 +1,24 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  createSwimmerSlot,
+  createTrainingSlot,
+  updateSwimmerSlot,
+  updateTrainingSlot,
+  deleteSwimmerSlot,
+  deleteTrainingSlot,
+  createSlotOverride,
+  getTrainingSlots,
+  getSlotOverrides,
+  listUsers,
+  getAthletes,
+  getSwimmerSlots,
+  hasCustomSlots,
+  getSlotAssignments,
+  createSwimSession,
+  bulkCreateSlotAssignments,
+  deleteSwimSession,
+} from "@/lib/api";
 import type {
   TrainingSlot,
   TrainingSlotOverride,
@@ -333,7 +351,7 @@ const SlotFormSheet = ({
     mutationFn: async (input: TrainingSlotInput): Promise<void> => {
       if (isSwimmerSlot) {
         if (!coachUserId) throw new Error("Coach non authentifié");
-        await api.createSwimmerSlot(
+        await createSwimmerSlot(
           {
             user_id: swimmerContext!.swimmerUserId,
             day_of_week: input.day_of_week,
@@ -346,7 +364,7 @@ const SlotFormSheet = ({
         );
         return;
       }
-      await api.createTrainingSlot(input);
+      await createTrainingSlot(input);
     },
     onSuccess: () => {
       toast({ title: "Creneau cree" });
@@ -365,7 +383,7 @@ const SlotFormSheet = ({
   const updateMutation = useMutation({
     mutationFn: async (input: TrainingSlotInput): Promise<void> => {
       if (isSwimmerSlot) {
-        await api.updateSwimmerSlot(slot!.id, {
+        await updateSwimmerSlot(slot!.id, {
           day_of_week: input.day_of_week,
           start_time: input.start_time,
           end_time: input.end_time,
@@ -374,7 +392,7 @@ const SlotFormSheet = ({
         });
         return;
       }
-      await api.updateTrainingSlot(slot!.id, input);
+      await updateTrainingSlot(slot!.id, input);
     },
     onSuccess: () => {
       toast({ title: "Creneau mis a jour" });
@@ -393,10 +411,10 @@ const SlotFormSheet = ({
   const deleteMutation = useMutation({
     mutationFn: async (): Promise<void> => {
       if (isSwimmerSlot) {
-        await api.deleteSwimmerSlot(slot!.id);
+        await deleteSwimmerSlot(slot!.id);
         return;
       }
-      await api.deleteTrainingSlot(slot!.id);
+      await deleteTrainingSlot(slot!.id);
     },
     onSuccess: () => {
       toast({ title: "Creneau supprime" });
@@ -772,7 +790,7 @@ const OverrideFormSheet = ({
       if (!overrideDate) throw new Error("Date requise");
 
       if (status === "cancelled") {
-        await api.createSlotOverride({
+        await createSlotOverride({
           slot_id: slot.id,
           override_date: overrideDate,
           status: "cancelled",
@@ -803,7 +821,7 @@ const OverrideFormSheet = ({
         const jsDay = d.getDay();
         const targetDayOfWeek = jsDay === 0 ? 7 : jsDay;
 
-        await api.createTrainingSlot({
+        await createTrainingSlot({
           day_of_week: targetDayOfWeek,
           start_time: newStartTime || formatTime(slot.start_time),
           end_time: newEndTime || formatTime(slot.end_time),
@@ -815,7 +833,7 @@ const OverrideFormSheet = ({
           scheduled_date: targetDate,
         });
 
-        await api.createSlotOverride({
+        await createSlotOverride({
           slot_id: slot.id,
           override_date: overrideDate,
           status: "cancelled",
@@ -835,7 +853,7 @@ const OverrideFormSheet = ({
         reason: reason.trim() || null,
       };
 
-      await api.createSlotOverride(input);
+      await createSlotOverride(input);
     },
     onSuccess: () => {
       toast({ title: "Exception enregistree" });
@@ -1822,25 +1840,25 @@ const CoachTrainingSlotsScreen = ({
   // Fetch slots
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
     queryKey: ["training-slots"],
-    queryFn: () => api.getTrainingSlots(),
+    queryFn: () => getTrainingSlots(),
   });
 
   // Fetch all overrides (we filter client-side per week)
   const { data: allOverrides = [] } = useQuery({
     queryKey: ["training-slot-overrides"],
-    queryFn: () => api.getSlotOverrides(),
+    queryFn: () => getSlotOverrides(),
   });
 
   // Fetch coaches
   const { data: coaches = [] } = useQuery({
     queryKey: ["users", "coaches"],
-    queryFn: () => api.listUsers({ role: "coach" }),
+    queryFn: () => listUsers({ role: "coach" }),
   });
 
   // Fetch athletes for swimmer filter
   const { data: athletes = [] } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
 
   // Swimmer filter: fetch swimmer's custom slots when selected
@@ -1850,13 +1868,13 @@ const CoachTrainingSlotsScreen = ({
 
   const { data: swimmerSlots } = useQuery({
     queryKey: ["swimmer-slots", swimmerFilterId],
-    queryFn: () => api.getSwimmerSlots(swimmerFilterId!),
+    queryFn: () => getSwimmerSlots(swimmerFilterId!),
     enabled: swimmerFilterId != null,
   });
 
   const { data: swimmerHasCustom } = useQuery({
     queryKey: ["swimmer-slots-exists", swimmerFilterId],
-    queryFn: () => api.hasCustomSlots(swimmerFilterId!),
+    queryFn: () => hasCustomSlots(swimmerFilterId!),
     enabled: swimmerFilterId != null,
   });
 
@@ -1936,7 +1954,7 @@ const CoachTrainingSlotsScreen = ({
   const { data: slotAssignments = [] } = useQuery({
     queryKey: ["slot-assignments", weekMondayIso, weekSundayIso],
     queryFn: () =>
-      api.getSlotAssignments({
+      getSlotAssignments({
         from: weekMondayIso,
         to: weekSundayIso,
       }),
@@ -2192,7 +2210,7 @@ const CoachTrainingSlotsScreen = ({
         totalDistance,
       );
 
-      const result = await api.createSwimSession({
+      const result = await createSwimSession({
         name: sessionName,
         description: null,
         total_distance: totalDistance,
@@ -2207,7 +2225,7 @@ const CoachTrainingSlotsScreen = ({
       }
 
       try {
-        return await api.bulkCreateSlotAssignments({
+        return await bulkCreateSlotAssignments({
           swimCatalogId: sessionId,
           trainingSlotId: instance.slot.id,
           scheduledDate: instance.date,
@@ -2223,7 +2241,7 @@ const CoachTrainingSlotsScreen = ({
         // éviter une pollution silencieuse du catalogue (§171).
         let rollbackOk = true;
         try {
-          await api.deleteSwimSession(sessionId);
+          await deleteSwimSession(sessionId);
         } catch (rollbackErr) {
           rollbackOk = false;
           console.error(
@@ -2280,7 +2298,7 @@ const CoachTrainingSlotsScreen = ({
       if (groupIds.length === 0) throw new Error("Aucun groupe sélectionné");
       if (!userId) throw new Error("Utilisateur non connecté");
 
-      return api.bulkCreateSlotAssignments({
+      return bulkCreateSlotAssignments({
         swimCatalogId: catalogId,
         trainingSlotId: instance.slot.id,
         scheduledDate: instance.date,

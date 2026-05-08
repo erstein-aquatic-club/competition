@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ExternalLink } from "lucide-react";
-import { api } from "@/lib/api";
+import { getAthletes, getSwimPlanningSlots, getCompetitions, getMyCompetitionIds } from "@/lib/api";
 import type { SwimPlanningSlot, Competition } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import SwimPlanningTimeline from "@/components/coach/swim/SwimPlanningTimeline";
@@ -38,7 +38,7 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
   // ── Athlete → group resolution ────────────────────────────────────
   const { data: athletes = [] } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
   const athlete = athletes.find((a) => a.id === athleteId) ?? null;
   const groupId = athlete?.group_id ?? null;
@@ -54,7 +54,7 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
   const { data: groupSlots = [] } = useQuery({
     queryKey: ["swim-planning-slots", groupId, visibleWeekKeys],
     queryFn: () =>
-      api.getSwimPlanningSlots({
+      getSwimPlanningSlots({
         groupId: groupId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -74,12 +74,12 @@ export default function SwimmerPlanningPanel({ athleteId }: Props) {
   // ── Competitions assigned to this athlete ─────────────────────────
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: athleteCompetitionIds = [] } = useQuery({
     queryKey: ["my-competition-ids", athleteId],
-    queryFn: () => api.getMyCompetitionIds(athleteId),
+    queryFn: () => getMyCompetitionIds(athleteId),
   });
 
   const athleteCompetitions = useMemo(

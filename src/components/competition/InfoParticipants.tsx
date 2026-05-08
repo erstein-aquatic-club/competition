@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { api } from "@/lib/api";
+import { getCompetitionAssignments, getAthletes } from "@/lib/api";
 import { groupAndSortAssignments, type ParticipantProfile } from "./info-helpers";
 import { Users } from "lucide-react";
 
@@ -14,12 +14,12 @@ export default function InfoParticipants({ competitionId }: Props) {
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ["competition-assignments", competitionId],
-    queryFn: () => api.getCompetitionAssignments(competitionId),
+    queryFn: () => getCompetitionAssignments(competitionId),
   });
 
   const { data: athletes = [], isLoading: athletesLoading } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
 
   const isLoading = assignmentsLoading || athletesLoading;

@@ -1,7 +1,31 @@
 import { Suspense, useEffect, useDeferredValue, useMemo, useState } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, Exercise, StrengthCycleType, StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api";
+import {
+  type Exercise,
+  type StrengthCycleType,
+  type StrengthSessionItem,
+  type StrengthSessionTemplate,
+  getExercises,
+  getAthletes,
+  getStrengthFolders,
+  createExercise as createExerciseApi,
+  createStrengthSession,
+  assignments_create,
+  updateExercise as updateExerciseApi,
+  deleteExercise as deleteExerciseApi,
+  deleteStrengthSession,
+  updateStrengthSession,
+  persistStrengthSessionOrder,
+  createStrengthFolder,
+  renameStrengthFolder,
+  deleteStrengthFolder,
+  moveToFolder,
+  duplicateStrengthSession,
+  duplicateFolder,
+  duplicateAthletePlan,
+  getStrengthSessionsPaginated,
+} from "@/lib/api";
 import type { AthleteSummary } from "@/lib/api/types";
 import type { StrengthSessionInput } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -12,7 +36,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getStrengthSessionsPaginated } from "@/lib/api/strength";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -446,7 +469,7 @@ export default function StrengthCatalog() {
 
   const { data: exercises, isLoading: isLoadingExercises, error: exercisesError, refetch: refetchExercises } = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises()
+    queryFn: () => getExercises()
   });
 
   const STRENGTH_PAGE_SIZE = 20;
@@ -477,17 +500,17 @@ export default function StrengthCatalog() {
 
   const { data: athletes = [] } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
 
   const { data: sessionFolders = [] } = useQuery({
     queryKey: ["strength_folders", "session", null],
-    queryFn: () => api.getStrengthFolders("session", { athleteId: null }),
+    queryFn: () => getStrengthFolders("session", { athleteId: null }),
   });
 
   const { data: exerciseFolders } = useQuery({
     queryKey: ["strength_folders", "exercise"],
-    queryFn: () => api.getStrengthFolders("exercise"),
+    queryFn: () => getStrengthFolders("exercise"),
   });
 
   const renderSessionMetrics = (session: StrengthSessionTemplate) => {
@@ -538,7 +561,7 @@ export default function StrengthCatalog() {
   }, [exercises]);
 
   const createExercise = useMutation({
-    mutationFn: (data: Omit<Exercise, "id">) => api.createExercise(data),
+    mutationFn: (data: Omit<Exercise, "id">) => createExerciseApi(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       setExerciseDialogOpen(false);
@@ -547,7 +570,7 @@ export default function StrengthCatalog() {
   });
 
   const createSession = useMutation({
-    mutationFn: (data: StrengthSessionInput) => api.createStrengthSession(data),
+    mutationFn: (data: StrengthSessionInput) => createStrengthSession(data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
@@ -558,7 +581,7 @@ export default function StrengthCatalog() {
         setAssignAfterSaveId(null);
         const sessionId = (data as { id?: number })?.id;
         if (sessionId) {
-          api.assignments_create({
+          assignments_create({
             session_type: "strength",
             session_id: sessionId,
             target_user_id: afterSaveId,
@@ -584,7 +607,7 @@ export default function StrengthCatalog() {
   });
 
   const updateExercise = useMutation({
-    mutationFn: (data: Exercise) => api.updateExercise(data),
+    mutationFn: (data: Exercise) => updateExerciseApi(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
@@ -596,7 +619,7 @@ export default function StrengthCatalog() {
   });
 
   const deleteExercise = useMutation({
-    mutationFn: (exerciseId: number) => api.deleteExercise(exerciseId),
+    mutationFn: (exerciseId: number) => deleteExerciseApi(exerciseId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
@@ -607,7 +630,7 @@ export default function StrengthCatalog() {
   });
 
   const deleteSession = useMutation({
-    mutationFn: (sessionId: number) => api.deleteStrengthSession(sessionId),
+    mutationFn: (sessionId: number) => deleteStrengthSession(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
@@ -617,7 +640,7 @@ export default function StrengthCatalog() {
   });
 
   const updateSession = useMutation({
-    mutationFn: (data: StrengthSessionInput) => api.updateStrengthSession(data),
+    mutationFn: (data: StrengthSessionInput) => updateStrengthSession(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
@@ -629,12 +652,12 @@ export default function StrengthCatalog() {
   });
 
   const persistOrder = useMutation({
-    mutationFn: (session: StrengthSessionTemplate) => api.persistStrengthSessionOrder(session),
+    mutationFn: (session: StrengthSessionTemplate) => persistStrengthSessionOrder(session),
   });
 
   const createFolder = useMutation({
     mutationFn: (args: { name: string; type: 'session' | 'exercise'; parentId?: number; athleteId?: number }) =>
-      api.createStrengthFolder(args.name, args.type, {
+      createStrengthFolder(args.name, args.type, {
         parentId: args.parentId ?? null,
         athleteId: args.athleteId ?? null,
       }),
@@ -646,7 +669,7 @@ export default function StrengthCatalog() {
 
   const renameFolder = useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
-      api.renameStrengthFolder(id, name),
+      renameStrengthFolder(id, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast({ title: "Dossier renommé" });
@@ -654,7 +677,7 @@ export default function StrengthCatalog() {
   });
 
   const deleteFolderMut = useMutation({
-    mutationFn: (id: number) => api.deleteStrengthFolder(id),
+    mutationFn: (id: number) => deleteStrengthFolder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
@@ -666,7 +689,7 @@ export default function StrengthCatalog() {
 
   const moveItem = useMutation({
     mutationFn: ({ itemId, folderId, table }: { itemId: number; folderId: number | null; table: 'strength_sessions' | 'dim_exercices' }) =>
-      api.moveToFolder(itemId, folderId, table),
+      moveToFolder(itemId, folderId, table),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
@@ -678,18 +701,18 @@ export default function StrengthCatalog() {
   const copyMutation = useMutation({
     mutationFn: async ({ mode, sourceId, targetAthleteId }: { mode: string; sourceId: number; targetAthleteId: number }) => {
       if (mode === "session") {
-        const targetFolders = await api.getStrengthFolders("session", { athleteId: targetAthleteId });
+        const targetFolders = await getStrengthFolders("session", { athleteId: targetAthleteId });
         const rootFolder = targetFolders.find((f) => f.athlete_id === targetAthleteId && !f.parent_id);
         let targetFolderId: number | null = null;
         if (rootFolder) {
           const subs = targetFolders.filter((f) => f.parent_id === rootFolder.id);
           targetFolderId = subs[0]?.id ?? rootFolder.id;
         }
-        await api.duplicateStrengthSession(sourceId, targetFolderId);
+        await duplicateStrengthSession(sourceId, targetFolderId);
       } else if (mode === "folder") {
-        await api.duplicateFolder(sourceId, targetAthleteId, null);
+        await duplicateFolder(sourceId, targetAthleteId, null);
       } else if (mode === "plan") {
-        await api.duplicateAthletePlan(sourceId, targetAthleteId);
+        await duplicateAthletePlan(sourceId, targetAthleteId);
       }
     },
     onSuccess: () => {
@@ -763,7 +786,7 @@ export default function StrengthCatalog() {
     if (assignTargetAthleteId == null) return;
     if (editingSessionId) {
       // Mode édition : assigner directement sans recréer
-      api.assignments_create({
+      assignments_create({
         session_type: "strength",
         session_id: editingSessionId,
         target_user_id: assignTargetAthleteId,

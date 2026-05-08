@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getRecentSessionsAllAthletes, getObjectivesCountsByUser } from "@/lib/api";
 import { getAthletesPaginated, getFeedbackRatesAllAthletes } from "@/lib/api/users";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -242,14 +242,14 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
 
   const { data: recentSessions = [] } = useQuery({
     queryKey: ["recent-sessions-all", 30],
-    queryFn: () => api.getRecentSessionsAllAthletes(30),
+    queryFn: () => getRecentSessionsAllAthletes(30),
     enabled: athletes.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: objectiveCounts } = useQuery({
     queryKey: ["objectives-counts-by-user"],
-    queryFn: () => api.getObjectivesCountsByUser(),
+    queryFn: () => getObjectivesCountsByUser(),
     enabled: athletes.length > 0,
     staleTime: 5 * 60 * 1000,
   });

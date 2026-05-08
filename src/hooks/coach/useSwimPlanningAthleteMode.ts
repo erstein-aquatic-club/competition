@@ -14,7 +14,18 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getAthletes,
+  getSwimPlanningSlotOverrides,
+  getSwimPlanningWeekMeta,
+  getSwimPlanningWeekOverrides,
+  upsertSwimPlanningSlot,
+  deleteSwimPlanningSlot,
+  upsertSwimPlanningSlotOverride,
+  deleteSwimPlanningSlotOverride,
+  upsertSwimPlanningWeekMeta,
+  upsertSwimPlanningWeekOverride,
+} from "@/lib/api";
 import type {
   SwimPlanningSlot,
   AthleteSummary,
@@ -89,7 +100,7 @@ export function useSwimPlanningAthleteMode({
   // ── Athlete list ──
   const { data: allAthletes = [] } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
 
   const groupAthletes = useMemo(
@@ -156,7 +167,7 @@ export function useSwimPlanningAthleteMode({
       visibleWeekKeys,
     ],
     queryFn: () =>
-      api.getSwimPlanningSlotOverrides({
+      getSwimPlanningSlotOverrides({
         athleteId: selectedAthleteId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -167,7 +178,7 @@ export function useSwimPlanningAthleteMode({
   const { data: groupWeekMeta = [] } = useQuery({
     queryKey: ["swim-planning-week-meta", selectedGroupId, visibleWeekKeys],
     queryFn: () =>
-      api.getSwimPlanningWeekMeta({
+      getSwimPlanningWeekMeta({
         groupId: selectedGroupId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -182,7 +193,7 @@ export function useSwimPlanningAthleteMode({
       visibleWeekKeys,
     ],
     queryFn: () =>
-      api.getSwimPlanningWeekOverrides({
+      getSwimPlanningWeekOverrides({
         athleteId: selectedAthleteId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -251,8 +262,8 @@ export function useSwimPlanningAthleteMode({
 
   // Group-mode slot upsert
   const upsertMutation = useMutation({
-    mutationFn: (input: Parameters<typeof api.upsertSwimPlanningSlot>[0]) =>
-      api.upsertSwimPlanningSlot(input),
+    mutationFn: (input: Parameters<typeof upsertSwimPlanningSlot>[0]) =>
+      upsertSwimPlanningSlot(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-slots"],
@@ -262,7 +273,7 @@ export function useSwimPlanningAthleteMode({
 
   // Group-mode slot delete
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.deleteSwimPlanningSlot(id),
+    mutationFn: (id: string) => deleteSwimPlanningSlot(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-slots"],
@@ -273,8 +284,8 @@ export function useSwimPlanningAthleteMode({
   // Athlete-mode slot override upsert
   const upsertOverrideMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertSwimPlanningSlotOverride>[0],
-    ) => api.upsertSwimPlanningSlotOverride(input),
+      input: Parameters<typeof upsertSwimPlanningSlotOverride>[0],
+    ) => upsertSwimPlanningSlotOverride(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-slot-overrides"],
@@ -284,7 +295,7 @@ export function useSwimPlanningAthleteMode({
 
   // Athlete-mode slot override delete
   const deleteOverrideMutation = useMutation({
-    mutationFn: (id: string) => api.deleteSwimPlanningSlotOverride(id),
+    mutationFn: (id: string) => deleteSwimPlanningSlotOverride(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-slot-overrides"],
@@ -295,8 +306,8 @@ export function useSwimPlanningAthleteMode({
   // Group-level week meta upsert
   const upsertGroupMetaMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertSwimPlanningWeekMeta>[0],
-    ) => api.upsertSwimPlanningWeekMeta(input),
+      input: Parameters<typeof upsertSwimPlanningWeekMeta>[0],
+    ) => upsertSwimPlanningWeekMeta(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-week-meta"],
@@ -307,8 +318,8 @@ export function useSwimPlanningAthleteMode({
   // Athlete-level week override upsert
   const upsertAthleteWeekOverrideMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertSwimPlanningWeekOverride>[0],
-    ) => api.upsertSwimPlanningWeekOverride(input),
+      input: Parameters<typeof upsertSwimPlanningWeekOverride>[0],
+    ) => upsertSwimPlanningWeekOverride(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["swim-planning-week-overrides"],

@@ -4,7 +4,23 @@ import { endOfMonth, format, startOfMonth, subDays, subMonths } from "date-fns";
 import { motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, summarizeApiError, type TimesheetLocation, type TimesheetGroupLabel } from "@/lib/api";
+import {
+  summarizeApiError,
+  type TimesheetLocation,
+  type TimesheetGroupLabel,
+  listTimesheetShifts,
+  listTimesheetLocations,
+  listPermanentGroupsForTimesheet,
+  listTimesheetGroupLabels,
+  getCapabilities,
+  createTimesheetShift,
+  updateTimesheetShift,
+  deleteTimesheetShift,
+  createTimesheetLocation,
+  deleteTimesheetLocation,
+  createTimesheetGroupLabel,
+  deleteTimesheetGroupLabel,
+} from "@/lib/api";
 import { supabaseConfig } from "@/lib/config";
 import { useToast } from "@/hooks/use-toast";
 import { SafeArea } from "@/components/shared/SafeArea";
@@ -141,31 +157,31 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   // ─── Queries ──
   const { data: shifts = [], error: shiftsError } = useQuery({
     queryKey: ["timesheet-shifts", userId],
-    queryFn: () => api.listTimesheetShifts({ coachId: userId ?? undefined }),
+    queryFn: () => listTimesheetShifts({ coachId: userId ?? undefined }),
     enabled: isCoach,
   });
 
   const { data: locations = [], error: locationsError } = useQuery<TimesheetLocation[]>({
     queryKey: ["timesheet-locations"],
-    queryFn: () => api.listTimesheetLocations(),
+    queryFn: () => listTimesheetLocations(),
     enabled: isCoach,
   });
 
   const { data: permanentGroups = [] } = useQuery({
     queryKey: ["timesheet-permanent-groups"],
-    queryFn: () => api.listPermanentGroupsForTimesheet(),
+    queryFn: () => listPermanentGroupsForTimesheet(),
     enabled: isCoach,
   });
 
   const { data: customGroupLabels = [] } = useQuery<TimesheetGroupLabel[]>({
     queryKey: ["timesheet-group-labels"],
-    queryFn: () => api.listTimesheetGroupLabels(),
+    queryFn: () => listTimesheetGroupLabels(),
     enabled: isCoach,
   });
 
   const { data: capabilities, error: capabilitiesError } = useQuery({
     queryKey: ["capabilities", "timesheet"],
-    queryFn: () => api.getCapabilities(),
+    queryFn: () => getCapabilities(),
     enabled: supabaseConfig.hasSupabase,
   });
 
@@ -182,7 +198,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   }, [defaultLocation]);
 
   const createShift = useMutation({
-    mutationFn: (payload: Omit<TimesheetShift, "id" | "coach_name">) => api.createTimesheetShift(payload),
+    mutationFn: (payload: Omit<TimesheetShift, "id" | "coach_name">) => createTimesheetShift(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
       resetForm();
@@ -194,7 +210,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const updateShift = useMutation({
-    mutationFn: (payload: Partial<TimesheetShift> & { id: number }) => api.updateTimesheetShift(payload),
+    mutationFn: (payload: Partial<TimesheetShift> & { id: number }) => updateTimesheetShift(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
       setIsSheetOpen(false);
@@ -208,7 +224,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const deleteShift = useMutation({
-    mutationFn: (payload: { id: number }) => api.deleteTimesheetShift(payload),
+    mutationFn: (payload: { id: number }) => deleteTimesheetShift(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
     },
@@ -218,7 +234,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const createLocation = useMutation({
-    mutationFn: (payload: { name: string }) => api.createTimesheetLocation(payload),
+    mutationFn: (payload: { name: string }) => createTimesheetLocation(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
     },
@@ -228,7 +244,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const deleteLocation = useMutation({
-    mutationFn: (payload: { id: number }) => api.deleteTimesheetLocation(payload),
+    mutationFn: (payload: { id: number }) => deleteTimesheetLocation(payload),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
       const remaining = locations.filter((item) => item.id !== variables.id);
@@ -242,7 +258,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const createGroupLabel = useMutation({
-    mutationFn: (payload: { name: string }) => api.createTimesheetGroupLabel(payload),
+    mutationFn: (payload: { name: string }) => createTimesheetGroupLabel(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-group-labels"] });
     },
@@ -252,7 +268,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const deleteGroupLabel = useMutation({
-    mutationFn: (payload: { id: number }) => api.deleteTimesheetGroupLabel(payload),
+    mutationFn: (payload: { id: number }) => deleteTimesheetGroupLabel(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-group-labels"] });
     },

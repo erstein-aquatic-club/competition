@@ -1,6 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getCompetitionRaces,
+  getRaceRoutines,
+  getRoutineTemplates,
+  setRaceRoutine,
+  removeRaceRoutine,
+  deleteRoutineTemplate,
+  createRoutineTemplate,
+} from "@/lib/api";
 import type { CompetitionRace, RoutineTemplate, RoutineStepInput } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -60,17 +68,17 @@ export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
 
   const { data: races = [], isLoading: loadingRaces } = useQuery({
     queryKey: ["competition-races", competitionId],
-    queryFn: () => api.getCompetitionRaces(competitionId),
+    queryFn: () => getCompetitionRaces(competitionId),
   });
 
   const { data: raceRoutines = [], isLoading: loadingRoutines } = useQuery({
     queryKey: ["race-routines", competitionId],
-    queryFn: () => api.getRaceRoutines(competitionId),
+    queryFn: () => getRaceRoutines(competitionId),
   });
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ["routine-templates"],
-    queryFn: () => api.getRoutineTemplates(),
+    queryFn: () => getRoutineTemplates(),
   });
 
   /* ── Derived lookups ──────────────────────────────────── */
@@ -96,7 +104,7 @@ export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
 
   const setRoutineMutation = useMutation({
     mutationFn: ({ raceId, routineId }: { raceId: string; routineId: string }) =>
-      api.setRaceRoutine(raceId, routineId),
+      setRaceRoutine(raceId, routineId),
     onSuccess: () => {
       invalidateAll();
       toast({ title: "Routine assignee" });
@@ -107,7 +115,7 @@ export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
   });
 
   const removeRoutineMutation = useMutation({
-    mutationFn: (raceId: string) => api.removeRaceRoutine(raceId),
+    mutationFn: (raceId: string) => removeRaceRoutine(raceId),
     onSuccess: () => {
       invalidateAll();
       toast({ title: "Routine retiree" });
@@ -117,7 +125,7 @@ export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
   });
 
   const deleteTemplateMutation = useMutation({
-    mutationFn: (id: string) => api.deleteRoutineTemplate(id),
+    mutationFn: (id: string) => deleteRoutineTemplate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["routine-templates"] });
       queryClient.invalidateQueries({ queryKey: ["race-routines", competitionId] });
@@ -378,7 +386,7 @@ function CreateRoutineSheet({
 
   const createMutation = useMutation({
     mutationFn: ({ n, s }: { n: string; s: RoutineStepInput[] }) =>
-      api.createRoutineTemplate(n, s),
+      createRoutineTemplate(n, s),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["routine-templates"] });
       toast({ title: "Template cree" });

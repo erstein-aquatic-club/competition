@@ -1,6 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  deleteSession,
+  syncSession,
+  saveSwimExerciseLogs,
+  updateSession,
+  setPlannedAbsence,
+  removePlannedAbsence,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import type { Session, Assignment, PlannedAbsence } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -132,7 +139,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (sessionId: number) => api.deleteSession(sessionId),
+    mutationFn: (sessionId: number) => deleteSession(sessionId),
     onMutate: () => {
       setSaveState("saving");
     },
@@ -153,14 +160,14 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
   const mutation = useMutation({
     mutationFn: async (data: Omit<Session, "id" | "created_at"> & { _exerciseLogs?: import("@/lib/api").SwimExerciseLogInput[] }) => {
       const { _exerciseLogs, ...sessionData } = data;
-      const result = await api.syncSession({ ...sessionData, athlete_name: user!, athlete_id: userId ?? undefined });
+      const result = await syncSession({ ...sessionData, athlete_name: user!, athlete_id: userId ?? undefined });
       // Save exercise logs if any
       if (_exerciseLogs && _exerciseLogs.length > 0 && result.sessionId) {
         try {
           const { data: authData } = await supabase.auth.getSession();
           const authUid = authData.session?.user?.id;
           if (authUid) {
-            await api.saveSwimExerciseLogs(result.sessionId, authUid, _exerciseLogs);
+            await saveSwimExerciseLogs(result.sessionId, authUid, _exerciseLogs);
           }
         } catch (e) {
           console.warn("[EAC] Failed to save exercise logs:", e);
@@ -195,14 +202,14 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
   const updateMutation = useMutation({
     mutationFn: async (data: Session & { _exerciseLogs?: import("@/lib/api").SwimExerciseLogInput[] }) => {
       const { _exerciseLogs, ...sessionData } = data;
-      const result = await api.updateSession(sessionData);
+      const result = await updateSession(sessionData);
       // Save exercise logs if any
       if (_exerciseLogs && sessionData.id) {
         try {
           const { data: authData } = await supabase.auth.getSession();
           const authUid = authData.session?.user?.id;
           if (authUid) {
-            await api.saveSwimExerciseLogs(sessionData.id, authUid, _exerciseLogs);
+            await saveSwimExerciseLogs(sessionData.id, authUid, _exerciseLogs);
           }
         } catch (e) {
           console.error("[EAC] Failed to save exercise logs:", e);
@@ -236,7 +243,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
 
   const absenceMutation = useMutation({
     mutationFn: ({ date, reason }: { date: string; reason?: string }) =>
-      api.setPlannedAbsence(date, reason),
+      setPlannedAbsence(date, reason),
     onMutate: async ({ date, reason }) => {
       await queryClient.cancelQueries({ queryKey: ["my-planned-absences"] });
       const previous = queryClient.getQueryData<PlannedAbsence[]>(["my-planned-absences"]);
@@ -258,7 +265,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
   });
 
   const removeAbsenceMutation = useMutation({
-    mutationFn: (date: string) => api.removePlannedAbsence(date),
+    mutationFn: (date: string) => removePlannedAbsence(date),
     onMutate: async (date) => {
       await queryClient.cancelQueries({ queryKey: ["my-planned-absences"] });
       const previous = queryClient.getQueryData<PlannedAbsence[]>(["my-planned-absences"]);

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getAllAssignments, assignSwimmer, unassignSwimmer, reassignSwimmer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import type { AthleteSummary, CoachSwimmerAssignment } from "@/lib/api/types";
@@ -228,7 +228,7 @@ export default function CoachMySwimmersScreen({
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ["all-assignments"],
-    queryFn: () => api.getAllAssignments(),
+    queryFn: () => getAllAssignments(),
   });
 
   const { data: coaches = [] } = useQuery<CoachInfo[]>({
@@ -264,18 +264,18 @@ export default function CoachMySwimmersScreen({
 
   const assignMutation = useMutation({
     mutationFn: ({ swimmerId, coachId }: { swimmerId: number; coachId: number }) =>
-      api.assignSwimmer(swimmerId, coachId, userId ?? 0),
+      assignSwimmer(swimmerId, coachId, userId ?? 0),
     onSuccess: invalidateKeys,
   });
 
   const unassignMutation = useMutation({
-    mutationFn: (swimmerId: number) => api.unassignSwimmer(swimmerId),
+    mutationFn: (swimmerId: number) => unassignSwimmer(swimmerId),
     onSuccess: invalidateKeys,
   });
 
   const reassignMutation = useMutation({
     mutationFn: ({ swimmerId, newCoachId }: { swimmerId: number; newCoachId: number }) =>
-      api.reassignSwimmer(swimmerId, newCoachId, userId ?? 0),
+      reassignSwimmer(swimmerId, newCoachId, userId ?? 0),
     onSuccess: invalidateKeys,
   });
 

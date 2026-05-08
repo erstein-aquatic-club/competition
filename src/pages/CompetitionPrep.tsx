@@ -1,7 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getCompetitions,
+  getCompetitionRaces,
+  getRaceRoutines,
+  getRoutineTemplates,
+} from "@/lib/api";
 import { eventLabel } from "@/lib/objectiveHelpers";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -81,7 +86,7 @@ export default function CompetitionPrep() {
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const competition = useMemo(
@@ -93,19 +98,19 @@ export default function CompetitionPrep() {
 
   const { data: races = [] } = useQuery({
     queryKey: ["competition-races", competitionId],
-    queryFn: () => api.getCompetitionRaces(competitionId!),
+    queryFn: () => getCompetitionRaces(competitionId!),
     enabled: !!competitionId,
   });
 
   const { data: raceRoutines = [] } = useQuery({
     queryKey: ["race-routines", competitionId],
-    queryFn: () => api.getRaceRoutines(competitionId!),
+    queryFn: () => getRaceRoutines(competitionId!),
     enabled: !!competitionId,
   });
 
   const { data: templates = [] } = useQuery({
     queryKey: ["routine-templates"],
-    queryFn: () => api.getRoutineTemplates(),
+    queryFn: () => getRoutineTemplates(),
   });
 
   /* ── Schedule push notifications for first routine step ── */

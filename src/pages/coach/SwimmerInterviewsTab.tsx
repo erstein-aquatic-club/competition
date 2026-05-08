@@ -1,14 +1,29 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type {
-  Interview,
-  InterviewStatus,
-  InterviewCoachInput,
-  Objective,
-  TrainingWeek,
-  TrainingWeekInput,
-  SwimmerPerformance,
+import {
+  getCompetitions,
+  getMyCompetitionIds,
+  getTrainingCycles,
+  getTrainingWeeks,
+  createTrainingCycle,
+  bulkUpsertTrainingWeeks,
+  upsertTrainingWeek,
+  getPreviousInterview,
+  updateInterviewCoachSections,
+  sendInterviewToAthlete,
+  deleteInterview,
+  getObjectives,
+  getProfile,
+  getSwimmerPerformances,
+  getInterviews,
+  createInterview,
+  type Interview,
+  type InterviewStatus,
+  type InterviewCoachInput,
+  type Objective,
+  type TrainingWeek,
+  type TrainingWeekInput,
+  type SwimmerPerformance,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -288,12 +303,12 @@ const InlinePlanning = ({
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: assignedIds = [] } = useQuery({
     queryKey: ["my-competition-ids", athleteId],
-    queryFn: () => api.getMyCompetitionIds(athleteId),
+    queryFn: () => getMyCompetitionIds(athleteId),
   });
 
   const assignedCompetitions = useMemo(() => {
@@ -310,7 +325,7 @@ const InlinePlanning = ({
 
   const { data: cycles = [] } = useQuery({
     queryKey: ["training-cycles", "athlete", athleteId],
-    queryFn: () => api.getTrainingCycles({ athleteId }),
+    queryFn: () => getTrainingCycles({ athleteId }),
   });
 
   const cyclesByCompetitionId = useMemo(() => {
@@ -340,7 +355,7 @@ const InlinePlanning = ({
   const weekQueries = useQueries({
     queries: plannedCycles.map((cycle) => ({
       queryKey: ["training-weeks", cycle.id],
-      queryFn: () => api.getTrainingWeeks(cycle.id),
+      queryFn: () => getTrainingWeeks(cycle.id),
       enabled: !!cycle.id,
     })),
   });
@@ -378,7 +393,7 @@ const InlinePlanning = ({
       const startCompetition = endIndex > 0 ? assignedCompetitions[endIndex - 1] : null;
       const startAnchor = startCompetition?.date ?? interviewDate;
 
-      const cycle = await api.createTrainingCycle({
+      const cycle = await createTrainingCycle({
         athlete_id: athleteId,
         group_id: null,
         start_competition_id: startCompetition?.id ?? null,
@@ -389,7 +404,7 @@ const InlinePlanning = ({
 
       const mondays = getMondays(startAnchor, endCompetition.date);
       if (mondays.length > 0) {
-        await api.bulkUpsertTrainingWeeks(
+        await bulkUpsertTrainingWeeks(
           mondays.map((monday) => ({ cycle_id: cycle.id, week_start: monday })),
         );
       }
@@ -406,7 +421,7 @@ const InlinePlanning = ({
   });
 
   const upsertWeekMutation = useMutation({
-    mutationFn: (input: TrainingWeekInput) => api.upsertTrainingWeek(input),
+    mutationFn: (input: TrainingWeekInput) => upsertTrainingWeek(input),
     onSuccess: () => {
       setEditingWeekKey(null);
       void queryClient.invalidateQueries({ queryKey: ["training-weeks"] });
@@ -657,7 +672,7 @@ const CoachInterviewCard = ({
   // Previous interview
   const { data: prevInterview } = useQuery({
     queryKey: ["previous-interview", athleteId, interview.date, interview.id],
-    queryFn: () => api.getPreviousInterview(athleteId, interview.date, interview.id),
+    queryFn: () => getPreviousInterview(athleteId, interview.date, interview.id),
     enabled: !!interview.date,
   });
 
@@ -691,7 +706,7 @@ const CoachInterviewCard = ({
   }, [buildCoachInput, interview]);
 
   const saveMutation = useMutation({
-    mutationFn: (input: InterviewCoachInput) => api.updateInterviewCoachSections(interview.id, input),
+    mutationFn: (input: InterviewCoachInput) => updateInterviewCoachSections(interview.id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
       toast({ title: "Sections coach enregistrées" });
@@ -703,8 +718,8 @@ const CoachInterviewCard = ({
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      await api.updateInterviewCoachSections(interview.id, buildCoachInput());
-      return api.sendInterviewToAthlete(interview.id);
+      await updateInterviewCoachSections(interview.id, buildCoachInput());
+      return sendInterviewToAthlete(interview.id);
     },
     onSuccess: () => {
       toast({ title: "Entretien envoyé au nageur" });
@@ -735,7 +750,7 @@ const CoachInterviewCard = ({
   };
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteInterview(interview.id),
+    mutationFn: () => deleteInterview(interview.id),
     onSuccess: () => {
       toast({ title: "Entretien supprimé" });
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
@@ -1067,13 +1082,13 @@ const SwimmerInterviewsTab = ({ athleteId, athleteName }: Props) => {
 
   const { data: objectives = [] } = useQuery({
     queryKey: ["objectives", athleteAuthId],
-    queryFn: () => api.getObjectives(athleteAuthId!),
+    queryFn: () => getObjectives(athleteAuthId!),
     enabled: !!athleteAuthId,
   });
 
   const { data: athleteProfile } = useQuery({
     queryKey: ["athlete-profile", athleteId],
-    queryFn: () => api.getProfile({ userId: athleteId }),
+    queryFn: () => getProfile({ userId: athleteId }),
     enabled: !!athleteId,
   });
   const athleteIuf = athleteProfile?.ffn_iuf ?? null;
@@ -1087,21 +1102,21 @@ const SwimmerInterviewsTab = ({ athleteId, athleteName }: Props) => {
 
   const { data: performances = [] } = useQuery({
     queryKey: ["swimmer-performances-recent", athleteIuf],
-    queryFn: () => api.getSwimmerPerformances({ iuf: athleteIuf!, fromDate: perfFromDate }),
+    queryFn: () => getSwimmerPerformances({ iuf: athleteIuf!, fromDate: perfFromDate }),
     enabled: !!athleteIuf,
   });
 
   // Interviews
   const { data: interviews = [], isLoading } = useQuery({
     queryKey: ["interviews", athleteId],
-    queryFn: () => api.getInterviews(athleteId),
+    queryFn: () => getInterviews(athleteId),
     enabled: !!athleteId,
   });
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: () =>
-      api.createInterview({ athlete_id: athleteId }),
+      createInterview({ athlete_id: athleteId }),
     onSuccess: () => {
       toast({ title: "Entretien créé" });
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });

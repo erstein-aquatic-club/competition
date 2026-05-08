@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getStrengthSessions, duplicateStrengthSession } from "@/lib/api";
 import { Dumbbell, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,13 +38,13 @@ export function AddSessionSheet({
 
   const { data: allSessions = [], isLoading } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
     enabled: open,
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (sessionId: number) =>
-      api.duplicateStrengthSession(sessionId, targetFolderId),
+      duplicateStrengthSession(sessionId, targetFolderId),
     onMutate: (sessionId) => setDuplicatingId(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });

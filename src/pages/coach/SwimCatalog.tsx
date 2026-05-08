@@ -1,6 +1,16 @@
 import React, { useEffect, useDeferredValue, useMemo, useState } from "react";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Assignment, SwimSessionItem, SwimSessionTemplate } from "@/lib/api";
+import {
+  type Assignment,
+  SwimSessionItem,
+  SwimSessionTemplate,
+  getAssignmentsForCoach,
+  migrateLocalStorageArchive,
+  createSwimSession,
+  deleteSwimSession,
+  archiveSwimSession,
+  moveSwimSession,
+} from "@/lib/api";
 import type { SwimSessionInput, SwimPayloadFields } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -261,7 +271,7 @@ export default function SwimCatalog({
 
   const { data: assignments, isLoading: assignmentsLoading, isError: assignmentsError, error: assignmentsErrorObj, refetch: refetchAssignments } = useQuery({
     queryKey: ["coach-assignments"],
-    queryFn: () => api.getAssignmentsForCoach(),
+    queryFn: () => getAssignmentsForCoach(),
     enabled: role === "coach" || role === "admin",
   });
 
@@ -299,7 +309,7 @@ export default function SwimCatalog({
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         const ids = parsed.map(Number).filter(Number.isFinite);
-        api.migrateLocalStorageArchive(ids).then(() => {
+        migrateLocalStorageArchive(ids).then(() => {
           window.localStorage.removeItem(ARCHIVED_SWIM_SESSIONS_KEY);
           window.localStorage.setItem(ARCHIVE_MIGRATED_KEY, "true");
           queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
@@ -391,7 +401,7 @@ export default function SwimCatalog({
   }, [sessions, showArchive]);
 
   const createSession = useMutation({
-    mutationFn: (data: SwimSessionInput) => api.createSwimSession(data),
+    mutationFn: (data: SwimSessionInput) => createSwimSession(data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
@@ -411,7 +421,7 @@ export default function SwimCatalog({
   });
 
   const deleteSession = useMutation({
-    mutationFn: (sessionId: number) => api.deleteSwimSession(sessionId),
+    mutationFn: (sessionId: number) => deleteSwimSession(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
@@ -429,7 +439,7 @@ export default function SwimCatalog({
 
   const archiveMutation = useMutation({
     mutationFn: ({ sessionId, archived }: { sessionId: number; archived: boolean }) =>
-      api.archiveSwimSession(sessionId, archived),
+      archiveSwimSession(sessionId, archived),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
@@ -442,7 +452,7 @@ export default function SwimCatalog({
 
   const moveMutation = useMutation({
     mutationFn: ({ sessionId, folder }: { sessionId: number; folder: string | null }) =>
-      api.moveSwimSession(sessionId, folder),
+      moveSwimSession(sessionId, folder),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });

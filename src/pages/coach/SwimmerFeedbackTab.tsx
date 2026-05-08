@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { updateSessionCoachNotes, getSessions } from "@/lib/api";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -83,7 +83,7 @@ function CoachNotePopover({
 
   const mutation = useMutation({
     mutationFn: (newNotes: string | null) =>
-      api.updateSessionCoachNotes(sessionId, newNotes),
+      updateSessionCoachNotes(sessionId, newNotes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions", athleteId] });
       setOpen(false);
@@ -167,7 +167,7 @@ export default function SwimmerFeedbackTab({
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ["sessions", athleteId],
-    queryFn: () => api.getSessions(athleteName, athleteId),
+    queryFn: () => getSessions(athleteName, athleteId),
   });
 
   const windowBounds = useMemo(() => {

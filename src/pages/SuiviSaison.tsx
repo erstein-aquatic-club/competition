@@ -2,7 +2,17 @@ import { useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@/lib/api";
+import {
+  getSwimPlanningSlots,
+  getCompetitions,
+  getMyCompetitionIds,
+  getTrainingCycles,
+  getMyInterviews,
+  getAthleteObjectives,
+  getProfile,
+  getSwimmerPerformances,
+  getTrainingWeeks,
+} from "@/lib/api";
 import type { TrainingWeek, Interview } from "@/lib/api";
 import type { SwimPlanningSlot } from "@/lib/api/types";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
@@ -252,7 +262,7 @@ function WeekFiliereGrid({ monday, groupId }: { monday: string; groupId: number 
 
   const { data: slots = [], isLoading } = useQuery({
     queryKey: ["swim-planning-slots-week", groupId, monday],
-    queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts }),
+    queryFn: () => getSwimPlanningSlots({ groupId, weekStarts }),
     enabled: !!groupId,
     staleTime: 60_000,
   });
@@ -310,29 +320,29 @@ export default function SuiviSaison() {
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: assignedIds = [] } = useQuery({
     queryKey: ["my-competition-ids", userId],
-    queryFn: () => api.getMyCompetitionIds(userId!),
+    queryFn: () => getMyCompetitionIds(userId!),
     enabled: !!userId,
   });
 
   const { data: cycles = [] } = useQuery({
     queryKey: ["training-cycles", "athlete", userId],
-    queryFn: () => api.getTrainingCycles({ athleteId: userId! }),
+    queryFn: () => getTrainingCycles({ athleteId: userId! }),
     enabled: !!userId,
   });
 
   const { data: interviews = [] } = useQuery({
     queryKey: ["my-interviews"],
-    queryFn: () => api.getMyInterviews(),
+    queryFn: () => getMyInterviews(),
   });
 
   const { data: objectives = [] } = useQuery({
     queryKey: ["athlete-objectives"],
-    queryFn: () => api.getAthleteObjectives(),
+    queryFn: () => getAthleteObjectives(),
   });
 
   // Fetch profile for IUF + performances + group_id
@@ -347,7 +357,7 @@ export default function SuiviSaison() {
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-iuf"],
-    queryFn: () => api.getProfile({ userId: appUserId }),
+    queryFn: () => getProfile({ userId: appUserId }),
     enabled: !!appUserId,
   });
   const iuf = profile?.ffn_iuf ?? null;
@@ -361,7 +371,7 @@ export default function SuiviSaison() {
 
   const { data: performances = [] } = useQuery({
     queryKey: ["swimmer-performances-recent", iuf],
-    queryFn: () => api.getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
+    queryFn: () => getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
     enabled: !!iuf,
   });
 
@@ -406,7 +416,7 @@ export default function SuiviSaison() {
   const weekQueries = useQueries({
     queries: plannedCycles.map((cycle) => ({
       queryKey: ["training-weeks", cycle.id],
-      queryFn: () => api.getTrainingWeeks(cycle.id),
+      queryFn: () => getTrainingWeeks(cycle.id),
       enabled: !!cycle.id,
     })),
   });

@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getAthletes,
+  getGroups,
+  getCompetitionAssignments,
+  createCompetition,
+  setCompetitionAssignments,
+  updateCompetition,
+  deleteCompetition,
+  getCompetitions,
+} from "@/lib/api";
 import type { Competition, CompetitionInput } from "@/lib/api";
 import { getAllPendingInterviews } from "@/lib/api/interviews";
 import { getTrainingCycles } from "@/lib/api/planning";
@@ -101,17 +110,17 @@ const CompetitionFormSheet = ({
 
   const { data: athletes = [] } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
 
   const { data: groups = [] } = useQuery({
     queryKey: ["groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
   });
 
   const { data: existingAssignments } = useQuery({
     queryKey: ["competition-assignments", competition?.id],
-    queryFn: () => api.getCompetitionAssignments(competition!.id),
+    queryFn: () => getCompetitionAssignments(competition!.id),
     enabled: !!competition?.id,
   });
 
@@ -139,12 +148,12 @@ const CompetitionFormSheet = ({
   }, [open, competition, existingAssignments]);
 
   const createMutation = useMutation({
-    mutationFn: (input: CompetitionInput) => api.createCompetition(input),
+    mutationFn: (input: CompetitionInput) => createCompetition(input),
     onSuccess: async (result) => {
       // Save competition assignments
       if (assignedAthleteIds.size > 0) {
         try {
-          await api.setCompetitionAssignments(result.id, Array.from(assignedAthleteIds));
+          await setCompetitionAssignments(result.id, Array.from(assignedAthleteIds));
         } catch (e) {
           console.warn("[EAC] Failed to save competition assignments:", e);
         }
@@ -165,11 +174,11 @@ const CompetitionFormSheet = ({
 
   const updateMutation = useMutation({
     mutationFn: (input: Partial<CompetitionInput>) =>
-      api.updateCompetition(competition!.id, input),
+      updateCompetition(competition!.id, input),
     onSuccess: async () => {
       // Save competition assignments
       try {
-        await api.setCompetitionAssignments(competition!.id, Array.from(assignedAthleteIds));
+        await setCompetitionAssignments(competition!.id, Array.from(assignedAthleteIds));
       } catch (e) {
         console.warn("[EAC] Failed to save competition assignments:", e);
       }
@@ -188,7 +197,7 @@ const CompetitionFormSheet = ({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteCompetition(competition!.id),
+    mutationFn: () => deleteCompetition(competition!.id),
     onSuccess: () => {
       toast({ title: "Competition supprimee" });
       void queryClient.invalidateQueries({ queryKey: ["competitions"] });
@@ -720,7 +729,7 @@ const CoachCompetitionsScreen = ({ onBack }: CoachCompetitionsScreenProps) => {
 
   const { data: competitions = [], isLoading: compLoading } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: interviews = [], isLoading: intvLoading } = useQuery({

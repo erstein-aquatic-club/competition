@@ -1,6 +1,14 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  createObjective,
+  updateObjective,
+  deleteObjective,
+  getCompetitions,
+  getObjectives,
+  getProfile,
+  getSwimmerPerformances,
+} from "@/lib/api";
 import type { Objective, ObjectiveInput, Competition } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -171,7 +179,7 @@ const ObjectiveFormSheet = ({
   }, [open, objective]);
 
   const createMutation = useMutation({
-    mutationFn: (input: ObjectiveInput) => api.createObjective(input),
+    mutationFn: (input: ObjectiveInput) => createObjective(input),
     onSuccess: (data: Objective) => {
       toast({ title: "Objectif créé" });
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
@@ -189,7 +197,7 @@ const ObjectiveFormSheet = ({
 
   const updateMutation = useMutation({
     mutationFn: (input: Partial<ObjectiveInput>) =>
-      api.updateObjective(objective!.id, input),
+      updateObjective(objective!.id, input),
     onSuccess: (data: Objective) => {
       toast({ title: "Objectif mis à jour" });
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
@@ -206,7 +214,7 @@ const ObjectiveFormSheet = ({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteObjective(objective!.id),
+    mutationFn: () => deleteObjective(objective!.id),
     onSuccess: () => {
       toast({ title: "Objectif supprimé" });
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
@@ -485,20 +493,20 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
   // Competitions query
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   // Objectives query
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
     queryKey: ["objectives", athleteAuthId],
-    queryFn: () => api.getObjectives(athleteAuthId!),
+    queryFn: () => getObjectives(athleteAuthId!),
     enabled: !!athleteAuthId,
   });
 
   // Fetch athlete IUF for performance lookup
   const { data: athleteProfile } = useQuery({
     queryKey: ["profile", athleteId],
-    queryFn: () => api.getProfile({ userId: athleteId }),
+    queryFn: () => getProfile({ userId: athleteId }),
     enabled: !!athleteId,
   });
   const athleteIuf = athleteProfile?.ffn_iuf ?? null;
@@ -509,7 +517,7 @@ const SwimmerObjectivesTab = ({ athleteId, athleteName, authUidError }: Props) =
   }, []);
   const { data: performances = [] } = useQuery({
     queryKey: ["swimmer-performances-recent", athleteIuf],
-    queryFn: () => api.getSwimmerPerformances({ iuf: athleteIuf!, fromDate: perfFromDate }),
+    queryFn: () => getSwimmerPerformances({ iuf: athleteIuf!, fromDate: perfFromDate }),
     enabled: !!athleteIuf,
   });
 

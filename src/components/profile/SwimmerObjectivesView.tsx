@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getObjectives,
+  getProfile,
+  getSwimmerPerformances,
+  createObjective,
+  updateObjective,
+  deleteObjective,
+} from "@/lib/api";
 import type { Objective, ObjectiveInput } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -76,7 +83,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   // Get objectives for current athlete
   const { data: objectives = [], isLoading } = useQuery({
     queryKey: ["athlete-objectives", authUid],
-    queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
+    queryFn: () => (authUid ? getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: "always",
@@ -87,7 +94,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   const user = useAuth((s) => s.user);
   const { data: profile } = useQuery({
     queryKey: ["my-profile"],
-    queryFn: () => api.getProfile({ displayName: user, userId }),
+    queryFn: () => getProfile({ displayName: user, userId }),
     enabled: !!userId,
   });
   const iuf = profile?.ffn_iuf ?? null;
@@ -107,7 +114,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   }, []);
   const { data: performances = [] } = useQuery({
     queryKey: ["swimmer-performances-recent", iuf],
-    queryFn: () => api.getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
+    queryFn: () => getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
     enabled: !!iuf,
   });
 
@@ -172,7 +179,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
     queryClient.invalidateQueries({ queryKey: ["athlete-objectives"] });
 
   const createMut = useMutation({
-    mutationFn: (input: ObjectiveInput) => api.createObjective(input),
+    mutationFn: (input: ObjectiveInput) => createObjective(input),
     onSuccess: () => {
       toast({ title: "Objectif créé" });
       invalidate();
@@ -184,7 +191,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
 
   const updateMut = useMutation({
     mutationFn: (input: Partial<ObjectiveInput>) =>
-      api.updateObjective(editingObj!.id, input),
+      updateObjective(editingObj!.id, input),
     onSuccess: () => {
       toast({ title: "Objectif mis à jour" });
       invalidate();
@@ -195,7 +202,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => api.deleteObjective(id),
+    mutationFn: (id: string) => deleteObjective(id),
     onSuccess: () => {
       toast({ title: "Objectif supprimé" });
       invalidate();

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getCompetitionRaces, getRaceRoutines, getRoutineTemplates } from "@/lib/api";
 import { eventLabel } from "@/lib/objectiveHelpers";
 import { Clock } from "lucide-react";
 
@@ -75,17 +75,17 @@ export default function TimelineTab({
 
   const { data: races = [] } = useQuery({
     queryKey: ["competition-races", competitionId],
-    queryFn: () => api.getCompetitionRaces(competitionId),
+    queryFn: () => getCompetitionRaces(competitionId),
   });
 
   const { data: raceRoutines = [] } = useQuery({
     queryKey: ["race-routines", competitionId],
-    queryFn: () => api.getRaceRoutines(competitionId),
+    queryFn: () => getRaceRoutines(competitionId),
   });
 
   const { data: templates = [] } = useQuery({
     queryKey: ["routine-templates"],
-    queryFn: () => api.getRoutineTemplates(),
+    queryFn: () => getRoutineTemplates(),
   });
 
   /* ── Build timeline ──────────────────────────────────── */

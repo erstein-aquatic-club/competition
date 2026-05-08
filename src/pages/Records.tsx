@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState, Suspense, lazy, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
-import { api, type Exercise, type SwimmerPerformance } from "@/lib/api";
+import {
+  type Exercise,
+  type SwimmerPerformance,
+  get1RM,
+  getExercises,
+  getSwimRecords,
+  getProfile,
+  getSwimmerPerformances,
+  getAthleteObjectives,
+  importSwimmerPerformances,
+  update1RM as update1RMApi,
+  updateExerciseNote as updateExerciseNoteApi,
+  upsertSwimRecord as upsertSwimRecordApi,
+  deleteSwimRecord,
+} from "@/lib/api";
 import type { SwimRecordWithPool } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -274,26 +288,26 @@ export default function Records() {
   // --- SOURCE OF TRUTH: queries / keys / endpoints unchanged ---
   const oneRmQuery = useQuery<OneRmRecord[]>({
     queryKey: ["1rm", user, userId],
-    queryFn: () => api.get1RM({ athleteName: user, athleteId: userId }),
+    queryFn: () => get1RM({ athleteName: user, athleteId: userId }),
     enabled: !!user && showRecords,
   });
 
   const exercisesQuery = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises(),
+    queryFn: () => getExercises(),
     enabled: showRecords,
   });
 
   const swimRecordsQuery = useQuery({
     queryKey: ["swim-records", userId, user, "training"],
-    queryFn: () => api.getSwimRecords({ athleteId: userId ?? undefined, athleteName: user ?? undefined, recordType: "training" }),
+    queryFn: () => getSwimRecords({ athleteId: userId ?? undefined, athleteName: user ?? undefined, recordType: "training" }),
     enabled: !!user && showRecords && swimMode === "training",
   });
 
   // Profile query (for IUF)
   const profileQuery = useQuery({
     queryKey: ["profile", userId],
-    queryFn: () => api.getProfile({ userId: userId ?? undefined }),
+    queryFn: () => getProfile({ userId: userId ?? undefined }),
     enabled: !!userId && showRecords,
   });
   const userIuf = String(profileQuery.data?.ffn_iuf ?? "").trim();
@@ -309,7 +323,7 @@ export default function Records() {
   const performancesQuery = useQuery<SwimmerPerformance[]>({
     queryKey: ["swimmer-performances", userId, userIuf, histPoolLen],
     queryFn: () =>
-      api.getSwimmerPerformances({
+      getSwimmerPerformances({
         userId: userId ?? undefined,
         iuf: userIuf || undefined,
         poolLength: histPoolLen,
@@ -324,7 +338,7 @@ export default function Records() {
   const otherPoolQuery = useQuery<SwimmerPerformance[]>({
     queryKey: ["swimmer-performances", userId, userIuf, otherPoolLen],
     queryFn: () =>
-      api.getSwimmerPerformances({
+      getSwimmerPerformances({
         userId: userId ?? undefined,
         iuf: userIuf || undefined,
         poolLength: otherPoolLen,
@@ -336,7 +350,7 @@ export default function Records() {
   // Objectives query (for target line on chart)
   const { data: objectives = [] } = useQuery({
     queryKey: ["athlete-objectives"],
-    queryFn: () => api.getAthleteObjectives(),
+    queryFn: () => getAthleteObjectives(),
     enabled: showRecords,
   });
 
@@ -344,7 +358,7 @@ export default function Records() {
   const importPerformances = useMutation({
     mutationFn: () => {
       if (!userIuf) throw new Error("IUF FFN manquant. Ajoutez-le dans votre profil.");
-      return api.importSwimmerPerformances({ iuf: userIuf, userId: userId ?? undefined });
+      return importSwimmerPerformances({ iuf: userIuf, userId: userId ?? undefined });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["swimmer-performances"] });
@@ -508,7 +522,7 @@ export default function Records() {
 
   // --- SOURCE OF TRUTH: mutations / invalidateQueries unchanged ---
   const update1RM = useMutation({
-    mutationFn: (data: { exercise_id: number; one_rm?: number; weight?: number }) => api.update1RM({ ...data, athlete_id: userId, athlete_name: user }),
+    mutationFn: (data: { exercise_id: number; one_rm?: number; weight?: number }) => update1RMApi({ ...data, athlete_id: userId, athlete_name: user }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
       toast({ title: "1RM mis à jour" });
@@ -517,7 +531,7 @@ export default function Records() {
 
   const updateExerciseNote = useMutation({
     mutationFn: (data: { exercise_id: number; notes: string | null }) =>
-      api.updateExerciseNote({ athlete_id: userId!, exercise_id: data.exercise_id, notes: data.notes }),
+      updateExerciseNoteApi({ athlete_id: userId!, exercise_id: data.exercise_id, notes: data.notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
       toast({ title: "Note mise à jour" });
@@ -525,7 +539,7 @@ export default function Records() {
   });
 
   const upsertSwimRecord = useMutation({
-    mutationFn: (data: Parameters<typeof api.upsertSwimRecord>[0]) => api.upsertSwimRecord(data),
+    mutationFn: (data: Parameters<typeof upsertSwimRecordApi>[0]) => upsertSwimRecordApi(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim-records"] });
       setSwimForm(emptySwimForm);
@@ -535,7 +549,7 @@ export default function Records() {
   });
 
   const deleteSwimRecordMut = useMutation({
-    mutationFn: (id: number) => api.deleteSwimRecord(id),
+    mutationFn: (id: number) => deleteSwimRecord(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim-records"] });
       setSwimSheetOpen(false);

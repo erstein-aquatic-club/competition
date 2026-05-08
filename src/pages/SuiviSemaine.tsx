@@ -23,7 +23,15 @@ import {
   Heart,
   Dumbbell,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import {
+  getSwimmerSlots,
+  getAssignments,
+  getSessions,
+  getStrengthHistory,
+  getMyPlannedAbsences,
+  setPlannedAbsence,
+  removePlannedAbsence,
+} from "@/lib/api";
 import type { Session, PlannedAbsence, Assignment } from "@/lib/api";
 import type { ResolvedSlotAssignment } from "@/lib/api/types";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
@@ -393,7 +401,7 @@ export default function SuiviSemaine() {
   // Swimmer slots
   const { data: swimmerSlots = [] } = useQuery({
     queryKey: ["swimmer-slots", userId],
-    queryFn: () => api.getSwimmerSlots(userId!),
+    queryFn: () => getSwimmerSlots(userId!),
     enabled: !!userId,
   });
 
@@ -410,7 +418,7 @@ export default function SuiviSemaine() {
 
   const { data: assignments = [] } = useQuery({
     queryKey: ["assignments", userId, "week-view"],
-    queryFn: () => api.getAssignments(user ?? "", userId),
+    queryFn: () => getAssignments(user ?? "", userId),
     enabled: !!userId && !!user,
   });
 
@@ -453,7 +461,7 @@ export default function SuiviSemaine() {
   // Swim sessions (ressentis)
   const { data: allSessions = [] } = useQuery({
     queryKey: ["sessions", userId],
-    queryFn: () => api.getSessions(user!, userId),
+    queryFn: () => getSessions(user!, userId),
     enabled: !!user,
   });
 
@@ -461,7 +469,7 @@ export default function SuiviSemaine() {
   const { data: strengthHistory } = useQuery({
     queryKey: ["strength-history-week", userId, weekISOs[0], weekISOs[6]],
     queryFn: () =>
-      api.getStrengthHistory(user ?? "", {
+      getStrengthHistory(user ?? "", {
         athleteId: userId,
         from: weekISOs[0],
         to: weekISOs[6],
@@ -475,7 +483,7 @@ export default function SuiviSemaine() {
   // Absences
   const { data: myAbsences = [] } = useQuery({
     queryKey: ["my-absences"],
-    queryFn: () => api.getMyPlannedAbsences(),
+    queryFn: () => getMyPlannedAbsences(),
     enabled: !!userId,
   });
 
@@ -491,7 +499,7 @@ export default function SuiviSemaine() {
 
   const absenceMutation = useMutation({
     mutationFn: ({ date, reason }: { date: string; reason?: string }) =>
-      api.setPlannedAbsence(date, reason),
+      setPlannedAbsence(date, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
       queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
@@ -500,7 +508,7 @@ export default function SuiviSemaine() {
   });
 
   const removeAbsenceMutation = useMutation({
-    mutationFn: (date: string) => api.removePlannedAbsence(date),
+    mutationFn: (date: string) => removePlannedAbsence(date),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
       queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });

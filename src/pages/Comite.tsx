@@ -3,7 +3,12 @@ import { Redirect } from "wouter";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, summarizeApiError } from "@/lib/api";
+import {
+  summarizeApiError,
+  listTimesheetCoaches,
+  listTimesheetShifts,
+  getCapabilities,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,7 +40,7 @@ export default function Comite() {
 
   const { data: coaches = [] } = useQuery({
     queryKey: ["timesheet-coaches"],
-    queryFn: () => api.listTimesheetCoaches(),
+    queryFn: () => listTimesheetCoaches(),
     enabled: isComite,
   });
 
@@ -43,13 +48,13 @@ export default function Comite() {
 
   const { data: shifts = [], error: shiftsError } = useQuery({
     queryKey: ["timesheet-shifts", coachId ?? "all"],
-    queryFn: () => api.listTimesheetShifts({ coachId }),
+    queryFn: () => listTimesheetShifts({ coachId }),
     enabled: isComite,
   });
 
   const { data: capabilities, error: capabilitiesError } = useQuery({
     queryKey: ["capabilities", "timesheet"],
-    queryFn: () => api.getCapabilities(),
+    queryFn: () => getCapabilities(),
     enabled: supabaseConfig.hasSupabase,
   });
 

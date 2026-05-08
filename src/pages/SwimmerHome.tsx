@@ -1,7 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getProfile,
+  getAssignments,
+  getSessions,
+  getSwimmerSlots,
+  getCompetitions,
+  getMyCompetitionIds,
+  getMyPlannedAbsences,
+  notifications_list,
+} from "@/lib/api";
 import { filterVisibleNotifications, readDismissedNotificationTargetIds } from "@/lib/notificationsVisibility";
 import type { Competition, Session } from "@/lib/api";
 import { useLocation } from "wouter";
@@ -195,7 +204,7 @@ export default function SwimmerHome() {
   // ── Profile ──────────────────────────────────────────────────
   const { data: profile } = useQuery({
     queryKey: ["profile", user, userId],
-    queryFn: () => api.getProfile({ displayName: user, userId }),
+    queryFn: () => getProfile({ displayName: user, userId }),
     enabled: !!user,
   });
 
@@ -206,19 +215,19 @@ export default function SwimmerHome() {
   // ── Section C: Today's sessions ──────────────────────────────
   const { data: assignments } = useQuery({
     queryKey: ["assignments", user],
-    queryFn: () => api.getAssignments(user!, userId),
+    queryFn: () => getAssignments(user!, userId),
     enabled: !!user,
   });
 
   const { data: sessions } = useQuery({
     queryKey: ["sessions", userId ?? user],
-    queryFn: () => api.getSessions(user!, userId),
+    queryFn: () => getSessions(user!, userId),
     enabled: !!user,
   });
 
   const { data: swimmerSlots } = useQuery({
     queryKey: ["swimmer-slots", userId],
-    queryFn: () => api.getSwimmerSlots(userId!),
+    queryFn: () => getSwimmerSlots(userId!),
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
   });
@@ -413,12 +422,12 @@ export default function SwimmerHome() {
   // ── Section D: Next competition ──────────────────────────────
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: myCompetitionIds } = useQuery({
     queryKey: ["my-competition-ids", userId],
-    queryFn: () => api.getMyCompetitionIds(userId),
+    queryFn: () => getMyCompetitionIds(userId),
     enabled: !!userId,
   });
 
@@ -453,7 +462,7 @@ export default function SwimmerHome() {
   // Training-days-remaining banner (matches Dashboard.tsx logic)
   const { data: myAbsences = [] } = useQuery({
     queryKey: ["my-planned-absences"],
-    queryFn: () => api.getMyPlannedAbsences(),
+    queryFn: () => getMyPlannedAbsences(),
     enabled: !!nextCompetition,
   });
 
@@ -484,7 +493,7 @@ export default function SwimmerHome() {
   const { data: notificationsResult } = useQuery({
     queryKey: ["notifications-home", userId],
     queryFn: () =>
-      api.notifications_list({
+      notifications_list({
         targetUserId: userId,
         limit: 20,
         status: "unread",

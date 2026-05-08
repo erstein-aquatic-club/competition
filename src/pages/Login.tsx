@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { api } from "@/lib/api";
+import { getGroups } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -96,7 +96,7 @@ export default function Login() {
 
   const { data: groups = [], isLoading: groupsLoading, isError: groupsError } = useQuery({
     queryKey: ["register-groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
     enabled: activeTab === "signup",
     retry: 2,
   });

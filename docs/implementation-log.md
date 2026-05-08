@@ -4,6 +4,60 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §219 — Suppression de la façade `src/lib/api.ts` (Refacto A) (2026-05-08)
+
+**Contexte :** Refacto A de l'audit §214 (perf/maintenabilité). `src/lib/api.ts` (1039 LOC) exposait `export const api = { ... }` avec ~242 stubs de délégation (`async fnX() { return _fnX(); }`) + 8 méthodes à vraie logique. Façade redondante par-dessus `src/lib/api/index.ts`. Toute addition d'API forçait à toucher 4 fichiers (sous-module + types + façade + index re-export).
+
+**Architecture cible :** suppression complète de `api.ts`. Vraie logique migrée vers un nouveau `api/swim-sessions.ts` + extensions de `api/localStorage.ts` et `api/index.ts`. Imports passent de `import { api } from "@/lib/api"` + `api.fnX(...)` à named imports `import { fnX } from "@/lib/api"` + `fnX(...)`.
+
+**Migrations vraie logique** :
+
+- `getCapabilities` (api.ts:433-449) → `api/swim-sessions.ts`
+- `syncSession` (api.ts:452-502) → `api/swim-sessions.ts`. **Logique 23505 dedup byte-identical** (verified via diff par le spec reviewer) : try/catch UPDATE de la row existante, préservation `assignment_id`, commentaire migration 00116. `this._get`/`this._save` → `localStorageGet`/`localStorageSave` (signatures équivalentes, type tightening `<Session[]>` au passage).
+- `ensureSwimSession` (api.ts:504-547) → `api/swim-sessions.ts`. Verbatim.
+- `getSessions` (api.ts:549-584) → `api/swim-sessions.ts`. `this._get` → `localStorageGet`.
+- `updateSession`, `deleteSession`, `updateSessionCoachNotes` (api.ts:586-641) → `api/swim-sessions.ts`. Idem.
+- `seedDemoData` (api.ts:644-679) → `api/localStorage.ts`. `this._save` → `localStorageSave`. `this.assignments_create` → import nommé.
+- `resetCache` (api.ts:691-694) → `api/localStorage.ts`. Verbatim.
+
+**Codemod 79 fichiers consommateurs** :
+
+- `import { api } from "@/lib/api"` → `import { fnX, fnY, type Foo } from "@/lib/api"` (named imports avec `type` keywords inline pour les types).
+- 425 occurrences `api.fnX(...)` → `fnX(...)`. 401 call sites traités par codemod automatique, le reste manuellement (multi-line chained calls dans `Strength.tsx`).
+- `Parameters<typeof api.X>` → `Parameters<typeof X>` (2e pass codemod).
+- **6 fichiers nécessitent un alias** `import { fnX as fnXApi }` pour résoudre une collision avec un `const fnX = useMutation(...)` local : `Admin.tsx`, `Profile.tsx`, `Records.tsx`, `Strength.tsx`, `coach/StrengthCatalog.tsx`, `components/strength/InProgressCard.tsx`. Convention : suffixe `Api`.
+
+**Tests adaptés** :
+
+- `__tests__/sessions-crud.test.ts` : `api._get`/`api._save` → `localStorageGet`/`localStorageSave` (importés depuis `@/lib/api`).
+- `pages/__tests__/SwimCatalog.test.tsx` : retrait du monkey-patch `api.getSwimCatalog = mock` (dead code SSR — le test exerce uniquement le loading skeleton, la query ne se résout jamais via `renderToStaticMarkup`).
+
+**Cleanups post-review** (code-quality reviewer) :
+
+- `ChecklistTab.tsx`, `SwimmerInterviewsTab.tsx` : value+type imports fusionnés en 1 bloc (cohérence avec le reste du codemod).
+- `StrengthCatalog.tsx:38` : `getStrengthSessionsPaginated` consolidé sur `@/lib/api` (était `@/lib/api/strength`).
+- `Dashboard.tsx:42-43`, `Strength.tsx:277` : commentaires obsolètes `api.X` → `X`.
+
+**Méthode** : subagent-driven (1 implementer batch Tasks 1-5, spec compliance review ✅, code quality review "approved with fixes" → 4 minor cleanups appliqués en main, smoke test user prod, commit final). Plan détaillé dans `docs/plans/2026-05-08-api-facade-removal.md`. Design dans `docs/plans/2026-05-08-api-facade-removal-design.md`.
+
+**Tests :** `npx tsc --noEmit` clean (post-cleanups). `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (non lié, déjà documenté §214/§216/§217/§218).
+
+**Bénéfice net :**
+
+- `api.ts` : **1039 → 0 LOC** (fichier supprimé).
+- `api/swim-sessions.ts` (NEW) : 241 LOC.
+- `api/localStorage.ts` : 119 → 171 LOC (+52 LOC).
+- `api/index.ts` : 508 → 522 LOC (+14 LOC).
+- **Net : -789 LOC** + 1 source de vérité stricte + suppression du double-export façade/index. Toute future addition d'API = 1 fichier (le sous-module).
+
+**Hors scope §219 :**
+
+- Pas de modification fonctionnelle. Strictement structural.
+- `seedDemoData`/`resetCache` migrés mais flagués par la review comme dead-code candidates (0 caller externe, 0 caller interne post-migration). À supprimer dans un § dédié si confirmé non utilisé en dev.
+- Refactos C (RPC coach KPIs), D (trio Records), helper `assertSupabase<T>()` reportés.
+
+**Fichiers** : Créés : `src/lib/api/swim-sessions.ts` (241 LOC). Modifiés : `src/lib/api/index.ts`, `src/lib/api/localStorage.ts`, 79 fichiers consommateurs + 2 fichiers de tests. **Supprimé : `src/lib/api.ts`**. **Doc** : `docs/plans/2026-05-08-api-facade-removal-design.md` (déjà commité), `docs/plans/2026-05-08-api-facade-removal.md`, `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`, `docs/claude/files-map.md`.
+
 ## §218 — Retirer stagger animation pills feedback (vibration latérale) (2026-05-08)
 
 **Contexte :** test prod §217 (pre-mount du FeedbackDrawer) → l'utilisateur signale que le lag est *toujours* là, mais sous une autre forme : "une sorte d'effet de vibration latérale sur la zone qui contient les pills de saisie de ressentis lors de l'ouverture". §217 avait fait disparaître le lag d'ouverture (mount du drawer) ; cette deuxième observation visait l'animation interne des pills.

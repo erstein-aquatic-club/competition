@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getSwimmerComments, markCommentsRead } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
@@ -58,14 +58,14 @@ export default function CoachCommentsScreen({ onBack, onOpenAthlete }: Props) {
   const { data: comments = [], isLoading } = useQuery({
     queryKey: ["coach-comments", coachUserId, pageCount],
     queryFn: () =>
-      api.getSwimmerComments(coachUserId!, { limit: pageCount * PAGE_SIZE }),
+      getSwimmerComments(coachUserId!, { limit: pageCount * PAGE_SIZE }),
     enabled: !!coachUserId,
   });
 
   // Auto-mark unread as read — optimistic update pour faire disparaître le badge
   // immédiatement plutôt qu'attendre l'invalidate (lag 1-2s post-mutation).
   const markReadMutation = useMutation({
-    mutationFn: (ids: number[]) => api.markCommentsRead(coachUserId!, ids),
+    mutationFn: (ids: number[]) => markCommentsRead(coachUserId!, ids),
     onMutate: async (ids: number[]) => {
       const queryKey = ["coach-comments-recent-48h", coachUserId];
       await queryClient.cancelQueries({ queryKey });

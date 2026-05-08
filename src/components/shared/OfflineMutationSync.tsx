@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { logStrengthSet, updateStrengthRun, saveStrengthRun } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
 import { runSyncOnce } from "@/lib/offlineSync";
@@ -67,7 +67,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
     const missingLogs = logs.slice(remoteLogCount);
 
     for (const [index, log] of missingLogs.entries()) {
-      await api.logStrengthSet({
+      await logStrengthSet({
         run_id: runId,
         exercise_id: log.exercise_id,
         set_index: log.set_index ?? log.set_number ?? remoteLogCount + index,
@@ -81,7 +81,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
       });
     }
 
-    await api.updateStrengthRun({
+    await updateStrengthRun({
       ...payload,
       run_id: runId,
       logs: undefined,
@@ -89,7 +89,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
     return;
   }
 
-  await api.saveStrengthRun({
+  await saveStrengthRun({
     ...payload,
     run_id: null,
     status: "completed",
@@ -128,7 +128,7 @@ export function OfflineMutationSync() {
             continue;
           }
           if (isQueuedStrengthSetLog(mutation)) {
-            await api.logStrengthSet(mutation.payload);
+            await logStrengthSet(mutation.payload);
             removeQueueItem(mutation.id);
             syncedCount += 1;
             continue;

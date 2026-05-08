@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getObjectives, getSwimmerPerformances } from "@/lib/api";
 import { eventLabel, formatTime } from "@/lib/objectiveHelpers";
 import { computeObjectivePerfRow } from "./info-helpers";
 import { Target, Plus } from "lucide-react";
@@ -29,7 +29,7 @@ export default function InfoMyObjectives({
   // already; just pass it.
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery({
     queryKey: ["athlete-objectives", authUid],
-    queryFn: () => (authUid ? api.getObjectives(authUid) : Promise.resolve([])),
+    queryFn: () => (authUid ? getObjectives(authUid) : Promise.resolve([])),
     enabled: !!authUid,
     staleTime: 5 * 60 * 1000,
     refetchOnMount: "always",
@@ -51,7 +51,7 @@ export default function InfoMyObjectives({
     queryKey: ["swimmer-performances-rolling-12m", userId, fromDateIso],
     queryFn: () =>
       userId
-        ? api.getSwimmerPerformances({ userId, fromDate: fromDateIso })
+        ? getSwimmerPerformances({ userId, fromDate: fromDateIso })
         : Promise.resolve([]),
     enabled: !!userId,
   });

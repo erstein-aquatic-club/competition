@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getSessions } from "@/lib/api";
 import {
   getWellnessRange,
   computeReadinessScore,
@@ -69,7 +69,7 @@ export default function Suivi() {
   // Sessions (all, then filter client-side)
   const { data: allSessions = [], isLoading: loadingSessions } = useQuery({
     queryKey: ["sessions", user, userId],
-    queryFn: () => api.getSessions(user!, userId),
+    queryFn: () => getSessions(user!, userId),
     enabled: !!user,
     staleTime: 5 * 60_000,
   });

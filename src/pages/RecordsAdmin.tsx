@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, summarizeApiError, type ClubRecordSwimmer } from "@/lib/api";
+import {
+  summarizeApiError,
+  type ClubRecordSwimmer,
+  getImportLogs,
+  syncClubRecordSwimmersFromUsers,
+  getClubRecordSwimmers,
+  getAppSettings,
+  createClubRecordSwimmer,
+  updateClubRecordSwimmer,
+  updateClubRecordSwimmerForUser,
+  importClubRecords,
+  importSingleSwimmer,
+  recalculateClubRecords,
+  updateAppSettings,
+  mergeClubRecordSwimmers,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -237,7 +252,7 @@ export default function RecordsAdmin() {
   // Import logs query
   const { data: importLogs = [], refetch: refetchLogs } = useQuery({
     queryKey: ["import-logs"],
-    queryFn: () => api.getImportLogs({ limit: 20 }),
+    queryFn: () => getImportLogs({ limit: 20 }),
     enabled: canAccess,
   });
 
@@ -247,8 +262,8 @@ export default function RecordsAdmin() {
     setError(null);
     try {
       // Auto-sync users first
-      await api.syncClubRecordSwimmersFromUsers();
-      const data = await api.getClubRecordSwimmers();
+      await syncClubRecordSwimmersFromUsers();
+      const data = await getClubRecordSwimmers();
       setSwimmers(data);
     } catch (err) {
       const summary = summarizeApiError(err, "Impossible de charger la liste.");
@@ -266,17 +281,17 @@ export default function RecordsAdmin() {
   // Load rate limit settings
   useEffect(() => {
     if (!isAdmin) return;
-    void api.getAppSettings("import_rate_limits").then((value) => {
+    void getAppSettings("import_rate_limits").then((value) => {
       if (value) setRateLimits(value);
     });
-    void api.getAppSettings("ffn_auto_sync").then((value) => {
+    void getAppSettings("ffn_auto_sync").then((value) => {
       if (value) setAutoSync(value);
     });
   }, [isAdmin]);
 
   const createSwimmer = useMutation({
     mutationFn: () =>
-      api.createClubRecordSwimmer({
+      createClubRecordSwimmer({
         display_name: newSwimmer.display_name.trim(),
         iuf: newSwimmer.iuf.trim() || null,
         sex: newSwimmer.sex ? (newSwimmer.sex as "M" | "F") : null,
@@ -295,7 +310,7 @@ export default function RecordsAdmin() {
 
   const updateSwimmer = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Record<string, unknown> }) =>
-      api.updateClubRecordSwimmer(id, payload),
+      updateClubRecordSwimmer(id, payload),
     onSuccess: () => {
       void load();
       toast({ title: "Sauvegardé" });
@@ -307,7 +322,7 @@ export default function RecordsAdmin() {
 
   const updateUserSwimmer = useMutation({
     mutationFn: ({ userId, payload }: { userId: number; payload: Record<string, unknown> }) =>
-      api.updateClubRecordSwimmerForUser(userId, payload),
+      updateClubRecordSwimmerForUser(userId, payload),
     onSuccess: () => {
       void load();
       toast({ title: "Sauvegardé" });
@@ -328,7 +343,7 @@ export default function RecordsAdmin() {
   };
 
   const importRecords = useMutation({
-    mutationFn: () => api.importClubRecords(),
+    mutationFn: () => importClubRecords(),
     onSuccess: (result: any) => {
       const summary = result?.summary ?? result;
       const s = result?.recalc_stats;
@@ -356,7 +371,7 @@ export default function RecordsAdmin() {
   // Per-swimmer import mutation
   const importSingle = useMutation({
     mutationFn: ({ iuf, name }: { iuf: string; name?: string }) =>
-      api.importSingleSwimmer(iuf, name),
+      importSingleSwimmer(iuf, name),
     onSuccess: (result, variables) => {
       toast({
         title: `Import de ${variables.name ?? variables.iuf}`,
@@ -364,7 +379,7 @@ export default function RecordsAdmin() {
       });
       void refetchLogs();
       // Trigger club records recalculation after individual import
-      void api.recalculateClubRecords().then(() => {
+      void recalculateClubRecords().then(() => {
         void queryClient.invalidateQueries({ queryKey: ["club-records"] });
       });
       void load();
@@ -380,7 +395,7 @@ export default function RecordsAdmin() {
 
   const saveRateLimits = useMutation({
     mutationFn: (limits: { coach_monthly: number; athlete_monthly: number; admin_monthly: number }) =>
-      api.updateAppSettings("import_rate_limits", limits),
+      updateAppSettings("import_rate_limits", limits),
     onSuccess: () => {
       toast({ title: "Limites sauvegardées" });
     },
@@ -391,7 +406,7 @@ export default function RecordsAdmin() {
 
   const saveAutoSync = useMutation({
     mutationFn: (config: { enabled: boolean; day: number; hour: number; last_run: string | null }) =>
-      api.updateAppSettings("ffn_auto_sync", config),
+      updateAppSettings("ffn_auto_sync", config),
     onSuccess: () => {
       toast({ title: "Planning sauvegardé" });
     },
@@ -402,7 +417,7 @@ export default function RecordsAdmin() {
 
   const mergeSwimmers = useMutation({
     mutationFn: ({ manualId, userSwimmerId }: { manualId: number; userSwimmerId: number }) =>
-      api.mergeClubRecordSwimmers(manualId, userSwimmerId),
+      mergeClubRecordSwimmers(manualId, userSwimmerId),
     onSuccess: (result) => {
       toast({
         title: "Profils fusionnés",
@@ -445,7 +460,7 @@ export default function RecordsAdmin() {
   );
 
   const recalculate = useMutation({
-    mutationFn: () => api.recalculateClubRecords(),
+    mutationFn: () => recalculateClubRecords(),
     onSuccess: (result: any) => {
       const s = result?.recalc_stats;
       const desc = s

@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, StrengthCycleType, StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment } from "@/lib/api";
+import {
+  StrengthCycleType,
+  StrengthSessionTemplate,
+  StrengthSessionItem,
+  Exercise,
+  Assignment,
+  getAssignments,
+  getStrengthSessions,
+  getExercises,
+  get1RM,
+  startStrengthRun as startStrengthRunApi,
+  logStrengthSet as logStrengthSetApi,
+  updateStrengthRun,
+  updateExerciseNote,
+  reconcileStrengthRunLogs,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -223,8 +238,7 @@ export default function Strength() {
     // a transient error here (RLS hiccup, 503) silently swallows the offline
     // logs: the next online tick wouldn't retry, and the reconcile-at-finish
     // path only runs if the swimmer ever taps "Terminer".
-    void api
-      .reconcileStrengthRunLogs({
+    void reconcileStrengthRunLogs({
         runId: activeRunId,
         logs: activeRunLogs,
         athleteId: userId ?? null,
@@ -247,20 +261,20 @@ export default function Strength() {
   // Queries
   const { data: assignments, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery({
     queryKey: ["assignments", user, "strength"],
-    queryFn: () => api.getAssignments(user!, userId, { assignmentType: "strength" }),
+    queryFn: () => getAssignments(user!, userId, { assignmentType: "strength" }),
     enabled: !!user,
   });
 
   const { data: strengthCatalog, isLoading: catalogLoading, error: catalogError, refetch: refetchCatalog } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
   });
 
   const { data: exercises, error: exercisesError, refetch: refetchExercises } = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises(),
+    queryFn: () => getExercises(),
     // Hydrate immediately from the localStorage mirror written by
-    // api.getExercises so a PWA cold-start in focus mode (no network) still
+    // getExercises so a PWA cold-start in focus mode (no network) still
     // resolves exercise names + GIF URLs without spinning on the skeleton.
     initialData: () => {
       const cached = localStorageGet(STORAGE_KEYS.EXERCISES) as Exercise[] | null;
@@ -284,7 +298,7 @@ export default function Strength() {
 
   const { data: oneRMs } = useQuery({
     queryKey: ["1rm", user, userId],
-    queryFn: () => api.get1RM({ athleteName: user, athleteId: userId }),
+    queryFn: () => get1RM({ athleteName: user, athleteId: userId }),
     enabled: !!user,
   });
 
@@ -370,7 +384,7 @@ export default function Strength() {
 
   // Mutations
   const startRun = useMutation({
-    mutationFn: (data: Parameters<typeof api.startStrengthRun>[0]) => api.startStrengthRun(data),
+    mutationFn: (data: Parameters<typeof startStrengthRunApi>[0]) => startStrengthRunApi(data),
     onMutate: () => {
       setSaveState("saving");
     },
@@ -406,7 +420,7 @@ export default function Strength() {
   });
 
   const logStrengthSet = useMutation({
-    mutationFn: (data: Parameters<typeof api.logStrengthSet>[0]) => api.logStrengthSet(data),
+    mutationFn: (data: Parameters<typeof logStrengthSetApi>[0]) => logStrengthSetApi(data),
     onMutate: () => {
       if (screenMode !== "focus") setSaveState("saving");
     },
@@ -436,7 +450,7 @@ export default function Strength() {
   });
 
   const updateRun = useMutation({
-    mutationFn: (data: UpdateStrengthRunInput) => api.updateStrengthRun(data),
+    mutationFn: (data: UpdateStrengthRunInput) => updateStrengthRun(data),
     onMutate: () => {
       if (screenMode !== "focus") setSaveState("saving");
     },
@@ -476,7 +490,7 @@ export default function Strength() {
 
   const updateNote = useMutation({
     mutationFn: (params: { exercise_id: number; notes: string | null }) =>
-      api.updateExerciseNote({
+      updateExerciseNote({
         athlete_id: userId ?? 0,
         exercise_id: params.exercise_id,
         notes: params.notes,
@@ -931,7 +945,7 @@ export default function Strength() {
                 setIsFinishing(true);
                 try {
                   // Re-insert any set logs that may have been lost in fire-and-forget saves
-                  await api.reconcileStrengthRunLogs({
+                  await reconcileStrengthRunLogs({
                     runId: activeRunId,
                     logs: result.logs,
                     athleteId: userId ?? null,

@@ -6,7 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, handlePasswordReset } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { getGroups } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -380,7 +380,7 @@ function CacheWarmer() {
     void queryClient
       .prefetchQuery({
         queryKey: ["groups"],
-        queryFn: () => api.getGroups(),
+        queryFn: () => getGroups(),
         staleTime: 10 * 60 * 1000,
       })
       .catch(() => {});

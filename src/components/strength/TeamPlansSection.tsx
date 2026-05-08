@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getTeamAthletePlans } from "@/lib/api";
 import type { StrengthSessionTemplate, TeamAthletePlan } from "@/lib/api/types";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
@@ -15,7 +15,7 @@ interface TeamPlansSectionProps {
 export function TeamPlansSection({ currentAthleteId, onSelectSession }: TeamPlansSectionProps) {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["team_athlete_plans", currentAthleteId],
-    queryFn: () => api.getTeamAthletePlans(currentAthleteId),
+    queryFn: () => getTeamAthletePlans(currentAthleteId),
   });
 
   if (isLoading || plans.length === 0) return null;

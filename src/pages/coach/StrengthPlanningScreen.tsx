@@ -13,7 +13,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getGroups,
+  getStrengthPlanningSlots,
+  getStrengthSessions,
+  getCompetitions,
+  getMyCompetitionIds,
+} from "@/lib/api";
 import type {
   StrengthSessionTemplate,
   Competition,
@@ -79,7 +85,7 @@ export default function StrengthPlanningScreen() {
   // ── Group selection ──
   const { data: groups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ["groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
   });
 
   // Filter to permanent groups only
@@ -136,7 +142,7 @@ export default function StrengthPlanningScreen() {
   } = useQuery({
     queryKey: ["strength-planning-slots", selectedGroupId, visibleWeekKeys],
     queryFn: () =>
-      api.getStrengthPlanningSlots({
+      getStrengthPlanningSlots({
         groupId: selectedGroupId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -176,7 +182,7 @@ export default function StrengthPlanningScreen() {
   // ── Session templates catalog ──
   const { data: sessionTemplates = [] } = useQuery({
     queryKey: ["strength-sessions"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
     staleTime: 5 * 60_000,
   });
 
@@ -192,13 +198,13 @@ export default function StrengthPlanningScreen() {
   // ── Competitions (context for planning) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   // In athlete mode, filter to only that athlete's assigned competitions.
   const { data: athleteCompetitionIds = [] } = useQuery({
     queryKey: ["my-competition-ids", selectedAthleteId],
-    queryFn: () => api.getMyCompetitionIds(selectedAthleteId),
+    queryFn: () => getMyCompetitionIds(selectedAthleteId),
     enabled: selectedAthleteId != null,
   });
 

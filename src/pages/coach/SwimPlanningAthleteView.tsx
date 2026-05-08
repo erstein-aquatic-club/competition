@@ -6,7 +6,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@/lib/api";
+import {
+  getSwimPlanningSlots,
+  getSwimPlanningSlotOverrides,
+  getSwimPlanningWeekMeta,
+  getSwimPlanningWeekOverrides,
+  getSwimFilieres,
+  getCompetitions,
+  getMyCompetitionIds,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SwimPlanningSlot, SwimFiliere, Competition } from "@/lib/api/types";
 import {
@@ -249,7 +257,7 @@ export default function SwimPlanningAthleteView({
   // sufficient to refresh.
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
     queryKey: ["swim-planning-slots", groupId, visibleWeekKeys],
-    queryFn: () => api.getSwimPlanningSlots({ groupId, weekStarts: visibleWeekKeys }),
+    queryFn: () => getSwimPlanningSlots({ groupId, weekStarts: visibleWeekKeys }),
     enabled: isVisible && !!groupId && visibleWeekKeys.length > 0,
     staleTime: 15_000,
   });
@@ -269,21 +277,21 @@ export default function SwimPlanningAthleteView({
   // them on top of the group plan. The swimmer cannot edit — read-only.
   const { data: myOverrides = [] } = useQuery({
     queryKey: ["swim-planning-slot-overrides", me, visibleWeekKeys],
-    queryFn: () => api.getSwimPlanningSlotOverrides({ athleteId: me!, weekStarts: visibleWeekKeys }),
+    queryFn: () => getSwimPlanningSlotOverrides({ athleteId: me!, weekStarts: visibleWeekKeys }),
     enabled: isVisible && me != null && visibleWeekKeys.length > 0,
     staleTime: 15_000,
   });
 
   const { data: groupWeekMeta = [] } = useQuery({
     queryKey: ["swim-planning-week-meta", groupId, visibleWeekKeys],
-    queryFn: () => api.getSwimPlanningWeekMeta({ groupId: groupId!, weekStarts: visibleWeekKeys }),
+    queryFn: () => getSwimPlanningWeekMeta({ groupId: groupId!, weekStarts: visibleWeekKeys }),
     enabled: isVisible && groupId != null && visibleWeekKeys.length > 0,
     staleTime: 15_000,
   });
 
   const { data: myWeekOverrides = [] } = useQuery({
     queryKey: ["swim-planning-week-overrides", me, visibleWeekKeys],
-    queryFn: () => api.getSwimPlanningWeekOverrides({ athleteId: me!, weekStarts: visibleWeekKeys }),
+    queryFn: () => getSwimPlanningWeekOverrides({ athleteId: me!, weekStarts: visibleWeekKeys }),
     enabled: isVisible && me != null && visibleWeekKeys.length > 0,
     staleTime: 15_000,
   });
@@ -319,7 +327,7 @@ export default function SwimPlanningAthleteView({
   // ── DB filières (description, examples) ──
   const { data: dbFilieres = [] } = useQuery({
     queryKey: ["swim-filieres"],
-    queryFn: () => api.getSwimFilieres(),
+    queryFn: () => getSwimFilieres(),
     enabled: isVisible,
     staleTime: 60_000,
   });
@@ -333,13 +341,13 @@ export default function SwimPlanningAthleteView({
   // ── Competitions (to provide context for filière training) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
     enabled: isVisible,
   });
 
   const { data: myCompetitionIds } = useQuery({
     queryKey: ["my-competition-ids", userId],
-    queryFn: () => api.getMyCompetitionIds(userId),
+    queryFn: () => getMyCompetitionIds(userId),
     enabled: isVisible && !!userId,
   });
 

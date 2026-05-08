@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§218** — Retrait stagger animation pills feedback (suite §217). 5 pills indicateurs + Commentaire utilisaient `staggerChildren` + `listItem` (x:-10→0) → vibration latérale visible une fois le drawer pre-mounté. Bloc passé en simple `<div>`, le wrapper AnimatePresence parent (panel détail opacity+y:8→0) suffit comme entry. 1 fichier (`FeedbackDrawer.tsx`). tsc clean.
+Dernier § livré : **§219** — Refacto A audit §214. Suppression complète `src/lib/api.ts` (1039 LOC, façade morte avec ~242 stubs). Migration vraie logique vers `api/swim-sessions.ts` (NEW, 241 LOC, syncSession 23505 dedup byte-identical) + extensions `api/localStorage.ts` + `api/index.ts`. Codemod 79 fichiers consommateurs : `import { api }` + `api.fnX(...)` → named imports + `fnX(...)`. **Net : -789 LOC** + 1 source de vérité stricte. tsc clean, 684 tests pass + 1 fail pré-existant non lié.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api";
+import {
+  getProfile,
+  getGroups,
+  updateProfile as updateProfileApi,
+  authPasswordUpdate,
+  uploadAvatar,
+  deleteAvatar,
+} from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -367,13 +374,13 @@ export default function Profile() {
 
   const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery({
     queryKey: ["profile", user, userId],
-    queryFn: () => api.getProfile({ displayName: user, userId }),
+    queryFn: () => getProfile({ displayName: user, userId }),
     enabled: !!user,
   });
 
   const { data: groups = [], isLoading: groupsLoading, error: groupsError, refetch: refetchGroups } = useQuery({
     queryKey: ["profile-groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
     enabled: !!user,
   });
 
@@ -396,7 +403,7 @@ export default function Profile() {
 
   const updateProfile = useMutation({
     mutationFn: (data: ProfileEditForm) =>
-      api.updateProfile({
+      updateProfileApi({
         userId,
         profile: {
           group_id: data.group_id ? Number(data.group_id) : null,
@@ -424,7 +431,7 @@ export default function Profile() {
   });
 
   const updatePassword = useMutation({
-    mutationFn: (payload: { password: string }) => api.authPasswordUpdate(payload),
+    mutationFn: (payload: { password: string }) => authPasswordUpdate(payload),
     onSuccess: () => {
       passwordForm.reset();
       toast({ title: "Mot de passe mis à jour" });
@@ -443,7 +450,7 @@ export default function Profile() {
       if (!userId) throw new Error("Utilisateur non identifié");
       const file = new File([croppedBlob], "avatar.png", { type: "image/png" });
       const { blob, mimeType, extension } = await compressImage(file);
-      return api.uploadAvatar({ userId, blob, mimeType, extension });
+      return uploadAvatar({ userId, blob, mimeType, extension });
     },
     onSuccess: () => {
       setCropDialogSrc(null);
@@ -484,7 +491,7 @@ export default function Profile() {
   const deleteAvatarMutation = useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error("Utilisateur non identifié");
-      return api.deleteAvatar(userId);
+      return deleteAvatar(userId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -502,7 +509,7 @@ export default function Profile() {
 
   const saveNeurotyp = useMutation({
     mutationFn: (result: NeurotypResultType) =>
-      api.updateProfile({
+      updateProfileApi({
         userId,
         profile: { neurotype_result: result },
       }),

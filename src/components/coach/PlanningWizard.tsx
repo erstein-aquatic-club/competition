@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { createTrainingCycle, createObjective, initSwimmerSlots } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,7 @@ export default function PlanningWizard({
       if (!startDate) throw new Error("Date de début requise");
       if (!endCompetitionId) throw new Error("Compétition de fin requise");
 
-      await api.createTrainingCycle({
+      await createTrainingCycle({
         athlete_id: athleteId,
         group_id: null,
         start_competition_id: null,
@@ -110,7 +110,7 @@ export default function PlanningWizard({
         (o) => (o.type === "chrono" && o.eventCode) || (o.type === "texte" && o.text.trim()),
       );
       for (const obj of valid) {
-        await api.createObjective({
+        await createObjective({
           athlete_id: athleteAuthId,
           event_code: obj.type === "chrono" ? obj.eventCode : null,
           pool_length: obj.type === "chrono" ? Number(obj.poolLength) : null,
@@ -136,7 +136,7 @@ export default function PlanningWizard({
   const slotsMutation = useMutation({
     mutationFn: async () => {
       if (inheritSlots && userId) {
-        await api.initSwimmerSlots(athleteId, groupId, userId);
+        await initSwimmerSlots(athleteId, groupId, userId);
       }
     },
     onSuccess: () => {

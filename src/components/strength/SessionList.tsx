@@ -1,6 +1,14 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, StrengthCycleType, StrengthSessionTemplate, Assignment } from "@/lib/api";
+import {
+  StrengthCycleType,
+  StrengthSessionTemplate,
+  Assignment,
+  getAssignments,
+  getStrengthSessions,
+  getExercises,
+  getStrengthHistory,
+} from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { ChevronRight, Dumbbell, Search, X } from "lucide-react";
 import { CycleSelector } from "@/components/strength/CycleSelector";
@@ -81,24 +89,24 @@ export function SessionList({
   // Queries
   const { data: assignments } = useQuery({
     queryKey: ["assignments", user, "strength"],
-    queryFn: () => api.getAssignments(user!, userId, { assignmentType: "strength" }),
+    queryFn: () => getAssignments(user!, userId, { assignmentType: "strength" }),
     enabled: !!user,
   });
 
   const { data: strengthCatalog } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
   });
 
   const { data: exercises } = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises(),
+    queryFn: () => getExercises(),
   });
 
   const inProgressRunQuery = useQuery({
     queryKey: ["strength_run_in_progress", athleteKey],
     queryFn: () =>
-      api.getStrengthHistory(athleteName!, {
+      getStrengthHistory(athleteName!, {
         limit: 1,
         offset: 0,
         order: "desc",

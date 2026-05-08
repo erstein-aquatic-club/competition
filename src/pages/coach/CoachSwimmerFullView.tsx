@@ -2,7 +2,14 @@ import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api";
+import {
+  getProfile,
+  getSessions,
+  getInterviews,
+  getTrainingCycles,
+  getObjectives,
+  getCompetitions,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -68,7 +75,7 @@ export default function CoachSwimmerFullView({
 
   const { data: profile } = useQuery({
     queryKey: ["profile", athleteId],
-    queryFn: () => api.getProfile({ userId: athleteId }),
+    queryFn: () => getProfile({ userId: athleteId }),
     enabled: athleteId != null,
   });
 
@@ -77,21 +84,21 @@ export default function CoachSwimmerFullView({
 
   const { data: sessions } = useQuery({
     queryKey: ["sessions", athleteId],
-    queryFn: () => api.getSessions(athleteName ?? "", athleteId),
+    queryFn: () => getSessions(athleteName ?? "", athleteId),
     enabled: !!athleteId,
     staleTime,
   });
 
   const { data: interviews } = useQuery({
     queryKey: ["interviews", athleteId],
-    queryFn: () => api.getInterviews(athleteId!),
+    queryFn: () => getInterviews(athleteId!),
     enabled: !!athleteId,
     staleTime,
   });
 
   const { data: cycles } = useQuery({
     queryKey: ["training-cycles", athleteId],
-    queryFn: () => api.getTrainingCycles({ athleteId: athleteId! }),
+    queryFn: () => getTrainingCycles({ athleteId: athleteId! }),
     enabled: !!athleteId,
     staleTime,
   });
@@ -105,14 +112,14 @@ export default function CoachSwimmerFullView({
 
   const { data: objectives } = useQuery({
     queryKey: ["objectives", athleteAuthId],
-    queryFn: () => api.getObjectives(athleteAuthId!),
+    queryFn: () => getObjectives(athleteAuthId!),
     enabled: !!athleteAuthId,
     staleTime,
   });
 
   const { data: competitions } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
     staleTime,
   });
 

@@ -5,7 +5,13 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getGroups,
+  getSwimPlanningSlots,
+  getCompetitions,
+  getMyCompetitionIds,
+  getSwimCatalog,
+} from "@/lib/api";
 import type {
   SwimPlanningSlot,
   GroupSummary,
@@ -79,7 +85,7 @@ export default function SwimPlanningDemo() {
   // ── Group selection ──
   const { data: groups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ["groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
   });
 
   // Filter to permanent groups only
@@ -133,7 +139,7 @@ export default function SwimPlanningDemo() {
   } = useQuery({
     queryKey: ["swim-planning-slots", selectedGroupId, visibleWeekKeys],
     queryFn: () =>
-      api.getSwimPlanningSlots({
+      getSwimPlanningSlots({
         groupId: selectedGroupId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -173,13 +179,13 @@ export default function SwimPlanningDemo() {
   // ── Competitions (context for filière training) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   // In athlete mode, filter to only that athlete's assigned competitions.
   const { data: athleteCompetitionIds = [] } = useQuery({
     queryKey: ["my-competition-ids", selectedAthleteId],
-    queryFn: () => api.getMyCompetitionIds(selectedAthleteId),
+    queryFn: () => getMyCompetitionIds(selectedAthleteId),
     enabled: selectedAthleteId != null,
   });
 
@@ -307,7 +313,7 @@ export default function SwimPlanningDemo() {
   // ── Swim catalog (for session linking) ──
   const { data: swimCatalog = [] } = useQuery({
     queryKey: ["swim-catalog"],
-    queryFn: () => api.getSwimCatalog(),
+    queryFn: () => getSwimCatalog(),
     staleTime: 5 * 60_000,
   });
 

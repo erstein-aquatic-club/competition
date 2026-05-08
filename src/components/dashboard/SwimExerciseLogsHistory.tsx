@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getSwimExerciseLogsHistory,
+  updateSwimExerciseLog,
+  deleteSwimExerciseLog,
+} from "@/lib/api";
 import type { SwimExerciseLog, SwimExerciseLogInput } from "@/lib/api";
 import { EQUIPMENT_OPTIONS } from "@/lib/api/types";
 import { eventLabel, strokeFromCode, STROKE_COLORS } from "@/lib/objectiveHelpers";
@@ -40,20 +44,20 @@ export function SwimExerciseLogsHistory({ userId, expanded, onToggle, standalone
   const queryClient = useQueryClient();
   const { data: logs, isLoading } = useQuery({
     queryKey: ["swim-exercise-logs-history", userId],
-    queryFn: () => api.getSwimExerciseLogsHistory(userId, 200),
+    queryFn: () => getSwimExerciseLogsHistory(userId, 200),
     enabled: !!userId && expanded,
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ logId, patch }: { logId: string; patch: Partial<SwimExerciseLogInput> }) =>
-      api.updateSwimExerciseLog(logId, patch),
+      updateSwimExerciseLog(logId, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history", userId] });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (logId: string) => api.deleteSwimExerciseLog(logId),
+    mutationFn: (logId: string) => deleteSwimExerciseLog(logId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history", userId] });
     },

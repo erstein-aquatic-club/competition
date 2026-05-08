@@ -6,7 +6,20 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/lib/auth";
-import { api, summarizeApiError, type UserSummary, getAuditLog, type AuditEntry } from "@/lib/api";
+import {
+  summarizeApiError,
+  type UserSummary,
+  getAuditLog,
+  type AuditEntry,
+  listUsers,
+  createCoach as createCoachApi,
+  updateUserRole as updateUserRoleApi,
+  disableUser as disableUserApi,
+  getPendingApprovals,
+  getProfile,
+  getGroups,
+  updateProfile,
+} from "@/lib/api";
 import { getAppSettings, updateAppSettings } from "@/lib/api/records";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -153,12 +166,12 @@ export default function Admin() {
 
   const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ["admin-users", includeInactive],
-    queryFn: () => api.listUsers({ includeInactive }),
+    queryFn: () => listUsers({ includeInactive }),
     enabled: isAdmin,
   });
 
   const createCoach = useMutation({
-    mutationFn: (payload: { display_name: string; email?: string; password?: string }) => api.createCoach(payload),
+    mutationFn: (payload: { display_name: string; email?: string; password?: string }) => createCoachApi(payload),
     onMutate: () => {
       setCreatedCoachPassword(null);
     },
@@ -183,7 +196,7 @@ export default function Admin() {
   });
 
   const updateUserRole = useMutation({
-    mutationFn: (payload: { userId: number; role: UserRole }) => api.updateUserRole(payload),
+    mutationFn: (payload: { userId: number; role: UserRole }) => updateUserRoleApi(payload),
     onSuccess: (data, variables) => {
       const feedback = getAdminMutationFeedback("updateUserRole", data.status);
       if (feedback.shouldApplyOptimisticData) {
@@ -208,7 +221,7 @@ export default function Admin() {
   });
 
   const disableUser = useMutation({
-    mutationFn: (payload: { userId: number }) => api.disableUser(payload),
+    mutationFn: (payload: { userId: number }) => disableUserApi(payload),
     onSuccess: (data) => {
       const feedback = getAdminMutationFeedback("disableUser", data.status);
       if (feedback.shouldInvalidate) {
@@ -229,7 +242,7 @@ export default function Admin() {
 
   const { data: pendingApprovals = [], error: approvalsError, refetch: refetchApprovals } = useQuery({
     queryKey: ["pending-approvals"],
-    queryFn: () => api.getPendingApprovals(),
+    queryFn: () => getPendingApprovals(),
     enabled: isAdmin,
   });
 
@@ -294,13 +307,13 @@ export default function Admin() {
 
   const { data: selectedProfile, isLoading: profileLoading } = useQuery({
     queryKey: ["admin-user-profile", selectedUserId],
-    queryFn: () => api.getProfile({ userId: selectedUserId }),
+    queryFn: () => getProfile({ userId: selectedUserId }),
     enabled: !!selectedUserId,
   });
 
   const { data: groups = [] } = useQuery({
     queryKey: ["admin-groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
     enabled: isAdmin,
   });
 
@@ -340,7 +353,7 @@ export default function Admin() {
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: AdminProfileEditForm) =>
-      api.updateProfile({
+      updateProfile({
         userId: selectedUserId,
         profile: {
           display_name: data.display_name.trim(),

@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type {
-  ChecklistTemplate,
-  ChecklistItemInput,
-  CompetitionChecklistCheck,
+import {
+  getCompetitionChecklist,
+  getChecklistTemplates,
+  applyChecklistTemplate,
+  toggleChecklistCheck,
+  removeCompetitionChecklist,
+  deleteChecklistTemplate,
+  createChecklistTemplate,
+  type ChecklistTemplate,
+  type ChecklistItemInput,
+  type CompetitionChecklistCheck,
 } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -48,19 +54,19 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
     isLoading: loadingChecklist,
   } = useQuery({
     queryKey: ["competition-checklist", competitionId],
-    queryFn: () => api.getCompetitionChecklist(competitionId),
+    queryFn: () => getCompetitionChecklist(competitionId),
   });
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ["checklist-templates"],
-    queryFn: () => api.getChecklistTemplates(),
+    queryFn: () => getChecklistTemplates(),
   });
 
   /* ── Mutations ──────────────────────────────────────── */
 
   const applyMutation = useMutation({
     mutationFn: (templateId: string) =>
-      api.applyChecklistTemplate(competitionId, templateId),
+      applyChecklistTemplate(competitionId, templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competition-checklist", competitionId] });
       toast({ title: "Checklist appliquee" });
@@ -70,7 +76,7 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
 
   const toggleMutation = useMutation({
     mutationFn: ({ checkId, checked }: { checkId: string; checked: boolean }) =>
-      api.toggleChecklistCheck(checkId, checked),
+      toggleChecklistCheck(checkId, checked),
     onMutate: async ({ checkId, checked }) => {
       await queryClient.cancelQueries({ queryKey: ["competition-checklist", competitionId] });
       const prev = queryClient.getQueryData<typeof compChecklist>(["competition-checklist", competitionId]);
@@ -92,7 +98,7 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: (id: string) => api.removeCompetitionChecklist(id),
+    mutationFn: (id: string) => removeCompetitionChecklist(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competition-checklist", competitionId] });
       toast({ title: "Checklist retirée" });
@@ -101,7 +107,7 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
   });
 
   const deleteTemplateMutation = useMutation({
-    mutationFn: (id: string) => api.deleteChecklistTemplate(id),
+    mutationFn: (id: string) => deleteChecklistTemplate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
       toast({ title: "Template supprime" });
@@ -268,7 +274,7 @@ function CreateTemplateSheet({
 
   const createMutation = useMutation({
     mutationFn: ({ n, its }: { n: string; its: ChecklistItemInput[] }) =>
-      api.createChecklistTemplate(n, its),
+      createChecklistTemplate(n, its),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
       toast({ title: "Template cree" });

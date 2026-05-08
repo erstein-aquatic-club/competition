@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api } from "@/lib/api";
+import { getAllOneRmRecords, getAthletes, getExercises, getPopularExercises } from "@/lib/api";
 import type { Exercise } from "@/lib/api/types";
 
 export interface LeaderboardEntry {
@@ -28,25 +28,25 @@ export function useStrengthLeaderboard(opts: {
 
   const { data: allRecords, isLoading: loadingRecords } = useQuery({
     queryKey: ["strength-leaderboard-records"],
-    queryFn: () => api.getAllOneRmRecords(),
+    queryFn: () => getAllOneRmRecords(),
     staleTime: 60_000,
   });
 
   const { data: athletes, isLoading: loadingAthletes } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
     staleTime: 60_000,
   });
 
   const { data: exercises, isLoading: loadingExercises } = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises(),
+    queryFn: () => getExercises(),
     staleTime: 60_000,
   });
 
   const { data: popularRaw } = useQuery({
     queryKey: ["strength-popular-exercises"],
-    queryFn: () => api.getPopularExercises(10),
+    queryFn: () => getPopularExercises(10),
     staleTime: 60_000,
   });
 

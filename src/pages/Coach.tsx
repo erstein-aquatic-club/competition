@@ -2,7 +2,20 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api";
+import {
+  getUnassignedSlots30d,
+  getTrainingSlots,
+  getSlotAssignments,
+  getSlotOverrides,
+  getSwimmerComments,
+  getSwimCatalog,
+  getStrengthSessions,
+  getAthletes,
+  getAllAssignments,
+  getGroups,
+  getSessions,
+  getStrengthHistory,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { useMySwimmerIds, filterByAssignment } from "@/hooks/useMySwimmerIds";
@@ -224,7 +237,7 @@ const CoachHome = ({
   // ── Section "Créneaux à compléter (30j)" ──────────────────────
   const { data: unassignedSlots = [], isLoading: unassignedLoading } = useQuery({
     queryKey: ["unassigned-slots-30d"],
-    queryFn: () => api.getUnassignedSlots30d(),
+    queryFn: () => getUnassignedSlots30d(),
   });
 
   const [unassignedExpanded, setUnassignedExpanded] = useState(false);
@@ -259,13 +272,13 @@ const CoachHome = ({
   // ── Section B: Slot data ────────────────────────────────────
   const { data: slots = [] } = useQuery({
     queryKey: ["training-slots"],
-    queryFn: () => api.getTrainingSlots(),
+    queryFn: () => getTrainingSlots(),
   });
 
   const { data: slotAssignments = [] } = useQuery({
     queryKey: ["slot-assignments-week", formatDateIso(monday), formatDateIso(sunday)],
     queryFn: () =>
-      api.getSlotAssignments({
+      getSlotAssignments({
         from: formatDateIso(monday),
         to: formatDateIso(sunday),
         includeCompleted: true,
@@ -274,7 +287,7 @@ const CoachHome = ({
 
   const { data: slotOverrides = [] } = useQuery({
     queryKey: ["slot-overrides-week", formatDateIso(monday)],
-    queryFn: () => api.getSlotOverrides({ fromDate: formatDateIso(monday) }),
+    queryFn: () => getSlotOverrides({ fromDate: formatDateIso(monday) }),
   });
 
   // Build 7×2 grid: morning/afternoon per day, tracking assigned vs. empty slots.
@@ -402,7 +415,7 @@ const CoachHome = ({
     queryKey: ["coach-comments-recent-48h", coachUserId],
     queryFn: async () => {
       if (!coachUserId) return { comments: [] as any[], unreadCount: 0 };
-      const all = await api.getSwimmerComments(coachUserId, { limit: 20 });
+      const all = await getSwimmerComments(coachUserId, { limit: 20 });
       const since = Date.now() - 48 * 60 * 60 * 1000;
       const recent = all.filter((c) => new Date(c.created_at).getTime() >= since);
       const unreadCount = recent.filter((c) => !c.is_read).length;
@@ -969,17 +982,17 @@ export default function Coach() {
   // Queries
   const { data: swimSessions } = useQuery({
     queryKey: ["swim_catalog"],
-    queryFn: () => api.getSwimCatalog(),
+    queryFn: () => getSwimCatalog(),
     enabled: coachAccess && shouldLoadCatalogs,
   });
   const { data: strengthSessions } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
     enabled: coachAccess && shouldLoadCatalogs,
   });
   const { data: athletes = [], isLoading: athletesLoading } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
     enabled: coachAccess && shouldLoadAthletes,
   });
   const { swimmerIds } = useMySwimmerIds();
@@ -992,7 +1005,7 @@ export default function Coach() {
 
   const { data: allAssignments = [] } = useQuery({
     queryKey: ["all-assignments"],
-    queryFn: () => api.getAllAssignments(),
+    queryFn: () => getAllAssignments(),
     enabled: isAdmin,
   });
 
@@ -1015,7 +1028,7 @@ export default function Coach() {
   );
   const { data: groups = [] } = useQuery({
     queryKey: ["groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
     enabled: coachAccess && shouldLoadGroups,
   });
   const coachKpisQuery = useQuery({
@@ -1031,8 +1044,8 @@ export default function Coach() {
       const perAthlete = await Promise.all(
         topAthletes.map(async (athlete) => {
           const [sessions, strength] = await Promise.all([
-            api.getSessions(athlete.display_name, athlete.id),
-            api.getStrengthHistory(athlete.display_name, {
+            getSessions(athlete.display_name, athlete.id),
+            getStrengthHistory(athlete.display_name, {
               athleteId: athlete.id,
               limit: 50,
               from: fromDate,

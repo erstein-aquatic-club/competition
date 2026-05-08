@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getNotificationLog } from "@/lib/api";
 import type { NotificationLogEntry } from "@/lib/api/notificationLog";
 import { BellRing, Clock, MessageSquare, Users, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ type CoachCommsProps = {
 function NotificationLogList() {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["notification-log"],
-    queryFn: () => api.getNotificationLog(50, 0),
+    queryFn: () => getNotificationLog(50, 0),
     staleTime: 30_000,
   });
 

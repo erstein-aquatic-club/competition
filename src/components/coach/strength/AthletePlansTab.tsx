@@ -1,6 +1,16 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getStrengthFolders,
+  getStrengthSessions,
+  createStrengthFolder,
+  renameStrengthFolder,
+  deleteStrengthFolder,
+  duplicateStrengthSession,
+  duplicateFolder,
+  duplicateAthletePlan,
+  assignments_create,
+} from "@/lib/api";
 import type { AthleteSummary, StrengthFolder, StrengthSessionTemplate } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,7 +105,7 @@ export function AthletePlansTab({
   /* Count sessions per athlete across all their folders */
   const { data: allFolders = [] } = useQuery({
     queryKey: ["strength_folders", "session", "all_athletes"],
-    queryFn: () => api.getStrengthFolders("session"),
+    queryFn: () => getStrengthFolders("session"),
   });
 
   const athleteFolderIds = useMemo(() => {
@@ -119,7 +129,7 @@ export function AthletePlansTab({
 
   const { data: allSessions = [] } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
   });
 
   const sessionCountByAthlete = useMemo(() => {
@@ -253,12 +263,12 @@ function AthletePlanDetail({
   /* ----- queries ----- */
   const { data: sessionFolders = [] } = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
-    queryFn: () => api.getStrengthFolders("session", { athleteId }),
+    queryFn: () => getStrengthFolders("session", { athleteId }),
   });
 
   const { data: allSessions = [] } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
   });
 
   const rootFolders = useMemo(
@@ -293,7 +303,7 @@ function AthletePlanDetail({
   /* ----- mutations ----- */
   const createFolder = useMutation({
     mutationFn: (args: { name: string; parentId?: number; athleteId?: number }) =>
-      api.createStrengthFolder(args.name, "session", {
+      createStrengthFolder(args.name, "session", {
         parentId: args.parentId ?? null,
         athleteId: args.athleteId ?? null,
       }),
@@ -305,7 +315,7 @@ function AthletePlanDetail({
 
   const renameFolder = useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
-      api.renameStrengthFolder(id, name),
+      renameStrengthFolder(id, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast({ title: "Renommé" });
@@ -313,7 +323,7 @@ function AthletePlanDetail({
   });
 
   const deleteFolderMut = useMutation({
-    mutationFn: (id: number) => api.deleteStrengthFolder(id),
+    mutationFn: (id: number) => deleteStrengthFolder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
@@ -345,7 +355,7 @@ function AthletePlanDetail({
       targetAthleteId: number;
     }) => {
       if (mode === "session") {
-        const targetFolders = await api.getStrengthFolders("session", {
+        const targetFolders = await getStrengthFolders("session", {
           athleteId: targetAthleteId,
         });
         const rootFolder = targetFolders.find(
@@ -356,11 +366,11 @@ function AthletePlanDetail({
           const subs = targetFolders.filter((f) => f.parent_id === rootFolder.id);
           targetFolderId = subs[0]?.id ?? rootFolder.id;
         }
-        await api.duplicateStrengthSession(sourceId, targetFolderId);
+        await duplicateStrengthSession(sourceId, targetFolderId);
       } else if (mode === "folder") {
-        await api.duplicateFolder(sourceId, targetAthleteId, null);
+        await duplicateFolder(sourceId, targetAthleteId, null);
       } else if (mode === "plan") {
-        await api.duplicateAthletePlan(sourceId, targetAthleteId);
+        await duplicateAthletePlan(sourceId, targetAthleteId);
       }
     },
     onSuccess: () => {
@@ -379,7 +389,7 @@ function AthletePlanDetail({
   const assignMutation = useMutation({
     mutationFn: async (sessionId: number) => {
       const today = new Date().toISOString().slice(0, 10);
-      return api.assignments_create({
+      return assignments_create({
         assignment_type: "strength",
         session_id: sessionId,
         target_user_id: athleteId,

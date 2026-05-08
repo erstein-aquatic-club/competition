@@ -2,7 +2,14 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { computeTrainingDaysRemaining } from "@/lib/date";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getSessions,
+  getAssignments,
+  getCompetitions,
+  getMyCompetitionIds,
+  getMyPlannedAbsences,
+  getSwimmerSlots,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useDashboardState } from "@/hooks/useDashboardState";
@@ -32,8 +39,8 @@ import { useStrengthPlanByISO } from "@/hooks/useStrengthPlanByISO";
 /**
  * Dashboard (swim) — UI based on maquette_accueil_calendrier_nageur_vite_react.jsx
  * - Refactored into modular components for maintainability
- * - Backend logic unchanged: Sessions (ressentis + distance) saved via api.syncSession / api.updateSession
- * - Coach assignments fetched via api.getAssignments
+ * - Backend logic unchanged: Sessions (ressentis + distance) saved via syncSession / updateSession
+ * - Coach assignments fetched via getAssignments
  * - 2 placeholders per day (Matin/Soir), tagged as "vides" if no assignment exists
  * - Presence/absence toggles stored client-side (localStorage)
  */
@@ -143,24 +150,24 @@ export default function Dashboard() {
 
   const { data: sessions, isLoading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useQuery({
     queryKey: ["sessions", userId ?? user],
-    queryFn: () => api.getSessions(user!, userId),
+    queryFn: () => getSessions(user!, userId),
     enabled: !!user,
   });
 
   const { data: assignments, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery({
     queryKey: ["assignments", userId ?? user],
-    queryFn: () => api.getAssignments(user!, userId),
+    queryFn: () => getAssignments(user!, userId),
     enabled: !!user,
   });
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: myCompetitionIds } = useQuery({
     queryKey: ["my-competition-ids"],
-    queryFn: () => api.getMyCompetitionIds(),
+    queryFn: () => getMyCompetitionIds(),
   });
 
   const visibleCompetitions = useMemo(() => {
@@ -171,7 +178,7 @@ export default function Dashboard() {
 
   const { data: myAbsences = [] } = useQuery({
     queryKey: ["my-planned-absences"],
-    queryFn: () => api.getMyPlannedAbsences(),
+    queryFn: () => getMyPlannedAbsences(),
   });
 
   const absenceDates = useMemo(() => {
@@ -208,7 +215,7 @@ export default function Dashboard() {
 
   const { data: swimmerSlots } = useQuery({
     queryKey: ['swimmer-slots', userId],
-    queryFn: () => api.getSwimmerSlots(userId!),
+    queryFn: () => getSwimmerSlots(userId!),
     enabled: !!userId,
   });
 

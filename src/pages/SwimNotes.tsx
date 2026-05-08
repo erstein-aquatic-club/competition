@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { createStandaloneSwimLog } from "@/lib/api";
 import { EQUIPMENT_OPTIONS } from "@/lib/api/types";
 import { FFN_EVENTS, eventLabel } from "@/lib/objectiveHelpers";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -114,7 +114,7 @@ function CreateNoteDialog({
       const splits = splitTexts
         .map((t, i) => ({ rep: i + 1, time_seconds: parseSwimTime(t) }))
         .filter((s) => s.time_seconds > 0);
-      return api.createStandaloneSwimLog(userId, {
+      return createStandaloneSwimLog(userId, {
         exercise_label: label.trim() || (eventCode ? eventLabel(eventCode) : "Note"),
         event_code: eventCode || null,
         pool_length: poolLength,

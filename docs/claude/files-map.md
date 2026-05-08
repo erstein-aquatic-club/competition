@@ -10,13 +10,13 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 
 | Fichier | Rôle | Taille |
 |---------|------|--------|
-| `src/lib/api.ts` | Façade API (stubs → modules) | 966 lignes |
 | `src/lib/api/types.ts` | Interfaces TypeScript (sessions, strength, users, comps, wellness, cycles, challenges, achievements, pain, strength-planning) | 1179 lignes |
 | `src/lib/api/client.ts` | Supabase client, utilitaires | ~316 lignes |
 | `src/lib/api/transformers.ts` | Fonctions de transformation strength | ~228 lignes |
 | `src/lib/api/helpers.ts` | Fonctions de mapping | ~161 lignes |
-| `src/lib/api/localStorage.ts` | Stockage local fallback | ~119 lignes |
-| `src/lib/api/index.ts` | Re-exports centralisés | 460 lignes |
+| `src/lib/api/localStorage.ts` | Stockage local fallback + seedDemoData/resetCache (§219) | 171 lignes |
+| `src/lib/api/index.ts` | Re-exports centralisés (point d'entrée unique post-§219) | 522 lignes |
+| `src/lib/api/swim-sessions.ts` | CRUD dim_sessions (syncSession 23505 dedup, ensureSwimSession, getSessions, updateSession, deleteSession, updateSessionCoachNotes, getCapabilities) — migré depuis ex-api.ts (§219) | 241 lignes |
 | `src/lib/api/strength-planning.ts` | CRUD strength_planning_* : slots groupe + overrides athlete + week meta (Phase 2 §157) | 170 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |

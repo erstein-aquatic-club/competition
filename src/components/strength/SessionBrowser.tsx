@@ -1,6 +1,16 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, StrengthCycleType, StrengthSessionTemplate, StrengthFolder, Assignment } from "@/lib/api";
+import {
+  StrengthCycleType,
+  StrengthSessionTemplate,
+  StrengthFolder,
+  Assignment,
+  getAssignments,
+  getStrengthSessions,
+  getExercises,
+  getStrengthHistory,
+  getStrengthFolders,
+} from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Dumbbell, Search, X } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
@@ -64,24 +74,24 @@ export function SessionBrowser({
   // ── Queries ──────────────────────────────────────────────────────────
   const { data: assignments } = useQuery({
     queryKey: ["assignments", user, "strength"],
-    queryFn: () => api.getAssignments(user!, userId, { assignmentType: "strength" }),
+    queryFn: () => getAssignments(user!, userId, { assignmentType: "strength" }),
     enabled: !!user,
   });
 
   const { data: strengthCatalog } = useQuery({
     queryKey: ["strength_catalog"],
-    queryFn: () => api.getStrengthSessions(),
+    queryFn: () => getStrengthSessions(),
   });
 
   const { data: exercises } = useQuery({
     queryKey: ["exercises"],
-    queryFn: () => api.getExercises(),
+    queryFn: () => getExercises(),
   });
 
   const inProgressRunQuery = useQuery({
     queryKey: ["strength_run_in_progress", athleteKey],
     queryFn: () =>
-      api.getStrengthHistory(athleteName!, {
+      getStrengthHistory(athleteName!, {
         limit: 1,
         offset: 0,
         order: "desc",
@@ -97,7 +107,7 @@ export function SessionBrowser({
   const { data: allGlobalFolders = [] } = useQuery({
     queryKey: ["strength_folders_global_all"],
     queryFn: async () => {
-      const all = await api.getStrengthFolders("session");
+      const all = await getStrengthFolders("session");
       return all.filter((f) => !f.athlete_id);
     },
   });

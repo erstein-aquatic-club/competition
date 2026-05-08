@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { notifications_list, notifications_mark_read, notifications_clear_all } from "@/lib/api";
 import type { Notification } from "@/lib/api";
 import {
   filterVisibleNotifications,
@@ -38,7 +38,7 @@ export default function SwimmerMessagesView({
   const { data, isLoading } = useQuery({
     queryKey: ["profile-notifications", userId],
     queryFn: () =>
-      api.notifications_list({
+      notifications_list({
         targetUserId: userId,
         limit: 100,
       }),
@@ -91,7 +91,7 @@ export default function SwimmerMessagesView({
 
     unsyncedIds.forEach((targetId) => syncedDismissedUnreadIdsRef.current.add(targetId));
 
-    Promise.all(unsyncedIds.map((targetId) => api.notifications_mark_read({ targetId })))
+    Promise.all(unsyncedIds.map((targetId) => notifications_mark_read({ targetId })))
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
         queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
@@ -111,7 +111,7 @@ export default function SwimmerMessagesView({
     setSelectedTargetId(notification.target_id ?? null);
 
     if (notification.target_id && !notification.read) {
-      api.notifications_mark_read({ targetId: notification.target_id })
+      notifications_mark_read({ targetId: notification.target_id })
         .then(() => {
           queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
           queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
@@ -154,7 +154,7 @@ export default function SwimmerMessagesView({
     setSelectedTargetId(null);
 
     try {
-      const result = await api.notifications_clear_all({ userId });
+      const result = await notifications_clear_all({ userId });
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
 

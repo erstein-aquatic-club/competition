@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, StrengthCycleType, StrengthSessionTemplate, Assignment } from "@/lib/api";
+import {
+  StrengthCycleType,
+  StrengthSessionTemplate,
+  Assignment,
+  deleteStrengthRun as deleteStrengthRunApi,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -64,7 +69,7 @@ export function InProgressCard({
     inProgressRun.status === "completed" || (inProgressRun.progress_pct ?? 0) >= 100;
 
   const deleteStrengthRun = useMutation({
-    mutationFn: (runId: number) => api.deleteStrengthRun(runId),
+    mutationFn: (runId: number) => deleteStrengthRunApi(runId),
     onMutate: () => {
       setSaveState("saving");
     },

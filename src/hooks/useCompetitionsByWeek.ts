@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getCompetitions, getMyCompetitionIds } from "@/lib/api";
 import { getMonday } from "@/components/coach/swim/swimPlanningShared";
 import type { Competition } from "@/lib/api/types";
 
 export function useCompetitionsByWeek(userId: number | null | undefined) {
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: myCompetitionIds } = useQuery({
     queryKey: ["my-competition-ids", userId],
-    queryFn: () => api.getMyCompetitionIds(userId),
+    queryFn: () => getMyCompetitionIds(userId),
     enabled: !!userId,
   });
 

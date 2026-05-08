@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getCompetitionRaces,
+  createCompetitionRace,
+  updateCompetitionRace,
+  deleteCompetitionRace,
+} from "@/lib/api";
 import type { CompetitionRace, CompetitionRaceInput } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -104,7 +109,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
 
   const { data: races = [], isLoading } = useQuery({
     queryKey: ["competition-races", competitionId],
-    queryFn: () => api.getCompetitionRaces(competitionId),
+    queryFn: () => getCompetitionRaces(competitionId),
   });
 
   /* ── Mutations ───────────────────────────────────────── */
@@ -113,7 +118,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
     queryClient.invalidateQueries({ queryKey: ["competition-races", competitionId] });
 
   const createMutation = useMutation({
-    mutationFn: (input: CompetitionRaceInput) => api.createCompetitionRace(input),
+    mutationFn: (input: CompetitionRaceInput) => createCompetitionRace(input),
     onSuccess: () => {
       invalidate();
       toast({ title: "Course ajoutée" });
@@ -124,7 +129,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: Partial<CompetitionRaceInput> }) =>
-      api.updateCompetitionRace(id, input),
+      updateCompetitionRace(id, input),
     onSuccess: () => {
       invalidate();
       toast({ title: "Course modifiée" });
@@ -134,7 +139,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.deleteCompetitionRace(id),
+    mutationFn: (id: string) => deleteCompetitionRace(id),
     onSuccess: () => {
       invalidate();
       toast({ title: "Course supprimée" });

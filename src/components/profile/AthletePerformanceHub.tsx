@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getSwimmerSlots,
+  getCompetitions,
+  getMyCompetitionIds,
+  getTrainingCycles,
+  getTrainingWeeks,
+} from "@/lib/api";
 import type { TrainingWeek } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,7 +115,7 @@ function durationLabel(start: string, end: string): string {
 function AthleteSlots({ athleteId }: { athleteId: number }) {
   const { data: slots = [], isLoading } = useQuery({
     queryKey: ["swimmer-slots", athleteId],
-    queryFn: () => api.getSwimmerSlots(athleteId),
+    queryFn: () => getSwimmerSlots(athleteId),
     enabled: !!athleteId,
   });
 
@@ -196,17 +202,17 @@ function AthleteSeasonPlanning({ athleteId }: { athleteId: number }) {
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: assignedIds = [] } = useQuery({
     queryKey: ["my-competition-ids", athleteId],
-    queryFn: () => api.getMyCompetitionIds(athleteId),
+    queryFn: () => getMyCompetitionIds(athleteId),
   });
 
   const { data: cycles = [] } = useQuery({
     queryKey: ["training-cycles", "athlete", athleteId],
-    queryFn: () => api.getTrainingCycles({ athleteId }),
+    queryFn: () => getTrainingCycles({ athleteId }),
   });
 
   const upcomingCompetitions = useMemo(() => {
@@ -243,7 +249,7 @@ function AthleteSeasonPlanning({ athleteId }: { athleteId: number }) {
   const weekQueries = useQueries({
     queries: plannedCycles.map((cycle) => ({
       queryKey: ["training-weeks", cycle.id],
-      queryFn: () => api.getTrainingWeeks(cycle.id),
+      queryFn: () => getTrainingWeeks(cycle.id),
       enabled: !!cycle.id,
     })),
   });

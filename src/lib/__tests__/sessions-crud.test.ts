@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { api, type Session } from "@/lib/api";
+import {
+  type Session,
+  localStorageSave,
+  updateSession,
+  localStorageGet,
+  deleteSession,
+} from "@/lib/api";
 
 const createLocalStorageMock = () => {
   const store = new Map<string, string>();
@@ -38,12 +44,12 @@ const baseSession: Session = {
 
 test("updateSession updates a stored swim entry", async () => {
   globalThis.localStorage = createLocalStorageMock();
-  api._save(sessionsKey, [baseSession]);
+  localStorageSave(sessionsKey, [baseSession]);
 
   const updated = { ...baseSession, comments: "Mise à jour", distance: 2500 };
-  const result = await api.updateSession(updated);
+  const result = await updateSession(updated);
 
-  const stored = api._get(sessionsKey) as Session[];
+  const stored = localStorageGet(sessionsKey) as Session[];
   assert.equal(result.status, "updated");
   assert.equal(stored[0].comments, "Mise à jour");
   assert.equal(stored[0].distance, 2500);
@@ -51,10 +57,10 @@ test("updateSession updates a stored swim entry", async () => {
 
 test("deleteSession removes a stored swim entry", async () => {
   globalThis.localStorage = createLocalStorageMock();
-  api._save(sessionsKey, [baseSession]);
+  localStorageSave(sessionsKey, [baseSession]);
 
-  const result = await api.deleteSession(baseSession.id);
-  const stored = api._get(sessionsKey) as Session[];
+  const result = await deleteSession(baseSession.id);
+  const stored = localStorageGet(sessionsKey) as Session[];
 
   assert.equal(result.status, "deleted");
   assert.equal(stored.length, 0);

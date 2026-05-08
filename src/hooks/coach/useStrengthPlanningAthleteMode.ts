@@ -16,7 +16,18 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getAthletes,
+  getStrengthPlanningSlotOverrides,
+  getStrengthPlanningWeekMeta,
+  getStrengthPlanningWeekOverrides,
+  upsertStrengthPlanningSlot,
+  deleteStrengthPlanningSlot,
+  upsertStrengthPlanningSlotOverride,
+  deleteStrengthPlanningSlotOverride,
+  upsertStrengthPlanningWeekMeta,
+  upsertStrengthPlanningWeekOverride,
+} from "@/lib/api";
 import type {
   StrengthPlanningSlot,
   AthleteSummary,
@@ -95,7 +106,7 @@ export function useStrengthPlanningAthleteMode({
   // ── Athlete list ──
   const { data: allAthletes = [] } = useQuery({
     queryKey: ["athletes"],
-    queryFn: () => api.getAthletes(),
+    queryFn: () => getAthletes(),
   });
 
   const groupAthletes = useMemo(
@@ -162,7 +173,7 @@ export function useStrengthPlanningAthleteMode({
       visibleWeekKeys,
     ],
     queryFn: () =>
-      api.getStrengthPlanningSlotOverrides({
+      getStrengthPlanningSlotOverrides({
         athleteId: selectedAthleteId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -177,7 +188,7 @@ export function useStrengthPlanningAthleteMode({
       visibleWeekKeys,
     ],
     queryFn: () =>
-      api.getStrengthPlanningWeekMeta({
+      getStrengthPlanningWeekMeta({
         groupId: selectedGroupId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -192,7 +203,7 @@ export function useStrengthPlanningAthleteMode({
       visibleWeekKeys,
     ],
     queryFn: () =>
-      api.getStrengthPlanningWeekOverrides({
+      getStrengthPlanningWeekOverrides({
         athleteId: selectedAthleteId!,
         weekStarts: visibleWeekKeys,
       }),
@@ -262,8 +273,8 @@ export function useStrengthPlanningAthleteMode({
   // Group-mode slot upsert
   const upsertMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertStrengthPlanningSlot>[0],
-    ) => api.upsertStrengthPlanningSlot(input),
+      input: Parameters<typeof upsertStrengthPlanningSlot>[0],
+    ) => upsertStrengthPlanningSlot(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["strength-planning-slots"],
@@ -273,7 +284,7 @@ export function useStrengthPlanningAthleteMode({
 
   // Group-mode slot delete
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.deleteStrengthPlanningSlot(id),
+    mutationFn: (id: string) => deleteStrengthPlanningSlot(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["strength-planning-slots"],
@@ -284,8 +295,8 @@ export function useStrengthPlanningAthleteMode({
   // Athlete-mode slot override upsert
   const upsertOverrideMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertStrengthPlanningSlotOverride>[0],
-    ) => api.upsertStrengthPlanningSlotOverride(input),
+      input: Parameters<typeof upsertStrengthPlanningSlotOverride>[0],
+    ) => upsertStrengthPlanningSlotOverride(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["strength-planning-slot-overrides"],
@@ -295,7 +306,7 @@ export function useStrengthPlanningAthleteMode({
 
   // Athlete-mode slot override delete
   const deleteOverrideMutation = useMutation({
-    mutationFn: (id: string) => api.deleteStrengthPlanningSlotOverride(id),
+    mutationFn: (id: string) => deleteStrengthPlanningSlotOverride(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["strength-planning-slot-overrides"],
@@ -306,8 +317,8 @@ export function useStrengthPlanningAthleteMode({
   // Group-level week meta upsert
   const upsertGroupMetaMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertStrengthPlanningWeekMeta>[0],
-    ) => api.upsertStrengthPlanningWeekMeta(input),
+      input: Parameters<typeof upsertStrengthPlanningWeekMeta>[0],
+    ) => upsertStrengthPlanningWeekMeta(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["strength-planning-week-meta"],
@@ -318,8 +329,8 @@ export function useStrengthPlanningAthleteMode({
   // Athlete-level week override upsert
   const upsertAthleteWeekOverrideMutation = useMutation({
     mutationFn: (
-      input: Parameters<typeof api.upsertStrengthPlanningWeekOverride>[0],
-    ) => api.upsertStrengthPlanningWeekOverride(input),
+      input: Parameters<typeof upsertStrengthPlanningWeekOverride>[0],
+    ) => upsertStrengthPlanningWeekOverride(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["strength-planning-week-overrides"],

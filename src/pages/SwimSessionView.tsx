@@ -22,7 +22,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { ExerciseLogInline } from "@/components/swim/ExerciseLogInline";
-import { api, Assignment, SwimSessionItem } from "@/lib/api";
+import {
+  Assignment,
+  SwimSessionItem,
+  getAssignments,
+  getSessions,
+  getSwimExerciseLogs,
+  ensureSwimSession,
+  saveSwimExerciseLogs,
+  assignments_delete,
+} from "@/lib/api";
 import type { SwimExerciseLog, SwimExerciseLogInput } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -112,7 +121,7 @@ export default function SwimSessionView() {
 
   const { data: assignments, isLoading, error, refetch } = useQuery({
     queryKey: ["assignments", user],
-    queryFn: () => api.getAssignments(user!, userId),
+    queryFn: () => getAssignments(user!, userId),
     enabled: !!user,
   });
 
@@ -133,12 +142,12 @@ export default function SwimSessionView() {
       const { data: authData } = await supabase.auth.getSession();
       const authUid = authData.session?.user?.id;
       if (!authUid) return [];
-      const sessions = await api.getSessions(user!, userId);
+      const sessions = await getSessions(user!, userId);
       const sessionIds = sessions.map((s) => s.id);
       if (sessionIds.length === 0) return [];
       const allLogs: SwimExerciseLog[] = [];
       for (const sid of sessionIds.slice(0, 10)) {
-        const logs = await api.getSwimExerciseLogs(sid);
+        const logs = await getSwimExerciseLogs(sid);
         allLogs.push(...logs.filter((l) => l.user_id === authUid));
       }
       const itemIds = new Set(
@@ -219,7 +228,7 @@ export default function SwimSessionView() {
         : new Date().toISOString().slice(0, 10);
       const slot = inferSlot(assignment?.assigned_date);
 
-      const sessionId = await api.ensureSwimSession({
+      const sessionId = await ensureSwimSession({
         athleteName: user,
         athleteId: userId,
         date,
@@ -248,7 +257,7 @@ export default function SwimSessionView() {
 
       if (allLogs.length === 0) throw new Error("Aucune donnée à sauvegarder");
 
-      await api.saveSwimExerciseLogs(sessionId, authUid, allLogs);
+      await saveSwimExerciseLogs(sessionId, authUid, allLogs);
     },
     onSuccess: () => {
       setDirty(false);
@@ -267,7 +276,7 @@ export default function SwimSessionView() {
   });
 
   const deleteAssignmentMutation = useMutation({
-    mutationFn: (assignmentId: number) => api.assignments_delete(assignmentId),
+    mutationFn: (assignmentId: number) => assignments_delete(assignmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
       toast({ title: "Séance retirée", description: "La séance a été retirée de votre feed." });

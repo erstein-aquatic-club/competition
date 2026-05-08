@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getGroups } from "@/lib/api";
 
 /**
  * Diagnostic component to test Login.tsx dependencies
@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 export default function LoginDebug() {
   const { data: groups, isLoading, isError, error } = useQuery({
     queryKey: ["register-groups"],
-    queryFn: () => api.getGroups(),
+    queryFn: () => getGroups(),
     retry: 2,
   });
 

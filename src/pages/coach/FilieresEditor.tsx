@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api } from "@/lib/api";
+import { getSwimFilieres, updateSwimFiliere, resetSwimFiliere } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FILIERES, FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import type { SwimFiliere, SwimFiliereInput } from "@/lib/api/types";
@@ -223,7 +223,7 @@ export default function FilieresEditor({ open, onClose }: FilieresEditorProps) {
 
   const { data: filieres = [], isLoading } = useQuery({
     queryKey: ["swim-filieres"],
-    queryFn: () => api.getSwimFilieres(),
+    queryFn: () => getSwimFilieres(),
     enabled: open,
     staleTime: 60_000,
   });
@@ -564,7 +564,7 @@ function DetailScreen({
   const constFiliere = FILIERE_MAP.get(filiere.id);
 
   const saveMutation = useMutation({
-    mutationFn: (input: SwimFiliereInput) => api.updateSwimFiliere(input),
+    mutationFn: (input: SwimFiliereInput) => updateSwimFiliere(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["swim-filieres"] });
       toast({ title: "Filière mise à jour" });
@@ -1025,7 +1025,7 @@ function ResetDialog({
   const queryClient = useQueryClient();
 
   const resetMutation = useMutation({
-    mutationFn: () => api.resetSwimFiliere(filiere.id),
+    mutationFn: () => resetSwimFiliere(filiere.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["swim-filieres"] });
       toast({ title: "Valeurs par défaut restaurées" });

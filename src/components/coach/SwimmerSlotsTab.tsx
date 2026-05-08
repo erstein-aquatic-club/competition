@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getPlannedAbsences,
+  getSwimmerSlots,
+  hasCustomSlots,
+  getTrainingSlotsForGroup,
+  initSwimmerSlots,
+  resetSwimmerSlots,
+  deleteSwimmerSlot,
+  createSwimmerSlot,
+  updateSwimmerSlot,
+} from "@/lib/api";
 import type { SwimmerTrainingSlot, SwimmerTrainingSlotInput } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -72,7 +82,7 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
 
   const { data: absences = [] } = useQuery({
     queryKey: ["planned-absences", athleteId, weekRange.from],
-    queryFn: () => api.getPlannedAbsences({ userId: athleteId, from: weekRange.from, to: weekRange.to }),
+    queryFn: () => getPlannedAbsences({ userId: athleteId, from: weekRange.from, to: weekRange.to }),
   });
 
   // Map day_of_week (1=Mon) → absence for the current week
@@ -90,17 +100,17 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
   // ── Queries ─────────────────────────────────────
   const { data: customSlots, isLoading } = useQuery({
     queryKey: ["swimmer-slots", athleteId],
-    queryFn: () => api.getSwimmerSlots(athleteId),
+    queryFn: () => getSwimmerSlots(athleteId),
   });
 
   const { data: hasCustom } = useQuery({
     queryKey: ["swimmer-slots-exists", athleteId],
-    queryFn: () => api.hasCustomSlots(athleteId),
+    queryFn: () => hasCustomSlots(athleteId),
   });
 
   const { data: groupSlots = [] } = useQuery({
     queryKey: ["training-slots", "group", groupId],
-    queryFn: () => api.getTrainingSlotsForGroup(groupId),
+    queryFn: () => getTrainingSlotsForGroup(groupId),
   });
 
   const hasPersonalSlots = hasCustom === true;
@@ -113,31 +123,31 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
   };
 
   const initMut = useMutation({
-    mutationFn: () => api.initSwimmerSlots(athleteId, groupId, userId!),
+    mutationFn: () => initSwimmerSlots(athleteId, groupId, userId!),
     onSuccess: () => { invalidate(); toast({ title: "Planning personnalisé créé" }); },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   const resetMut = useMutation({
-    mutationFn: () => api.resetSwimmerSlots(athleteId, groupId, userId!),
+    mutationFn: () => resetSwimmerSlots(athleteId, groupId, userId!),
     onSuccess: () => { invalidate(); toast({ title: "Planning réinitialisé" }); },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (slotId: string) => api.deleteSwimmerSlot(slotId),
+    mutationFn: (slotId: string) => deleteSwimmerSlot(slotId),
     onSuccess: () => { invalidate(); toast({ title: "Créneau supprimé" }); },
   });
 
   const createMut = useMutation({
-    mutationFn: (input: SwimmerTrainingSlotInput) => api.createSwimmerSlot(input, userId!),
+    mutationFn: (input: SwimmerTrainingSlotInput) => createSwimmerSlot(input, userId!),
     onSuccess: () => { invalidate(); toast({ title: "Créneau ajouté" }); },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   const updateMut = useMutation({
     mutationFn: ({ slotId, input }: { slotId: string; input: Partial<SwimmerTrainingSlotInput> }) =>
-      api.updateSwimmerSlot(slotId, input),
+      updateSwimmerSlot(slotId, input),
     onSuccess: () => { invalidate(); toast({ title: "Créneau modifié" }); },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });

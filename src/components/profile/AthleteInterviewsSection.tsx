@@ -1,6 +1,19 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  getMyInterviews,
+  getAthleteObjectives,
+  getProfile,
+  getSwimmerPerformances,
+  updateInterviewAthleteSections,
+  submitInterviewToCoach,
+  signInterview,
+  getPreviousInterview,
+  getCompetitions,
+  getMyCompetitionIds,
+  getTrainingCycles,
+  getTrainingWeeks,
+} from "@/lib/api";
 import type { Interview, InterviewAthleteInput, Objective, SwimmerPerformance, TrainingWeek } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,18 +115,18 @@ export default function AthleteInterviewsSection({
 
   const { data: interviews = [], isLoading } = useQuery({
     queryKey: ["my-interviews"],
-    queryFn: () => api.getMyInterviews(),
+    queryFn: () => getMyInterviews(),
   });
 
   const { data: objectives = [] } = useQuery({
     queryKey: ["athlete-objectives"],
-    queryFn: () => api.getAthleteObjectives(),
+    queryFn: () => getAthleteObjectives(),
   });
 
   // Fetch profile for IUF + performances (360 days)
   const { data: profile } = useQuery({
     queryKey: ["my-profile-iuf"],
-    queryFn: () => api.getProfile({ userId: appUserId }),
+    queryFn: () => getProfile({ userId: appUserId }),
     enabled: !!appUserId,
   });
   const iuf = profile?.ffn_iuf ?? null;
@@ -126,7 +139,7 @@ export default function AthleteInterviewsSection({
 
   const { data: performances = [] } = useQuery({
     queryKey: ["swimmer-performances-recent", iuf],
-    queryFn: () => api.getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
+    queryFn: () => getSwimmerPerformances({ iuf: iuf!, fromDate: perfFromDate }),
     enabled: !!iuf,
   });
 
@@ -142,7 +155,7 @@ export default function AthleteInterviewsSection({
     }: {
       id: string;
       input: InterviewAthleteInput;
-    }) => api.updateInterviewAthleteSections(id, input),
+    }) => updateInterviewAthleteSections(id, input),
     onSuccess: () => {
       toast({ title: "Sauvegardé" });
       invalidate();
@@ -156,7 +169,7 @@ export default function AthleteInterviewsSection({
   });
 
   const submitMut = useMutation({
-    mutationFn: (id: string) => api.submitInterviewToCoach(id),
+    mutationFn: (id: string) => submitInterviewToCoach(id),
     onSuccess: () => {
       toast({ title: "Envoyé au coach" });
       invalidate();
@@ -170,7 +183,7 @@ export default function AthleteInterviewsSection({
   });
 
   const signMut = useMutation({
-    mutationFn: (id: string) => api.signInterview(id),
+    mutationFn: (id: string) => signInterview(id),
     onSuccess: () => {
       toast({ title: "Entretien signé" });
       invalidate();
@@ -313,7 +326,7 @@ function InterviewCard({
     queryKey: ["my-previous-interview", interview.date, interview.id],
     queryFn: () => {
       if (!appUserId) return null;
-      return api.getPreviousInterview(appUserId, interview.date, interview.id);
+      return getPreviousInterview(appUserId, interview.date, interview.id);
     },
     enabled: (isDraft || isSent || isSigned || isDraftCoach) && !!appUserId,
   });
@@ -678,12 +691,12 @@ function ReadOnlyPlanning({
 }) {
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],
-    queryFn: () => api.getCompetitions(),
+    queryFn: () => getCompetitions(),
   });
 
   const { data: assignedIds = [] } = useQuery({
     queryKey: ["my-competition-ids", athleteId],
-    queryFn: () => api.getMyCompetitionIds(athleteId),
+    queryFn: () => getMyCompetitionIds(athleteId),
   });
 
   const nextCompetition = useMemo(() => {
@@ -696,7 +709,7 @@ function ReadOnlyPlanning({
 
   const { data: cycles = [] } = useQuery({
     queryKey: ["training-cycles", "athlete", athleteId],
-    queryFn: () => api.getTrainingCycles({ athleteId }),
+    queryFn: () => getTrainingCycles({ athleteId }),
   });
 
   const upcomingCompetitions = useMemo(() => {
@@ -733,7 +746,7 @@ function ReadOnlyPlanning({
   const weekQueries = useQueries({
     queries: plannedCycles.map((cycle) => ({
       queryKey: ["training-weeks", cycle.id],
-      queryFn: () => api.getTrainingWeeks(cycle.id),
+      queryFn: () => getTrainingWeeks(cycle.id),
       enabled: !!cycle.id,
     })),
   });

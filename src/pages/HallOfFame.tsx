@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { getHallOfFame } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trophy, Dumbbell, Waves, Heart, AlertCircle, Medal } from "lucide-react";
@@ -45,7 +45,7 @@ export default function HallOfFame() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["hall-of-fame", fromDate],
-    queryFn: () => api.getHallOfFame(fromDate),
+    queryFn: () => getHallOfFame(fromDate),
   });
 
   const rawSwimDistance = (data as HallOfFameData | undefined)?.distance ?? [];

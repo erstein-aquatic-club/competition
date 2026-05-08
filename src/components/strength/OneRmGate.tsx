@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { update1RM } from "@/lib/api";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export function OneRmGate({
       for (const ex of missingExercises) {
         const weight = Number(values[ex.exerciseId]);
         if (weight > 0) {
-          await api.update1RM({
+          await update1RM({
             athlete_id: athleteId ?? undefined,
             exercise_id: ex.exerciseId,
             one_rm: weight,

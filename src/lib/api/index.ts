@@ -87,8 +87,22 @@ export {
   type DbStrengthItemPayload,
 } from './transformers';
 
-// Re-export main api object from legacy file
-export { api } from '../api';
+// §219 — Swim sessions (extracted from legacy api.ts façade)
+export {
+  getCapabilities,
+  syncSession,
+  ensureSwimSession,
+  getSessions,
+  updateSession,
+  deleteSession,
+  updateSessionCoachNotes,
+} from './swim-sessions';
+
+// §219 — Demo seed + reset cache (extracted from legacy api.ts façade)
+export {
+  seedDemoData,
+  resetCache,
+} from './localStorage';
 
 // Re-export extracted modules
 export {

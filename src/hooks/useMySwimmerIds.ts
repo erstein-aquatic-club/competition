@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { getMySwimmers } from "@/lib/api";
 import { useAuth } from '@/lib/auth';
 
 /**
@@ -14,7 +14,7 @@ export function useMySwimmerIds() {
 
   const { data: mySwimmerIds, isLoading } = useQuery({
     queryKey: ['my-swimmer-ids', userId],
-    queryFn: () => api.getMySwimmers(),
+    queryFn: () => getMySwimmers(),
     enabled: isCoach && userId != null,
     staleTime: 30_000,
   });

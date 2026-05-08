@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  createTemporaryGroup,
+  addTemporaryGroupMembers,
+  getTemporaryGroupDetail,
+  removeTemporaryGroupMember,
+  getTemporaryGroups,
+  deactivateTemporaryGroup,
+  reactivateTemporaryGroup,
+  deleteTemporaryGroup,
+} from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -189,7 +198,7 @@ const CreateGroupSheet = ({
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.createTemporaryGroup({
+      createTemporaryGroup({
         name: name.trim(),
         member_user_ids: [...selected],
         parent_group_id: parentGroupId ?? undefined,
@@ -312,7 +321,7 @@ const AddMembersSheet = ({
   };
 
   const addMutation = useMutation({
-    mutationFn: () => api.addTemporaryGroupMembers(groupId, [...selected]),
+    mutationFn: () => addTemporaryGroupMembers(groupId, [...selected]),
     onSuccess: () => {
       toast({
         title: "Nageurs ajoutés",
@@ -389,12 +398,12 @@ const GroupDetailView = ({
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["temp-group-detail", groupId],
-    queryFn: () => api.getTemporaryGroupDetail(groupId),
+    queryFn: () => getTemporaryGroupDetail(groupId),
   });
 
   const removeMutation = useMutation({
     mutationFn: (userId: number) =>
-      api.removeTemporaryGroupMember(groupId, userId),
+      removeTemporaryGroupMember(groupId, userId),
     onSuccess: () => {
       toast({ title: "Nageur retiré" });
       void queryClient.invalidateQueries({
@@ -769,7 +778,7 @@ const CoachGroupsScreen = ({
 
   const { data: tempGroups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ["temp-groups"],
-    queryFn: () => api.getTemporaryGroups(),
+    queryFn: () => getTemporaryGroups(),
   });
 
   const activeGroups = useMemo(
@@ -782,7 +791,7 @@ const CoachGroupsScreen = ({
   );
 
   const deactivateMutation = useMutation({
-    mutationFn: (groupId: number) => api.deactivateTemporaryGroup(groupId),
+    mutationFn: (groupId: number) => deactivateTemporaryGroup(groupId),
     onSuccess: () => {
       toast({ title: "Groupe terminé" });
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
@@ -797,7 +806,7 @@ const CoachGroupsScreen = ({
   });
 
   const reactivateMutation = useMutation({
-    mutationFn: (groupId: number) => api.reactivateTemporaryGroup(groupId),
+    mutationFn: (groupId: number) => reactivateTemporaryGroup(groupId),
     onSuccess: () => {
       toast({ title: "Groupe réactivé" });
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
@@ -812,7 +821,7 @@ const CoachGroupsScreen = ({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (groupId: number) => api.deleteTemporaryGroup(groupId),
+    mutationFn: (groupId: number) => deleteTemporaryGroup(groupId),
     onSuccess: () => {
       toast({ title: "Groupe supprimé" });
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
