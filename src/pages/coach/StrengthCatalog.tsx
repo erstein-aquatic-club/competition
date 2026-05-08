@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StrengthSessionBuilder } from "@/components/coach/strength/StrengthSessionBuilder";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { FolderCard } from "@/components/shared/FolderCard";
-import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -1454,11 +1454,7 @@ export default function StrengthCatalog() {
                         isDeleting={deleteSession.isPending}
                       />
                     ) : (
-                      <Empty className="py-4 border-0">
-                        <EmptyHeader>
-                          <EmptyDescription>Dossier vide</EmptyDescription>
-                        </EmptyHeader>
-                      </Empty>
+                      <EmptyState compact title="Dossier vide" />
                     )}
                   </FolderCard>
                 );
@@ -1527,11 +1523,7 @@ export default function StrengthCatalog() {
                       {folderExercises.map(renderExerciseRow)}
                     </div>
                   ) : (
-                    <Empty className="py-4 border-0">
-                      <EmptyHeader>
-                        <EmptyDescription>Dossier vide</EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
+                    <EmptyState compact title="Dossier vide" />
                   )}
                 </FolderCard>
               );

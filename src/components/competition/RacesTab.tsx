@@ -302,7 +302,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(race)}
-                      className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition"
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-status-error hover:bg-status-error-bg transition"
                       aria-label="Supprimer"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -516,7 +516,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
             <AlertDialogAction
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
               disabled={deleteMutation.isPending}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-status-error hover:bg-status-error/90 text-white"
             >
               {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>

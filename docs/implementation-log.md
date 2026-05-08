@@ -4,6 +4,52 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §205 — Chantier C suite : migration hardcodes rang 6-12 (2026-05-08)
+
+**Contexte :** suite §202 (rang 1-5). Chantier C continue sur 6 fichiers de rang 6-12 du top contributeurs hardcodes selon audit shared. Sub-agent sonnet en parallèle de §204.
+
+**Changements (22 remplacements sur 6 fichiers)** :
+
+| Fichier | Hits avant | Migrés | Laissés (catégoriels) |
+|---|---|---|---|
+| `pages/SuiviSemaine.tsx` | 10 | 2 | 8 — `isStrength` amber (identité catégorielle muscu vs swim blue) |
+| `components/dashboard/FeedbackDrawer.tsx` | 2 | 2 | 0 |
+| `components/profile/AthleteInterviewsSection.tsx` | 9 | 5 | 4 — coach blocks `border-amber-400 bg-amber-50/50` + Trophy icon (identité brand coach) |
+| `components/strength/RunDetailSheet.tsx` | 8 | 7 | 1 — `text-amber-500` Zap icon sRPE (décoration) |
+| `pages/coach/SwimmerFeedbackTab.tsx` | 4 | 4 | 0 |
+| `components/competition/RacesTab.tsx` | 15 | 2 | 13 — thème amber/yellow finale gold/série/submit (identité catégorielle compétition) |
+
+**Cas migrés** : `indicatorColor` maps (status sémantique 1-5), badges "À préparer"/"À signer"/"Présent"/"Absent"/"Assignée", `difficultyColor` emerald/amber/red, MiniGauges fatigue/feeling/difficulté, hover delete buttons (red destructive).
+
+**Cas laissés volontairement (avec ligne)** :
+- `SuiviSemaine.tsx:1131,1141,1241,1251,1297,1340` : amber pour `isStrength` toggle, accent bar, duration, mini bars — code couleur d'**activité** (muscu vs swim blue), pas status.
+- `AthleteInterviewsSection.tsx:413,653,933,935` : `border-amber-400 bg-amber-50/50` coach blocks + GraduationCap icon — **identité brand coach** (cohérence cross-projet).
+- `RunDetailSheet.tsx:171` : `text-amber-500` Zap sRPE — décoration iconographique.
+- `RacesTab.tsx` (13 hits laissés) : empty state Trophy gold, finale gold badge, "Ajouter une course" amber button, "Série" selected amber state, submit CTA — **identité catégorielle compétition** (gold/amber = brand course).
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass, 1 fail pré-existant.
+
+**Fichiers modifiés (6)** : SuiviSemaine.tsx, FeedbackDrawer.tsx, AthleteInterviewsSection.tsx, RunDetailSheet.tsx, SwimmerFeedbackTab.tsx, RacesTab.tsx.
+
+---
+
+## §204 — Migration call-sites EmptyState (2026-05-08)
+
+**Contexte :** suite §203 qui a posé `EmptyState` partagé. 4 call-sites recensés dans l'audit migrent vers la primitive. Sub-agent sonnet en parallèle de §205.
+
+**Changements (4 fichiers, 5 occurrences)** :
+
+- `src/pages/Coach.tsx:849` — `<p className="rounded-2xl border bg-card px-4 py-6 text-center...">Aucun nageur consulté récemment</p>` → `<EmptyState compact icon={<Users />} title="Aucun nageur consulté récemment" />`. Variant `compact` (embedded section).
+- `src/pages/coach/StrengthCatalog.tsx:1457,1530` — **2 occurrences** identiques `<Empty><EmptyHeader><EmptyDescription>Dossier vide` → `<EmptyState compact title="Dossier vide" />`. Imports `{ Empty, EmptyHeader, EmptyDescription }` from `@/components/ui/empty` remplacés par `{ EmptyState }` partagé.
+- `src/components/coach/strength/AthletePlansTab.tsx:461` — empty state Dumbbell + texte + Button "Créer un plan" → `<EmptyState compact icon={<Dumbbell />} title="..." description="..." cta={<Button>...</Button>} />`. CTA préservé via prop.
+- `src/pages/CompetitionDetail.tsx:76` — `<div className="mt-8 text-center"><Trophy /><p>Compétition introuvable</p><p>Elle a peut-être été supprimée.</p></div>` → `<EmptyState icon={<Trophy />} title="Compétition introuvable" description="Elle a peut-être été supprimée." />`. Variant default (écran principal).
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass.
+
+**Fichiers modifiés (4)** : Coach.tsx, StrengthCatalog.tsx, AthletePlansTab.tsx, CompetitionDetail.tsx.
+
+---
+
 ## §203 — Chantier D : NEW EmptyState (composant partagé) (2026-05-08)
 
 **Contexte :** suite §200+§201 livrés ensemble. Audit shared listait 4 implémentations distinctes pour empty states (`<p>` simple, shadcn `<Empty>`, inline div centered, icon+texte+CTA). Création de la primitive partagée. Migration des call-sites reportée à §204+ pour ne pas faire conflit avec §202 en parallèle.

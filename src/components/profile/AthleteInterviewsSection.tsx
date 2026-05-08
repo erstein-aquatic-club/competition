@@ -338,7 +338,7 @@ function InterviewCard({
 
   // Status badge
   const statusBadge = isDraft ? (
-    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+    <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
       <Clock className="h-3 w-3 mr-1" />
       À préparer
     </Badge>
@@ -348,7 +348,7 @@ function InterviewCard({
       En préparation
     </Badge>
   ) : isSent ? (
-    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">
+    <Badge className="bg-status-success-bg text-status-success border-status-success/30">
       <CheckCircle2 className="h-3 w-3 mr-1" />
       À signer
     </Badge>
@@ -358,11 +358,11 @@ function InterviewCard({
 
   // Card border highlight for actionable items
   const borderClass = isDraft
-    ? "border-amber-300 dark:border-amber-700 border-l-4"
+    ? "border-status-warning/40 border-l-4"
     : isDraftCoach
       ? "border-blue-300 dark:border-blue-700 border-l-4"
       : isSent
-        ? "border-emerald-300 dark:border-emerald-700 border-l-4"
+        ? "border-status-success/40 border-l-4"
         : "";
 
   return (

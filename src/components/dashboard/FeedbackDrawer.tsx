@@ -826,7 +826,7 @@ export function FeedbackDrawer({
                                   </span>
                                 )}
                                 {hasLog && (
-                                  <span className="inline-flex items-center text-emerald-800">
+                                  <span className="inline-flex items-center text-status-success">
                                     <Check className="h-4 w-4" />
                                     <span className="sr-only">Présent</span>
                                   </span>
@@ -1106,7 +1106,7 @@ export function FeedbackDrawer({
                                     </span>
                                   )}
                                   {hasLog ? (
-                                    <span className="inline-flex items-center text-emerald-800">
+                                    <span className="inline-flex items-center text-status-success">
                                       <Check className="h-4 w-4" />
                                       <span className="sr-only">Présent</span>
                                     </span>

@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CopyToAthleteDialog } from "./CopyToAthleteDialog";
 import { AddSessionSheet } from "./AddSessionSheet";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 /* ---------- colour palette for cycle left borders ---------- */
 const CYCLE_COLORS = [
@@ -458,22 +459,25 @@ function AthletePlanDetail({
 
       {/* No plan state */}
       {rootFolders.length === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-4 py-10 text-center">
-          <Dumbbell className="h-8 w-8 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">Aucun plan pour ce nageur</p>
-          <Button
-            variant="outline"
-            onClick={() =>
-              createFolder.mutate({
-                name: athleteName,
-                athleteId,
-              })
-            }
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Créer un plan
-          </Button>
-        </div>
+        <EmptyState
+          compact
+          icon={<Dumbbell />}
+          title="Aucun plan pour ce nageur"
+          cta={
+            <Button
+              variant="outline"
+              onClick={() =>
+                createFolder.mutate({
+                  name: athleteName,
+                  athleteId,
+                })
+              }
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Créer un plan
+            </Button>
+          }
+        />
       )}
 
       {/* Root folders / plans */}

@@ -25,17 +25,17 @@ import { supabase } from "@/lib/supabase";
 import { canUseSupabase } from "@/lib/api/client";
 
 const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
-  completed: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", label: "Terminée" },
-  in_progress: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", label: "En cours" },
-  abandoned: { bg: "bg-red-400/10", text: "text-red-500 dark:text-red-400", label: "Abandonnée" },
+  completed: { bg: "bg-status-success-bg", text: "text-status-success", label: "Terminée" },
+  in_progress: { bg: "bg-status-warning-bg", text: "text-status-warning", label: "En cours" },
+  abandoned: { bg: "bg-status-error-bg", text: "text-status-error", label: "Abandonnée" },
 };
 
 function difficultyColor(d: number | null | undefined): string {
   if (!d) return "bg-muted";
-  if (d <= 2) return "bg-emerald-500";
-  if (d <= 3) return "bg-amber-400";
+  if (d <= 2) return "bg-status-success";
+  if (d <= 3) return "bg-status-warning";
   if (d <= 4) return "bg-orange-500";
-  return "bg-red-500";
+  return "bg-status-error";
 }
 
 function KpiCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
@@ -224,9 +224,9 @@ export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDe
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ressenti</h3>
             <div className="flex justify-around py-2">
               {(run.rpe ?? 0) > 0 && <MiniGauge value={run.rpe!} max={10} label="RPE" color="text-orange-500" />}
-              {(run.fatigue ?? 0) > 0 && <MiniGauge value={run.fatigue!} max={5} label="Fatigue" color="text-red-500" />}
-              {(run.feeling ?? 0) > 0 && <MiniGauge value={run.feeling!} max={5} label="Forme" color="text-emerald-500" />}
-              {avgDifficulty > 0 && <MiniGauge value={avgDifficulty} max={5} label="Difficulté" color="text-amber-500" />}
+              {(run.fatigue ?? 0) > 0 && <MiniGauge value={run.fatigue!} max={5} label="Fatigue" color="text-status-error" />}
+              {(run.feeling ?? 0) > 0 && <MiniGauge value={run.feeling!} max={5} label="Forme" color="text-status-success" />}
+              {avgDifficulty > 0 && <MiniGauge value={avgDifficulty} max={5} label="Difficulté" color="text-status-warning" />}
             </div>
           </div>
         )}

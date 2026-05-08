@@ -28,6 +28,7 @@ import {
   Waves,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { formatRelativeDate } from "@/lib/date";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
 import { buildCoachHash, parseCoachHashLocation, type CoachSection } from "./coach/coachRouteState";
@@ -846,9 +847,7 @@ const CoachHome = ({
             ))}
           </div>
         ) : recentAthletes.length === 0 ? (
-          <p className="rounded-2xl border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-            Aucun nageur consulté récemment
-          </p>
+          <EmptyState compact icon={<Users />} title="Aucun nageur consulté récemment" />
         ) : (
           <div className="overflow-hidden rounded-2xl border bg-card">
             <div className="divide-y divide-border/60">

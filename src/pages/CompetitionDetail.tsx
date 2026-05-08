@@ -8,6 +8,7 @@ import InfoParticipants from "@/components/competition/InfoParticipants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Trophy, MapPin, CalendarDays } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function formatDate(iso: string): string {
   const d = new Date(iso + "T00:00:00");
@@ -73,11 +74,11 @@ export default function CompetitionDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="mt-8 text-center">
-          <Trophy className="mx-auto h-10 w-10 text-muted-foreground/40" />
-          <p className="mt-3 text-sm font-medium">Compétition introuvable</p>
-          <p className="mt-1 text-xs text-muted-foreground">Elle a peut-être été supprimée.</p>
-        </div>
+        <EmptyState
+          icon={<Trophy />}
+          title="Compétition introuvable"
+          description="Elle a peut-être été supprimée."
+        />
       </div>
     );
   }
