@@ -147,7 +147,7 @@ const CoachMessagesScreen = ({
             Retour
           </Button>
         ) : null}
-        <h2 className="text-xl font-display font-semibold uppercase italic text-primary">
+        <h2 className="text-2xl font-display font-semibold uppercase italic text-primary">
           Envoyer un message
         </h2>
       </div>
@@ -218,9 +218,9 @@ const CoachMessagesScreen = ({
       </div>
 
       {/* CTA sticky */}
-      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 p-4 backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 p-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:p-0">
         <Button
-          className="w-full"
+          className="w-full sm:w-auto"
           onClick={handleSendMessage}
           disabled={!selectedTarget.target || selectedTarget.recipients === 0 || !title.trim() || sending}
         >
