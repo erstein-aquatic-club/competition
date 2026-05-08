@@ -12,6 +12,57 @@ export function toISODate(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+/** Alias historique — préfère `toISODate`. */
+export const formatLocalDateISO = toISODate;
+/** Alias historique — préfère `toISODate`. */
+export const formatDateIso = toISODate;
+
+export function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+export function addDaysIso(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
+}
+
+/** Lundi (00:00 local) de la semaine ISO contenant `d`. */
+export function getMonday(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(0, 0, 0, 0);
+  const jsDay = r.getDay();
+  const diff = jsDay === 0 ? -6 : 1 - jsDay;
+  r.setDate(r.getDate() + diff);
+  return r;
+}
+
+/** Dimanche (00:00 local) qui suit le lundi donné. */
+export function getSunday(monday: Date): Date {
+  return addDays(monday, 6);
+}
+
+/** ISO du lundi de la semaine contenant la date ISO `dateIso`. */
+export function mondayIsoOf(dateIso: string): string {
+  return toISODate(getMonday(new Date(dateIso + "T00:00:00")));
+}
+
+/**
+ * Liste les ISOs des lundis présents dans l'intervalle [startDate, endDate].
+ * Bornes incluses si elles tombent un lundi (sinon premier lundi >= startDate).
+ */
+export function getMondaysBetween(startDate: string, endDate: string): string[] {
+  const start = getMonday(new Date(startDate + "T00:00:00"));
+  const end = new Date(endDate + "T00:00:00");
+  const out: string[] = [];
+  for (let d = start; d <= end; d = addDays(d, 7)) {
+    out.push(toISODate(d));
+  }
+  return out;
+}
+
 type PresenceSlots = Record<number, { AM?: boolean; PM?: boolean }>;
 
 /**

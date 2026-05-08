@@ -6,8 +6,11 @@
  */
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import eacLogoUrl from "@assets/logo-eac.png";
 import type { TeamMember } from "@/hooks/useMyTeam";
+
+// §211 — Logo servi depuis /public en runtime (webp 7.7K) au lieu d'inliner
+// le PNG 373K via Vite. Évite que le chunk PDF n'embarque le logo en base64.
+const eacLogoUrl = `${import.meta.env.BASE_URL}logo-eac-256.webp`;
 import type { PaceTarget } from "@/lib/api/pace-targets";
 import type { EventFamily, Zone } from "@/lib/paceData";
 import {
@@ -749,7 +752,7 @@ function drawEacBrandedHeader(
         2,
         "F",
       );
-      doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoSize, logoSize);
+      doc.addImage(logoDataUrl, "WEBP", logoX, logoY, logoSize, logoSize);
     } catch {
       /* continue without logo */
     }

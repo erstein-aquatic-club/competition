@@ -21,6 +21,7 @@ import type { Session } from "@/lib/api";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import type { SwimmerSession } from "@/lib/api/types";
 import { getMondayOfWeek } from "@/hooks/useSlotCalendar";
+import { toISODate, addDaysIso } from "@/lib/date";
 import {
   AlertCircle,
   Check,
@@ -36,20 +37,8 @@ import {
 
 const DAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"] as const;
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 function todayIso(): string {
-  const n = new Date();
-  return `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}`;
-}
-
-function addDaysIso(iso: string, days: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + days);
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  return toISODate(new Date());
 }
 
 function buildWeekDates(mondayIso: string): string[] {

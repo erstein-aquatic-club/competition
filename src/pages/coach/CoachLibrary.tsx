@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState } from "react";
 import { Waves, Dumbbell } from "lucide-react";
-import { FEATURES } from "@/lib/features";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 
 const SwimCatalog = lazy(() => import("./SwimCatalog"));
@@ -11,7 +10,7 @@ const LS_KEY = "eac-coach-library-tab";
 
 function readTab(): LibraryTab {
   const v = localStorage.getItem(LS_KEY);
-  return v === "strength" && FEATURES.coachStrength ? "strength" : "swim";
+  return v === "strength" ? "strength" : "swim";
 }
 
 export default function CoachLibrary() {
@@ -39,21 +38,19 @@ export default function CoachLibrary() {
           <Waves className="h-4 w-4" />
           Natation
         </button>
-        {FEATURES.coachStrength && (
-          <button
-            type="button"
-            onClick={() => switchTab("strength")}
-            className={[
-              "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              tab === "strength"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            ].join(" ")}
-          >
-            <Dumbbell className="h-4 w-4" />
-            Musculation
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => switchTab("strength")}
+          className={[
+            "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            tab === "strength"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          ].join(" ")}
+        >
+          <Dumbbell className="h-4 w-4" />
+          Musculation
+        </button>
       </div>
 
       {/* Content */}

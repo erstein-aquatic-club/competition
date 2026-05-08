@@ -19,7 +19,6 @@ import { useCoachPaceZonesV2 } from "@/hooks/useCoachPaceZonesV2";
 import { useCoachStrokeAdjustments } from "@/hooks/useCoachStrokeAdjustments";
 import { listMyPaceTargets, upsertPaceTarget, deletePaceTarget } from "@/lib/api/pace-targets";
 import { ZONE_COEFFICIENTS, type EventFamily, type Zone } from "@/lib/paceData";
-import { exportPacePdf as exportPacePdfFn } from "@/lib/export-pace-pdf";
 import { downloadBlob } from "@/lib/downloadBlob";
 import { createPaceShareLink } from "@/lib/api/pace-share";
 import type { AthleteSummary } from "@/lib/api/types";
@@ -361,7 +360,8 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
               onExportPdf={async (pool) => {
                 setExportingPdfId(swimmer.id);
                 try {
-                  const blob = await exportPacePdfFn({
+                  const { exportPacePdf } = await import("@/lib/export-pace-pdf");
+                  const blob = await exportPacePdf({
                     swimmer,
                     targets: targets.filter((t) => belongsTo(t, swimmer)),
                     zones: fullZones,

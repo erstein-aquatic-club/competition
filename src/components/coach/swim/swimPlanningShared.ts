@@ -27,14 +27,8 @@ export function getISOWeekNumber(date: Date): number {
   );
 }
 
-export function getMonday(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
+// §211 — getMonday déplacé dans src/lib/date.ts. Re-export pour compat.
+export { getMonday } from "@/lib/date";
 
 export function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
   return Array.from({ length: count }, (_, i) => {

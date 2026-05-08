@@ -44,6 +44,8 @@ describe("DayCell — Dumbbell + Trophy priority", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}
@@ -71,6 +73,8 @@ describe("DayCell — Dumbbell + Trophy priority", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}
@@ -98,6 +102,8 @@ describe("DayCell — Dumbbell + Trophy priority", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}
@@ -119,6 +125,8 @@ describe("DayCell — SlotPill variants (dark-mode contrast contract)", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}
@@ -136,6 +144,8 @@ describe("DayCell — SlotPill variants (dark-mode contrast contract)", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}
@@ -153,6 +163,8 @@ describe("DayCell — SlotPill variants (dark-mode contrast contract)", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}
@@ -171,6 +183,8 @@ describe("DayCell — SlotPill variants (dark-mode contrast contract)", () => {
     const markup = renderToStaticMarkup(
       <DayCell
         date={baseDate}
+        iso="2026-04-22"
+        index={0}
         inMonth
         isToday={false}
         isSelected={false}

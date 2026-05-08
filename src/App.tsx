@@ -9,7 +9,6 @@ import { useAuth, handlePasswordReset } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { FEATURES } from "@/lib/features";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -281,7 +280,7 @@ function AppRouter() {
             <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <SwimmerHome />}</Route>
             <Route path="/natation" component={Dashboard} />
             <Route path="/progress"><Redirect to="/suivi/progression" /></Route>
-            <Route path="/hall-of-fame" component={FEATURES.hallOfFame ? HallOfFame : ComingSoon} />
+            <Route path="/hall-of-fame" component={HallOfFame} />
             <Route path="/competition/:id/prep" component={CompetitionPrep} />
             <Route path="/competition/:id" component={CompetitionDetail} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
@@ -291,7 +290,7 @@ function AppRouter() {
             <Route path="/admin" component={Admin} />
             <Route path="/administratif" component={Administratif} />
             <Route path="/comite" component={Comite} />
-            <Route path="/strength" component={FEATURES.strength ? Strength : ComingSoon} />
+            <Route path="/strength" component={Strength} />
             <Route path="/records" component={Records} />
             <Route path="/records-admin" component={RecordsAdmin} />
             <Route path="/records-club" component={RecordsClub} />

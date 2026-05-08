@@ -1,7 +1,10 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import eacLogoUrl from "@assets/logo-eac.png";
 import type { SwimSessionTemplate } from "@/lib/api/types";
+
+// §211 — Logo servi depuis /public en runtime (webp 7.7K) au lieu d'inliner
+// le PNG 373K via Vite.
+const eacLogoUrl = `${import.meta.env.BASE_URL}logo-eac-256.webp`;
 import type { SwimPayloadFields } from "@/lib/types";
 
 export type SessionHeaderInfo = {
@@ -82,7 +85,7 @@ function drawPageHeader(doc: jsPDF, logoDataUrl: string | null, pageWidth: numbe
     try {
       doc.setFillColor(...WHITE);
       doc.roundedRect(logoX - logoPad, logoY - logoPad, logoSize + logoPad * 2, logoSize + logoPad * 2, 2, 2, "F");
-      doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoSize, logoSize);
+      doc.addImage(logoDataUrl, "WEBP", logoX, logoY, logoSize, logoSize);
     } catch { /* continue without logo */ }
   }
   const textX = logoDataUrl ? logoX + logoSize + logoPad + 5 : 12;

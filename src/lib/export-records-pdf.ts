@@ -6,7 +6,10 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ClubRecord } from "@/lib/api";
-import eacLogoUrl from "@assets/logo-eac.png";
+
+// §211 — Logo servi depuis /public en runtime (webp 7.7K) au lieu d'inliner
+// le PNG 373K via Vite.
+const eacLogoUrl = `${import.meta.env.BASE_URL}logo-eac-256.webp`;
 
 // ── EAC Branding Palette (RGB) ──
 
@@ -145,7 +148,7 @@ function drawHeader(
         logoSize + logoPad * 2, logoSize + logoPad * 2,
         2.5, 2.5, "F",
       );
-      doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoSize, logoSize);
+      doc.addImage(logoDataUrl, "WEBP", logoX, logoY, logoSize, logoSize);
     } catch {
       // Continue without logo
     }

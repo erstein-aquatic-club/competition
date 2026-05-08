@@ -42,32 +42,14 @@ import {
 } from "@/components/ui/sheet";
 
 // ── Helpers ──────────────────────────────────────────────────
+// §211 — getMonday/addDays/formatLocalDateISO déplacés dans src/lib/date.ts.
+
+import { getMonday, addDays, formatLocalDateISO } from "@/lib/date";
+
+export { formatLocalDateISO };
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
-}
-
-/** Monday-based week start for a given date */
-function getMonday(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay(); // 0=Sun, 1=Mon, ...
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function addDays(d: Date, n: number): Date {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + n);
-  return copy;
-}
-
-export function formatLocalDateISO(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function isToday(d: Date): boolean {

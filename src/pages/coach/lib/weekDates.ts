@@ -20,19 +20,15 @@ export const DAYS_FR = [
 
 export const DAYS_SHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
-/** `"YYYY-MM-DD"` for today in the local timezone. */
-export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+// §211 — `getMonday` et `toIsoDate` proviennent désormais de src/lib/date.ts.
+// `todayIso` corrige aussi le bug TZ (toISOString → UTC, décalait la date en
+// soirée Europe/Paris).
+import { getMonday, toISODate as toIsoDate } from "@/lib/date";
+export { getMonday, toIsoDate };
 
-/** Returns a Date pointing to the Monday of the week containing `date`. */
-export function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sun, 1=Mon…6=Sat
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+/** `"YYYY-MM-DD"` pour aujourd'hui en timezone locale. */
+export function todayIso(): string {
+  return toIsoDate(new Date());
 }
 
 /** ISO 8601 week number (1–53). */
@@ -58,12 +54,6 @@ export function formatDayMonth(date: Date): string {
     day: "2-digit",
     month: "2-digit",
   });
-}
-
-/** `YYYY-MM-DD` from a Date, using local timezone (not UTC). */
-export function toIsoDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Inclusive day count between two ISO dates (`"2026-04-20"` → `"2026-04-22"` = 3). */

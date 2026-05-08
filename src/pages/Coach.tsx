@@ -29,7 +29,13 @@ import {
 } from "lucide-react";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { formatRelativeDate } from "@/lib/date";
+import {
+  formatRelativeDate,
+  getMonday as getMondayOfWeek,
+  getSunday as getSundayOfWeek,
+  toISODate as formatDateIso,
+  mondayIsoOf as mondayIsoOfDate,
+} from "@/lib/date";
 import { PendingApprovals } from "@/components/shared/PendingApprovals";
 import { buildCoachHash, parseCoachHashLocation, type CoachSection } from "./coach/coachRouteState";
 
@@ -180,34 +186,10 @@ const FATIGUE_ALERT_MIN_SAMPLES = 2;
 const FATIGUE_ALERT_HIGH_THRESHOLD = 4.2;
 const FATIGUE_ALERT_MAX_THRESHOLD = 4.7;
 
-/** Get Monday of the current week (ISO week, Monday = first day) */
-function getMondayOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay(); // 0=Sun..6=Sat
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function getSundayOfWeek(monday: Date): Date {
-  const sun = new Date(monday);
-  sun.setDate(sun.getDate() + 6);
-  return sun;
-}
-
-function formatDateIso(d: Date): string {
-  // Use local date parts — toISOString() shifts to UTC, which rolls the date
-  // back one day for any local midnight Date at a positive UTC offset
-  // (Europe/Paris in DST = +02:00 → local Monday 00:00 becomes UTC Sunday 22:00).
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 // §198 QW6 — formatRelativeTime local supprimé, on utilise formatRelativeDate
 // (de src/lib/date.ts, §196) qui ajoute hier/lun./jj/mm pour lisibilité accrue.
+// §211 — getMondayOfWeek/getSundayOfWeek/formatDateIso/mondayIsoOfDate déplacés
+// dans src/lib/date.ts (helpers canoniques getMonday/getSunday/toISODate/mondayIsoOf).
 
 // ── CoachHome — "Ma semaine" dashboard ────────────────────────────────────
 const CoachHome = ({
@@ -243,18 +225,9 @@ const CoachHome = ({
   const { data: unassignedSlots = [], isLoading: unassignedLoading } = useQuery({
     queryKey: ["unassigned-slots-30d"],
     queryFn: () => api.getUnassignedSlots30d(),
-    staleTime: 5 * 60 * 1000,
   });
 
   const [unassignedExpanded, setUnassignedExpanded] = useState(false);
-
-  function mondayIsoOfDate(dateIso: string): string {
-    const d = new Date(dateIso + "T00:00:00");
-    const jsDay = d.getDay();
-    const diff = jsDay === 0 ? -6 : 1 - jsDay;
-    d.setDate(d.getDate() + diff);
-    return formatDateIso(d);
-  }
 
   const unassignedByWeek = useMemo(() => {
     const weekGroups = new Map<string, typeof unassignedSlots>();
@@ -287,7 +260,6 @@ const CoachHome = ({
   const { data: slots = [] } = useQuery({
     queryKey: ["training-slots"],
     queryFn: () => api.getTrainingSlots(),
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: slotAssignments = [] } = useQuery({
@@ -298,13 +270,11 @@ const CoachHome = ({
         to: formatDateIso(sunday),
         includeCompleted: true,
       }),
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: slotOverrides = [] } = useQuery({
     queryKey: ["slot-overrides-week", formatDateIso(monday)],
     queryFn: () => api.getSlotOverrides({ fromDate: formatDateIso(monday) }),
-    staleTime: 5 * 60 * 1000,
   });
 
   // Build 7×2 grid: morning/afternoon per day, tracking assigned vs. empty slots.

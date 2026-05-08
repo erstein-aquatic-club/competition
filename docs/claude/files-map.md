@@ -52,8 +52,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/systemBanners.ts` | Queue système pour les 4 bandeaux (§210 Chantier D) — hook `useSystemBanner(key, isActive)` + module state ; priorité fixe `offline > update > push > install` → 1 seul banner visible à la fois | ~95 lignes |
 | `src/lib/offlineQueue.ts` | Queue localStorage pour mutations offline — `enqueue`, `getQueue`, `markRetry`, dispatche `eac-offline-queue-updated` (§162) | 113 lignes |
 | `src/components/shared/OfflineMutationSync.tsx` | Rejoue la queue offline au retour réseau ET sur `eac-offline-queue-updated` (§162) | 168 lignes |
-| `src/lib/features.ts` | Feature flags | 5 lignes |
-| `src/lib/date.ts` | Helpers de date : `formatSwimSessionDefaultTitle`, `toISODate`, `computeTrainingDaysRemaining`, `formatRelativeDate` (§196) | 86 lignes |
+| `src/lib/date.ts` | Helpers de date canoniques : `toISODate`/`formatLocalDateISO`/`formatDateIso`, `addDays`, `addDaysIso`, `getMonday`, `getSunday`, `mondayIsoOf`, `getMondaysBetween`, `formatSwimSessionDefaultTitle`, `computeTrainingDaysRemaining`, `formatRelativeDate` (§196, §214) | 138 lignes |
 | `src/lib/__tests__/date.test.ts` | Tests unitaires des helpers de date (formatSwimSessionDefaultTitle, formatRelativeDate) | 52 lignes |
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | |
 | `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |

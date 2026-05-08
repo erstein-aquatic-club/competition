@@ -1,19 +1,23 @@
-import React, { memo } from "react";
+import React, { memo, useCallback } from "react";
 import { Dumbbell, Moon, Sun, Trophy } from "lucide-react";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function toISODate(d: Date) {
+type SlotStatus = { slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string };
+
+function defaultIso(d: Date) {
   const pad2 = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-type SlotStatus = { slotKey: "AM" | "PM"; expected: boolean; completed: boolean; absent: boolean; slotTime?: string };
-
 interface DayCellProps {
   date: Date;
+  /** Pre-computed ISO. Pass from parent to keep handlers stable for memo(). */
+  iso?: string;
+  /** Grid index, used by parent's onKeyDown. */
+  index?: number;
   inMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
@@ -22,12 +26,14 @@ interface DayCellProps {
   strengthAssigned?: boolean;
   hasCompetition?: boolean;
   hasAbsence?: boolean;
-  onClick: () => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
+  onClick: (iso: string) => void;
+  onKeyDown: (e: React.KeyboardEvent, index: number) => void;
 }
 
 export const DayCell = memo(function DayCell({
   date,
+  iso: isoProp,
+  index = 0,
   inMonth,
   isToday,
   isSelected,
@@ -39,6 +45,12 @@ export const DayCell = memo(function DayCell({
   onClick,
   onKeyDown,
 }: DayCellProps) {
+  const iso = isoProp ?? defaultIso(date);
+  const handleClick = useCallback(() => onClick(iso), [onClick, iso]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => onKeyDown(e, index),
+    [onKeyDown, index],
+  );
   const { total, slots } = status;
   const isRest = total === 0;
   const expectedSlots = slots.filter((s) => s.expected);
@@ -85,8 +97,8 @@ export const DayCell = memo(function DayCell({
   return (
     <button
       type="button"
-      onClick={onClick}
-      onKeyDown={onKeyDown}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
       tabIndex={isFocused ? 0 : -1}
       data-calendar-cell="true"
       className={cn(
@@ -99,7 +111,7 @@ export const DayCell = memo(function DayCell({
         todayRing,
         focusRing
       )}
-      aria-label={`${toISODate(date)} — ${isRest ? "Repos" : `${status.completed}/${total}`}`}
+      aria-label={`${iso} — ${isRest ? "Repos" : `${status.completed}/${total}`}`}
     >
       <div className="flex h-full flex-col justify-between">
         <div className="flex items-start justify-between">

@@ -4,6 +4,96 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §214 — Quick wins perf + maintenabilité post-audit (2026-05-08)
+
+**Contexte :** suite à un audit double (code-simplifier + perf/fluidité) lancé en parallèle. Synthèse priorisée → 6 quick wins ROI immédiat regroupés dans une seule passe. Audits réalisés en lecture seule, recommandations validées avant implémentation.
+
+### QW#1 — Lazifier `jspdf` dans `CoachPaceCalculatorScreen`
+
+`src/pages/coach/CoachPaceCalculatorScreen.tsx:22` faisait un `import { exportPacePdf }` statique → toute la chaîne `jspdf` + `jspdf-autotable` + ex-logo PNG (cf. QW#6) chargée au mount de la page Pace. Migré vers `const { exportPacePdf } = await import("@/lib/export-pace-pdf")` dans le handler `onExportPdf`. Pattern aligné avec `SwimSessionView`, `RecordsClub`, `SlotSessionSheet`.
+
+### QW#2 — Closures inline `CalendarGrid` cassaient `memo()` sur `DayCell`
+
+`CalendarGrid.tsx:72-73` créait à chaque render `onClick={() => onDayClick(iso)}` et `onKeyDown={(e) => onKeyDown(e, index)}` — 2 nouvelles closures × 42 cellules = 84 fonctions/render → `DayCell` (memoïsé) re-rendait toujours.
+
+Refactor : `DayCell` reçoit maintenant `iso` et `index` comme props, wrappe les handlers via `useCallback([onClick, iso])` / `useCallback([onKeyDown, index])`. `CalendarGrid` passe directement les références stables `onClick={onDayClick}` (déjà `useCallback` côté Dashboard.tsx:497, 720). Props `iso`/`index` rendues optionnelles avec fallback computed depuis `date` pour ne pas casser les stories `.stories.tsx` pré-existantes.
+
+### QW#3 — `staleTime` overrides incohérents (`5min < 10min default global`)
+
+`queryClient.ts` a un `staleTime: 10 * 60 * 1000` global (PWA-tuned). Mais 5 useQuery dans Dashboard.tsx (`user-group-ids`, `active-challenges`, `swimmer-slots`) et Coach.tsx (`unassigned-slots-30d`, `training-slots`, `slot-assignments-week`, `slot-overrides-week`) forçaient `staleTime: 5 * 60 * 1000` qui RACCOURCISSAIT le cache. Tous supprimés → héritage du 10 min global. Économie estimée : -4 à -8 requêtes Supabase par session.
+
+### QW#4 — Suppression de `src/lib/features.ts` (3 flags morts)
+
+Les 3 flags (`strength`, `hallOfFame`, `coachStrength`) tous à `true` depuis longtemps (CLAUDE.md confirme "tous activés"). Supprimé le fichier + nettoyage des 5 call-sites :
+- `App.tsx:284,294` : `component={FEATURES.x ? Strength : ComingSoon}` → `component={Strength}` (route `/coming-soon` indépendante préservée).
+- `navItems.ts:41` : `if (FEATURES.strength) push(...)` → tableau direct.
+- `CoachLibrary.tsx:14,42` : `&& FEATURES.coachStrength` retiré, onglet Musculation toujours présent.
+
+### QW#5 — Centralisation des helpers de date dans `src/lib/date.ts`
+
+11 helpers dupliqués à travers le projet → consolidation dans `src/lib/date.ts` (canonique).
+
+**Ajouts canoniques** :
+- `addDays(d: Date, n: number): Date`
+- `addDaysIso(iso: string, days: number): string`
+- `getMonday(d: Date): Date` — lundi de la semaine ISO contenant `d`, à 00:00 local.
+- `getSunday(monday: Date): Date`
+- `mondayIsoOf(dateIso: string): string`
+- `getMondaysBetween(startDate, endDate): string[]`
+- Alias historiques `formatLocalDateISO` / `formatDateIso` = `toISODate` (pour transition douce).
+
+**Migrations** :
+- `src/pages/Coach.tsx` : 4 helpers locaux supprimés (`getMondayOfWeek`, `getSundayOfWeek`, `formatDateIso`, `mondayIsoOfDate`) → import alias depuis `@/lib/date`.
+- `src/pages/SuiviSemaine.tsx` : `getMonday`, `addDays`, `formatLocalDateISO` locaux supprimés. `formatLocalDateISO` re-exporté depuis date.ts pour compat avec `__tests__/SuiviSemaine.test.ts`.
+- `src/components/shared/SwimmerWeekMatrixCard.tsx` : `addDaysIso` local + 2 helpers `pad2`/`todayIso` simplifiés via `toISODate(new Date())`.
+- `src/components/coach/swim/swimPlanningShared.ts` : `getMonday` → re-export `from "@/lib/date"`.
+- `src/pages/coach/SwimPlanningAthleteView.tsx` : `getMonday` local supprimé → import.
+- `src/pages/coach/lib/weekDates.ts` : `getMonday` + `toIsoDate` → re-export depuis date.ts. **Bug TZ corrigé** : `todayIso()` utilisait `toISOString().slice(0,10)` (UTC) malgré le commentaire "local timezone" — soir Europe/Paris en DST décalait au lendemain. Refait via `toIsoDate(new Date())`.
+
+### QW#6 — Logo PDF en runtime fetch (-370 Ko sur chunk PDF)
+
+3 fichiers `src/lib/export-{pace,records,session}-pdf.ts` faisaient `import eacLogoUrl from "@assets/logo-eac.png"` → Vite inlinait le PNG **373 Ko** en base64 dans un chunk JS (411 Ko mesuré sur le build production). Remplacé par `const eacLogoUrl = \`${import.meta.env.BASE_URL}logo-eac-256.webp\`` (asset déjà présent dans `/public`, **7.7 Ko**). `doc.addImage(..., "PNG", ...)` → `"WEBP"` (jspdf 4.1.0 supporte WEBP nativement). Runtime fetch déjà en place dans `loadEacLogoAsDataUrl()`.
+
+### Tests & vérifications
+
+- `npx tsc --noEmit` clean.
+- `npm test` : 684 pass + 1 fail pré-existant `transformers.test.ts:18` (commit `6dce3687f` a retiré des colonnes `feeling/rpe/duration` du payload UPDATE mais le test n'a pas été ajusté — non lié).
+- DayCell test mis à jour pour passer `iso="2026-04-22"` et `index={0}` explicitement (couvre le path direct sans fallback).
+
+### Fichiers modifiés (19)
+
+| Fichier | Changement |
+|---|---|
+| `src/lib/date.ts` | +52 LOC : helpers canoniques (addDays, addDaysIso, getMonday, getSunday, mondayIsoOf, getMondaysBetween) + alias historiques |
+| `src/lib/features.ts` | **SUPPRIMÉ** |
+| `src/App.tsx` | -3 LOC : import FEATURES + 2 conditionnels routes |
+| `src/components/layout/navItems.ts` | -10 LOC : `if (FEATURES.strength)` → tableau direct |
+| `src/pages/coach/CoachLibrary.tsx` | -7 LOC : conditionnel onglet muscu retiré |
+| `src/pages/Coach.tsx` | -38 LOC : 4 helpers date supprimés, imports avec alias |
+| `src/pages/SuiviSemaine.tsx` | -22 LOC : 3 helpers date supprimés, re-export `formatLocalDateISO` |
+| `src/components/shared/SwimmerWeekMatrixCard.tsx` | -10 LOC : `addDaysIso`/`pad2` retirés |
+| `src/components/coach/swim/swimPlanningShared.ts` | -7 LOC : `getMonday` → re-export |
+| `src/pages/coach/SwimPlanningAthleteView.tsx` | -8 LOC : `getMonday` retiré |
+| `src/pages/coach/lib/weekDates.ts` | -10 LOC + fix bug TZ `todayIso()` |
+| `src/components/dashboard/DayCell.tsx` | +20 LOC : `useCallback` handlers stables, props `iso`/`index` optionnelles |
+| `src/components/dashboard/CalendarGrid.tsx` | +2 LOC : passe `iso`/`index`, retire closures |
+| `src/components/dashboard/__tests__/DayCell.test.tsx` | +14 LOC : props `iso`/`index` ajoutées aux 7 cas |
+| `src/pages/coach/CoachPaceCalculatorScreen.tsx` | -2 / +2 LOC : import statique → dynamic import |
+| `src/pages/Dashboard.tsx` | -3 LOC : 3 staleTime overrides retirés |
+| `src/lib/export-pace-pdf.ts` | -1 / +5 LOC : import @assets retiré, runtime URL webp, `addImage WEBP` |
+| `src/lib/export-records-pdf.ts` | idem |
+| `src/lib/export-session-pdf.ts` | idem |
+
+### Limites (out of scope §214)
+
+Refactos moyens identifiés par l'audit non traités ici (à attaquer dans des § dédiés) :
+- Refacto **A** : tuer la façade morte `src/lib/api.ts:432-1039` (607 lignes de stubs `async fn() { return _fn() }`) — codemod sur 439 call-sites.
+- Refacto **B** : casser `Dashboard.tsx` (1117 LOC) en `<DashboardCalendar>` + `<FeedbackDrawerContainer>`.
+- Refacto **C** : endpoint RPC `get_coach_kpis(athlete_ids[])` (40 round-trips → 1).
+- Refacto **D** : factoriser le trio `Records.tsx` + `RecordsClub.tsx` + `RecordsAdmin.tsx` (3190 LOC).
+- Pattern d'erreur `assertSupabase<T>()` à introduire dans `client.ts` pour les 234 occurrences `if (error) throw new Error(error.message)`.
+- Centraliser les `getMondays(start, end)` dupliqués dans 4 fichiers (semantics légèrement différente — premier lundi >= start vs lundi de la semaine de start). Reporté.
+
 ## §211+§212+§213 — Polish bonus post-audit (2026-05-08)
 
 **Contexte :** suite §210 (Chantier D livré). Trois polish items non-structurels du plan d'audit, dispatchés en parallèle. §212+§213 réalisés par sub-agents sonnet, §211 réalisé en main (sub-agent stallé après 600s).

@@ -71,9 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§207+§208** — Cleanup post-audit (sonnet parallèle). §207 : 7 migrations alias InlineBanner → variants sémantiques (`amber→warning`, `emerald→success`, `blue→info`, `destructive→error`, `yellow→warning`) sur WellnessBanner, RecordsAdmin, Records, Dashboard, SwimmerHome. §208 : `CoachSectionHeader.tsx` back button → icon-only `h-11 w-11` iOS-style (texte "Retour" supprimé, `aria-label="Retour"` ajouté). API publique préservée, 6 call-sites validés sans modif. 6 fichiers.
-
-Précédent : **§206** — Fix Radix `SelectLabel must be used within SelectGroup` dans `CoachMessagesScreen.tsx:167-182` (fragments `<>` → `<SelectGroup>`). 1 fichier.
+Dernier § livré : **§214** — Quick wins perf + maintenabilité post-audit. 6 wins ROI immédiat : lazy `jspdf` dans Pace Calculator, closures inline CalendarGrid retirées (DayCell stable), 6 `staleTime` overrides incohérents supprimés, `src/lib/features.ts` mort supprimé, 11 helpers de date dupliqués centralisés dans `src/lib/date.ts` + fix bug TZ `weekDates`, logo PDF (373 Ko inliné) → runtime webp 7.7 Ko × 3 fichiers export. 19 fichiers, tsc clean.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

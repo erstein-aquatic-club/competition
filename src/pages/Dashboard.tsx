@@ -220,7 +220,6 @@ export default function Dashboard() {
     queryKey: ["user-group-ids", userId],
     queryFn: () => fetchUserGroupIds(userId),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
   });
 
   // ── Strength plan → calendar feed ───────────────────────────
@@ -235,7 +234,6 @@ export default function Dashboard() {
     queryKey: ["active-challenges", userGroupIds],
     queryFn: () => getActiveChallenges(userGroupIds?.[0] ?? null),
     enabled: userGroupIds !== undefined,
-    staleTime: 5 * 60 * 1000,
   });
 
   const isLoading = sessionsLoading || assignmentsLoading;
@@ -396,7 +394,6 @@ export default function Dashboard() {
     queryKey: ['swimmer-slots', userId],
     queryFn: () => api.getSwimmerSlots(userId!),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
   });
 
   const state = useDashboardState({ sessions, assignments, userId, user, swimmerSlots });

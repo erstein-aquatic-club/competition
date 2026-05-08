@@ -61,6 +61,8 @@ export function CalendarGrid({
             <DayCell
               key={iso}
               date={d}
+              iso={iso}
+              index={index}
               inMonth={inMonth}
               isToday={isToday}
               isSelected={isSel}
@@ -69,8 +71,8 @@ export function CalendarGrid({
               strengthAssigned={strengthByISO?.[iso]}
               hasCompetition={competitionDates?.has(iso)}
               hasAbsence={absenceDates?.has(iso)}
-              onClick={() => onDayClick(iso)}
-              onKeyDown={(e) => onKeyDown(e, index)}
+              onClick={onDayClick}
+              onKeyDown={onKeyDown}
             />
           );
         })}
