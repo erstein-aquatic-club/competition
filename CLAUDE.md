@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§217** — Pre-mount FeedbackDrawer (suite test prod §216). Drop du `<AnimatePresence>{open && (...)}` racine du drawer (≈1265 LOC + framer warm-up monté à chaque ouverture). Drawer toujours mounté, `open` pilote `motion.div` variants + `pointer-events` + `aria-hidden` + `drag`. Open ressenti instant ; coût payé une fois au premier render Dashboard. Pré-existant à §216 (pattern non touché par refacto B). 1 fichier (`FeedbackDrawer.tsx`). tsc clean.
+Dernier § livré : **§218** — Retrait stagger animation pills feedback (suite §217). 5 pills indicateurs + Commentaire utilisaient `staggerChildren` + `listItem` (x:-10→0) → vibration latérale visible une fois le drawer pre-mounté. Bloc passé en simple `<div>`, le wrapper AnimatePresence parent (panel détail opacity+y:8→0) suffit comme entry. 1 fichier (`FeedbackDrawer.tsx`). tsc clean.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

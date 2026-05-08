@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { slideInFromBottom, staggerChildren, listItem } from "@/lib/animations";
+import { slideInFromBottom } from "@/lib/animations";
 import { durationsSeconds } from "@/lib/design-tokens";
 import { StrokeDetailForm } from "./StrokeDetailForm";
 import type { Session, SwimExerciseLogInput } from "@/lib/api";
@@ -1224,23 +1224,22 @@ export function FeedbackDrawer({
                                 </div>
                               )}
 
-                              <motion.div
-                                className="space-y-4"
-                                variants={reduceMotion ? undefined : staggerChildren}
-                                initial={reduceMotion ? false : "hidden"}
-                                animate={reduceMotion ? false : "visible"}
-                              >
+                              {/* §218 — stagger + listItem (x: -10 → 0) retirés.
+                                  Causaient une "vibration" latérale sur les pills
+                                  à l'ouverture (5 éléments décalés de 0.05s). Le
+                                  wrapper AnimatePresence du panel parent (ligne
+                                  ~1052, opacity+y) suffit visuellement à l'entry. */}
+                              <div className="space-y-4">
                                 {INDICATORS.map((ind) => {
                                   const selected = draftState[ind.key];
                                   const isMissing = showMissing && !Number.isInteger(selected);
                                   return (
-                                    <motion.div
+                                    <div
                                       key={ind.key}
                                       className={cn(
                                         "space-y-2 rounded-2xl p-2 -mx-2 transition",
                                         isMissing && "ring-2 ring-destructive transition-all"
                                       )}
-                                      variants={listItem}
                                     >
                                       <div className={cn("text-sm font-semibold", !canRate ? "text-muted-foreground" : "text-foreground")}>{ind.label}</div>
                                       <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
@@ -1274,11 +1273,11 @@ export function FeedbackDrawer({
                                           {ind.mode === "hard" ? "Très dur" : "Excellente"}
                                         </span>
                                       </div>
-                                    </motion.div>
+                                    </div>
                                   );
                                 })}
 
-                                <motion.div className="space-y-2" variants={listItem}>
+                                <div className="space-y-2">
                                   <div className={cn("text-sm font-semibold", !canRate ? "text-muted-foreground" : "text-foreground")}>Commentaire</div>
                                   <textarea
                                     value={draftState.comment}
@@ -1294,8 +1293,8 @@ export function FeedbackDrawer({
                                         : "bg-card text-foreground border-border focus:ring-2 focus:ring-foreground/10"
                                     )}
                                   />
-                                </motion.div>
-                              </motion.div>
+                                </div>
+                              </div>
 
                               <div className="mt-4 rounded-3xl border border-border bg-muted/20 overflow-hidden">
                                 <button

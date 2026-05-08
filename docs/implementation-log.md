@@ -4,6 +4,33 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §218 — Retirer stagger animation pills feedback (vibration latérale) (2026-05-08)
+
+**Contexte :** test prod §217 (pre-mount du FeedbackDrawer) → l'utilisateur signale que le lag est *toujours* là, mais sous une autre forme : "une sorte d'effet de vibration latérale sur la zone qui contient les pills de saisie de ressentis lors de l'ouverture". §217 avait fait disparaître le lag d'ouverture (mount du drawer) ; cette deuxième observation visait l'animation interne des pills.
+
+**Diagnostic :** `FeedbackDrawer.tsx:1227-1298` — le bloc des indicateurs (Difficulté / Fatigue / Perf perçue / Engagement + Commentaire) était wrappé dans un `<motion.div>` parent avec `variants={staggerChildren}` (`transition: { staggerChildren: 0.05 }`) + `initial="hidden"`, `animate="visible"`. Chaque enfant pill avait `variants={listItem}` (`hidden: { opacity: 0, x: -10 }` → `visible: { opacity: 1, x: 0 }`). Résultat : 5 éléments slide-in depuis la gauche (10px) avec 50 ms de décalage chacun → effet de "vague" / vibration latérale perceptible.
+
+Cette animation pré-existait à §216-§217. Elle était auparavant masquée par l'animation slide-in-from-bottom du drawer entier (≈300 ms spring) qui démarrait depuis y:100%. Avec §217 (drawer pre-mounté), l'animation des pills devient le mouvement dominant à l'ouverture → la vibration devient visible.
+
+**Choix :** retirer **complètement** la stagger animation interne. Le wrapper parent `<AnimatePresence>{activeSession && (motion.div opacity+y:8→0)}</AnimatePresence>` (ligne ~1052) fournit déjà une entrée visuelle smooth pour tout le panel détail séance — le stagger inner devient redondant et nuisible.
+
+**Modifs `FeedbackDrawer.tsx`** :
+
+- Le `<motion.div className="space-y-4" variants={...} initial=... animate=...>` racine des pills devient un simple `<div className="space-y-4">`.
+- Chaque `<motion.div variants={listItem}>` enfant (4 indicateurs + 1 textarea Commentaire) devient un simple `<div>`.
+- Imports `staggerChildren` et `listItem` retirés depuis `@/lib/animations` (`slideInFromBottom` reste).
+
+**Préservé :**
+
+- `<AnimatePresence>` parent du panel (motion.div opacity+y:8→0) — l'animation d'entrée du panel détail séance reste smooth.
+- Toutes les autres animations du drawer (slideInFromBottom du container, AnimatePresence des sub-blocks comme `detailsOpen`, drag-down-close).
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (déjà documenté §214/§216/§217).
+
+**Validation perf attendue :** ouverture du drawer + sélection d'une séance → panel apparaît avec smooth fade-in (opacity 0→1, y 8→0), pills affichées d'un coup sans déphasage horizontal. Vérification utilisateur en prod après push.
+
+**Fichiers modifiés (1)** : `src/components/dashboard/FeedbackDrawer.tsx`. **Doc** : `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`.
+
 ## §217 — Pre-mount FeedbackDrawer (lag d'ouverture) (2026-05-08)
 
 **Contexte :** test prod §216 → l'utilisateur signale un lag perceptible à l'ouverture du drawer (clic sur jour calendrier). Diagnostic : `FeedbackDrawer.tsx:590-1429` enveloppait son contenu (≈1265 LOC + framer-motion warm-up + StrokeDetailForm + 8 motion.div + sub-sections) dans `<AnimatePresence>{open && (...)}</AnimatePresence>`. Premier `open=true` ⇒ premier mount ⇒ frames perdues. Pré-existant à §216 (le pattern n'a pas été touché par le refacto B), mais devenu visible lors du smoke test focalisé.
