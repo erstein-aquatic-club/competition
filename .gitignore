@@ -43,3 +43,7 @@ supabase/.temp/
 # to a non-xlsx format if you genuinely need to track it.
 docs/*.xlsx
 docs/*.xls
+
+# Archive bucket (cleanup §196). Holds obsolete/superfluous files
+# moved out of the active tree but not yet relocated off-machine.
+_archive/
