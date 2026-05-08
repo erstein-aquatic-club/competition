@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §224 — P0 transverses + typo régressions P1 post-audit pass 2 (2026-05-08)
+
+**Contexte :** suite à l'audit pass 2 (§215, `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md`). 4 régressions P0/P1 ciblées identifiées dans le rapport, 2 d'entre elles étant transverses (impact app-wide). Patch ciblé low-effort/high-ROI. Coach.tsx:1151 (5e régression P0 typo CardTitle uppercase italic fallback "Accès Coach") reporté à un § ultérieur car interférait avec §223 (RPC coach-KPIs) en parallèle.
+
+**Changements :**
+
+P0 transverses :
+
+- `src/components/ui/select.tsx:22` — `SelectTrigger` className `flex h-9` → `flex min-h-11 md:min-h-9`. Impact app-wide : tous les `<Select>` Radix passent à 44px tap target sur mobile (Apple HIG strict). Le `md:min-h-9` préserve la densité desktop comme le pattern `Button` (default `min-h-11 md:min-h-10`).
+- `src/components/coach/strength/AthletePlansTab.tsx` — cluster de 6 boutons d'action (assign/edit/delete/copy/assign-today, lignes 817, 825, 923, 932, 945, 953) `inline-flex h-7 w-7` → `inline-flex h-11 w-11`. Mutations critiques (suppression, assignation) désormais conformes HIG. Migration via Edit `replace_all=true` sur le pattern unique `inline-flex h-7 w-7 items-center justify-center rounded-full`. Bouton clear search L.184 (pattern différent `absolute right-0 top-1/2 -translate-y-1/2 flex h-7 w-7`) conservé : field-internal, audit OK.
+
+Typo régressions P1 (sentence-case) :
+
+- `src/pages/AwaitingApproval.tsx:22` — h1 `text-2xl font-display font-bold uppercase italic` → `text-2xl font-semibold tracking-tight`. Page utilitaire (compte en attente validation), hors brand-moment.
+- `src/pages/ComingSoon.tsx:21` — CardTitle `text-2xl font-display uppercase italic text-primary` → `text-2xl font-semibold tracking-tight text-primary` (couleur primary conservée). Page placeholder, triple anti-pattern uppercase+italic+primary supprimé.
+- `src/pages/coach/SlotSessionSheet.tsx:376-378` — h3 preview `text-base font-bold tracking-tight uppercase truncate` + `style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}` inline → `text-base font-semibold tracking-tight truncate`. Suppression complète de l'override Oswald uppercase (sheet interne).
+
+**Hors scope §224 :**
+
+- `src/pages/Coach.tsx:1151` régression P0 (CardTitle uppercase italic fallback "Accès Coach") — reporté car §223 (RPC coach-KPIs) modifiait Coach.tsx en parallèle.
+- §225 prévu : tokens manquants index.css (`tag-swim-stroke`, `tag-strength`, `override-accent`, `rank-competition`) + migration des 31 catégoriels TODO de `CoachTrainingSlotsScreen.tsx` (commit §222) + `STROKE_BORDER_TOP` map dans `ObjectiveCard.tsx`.
+- §226 prévu : Surface consolidation (BottomActionBar + UpdateNotification → primitive Surface) + polish (toast.tsx dotColors, SafeArea suppression, SwimCatalog empty state).
+
+**Vérifications :**
+- `npx tsc --noEmit` : ✅ clean
+- `npm test` : 684/685 pass + 1 fail pré-existant (`buildRunUpdatePayload keeps completed run ressentis` — non lié, hérité §214)
+- Diff : 5 fichiers modifiés, +10/-13 lignes (gain net de 3 lignes via suppression `style` inline et tokens compacts)
+
+**Fichiers modifiés (5)** : `src/components/ui/select.tsx`, `src/components/coach/strength/AthletePlansTab.tsx`, `src/pages/AwaitingApproval.tsx`, `src/pages/ComingSoon.tsx`, `src/pages/coach/SlotSessionSheet.tsx`. **Doc** : `docs/implementation-log.md` (entrée §224), `CLAUDE.md` (ligne "Dernier § livré"), `docs/ROADMAP.md`.
+
 ## §223 — RPC `get_coach_kpis` côté Postgres (Refacto C audit §214) (2026-05-08)
 
 **Contexte :** Refacto C de l'audit §214 (perf/maintenabilité). `Coach.tsx:1034-1141` faisait 2N requêtes Supabase REST par athlète sur la home coach (`getSessions` + `getStrengthHistory` pour chaque athlete dans `topAthletes.slice(0, 5)`). Pour 5 athlètes : 10 round-trips à chaque navigation home, ~600-700 ms en 4G coach mobile.
