@@ -29,11 +29,11 @@ import { Surface } from "@/components/shared/Surface";
 // ── Stroke colors (top border) ──────────────────────────────────
 
 const STROKE_BORDER_TOP: Record<string, string> = {
-  NL: "border-t-blue-500",
-  DOS: "border-t-emerald-500",
-  BR: "border-t-rose-500",
-  PAP: "border-t-violet-500",
-  QN: "border-t-amber-500",
+  NL: "border-t-stroke-nl",
+  DOS: "border-t-stroke-dos",
+  BR: "border-t-stroke-br",
+  PAP: "border-t-stroke-pap",
+  QN: "border-t-stroke-qn",
 };
 
 // ── Progress-based ring colors (same palette as progress bar) ───
@@ -219,7 +219,7 @@ export function ObjectiveCard({
           </span>
         )}
         {delta != null && (
-          <span className={`text-[10px] font-mono tabular-nums shrink-0 ${delta <= 0 ? "text-emerald-500 font-semibold" : "text-muted-foreground/60"}`}>
+          <span className={`text-[10px] font-mono tabular-nums shrink-0 ${delta <= 0 ? "text-status-success font-semibold" : "text-muted-foreground/60"}`}>
             {delta <= 0 ? "OK" : `+${delta.toFixed(2)}`}
           </span>
         )}
@@ -302,7 +302,7 @@ export function ObjectiveCard({
               )}
               {/* Delta */}
               {delta != null && (
-                <p className={`text-xs font-mono tabular-nums font-semibold leading-none ${delta <= 0 ? "text-emerald-500" : "text-amber-500"}`}>
+                <p className={`text-xs font-mono tabular-nums font-semibold leading-none ${delta <= 0 ? "text-status-success" : "text-status-warning"}`}>
                   {delta <= 0 ? "Atteint" : `+${delta.toFixed(2)}s`}
                 </p>
               )}

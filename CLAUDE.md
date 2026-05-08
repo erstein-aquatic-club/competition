@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§225** — Polish post-audit : toast.tsx dotColors → status-* + intensity-prog, SwimCatalog empty state → EmptyState (5e call-site).
+Dernier § livré : **§226** — Tokens chantier (cat-* + stroke-*) + caves catégoriels CoachTrainingSlotsScreen 31→0 + ObjectiveCard 7→0. 9 nouveaux tokens index.css (light+dark).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

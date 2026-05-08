@@ -4,6 +4,70 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §226 — Tokens chantier (cat-* + stroke-*) + caves catégoriels CoachTrainingSlotsScreen (2026-05-08)
+
+**Contexte :** suite à §222 (caves hardcodes top 3) qui avait identifié 31 catégoriels non migrables faute de tokens disponibles dans `CoachTrainingSlotsScreen.tsx` (commentés `TODO §223`/§218 par le sub-agent §222) + `STROKE_BORDER_TOP` map dans `ObjectiveCard.tsx:31-37` (5 hits hardcoded blue/emerald/rose/violet/amber). Création des 9 tokens manquants identifiés et migration complète. Validation utilisateur : "Oui, créer les tokens manquants en §223" (réponse AskUserQuestion §215, le numéro a glissé à §226).
+
+**Architecture des nouveaux tokens (`src/index.css`) :**
+
+9 nouveaux tokens HSL light + dark variants :
+
+```css
+/* Category tags — caves audit pass 2 */
+--cat-swim: 217 91% 60%;        /* blue-500 — natation type */
+--cat-strength: 38 92% 50%;     /* amber-500 — muscu type */
+--cat-override: 25 95% 53%;     /* orange-500 — modifié badges */
+--cat-competition: 350 89% 60%; /* rose-500 — compétitions */
+
+/* Stroke colors (4 nages — ObjectiveCard) */
+--stroke-nl: 217 91% 60%;       /* blue-500 — Nage Libre */
+--stroke-dos: 152 71% 50%;      /* emerald-500 — Dos */
+--stroke-br: 350 89% 60%;       /* rose-500 — Brasse */
+--stroke-pap: 273 71% 50%;      /* violet-500 — Papillon */
+--stroke-qn: 38 92% 50%;        /* amber-500 — 4 Nages */
+```
+
+Dark variants calibrées avec lightness +5-10% pour visibilité fond noir + saturation -10-20% (cohérent avec le pattern existant `intensity-*-bg` / `status-*-bg`).
+
+Déclarations `@theme inline` ajoutées (12 lignes) pour exposer les tokens à Tailwind 4 sous forme `bg-cat-swim`, `text-cat-swim/70`, `border-stroke-nl`, etc.
+
+**Migrations appliquées :**
+
+- **`src/components/shared/ObjectiveCard.tsx` 7 → 0 hits** (-7) :
+  - `STROKE_BORDER_TOP` map (5 hits) : `border-t-{blue,emerald,rose,violet,amber}-500` → `border-t-stroke-{nl,dos,br,pap,qn}` (1:1).
+  - L.222 + L.305 deltas vs objectif (2 hits) : `text-emerald-500`/`text-amber-500` → `text-status-success`/`text-status-warning` (status sémantique : delta favorable / défavorable).
+
+- **`src/pages/coach/CoachTrainingSlotsScreen.tsx` 31 → 0 hits** (-31, sub-agent sonnet) :
+  - blue → cat-swim (14 lignes) : type natation (toggle, sliding pill, sélection groupes, badges durée, banner héritage).
+  - amber → cat-strength (8 lignes) : type muscu (toggle, badges, miniature).
+  - orange → cat-override (8 lignes) : badge "Modifié", AlertTriangle, border-t override accent.
+  - rose → cat-competition (4 lignes) : indicateurs compétition, gradient from-rose to-orange.
+  - 12 commentaires `TODO §218 token tag-swim-stroke` supprimés (migration accomplie).
+  - 19 calls Edit, plusieurs lignes par edit (regroupements logiques).
+
+- **Cas inline conservés** :
+  - `CoachTrainingSlotsScreen.tsx:2650` `ctx.fillStyle = "#f97316"` (canvas JS, hex, pas une classe Tailwind — non-tokenisable simplement).
+  - L.482-483 shadows avec `rgba(59,130,246,0.25)` / `rgba(245,158,11,0.25)` (équivalent rgba blue/amber-500) — gardés inline car la conversion en `hsl(var(--cat-swim))` dans une chaîne de shadow `inset` complique pour zéro gain visuel.
+
+**Total cumulé Chantier C** : 120 (§199-§222) + 38 (§226) = **158 hardcodes status remplacés sur 18 fichiers**.
+
+**Nuances visuelles acceptées** :
+
+Les nouveaux tokens cat-* utilisent une lightness uniforme (60% light / 65% dark) là où l'usage hardcoded pouvait varier (text-blue-700 = 37%, text-blue-300 = 80%, etc.). Cette consolidation simplifie la maintenance au prix d'un léger ajustement perceptuel (texte cat-swim sur fond clair sera ~5-10% plus clair que text-blue-700 d'origine). Trade-off accepté : c'est l'objectif du chantier (réduire les nuances divergentes).
+
+**Vérifications :**
+- `npx tsc --noEmit` : ✅ clean
+- `npm test` : 684/685 pass + 1 fail pré-existant (`buildRunUpdatePayload`)
+- Diff : 3 fichiers modifiés, +81/-47 lignes net.
+
+**Hors scope §226 / reportés :**
+- `Coach.tsx:1151` typo régression P0 (CardTitle uppercase italic fallback "Accès Coach") — toujours reporté car §223 RPC vient juste de toucher Coach.tsx, attendre stabilisation.
+- Surface consolidation (BottomActionBar + UpdateNotification → primitive Surface) — §227.
+- SafeArea suppression — Tailwind 4 sans `pb-safe` natif ici, à investiguer plus tard.
+- SwimCatalog header inline → CoachSectionHeader — décision UX (visual change).
+
+**Fichiers modifiés (3)** : `src/index.css` (+39 lignes : 9 tokens × 2 thèmes + déclarations @theme), `src/components/shared/ObjectiveCard.tsx`, `src/pages/coach/CoachTrainingSlotsScreen.tsx`. **Doc** : `docs/implementation-log.md`, `CLAUDE.md`, `docs/ROADMAP.md`.
+
 ## §225 — Polish post-audit (toast tokens + SwimCatalog empty state) (2026-05-08)
 
 **Contexte :** suite à l'audit pass 2 (§215). Polish bonus identifié dans le rapport : régression mineure `toast.tsx dotColors` (4 hardcodes `bg-emerald-500/red-500/amber-500/blue-500`) et empty state ad hoc dans SwimCatalog (4 lignes `<div Archive /><p>` au lieu d'`<EmptyState>`). Patch ciblé low-effort/high-cohérence.

@@ -81,6 +81,19 @@
   --color-tag-swim-text: hsl(var(--tag-swim-text));
   --color-tag-educ-bg: hsl(var(--tag-educ-bg));
   --color-tag-educ-text: hsl(var(--tag-educ-text));
+
+  /* Category tags (§226 caves audit pass 2) */
+  --color-cat-swim: hsl(var(--cat-swim));
+  --color-cat-strength: hsl(var(--cat-strength));
+  --color-cat-override: hsl(var(--cat-override));
+  --color-cat-competition: hsl(var(--cat-competition));
+
+  /* Stroke colors (4 nages — ObjectiveCard) */
+  --color-stroke-nl: hsl(var(--stroke-nl));
+  --color-stroke-dos: hsl(var(--stroke-dos));
+  --color-stroke-br: hsl(var(--stroke-br));
+  --color-stroke-pap: hsl(var(--stroke-pap));
+  --color-stroke-qn: hsl(var(--stroke-qn));
 }
 
 /* Prevent overscroll bounce on mobile (dock lifts on iOS PWA) */
@@ -173,6 +186,19 @@ body {
   --status-warning-bg: 48 96% 89%;
   --status-error: 0 72% 51%;
   --status-error-bg: 0 93% 94%;
+
+  /* Category tags — caves audit pass 2 (§226) */
+  --cat-swim: 217 91% 60%;        /* blue-500 — natation type */
+  --cat-strength: 38 92% 50%;     /* amber-500 — muscu type */
+  --cat-override: 25 95% 53%;     /* orange-500 — modifié badges */
+  --cat-competition: 350 89% 60%; /* rose-500 — compétitions */
+
+  /* Stroke colors (4 nages — ObjectiveCard) */
+  --stroke-nl: 217 91% 60%;       /* blue-500 — Nage Libre */
+  --stroke-dos: 152 71% 50%;      /* emerald-500 — Dos */
+  --stroke-br: 350 89% 60%;       /* rose-500 — Brasse */
+  --stroke-pap: 273 71% 50%;      /* violet-500 — Papillon */
+  --stroke-qn: 38 92% 50%;        /* amber-500 — 4 Nages */
 }
 
 .dark {
@@ -238,6 +264,19 @@ body {
   --status-warning-bg: 48 40% 15%;
   --status-error: 0 60% 55%;
   --status-error-bg: 0 40% 15%;
+
+  /* Category tags (dark mode — §226) */
+  --cat-swim: 213 80% 65%;
+  --cat-strength: 43 80% 55%;
+  --cat-override: 27 85% 60%;
+  --cat-competition: 351 80% 65%;
+
+  /* Stroke colors (dark mode — 4 nages) */
+  --stroke-nl: 213 80% 65%;
+  --stroke-dos: 152 55% 55%;
+  --stroke-br: 351 80% 65%;
+  --stroke-pap: 273 55% 60%;
+  --stroke-qn: 43 80% 55%;
 }
 
 /* Bridge the --z-index-* custom properties to Tailwind 4's class-based API.
