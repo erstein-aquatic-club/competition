@@ -372,10 +372,7 @@ export default function SlotSessionSheet({
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <h3
-                  className="flex-1 text-base font-bold tracking-tight uppercase truncate"
-                  style={{ fontFamily: "var(--font-display, 'Oswald', sans-serif)" }}
-                >
+                <h3 className="flex-1 text-base font-semibold tracking-tight truncate">
                   {assignment?.session_name ?? "Séance"}
                 </h3>
                 {assignment?.swim_catalog_id != null && (

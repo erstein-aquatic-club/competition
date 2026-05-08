@@ -18,7 +18,7 @@ export default function ComingSoon({
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Clock className="h-6 w-6" />
           </div>
-          <CardTitle className="mt-4 text-2xl font-display uppercase italic text-primary">{title}</CardTitle>
+          <CardTitle className="mt-4 text-2xl font-semibold tracking-tight text-primary">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">

@@ -19,7 +19,7 @@ export default function AwaitingApproval({ mode = "pending" }: AwaitingApprovalP
           <AlertCircle className="h-10 w-10 text-amber-600 dark:text-amber-400" />
         )}
       </div>
-      <h1 className="text-2xl font-display font-bold uppercase italic">
+      <h1 className="text-2xl font-semibold tracking-tight">
         {isPending ? "En attente de validation" : "Verification indisponible"}
       </h1>
       <p className="mt-3 max-w-sm text-sm text-muted-foreground">

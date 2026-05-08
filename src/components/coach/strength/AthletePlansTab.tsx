@@ -814,7 +814,7 @@ function CycleCard({
                     type="button"
                     onClick={() => onAssignSession(session)}
                     disabled={assignPending}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-status-success shrink-0"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted text-status-success shrink-0"
                     aria-label="Assigner"
                   >
                     {assignPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CalendarPlus className="h-3 w-3" />}
@@ -822,7 +822,7 @@ function CycleCard({
                   <button
                     type="button"
                     onClick={() => onDeleteSession(session)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 shrink-0"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 shrink-0"
                     aria-label="Supprimer"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -920,7 +920,7 @@ function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending
         <button
           type="button"
           onClick={onEdit}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted"
           aria-label="Modifier"
         >
           <Edit2 className="h-3.5 w-3.5" />
@@ -929,7 +929,7 @@ function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending
           type="button"
           onClick={onAssign}
           disabled={assignPending}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted text-status-success"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted text-status-success"
           aria-label="Assigner pour aujourd'hui"
           title="Assigner pour aujourd'hui"
         >
@@ -942,7 +942,7 @@ function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending
         <button
           type="button"
           onClick={onCopy}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted"
           aria-label="Copier vers un nageur"
         >
           <Copy className="h-3.5 w-3.5" />
@@ -950,7 +950,7 @@ function SessionRow({ session, onEdit, onDelete, onCopy, onAssign, assignPending
         <button
           type="button"
           onClick={onDelete}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
           aria-label="Supprimer"
         >
           <Trash2 className="h-3.5 w-3.5" />
