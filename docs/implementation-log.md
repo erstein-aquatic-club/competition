@@ -4,6 +4,57 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §223 — RPC `get_coach_kpis` côté Postgres (Refacto C audit §214) (2026-05-08)
+
+**Contexte :** Refacto C de l'audit §214 (perf/maintenabilité). `Coach.tsx:1034-1141` faisait 2N requêtes Supabase REST par athlète sur la home coach (`getSessions` + `getStrengthHistory` pour chaque athlete dans `topAthletes.slice(0, 5)`). Pour 5 athlètes : 10 round-trips à chaque navigation home, ~600-700 ms en 4G coach mobile.
+
+§223 (et non §222) suite à conflit de numérotation avec un cleanup hardcodes coach builder en parallèle (§222 caves audit pass 2).
+
+**Architecture :**
+
+- Migration `00157_get_coach_kpis_rpc.sql` (NEW, ~70 LOC) : fonction Postgres `get_coach_kpis(athlete_ids int[], from_date date, to_date date)` retournant `setof (athlete_id int, fatigue_values numeric[])`. `language sql stable security invoker set search_path = public`. CTEs `swim_fatigue` (`dim_sessions`, coalesce fatigue/rpe) + `strength_fatigue` (`strength_session_runs`, coalesce fatigue/raw_payload->>fatigue, filtre temps `coalesce(completed_at, started_at)`) + `combined` + final `unnest(athlete_ids) left join`. `grant execute on function ... to authenticated`. Appliquée en prod via MCP `apply_migration`.
+- `src/lib/api/coach-kpis.ts` (NEW, 56 LOC) : wrapper TS `getCoachKpis(ids, from, to)` retourne `Map<number, number[]>`. Guard `canUseSupabase()` pour préserver le contrat hybride offline (pattern aligné `swimmerSessions.ts:21`).
+- `src/lib/api/index.ts` : re-export `getCoachKpis` + type `CoachKpiRow`.
+- `src/pages/Coach.tsx:1034-1141` : queryFn ~110 LOC → ~30 LOC. Logique client (`buildFatigueRating`/`normalizeFatigueValue`/threshold/sort) intacte. Order déterministe via `topAthletes.map(...)`.
+- `supabase/tests/rls/get_coach_kpis.test.ts` (NEW, 171 LOC) : 8 cas — coach voit ses athlètes, admin voit tout, athlète ne fuit pas les autres, athlète voit ses propres values, fenêtre vide, IDs inexistants, array vide, fatigue-wins-over-rpe.
+- `supabase/tests/schema.sql` : ajout `dim_sessions.fatigue` (int null) + `strength_session_runs.raw_payload` (jsonb null) + body du RPC verbatim — convention identique à `get_swimmer_sessions` déjà mirorée dans le harness.
+
+**Cleanup bonus YAGNI :**
+
+- Suppression de `mostLoadedAthlete`, `formeScores`, `loadScore`, `formeScore` du `coachKpisQuery` (calculés mais 0 consumer post-grep).
+- Suppression des helpers `getRunTimestamp` et `getRunFatigueValue` devenus inutilisés (logique migrée en SQL).
+- Suppression des imports inutiles `getSessions`, `getStrengthHistory`, type `LocalStrengthRun` dans Coach.tsx.
+
+**Schema findings (Task 1 du plan)** :
+
+- `dim_sessions.fatigue` (int null) + `rpe` (int NOT NULL) → `coalesce(fatigue, rpe)` reproduit la sémantique JS `session.fatigue ?? session.feeling`.
+- `strength_session_runs` : `fatigue` (int null) + `raw_payload` (jsonb null), **uniquement `started_at` + `completed_at`** comme timestamps (pas `date`/`created_at` en prod) → filtre `coalesce(completed_at, started_at)`. Documenté en commentaire SQL header.
+
+**Méthode :** subagent-driven (1 implementer Tasks 1-7 batchés, spec compliance review ✅, code quality review "approved with fixes" → 2 fixes critiques appliqués en main : `canUseSupabase()` guard + describe block rename `RLS coverage + SQL semantics`). Plan détaillé `docs/plans/2026-05-08-coach-kpis-rpc.md`. Design `docs/plans/2026-05-08-coach-kpis-rpc-design.md`.
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (non lié, déjà documenté §214/§216/§217/§218/§219). `npm run test:rls` à valider par l'utilisateur (Docker requis).
+
+**Validation prod attendue :**
+
+- `/coach` home charge, alertes fatigue identiques à avant (à comparaison près).
+- DevTools Network : 1 seul appel `rpc/get_coach_kpis` au lieu de 2-10 GETs sur `/dim_sessions` et `/strength_session_runs`.
+
+**Bénéfice net :**
+
+- 2-10 round-trips → 1 round-trip sur la home coach.
+- ~600-700 ms gagnés en 4G coach mobile (5 athlètes max).
+- `Coach.tsx` : -67 LOC sur le `coachKpisQuery` + dead code retiré.
+
+**Hors scope §223 :**
+
+- Pas de modification de `buildFatigueRating`/`normalizeFatigueValue`/seuils.
+- `mostLoadedAthlete`/`formeScores` retirés (YAGNI).
+- Hardening numeric cast `nullif(...)::numeric` (review minor #3) reporté — production a uniquement des valeurs numeric/null donc pas de risque immédiat.
+- `as CoachKpiRow[]` cast manuel (review minor #4) — pas de fichier de types Supabase régénéré dans `src/`. À reprendre si on persiste les types.
+- Refacto D (trio Records), helper `assertSupabase<T>()`, `seedDemoData` deletion → § dédiés.
+
+**Fichiers** : Créés : `supabase/migrations/00157_get_coach_kpis_rpc.sql`, `src/lib/api/coach-kpis.ts` (56 LOC), `supabase/tests/rls/get_coach_kpis.test.ts` (171 LOC). Modifiés : `src/pages/Coach.tsx` (-67 LOC), `src/lib/api/index.ts` (+1 re-export), `supabase/tests/schema.sql` (+ colonnes + RPC body). **Doc** : `docs/plans/2026-05-08-coach-kpis-rpc-design.md`, `docs/plans/2026-05-08-coach-kpis-rpc.md`, `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`, `docs/claude/files-map.md`.
+
 ## §222 — Caves hardcodes top 3 post-audit pass 2 (Chantier C suite) (2026-05-08)
 
 **Contexte :** suite à l'audit pass 2 (§215, `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md`) qui a identifié 3 "caves" de hardcodes color non touchées par les Chantiers C précédents (§202+§205+§209) : `CoachTrainingSlotsScreen.tsx` (36 hits), `AthletePlansTab.tsx` (22 hits), `FeedbackDrawer.tsx` (16 hits) = 74 hits combinés. Drapeau racine #3 (tokens sémantiques vs hardcodes Tailwind) ciblé. 3 sub-agents sonnet en parallèle (1 par fichier), zéro overlap.

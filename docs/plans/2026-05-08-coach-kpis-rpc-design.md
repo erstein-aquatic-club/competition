@@ -1,4 +1,4 @@
-# §220 — RPC `get_coach_kpis` côté Postgres (Refacto C)
+# §223 — RPC `get_coach_kpis` côté Postgres (Refacto C)
 
 *Date : 2026-05-08 — Suite §219 (kill façade api.ts), §218 (drawer perf), §216 (Dashboard split), §214 (audit perf/maintenabilité).*
 
@@ -42,7 +42,7 @@ grep -rn "mostLoadedAthlete\|formeScores" src/ --include="*.ts" --include="*.tsx
 # Seules les 5 occurrences dans Coach.tsx (déclaration + return), 0 consumer.
 ```
 
-Per CLAUDE.md "Don't add features beyond what the task requires" + YAGNI, ce dead code est supprimé en bonus du §220. La logique du queryFn passe de ~110 LOC à ~30 LOC.
+Per CLAUDE.md "Don't add features beyond what the task requires" + YAGNI, ce dead code est supprimé en bonus du §223. La logique du queryFn passe de ~110 LOC à ~30 LOC.
 
 ### Architecture
 
@@ -133,7 +133,7 @@ where r.athlete_id = any(athlete_ids)
 | Behavior change sur `fatigueAlerts` (athlètes différents apparaissent en alerte) | Smoke test prod : avant/après comparer les 3 alertes affichées. Si différence, ne pas push. |
 | Migration mal appliquée → rollback | Migration via MCP `apply_migration` (atomique). READ-ONLY function : pas de DDL destructif, juste `CREATE OR REPLACE FUNCTION`. Rollback = `DROP FUNCTION`. |
 | Date filter sur runs ≠ JS `getRunTimestamp` | Spec : `coalesce(completed_at, started_at, date::timestamptz, created_at)` — même priorité que JS. |
-| RLS test ne couvre pas `dim_sessions`/`strength_session_runs` | L'implementer vérifie `supabase/tests/rls/` ; si absent, signale (out of scope §220 = ne pas étendre le harness). |
+| RLS test ne couvre pas `dim_sessions`/`strength_session_runs` | L'implementer vérifie `supabase/tests/rls/` ; si absent, signale (out of scope §223 = ne pas étendre le harness). |
 | Dead code suppression casse subtilement | grep résiduel `mostLoadedAthlete\|formeScores\|loadScore\|formeScore` dans `src/` après cleanup → 0 résultats avant commit. |
 
 ### Validation
@@ -145,7 +145,7 @@ where r.athlete_id = any(athlete_ids)
 - `gh run list` workflow Deploy green
 - DevTools Network : 1 seul appel `rpc/get_coach_kpis` au lieu de 40 GETs
 
-### Out of scope §220
+### Out of scope §223
 
 - Pas de modification de la formule `buildFatigueRating`/`normalizeFatigueValue`.
 - Pas de migration des seuils (`FATIGUE_ALERT_HIGH_THRESHOLD`, `FATIGUE_ALERT_MAX_THRESHOLD`, `FATIGUE_ALERT_MIN_SAMPLES`).

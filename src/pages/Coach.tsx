@@ -13,8 +13,7 @@ import {
   getAthletes,
   getAllAssignments,
   getGroups,
-  getSessions,
-  getStrengthHistory,
+  getCoachKpis,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
@@ -74,7 +73,6 @@ const CoachMySwimmersScreen = lazyWithRetry(() => import("./coach/CoachMySwimmer
 const CoachCommentsScreen = lazyWithRetry(() => import("./coach/CoachCommentsScreen"));
 const CoachPaceCalculatorScreen = lazyWithRetry(() => import("./coach/CoachPaceCalculatorScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
-import type { LocalStrengthRun } from "@/lib/types";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -872,10 +870,10 @@ const CoachHome = ({
   );
 };
 
-// ── Data helpers (unchanged) ───────────────────────────────────────────────
+// ── Data helpers ───────────────────────────────────────────────────────────
 const getDateOnly = (value: Date) => value.toISOString().split("T")[0];
-const getRunTimestamp = (run: LocalStrengthRun) =>
-  new Date(run.completed_at || run.started_at || run.date || run.created_at || 0).getTime();
+// §222 — getRunTimestamp/getRunFatigueValue retirés : la fenêtre temporelle
+// et la source de fatigue sont gérées côté SQL par get_coach_kpis (RPC).
 const normalizeFatigueValue = (value: unknown): number | null => {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return null;
@@ -886,12 +884,6 @@ const normalizeFatigueValue = (value: unknown): number | null => {
     return Math.min(5, Math.max(1, num / 2));
   }
   return null;
-};
-const getRunFatigueValue = (run: LocalStrengthRun): number | null => {
-  const direct = normalizeFatigueValue(run.fatigue);
-  if (direct != null) return direct;
-  const rawPayload = run.raw_payload as Record<string, unknown> | null | undefined;
-  return normalizeFatigueValue(rawPayload?.fatigue);
 };
 
 const buildFatigueRating = (values: number[]) => {
@@ -1031,6 +1023,11 @@ export default function Coach() {
     queryFn: () => getGroups(),
     enabled: coachAccess && shouldLoadGroups,
   });
+  // §222 — Refacto C : 2N requêtes REST (sessions + strength) → 1 RPC.
+  // Le RPC `get_coach_kpis` retourne les valeurs brutes de fatigue par
+  // athlète sur la fenêtre demandée. La logique seuils + sort + filter
+  // (FATIGUE_ALERT_MIN_SAMPLES, FATIGUE_ALERT_HIGH_THRESHOLD,
+  // FATIGUE_ALERT_MAX_THRESHOLD) reste côté client via buildFatigueRating.
   const coachKpisQuery = useQuery({
     queryKey: ["coach-kpis", kpiPeriod, topAthleteKey],
     enabled: coachAccess && activeSection === "home" && topAthletes.length > 0,
@@ -1041,102 +1038,38 @@ export default function Coach() {
       const fromDate = getDateOnly(startDate);
       const toDate = getDateOnly(new Date());
 
-      const perAthlete = await Promise.all(
-        topAthletes.map(async (athlete) => {
-          const [sessions, strength] = await Promise.all([
-            getSessions(athlete.display_name, athlete.id),
-            getStrengthHistory(athlete.display_name, {
-              athleteId: athlete.id,
-              limit: 50,
-              from: fromDate,
-              to: toDate,
-            }),
-          ]);
-          const recentSessions = sessions.filter(
-            (session) => new Date(session.date).getTime() >= startDate.getTime(),
-          );
-          const sessionFatigueValues = recentSessions
-            .map((session) => session.fatigue ?? session.feeling)
-            .filter((value): value is number => Number.isFinite(value));
-          const swimLoad = recentSessions.reduce(
-            (sum, session) => sum + (Number(session.duration) || 0) * (Number(session.effort) || 0),
-            0,
-          );
-          const runs = strength?.runs ?? [];
-          const recentRuns = runs.filter((run: LocalStrengthRun) => getRunTimestamp(run) >= startDate.getTime());
-          const runFatigueValues = recentRuns
-            .map((run: LocalStrengthRun) => getRunFatigueValue(run))
-            .filter((value): value is number => value != null);
-          const strengthLoad = recentRuns.reduce((sum: number, run: LocalStrengthRun) => {
-            const runEffort = Number(run.feeling ?? run.rpe ?? 0);
-            const runDuration = Number(run.duration ?? 0);
-            if (runDuration > 0 && runEffort > 0) {
-              return sum + runDuration * runEffort;
-            }
-            const setCount = Array.isArray(run.logs) ? run.logs.length : 0;
-            return sum + setCount * 5;
-          }, 0);
-          const fatigueRating = buildFatigueRating([...sessionFatigueValues, ...runFatigueValues]);
-          // Compute forme score from most recent session (same pattern as CoachSwimmersOverview)
-          const lastSession = recentSessions[0];
-          let formeScore: number | null = null;
-          if (lastSession) {
-            const fv: number[] = [];
-            const eff = lastSession.effort;
-            const fat = lastSession.fatigue ?? lastSession.feeling;
-            const perf = lastSession.performance;
-            const eng = lastSession.engagement;
-            // Values are normalized to 1-5 scale — invert effort and fatigue (high = bad)
-            if (eff != null && Number.isFinite(eff)) fv.push(6 - eff);
-            if (fat != null && Number.isFinite(fat)) fv.push(6 - fat);
-            if (perf != null && Number.isFinite(perf)) fv.push(perf);
-            if (eng != null && Number.isFinite(eng)) fv.push(eng);
-            if (fv.length > 0) {
-              formeScore = Math.round((fv.reduce((a, b) => a + b, 0) / fv.length) * 10) / 10;
-            }
-          }
-          return {
-            athleteId: athlete.id,
-            athleteName: athlete.display_name,
-            loadScore: swimLoad + strengthLoad,
-            fatigueRating,
-            formeScore,
-          };
-        }),
-      );
+      const athleteIds = topAthletes
+        .map((a) => a.id)
+        .filter((id): id is number => typeof id === "number");
 
-      const fatigueAlerts = perAthlete
-        .filter((entry) => {
-          if (!entry.fatigueRating) return false;
-          if (entry.fatigueRating.sampleCount < FATIGUE_ALERT_MIN_SAMPLES) return false;
-          return entry.fatigueRating.average >= FATIGUE_ALERT_HIGH_THRESHOLD;
+      const fatigueByAthlete = await getCoachKpis(athleteIds, fromDate, toDate);
+
+      const fatigueAlerts = topAthletes
+        .map((athlete) => {
+          if (athlete.id == null) return null;
+          const values = fatigueByAthlete.get(athlete.id) ?? [];
+          const rating = buildFatigueRating(values);
+          if (!rating) return null;
+          if (rating.sampleCount < FATIGUE_ALERT_MIN_SAMPLES) return null;
+          if (rating.average < FATIGUE_ALERT_HIGH_THRESHOLD) return null;
+          return {
+            athleteName: athlete.display_name,
+            rating: rating.rating,
+            average: rating.average,
+            sampleCount: rating.sampleCount,
+            level:
+              rating.average >= FATIGUE_ALERT_MAX_THRESHOLD
+                ? ("max" as const)
+                : ("high" as const),
+          };
         })
-        .map((entry) => ({
-          athleteName: entry.athleteName,
-          rating: entry.fatigueRating?.rating ?? 0,
-          average: entry.fatigueRating?.average ?? 0,
-          sampleCount: entry.fatigueRating?.sampleCount ?? 0,
-          level:
-            (entry.fatigueRating?.average ?? 0) >= FATIGUE_ALERT_MAX_THRESHOLD
-              ? ("max" as const)
-              : ("high" as const),
-        }))
+        .filter((alert): alert is NonNullable<typeof alert> => alert !== null)
         .sort((a, b) => {
           if (b.average !== a.average) return b.average - a.average;
           return b.sampleCount - a.sampleCount;
         });
-      const mostLoadedAthlete = perAthlete
-        .filter((entry) => entry.loadScore > 0)
-        .sort((a, b) => b.loadScore - a.loadScore)[0];
 
-      const formeScores = new Map<number, number | null>();
-      for (const entry of perAthlete) {
-        if (entry.athleteId != null) {
-          formeScores.set(entry.athleteId, entry.formeScore);
-        }
-      }
-
-      return { fatigueAlerts, mostLoadedAthlete: mostLoadedAthlete ?? null, formeScores };
+      return { fatigueAlerts };
     },
   });
 

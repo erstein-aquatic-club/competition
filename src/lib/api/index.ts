@@ -177,6 +177,9 @@ export {
 // Swimmer sessions unified RPC (§144)
 export { getSwimmerSessions } from './swimmerSessions';
 
+// Coach KPIs (§222) — agrégation fatigue sessions+runs en 1 round-trip
+export { getCoachKpis, type CoachKpiRow } from './coach-kpis';
+
 export {
   getSwimCatalog,
   getSwimSessionById,

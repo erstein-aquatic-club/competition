@@ -80,6 +80,7 @@ CREATE TABLE public.dim_sessions (
   time_slot TEXT NOT NULL,
   duration INTEGER NOT NULL,
   rpe INTEGER NOT NULL,
+  fatigue INTEGER, -- §223 : utilisé par get_coach_kpis (coalesce(fatigue, rpe))
   distance INTEGER,
   comments TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -391,6 +392,7 @@ CREATE TABLE public.strength_session_runs (
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   fatigue INTEGER,
+  raw_payload JSONB, -- §223 : fallback pour get_coach_kpis (raw_payload->>'fatigue')
   comments TEXT
 );
 
@@ -1146,5 +1148,61 @@ BEGIN
     'targets',      COALESCE(targets,  '[]'::jsonb)
   );
 END;
+$$;
+
+-- =============================================================================
+-- RPC get_coach_kpis (§223) — verbatim body from migration 00157.
+-- Agrège les valeurs de fatigue (sessions + runs) par athlète sur une fenêtre.
+-- security invoker → RLS héritée des policies dim_sessions + strength_session_runs.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_coach_kpis(
+  athlete_ids int[],
+  from_date date,
+  to_date date
+)
+RETURNS TABLE (
+  athlete_id int,
+  fatigue_values numeric[]
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  with swim_fatigue as (
+    select s.athlete_id, coalesce(s.fatigue, s.rpe)::numeric as v
+    from public.dim_sessions s
+    where s.athlete_id = any(athlete_ids)
+      and s.session_date between from_date and to_date
+      and coalesce(s.fatigue, s.rpe) is not null
+  ),
+  strength_fatigue as (
+    select r.athlete_id,
+      coalesce(
+        r.fatigue::numeric,
+        nullif(r.raw_payload->>'fatigue', '')::numeric
+      ) as v
+    from public.strength_session_runs r
+    where r.athlete_id = any(athlete_ids)
+      and coalesce(r.completed_at, r.started_at)
+          between from_date::timestamptz
+              and (to_date + interval '1 day')::timestamptz
+      and (r.fatigue is not null or r.raw_payload->>'fatigue' is not null)
+  ),
+  combined as (
+    select athlete_id, v from swim_fatigue
+    union all
+    select athlete_id, v from strength_fatigue
+  )
+  select
+    a.id as athlete_id,
+    coalesce(
+      array_agg(c.v) filter (where c.v is not null),
+      '{}'::numeric[]
+    ) as fatigue_values
+  from unnest(athlete_ids) as a(id)
+  left join combined c on c.athlete_id = a.id
+  group by a.id;
 $$;
 GRANT EXECUTE ON FUNCTION get_pace_share_payload(uuid) TO anon, authenticated;
