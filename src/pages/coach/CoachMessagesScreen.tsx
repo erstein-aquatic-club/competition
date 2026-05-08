@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { BellRing, SendHorizontal } from "lucide-react";
+import { ArrowLeft, BellRing, SendHorizontal } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import CoachSectionHeader from "./CoachSectionHeader";
 
 type CoachMessagesScreenProps = {
   onBack?: () => void;
@@ -110,7 +108,7 @@ const CoachMessagesScreen = ({
 
     setSending(true);
     try {
-      const result = await api.notifications_send({
+      await api.notifications_send({
         title: title.trim(),
         body: message.trim() || null,
         type: "message",
@@ -140,107 +138,89 @@ const CoachMessagesScreen = ({
   };
 
   return (
-    <div className="space-y-6 pb-24">
-      <CoachSectionHeader
-        title="Envoyer un message"
-        description="Crée une notification push (FCM) pour un groupe ou un nageur."
-        onBack={onBack}
-      />
+    <div className="space-y-5 pb-24">
+      {/* Header */}
+      <div>
+        {onBack ? (
+          <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={onBack}>
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Retour
+          </Button>
+        ) : null}
+        <h2 className="text-xl font-display font-semibold uppercase italic text-primary">
+          Envoyer un message
+        </h2>
+      </div>
 
-      <Card className="border-l-4 border-l-primary">
-        <CardHeader>
-          <CardTitle>Destinataire</CardTitle>
-          <CardDescription>Sélectionnez un groupe complet ou un nageur individuel.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Destinataire</Label>
-            <Select value={targetValue} onValueChange={setTargetValue}>
-              <SelectTrigger>
-                <SelectValue placeholder={athletesLoading ? "Chargement..." : "Choisir un nageur ou un groupe"} />
-              </SelectTrigger>
-              <SelectContent>
-                {groupOptions.length ? (
-                  <>
-                    <SelectItem value="section-group" disabled>
-                      Groupes
-                    </SelectItem>
-                    {groupOptions.map((g) => (
-                      <SelectItem key={g.value} value={g.value}>
-                        {g.label}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : null}
-                {athleteOptions.length ? (
-                  <>
-                    <SelectItem value="section-athlete" disabled>
-                      Nageurs
-                    </SelectItem>
-                    {athleteOptions.map((a) => (
-                      <SelectItem key={a.value} value={a.value}>
-                        {a.label}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : null}
-              </SelectContent>
-            </Select>
-          </div>
-          {targetValue && selectedTarget.recipients > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {selectedTarget.recipients} nageur{selectedTarget.recipients > 1 ? "s" : ""} ciblé{selectedTarget.recipients > 1 ? "s" : ""}
-            </p>
-          ) : null}
-          {targetValue && selectedTarget.recipients === 0 ? (
-            <p className="text-xs text-destructive">
-              Aucun nageur actif n'est rattaché à cette sélection.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification</CardTitle>
-          <CardDescription>Le titre apparaît dans la push, le message reste optionnel.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="coach-message-title">Titre</Label>
-            <Input
-              id="coach-message-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex. Changement d'horaire demain"
-              maxLength={200}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="coach-message-body">Message</Label>
-            <Textarea
-              id="coach-message-body"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Ajoutez les détails à afficher dans la notification…"
-              rows={4}
-              maxLength={2000}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-muted/20">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
-            L'envoi crée aussi une notification dans l'application. Les appareils avec les push activées la recevront immédiatement.
+      {/* Destinataire */}
+      <div className="space-y-1.5">
+        <Label htmlFor="coach-msg-target">Destinataire</Label>
+        <Select value={targetValue} onValueChange={setTargetValue}>
+          <SelectTrigger id="coach-msg-target">
+            <SelectValue placeholder={athletesLoading ? "Chargement..." : "Choisir un nageur ou un groupe"} />
+          </SelectTrigger>
+          <SelectContent>
+            {groupOptions.length ? (
+              <>
+                <SelectItem value="section-group" disabled>Groupes</SelectItem>
+                {groupOptions.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                ))}
+              </>
+            ) : null}
+            {athleteOptions.length ? (
+              <>
+                <SelectItem value="section-athlete" disabled>Nageurs</SelectItem>
+                {athleteOptions.map((a) => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </>
+            ) : null}
+          </SelectContent>
+        </Select>
+        {targetValue && selectedTarget.recipients > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {selectedTarget.recipients} nageur{selectedTarget.recipients > 1 ? "s" : ""} ciblé{selectedTarget.recipients > 1 ? "s" : ""}
           </p>
-        </CardContent>
-      </Card>
+        ) : null}
+        {targetValue && selectedTarget.recipients === 0 ? (
+          <p className="text-xs text-destructive">Aucun nageur actif n'est rattaché à cette sélection.</p>
+        ) : null}
+      </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 p-4 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:p-0">
+      {/* Titre */}
+      <div className="space-y-1.5">
+        <Label htmlFor="coach-message-title">
+          Titre <span className="text-destructive" aria-hidden="true">*</span>
+        </Label>
+        <Input
+          id="coach-message-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex. Changement d'horaire demain"
+          maxLength={200}
+        />
+      </div>
+
+      {/* Message */}
+      <div className="space-y-1.5">
+        <Label htmlFor="coach-message-body">
+          Message <span className="text-muted-foreground font-normal">(optionnel)</span>
+        </Label>
+        <Textarea
+          id="coach-message-body"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Ajoutez les détails à afficher dans la notification…"
+          rows={3}
+          maxLength={2000}
+        />
+      </div>
+
+      {/* CTA sticky */}
+      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 p-4 backdrop-blur">
         <Button
-          className="w-full sm:w-auto"
+          className="w-full"
           onClick={handleSendMessage}
           disabled={!selectedTarget.target || selectedTarget.recipients === 0 || !title.trim() || sending}
         >
