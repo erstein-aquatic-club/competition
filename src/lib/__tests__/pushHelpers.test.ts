@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   shouldRefreshPushSubscription,
   shouldShowPushBanner,
+  extractHashPath,
+  pushTargetMatchesClient,
 } from "../pushHelpers.ts";
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -75,6 +77,114 @@ describe("shouldShowPushBanner — re-proposition après 60j", () => {
     assert.equal(
       shouldShowPushBanner(now, now - SIXTY_DAYS + 1, SIXTY_DAYS),
       false,
+    );
+  });
+});
+
+describe("extractHashPath — extraction du chemin (sans query)", () => {
+  it("URL pleine avec hash route", () => {
+    assert.equal(
+      extractHashPath("https://x.fr/competition/#/profile?section=messages"),
+      "/profile",
+    );
+  });
+
+  it("URL pleine avec hash root", () => {
+    assert.equal(extractHashPath("https://x.fr/competition/#/"), "/");
+  });
+
+  it("URL pleine sans hash → vide (root du domaine, pas de route SPA)", () => {
+    assert.equal(extractHashPath("https://x.fr/competition/"), "");
+  });
+
+  it("hash route seul avec #", () => {
+    assert.equal(extractHashPath("#/competition/123/prep"), "/competition/123/prep");
+  });
+
+  it("route slash sans # (cas wellness `/?wellness=open`)", () => {
+    assert.equal(extractHashPath("/?wellness=open"), "/");
+  });
+
+  it("route slash sans # avec path", () => {
+    assert.equal(extractHashPath("/suivi/entretiens"), "/suivi/entretiens");
+  });
+
+  it("chaîne vide", () => {
+    assert.equal(extractHashPath(""), "");
+  });
+});
+
+describe("pushTargetMatchesClient — gate focused contextuel", () => {
+  it("match : client sur la même page que la cible", () => {
+    assert.equal(
+      pushTargetMatchesClient(
+        "https://x.fr/competition/#/profile?section=messages",
+        "#/profile?section=messages",
+      ),
+      true,
+    );
+  });
+
+  it("match : client sur la page cible avec query différente", () => {
+    assert.equal(
+      pushTargetMatchesClient(
+        "https://x.fr/competition/#/profile?section=other",
+        "#/profile?section=messages",
+      ),
+      true,
+    );
+  });
+
+  it("match : trailing slash ignoré", () => {
+    assert.equal(
+      pushTargetMatchesClient(
+        "https://x.fr/competition/#/profile/",
+        "#/profile",
+      ),
+      true,
+    );
+  });
+
+  it("no match : page différente → afficher OS notif", () => {
+    assert.equal(
+      pushTargetMatchesClient(
+        "https://x.fr/competition/#/strength",
+        "#/profile?section=messages",
+      ),
+      false,
+    );
+  });
+
+  it("no match : root vs page profonde", () => {
+    assert.equal(
+      pushTargetMatchesClient("https://x.fr/competition/#/", "#/profile"),
+      false,
+    );
+  });
+
+  it("no match : client sans hash (page racine domaine sans SPA route) → afficher OS", () => {
+    assert.equal(
+      pushTargetMatchesClient(
+        "https://x.fr/competition/",
+        "#/profile",
+      ),
+      false,
+    );
+  });
+
+  it("no match : URL cible vide → afficher OS (sécurité)", () => {
+    assert.equal(
+      pushTargetMatchesClient("https://x.fr/competition/#/profile", ""),
+      false,
+    );
+  });
+
+  it("match : wellness `#/?wellness=open` quand client sur dashboard `#/`", () => {
+    // Path commun = '/', les query strings (?wellness=open vs rien) sont
+    // ignorées. L'utilisateur est déjà sur la bonne page, le toast §180 suffit.
+    assert.equal(
+      pushTargetMatchesClient("https://x.fr/competition/#/", "#/?wellness=open"),
+      true,
     );
   });
 });

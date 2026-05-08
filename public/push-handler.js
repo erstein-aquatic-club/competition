@@ -2,6 +2,36 @@
 // Imported by the Workbox-generated service worker via importScripts.
 // Handles Web Push events and notification clicks.
 
+// §194 Vague C — duplique la logique pure de `src/lib/pushHelpers.ts`
+// (le SW est servi en JS classique, pas de bundling).
+function extractHashPath(url) {
+  if (!url) return '';
+  var hashPart;
+  var hashIndex = url.indexOf('#');
+  if (hashIndex >= 0) {
+    hashPart = url.substring(hashIndex + 1);
+  } else if (url.charAt(0) === '/') {
+    hashPart = url;
+  } else {
+    return '';
+  }
+  var queryIndex = hashPart.indexOf('?');
+  return queryIndex >= 0 ? hashPart.substring(0, queryIndex) : hashPart;
+}
+
+function pushTargetMatchesClient(clientUrl, targetUrl) {
+  var clientPath = extractHashPath(clientUrl);
+  var targetPath = extractHashPath(targetUrl);
+  if (!clientPath || !targetPath) return false;
+  var normClient = clientPath.length > 1 && clientPath.charAt(clientPath.length - 1) === '/'
+    ? clientPath.substring(0, clientPath.length - 1)
+    : clientPath;
+  var normTarget = targetPath.length > 1 && targetPath.charAt(targetPath.length - 1) === '/'
+    ? targetPath.substring(0, targetPath.length - 1)
+    : targetPath;
+  return normClient === normTarget;
+}
+
 self.addEventListener('push', function(event) {
   if (!event.data) return;
 
@@ -15,21 +45,26 @@ self.addEventListener('push', function(event) {
   event.waitUntil(
     (async function() {
       try {
-        // §171 P2 — if any window client is focused, skip OS notification
-        // (the focused client owns the in-app toast); just postMessage the
-        // payload so the client can render it however it wants.
+        // §194 Vague C — gate "focused" contextuel : on ne supprime la notif
+        // OS que si un client focused est DÉJÀ sur la page ciblée par
+        // data.url. Sinon on l'affiche, même si un autre onglet est ouvert.
+        // Le postMessage est envoyé à tous les clients focused (le pont §180
+        // déclenche un toast + invalide les caches).
         var clients = await self.clients.matchAll({
           type: 'window',
           includeUncontrolled: true,
         });
-        var focused = false;
+        var anyFocusedSamePage = false;
         for (var i = 0; i < clients.length; i++) {
-          if (clients[i].focused) {
-            focused = true;
-            try { clients[i].postMessage({ type: 'eac-push', payload: data }); } catch (_) {}
+          var c = clients[i];
+          if (c.focused) {
+            try { c.postMessage({ type: 'eac-push', payload: data }); } catch (_) {}
+            if (pushTargetMatchesClient(c.url, data.url || '')) {
+              anyFocusedSamePage = true;
+            }
           }
         }
-        if (focused) return;
+        if (anyFocusedSamePage) return;
 
         var options = {
           body: data.body || '',
@@ -37,6 +72,9 @@ self.addEventListener('push', function(event) {
           badge: 'favicon.png',
           data: { url: data.url || '#/' },
           vibrate: [200, 100, 200],
+          // §194 Vague C — tag par notif (envoyé par push-send) au lieu du
+          // tag partagé 'eac-notification' qui faisait écraser les notifs
+          // rapprochées dans le tray OS. Fallback inchangé.
           tag: data.tag || 'eac-notification',
           renotify: true,
         };

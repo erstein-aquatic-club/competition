@@ -60,11 +60,17 @@ Deno.serve(async (req) => {
   }
 
   // --- Authentication gate ----------------------------------------------------
-  // Two allowed callers:
-  //   1) DB webhook trigger (00044_push_webhook_trigger.sql) → Bearer token
-  //      equals the project service_role key (pg_net pulls it from vault)
-  //   2) Authenticated coach/admin via supabase.functions.invoke (user JWT)
-  // Anonymous callers and athletes are rejected.
+  // §194 Vague C — refactor : on décode le payload JWT pour lire le claim
+  // `role`, au lieu de comparer le token à `SUPABASE_SERVICE_ROLE_KEY` env.
+  // L'ancienne approche cassait dès que la vault key (utilisée par le trigger
+  // pg_net 00044) divergait de l'env service_role (rotation, set initial
+  // distinct, etc.) → toutes les notifs auto silencieusement en 401.
+  //
+  // Avec `verify_jwt: true` au niveau function, Supabase a déjà validé la
+  // signature du token avant qu'on arrive ici → on peut faire confiance au
+  // payload. Deux cas :
+  //   1) role = 'service_role' → webhook trigger.
+  //   2) role = 'authenticated' → user JWT, on vérifie ensuite coach/admin.
   const authHeader = req.headers.get("authorization") ?? "";
   if (!authHeader.toLowerCase().startsWith("bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -73,8 +79,22 @@ Deno.serve(async (req) => {
     });
   }
   const token = authHeader.slice("bearer ".length).trim();
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const isWebhookCall = serviceRoleKey.length > 0 && token === serviceRoleKey;
+
+  function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
+    try {
+      const parts = jwt.split(".");
+      if (parts.length !== 3) return null;
+      const padded = parts[1] + "===".slice(0, (4 - (parts[1].length % 4)) % 4);
+      const decoded = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+      return JSON.parse(decoded);
+    } catch {
+      return null;
+    }
+  }
+
+  const jwtPayload = decodeJwtPayload(token);
+  const jwtRole = (jwtPayload?.role as string | undefined) ?? null;
+  const isWebhookCall = jwtRole === "service_role";
 
   let isAuthorizedManualCaller = false;
   if (!isWebhookCall) {
@@ -92,9 +112,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // Primary source of role: JWT app_metadata.app_user_role (set by
-    // handle_new_auth_user trigger). Fallback: query users table in case of
-    // legacy accounts whose JWT has not been refreshed.
     let role =
       (userData.user.app_metadata?.app_user_role as string | undefined) ??
       null;
@@ -122,6 +139,9 @@ Deno.serve(async (req) => {
     let body: string;
     let url: string | undefined;
     let targetUserIds: number[] = [];
+    // §194 Vague C — tag unique par notif pour empêcher l'OS d'écraser les
+    // pushs rapprochées dans le tray (tag partagé 'eac-notification' avant).
+    let tag: string;
 
     if (payload.type === "INSERT" && payload.record) {
       const target = payload.record;
@@ -143,6 +163,7 @@ Deno.serve(async (req) => {
       title = notif.title;
       body = notif.body || "";
       url = resolveNotificationUrl(notif);
+      tag = `eac-notif-${notifId}`;
 
       if (target.target_user_id) {
         targetUserIds = [target.target_user_id];
@@ -166,6 +187,7 @@ Deno.serve(async (req) => {
       body = payload.body || "";
       url = payload.url || resolveNotificationUrl(payload);
       targetUserIds = payload.target_user_ids || [];
+      tag = `eac-manual-${Date.now()}`;
     }
 
     if (targetUserIds.length === 0) {
@@ -185,7 +207,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const pushPayload = JSON.stringify({ title, body, url: url || "#/" });
+    const pushPayload = JSON.stringify({ title, body, url: url || "#/", tag });
     const expiredIds: string[] = [];
 
     const results = await Promise.allSettled(

@@ -4,6 +4,53 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §194-vagueC — Tag SW per-notif + gate focused contextuel + fix auth 401 push-send (2026-05-08)
+
+**Contexte :** Vagues A et B livrées (centre vidé à 49 notifs visibles, push subscriptions désormais rafraîchies au boot). Vague C devait corriger 2 défauts UX du SW. **En vérifiant les logs Edge Function, découverte d'une cause racine majeure non identifiée à l'audit initial** : tous les appels webhook `push-send` (cron + triggers) retournaient **401 systématiquement** depuis au moins plusieurs jours. Cause : la vault key `push_edge_function_key` (utilisée par le trigger pg_net 00044) ne correspondait plus à l'env `SUPABASE_SERVICE_ROLE_KEY` côté Edge Function. Conséquence : **aucune notif automatique ne déclenchait de push** (wellness matin, slot reminder, assignations, interviews, swimmer comments → 401 silencieux). Seuls les broadcasts coach manuels (via `supabase.functions.invoke` avec JWT user) fonctionnaient. C'est l'explication structurelle de "pas systématiquement".
+
+### Causes racines traitées
+
+1. **401 silencieux du webhook trigger** : le check `token === SUPABASE_SERVICE_ROLE_KEY` env devient invalide dès que la vault key et l'env divergent (rotation, set initial différent). Pas d'observabilité côté DB → le bug pouvait persister indéfiniment.
+2. **Tag SW partagé `'eac-notification'` + `renotify: true`** : pushs rapprochées (cron wellness à 06h00 + slot reminder à 06h15) → même tag → l'OS écrase la précédente dans le tray (la bannière est rejouée mais une seule entrée subsiste). Si l'utilisateur regarde 5 s plus tard, il a manqué N-1 notifs.
+3. **Gate `clients[i].focused` trop large** : dès qu'**un** client est focused (même sur une page non liée à `data.url`), aucune notif OS n'est affichée. Toast in-app §180 disparaît en 5 s → notif facile à rater.
+
+### Changements
+
+**Edge Function (déployée v35)**
+
+| Fichier | Changement |
+|---|---|
+| `supabase/functions/push-send/index.ts` | Refactor auth gate : `decodeJwtPayload(token)` lit le claim `role`. `isWebhookCall = role === 'service_role'`. Plus aucune dépendance à l'égalité vault ↔ env (verify_jwt:true côté Supabase a déjà validé la signature). Tag dans pushPayload : `eac-notif-${notifId}` (webhook) ou `eac-manual-${Date.now()}` (manual). |
+
+**Service Worker (déployé via push GitHub Pages)**
+
+| Fichier | Changement |
+|---|---|
+| `public/push-handler.js` | Helpers `extractHashPath` + `pushTargetMatchesClient` (duplique la logique pure de pushHelpers.ts, le SW est servi en JS classique). Gate `focused` : on n'élide la notif OS que si **un client focused est sur la même hash route** que `data.url` ; sinon affichage OS systématique. Tag respecté : `data.tag || 'eac-notification'` (fallback inchangé). |
+
+**Helpers purs**
+
+| Fichier | Changement |
+|---|---|
+| `src/lib/pushHelpers.ts` | NEW `extractHashPath(url)` (URL pleine ou hash route → path sans query) + `pushTargetMatchesClient(clientUrl, targetUrl)` (gère wellness `/?wellness=open` ↔ `#/`, trailing slash, etc.). |
+| `src/lib/__tests__/pushHelpers.test.ts` | +15 tests (7 sur extractHashPath, 8 sur pushTargetMatchesClient). Couvre URL pleine avec/sans hash, wellness, query strings, trailing slash, root vs profond. |
+
+### Validation prod
+
+Test post-déploiement : INSERT manuel d'un row `notification_targets` (target_user_id sans push_subscription) → trigger pg_net fire → **push-send v35 répond 200** (1782 ms, contre 401 systématique sur v33). La notif test a été supprimée immédiatement après.
+
+### Tests
+
+- `npx tsc --noEmit` : clean.
+- `npm test` : 678 tests (vs 663 avant), 677 pass, 1 fail pré-existant.
+- 15 tests TDD nouveaux (gate focused contextuel + extraction path).
+
+### Limites / suite
+
+- **L'ancienne vault key reste en place** mais inutilisée par la nouvelle logique. Possible nettoyage futur (DROP du secret) une fois confirmé que le webhook fonctionne sur plusieurs jours.
+- **Pas de monitoring `pg_net.http_response`** ajouté : si une nouvelle erreur survient, elle restera silencieuse côté DB. Vague D potentielle.
+- **Service Worker update gating** : les utilisateurs PWA doivent accepter le prompt `UpdateNotification` (§176) pour récupérer le nouveau `push-handler.js`. La nouvelle logique de gate focused contextuel ne s'applique qu'après acceptation.
+
 ## §194-vagueB — Resync push subscription auto + reset banner 60j (2026-05-08)
 
 **Contexte :** Vague A a réduit le centre de notifications de 82 %. Cette livraison attaque la 2e moitié de la plainte initiale — « les pushs n'arrivent pas systématiquement aux utilisateurs connectés ». Audit Phase 1 avait identifié 3 causes structurelles :

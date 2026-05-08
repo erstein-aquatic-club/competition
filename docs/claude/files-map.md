@@ -125,7 +125,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/pushConfig.ts` | VAPID public key config | ~1 ligne |
 | `src/components/shared/PWAInstallGate.tsx` | Gate installation PWA mobile | ~130 lignes |
 | `src/components/shared/PushPermissionBanner.tsx` | Banner permission push post-login | ~70 lignes |
-| `public/push-handler.js` | Service Worker push event handler | ~40 lignes |
+| `public/push-handler.js` | Service Worker push event handler — gate `focused` désormais contextuel (suppression OS uniquement si client focused sur la même page que `data.url` via `pushTargetMatchesClient`), tag par notif respecté (envoyé par push-send) (§194 Vague C) | 100 lignes |
+| `supabase/functions/push-send/index.ts` | Edge Function envoi push (web-push VAPID) — auth gate refactor : décode JWT payload + check `role === 'service_role'` au lieu de comparer le token à l'env (résout les 401 silencieux du trigger pg_net après divergence vault/env) ; tag unique `eac-notif-{id}` ou `eac-manual-{ts}` envoyé au SW (§194 Vague C) | ~256 lignes |
 | `src/pages/Suivi.tsx` | Hub Mon suivi (4 cartes aperçu → drill-down) | ~310 lignes |
 | `src/pages/SuiviSemaine.tsx` | Vue semaine drill-down (timeline jour/créneau : nage + muscu + absences + wellness) | ~1240 lignes |
 | `src/pages/SuiviPlanification.tsx` | Vue planification saison (natation infinite scroll + musculation Mon plan) | ~105 lignes |

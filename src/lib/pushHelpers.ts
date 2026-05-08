@@ -59,6 +59,59 @@ export function shouldRefreshPushSubscription(
 }
 
 /**
+ * §194 (Vague C) — Extrait le chemin (sans query) à partir d'une URL ou
+ * d'une route hash. Utilisé pour comparer la page courante d'un client SW
+ * avec la cible d'une notification.
+ *
+ * Entrées tolérées :
+ *   - URL complète avec hash : "https://x.fr/competition/#/profile?s=msg"
+ *   - URL complète sans hash : "https://x.fr/competition/"
+ *   - Hash seul : "#/profile"
+ *   - Hash sans `#` : "/profile" ou "/?wellness=open"
+ *
+ * Retourne le chemin (slash inclus) sans la query, ou chaîne vide si pas
+ * de hash dans une URL pleine.
+ */
+export function extractHashPath(url: string): string {
+  if (!url) return "";
+  let hashPart: string;
+  const hashIndex = url.indexOf("#");
+  if (hashIndex >= 0) {
+    hashPart = url.substring(hashIndex + 1);
+  } else if (url.startsWith("/")) {
+    hashPart = url;
+  } else {
+    return "";
+  }
+  const queryIndex = hashPart.indexOf("?");
+  return queryIndex >= 0 ? hashPart.substring(0, queryIndex) : hashPart;
+}
+
+/**
+ * §194 (Vague C) — Décide si la page courante d'un client SW correspond
+ * déjà à la cible d'une notification push.
+ *
+ * Avant : le SW supprimait la notif OS dès qu'**un** client était `focused`,
+ * peu importe sur quelle page. Si l'utilisateur naviguait ailleurs dans
+ * l'app, il pouvait rater une notif (toast in-app §180 disparaît en 5 s).
+ * Désormais on ne supprime QUE si le client focused est exactement sur la
+ * page ciblée — la notif s'affiche dans tous les autres cas.
+ *
+ * Comparaison : path du hash (sans query, sans trailing slash sauf root).
+ */
+export function pushTargetMatchesClient(
+  clientUrl: string,
+  targetUrl: string,
+): boolean {
+  const clientPath = extractHashPath(clientUrl);
+  const targetPath = extractHashPath(targetUrl);
+  if (!clientPath || !targetPath) return false;
+  const norm = (p: string) =>
+    p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p;
+  return norm(clientPath) === norm(targetPath);
+}
+
+/**
  * §194 (Vague B) — décide si on affiche le banner d'activation des pushs.
  *
  * Avant : un dismiss = silence définitif (`localStorage.eac-push-banner-dismissed`
