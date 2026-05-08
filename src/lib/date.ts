@@ -55,3 +55,29 @@ export function computeTrainingDaysRemaining(opts: {
 
   return trainingDates.size;
 }
+
+const DAY_ABBRS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+export function formatRelativeDate(value: string, now: Date = new Date()): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffH = Math.floor(diffMs / 3_600_000);
+
+  if (diffMin < 60) return `il y a ${diffMin}m`;
+  if (diffH < 24) return `il y a ${diffH}h`;
+
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = toISODate(yesterdayDate);
+  const dateStr = toISODate(date);
+
+  if (dateStr === yesterdayStr) return "hier";
+
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffDays < 7) return DAY_ABBRS[date.getDay()];
+
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
