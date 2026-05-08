@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react"
 import { X, Download } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useSystemBanner } from "@/lib/systemBanners"
 
 const STORAGE_KEY = "eac-install-prompt-dismissed"
 
@@ -55,10 +56,12 @@ export function InstallPrompt() {
   }
 
   const show = !isDismissed && !!deferredPrompt
+  // §210 — gate via system banner queue (priorité 4 = la plus basse).
+  const shouldRender = useSystemBanner("install", show)
 
   return (
     <AnimatePresence>
-      {show && (
+      {shouldRender && (
         <div className="fixed top-3 left-0 right-0 z-[var(--z-index-toast)] pointer-events-none flex justify-center px-4">
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.9 }}

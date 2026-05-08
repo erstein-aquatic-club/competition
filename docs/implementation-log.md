@@ -4,6 +4,63 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §210 — SystemBannerStack : queue + priorité pour 4 bandeaux système (2026-05-08)
+
+**Contexte :** suite §198 QW1 (qui avait retiré le doublon `OfflineBanner`/`OfflineDetector`). L'audit shared (`docs/audits/2026-05-08-ui-ux-audit-ios.md`) signalait toujours un problème d'empilement : `UpdateNotification` et `InstallPrompt` ciblent **la même position `top-3`** → si les deux events arrivent ensemble, ils se superposent. Le Chantier D (audit) recommandait un manager unifié `<SystemBannerStack/>` qui n'affiche **qu'un seul banner à la fois** avec priorité fixe.
+
+**Architecture choisie :** approche minimale **module state + hook**, sans wrapper component. Chaque banner garde son propre layout/animation existant et appelle `useSystemBanner(key, isActive)` qui retourne un boolean indiquant s'il est le plus prioritaire actif. Avantages : zéro refactor du JSX/animation, une seule source de vérité (le module state), API testable.
+
+**Changements** :
+
+1. **NEW `src/lib/systemBanners.ts`** (95 LOC) :
+   - Type `SystemBannerKey = "offline" | "update" | "push" | "install"`.
+   - Priorités fixes : `offline (1) > update (2) > push (3) > install (4)` (le plus petit = plus haut).
+   - Module state : `Set<SystemBannerKey>` des banners actifs + `Set` de listeners pour notification.
+   - Helper privé `getVisibleBanner()` : retourne le `SystemBannerKey` de plus haute priorité actif, ou `null`.
+   - Hook `useSystemBanner(key, isActive)` : (a) `useEffect` register/unregister la `key` dans le set quand `isActive` change ; (b) `useSyncExternalStore` subscribe au visible courant ; (c) retourne `isActive && visibleKey === key`.
+   - Helpers internes `_resetSystemBannerState()` et `_getActiveBanners()` pour tests futurs.
+
+2. **`OfflineDetector.tsx`** (priorité 1) :
+   - Import `useSystemBanner`.
+   - `const shouldRender = useSystemBanner("offline", show)` (où `show = isOffline || isTransitioning`).
+   - JSX : `{shouldRender && (...)}` au lieu de `{show && (...)}`.
+
+3. **`UpdateNotification.tsx`** (priorité 2) :
+   - Import `useSystemBanner`.
+   - `const shouldRender = useSystemBanner("update", show)` (où `show = updateAvailable && !dismissed && activeRunId === null`).
+   - Le focus-mode guard (§176) reste en place via `show` qui inclut `activeRunId === null`.
+
+4. **`PushPermissionBanner.tsx`** (priorité 3) :
+   - Import `useSystemBanner`.
+   - `const shouldRender = useSystemBanner("push", visible)` ; `if (!shouldRender) return null;`.
+   - Note : push est rendu en `bottom-20` (full card) alors que les 3 autres sont en `top-3` — pas de conflit de zone visuel, mais on respecte la règle "1 banner à la fois" pour réduire le bruit cognitif.
+
+5. **`InstallPrompt.tsx`** (priorité 4) :
+   - Import `useSystemBanner`.
+   - `const shouldRender = useSystemBanner("install", show)` (où `show = !isDismissed && !!deferredPrompt`).
+   - Résout le conflit historique avec `UpdateNotification` (même slot `top-3`) — désormais `update` masque `install` quand les deux sont actifs.
+
+**Comportement attendu** :
+- Mode avion ON : `offline` pill rouge top apparaît ; tout autre banner actif est masqué jusqu'au retour réseau.
+- Update PWA disponible + utilisateur pas encore installé : `update` pill apparaît, `install` reste en queue. Si user dismiss l'update, `install` apparaît immédiatement.
+- Onboarding nouveau user : `push` (bottom) apparaît seul ; si update arrive, `update` masque `push` jusqu'au dismiss.
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass + 1 fail pré-existant `transformers.test.ts:18` non lié. Aucune régression.
+
+**Limites (out of scope §210)** :
+- Pas d'animation crossfade quand le visible change (chaque banner conserve son `AnimatePresence` exit individuel ; le suivant entre quand le state s'update). Acceptable visuellement, à raffiner §211+ si besoin.
+- Pas de tests unitaires sur le hook (logique simple ; à ajouter si bug observé).
+- Le `SystemBannerStack` composant explicite n'est pas créé (l'architecture module-state-only suffit). Si besoin futur d'un slot top fixe partagé, créer un wrapper.
+
+**Fichiers modifiés (5)** :
+- NEW `src/lib/systemBanners.ts`
+- `src/components/shared/OfflineDetector.tsx`
+- `src/components/shared/UpdateNotification.tsx`
+- `src/components/shared/PushPermissionBanner.tsx`
+- `src/components/shared/InstallPrompt.tsx`
+
+---
+
 ## §209 — Clôture Chantier C : 3 derniers fichiers top 15 (2026-05-08)
 
 **Contexte :** suite §202+§205. Fin de la migration Chantier C sur les 3 derniers fichiers du top 15 contributeurs hardcodes selon audit shared. Sub-agent sonnet.

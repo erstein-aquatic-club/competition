@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { WifiOff, Wifi } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { useSystemBanner } from "@/lib/systemBanners"
 
 /**
  * OfflineDetector shows a floating pill at the top when the user goes offline.
@@ -35,10 +36,12 @@ export function OfflineDetector() {
   }, [])
 
   const show = isOffline || isTransitioning
+  // §210 — gate via system banner queue (priorité 1 = top).
+  const shouldRender = useSystemBanner("offline", show)
 
   return (
     <AnimatePresence>
-      {show && (
+      {shouldRender && (
         <div className="fixed top-12 left-0 right-0 z-[var(--z-index-toast)] pointer-events-none flex justify-center px-4">
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.9 }}

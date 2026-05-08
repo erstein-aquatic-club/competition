@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { isPushSupported, getPushPermission, subscribeToPush, hasActivePushSubscription } from "@/lib/push";
 import { shouldShowPushBanner } from "@/lib/pushHelpers";
 import { Surface } from "@/components/shared/Surface";
+import { useSystemBanner } from "@/lib/systemBanners";
 
 const DISMISS_KEY = "eac-push-banner-dismissed";
 const DISMISS_AT_KEY = "eac-push-banner-dismissed-at";
@@ -61,7 +62,11 @@ export function PushPermissionBanner() {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  // §210 — gate via system banner queue (priorité 3). Note : push est rendu en
+  // bottom-20 alors que les autres sont en top-3 — pas de conflit de zone, mais
+  // on respecte la règle "1 banner à la fois" pour réduire le bruit cognitif.
+  const shouldRender = useSystemBanner("push", visible);
+  if (!shouldRender) return null;
 
   return (
     <Surface

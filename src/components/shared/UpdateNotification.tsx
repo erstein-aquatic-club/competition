@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStrengthState } from "@/hooks/useStrengthState";
+import { useSystemBanner } from "@/lib/systemBanners";
 
 /**
  * §176 — Shows a "mise à jour disponible" pill.
@@ -63,10 +64,12 @@ export function UpdateNotification() {
   };
 
   const show = updateAvailable && !dismissed && activeRunId === null;
+  // §210 — gate via system banner queue (priorité 2).
+  const shouldRender = useSystemBanner("update", show);
 
   return (
     <AnimatePresence>
-      {show && (
+      {shouldRender && (
         <div className="fixed top-3 left-0 right-0 z-toast pointer-events-none flex justify-center px-4">
           <motion.div
             initial={{ opacity: 0, y: -20, scale: 0.9 }}
