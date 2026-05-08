@@ -56,9 +56,9 @@ function computeFormeScore(sessions: Array<{
 
 function formeBadge(score: number | null): { label: string; className: string } {
   if (score == null) return { label: "—", className: "bg-muted text-muted-foreground" };
-  if (score >= 3.5) return { label: `${score.toFixed(1)}`, className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" };
-  if (score >= 2.5) return { label: `${score.toFixed(1)}`, className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" };
-  return { label: `${score.toFixed(1)}`, className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" };
+  if (score >= 3.5) return { label: `${score.toFixed(1)}`, className: "bg-status-success-bg text-status-success" };
+  if (score >= 2.5) return { label: `${score.toFixed(1)}`, className: "bg-status-warning-bg text-status-warning" };
+  return { label: `${score.toFixed(1)}`, className: "bg-status-error-bg text-status-error" };
 }
 
 // --- Visual helpers ---
@@ -72,10 +72,10 @@ function FormeDots({ score }: { score: number | null }) {
   const isGood = score >= 3.5;
   const isMid = score >= 2.5;
   const dotColor = isGood
-    ? "bg-emerald-500"
+    ? "bg-status-success"
     : isMid
-    ? "bg-amber-500"
-    : "bg-red-500";
+    ? "bg-status-warning"
+    : "bg-status-error";
 
   return (
     <div className="flex items-center gap-1">
@@ -87,7 +87,7 @@ function FormeDots({ score }: { score: number | null }) {
           />
         ))}
       </div>
-      <span className={`text-[10px] font-bold tabular-nums ${isGood ? "text-emerald-600 dark:text-emerald-400" : isMid ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+      <span className={`text-[10px] font-bold tabular-nums ${isGood ? "text-status-success" : isMid ? "text-status-warning" : "text-status-error"}`}>
         {score.toFixed(1)}
       </span>
     </div>
@@ -102,9 +102,9 @@ function SparkBar({ value, max }: { value: number; max: number }) {
   // Rising heights: 35% → 55% → 70% → 85% → 100%
   const heights = [35, 55, 70, 85, 100];
   const barColor =
-    ratio >= 0.7 ? "bg-emerald-500 dark:bg-emerald-400"
+    ratio >= 0.7 ? "bg-status-success"
     : ratio >= 0.4 ? "bg-blue-500 dark:bg-blue-400"
-    : "bg-amber-500 dark:bg-amber-400";
+    : "bg-status-warning";
 
   return (
     <div className="flex items-end gap-0.5" style={{ height: "18px" }}>
@@ -131,7 +131,7 @@ function LastSeenLabel({ dateStr }: { dateStr: string | null }) {
     d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
   const urgent = daysAgo >= 14;
   return (
-    <span className={`text-[10px] ${urgent ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}>
+    <span className={`text-[10px] ${urgent ? "text-status-warning font-semibold" : "text-muted-foreground"}`}>
       {label}
     </span>
   );
@@ -151,10 +151,10 @@ function FeedbackRateKPI({
   const pct = Math.min(100, Math.round(ratio * 100));
   const ratioColor =
     ratio >= 0.75
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-status-success"
       : ratio >= 0.4
-      ? "text-amber-600 dark:text-amber-400"
-      : "text-red-600 dark:text-red-400";
+      ? "text-status-warning"
+      : "text-status-error";
 
   return (
     <div className="space-y-1">
@@ -579,7 +579,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                     "group rounded-2xl border bg-card p-4 text-left transition-all duration-150",
                     "hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5",
                     "active:scale-[0.98] active:shadow-sm",
-                    isLowForme ? "border-red-200/60 dark:border-red-900/30" : "",
+                    isLowForme ? "border-status-error/30" : "",
                   ].join(" ")}
                 >
                   {/* Header row */}
@@ -595,7 +595,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                         className={[
                           "h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0",
                           isLowForme
-                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            ? "bg-status-error-bg text-status-error"
                             : "bg-primary/10 text-primary",
                         ].join(" ")}
                       >
@@ -612,11 +612,11 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                     </div>
                     {/* Objectives badge */}
                     {(kpis?.objectivesTotal ?? 0) > 0 && (
-                      <div className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5">
-                        <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                      <div className="flex shrink-0 items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5">
+                        <span className="text-[10px] font-bold text-status-warning">
                           {kpis!.objectivesTotal}
                         </span>
-                        <span className="text-[9px] text-amber-600 dark:text-amber-500">obj</span>
+                        <span className="text-[9px] text-status-warning/80">obj</span>
                       </div>
                     )}
                   </div>
@@ -662,7 +662,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                           Activité 30j
                         </span>
-                        <span className={`text-[10px] mt-0.5 ${hasLowActivity ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}>
+                        <span className={`text-[10px] mt-0.5 ${hasLowActivity ? "text-status-warning font-semibold" : "text-muted-foreground"}`}>
                           {sessionsCount} séance{sessionsCount !== 1 ? "s" : ""}
                         </span>
                       </div>

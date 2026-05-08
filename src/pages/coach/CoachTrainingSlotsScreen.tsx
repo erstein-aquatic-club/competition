@@ -1059,14 +1059,14 @@ function SlotCompletionBadge({
       shortLabel: "Brouillon",
       icon: CircleDashed,
       className:
-        "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+        "border-status-warning/30 bg-status-warning-bg text-status-warning",
     },
     published: {
       label: "Renseignée",
       shortLabel: "OK",
       icon: Check,
       className:
-        "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        "border-status-success/30 bg-status-success-bg text-status-success",
     },
     cancelled: {
       label: "Annulé",
@@ -1126,17 +1126,17 @@ const TimelineSlot = ({
   const bgClass = cancelled
     ? "bg-muted/50 border-muted-foreground/20 opacity-50 line-through"
     : isPublished
-      ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
+      ? "bg-status-success-bg border-status-success/30 hover:bg-status-success/18"
       : isDraft
-        ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
+        ? "bg-status-warning-bg border-status-warning/30 hover:bg-status-warning/18"
     : swim
       ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
       : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
 
   const iconClass = isPublished
-    ? "text-emerald-600 dark:text-emerald-400"
+    ? "text-status-success"
     : isDraft
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-status-warning"
       : swim
         ? "text-blue-500"
         : "text-amber-500";
@@ -1193,8 +1193,8 @@ const TimelineSlot = ({
             <span
               className={`text-[9px] truncate ${
                 isDraft
-                  ? "text-amber-700 dark:text-amber-300"
-                  : "text-emerald-700 dark:text-emerald-300"
+                  ? "text-status-warning"
+                  : "text-status-success"
               }`}
             >
               {instance?.assignment?.session_name ?? "Séance"}
@@ -1234,17 +1234,17 @@ function TimelineSlotInlineImpl({
   const bgClass = cancelled
     ? "bg-muted/50 border-muted-foreground/20 opacity-50 line-through"
     : isPublished
-      ? "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/18"
+      ? "bg-status-success-bg border-status-success/30 hover:bg-status-success/18"
       : isDraft
-        ? "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/18"
+        ? "bg-status-warning-bg border-status-warning/30 hover:bg-status-warning/18"
       : swim
         ? "bg-blue-500/15 border-blue-400/40 hover:bg-blue-500/25"
         : "bg-amber-400/15 border-amber-400/40 hover:bg-amber-400/25";
 
   const iconClass = isPublished
-    ? "text-emerald-600 dark:text-emerald-400"
+    ? "text-status-success"
     : isDraft
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-status-warning"
       : swim
         ? "text-blue-500"
         : "text-amber-500";
@@ -1310,8 +1310,8 @@ function TimelineSlotInlineImpl({
             <span
               className={`text-[9px] truncate ${
                 isDraft
-                  ? "text-amber-700 dark:text-amber-300"
-                  : "text-emerald-700 dark:text-emerald-300"
+                  ? "text-status-warning"
+                  : "text-status-success"
               }`}
             >
               {instance?.assignment?.session_name ?? "Séance"}
@@ -1486,9 +1486,9 @@ const MobileView = ({
                         cancelled
                           ? "bg-muted-foreground/20"
                           : isPublished
-                            ? "bg-emerald-500/50"
+                            ? "bg-status-success/50"
                             : isDraft
-                              ? "bg-amber-500/50"
+                              ? "bg-status-warning/50"
                           : swim
                             ? "bg-blue-500/40"
                             : "bg-amber-400/50"
@@ -1634,9 +1634,9 @@ const MobileView = ({
                           <span
                             className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
                               isDraft
-                                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                ? "bg-status-warning-bg text-status-warning"
                                 : isPublished
-                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                  ? "bg-status-success-bg text-status-success"
                                   : "bg-muted text-muted-foreground"
                             }`}
                           >
@@ -1663,7 +1663,7 @@ const MobileView = ({
                             </span>
                           ))}
                           {(slot.coaches ?? []).length > 0 && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-status-success-bg text-status-success">
                               {(slot.coaches ?? []).map((c) => c.coach_name.split(" ")[0]).join(", ")}
                             </span>
                           )}
@@ -1681,7 +1681,7 @@ const MobileView = ({
                           {slotOverrides.slice(0, 2).map((o) => (
                             <div key={o.id} className="flex items-center gap-1 text-[10px]">
                               <span className={`font-medium ${
-                                o.status === "cancelled" ? "text-red-500" : "text-orange-500"
+                                o.status === "cancelled" ? "text-status-error" : "text-orange-500"
                               }`}>
                                 {o.status === "cancelled" ? "Annulé" : "Modifié"} le{" "}
                                 {new Date(o.override_date).toLocaleDateString("fr-FR", {

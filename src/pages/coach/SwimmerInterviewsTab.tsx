@@ -112,7 +112,7 @@ const STATUS_CONFIG: Record<InterviewStatus, { label: string; variant: "default"
   draft_athlete: {
     label: "En attente nageur",
     variant: "secondary",
-    className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+    className: "bg-status-warning-bg text-status-warning border-status-warning/30",
   },
   draft_coach: {
     label: "Préparation coach",
@@ -748,11 +748,11 @@ const CoachInterviewCard = ({
   const isPending = saveMutation.isPending || sendMutation.isPending || deleteMutation.isPending;
   const status = interview.status;
   const borderClass = status === "draft_athlete"
-    ? "border-amber-300 dark:border-amber-700 border-l-4"
+    ? "border-status-warning border-l-4"
     : status === "draft_coach"
       ? "border-blue-300 dark:border-blue-700 border-l-4"
       : status === "sent"
-        ? "border-emerald-300 dark:border-emerald-700 border-l-4"
+        ? "border-status-success border-l-4"
         : "";
 
   const handleAutoSave = useCallback(() => {
@@ -795,8 +795,8 @@ const CoachInterviewCard = ({
         {expanded && (
           <div className="px-4 pb-4 space-y-5">
             {status === "draft_athlete" && (
-              <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 p-6 text-center space-y-2">
-                <Clock className="h-8 w-8 mx-auto text-amber-500" />
+              <div className="rounded-xl border border-dashed border-status-warning/50 bg-status-warning-bg p-6 text-center space-y-2">
+                <Clock className="h-8 w-8 mx-auto text-status-warning" />
                 <p className="text-sm font-medium">En attente de la préparation du nageur</p>
                 <p className="text-xs text-muted-foreground">
                   Le contenu n&apos;est pas encore visible. Le nageur doit d&apos;abord remplir ses sections.
@@ -1033,11 +1033,11 @@ function InterviewStatusBar({ status }: { status: InterviewStatus }) {
         return (
           <div key={phase.key} className="flex items-center gap-1">
             {i > 0 && (
-              <div className={`h-0.5 w-3 rounded ${isDone || isTerminal ? "bg-emerald-500" : "bg-muted"}`} />
+              <div className={`h-0.5 w-3 rounded ${isDone || isTerminal ? "bg-status-success" : "bg-muted"}`} />
             )}
             <div className={`flex h-6 items-center gap-1 rounded-full px-2 text-[10px] font-medium ${
               isTerminal || isDone
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                ? "bg-status-success-bg text-status-success"
                 : isCurrent
                   ? "bg-primary/10 text-primary"
                   : "bg-muted text-muted-foreground"

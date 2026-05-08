@@ -120,7 +120,7 @@ function SlotCell({ info, isToday }: { info: CellInfo; isToday: boolean }) {
       <div className="flex h-9 items-center justify-center">
         <div
           className={[
-            "flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 dark:bg-emerald-500/90",
+            "flex h-7 w-7 items-center justify-center rounded-[10px] bg-status-success text-white shadow-sm shadow-status-success/30",
             ringClass,
           ].join(" ")}
           aria-label={showCount ? `${assigned} séances assignées` : "Séance assignée"}
@@ -140,14 +140,14 @@ function SlotCell({ info, isToday }: { info: CellInfo; isToday: boolean }) {
       <div className="flex h-9 items-center justify-center">
         <div
           className={[
-            "relative flex h-7 w-7 items-center justify-center rounded-[10px] border-[1.5px] border-dashed border-amber-400 bg-amber-50/80 dark:border-amber-500/60 dark:bg-amber-950/30",
+            "relative flex h-7 w-7 items-center justify-center rounded-[10px] border-[1.5px] border-dashed border-status-warning bg-status-warning-bg",
             ringClass,
           ].join(" ")}
           aria-label={`${total} créneau${total > 1 ? "x" : ""} sans séance`}
         >
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-warning opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-warning" />
           </span>
         </div>
       </div>
@@ -159,7 +159,7 @@ function SlotCell({ info, isToday }: { info: CellInfo; isToday: boolean }) {
     <div className="flex h-9 items-center justify-center">
       <div
         className={[
-          "relative flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-500 text-white shadow-sm shadow-emerald-500/30",
+          "relative flex h-7 w-7 items-center justify-center rounded-[10px] bg-status-success text-white shadow-sm shadow-status-success/30",
           ringClass,
         ].join(" ")}
         aria-label={`${assigned} sur ${total} séances assignées`}
@@ -167,7 +167,7 @@ function SlotCell({ info, isToday }: { info: CellInfo; isToday: boolean }) {
         <span className="text-[9px] font-black tabular-nums leading-none">
           {assigned}/{total}
         </span>
-        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-card" />
+        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-status-warning ring-2 ring-card" />
       </div>
     </div>
   );
@@ -576,12 +576,12 @@ const CoachHome = ({
                 Aucun créneau configuré
               </span>
             ) : weekGrid.emptyCount > 0 ? (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+              <span className="flex items-center gap-1 text-[11px] font-bold text-status-warning">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {weekGrid.emptyCount} à compléter
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="flex items-center gap-1 text-[11px] font-bold text-status-success">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Semaine complète
               </span>
@@ -599,43 +599,43 @@ const CoachHome = ({
             <div className="h-4 w-48 animate-pulse rounded bg-muted" />
           </div>
         ) : unassignedSlots.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/25">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-[12px] font-semibold text-emerald-900 dark:text-emerald-200">
+          <div className="flex items-center gap-2 rounded-2xl border border-status-success/30 bg-status-success-bg px-4 py-3">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
+            <span className="text-[12px] font-semibold text-status-success">
               Tous les créneaux des 30 derniers jours sont assignés
             </span>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/20">
+          <div className="overflow-hidden rounded-2xl border border-status-warning/30 bg-status-warning-bg">
             <button
               type="button"
               onClick={() => setUnassignedExpanded((v) => !v)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-amber-100/60 dark:active:bg-amber-950/40"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-status-warning/10"
               aria-expanded={unassignedExpanded}
             >
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <span className="flex-1 text-[13px] font-semibold text-amber-900 dark:text-amber-200">
+              <AlertCircle className="h-4 w-4 shrink-0 text-status-warning" />
+              <span className="flex-1 text-[13px] font-semibold text-status-warning">
                 {unassignedSlots.length} créneau{unassignedSlots.length > 1 ? "x" : ""} à compléter
-                <span className="ml-1 text-[11px] font-normal text-amber-700/80 dark:text-amber-300/80">
+                <span className="ml-1 text-[11px] font-normal text-status-warning/80">
                   (30 derniers jours)
                 </span>
               </span>
               <ChevronRight
                 className={[
-                  "h-4 w-4 shrink-0 text-amber-600 transition-transform dark:text-amber-400",
+                  "h-4 w-4 shrink-0 text-status-warning transition-transform",
                   unassignedExpanded ? "rotate-90" : "",
                 ].join(" ")}
               />
             </button>
 
             {unassignedExpanded && (
-              <div className="border-t border-amber-200/70 dark:border-amber-900/40">
+              <div className="border-t border-status-warning/20">
                 {unassignedByWeek.map(([mondayIso, weekSlots]) => (
                   <div key={mondayIso}>
-                    <div className="bg-amber-100/40 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200/70">
+                    <div className="bg-status-warning/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-status-warning/70">
                       {formatWeekLabel(mondayIso)}
                     </div>
-                    <div className="divide-y divide-amber-200/50 dark:divide-amber-900/30">
+                    <div className="divide-y divide-status-warning/20">
                       {weekSlots.map((slot) => (
                         <button
                           key={`${slot.slot_id}-${slot.scheduled_date}`}
@@ -674,8 +674,8 @@ const CoachHome = ({
           <div className={[
             "space-y-1.5 rounded-2xl border p-3",
             hasMaxFatigueAlert
-              ? "border-red-200 bg-red-50/70 dark:border-red-900/50 dark:bg-red-950/25"
-              : "border-amber-200 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/25",
+              ? "border-status-error/30 bg-status-error-bg"
+              : "border-status-warning/30 bg-status-warning-bg",
           ].join(" ")}>
             {topAlerts.map((alert) => {
               const athlete = athletes.find((a) => a.display_name === alert.athleteName);
@@ -694,20 +694,20 @@ const CoachHome = ({
                     <span
                       className={[
                         "absolute inline-flex h-full w-full animate-ping rounded-full opacity-60",
-                        isMaxAlert ? "bg-red-400" : "bg-amber-400",
+                        isMaxAlert ? "bg-status-error" : "bg-status-warning",
                       ].join(" ")}
                     />
                     <span
                       className={[
                         "relative inline-flex h-3 w-3 rounded-full",
-                        isMaxAlert ? "bg-red-500" : "bg-amber-500",
+                        isMaxAlert ? "bg-status-error" : "bg-status-warning",
                       ].join(" ")}
                     />
                   </span>
                   <span
                     className={[
                       "flex-1 text-sm font-semibold",
-                      isMaxAlert ? "text-red-900 dark:text-red-200" : "text-amber-900 dark:text-amber-200",
+                      isMaxAlert ? "text-status-error" : "text-status-warning",
                     ].join(" ")}
                   >
                     {alert.athleteName}
@@ -715,7 +715,7 @@ const CoachHome = ({
                   <span
                     className={[
                       "text-[9px] font-black uppercase tracking-widest",
-                      isMaxAlert ? "text-red-600 dark:text-red-400" : "text-amber-700 dark:text-amber-400",
+                      isMaxAlert ? "text-status-error" : "text-status-warning",
                     ].join(" ")}
                   >
                     {isMaxAlert ? "Fatigue max" : "Fatigue élevée"}
@@ -723,7 +723,7 @@ const CoachHome = ({
                   <span
                     className={[
                       "text-[10px] font-bold tabular-nums",
-                      isMaxAlert ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300",
+                      isMaxAlert ? "text-status-error" : "text-status-warning",
                     ].join(" ")}
                   >
                     {alert.average.toFixed(1)}/5
@@ -731,7 +731,7 @@ const CoachHome = ({
                   <ChevronRight
                     className={[
                       "h-3.5 w-3.5",
-                      isMaxAlert ? "text-red-400" : "text-amber-500",
+                      isMaxAlert ? "text-status-error" : "text-status-warning",
                     ].join(" ")}
                   />
                 </button>

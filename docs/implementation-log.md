@@ -4,6 +4,61 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §203 — Chantier D : NEW EmptyState (composant partagé) (2026-05-08)
+
+**Contexte :** suite §200+§201 livrés ensemble. Audit shared listait 4 implémentations distinctes pour empty states (`<p>` simple, shadcn `<Empty>`, inline div centered, icon+texte+CTA). Création de la primitive partagée. Migration des call-sites reportée à §204+ pour ne pas faire conflit avec §202 en parallèle.
+
+**Changements** :
+- NEW `src/components/shared/EmptyState.tsx` (~75 LOC) : API `icon` (ReactNode optionnel, sized auto via attribute selector h-8/h-10 selon variant), `title` (string), `description` (ReactNode optionnel), `cta` (ReactNode optionnel), `compact` (boolean pour usage embedded carte/section), `className` (override). Layout vertical centered, icon top muted-foreground/60, espacement généreux (gap-3 py-12 standard, gap-2 py-6 compact). `role="status"` pour accessibilité.
+
+**Limites (out of scope §203)** :
+- Migration des call-sites existants (CompetitionDetail.tsx:76-81 introuvable, Coach.tsx:856 "Aucun nageur", AthletePlansTab.tsx:460 dumbbell empty, etc.) reportée § suivant.
+- Évolution CoachSectionHeader (back button h-11 iOS-style icon-only) reportée.
+- SystemBannerStack (queue + priorité Offline > Update > Push > Install) reportée — composant plus complexe nécessitant brainstorming.
+
+**Tests :** `npx tsc --noEmit` clean. Pas de modif aux tests existants.
+
+---
+
+## §202 — Chantier C : migration top contributeurs hardcodes → tokens sémantiques (2026-05-08)
+
+**Contexte :** suite §199 (qui a tokenisé InlineBanner, top 3 contributeur). Audit shared listait 5 autres top contributeurs (94 fichiers .tsx au total avec couleurs Tailwind hardcoded). Migration ciblée vers `--color-status-success/warning/error` exposés dans `index.css`. Sub-agent sonnet pour batch-edits avec discrimination status sémantique vs catégoriel.
+
+**Changements (37 remplacements ciblés sur 4 fichiers)** :
+
+| Fichier | Hits avant | Hits après | Remplacés |
+|---|---|---|---|
+| `pages/coach/CoachTrainingSlotsScreen.tsx` | 37 | 17 | 20 |
+| `pages/Coach.tsx` | 34 | 5 | 29 |
+| `pages/coach/CoachSwimmersOverview.tsx` | 21 | 0 | 21 |
+| `pages/coach/SwimmerInterviewsTab.tsx` | 20 | 6 | 14 |
+| `components/coach/strength/AthletePlansTab.tsx` | 9 | 9 | 0 (tous catégoriels — CYCLE_COLORS, nameToColor, day badges, DAY_PATTERNS) |
+
+**Patterns de remplacement appliqués** :
+- `bg-amber-{50,100,200}` → `bg-status-warning-bg` (fond warning soft, lightness 89-96%).
+- `bg-amber-{500,600}` → `bg-status-warning` (warning fort).
+- `text-amber-{600,700,800}` → `text-status-warning`.
+- `border-amber-{200,300}` → `border-status-warning/20` ou sans opacité selon contexte.
+- `bg-emerald-*` / `text-emerald-*` / `border-emerald-*` → `bg-status-success-bg` / `text-status-success` / `border-status-success` (mapping success).
+- `bg-red-*` / `text-red-*` → `bg-status-error-bg` / `text-status-error` (mapping error).
+- `bg-rose-*` (pour status) → idem `red-*` ; mais conservé `bg-rose-500`/`bg-rose-400/90` quand catégoriel (ex: dot compétition, icône Sunset dans Coach.tsx).
+
+**Cas laissés volontairement (catégoriels)** :
+- `CoachTrainingSlotsScreen` : amber pour le **type** strength (vs blue swim) sur le tab toggle, accent bar, duration badge, mini bars strength — c'est un code couleur de **catégorie d'activité**, pas un status.
+- `CoachTrainingSlotsScreen` : `bg-rose-500` competition dot + bloc rose competition — couleur brand compétition (catégoriel).
+- `CoachSwimmersOverview` : aucune ambiguïté résiduelle, 100% migré.
+- `SwimmerInterviewsTab` : `CoachSectionReadOnly/Editable/CommitmentsBlock` amber = couleur identité coach (thématique), `text-amber-500` Trophy échéances décoratif.
+- `Coach.tsx` : nav icons quick access (Groupes/Records/Chronos), `text-amber-500/80` Sunrise + `text-rose-400/90` Sunset (icônes décoratives matin/soir).
+- `AthletePlansTab` : palette CYCLE_COLORS, avatar nameToColor (déterministe par hash), WEEK_DAYS day badges (catégoriel).
+
+**Effet :** -84 occurrences de classes Tailwind hardcoded dont `amber/emerald/red/rose` à usage status. Le **dark mode** est désormais cohérent sur ces 4 fichiers grâce aux tokens `--status-*-bg` qui ont des valeurs alternatives dans `.dark` (vs avant : double classe `bg-amber-50/50 dark:bg-amber-950/10` parfois divergente).
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass + 1 fail pré-existant.
+
+**Fichiers modifiés (4)** : CoachTrainingSlotsScreen.tsx, Coach.tsx, CoachSwimmersOverview.tsx, SwimmerInterviewsTab.tsx.
+
+---
+
 ## §201 — Migration Surface primitive (3/5 composants) (2026-05-08)
 
 **Contexte :** suite §199 Chantier B. La primitive `Surface` posée mais non déployée. Migration partielle de 3 composants "card-like" du top contributeur audit shared. Sub-agent sonnet en parallèle de §200.
