@@ -282,6 +282,8 @@ export default function SwimmerMessagesView({
                   type="button"
                   onClick={() => handleNotificationPress(notification)}
                   className="w-full px-3 py-3 pr-10 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                  aria-expanded={isExpanded}
+                  aria-controls={`notif-detail-${notification.target_id ?? notification.id}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Unread dot */}
@@ -323,7 +325,7 @@ export default function SwimmerMessagesView({
 
                 {/* Inline expanded content */}
                 {isExpanded ? (
-                  <div className="mx-3 mb-3 rounded-xl border border-border/60 bg-card p-3 space-y-2">
+                  <div id={`notif-detail-${notification.target_id ?? notification.id}`} className="mx-3 mb-3 rounded-xl border border-border/60 bg-card p-3 space-y-2">
                     <p className="text-sm text-foreground/80 leading-relaxed">
                       {notification.message || "Aucun détail supplémentaire."}
                     </p>

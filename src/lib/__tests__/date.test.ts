@@ -50,3 +50,8 @@ test("formatRelativeDate — date future → jj/mm", () => {
   const future = new Date(NOW.getTime() + 60_000).toISOString(); // dans 1 minute
   assert.equal(formatRelativeDate(future, NOW), "08/05");
 });
+
+test("formatRelativeDate — moins d'une minute → 'à l'instant'", () => {
+  assert.equal(formatRelativeDate(minutesAgo(0, NOW), NOW), "à l'instant");
+  assert.equal(formatRelativeDate(new Date(NOW.getTime() - 30_000).toISOString(), NOW), "à l'instant");
+});

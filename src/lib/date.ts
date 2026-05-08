@@ -68,6 +68,7 @@ export function formatRelativeDate(value: string, now: Date = new Date()): strin
   const diffMin = Math.floor(diffMs / 60_000);
   const diffH = Math.floor(diffMs / 3_600_000);
 
+  if (diffMin < 1) return "à l'instant";
   if (diffMin < 60) return `il y a ${diffMin}m`;
   if (diffH < 24) return `il y a ${diffH}h`;
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BellRing, SendHorizontal } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type CoachMessagesScreenProps = {
   onBack?: () => void;
@@ -28,6 +28,7 @@ const CoachMessagesScreen = ({
   const [message, setMessage] = useState("");
   const [targetValue, setTargetValue] = useState("");
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
 
   const athleteOptions = useMemo(
     () =>
@@ -106,6 +107,8 @@ const CoachMessagesScreen = ({
       return;
     }
 
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     try {
       await api.notifications_send({
@@ -133,6 +136,7 @@ const CoachMessagesScreen = ({
         variant: "destructive",
       });
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
@@ -162,7 +166,7 @@ const CoachMessagesScreen = ({
           <SelectContent>
             {groupOptions.length ? (
               <>
-                <SelectItem value="section-group" disabled>Groupes</SelectItem>
+                <SelectLabel>Groupes</SelectLabel>
                 {groupOptions.map((g) => (
                   <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
                 ))}
@@ -170,7 +174,7 @@ const CoachMessagesScreen = ({
             ) : null}
             {athleteOptions.length ? (
               <>
-                <SelectItem value="section-athlete" disabled>Nageurs</SelectItem>
+                <SelectLabel>Nageurs</SelectLabel>
                 {athleteOptions.map((a) => (
                   <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
                 ))}
