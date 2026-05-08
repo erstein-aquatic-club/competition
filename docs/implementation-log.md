@@ -4,6 +4,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §221 — Fix chargement lent des GIFs exercices dans SessionDetailPreview (2026-05-08)
+
+**Contexte :** Les animations GIF des exercices (icône 44×44 dans la liste + preview agrandie) mettaient plusieurs secondes à s'afficher dans la vue nageur > muscu > mon plan > aperçu de séance.
+
+**Diagnostic :** Deux causes combinées identifiées :
+1. `loading="lazy"` sur les thumbnails GIF à l'intérieur d'éléments Framer Motion avec `initial="hidden"` (`opacity: 0`). Sur Safari iOS, l'IntersectionObserver ne déclenche pas le téléchargement d'une image dans un élément `opacity: 0`. Les GIFs ne commençaient à se charger qu'après la fin du stagger (jusqu'à ~500ms), puis s'ajoutait le délai réseau.
+2. Aucun préchargement : au clic sur la séance, rien ne démarrait les téléchargements avant le montage + animation du composant.
+
+**Fix :**
+- `useEffect` de préchargement au montage : instancie `new window.Image()` pour chaque URL GIF de la séance → le navigateur démarre tous les téléchargements en parallèle immédiatement, avant même la fin des animations.
+- `loading="eager"` sur les thumbnails (ligne 200) : les items sont tous visibles en même temps dans la preview, le lazy loading n'apporte rien et aggrave le problème sur iOS.
+- La grande image de l'expand (ligne 262) garde `loading="lazy"` : non visible tant que l'utilisateur n'a pas tapé, et elle sera servie depuis le cache HTTP une fois le thumbnail chargé.
+
+**Fichiers modifiés (1)** : `src/components/strength/SessionDetailPreview.tsx` (+13 LOC, import `useEffect` + preload effect + `loading="eager"`).
+
 ## §219 — Suppression de la façade `src/lib/api.ts` (Refacto A) (2026-05-08)
 
 **Contexte :** Refacto A de l'audit §214 (perf/maintenabilité). `src/lib/api.ts` (1039 LOC) exposait `export const api = { ... }` avec ~242 stubs de délégation (`async fnX() { return _fnX(); }`) + 8 méthodes à vraie logique. Façade redondante par-dessus `src/lib/api/index.ts`. Toute addition d'API forçait à toucher 4 fichiers (sous-module + types + façade + index re-export).
@@ -151,6 +166,54 @@ Cette animation pré-existait à §216-§217. Elle était auparavant masquée pa
 - Type `selectedDayStatus.slots` dupliqué dans 2 nouveaux fichiers — non bloquant (review code-quality).
 
 **Fichiers modifiés (2)** : `src/pages/Dashboard.tsx`, `src/hooks/useDashboardState.ts`. **Créés (2)** : `src/components/dashboard/DashboardCalendar.tsx`, `src/components/dashboard/DashboardFeedbackContainer.tsx`. **Doc** : `docs/plans/2026-05-08-dashboard-split-design.md`, `docs/plans/2026-05-08-dashboard-split.md` (plan d'implémentation), `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`, `docs/claude/files-map.md`.
+
+## §215 — Audit UI/UX iOS-like — passe 2 post-§213 (2026-05-08)
+
+**Contexte :** demande utilisateur — re-mener l'audit de §197 (`docs/audits/2026-05-08-ui-ux-audit-ios.md`, verdict 6/10) avec EXACTEMENT la même méthode (3 forks parallèles + même grille iOS HIG) pour mesurer la trajectoire après 17 chantiers livrés (§197 → §214). Contraintes : audit lecture seule (zéro edit), file:line systématique, comparaison /10 par surface vs scores initiaux, validation des 3 drapeaux racines, audit qualité des 3 NEW composants (`Surface`, `EmptyState`, `systemBanners`).
+
+**Méthode :** 3 forks sonnet parallèles (nageur / coach / partagés+NEW) + greps centralisés en main pour les 3 drapeaux racines. Lecture ciblée via Read offset/limit (pas de fichier entier).
+
+**Résultat synthétique :**
+
+- Score global app : **6/10 → ~7.8/10** (+1.8)
+- Score moyen nageur : **6.0 → 7.94** (+1.94)
+- Score moyen coach : **6.0 → 7.15** (+1.15)
+- Score moyen partagés : **5.7 → 7.6** (+1.9)
+- 3 NEW composants notés : Surface 8.5/10 (3 call-sites), EmptyState 9.0/10 (4/4 cibles initiales migrées), systemBanners 9.5/10 (4/4 consumers — couverture totale)
+
+**Drapeaux racines :**
+
+- **#1 typo** : NEUTRALISÉ au niveau racine (règle `index.css:271-279` convertie en opt-in `.heading-display`). 5 régressions ponctuelles résiduelles : `Coach.tsx:1151` (P0 fallback "Accès Coach"), `ComingSoon.tsx:21` (P1), `AwaitingApproval.tsx:22` (P1), `SlotSessionSheet.tsx:376` (P1 inline style), `SessionSummary:58`/`WorkoutRunner:751` (borderline brand-moment).
+- **#2 tap targets** : PARTIEL. Primitives `Button/Input/Tabs/Sheet` conformes HIG 44pt. Mais `SelectTrigger h-9` (P0 transverse, `select.tsx:22`) et cluster `AthletePlansTab.tsx:807,815,913,922,935,943` (6 boutons h-7 sur mutations critiques) non corrigés.
+- **#3 hardcodes** : RÉDUIT en surface (InlineBanner 25→0 hits, top 5 cumul 157→102 = -35%) mais 3 caves coach builder intactes : `CoachTrainingSlotsScreen` (36), `AthletePlansTab` (22), `FeedbackDrawer` (16) = 74 hits.
+
+**Trajectoire des 5 chantiers structurels passe 1 :**
+
+- A (détox typo) : ✅ livré (§197)
+- B (Surface primitive) : 🟡 partiel (§199, §201, §202) — 3 call-sites adopté, BottomActionBar/UpdateNotification non migrés
+- C (tokens) : 🟡 partiel (§202, §205, §207, §209) — top 15 soldé, top 3 caves coach intactes
+- D (CoachPageHeader + EmptyState + SystemBannerStack) : ✅ livré (§203, §208, §210)
+- E (sheets bottom) : 🟡 partiel — `ui/sheet.tsx` default conforme, pas de wrapper `<IosSheet>` dédié
+
+**Régressions vs passe 1 (P0/P1) :**
+
+- P0 `Coach.tsx:1151` CardTitle uppercase italic fallback
+- P0 `select.tsx:22` SelectTrigger h-9
+- P0 cluster `AthletePlansTab.tsx` h-7 (6 lignes)
+- P1 `AwaitingApproval`, `ComingSoon`, `SlotSessionSheet:376` typo résiduelle
+- P2 `toast.tsx:24-29` régression mineure dotColors hardcodés
+- P2 `SafeArea.tsx` zombie (1 call-site, Tailwind 4 `pb-safe` natif disponible)
+
+**Recommandation passe 3 :** chemin critique ~1.5 j (P0 ~0.5 j + caves hardcodes top 3 ~1 j) → score visé **8.5+/10** sans nouveau chantier structurel.
+
+**Fichier livrable nouveau** : `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md` (rapport pass 2 complet, ~280 lignes).
+
+**Limites (out of scope §215) :**
+- Audit lecture seule, aucun fix appliqué.
+- Score `~7.8/10` est une moyenne pondérée approximative — pas un calcul rigoureux.
+- 3 surfaces non scorées passe 1 (`SlotSessionSheet`, `AthletePlansTab`, `ChronoSetup`, `SwimmerObjectivesTab`) sont nouvellement scorées en pass 2 → comparaison Δ non disponible pour elles.
+
+---
 
 ## §214 — Quick wins perf + maintenabilité post-audit (2026-05-08)
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment, StrengthCycleType } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +78,18 @@ export function SessionDetailPreview({
   }, [exercises]);
 
   const items = session.items ?? [];
+
+  // Preload GIFs immediately on mount so downloads start before animations play.
+  // Fixes Safari iOS lazy-load suppression inside opacity:0 Framer Motion elements.
+  useEffect(() => {
+    items.forEach((item) => {
+      const gif = exerciseLookup.get(item.exercise_id)?.illustration_gif;
+      if (gif) {
+        const img = new window.Image();
+        img.src = gif;
+      }
+    });
+  }, [items, exerciseLookup]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTargetIndex, setPickerTargetIndex] = useState<number | null>(null);
@@ -188,7 +200,7 @@ export function SessionDetailPreview({
                           src={exercise!.illustration_gif!}
                           alt=""
                           className="h-full w-full object-cover"
-                          loading="lazy"
+                          loading="eager"
                           decoding="async"
                         />
                         <span className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-tl-md bg-primary text-[9px] font-bold text-primary-foreground">
