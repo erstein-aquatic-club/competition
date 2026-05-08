@@ -52,6 +52,11 @@ export default function SwimmerMessagesView({
     [allNotifications, dismissedTargetIds],
   );
 
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  );
+
   const hiddenNotificationCount = Math.max(allNotifications.length - notifications.length, 0);
 
   const dismissedUnreadTargetIds = useMemo(
@@ -198,15 +203,15 @@ export default function SwimmerMessagesView({
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
+          <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack} aria-label="Retour">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-xl font-display font-semibold uppercase italic text-primary">
             Messages
           </h2>
-          {notifications.filter((n) => !n.read).length > 0 ? (
+          {unreadCount > 0 ? (
             <Badge className="rounded-full px-1.5 py-0 text-[11px] leading-5 h-5">
-              {notifications.filter((n) => !n.read).length}
+              {unreadCount}
             </Badge>
           ) : null}
         </div>
@@ -269,14 +274,14 @@ export default function SwimmerMessagesView({
             return (
               <div
                 key={notification.target_id ?? notification.id}
-                className={`group rounded-xl transition-colors ${
+                className={`group relative rounded-xl transition-colors ${
                   isUnread ? "bg-primary/8" : "bg-transparent"
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => handleNotificationPress(notification)}
-                  className="w-full px-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                  className="w-full px-3 py-3 pr-10 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 >
                   <div className="flex items-start gap-3">
                     {/* Unread dot */}
@@ -301,23 +306,20 @@ export default function SwimmerMessagesView({
                         </p>
                       ) : null}
                     </div>
-
-                    {/* Dismiss button */}
-                    {notification.target_id != null ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDismissOne(notification.target_id!);
-                        }}
-                        className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                        aria-label="Masquer"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
                   </div>
                 </button>
+
+                {/* Dismiss button — absolute, outside the main button */}
+                {notification.target_id != null ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDismissOne(notification.target_id!)}
+                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    aria-label="Masquer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
 
                 {/* Inline expanded content */}
                 {isExpanded ? (
@@ -330,10 +332,7 @@ export default function SwimmerMessagesView({
                         variant="outline"
                         size="sm"
                         className="w-full justify-between"
-                        onClick={() => {
-                          void selectNotification(notification);
-                          openNotificationDestination(notification);
-                        }}
+                        onClick={() => handleNotificationPress(notification)}
                       >
                         {actionLabel}
                         <ChevronRight className="h-3.5 w-3.5" />
