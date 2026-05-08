@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §217 — Pre-mount FeedbackDrawer (lag d'ouverture) (2026-05-08)
+
+**Contexte :** test prod §216 → l'utilisateur signale un lag perceptible à l'ouverture du drawer (clic sur jour calendrier). Diagnostic : `FeedbackDrawer.tsx:590-1429` enveloppait son contenu (≈1265 LOC + framer-motion warm-up + StrokeDetailForm + 8 motion.div + sub-sections) dans `<AnimatePresence>{open && (...)}</AnimatePresence>`. Premier `open=true` ⇒ premier mount ⇒ frames perdues. Pré-existant à §216 (le pattern n'a pas été touché par le refacto B), mais devenu visible lors du smoke test focalisé.
+
+**Choix utilisateur** (parmi 4 options proposées) : **pre-mount du drawer** (option 1) — drop le `{open && ...}`, garde le JSX mounté en permanence, pilote opacity / y / pointer-events / aria via `open` prop. Trade-off : coût de mount déplacé au premier render Dashboard. Acceptable car le drawer s'ouvre quasi systématiquement chez un nageur actif.
+
+**Modifs `FeedbackDrawer.tsx`** :
+
+- Suppression du wrapper `<AnimatePresence>` racine (lignes 590, 1429) et du `{open && (<>` / `</>)}`.
+- Backdrop `motion.div` : `initial={false}`, `animate={{ opacity: open ? 1 : 0 }}`, `transition={{ duration: reduceMotion ? 0 : 0.15 }}`, `pointerEvents: open ? "auto" : "none"`, `aria-hidden={!open}`, `onClick={open ? onClose : undefined}` (pas de close handler quand le backdrop est invisible).
+- Drawer container `motion.div` : `variants={slideInFromBottom}`, `initial="hidden"`, `animate={open ? "visible" : "hidden"}`, `transition={reduceMotion ? { duration: 0 } : undefined}`, `drag={open ? "y" : false}` (drag down to close désactivé quand fermé), `aria-modal={open ? "true" : undefined}`, `aria-hidden={!open}`, `pointerEvents` idem.
+
+**Préservé :**
+
+- Guard `prefers-reduced-motion` de §211 (transition forced à duration:0 quand reduceMotion).
+- Drag-down to close (uniquement quand open, via `drag={open ? "y" : false}`).
+- Body scroll lock effect (`useEffect [open]` ligne 577-586 — garde son early return `if (!open) return`).
+- Tous les useEffects internes (draft restore/save/flush, advancedOpen reset, etc.) s'exécutent comme avant — la drawer component était déjà toujours montée (mais son contenu non).
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (non lié, déjà documenté §214 et §216).
+
+**Validation perf attendue :** open ressenti instant. Coût payé une fois au premier render Dashboard (tab nageur arrive à `/`, drawer monté avec `open=false`, animation hidden snap à 0,100%). Vérification utilisateur en prod après push.
+
+**Hors scope §217 :**
+
+- Lazy-loading des sub-components lourds (StrokeDetailForm, sections motion) — option 2 du choix utilisateur, pas retenue.
+- Pas d'audit perf via React Profiler — option 4 du choix utilisateur, pas retenue.
+
+**Fichiers modifiés (1)** : `src/components/dashboard/FeedbackDrawer.tsx`. **Doc** : `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`.
+
 ## §216 — Découpage Dashboard.tsx en orchestrateur + Calendar + FeedbackContainer (Refacto B) (2026-05-08)
 
 **Contexte :** suite §214 (audit perf/maintenabilité). Refacto B identifiée : `src/pages/Dashboard.tsx` (1114 LOC) re-rendait à chaque keystroke dans le drawer (`saveState`, `draftState`, `alternativeOverride` co-localisés). Cible : isoler le calendrier des re-renders d'écriture pour gagner -50 à -80% de renders calendrier pendant la saisie.

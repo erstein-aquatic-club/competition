@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§216** — Refacto B Dashboard.tsx (audit §214). Découpage 1114 → 784 LOC : `<DashboardCalendar>` (memo, 69 LOC) + `<DashboardFeedbackContainer>` (memo, 440 LOC, host saveState/draftState/alternativeOverride + 5 mutations). `useFeedbackDraft` sorti du hook parent. Calendrier ne re-render plus pendant la saisie feedback (-50 à -80% estimé). Settings dialog inline (validé). 4 fichiers + doc. tsc clean, 684 tests pass + 1 fail pré-existant non lié. (§215 réservé audit UI/UX parallèle.)
+Dernier § livré : **§217** — Pre-mount FeedbackDrawer (suite test prod §216). Drop du `<AnimatePresence>{open && (...)}` racine du drawer (≈1265 LOC + framer warm-up monté à chaque ouverture). Drawer toujours mounté, `open` pilote `motion.div` variants + `pointer-events` + `aria-hidden` + `drag`. Open ressenti instant ; coût payé une fois au premier render Dashboard. Pré-existant à §216 (pattern non touché par refacto B). 1 fichier (`FeedbackDrawer.tsx`). tsc clean.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

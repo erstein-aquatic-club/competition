@@ -587,42 +587,48 @@ export function FeedbackDrawer({
 
   return (
     <>
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="fixed inset-0 z-overlay bg-black/30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            className={cn(
-              "fixed z-modal bg-background shadow-2xl overflow-hidden",
-              // Mobile: bottom sheet
-              "left-0 right-0 bottom-0 top-auto max-h-[calc(100dvh-env(safe-area-inset-top))] h-[88dvh] rounded-t-3xl",
-              // Desktop: drawer à droite
-              "sm:right-0 sm:top-0 sm:left-auto sm:bottom-auto sm:h-full sm:w-full sm:max-w-xl sm:rounded-none"
-            )}
-            variants={reduceMotion ? undefined : slideInFromBottom}
-            initial={reduceMotion ? false : "hidden"}
-            animate={reduceMotion ? false : "visible"}
-            exit={reduceMotion ? undefined : "exit"}
-            drag="y"
-            dragControls={dragControls}
-            dragListener={false}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0.05, bottom: 0.3 }}
-            dragSnapToOrigin={true}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > 100 || info.velocity.y > 500) {
-                onClose();
-              }
-            }}
-            role="dialog"
-            aria-modal="true"
-          >
+    {/* §217 — drawer pre-mounted (always rendered). `open` drives motion variants,
+        pointer-events, aria. Évite le coût de premier mount (≈1265 LOC + framer-
+        motion warm-up + sub-components). Bénéfice : open ressenti instant.
+        Coût : drawer payé au premier render Dashboard (acceptable, drawer ouvert
+        quasi systématiquement chez un nageur actif). */}
+    <motion.div
+      className="fixed inset-0 z-overlay bg-black/30"
+      initial={false}
+      animate={{ opacity: open ? 1 : 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.15 }}
+      onClick={open ? onClose : undefined}
+      style={{ pointerEvents: open ? "auto" : "none" }}
+      aria-hidden={!open}
+    />
+    <motion.div
+      className={cn(
+        "fixed z-modal bg-background shadow-2xl overflow-hidden",
+        // Mobile: bottom sheet
+        "left-0 right-0 bottom-0 top-auto max-h-[calc(100dvh-env(safe-area-inset-top))] h-[88dvh] rounded-t-3xl",
+        // Desktop: drawer à droite
+        "sm:right-0 sm:top-0 sm:left-auto sm:bottom-auto sm:h-full sm:w-full sm:max-w-xl sm:rounded-none"
+      )}
+      variants={slideInFromBottom}
+      initial="hidden"
+      animate={open ? "visible" : "hidden"}
+      transition={reduceMotion ? { duration: 0 } : undefined}
+      drag={open ? "y" : false}
+      dragControls={dragControls}
+      dragListener={false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0.05, bottom: 0.3 }}
+      dragSnapToOrigin={true}
+      onDragEnd={(_, info) => {
+        if (info.offset.y > 100 || info.velocity.y > 500) {
+          onClose();
+        }
+      }}
+      role="dialog"
+      aria-modal={open ? "true" : undefined}
+      aria-hidden={!open}
+      style={{ pointerEvents: open ? "auto" : "none" }}
+    >
             <div className="flex h-full flex-col overflow-hidden">
               <div
                 className="px-5 pt-3 sm:hidden touch-none shrink-0"
@@ -1417,10 +1423,7 @@ export function FeedbackDrawer({
                 );
               })()}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    </motion.div>
 
     {onDeleteFeedback && (
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
