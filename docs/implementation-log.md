@@ -4,6 +4,40 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §227 — Tap targets résiduels + Coach.tsx typo P0 régression (2026-05-08)
+
+**Contexte :** suite à §215 audit pass 2 et §223 RPC user (committé+pushé). 5 dernières régressions P0/P1 ciblées identifiées dans le rapport audit pass 2. Coach.tsx:1097 (ex-1151 décalé après §223 -67 LOC) débloqué car RPC stabilisé. Patch ciblé ~5 minutes / 5 fichiers.
+
+**Changements :**
+
+- `src/pages/Coach.tsx:1097` — CardTitle fallback "Accès Coach" (rendu lors d'accès refusé) `className="flex items-center gap-2 uppercase italic"` → `className="flex items-center gap-2"`. Sentence-case rétabli, hors brand-moment. **Régression P0 closeée** (la dernière typo régression hors borderline `SessionSummary`/`WorkoutRunner` "Séance terminée").
+- `src/components/layout/AppLayout.tsx:172` — bouton avatar/profil header `h-9 w-9` → `h-11 w-11`. Apple HIG 44pt sur action critique navigation.
+- `src/components/shared/PageHeader.tsx:60` — back button `h-9 w-9` → `h-11 w-11`. Cohérent avec CoachSectionHeader (§208) et autres back buttons HIG.
+- `src/components/ui/sheet.tsx:92` — `SheetPrimitive.Close` className `absolute right-4 top-4 rounded-sm opacity-70` (~16px tap area) → `absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full opacity-70 hover:bg-muted`. Wrapper 44px tout en préservant la taille de l'icône X (h-4 w-4 = 16px). `right-2 top-2` car la zone élargie compense l'espacement antérieur. `rounded-full` + `hover:bg-muted` pour feedback tactile iOS-style.
+- `src/components/ui/dialog.tsx:45` — `DialogPrimitive.Close` même traitement que sheet.tsx (cohérence des primitives).
+
+**Hors scope §227** :
+- `BottomActionBar.tsx` + `UpdateNotification.tsx` migration vers `Surface` primitive — **abandonné**. Audit §201 avait déjà signalé : Surface n'a pas de variant `radius="full"` (UpdateNotification rounded-full pill) ni `radius="top-only"` (BottomActionBar rounded-t-2xl). L'extension d'API ou les overrides via className n'apportent pas de gain net (consolidation cosmétique vs complexité accrue). Les 2 composants restent à structure custom, déjà tokenisés sur `bg-status-*` (BottomActionBar) et `bg-card/95 backdrop-blur-xl` (UpdateNotification glass natif).
+- SafeArea suppression — Tailwind 4 sans `pb-safe`/`pt-safe` natif ici, à investiguer dans un § dédié.
+- SwimCatalog header inline → CoachSectionHeader — décision UX (changement visuel `text-base → text-2xl`).
+
+**Vérifications :**
+- `npx tsc --noEmit` : ✅ clean
+- `npm test` : 684/685 pass + 1 fail pré-existant
+- Diff : 5 fichiers modifiés (3 src + 2 ui primitives). Lignes affectées : 5 (1 par fichier).
+
+**Drapeau racine #1 (typo) — état post-§227 :**
+- Régressions P0/P1 closeées : Coach.tsx:1097, AwaitingApproval.tsx:22, ComingSoon.tsx:21, SlotSessionSheet.tsx:376 (toutes §224 + §227).
+- Borderline brand-moments restants (à valider whitelist `.heading-display`) : `SessionSummary.tsx:58` "Séance terminée" + `WorkoutRunner.tsx:751` "Séance Terminée !" — décision utilisateur §215 : whitelist (célébration fin de séance, pattern iOS fitness rings). À documenter en §228 (whitelist explicite).
+
+**Drapeau racine #2 (tap targets) — état post-§227 :**
+- Primitives ui : Button/Input/Tabs/Sheet/Select (§224) + Dialog/Sheet Close (§227) tous conformes HIG 44pt.
+- AppLayout avatar et PageHeader back : conformes HIG.
+- Cluster AthletePlansTab actions critiques : §224.
+- Reste : Dashboard stepper h-7 (config séance modal), SwimSessionView inputs h-9 (mode libre), ChronoSetup count input h-10 inline. Acceptés non-critiques (chemins peu fréquents, non-mutation).
+
+**Fichiers modifiés (5)** : `src/pages/Coach.tsx`, `src/components/layout/AppLayout.tsx`, `src/components/shared/PageHeader.tsx`, `src/components/ui/sheet.tsx`, `src/components/ui/dialog.tsx`. **Doc** : `docs/implementation-log.md`, `CLAUDE.md`, `docs/ROADMAP.md`.
+
 ## §226 — Tokens chantier (cat-* + stroke-*) + caves catégoriels CoachTrainingSlotsScreen (2026-05-08)
 
 **Contexte :** suite à §222 (caves hardcodes top 3) qui avait identifié 31 catégoriels non migrables faute de tokens disponibles dans `CoachTrainingSlotsScreen.tsx` (commentés `TODO §223`/§218 par le sub-agent §222) + `STROKE_BORDER_TOP` map dans `ObjectiveCard.tsx:31-37` (5 hits hardcoded blue/emerald/rose/violet/amber). Création des 9 tokens manquants identifiés et migration complète. Validation utilisateur : "Oui, créer les tokens manquants en §223" (réponse AskUserQuestion §215, le numéro a glissé à §226).

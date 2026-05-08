@@ -169,7 +169,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => handleNavClick("/profile")}
-                  className="h-9 w-9 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  className="h-11 w-11 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   aria-label="Profil"
                 >
                   <UserCircle className="h-5 w-5" />

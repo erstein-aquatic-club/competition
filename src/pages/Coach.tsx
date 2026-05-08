@@ -1094,7 +1094,7 @@ export default function Coach() {
       <div className="flex items-center justify-center min-h-[60vh] animate-in fade-in motion-reduce:animate-none">
         <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 uppercase italic">
+            <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               Accès Coach
             </CardTitle>

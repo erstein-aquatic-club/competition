@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§226** — Tokens chantier (cat-* + stroke-*) + caves catégoriels CoachTrainingSlotsScreen 31→0 + ObjectiveCard 7→0. 9 nouveaux tokens index.css (light+dark).
+Dernier § livré : **§227** — Tap targets résiduels (DialogClose/SheetClose h-11, AppLayout avatar, PageHeader back) + Coach.tsx typo P0 sentence-case fallback "Accès Coach".
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
