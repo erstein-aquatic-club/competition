@@ -161,48 +161,15 @@ export async function assignments_create(
     } else if (data.target_group_id !== null && data.target_group_id !== undefined) {
       insertPayload.target_group_id = data.target_group_id;
     }
-    const { data: created, error } = await supabase
+    const { data: _created, error } = await supabase
       .from("session_assignments")
       .insert(insertPayload)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    // Create notification
-    const { data: notif, error: notifError } = await supabase
-      .from("notifications")
-      .insert({
-        title: "Nouvelle séance assignée",
-        body: `Séance prévue le ${scheduledDate}.`,
-        type: "assignment",
-      })
-      .select("id")
-      .single();
-    if (notifError) {
-      console.warn('[assignments] Notification creation failed:', notifError.message);
-    } else if (notif) {
-      const targetPayload: Record<string, unknown> = { notification_id: notif.id };
-      if (data.target_user_id) targetPayload.target_user_id = data.target_user_id;
-      if (data.target_group_id) targetPayload.target_group_id = data.target_group_id;
-      const { error: targetError } = await supabase
-        .from("notification_targets")
-        .insert(targetPayload);
-      if (targetError) {
-        // Rollback : supprimer la notification orpheline pour éviter une notif sans cible
-        try {
-          const { error: rollbackError } = await supabase.from("notifications").delete().eq("id", notif.id);
-          if (rollbackError) {
-            console.error('[assignments] Notification rollback DELETE failed:', rollbackError.message);
-          }
-        } catch (rollbackThrow) {
-          console.error('[assignments] Notification rollback threw:', rollbackThrow);
-        }
-        console.warn(
-          '[assignments] Notification rolled back (target insert failed):',
-          targetError.message,
-        );
-      }
-      // Push delivery handled by pg_net trigger (00044)
-    }
+    // Notif + push délégués au trigger SQL `auto_notify_session_assignment`
+    // (migration 00045) qui crée 1 notification + 1 target par INSERT, puis le
+    // trigger pg_net (00044) appelle push-send. Doublon retiré §194.
     return { status: "assigned" };
   }
 

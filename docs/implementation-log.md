@@ -4,6 +4,46 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §194 — Vague A : doublon notif retiré + expiration auto sur triggers (2026-05-08)
+
+**Contexte :** Plainte utilisateur — « il y a trop de notifications tous les jours dans le centre de notifications mais les pushs n'arrivent pas systématiquement aux utilisateurs connectés ». Audit Phase 1 (systematic-debugging) a identifié 8 causes racines. Cette livraison attaque les 2 causes les plus rentables côté centre de notifications (Vague A). Push delivery (Vague B/C : refresh subscriptions, rotation endpoint, tag SW, gate focused) reportée.
+
+### Causes racines traitées
+
+1. **Doublon critique sur les assignations muscu** : `assignments.ts assignments_create` (utilisé par `AthletePlansTab.tsx`) insérait manuellement `notifications` + `notification_targets` après chaque INSERT dans `session_assignments`. Le trigger SQL `auto_notify_session_assignment` (00045) faisait déjà la même chose → **2 notifs + 2 pushs identiques par clic**. Le chemin `bulkCreateSlotAssignments` (séances natation) n'avait pas le bug.
+2. **Aucun `expires_at` sur les triggers d'assignation** : §163 (00143) avait posé l'expiration sur les CRONS (wellness, slot reminder), mais les 6 triggers `auto_notify_*` (session, compétition, slot override, interview created/transition, swimmer comment) créaient des notifs persistantes. Cumul indéfini dans le centre + impossibles à purger par `cleanup_expired_notifications` (00085, qui ignore `expires_at IS NULL`).
+
+### Changements
+
+| Fichier | Type | Effet |
+|---|---|---|
+| `src/lib/api/assignments.ts` | Edit (-32, +4 LOC) | Suppression du bloc INSERT manuel `notifications` + `notification_targets` (lignes 171-205). Le trigger 00045 + pg_net (00044) couvrent. |
+| `src/lib/api/__tests__/assignmentsCreate.test.ts` | NEW (138 LOC) | 2 tests TDD : `assignments_create` n'appelle plus que `from('session_assignments')` ; propage l'erreur sans tenter de notif manuelle. |
+| `supabase/migrations/00156_notification_triggers_expires_at.sql` | NEW (292 LOC) | Recrée les 6 fonctions trigger avec `expires_at` adapté au type : `session_assignment` = `scheduled_date + 1d` (fallback `now() + 14d`) ; `competition_assignment` = `start_date + 2d` (fallback `now() + 60d`) ; `slot_override` = `override_date + 1d` ; `interview_created/transition` = `now() + 30d` ; `swimmer_comment` = `now() + 7d`. Backfill : `expires_at = created_at + 14d` pour toutes les notifs sans `expires_at`. |
+
+### Mesures pré/post (prod, project `fscnobivsgornxdwqwlk`)
+
+Avant migration : 278 notifs total, **208 sans `expires_at`** (75 %).
+
+Après migration + backfill :
+- 0 notif sans `expires_at`
+- **229 désormais masquées** par le filtre serveur (`notifications_list` ignore `expires_at <= now`)
+- 49 toujours visibles
+- **Réduction immédiate du centre : -82 % de notifs visibles**
+
+### Tests
+
+- `npx tsc --noEmit` : clean.
+- `npm test` : 652/653 (1 fail pré-existant `transformers.test.ts:18` non lié, documenté MEMORY.md).
+- 2 nouveaux tests régression `assignments_create` passent.
+
+### Limites / suite
+
+- **Pas de tests RLS lancés** : la migration ne touche aucune policy ni helper auth, uniquement des fonctions trigger SECURITY DEFINER. Critères CLAUDE.md non remplis.
+- Vague B (resync subscriptions push tous les boots, détection rotation endpoint, reset banner après 60j) reportée : à attaquer après mesure du gain Vague A.
+- Vague C (tag SW per-notif, gate focused contextuel) reportée : modification UX qui mérite un §séparé.
+- `notifications_send` (broadcasts coach manuels) volontairement non touché : changer la durée de vie des messages coach surprend l'utilisateur, sera traité en concertation si nécessaire.
+
 ## §193 — Objectives ↔ compétitions : passage en many-to-many (2026-05-04)
 
 **Contexte :** Le §192 limitait l'onglet "Lier" du Sheet à des objectifs sans `competition_id`. L'utilisateur a 4 objectifs dans sa vue profil mais n'en voyait qu'un dans le Sheet. Diagnostic : 3 sont déjà liés à d'autres compétitions, et la colonne `objectives.competition_id` est 1:1 (un objectif ne peut être rattaché qu'à une compétition à la fois). L'utilisateur a explicitement demandé que "un objectif doit pouvoir être affecté à plusieurs compétitions". → Refactor schéma vers N:N.
