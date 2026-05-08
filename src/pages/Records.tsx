@@ -932,7 +932,7 @@ export default function Records() {
                 <div className="mt-3 space-y-3">
                   {/* Alerts */}
                   <InlineBanner
-                    variant="destructive"
+                    variant="error"
                     icon={<AlertCircle />}
                     label="Impossible de charger votre profil"
                     visible={profileQuery.isError}
@@ -940,7 +940,7 @@ export default function Records() {
                   />
 
                   <InlineBanner
-                    variant="yellow"
+                    variant="warning"
                     icon={<AlertCircle />}
                     label="IUF FFN non renseigné"
                     sublabel={

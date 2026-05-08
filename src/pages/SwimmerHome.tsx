@@ -587,7 +587,7 @@ export default function SwimmerHome() {
               Prochaine compétition
             </p>
             <InlineBanner
-              variant="amber"
+              variant="warning"
               icon={<Trophy />}
               label={nextCompetition.name}
               badge={

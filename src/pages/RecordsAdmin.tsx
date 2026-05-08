@@ -569,7 +569,7 @@ export default function RecordsAdmin() {
 
         {/* Incomplete warning */}
         <InlineBanner
-          variant="amber"
+          variant="warning"
           icon={<AlertCircle />}
           label={`${incompleteCount} nageur${incompleteCount > 1 ? "s" : ""} incomplet${incompleteCount > 1 ? "s" : ""}`}
           sublabel="IUF, sexe et année de naissance requis pour les records"

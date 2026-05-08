@@ -13,9 +13,14 @@ const CoachSectionHeader = ({ title, description, onBack, actions }: CoachSectio
   <div className="space-y-3">
     <div className="space-y-1">
       {onBack && (
-        <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Retour
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-ml-2 h-11 w-11"
+          onClick={onBack}
+          aria-label="Retour"
+        >
+          <ArrowLeft className="h-5 w-5" />
         </Button>
       )}
       <h2 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h2>

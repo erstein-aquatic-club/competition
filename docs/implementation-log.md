@@ -4,6 +4,55 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §208 — Évolution `CoachSectionHeader` iOS-style (2026-05-08)
+
+**Contexte :** suite §206. Audit shared (`docs/audits/2026-05-08-ui-ux-audit-ios.md`) recommandait d'aligner le composant partagé `CoachSectionHeader` sur le pattern iOS HIG (back button icon-only h-11 au lieu de `Button variant="ghost" size="sm"` avec icône + texte "Retour"). Sub-agent sonnet.
+
+**Changements :**
+- `src/pages/coach/CoachSectionHeader.tsx` (~28 LOC) : back button passe de `<Button variant="ghost" size="sm" className="-ml-2">⬅ Retour</Button>` → `<Button variant="ghost" size="icon" className="-ml-2 h-11 w-11" aria-label="Retour"><ArrowLeft className="h-5 w-5" /></Button>`. Tap target Apple HIG strict (44×44px). Texte "Retour" supprimé (icon-only iOS-style). Le reste du composant (title h2, description p, actions slot) inchangé. **API publique préservée** (`title`, `description?`, `onBack?`, `actions?`).
+
+**Call-sites validés** (pas de modif requise — passent toujours les mêmes props) :
+- `src/pages/coach/CoachCompetitionsScreen.tsx`
+- `src/pages/coach/CoachSwimmersOverview.tsx`
+- `src/pages/coach/CoachGroupsScreen.tsx`
+- `src/pages/coach/CoachPaceCalculatorScreen.tsx`
+- `src/pages/coach/CoachSmsScreen.tsx`
+- `src/pages/coach/CoachMySwimmersScreen.tsx`
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass + 1 fail pré-existant.
+
+**Fichiers modifiés (1)** : `CoachSectionHeader.tsx`.
+
+---
+
+## §207 — Migration alias InlineBanner → variants sémantiques (2026-05-08)
+
+**Contexte :** suite §199 (qui a tokenisé InlineBanner et créé les variants sémantiques `info|success|warning|error|muted` avec alias back-compat `amber|red|yellow|emerald|blue|destructive` pour migration douce). Cleanup des call-sites pour utiliser directement les variants sémantiques (mieux exprime l'intention, prépare le retrait des alias en §220+). Sub-agent sonnet.
+
+**Changements (7 migrations sur 5 fichiers)** :
+
+| Fichier:ligne | Avant | Après |
+|---|---|---|
+| `components/wellness/WellnessBanner.tsx:41` | `variant="emerald"` | `variant="success"` |
+| `components/wellness/WellnessBanner.tsx:60` | `variant="blue"` | `variant="info"` |
+| `pages/RecordsAdmin.tsx:572` | `variant="amber"` | `variant="warning"` |
+| `pages/Records.tsx:935` | `variant="destructive"` | `variant="error"` |
+| `pages/Records.tsx:943` | `variant="yellow"` | `variant="warning"` |
+| `pages/Dashboard.tsx:837` | `variant="amber"` | `variant="warning"` |
+| `pages/SwimmerHome.tsx:590` | `variant="amber"` | `variant="warning"` |
+
+**Skipped** :
+- `SwimmerHome.tsx:618` (Section E refondu §199) déjà en `variant="info"` — déjà migré.
+- `Progress.tsx` importe `InlineBanner` mais ne le rend jamais (no-op).
+
+**Effet :** les call-sites utilisent désormais directement la sémantique iOS HIG. La primitive `InlineBanner` conserve ses 11 variants pour back-compat (alias non retirés cette session).
+
+**Tests :** `npx tsc --noEmit` clean. 684 pass + 1 fail pré-existant.
+
+**Fichiers modifiés (5)** : WellnessBanner.tsx, RecordsAdmin.tsx, Records.tsx, Dashboard.tsx, SwimmerHome.tsx.
+
+---
+
 ## §206 — Fix crash Radix `SelectLabel` dans CoachMessagesScreen (2026-05-08)
 
 **Contexte :** retour utilisateur après tests visuels post-§204+§205. En cliquant sur le quick access "Comms" depuis le hub coach (`Coach.tsx:454`), l'ErrorBoundary attrape une erreur Radix UI : `\`SelectLabel\` must be used within \`SelectGroup\``. Bug latent (probablement présent depuis la refonte §196 ou un durcissement Radix récent), jamais déclenché car ce path n'avait pas été testé avec les versions actuelles.

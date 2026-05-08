@@ -38,7 +38,7 @@ export function WellnessBanner({ userId, onOpen }: WellnessBannerProps) {
   if (wellness) {
     return (
       <InlineBanner
-        variant="emerald"
+        variant="success"
         icon={<Heart />}
         label="Bien-être"
         badge={
@@ -57,7 +57,7 @@ export function WellnessBanner({ userId, onOpen }: WellnessBannerProps) {
   // No data today: prompt to fill
   return (
     <InlineBanner
-      variant="blue"
+      variant="info"
       icon={<Heart />}
       label="Comment te sens-tu ce matin ?"
       badge="Remplir"

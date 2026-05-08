@@ -834,7 +834,7 @@ export default function Dashboard() {
 
         {/* Next competition banner */}
         <InlineBanner
-          variant="amber"
+          variant="warning"
           icon={<Trophy />}
           label={nextCompetition?.name}
           badge={daysUntilNextCompetition === 0 ? "Aujourd'hui" : `J-${daysUntilNextCompetition}`}
