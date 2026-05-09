@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§228** — Profile edit/password : Sheets → sections inline plein écran, fix scroll horizontal mobile.
+Dernier § livré : **§229+§230** — Whitelist brand-moments .heading-display (Séance terminée ×2) + suppression SafeArea zombie (4 @utility pb-safe/pt-safe ajoutées).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

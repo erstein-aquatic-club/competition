@@ -23,7 +23,6 @@ import {
 } from "@/lib/api";
 import { supabaseConfig } from "@/lib/config";
 import { useToast } from "@/hooks/use-toast";
-import { SafeArea } from "@/components/shared/SafeArea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -530,7 +529,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
 
   // ─── Render ──
   return (
-    <SafeArea top bottom className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pt-safe pb-safe">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pt-4 text-foreground">
         {/* Header */}
         <div className="flex items-center justify-between gap-3">
@@ -989,6 +988,6 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
           onDeleteGroupLabel={(id) => deleteGroupLabel.mutate({ id })}
         />
       ) : null}
-    </SafeArea>
+    </div>
   );
 }

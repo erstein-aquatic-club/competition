@@ -748,7 +748,7 @@ export function WorkoutRunner({
             <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
               <CheckCircle2 className="h-12 w-12 text-primary" />
             </div>
-            <CardTitle className="text-3xl uppercase font-display italic">Séance Terminée !</CardTitle>
+            <CardTitle className="text-3xl heading-display">Séance Terminée !</CardTitle>
             <CardDescription className="text-lg">
               Durée totale: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
             </CardDescription>

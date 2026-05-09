@@ -55,7 +55,7 @@ export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNa
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
           <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
         </div>
-        <h2 className="text-xl font-display font-bold uppercase italic">Séance terminée</h2>
+        <h2 className="text-xl font-bold heading-display">Séance terminée</h2>
         <p className="text-sm text-muted-foreground">{sessionTitle}</p>
       </div>
 

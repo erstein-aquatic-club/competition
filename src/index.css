@@ -307,6 +307,22 @@ body {
   z-index: var(--z-index-toast);
 }
 
+/* Safe-area utilities for iOS notch/home-indicator/landscape (§230).
+   Tailwind 4 ne fournit pas pb-safe/pt-safe natifs ici — déclarations explicites.
+   Remplace le composant `<SafeArea top bottom>` (zombie : 1 call-site, style inline). */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
 /* Brand-moment opt-in: Oswald uppercase italic.
    Reserved for hero/branding contexts (Login hero, Podium, Records leaderboard,
    competition cover banners). Default headings stay sentence-case for an

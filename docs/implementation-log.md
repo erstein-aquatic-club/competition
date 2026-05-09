@@ -4,6 +4,43 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §229+§230 — Brand-moments whitelist + suppression SafeArea zombie (2026-05-09)
+
+**Contexte :** 2 quick wins finaux post-audit pass 2 (§215). §229 : whitelister explicitement les 2 dernières occurrences typo borderline ("Séance terminée") via la classe utility `.heading-display` opt-in définie §197. §230 : supprimer le composant `SafeArea.tsx` zombie (1 call-site, style inline, doublon avec utilitaires CSS natifs) en ajoutant `@utility pb-safe`/`pt-safe` Tailwind 4 dans `index.css`. Bundle commit logique : 2 chantiers de cleanup distincts mais cohérents (purge des résidus typo + suppression dette technique).
+
+### §229 — Whitelist brand-moments
+
+**Changements :**
+
+- `src/components/strength/SessionSummary.tsx:58` — h2 `text-xl font-display font-bold uppercase italic` → `text-xl font-bold heading-display`. Classe utility `.heading-display` (`@apply font-display tracking-tight uppercase italic` définie `index.css:314-316` §197) factorise le combo brand-moment. `font-bold` préservé (extra weight).
+- `src/components/strength/WorkoutRunner.tsx:751` — CardTitle `text-3xl uppercase font-display italic` → `text-3xl heading-display`. Idem factorisation.
+
+**Sémantique :** ces 2 surfaces sont des écrans de célébration fin de séance muscu (brand-moment légitime aligné iOS fitness rings). Décision utilisateur §215 : whitelist plutôt que sentence-case. Le drapeau racine #1 (typo) est désormais NEUTRALISÉ ET nettoyé : règle globale virée (§197), 4 régressions P0/P1 closeées (§224 + §227), 2 borderline whitelistées (§229). Plus aucune occurrence de `font-display + uppercase + italic` cumulés en classes inline ad-hoc.
+
+### §230 — Suppression SafeArea zombie
+
+**Architecture :**
+
+- `src/index.css` : ajout de 4 nouvelles `@utility` Tailwind 4 (`pt-safe`, `pb-safe`, `pl-safe`, `pr-safe`) qui exposent `padding-X: env(safe-area-inset-X)`. Pattern aligné avec les `@utility z-overlay/z-bar/z-toast` existants.
+- `src/pages/Administratif.tsx:26` — import `{ SafeArea }` retiré. L.533 `<SafeArea top bottom className="min-h-screen bg-background">` → `<div className="min-h-screen bg-background pt-safe pb-safe">`. L.992 `</SafeArea>` → `</div>`.
+- `src/components/shared/SafeArea.tsx` — **fichier supprimé** (33 LOC, wrapper inline-style sans valeur ajoutée vs utilitaires CSS).
+
+**Gain :**
+- -34 LOC nettes (SafeArea.tsx supprimé + 1 import).
+- Plus d'inline `style={{ paddingTop: ..., paddingBottom: ... }}` (alignement avec le pattern `pb-[max(env(...),...)]` déjà utilisé partout ailleurs : `AppLayout.tsx:189`, `ui/sheet.tsx:44`, `ChronoSetup.tsx:695`).
+- Réutilisable : `pt-safe`/`pb-safe`/`pl-safe`/`pr-safe` sont disponibles partout dans l'app pour de futurs composants.
+
+**Vérifications :**
+- `npx tsc --noEmit` : ✅ clean
+- `npm test` : 681/685 pass + 4 fail. **3 fails non liés à §229/§230** : `coach-quickview canUseSupabase=false`, `getSwimmerBriefing Supabase unavailable`, `recordAttendanceAsSub Supabase unavailable`, `addSessionCommentAsSub Supabase unavailable` — viennent du chantier user `assertSupabase` helper en cours sur `lib/api/*` (tests adapteront quand le chantier sera committé). 1 fail pré-existant (`buildRunUpdatePayload`) hérité §214, toujours là.
+
+**Hors scope §229+§230 :**
+- §231 prévu : compléter prefers-reduced-motion sur Records/Login/Progress/RunDetailSheet/SessionList (audit bonus pass 1 reportés).
+- §232 prévu : `text-[9px]` → `text-[11px]` sur Coach.tsx section labels (lisibilité WCAG).
+- §233 prévu : audit pass 3 (re-mesure score post-§224-§230).
+
+**Fichiers modifiés (4)** : `src/components/strength/SessionSummary.tsx`, `src/components/strength/WorkoutRunner.tsx`, `src/index.css`, `src/pages/Administratif.tsx`. **Fichier supprimé (1)** : `src/components/shared/SafeArea.tsx`. **Doc** : `docs/implementation-log.md`, `CLAUDE.md`, `docs/ROADMAP.md`.
+
 ## §228 — Profile edit/password : Sheets → sections inline plein écran (2026-05-09)
 
 **Contexte :** La vue "Modifier le profil" et "Sécurité" utilisaient des bottom Sheets Shadcn. Sur mobile, ils généraient un scroll horizontal et leur style (inputs non bornés, layout `flex` non contrôlé) ne correspondait pas aux cards `rounded-2xl border border-border/70` du reste de la page Profile.
