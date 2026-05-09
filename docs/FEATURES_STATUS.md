@@ -227,7 +227,6 @@ Tous les feature flags sont activés.
 | Changement de groupe → sync group_members | ✅ | `Profile.tsx`, migration `00032` | Trigger PostgreSQL BEFORE UPDATE sync `group_members` + `group_label` automatiquement (§67) |
 | Changement mot de passe | ✅ | `Profile.tsx` | Bottom sheet dédié Sécurité (§61, was Collapsible §38) |
 | FFN & Records | ✅ | `Profile.tsx` | Card fusionnée sync FFN + lien records (§38) |
-| Quiz neurotype (profil entraînement) | ✅ | `NeurotypQuiz.tsx`, `NeurotypResult.tsx`, `neurotype-quiz-data.ts`, `neurotype-scoring.ts` | 30 questions, 5 profils, scoring client-side, résultat JSONB dans user_profiles (§71) |
 | Entretiens nageur | ✅ | `AthleteInterviewsSection.tsx`, `Profile.tsx` | Formulaire 4 sections en draft_athlete, lecture seule + signature en sent, historique en signed (§74) |
 
 ### Planification natation (granularité nageur, §153 — remplace macro-cycles)

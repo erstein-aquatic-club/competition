@@ -115,10 +115,6 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/__tests__/fixtures/slots.ts` | Fixtures canoniques pour tests training slots (makeTrainingSlot, makeSlotInstance, etc.) (§168) | 151 lignes |
 | `src/pages/coach/SlotSessionSheet.tsx` | Bottom sheet créneau — quick-compose (texte + bibliothèque inline) + édition/visibilité/suppression (§85, §142) | ~1380 lignes |
 | `src/hooks/useSlotCalendar.ts` | Hook matérialisation créneaux récurrents → instances semaine (§85) | ~358 lignes |
-| `src/lib/neurotype-quiz-data.ts` | 30 questions quiz + 5 profils neurotype + couleurs | ~450 lignes |
-| `src/lib/neurotype-scoring.ts` | Calcul scores neurotype (points/maxPoints) + niveaux | ~40 lignes |
-| `src/components/neurotype/NeurotypQuiz.tsx` | Quiz 30 questions avec carousel + progress bar | ~250 lignes |
-| `src/components/neurotype/NeurotypResult.tsx` | Affichage résultat neurotype (barres, profil, accordéons) | ~250 lignes |
 | `src/lib/weekTypeColor.ts` | Helper partage couleur type semaine (hash-based) | ~15 lignes |
 | `src/lib/api/swimmer-slots.ts` | CRUD créneaux personnalisés par nageur | ~160 lignes |
 | `src/components/coach/SwimmerSlotsTab.tsx` | Onglet Créneaux dans fiche nageur coach | ~374 lignes |

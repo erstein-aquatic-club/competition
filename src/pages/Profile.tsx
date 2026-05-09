@@ -36,15 +36,10 @@ import { useAchievementChecker } from "@/hooks/useAchievementChecker";
 import AchievementToast from "@/components/shared/AchievementToast";
 import type { BadgeDefinition } from "@/lib/achievementRules";
 import SwimmerMessagesView from "@/components/profile/SwimmerMessagesView";
-import { NeurotypQuiz } from "@/components/neurotype/NeurotypQuiz";
-import NeurotypResultView from "@/components/neurotype/NeurotypResult";
-import type { NeurotypResult as NeurotypResultType } from "@/lib/api/types";
 
 type ProfileSection =
   | "home"
   | "messages"
-  | "neurotype-quiz"
-  | "neurotype-result"
   | "edit"
   | "password";
 
@@ -67,14 +62,11 @@ function readProfileSectionFromHash(): ProfileSection {
 
   switch (requested) {
     case "messages":
-    case "neurotype-quiz":
-    case "neurotype-result":
       return requested;
     default:
       return "home";
   }
 }
-
 
 export const shouldShowRecords = (role: string | null) => role !== "coach" && role !== "admin" && role !== "comite";
 
@@ -235,7 +227,6 @@ export default function Profile() {
   const [activeSection, setActiveSection] = useState<ProfileSection>(() => readProfileSectionFromHash());
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [cropDialogSrc, setCropDialogSrc] = useState<string | null>(null);
-  const [pendingNeurotypResult, setPendingNeurotypResult] = useState<NeurotypResultType | null>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
 
@@ -257,7 +248,6 @@ export default function Profile() {
     const reset = () => {
       setActiveSection("home");
       setCropDialogSrc(null);
-      setPendingNeurotypResult(null);
     };
     window.addEventListener("nav:reset", reset);
     return () => window.removeEventListener("nav:reset", reset);
@@ -504,27 +494,6 @@ export default function Profile() {
     },
   });
 
-  const saveNeurotyp = useMutation({
-    mutationFn: (result: NeurotypResultType) =>
-      updateProfileApi({
-        userId,
-        profile: { neurotype_result: result },
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      setPendingNeurotypResult(null);
-      setActiveSection("home");
-      toast({ title: "Neurotype enregistré" });
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: "Erreur",
-        description: String((error as Error)?.message || error),
-        variant: "destructive",
-      });
-    },
-  });
-
   const startEdit = () => {
     profileForm.reset({
       group_id: profile?.group_id ? String(profile.group_id) : "",
@@ -581,33 +550,6 @@ export default function Profile() {
           Réessayer
         </Button>
       </div>
-    );
-  }
-
-  if (activeSection === "neurotype-quiz") {
-    return (
-      <NeurotypQuiz
-        onComplete={(result) => {
-          setPendingNeurotypResult(result);
-          setActiveSection("neurotype-result");
-        }}
-        onCancel={() => setActiveSection("home")}
-      />
-    );
-  }
-
-  if (activeSection === "neurotype-result" && pendingNeurotypResult) {
-    return (
-      <NeurotypResultView
-        result={pendingNeurotypResult}
-        onSave={(result) => saveNeurotyp.mutate(result)}
-        onRetry={() => {
-          setPendingNeurotypResult(null);
-          setActiveSection("neurotype-quiz");
-        }}
-        onBack={() => setActiveSection("home")}
-        isSaving={saveNeurotyp.isPending}
-      />
     );
   }
 

@@ -4,6 +4,24 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §231 — Suppression complète NeurotypQuiz (2026-05-09)
+
+**Contexte :** Le NeurotypQuiz n'était plus utilisé. Suppression de toute trace frontend.
+
+**Changements :**
+- Supprimés : `src/components/neurotype/NeurotypQuiz.tsx`, `NeurotypResult.tsx`, `src/lib/neurotype-quiz-data.ts`, `src/lib/neurotype-scoring.ts`, dossier `src/components/neurotype/`
+- `Profile.tsx` : 3 imports, valeurs `"neurotype-quiz"`/`"neurotype-result"` du type `ProfileSection`, state `pendingNeurotypResult`, mutation `saveNeurotyp`, 2 guards inline supprimés
+- `src/lib/api/types.ts` : interfaces `NeurotypScores`, `NeurotypCode`, `NeurotypResult` + champ `neurotype_result` sur `UserProfile` supprimés
+- `src/lib/api/users.ts` : import, champ mapping et type payload `neurotype_result` supprimés
+- Docs : `files-map.md` (4 entrées), `FEATURES_STATUS.md` (1 ligne), `ROADMAP.md` (statut → Supprimé) nettoyés
+
+**Tests :**
+- `npx tsc --noEmit` : 0 erreur. ✅
+- Tests RLS : non lancés — patch purement frontend, aucune policy touchée.
+
+**Non touché (intentionnel) :**
+- Migrations `00033_neurotype_result.sql` et `00081_pagination_rpcs.sql` — déjà appliquées en prod, colonne DB conservée.
+
 ## §229+§230 — Brand-moments whitelist + suppression SafeArea zombie (2026-05-09)
 
 **Contexte :** 2 quick wins finaux post-audit pass 2 (§215). §229 : whitelister explicitement les 2 dernières occurrences typo borderline ("Séance terminée") via la classe utility `.heading-display` opt-in définie §197. §230 : supprimer le composant `SafeArea.tsx` zombie (1 call-site, style inline, doublon avec utilitaires CSS natifs) en ajoutant `@utility pb-safe`/`pt-safe` Tailwind 4 dans `index.css`. Bundle commit logique : 2 chantiers de cleanup distincts mais cohérents (purge des résidus typo + suppression dette technique).

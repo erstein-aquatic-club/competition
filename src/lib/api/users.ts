@@ -8,6 +8,7 @@ import {
   safeInt,
   safeOptionalInt,
   STORAGE_KEYS,
+  assertSupabase,
 } from './client';
 import type {
   UserProfile,
@@ -15,7 +16,6 @@ import type {
   GroupSummary,
   UpcomingBirthday,
   UserSummary,
-  NeurotypResult,
 } from './types';
 import { localStorageGet } from './localStorage';
 
@@ -30,8 +30,7 @@ export async function getProfile(options: {
   } else if (options.displayName) {
     query = query.eq("display_name", options.displayName);
   }
-  const { data, error } = await query.maybeSingle();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query.maybeSingle());
   if (!data) return null;
   return {
     id: data.user_id ?? null,
@@ -45,7 +44,6 @@ export async function getProfile(options: {
     avatar_url: data.avatar_url ?? null,
     ffn_iuf: data.ffn_iuf ?? null,
     phone: data.phone ?? null,
-    neurotype_result: data.neurotype_result ?? null,
     body_weight: data.body_weight != null ? Number(data.body_weight) : null,
   };
 }
@@ -62,7 +60,6 @@ export async function updateProfile(payload: {
     avatar_url?: string | null;
     ffn_iuf?: string | null;
     phone?: string | null;
-    neurotype_result?: NeurotypResult | null;
     body_weight?: number | null;
   };
 }) {
@@ -89,14 +86,13 @@ export async function updateProfile(payload: {
     }
   }
 
-  const { error } = await supabase.from("user_profiles").upsert(
+  assertSupabase(await supabase.from("user_profiles").upsert(
     {
       user_id: userId,
       ...payload.profile,
     },
     { onConflict: "user_id" },
-  );
-  if (error) throw new Error(error.message);
+  ));
 
   // Sync display_name to the users table if provided
   if (payload.profile.display_name) {
@@ -185,10 +181,11 @@ export async function getAthletes(): Promise<AthleteSummary[]> {
 
 export async function getGroups(): Promise<GroupSummary[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("groups")
-    .select("id, name, description, is_temporary, is_active, parent_group_id");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("groups")
+      .select("id, name, description, is_temporary, is_active, parent_group_id")
+  );
   return (data ?? [])
     .filter((g: any) => {
       // Show all permanent groups + active temporary groups
@@ -217,8 +214,7 @@ export async function getUpcomingBirthdays(options?: {
 }): Promise<UpcomingBirthday[]> {
   if (!canUseSupabase()) return [];
   const days = options?.days ?? 30;
-  const { data, error } = await supabase.rpc("get_upcoming_birthdays", { p_days: days });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await supabase.rpc("get_upcoming_birthdays", { p_days: days }));
   return Array.isArray(data) ? data : [];
 }
 
@@ -234,8 +230,7 @@ export async function listUsers(options?: {
   if (!options?.includeInactive) {
     query = query.eq("is_active", true);
   }
-  const { data, error } = await query.order("display_name");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query.order("display_name"));
   return (data ?? []).map((user: any) => ({
     id: user.id,
     display_name: user.display_name ?? "",
@@ -252,15 +247,14 @@ export async function createCoach(payload: {
   password?: string | null;
 }) {
   if (!canUseSupabase()) return { status: "skipped", user: null, initialPassword: null };
-  const { data, error } = await supabase.functions.invoke("admin-user", {
+  const data = assertSupabase(await supabase.functions.invoke("admin-user", {
     body: {
       action: "create_coach",
       display_name: payload.display_name,
       email: payload.email,
       password: payload.password,
     },
-  });
-  if (error) throw new Error(error.message);
+  }));
   return {
     status: "created",
     user: data?.user ?? null,
@@ -273,19 +267,17 @@ export async function updateUserRole(payload: {
   role: "athlete" | "coach" | "comite" | "admin";
 }) {
   if (!canUseSupabase()) return { status: "skipped" };
-  const { error } = await supabase.functions.invoke("admin-user", {
+  assertSupabase(await supabase.functions.invoke("admin-user", {
     body: { action: "update_role", user_id: payload.userId, role: payload.role },
-  });
-  if (error) throw new Error(error.message);
+  }));
   return { status: "updated" };
 }
 
 export async function disableUser(payload: { userId: number }) {
   if (!canUseSupabase()) return { status: "skipped" };
-  const { error } = await supabase.functions.invoke("admin-user", {
+  assertSupabase(await supabase.functions.invoke("admin-user", {
     body: { action: "disable_user", user_id: payload.userId },
-  });
-  if (error) throw new Error(error.message);
+  }));
   return { status: "disabled" };
 }
 
@@ -294,11 +286,12 @@ export async function getPendingApprovals(): Promise<
 > {
   if (!canUseSupabase()) return [];
   // Explicitly specify the foreign key to use (user_id, not approved_by)
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("user_id, display_name, email, users!user_profiles_user_id_fkey(created_at)")
-    .eq("is_approved", false);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("user_profiles")
+      .select("user_id, display_name, email, users!user_profiles_user_id_fkey(created_at)")
+      .eq("is_approved", false)
+  );
   // Transform the response to match the expected interface
   return (data ?? []).map((item: any) => ({
     user_id: item.user_id,
@@ -310,21 +303,23 @@ export async function getPendingApprovals(): Promise<
 
 export async function approveUser(userId: number): Promise<void> {
   if (!canUseSupabase()) return;
-  const { error } = await supabase
-    .from("user_profiles")
-    .update({ is_approved: true, approved_at: new Date().toISOString() })
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("user_profiles")
+      .update({ is_approved: true, approved_at: new Date().toISOString() })
+      .eq("user_id", userId)
+  );
 }
 
 export async function rejectUser(userId: number): Promise<void> {
   if (!canUseSupabase()) return;
   // Delete from users table (will cascade to user_profiles and other related tables)
-  const { error } = await supabase
-    .from("users")
-    .delete()
-    .eq("id", userId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("users")
+      .delete()
+      .eq("id", userId)
+  );
 }
 
 export async function authPasswordUpdate(payload: {
@@ -340,10 +335,9 @@ export async function authPasswordUpdate(payload: {
     if (error) throw new Error(error.message);
     return { status: "updated" };
   }
-  const { error } = await supabase.functions.invoke("admin-user", {
+  assertSupabase(await supabase.functions.invoke("admin-user", {
     body: { action: "update_password", user_id: payload.userId, password: payload.password },
-  });
-  if (error) throw new Error(error.message);
+  }));
   return { status: "updated" };
 }
 
@@ -383,10 +377,11 @@ export async function uploadAvatar(payload: {
 export async function deleteAvatar(userId: number): Promise<void> {
   if (!canUseSupabase()) return;
 
-  const { error } = await supabase.storage
-    .from("avatars")
-    .remove([`${userId}.webp`, `${userId}.jpg`]);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase.storage
+      .from("avatars")
+      .remove([`${userId}.webp`, `${userId}.jpg`])
+  );
 
   const { error: profileError } = await supabase
     .from("user_profiles")
@@ -405,13 +400,12 @@ export async function getAthletesPaginated(opts: {
     const all = await getAthletes();
     return { athletes: all, total: all.length };
   }
-  const { data, error } = await supabase.rpc('get_athletes_paginated', {
+  const data = assertSupabase(await supabase.rpc('get_athletes_paginated', {
     p_offset: opts.offset ?? 0,
     p_limit: opts.limit ?? 20,
     p_search: opts.search ?? null,
     p_group_id: opts.groupId ?? null,
-  });
-  if (error) throw new Error(error.message);
+  }));
   return { athletes: data?.athletes ?? [], total: data?.total ?? 0 };
 }
 
@@ -431,12 +425,13 @@ export async function getRecentSessionsAllAthletes(days = 30): Promise<
   since.setDate(since.getDate() - days);
   const sinceISO = since.toISOString().slice(0, 10);
 
-  const { data, error } = await supabase
-    .from("dim_sessions")
-    .select("athlete_id, athlete_name, session_date, rpe, performance, engagement, fatigue")
-    .gte("session_date", sinceISO)
-    .order("session_date", { ascending: false });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("dim_sessions")
+      .select("athlete_id, athlete_name, session_date, rpe, performance, engagement, fatigue")
+      .gte("session_date", sinceISO)
+      .order("session_date", { ascending: false })
+  );
 
   return (data ?? []).map((row: any) => ({
     athlete_id: row.athlete_id ? safeInt(row.athlete_id) : null,
@@ -453,10 +448,9 @@ export async function getFeedbackRatesAllAthletes(
   daysBack = 30,
 ): Promise<Map<number, { assigned: number; feedback: number; total: number }>> {
   if (!canUseSupabase()) return new Map();
-  const { data, error } = await supabase.rpc("get_feedback_rates_all_athletes", {
+  const data = assertSupabase(await supabase.rpc("get_feedback_rates_all_athletes", {
     days_back: daysBack,
-  });
-  if (error) throw new Error(error.message);
+  }));
   const map = new Map<number, { assigned: number; feedback: number; total: number }>();
   for (const row of data ?? []) {
     map.set(Number(row.athlete_id), {

@@ -94,7 +94,7 @@ Ce document décrit les fonctionnalités à implémenter. Il sert de référence
 | 33 | Écran SMS dédié coach dashboard | Moyenne | Faible | Fait (§65) |
 | 34 | Groupes encadrés par shift (pointage coach) | Moyenne | Moyenne | Fait (§66) |
 | 35 | Fix désynchronisation group_members au changement de groupe | Haute | Faible | Fait (§67) |
-| 36 | Quiz neurotype nageur (profil d'entraînement) | Moyenne | Moyenne | Fait (§71) |
+| 36 | Quiz neurotype nageur (profil d'entraînement) | Moyenne | Moyenne | Supprimé (§231) |
 | 37 | Planification & Entretiens (fiche nageur coach) | Haute | Haute | Fait (§74) |
 | 38 | Créneaux d'entraînement récurrents | Moyenne | Moyenne | Fait (§76) |
 | 39 | Créneaux personnalisés par nageur | Moyenne | Moyenne | Fait (§78) |
