@@ -4,6 +4,35 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §228 — Profile edit/password : Sheets → sections inline plein écran (2026-05-09)
+
+**Contexte :** La vue "Modifier le profil" et "Sécurité" utilisaient des bottom Sheets Shadcn. Sur mobile, ils généraient un scroll horizontal et leur style (inputs non bornés, layout `flex` non contrôlé) ne correspondait pas aux cards `rounded-2xl border border-border/70` du reste de la page Profile.
+
+**Changements :**
+- `ProfileSection` étendu : ajout de `"edit"` et `"password"` au type union
+- États `isEditSheetOpen` et `isPasswordSheetOpen` supprimés
+- `startEdit()` → `setActiveSection("edit")`, bouton Sécurité → `setActiveSection("password")`
+- `updateProfile.onSuccess` → `setActiveSection("home")` (retour auto après save)
+- Guard inline `if (activeSection === "edit")` : form plein écran avec cards sectionnées (Photo de profil, Informations, Identifiant FFN), `overflow-x-hidden` sur le root, tous les inputs `w-full`
+- Guard inline `if (activeSection === "password")` : form plein écran avec card unique, bouton retour ChevronLeft
+- Les deux blocs `<Sheet>` supprimés du JSX principal (`AvatarCropDialog` conservé)
+- Import `Sheet`/`SheetContent`/etc. supprimé, `ChevronLeft` ajouté
+
+**Fichiers modifiés :**
+- `src/pages/Profile.tsx` (928 → 990 lignes)
+
+**Tests :**
+- `npx tsc --noEmit` : 0 erreur (hors pré-existantes `*.stories.tsx`). ✅
+- Tests RLS : non lancés — patch purement UI, aucune policy RLS touchée.
+
+**Décisions :**
+- Option B (inline section) retenue plutôt que nouvelle route : suit exactement le pattern `activeSection` déjà en place pour Messages/Neurotype, changement minimal, 1 seul fichier.
+- `overflow-x-hidden` sur le `motion.div` root de chaque section pour verrouiller définitivement tout débordement horizontal natif (inputs date iOS notamment).
+- Pas de bouton "Annuler" dans les sections inline — le header ChevronLeft assure le retour, cohérent avec Messages/Neurotype.
+
+**Limites :**
+- `Label` sans `htmlFor` sur Groupe/Bio/IUF FFN (Select Radix gère l'association différemment, pas bloquant). À adresser dans un pass a11y ultérieur.
+
 ## §227 — Tap targets résiduels + Coach.tsx typo P0 régression (2026-05-08)
 
 **Contexte :** suite à §215 audit pass 2 et §223 RPC user (committé+pushé). 5 dernières régressions P0/P1 ciblées identifiées dans le rapport audit pass 2. Coach.tsx:1097 (ex-1151 décalé après §223 -67 LOC) débloqué car RPC stabilisé. Patch ciblé ~5 minutes / 5 fichiers.

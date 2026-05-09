@@ -19,11 +19,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
+import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronLeft, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import { compressImage, isAcceptedImageType } from "@/lib/imageUtils";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -45,7 +44,9 @@ type ProfileSection =
   | "home"
   | "messages"
   | "neurotype-quiz"
-  | "neurotype-result";
+  | "neurotype-result"
+  | "edit"
+  | "password";
 
 function readProfileSectionFromHash(): ProfileSection {
   if (typeof window === "undefined") return "home";
@@ -232,8 +233,6 @@ export default function Profile() {
   const roleLabel = getRoleLabel(role);
 
   const [activeSection, setActiveSection] = useState<ProfileSection>(() => readProfileSectionFromHash());
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [cropDialogSrc, setCropDialogSrc] = useState<string | null>(null);
   const [pendingNeurotypResult, setPendingNeurotypResult] = useState<NeurotypResultType | null>(null);
@@ -257,8 +256,6 @@ export default function Profile() {
   useEffect(() => {
     const reset = () => {
       setActiveSection("home");
-      setIsEditSheetOpen(false);
-      setIsPasswordSheetOpen(false);
       setCropDialogSrc(null);
       setPendingNeurotypResult(null);
     };
@@ -418,7 +415,7 @@ export default function Profile() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      setIsEditSheetOpen(false);
+      setActiveSection("home");
       toast({ title: "Profil mis à jour" });
     },
     onError: (error: unknown) => {
@@ -536,7 +533,7 @@ export default function Profile() {
       ffn_iuf: profile?.ffn_iuf ? String(profile.ffn_iuf) : "",
       phone: profile?.phone || "",
     });
-    setIsEditSheetOpen(true);
+    setActiveSection("edit");
   };
 
   const handleSaveProfile = profileForm.handleSubmit((data) => {
@@ -624,6 +621,235 @@ export default function Profile() {
     );
   }
 
+  if (activeSection === "edit") {
+    return (
+      <motion.div
+        className="space-y-4 overflow-x-hidden"
+        variants={fadeIn}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveSection("home")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/70 hover:bg-muted/40 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Retour"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <h1 className="text-xl font-semibold tracking-tight">Modifier le profil</h1>
+        </div>
+
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          {/* Photo de profil */}
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Photo de profil</p>
+            <div className="flex flex-col items-center gap-3">
+              <Avatar className="h-20 w-20 ring-2 ring-primary/20">
+                <AvatarImage src={avatarSrc} alt="Avatar" />
+                <AvatarFallback>{(user || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                disabled={uploadAvatarMutation.isPending}
+                onClick={() => document.getElementById("avatar-upload-inline")?.click()}
+              >
+                <Camera className="h-4 w-4" />
+                {uploadAvatarMutation.isPending ? "Envoi..." : "Changer la photo"}
+              </Button>
+              {profile?.avatar_url && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full gap-2 text-destructive hover:text-destructive"
+                  disabled={deleteAvatarMutation.isPending}
+                  onClick={() => deleteAvatarMutation.mutate()}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleteAvatarMutation.isPending ? "Suppression..." : "Supprimer la photo"}
+                </Button>
+              )}
+            </div>
+            <input
+              id="avatar-upload-inline"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,.heic,.heif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileSelected(file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          {/* Informations */}
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Informations</p>
+
+            <div className="space-y-1.5">
+              <Label>Groupe</Label>
+              <Select
+                value={profileForm.watch("group_id")}
+                onValueChange={(value) => profileForm.setValue("group_id", value)}
+                disabled={groupsLoading}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={groupsLoading ? "Chargement..." : "Choisir un groupe"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((group) => (
+                    <SelectItem key={group.id} value={String(group.id)}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Bio</Label>
+              <Textarea
+                {...profileForm.register("bio")}
+                maxLength={500}
+                className="resize-none w-full"
+                rows={3}
+              />
+              {profileForm.formState.errors.bio && (
+                <p className="text-xs text-destructive" role="alert" aria-live="assertive">
+                  {profileForm.formState.errors.bio.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Date de naissance</Label>
+              <div className="w-full">
+                <Input type="date" className="w-full" {...profileForm.register("birthdate")} />
+              </div>
+              {profileForm.formState.errors.birthdate && (
+                <p className="text-xs text-destructive" role="alert" aria-live="assertive">
+                  {profileForm.formState.errors.birthdate.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-phone-inline">Téléphone</Label>
+              <Input
+                id="edit-phone-inline"
+                type="tel"
+                placeholder="06 12 34 56 78"
+                maxLength={20}
+                className="w-full"
+                {...profileForm.register("phone")}
+              />
+            </div>
+          </div>
+
+          {/* IUF FFN — athletes uniquement */}
+          {showRecords ? (
+            <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-3">
+              <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Identifiant FFN</p>
+              <div className="space-y-1.5">
+                <Label>IUF FFN</Label>
+                <Input
+                  {...profileForm.register("ffn_iuf")}
+                  placeholder="879576"
+                  inputMode="numeric"
+                  className="w-full"
+                />
+                {profileForm.formState.errors.ffn_iuf && (
+                  <p className="text-xs text-destructive" role="alert" aria-live="assertive">
+                    {profileForm.formState.errors.ffn_iuf.message}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Identifiant unique FFN (utilisé pour importer vos records compétition).
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <Button type="submit" disabled={updateProfile.isPending} className="w-full">
+            <Save className="mr-2 h-4 w-4" />
+            {updateProfile.isPending ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </form>
+      </motion.div>
+    );
+  }
+
+  if (activeSection === "password") {
+    return (
+      <motion.div
+        className="space-y-4 overflow-x-hidden"
+        variants={fadeIn}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveSection("home")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/70 hover:bg-muted/40 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Retour"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <h1 className="text-xl font-semibold tracking-tight">Sécurité</h1>
+        </div>
+
+        <form onSubmit={handleUpdatePassword} className="space-y-4">
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Mot de passe</p>
+            <p className="text-xs text-muted-foreground">
+              Au moins 8 caractères, une majuscule et un chiffre.
+            </p>
+
+            <div className="space-y-1.5">
+              <Label>Nouveau mot de passe</Label>
+              <Input
+                type="password"
+                className="w-full"
+                {...passwordForm.register("password")}
+                placeholder="••••••••"
+              />
+              {passwordForm.formState.errors.password && (
+                <p className="text-xs text-destructive" role="alert" aria-live="assertive">
+                  {passwordForm.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Confirmer</Label>
+              <Input
+                type="password"
+                className="w-full"
+                {...passwordForm.register("confirmPassword")}
+                placeholder="••••••••"
+              />
+              {passwordForm.formState.errors.confirmPassword && (
+                <p className="text-xs text-destructive" role="alert" aria-live="assertive">
+                  {passwordForm.formState.errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full" disabled={updatePassword.isPending}>
+            {updatePassword.isPending ? "Mise à jour..." : "Mettre à jour le mot de passe"}
+          </Button>
+        </form>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -694,7 +920,7 @@ export default function Profile() {
               <ProfileActionRow
                 icon={Lock}
                 title="Sécurité"
-                onClick={() => setIsPasswordSheetOpen(true)}
+                onClick={() => setActiveSection("password")}
               />
             ) : null}
             <ProfileActionRow
@@ -744,170 +970,6 @@ export default function Profile() {
         Se déconnecter
       </Button>
 
-      {/* Edit profile bottom sheet */}
-      <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Modifier le profil</SheetTitle>
-            <SheetDescription>Mettez à jour vos informations personnelles.</SheetDescription>
-          </SheetHeader>
-          <form onSubmit={handleSaveProfile} className="space-y-4 mt-4">
-            <div className="grid gap-2">
-              <Label>Groupe</Label>
-              <Select
-                value={profileForm.watch("group_id")}
-                onValueChange={(value) => profileForm.setValue("group_id", value)}
-                disabled={groupsLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={groupsLoading ? "Chargement..." : "Choisir un groupe"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map((group) => (
-                    <SelectItem key={group.id} value={String(group.id)}>
-                      {group.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {showRecords ? (
-              <div className="grid gap-2">
-                <Label>IUF FFN</Label>
-                <Input
-                  {...profileForm.register("ffn_iuf")}
-                  placeholder="879576"
-                  inputMode="numeric"
-                />
-                {profileForm.formState.errors.ffn_iuf && (
-                  <p className="text-xs text-destructive" role="alert" aria-live="assertive">{profileForm.formState.errors.ffn_iuf.message}</p>
-                )}
-                <div className="text-xs text-muted-foreground">
-                  Identifiant unique FFN (utilisé pour importer vos records compétition).
-                </div>
-              </div>
-            ) : null}
-
-            <div className="grid gap-2">
-              <Label>Bio</Label>
-              <Textarea {...profileForm.register("bio")} maxLength={500} />
-              {profileForm.formState.errors.bio && (
-                <p className="text-xs text-destructive" role="alert" aria-live="assertive">{profileForm.formState.errors.bio.message}</p>
-              )}
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Photo de profil</Label>
-              <div className="flex items-center gap-3">
-                <Avatar className="h-16 w-16 ring-2 ring-primary/20">
-                  <AvatarImage src={avatarSrc} alt="Avatar" />
-                  <AvatarFallback>{(user || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={uploadAvatarMutation.isPending}
-                    onClick={() => document.getElementById("avatar-upload")?.click()}
-                  >
-                    <Camera className="h-4 w-4" />
-                    {uploadAvatarMutation.isPending ? "Envoi..." : "Changer la photo"}
-                  </Button>
-                  {profile?.avatar_url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="gap-2 text-destructive hover:text-destructive"
-                      disabled={deleteAvatarMutation.isPending}
-                      onClick={() => deleteAvatarMutation.mutate()}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Supprimer
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <input
-                id="avatar-upload"
-                type="file"
-                accept="image/jpeg,image/png,image/webp,.heic,.heif"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileSelected(file);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Date de naissance</Label>
-              <Input
-                type="date"
-                {...profileForm.register("birthdate")}
-              />
-              {profileForm.formState.errors.birthdate && (
-                <p className="text-xs text-destructive" role="alert" aria-live="assertive">{profileForm.formState.errors.birthdate.message}</p>
-              )}
-            </div>
-
-            {/* Phone */}
-            <div className="grid gap-2">
-              <Label htmlFor="edit-phone">Telephone</Label>
-              <Input
-                id="edit-phone"
-                type="tel"
-                placeholder="06 12 34 56 78"
-                maxLength={20}
-                {...profileForm.register("phone")}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button type="submit" disabled={updateProfile.isPending} className="w-full">
-                <Save className="mr-2 h-4 w-4" />
-                Enregistrer
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setIsEditSheetOpen(false)} disabled={updateProfile.isPending}>
-                Annuler
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-
-      {/* Password change bottom sheet */}
-      <Sheet open={isPasswordSheetOpen} onOpenChange={setIsPasswordSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Changer le mot de passe</SheetTitle>
-            <SheetDescription>Votre mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.</SheetDescription>
-          </SheetHeader>
-          <form onSubmit={handleUpdatePassword} className="space-y-3 mt-4">
-            <div className="grid gap-2">
-              <Label>Nouveau mot de passe</Label>
-              <Input type="password" {...passwordForm.register("password")} placeholder="••••••••" />
-              {passwordForm.formState.errors.password && (
-                <p className="text-xs text-destructive" role="alert" aria-live="assertive">{passwordForm.formState.errors.password.message}</p>
-              )}
-            </div>
-            <div className="grid gap-2">
-              <Label>Confirmer</Label>
-              <Input type="password" {...passwordForm.register("confirmPassword")} placeholder="••••••••" />
-              {passwordForm.formState.errors.confirmPassword && (
-                <p className="text-xs text-destructive" role="alert" aria-live="assertive">{passwordForm.formState.errors.confirmPassword.message}</p>
-              )}
-            </div>
-            <Button type="submit" className="w-full" disabled={updatePassword.isPending}>
-              Mettre à jour le mot de passe
-            </Button>
-          </form>
-        </SheetContent>
-      </Sheet>
       {/* Avatar crop dialog */}
       {cropDialogSrc && (
         <AvatarCropDialog

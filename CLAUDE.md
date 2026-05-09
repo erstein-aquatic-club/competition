@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§227** — Tap targets résiduels (DialogClose/SheetClose h-11, AppLayout avatar, PageHeader back) + Coach.tsx typo P0 sentence-case fallback "Accès Coach".
+Dernier § livré : **§228** — Profile edit/password : Sheets → sections inline plein écran, fix scroll horizontal mobile.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
