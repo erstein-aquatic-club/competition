@@ -572,7 +572,7 @@ export default function RecordsAdmin() {
       {/* Swimmers list */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">
             Nageurs suivis
           </h2>
           {!isLoading && swimmers.length > 0 && (
@@ -672,7 +672,7 @@ export default function RecordsAdmin() {
 
       {/* Import logs */}
       <div className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">
           Historique des imports
         </h2>
         {importLogs.length === 0 ? (

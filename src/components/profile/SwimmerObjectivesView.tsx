@@ -256,7 +256,7 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
       {/* Header */}
       {embedded ? (
         <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">
+          <h3 className="text-[10px] font-black uppercase tracking-eyebrow-lg text-muted-foreground/70">
             Objectifs
           </h3>
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={openCreate}>

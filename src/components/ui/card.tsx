@@ -1,17 +1,17 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { Surface } from "@/components/shared/Surface"
 
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div
+  <Surface
     ref={ref}
-    className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
-      className
-    )}
+    variant="solid"
+    radius="sm"
+    className={cn("text-card-foreground shadow", className)}
     {...props}
   />
 ))

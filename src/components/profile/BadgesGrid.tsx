@@ -181,7 +181,7 @@ export default function BadgesGrid({ userId }: BadgesGridProps) {
       >
         <div className="flex items-center gap-2.5">
           <Trophy className="h-4 w-4 text-primary/70" />
-          <span className="text-base font-semibold uppercase tracking-[0.08em]">
+          <span className="text-base font-semibold uppercase tracking-eyebrow-sm">
             Mes badges
           </span>
         </div>

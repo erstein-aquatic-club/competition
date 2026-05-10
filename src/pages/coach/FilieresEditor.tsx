@@ -380,7 +380,7 @@ function ListScreen({
             <ChevronLeft className="h-[22px] w-[22px]" strokeWidth={2.2} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+            <p className="text-[10px] font-medium uppercase tracking-eyebrow text-muted-foreground/70">
               Coach · Planification
             </p>
             <h1 className="text-[17px] font-semibold tracking-tight text-foreground -mt-0.5">
@@ -399,10 +399,10 @@ function ListScreen({
           </p>
 
           <div className="mt-7 mb-2.5 flex items-baseline justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground/70">
               8 filières
             </span>
-            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/40">
+            <span className="text-[10px] uppercase tracking-eyebrow text-muted-foreground/40">
               Standard EAC
             </span>
           </div>
@@ -516,7 +516,7 @@ function FiliereRow({
             {perso && (
               <Badge
                 variant="secondary"
-                className="h-[18px] px-1.5 rounded-md text-[9.5px] font-semibold uppercase tracking-[0.08em] bg-foreground/[0.07] text-foreground/70 border-0"
+                className="h-[18px] px-1.5 rounded-md text-[9.5px] font-semibold uppercase tracking-eyebrow-sm bg-foreground/[0.07] text-foreground/70 border-0"
               >
                 Personnalisé
               </Badge>
@@ -682,7 +682,7 @@ function DetailScreen({
                   <div key={field.key} className="space-y-1.5">
                     <label
                       htmlFor={`fe-${field.key}`}
-                      className="block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/80"
+                      className="block text-[10.5px] font-semibold uppercase tracking-eyebrow-sm text-muted-foreground/80"
                     >
                       {field.label}
                       <span className="ml-1 text-muted-foreground/40 font-normal normal-case tracking-normal">
@@ -787,7 +787,7 @@ function Section({
   return (
     <section className="space-y-2">
       <header className="flex items-baseline justify-between">
-        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-foreground/70">
+        <h2 className="text-[10.5px] font-semibold uppercase tracking-eyebrow text-foreground/70">
           {label}
         </h2>
         {hint && (
@@ -872,7 +872,7 @@ function GaugeRow({
       </div>
 
       <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none">
-        <span className="text-[10.5px] uppercase tracking-[0.1em] text-muted-foreground/70 font-medium">
+        <span className="text-[10.5px] uppercase tracking-eyebrow-sm text-muted-foreground/70 font-medium">
           Variable
         </span>
         <Switch
@@ -904,11 +904,11 @@ function LivePreview({
   return (
     <section>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-foreground/70 flex items-center gap-1.5">
+        <h2 className="text-[10.5px] font-semibold uppercase tracking-eyebrow text-foreground/70 flex items-center gap-1.5">
           <Sparkles className="h-3 w-3 text-foreground/50" strokeWidth={2.2} />
           Aperçu nageur
         </h2>
-        <span className="text-[10.5px] uppercase tracking-[0.16em] text-muted-foreground/50">
+        <span className="text-[10.5px] uppercase tracking-eyebrow text-muted-foreground/50">
           Live
         </span>
       </div>
@@ -943,7 +943,7 @@ function LivePreview({
 
           {/* Description preview */}
           <div>
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60 mb-1">
+            <p className="text-[9.5px] font-semibold uppercase tracking-eyebrow text-muted-foreground/60 mb-1">
               Description
             </p>
             <p className="text-[12.5px] text-foreground/85 leading-relaxed line-clamp-3">
@@ -957,7 +957,7 @@ function LivePreview({
 
           {/* Examples preview */}
           <div>
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60 mb-1">
+            <p className="text-[9.5px] font-semibold uppercase tracking-eyebrow text-muted-foreground/60 mb-1">
               Exemples
             </p>
             <p className="text-[12.5px] text-foreground/85 leading-relaxed whitespace-pre-line line-clamp-3">

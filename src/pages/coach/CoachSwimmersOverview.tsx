@@ -159,7 +159,7 @@ function FeedbackRateKPI({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
           Ressentis 30j
         </span>
         <span className={`text-[11px] font-bold tabular-nums ${ratioColor}`}>
@@ -510,7 +510,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
 
       {/* Sort buttons */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Trier :</span>
+        <span className="text-[10px] font-bold uppercase tracking-eyebrow-lg text-muted-foreground">Trier :</span>
         {([
           { key: "name" as const, label: "Nom" },
           { key: "forme" as const, label: "Forme" },
@@ -625,7 +625,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                   <div className="mt-3.5 space-y-2.5">
                     {/* Forme dots */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
                         Forme
                       </span>
                       <FormeDots score={kpis?.forme ?? null} />
@@ -633,7 +633,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
 
                     {/* Readiness (wellness) */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
                         Bien-être
                       </span>
                       <div className="flex items-center gap-2">
@@ -646,7 +646,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
 
                     {/* Charge (ACWR + load mini chart) */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
                         Charge
                       </span>
                       {athlete.id != null ? (
@@ -659,7 +659,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
                     {/* Assiduité sparkline */}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
                           Activité 30j
                         </span>
                         <span className={`text-[10px] mt-0.5 ${hasLowActivity ? "text-status-warning font-semibold" : "text-muted-foreground"}`}>

@@ -308,7 +308,7 @@ function SwimSessionTimelineImpl({
                   >
                     <span
                       className={cn(
-                        "font-display font-bold uppercase tracking-[0.08em]",
+                        "font-display font-bold uppercase tracking-eyebrow-sm",
                         isBassin ? "text-base" : "text-sm",
                         intensityTextMap[dominant] ?? "text-foreground",
                       )}

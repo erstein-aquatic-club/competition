@@ -75,7 +75,7 @@ export function CalendarHeader({ monthCursor, selectedDayStatus, onPrevMonth, on
 
       <div className="min-w-0 text-center">
         <div className="text-base font-semibold text-foreground capitalize truncate">{monthLabelFR(monthCursor)}</div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-eyebrow-sm text-muted-foreground">
           {summaryLabel}
         </div>
       </div>

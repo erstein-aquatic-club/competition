@@ -746,7 +746,7 @@ function CycleCard({
         )}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
-            <button className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-full hover:bg-muted">
+            <button className="h-11 w-11 md:h-8 md:w-8 shrink-0 inline-flex items-center justify-center rounded-full hover:bg-muted">
               <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
             </button>
           </PopoverTrigger>

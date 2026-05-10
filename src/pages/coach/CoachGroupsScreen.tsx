@@ -495,7 +495,7 @@ const GroupDetailView = ({
       {/* Members */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">
             Membres
           </h3>
           {detail.is_active && (
@@ -558,7 +558,7 @@ const GroupDetailView = ({
       {/* Sub-groups */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">
             Sous-groupes
           </h3>
           {detail.is_active && (
@@ -906,7 +906,7 @@ const CoachGroupsScreen = ({
           {/* Active groups */}
           {activeGroups.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">
                 Actifs ({activeGroups.length})
               </h3>
               {activeGroups.map((g) => (
@@ -925,7 +925,7 @@ const CoachGroupsScreen = ({
           {/* Inactive groups */}
           {inactiveGroups.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">
                 Terminés ({inactiveGroups.length})
               </h3>
               {inactiveGroups.map((g) => (

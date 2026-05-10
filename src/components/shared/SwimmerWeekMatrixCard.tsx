@@ -351,7 +351,7 @@ export default function SwimmerWeekMatrixCard() {
               >
                 <span
                   className={[
-                    "text-[9px] font-black uppercase tracking-[0.18em]",
+                    "text-[9px] font-black uppercase tracking-eyebrow-lg",
                     isToday ? "text-primary" : "text-muted-foreground/60",
                   ].join(" ")}
                 >
@@ -379,7 +379,7 @@ export default function SwimmerWeekMatrixCard() {
           {/* Matin row */}
           <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
             <Sunrise className="h-3 w-3 shrink-0 text-amber-500/80" />
-            <span className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="text-[9px] font-black uppercase tracking-eyebrow-sm text-muted-foreground">
               Matin
             </span>
           </div>
@@ -395,7 +395,7 @@ export default function SwimmerWeekMatrixCard() {
           {/* Aprèm row */}
           <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
             <Sunset className="h-3 w-3 shrink-0 text-rose-400/90" />
-            <span className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="text-[9px] font-black uppercase tracking-eyebrow-sm text-muted-foreground">
               Aprèm
             </span>
           </div>
@@ -415,7 +415,7 @@ export default function SwimmerWeekMatrixCard() {
             <span className="text-base font-black tabular-nums leading-none">
               {grid.donePast}
             </span>
-            <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
+            <span className="text-[10px] uppercase tracking-eyebrow text-muted-foreground/70">
               / {grid.plannedPast} séance{grid.plannedPast > 1 ? "s" : ""} faite{grid.donePast > 1 ? "s" : ""}
             </span>
           </div>

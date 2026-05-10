@@ -769,7 +769,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
           >
             {/* Period Selector */}
             <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                 Période
               </h2>
               <ToggleGroup
@@ -885,7 +885,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             {/* Donut Chart — Work vs Travel */}
             {pieData.length > 0 ? (
               <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
+                <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                   Répartition
                 </h3>
                 <div className="flex items-center gap-6">
@@ -927,7 +927,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
 
             {/* Stacked Bar Chart — Hours per Day */}
             <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
+              <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                 Heures par jour
               </h3>
               {dashboardHistogram.length > 0 ? (
@@ -962,7 +962,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             {/* Top Locations */}
             {topLocations.length > 0 ? (
               <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
+                <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                   Top lieux
                 </h3>
                 <div className="space-y-3">

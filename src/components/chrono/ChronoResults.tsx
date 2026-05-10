@@ -366,7 +366,7 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
       {/* ── Header — title + meta + actions ── */}
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/80">
+          <span className="text-[10px] font-black uppercase tracking-eyebrow-lg text-primary/80">
             Résultats
           </span>
           <span className="text-[11px] text-muted-foreground">{configSummary}</span>

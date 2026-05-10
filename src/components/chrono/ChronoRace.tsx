@@ -474,13 +474,13 @@ function SwimmerCard({
           {shouldPromptStop ? (
             <div className="flex flex-col items-center gap-0.5 px-1">
               <Flag className="h-5 w-5 fill-current" strokeWidth={2.5} />
-              <span className="text-[10px] font-black uppercase tracking-[0.15em] leading-none">
+              <span className="text-[10px] font-black uppercase tracking-eyebrow leading-none">
                 Arrivée
               </span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-0 px-1">
-              <span className="text-[8px] font-bold uppercase tracking-[0.12em] opacity-70 leading-none">
+              <span className="text-[8px] font-bold uppercase tracking-eyebrow-sm opacity-70 leading-none">
                 Δ lap
               </span>
               <span className="font-mono tabular-nums text-base font-black leading-none mt-0.5">
@@ -494,7 +494,7 @@ function SwimmerCard({
               className={shouldPromptStop ? "h-7 w-7" : "h-5 w-5"}
               strokeWidth={shouldPromptStop ? 3 : 2.5}
             />
-            <span className={`font-black uppercase tracking-[0.15em] leading-none ${
+            <span className={`font-black uppercase tracking-eyebrow leading-none ${
               shouldPromptStop ? "text-xs" : "text-[10px]"
             }`}>
               {shouldPromptStop ? "Stop !" : "Stop"}

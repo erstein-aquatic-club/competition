@@ -437,7 +437,7 @@ export default function CoachMySwimmersScreen({
             {teamAccounts.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  <h3 className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">
                     Avec compte
                   </h3>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -464,7 +464,7 @@ export default function CoachMySwimmersScreen({
             {teamManuals.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  <h3 className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">
                     Sans compte
                   </h3>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -541,7 +541,7 @@ export default function CoachMySwimmersScreen({
               return (
                 <section key={coach.id} className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                    <h3 className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">
                       {coach.display_name}
                     </h3>
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -577,7 +577,7 @@ export default function CoachMySwimmersScreen({
             return (
               <section className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
+                  <h3 className="text-xs font-bold uppercase tracking-eyebrow text-amber-600 dark:text-amber-400">
                     Non attribués
                   </h3>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0">

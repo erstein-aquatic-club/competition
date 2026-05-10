@@ -155,7 +155,7 @@ function WeekVolumeChip({ distanceMeters, variant }: WeekVolumeChipProps) {
         className="flex items-baseline justify-between border-t border-b border-border/50 py-2.5"
         title="Volume total assigné (brouillons + publiés) pour la semaine"
       >
-        <span className="font-display text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
+        <span className="font-display text-[10px] uppercase tracking-eyebrow-lg text-muted-foreground/80">
           Volume semaine
         </span>
         <span className="flex items-baseline gap-1.5">
@@ -175,7 +175,7 @@ function WeekVolumeChip({ distanceMeters, variant }: WeekVolumeChipProps) {
       className="inline-flex items-baseline gap-2.5"
       title="Volume total assigné (brouillons + publiés) pour la semaine"
     >
-      <span className="font-display text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
+      <span className="font-display text-[10px] uppercase tracking-eyebrow-lg text-muted-foreground/80">
         Volume
       </span>
       <span className="flex items-baseline gap-1">
@@ -535,7 +535,7 @@ const SlotFormSheet = ({
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="slot-date">Date *</Label>
-                <input id="slot-date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                <input id="slot-date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
               </div>
             )}
 
@@ -548,7 +548,7 @@ const SlotFormSheet = ({
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
               <div className="space-y-2">
@@ -558,7 +558,7 @@ const SlotFormSheet = ({
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
             </div>
@@ -918,7 +918,7 @@ const OverrideFormSheet = ({
               type="date"
               value={overrideDate}
               onChange={(e) => setOverrideDate(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
 
@@ -957,7 +957,7 @@ const OverrideFormSheet = ({
                   type="date"
                   value={effectiveDate}
                   onChange={(e) => setEffectiveDate(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
                 <p className="text-xs text-muted-foreground">
                   Changez la date pour deplacer le creneau sur un autre jour.
@@ -971,7 +971,7 @@ const OverrideFormSheet = ({
                     type="time"
                     value={newStartTime}
                     onChange={(e) => setNewStartTime(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
                 </div>
                 <div className="space-y-2">
@@ -981,7 +981,7 @@ const OverrideFormSheet = ({
                     type="time"
                     value={newEndTime}
                     onChange={(e) => setNewEndTime(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-11 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
                 </div>
               </div>
@@ -2908,12 +2908,12 @@ const CoachTrainingSlotsScreen = ({
           }
         />
         {onOpenLibrary && (
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onOpenLibrary()}>
+          <Button variant="ghost" size="sm" className="min-h-11 md:h-8 text-xs" onClick={() => onOpenLibrary()}>
             <BookOpen className="mr-1.5 h-3.5 w-3.5" />
             Bibliothèque
           </Button>
         )}
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreate}>
+        <Button variant="outline" size="sm" className="min-h-11 md:h-8 text-xs" onClick={handleCreate}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Nouveau
         </Button>
@@ -2921,7 +2921,7 @@ const CoachTrainingSlotsScreen = ({
 
       {/* ── Desktop: row 2 — week navigation ── */}
       <div className="hidden sm:flex items-center justify-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={prevWeek}>
+        <Button variant="ghost" size="icon" className="h-11 w-11 md:h-8 md:w-8 shrink-0" onClick={prevWeek}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <button
@@ -2935,7 +2935,7 @@ const CoachTrainingSlotsScreen = ({
             {formatDayMonth(weekMonday)} – {formatDayMonth(weekSunday)}
           </span>
         </button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={nextWeek}>
+        <Button variant="ghost" size="icon" className="h-11 w-11 md:h-8 md:w-8 shrink-0" onClick={nextWeek}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -3048,7 +3048,7 @@ const CoachTrainingSlotsScreen = ({
                 const isToday = toIsoDate(date) === todayIso();
                 return (
                   <div key={i} className="text-center pb-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                    <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
                       {DAYS_FR[i]}
                     </span>
                     <br />

@@ -1080,7 +1080,7 @@ export function FeedbackDrawer({
                           <>
                             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-eyebrow text-muted-foreground">
                                   <span>Créneau sélectionné</span>
                                   {activeSession.slotTime ? (
                                     <span className="inline-flex items-center gap-0.5 normal-case tracking-normal">

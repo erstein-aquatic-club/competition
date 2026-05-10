@@ -82,7 +82,7 @@ export default function SharedSwimSession() {
       {/* Header */}
       <div className="border-b border-border bg-card px-4 py-4">
         <div className="mx-auto max-w-lg">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-eyebrow-lg text-muted-foreground">
             <Waves className="h-4 w-4" />
             Séance partagée
           </div>
