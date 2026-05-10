@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useState, useCallback } from "react";
+import { useReducer, useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { flush, getPending, subscribe } from "../../lib/chrono-save-queue";
 import { useQueryClient } from "@tanstack/react-query";
@@ -96,8 +96,12 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
     };
   }, []);
 
+  const persistTimeoutRef = useRef<number | null>(null);
+  const quotaWarnedRef = useRef(false);
   useEffect(() => {
-    if (state.swimmers.length > 0) {
+    if (state.swimmers.length === 0) return;
+    if (persistTimeoutRef.current) window.clearTimeout(persistTimeoutRef.current);
+    persistTimeoutRef.current = window.setTimeout(() => {
       try {
         localStorage.setItem(BACKUP_KEY, serializeState(state));
       } catch {
@@ -110,9 +114,18 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
           localStorage.setItem(BACKUP_KEY, serializeState(lean));
         } catch {
           localStorage.removeItem(BACKUP_KEY);
+          if (!quotaWarnedRef.current) {
+            quotaWarnedRef.current = true;
+            toast.error("Sauvegarde locale impossible", {
+              description: "Quota navigateur dépassé. Exporte régulièrement pour ne rien perdre.",
+            });
+          }
         }
       }
-    }
+    }, 500);
+    return () => {
+      if (persistTimeoutRef.current) window.clearTimeout(persistTimeoutRef.current);
+    };
   }, [state]);
 
   const handleRestore = useCallback(() => {
