@@ -4,6 +4,48 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §240 — Pass 6 sub-§A audit accessibilité WCAG AA (2026-05-10)
+
+**Contexte :** exécution Pass 6 du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md`. Audit WCAG AA via sub-agent sonnet read-only (1 fork, 154s, 53k tokens). Méthode : grep systématique sur 10 catégories (icon-only buttons, hierarchies headings, contraste muted-foreground, focus-visible, inputs labels, div onClick, color-only, tabindex, focus trap Sheet/Dialog, calendrier nav clavier).
+
+**Verdict global :** dette ciblée — aucun problème systémique, mais plusieurs patterns récurrents à corriger pour conformité WCAG AA stricte.
+
+**Synthèse 28 spots :**
+- 4 P0 (bloquant)
+- 17 P1 (à corriger)
+- 7 P2 (nice-to-have)
+
+**Détail par catégorie :**
+
+| # | Catégorie | Verdict | Spots P0/P1 |
+|---|---|---|---|
+| 1 | Boutons icon-only sans `aria-label` | Dette ciblée | 19 P1 (ChronoSetup +/-, MonthlyReport prev/next month, SwimmerPaceCard PDF/Share/Trash, CoachTrainingSlotsScreen Share, CoachMySwimmersScreen Pencil/Trash, CoachGroupsScreen Trash, SwimSessionBuilder ArrowUp/Down/Trash, SwimmerSlotsTab Trash) |
+| 2 | Hiérarchie headings | Dette ciblée | 6 pages sans `<h1>` (Strength, Progress, HallOfFame, SuiviSaison, Suivi, RecordsClub) + 1 P0 Login.tsx 3 h1 dans le DOM (CSS-responsive non exclusif) + 2 sauts h3→h1 erreur conditionnelle (Admin:451, Dashboard:523) |
+| 3 | Contraste `text-muted-foreground/X` | P0 sur données + P1 secondaire | 2 P0 (`/30` `/40` sur ChronoResults:627 et PaceStrokeAdjustments:152 = données) + ~10 P1 `/50`-`/60` sur ChronoSetup, ChronoRace, PaceTeamPanel, SwimmerWeekMatrixCard |
+| 4 | Focus-visible boutons custom | Dette ciblée | 8 P1 boutons natifs HTML sans `focus-visible:ring` (SwimSessionBuilder ×3, CoachTrainingSlotsScreen tabs ×2, CoachSwimmerFullView/QuickView Retour ×3) |
+| 5 | Inputs sans label associé | P0 forms majeurs | 3 P0 Profile.tsx (bio, birthdate, ffn_iuf — `<Label>` sans `htmlFor`) + 6 P1 SwimmerSlotsTab (Début/Fin/Lieu ×2 forms) + 1 ChronoSetup:284 input numeric orphelin |
+| 6 | `<div onClick>` sans rôle | ✅ Conforme | 1 occurrence trouvée mais c'est un `stopPropagation` wrapper non-actionnable |
+| 7 | Color-only signaling | ✅ Quasi-conforme | 3 P2 mineures (ChallengeProgressBar zones, WellnessTrend dot, InlineBanner dot — tous ont label texte adjacent en pratique) |
+| 8 | `tabindex` arbitraire | ✅ Conforme | 0 occurrence > 0 ou < -1 |
+| 9 | Sheet/Dialog focus trap | ✅ Conforme | Radix Primitive natif intact, pas d'override |
+| 10 | Calendrier nav clavier | ✅ Conforme | `CalendarGrid.tsx` expose `onKeyDown` et le branche depuis le parent |
+
+**Recommandations §241 (fixes) — 6 batches estimés :**
+
+1. **Batch 1 P0 (5 fixes)** : contrast `/30` `/40` → `/70` sur données (ChronoResults:627, PaceStrokeAdjustments:152), Login.tsx 3 h1 (refactor en 1 h1 sémantique + 2 décoratifs `<p>` ou `aria-hidden`).
+2. **Batch 2 aria-label icon-only (19 fixes)** : ChronoSetup +/-, MonthlyReport, SwimmerPaceCard, CoachTrainingSlotsScreen, CoachMySwimmersScreen, CoachGroupsScreen, SwimSessionBuilder, SwimmerSlotsTab.
+3. **Batch 3 inputs id+htmlFor (8 fixes)** : Profile bio/birthdate/ffn_iuf, SwimmerSlotsTab Début/Fin/Lieu ×2 forms, ChronoSetup numeric orphelin.
+4. **Batch 4 focus-visible boutons custom (8 fixes)** : SwimSessionBuilder ×3, CoachTrainingSlotsScreen tabs ×2, CoachSwimmerFullView/QuickView Retour ×3.
+5. **Batch 5 h1 sr-only sur 6 pages** : Strength, Progress, HallOfFame, SuiviSaison, Suivi, RecordsClub.
+6. **Batch 6 contrast `/50`-`/60` → `/70` (~10 fixes)** : ChronoSetup, ChronoRace, PaceTeamPanel, SwimmerWeekMatrixCard.
+
+**Total estimé :** ~50 fixes file:line, exécution §241 en 4 sub-agents sonnet parallèles (batches indépendants).
+
+**Hors scope §240 :**
+- Aucun fix appliqué (audit lecture seule, ce § est doc-only).
+- P2 cosmétiques (color-only signaling, ChallengeProgressBar zones labels) reportés à §242+ ou Pass 7.
+- Tests manuels Lighthouse / axe DevTools à faire en complément (sub-agent peut pas exécuter Chrome DevTools).
+
 ## §239 — 8 quick wins perf (audit pass 1) (2026-05-10)
 
 **Contexte :** exécution des 8 quick wins issus de `docs/audits/2026-05-10-perf-audit-pass1.md` (audit perf 3 contextes : online stable, offline PWA, réseau instable). Cible : amorcer le composite 6.1 → 8.0/10 en lot ≤ 10 LOC par item, sans toucher à l'architecture. Numérotation §239 (et non §238) car §238 réservé à un Pass 5 UI/UX livré en parallèle.

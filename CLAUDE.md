@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§239** — 8 quick wins perf (audit pass 1). 9 fichiers, ~25 LOC, composite 6.1 → ~6.7/10.
+Dernier § livré : **§240** — Pass 6 sub-§A audit WCAG AA. 28 spots (4 P0 / 17 P1 / 7 P2). Lecture seule.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
