@@ -193,7 +193,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
         className="flex flex-col items-center justify-center py-10 gap-4"
       >
         <ReadinessGauge score={savedScore} size={100} />
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-status-success">
           <Check className="h-4 w-4" />
           Enregistré
         </div>

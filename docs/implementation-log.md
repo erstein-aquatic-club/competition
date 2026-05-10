@@ -4,6 +4,39 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §237 — Pass 4 closing P1 résiduels (vers 9.0/10) (2026-05-10)
+
+**Contexte :** exécution du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` Pass 4. 8 fixes P1 file:line identifiés par l'audit pass 3 §236, tous documentés.
+
+**Changements (8 fichiers, ~20 LOC nettes) :**
+
+| # | Fichier:ligne | Avant | Après |
+|---|---|---|---|
+| 1 | `src/components/shared/OfflineDetector.tsx:58-59` | `bg-emerald-500/90 border-emerald-400/30` / `bg-red-500/90 border-red-400/30` | `bg-status-success/90 border-status-success/30` / `bg-status-error/90 border-status-error/30` |
+| 2 | `src/components/shared/InfoBubble.tsx:81-83` (`AcwrInfoContent` 3 zones) | `bg-emerald-500` / `bg-amber-500` / `bg-red-500` | `bg-status-success` / `bg-status-warning` / `bg-status-error` |
+| 3 | `src/pages/CompetitionDetail.tsx:72,95` (back buttons ×2) | `h-9 w-9` | `h-11 w-11` (HIG 44pt) |
+| 4 | `src/components/strength/WorkoutRunner.tsx:1028-1034` difficulté 1-5 | ternaire emerald/amber/orange/red hardcodé | map `Record<1..5, "bg-intensity-N text-white border-intensity-N">` |
+| 5 | `src/components/wellness/WellnessForm.tsx:196` | `text-emerald-600 dark:text-emerald-400` | `text-status-success` |
+| 6 | `src/pages/Profile.tsx:122` (ToggleGroupItem theme) | `h-9` | `min-h-11` (HIG 44pt, segmented control) |
+| 7 | `src/pages/SwimSessionView.tsx:468,479,486` (input/reps/Ajouter mode libre) | `h-9` ×3 | `h-11` ×3 |
+| 8 | `src/pages/coach/CoachCommentsScreen.tsx:25-27` (`indicatorColor`) | `bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400` etc. | `bg-status-success-bg text-status-success` (status-warning, status-error) |
+
+**Drapeau racine #2 tap targets** : 3 spots P1 résiduels closés (CompetitionDetail back ×2, Profile ToggleGroupItem, SwimSessionView mode libre 3 inputs).
+
+**Drapeau racine #3 hardcodes** : 5 spots tokenisés (OfflineDetector, InfoBubble, WorkoutRunner difficulté, WellnessForm success, CoachCommentsScreen indicatorColor) — net ≈ -8 hits sur les régressions P2 ponctuelles + cave coach mineure.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 684/685 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Tokens utilisés tous existants dans `src/index.css` (greppé : `--color-status-success/warning/error`, `--color-intensity-1..5`).
+
+**Hors scope §237 :**
+- Pass 5 (caves catégoriels SuiviSemaine/AthleteInterviews/SwimmerInterviewsTab/RacesTab/Pace4NSegmentMatrix, 67 hits cumulés).
+- Pass 6 (audit WCAG AA + fixes).
+- Pass 7 (iOS premium polish — décisions UX à valider avant exécution).
+
+**Score estimé** : 8.5/10 → ~9.0/10 (P1 régressions ponctuelles closeés + tap targets résiduels HIG).
+
 ## §236 — Audit UI/UX iOS-like — passe 3 post-§234 (2026-05-10)
 
 **Contexte :** demande utilisateur — re-mener l'audit pass 3 lecture seule pour mesurer le score effectif post-livraison de §215-§234 (8 chantiers UI/UX + 6 user en parallèle). Méthode identique §215 : 3 forks parallèles sonnet (nageur / coach / partagés+NEW) + greps centralisés pour les 3 drapeaux racines. Validation file:line des P0/P1 et régressions.

@@ -465,7 +465,7 @@ export default function SwimSessionView() {
                     value={manualLabel}
                     onChange={(e) => setManualLabel(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") addManualExercise(); }}
-                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
                 <div className="w-16 space-y-1">
@@ -476,14 +476,14 @@ export default function SwimSessionView() {
                     inputMode="numeric"
                     value={manualReps}
                     onChange={(e) => setManualReps(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
                 <Button
                   size="sm"
                   onClick={addManualExercise}
                   disabled={!manualLabel.trim()}
-                  className="h-9 gap-1"
+                  className="h-11 gap-1"
                 >
                   <Plus className="h-4 w-4" />
                   Ajouter

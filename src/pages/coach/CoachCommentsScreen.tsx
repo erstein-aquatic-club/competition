@@ -22,9 +22,9 @@ function indicatorColor(mode: "hard" | "good", value: number | null | undefined)
   const v = Number(value);
   if (!Number.isFinite(v) || v < 1 || v > 5) return "bg-muted text-muted-foreground";
   const effective = mode === "hard" ? 6 - v : v;
-  if (effective >= 4) return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400";
-  if (effective >= 3) return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
-  return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+  if (effective >= 4) return "bg-status-success-bg text-status-success";
+  if (effective >= 3) return "bg-status-warning-bg text-status-warning";
+  return "bg-status-error-bg text-status-error";
 }
 
 function isAlertComment(c: SwimmerComment): boolean {

@@ -1025,13 +1025,14 @@ export function WorkoutRunner({
           <div className="flex gap-1.5">
             {([1, 2, 3, 4, 5] as const).map((level) => {
               const selected = currentSetInputs[currentSetIndex - 1]?.difficulty === level;
-              const colorClass = level <= 2
-                ? "bg-emerald-500 text-white border-emerald-500"
-                : level === 3
-                  ? "bg-amber-400 text-white border-amber-400"
-                  : level === 4
-                    ? "bg-orange-500 text-white border-orange-500"
-                    : "bg-red-500 text-white border-red-500";
+              const colorByLevel: Record<1 | 2 | 3 | 4 | 5, string> = {
+                1: "bg-intensity-1 text-white border-intensity-1",
+                2: "bg-intensity-2 text-white border-intensity-2",
+                3: "bg-intensity-3 text-white border-intensity-3",
+                4: "bg-intensity-4 text-white border-intensity-4",
+                5: "bg-intensity-5 text-white border-intensity-5",
+              };
+              const colorClass = colorByLevel[level];
               return (
                 <button
                   key={level}

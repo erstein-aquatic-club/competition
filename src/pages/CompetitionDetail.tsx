@@ -69,7 +69,7 @@ export default function CompetitionDetail() {
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition"
+          className="h-11 w-11 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition"
           aria-label="Retour"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -92,7 +92,7 @@ export default function CompetitionDetail() {
         <button
           type="button"
           onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/"))}
-          className="mt-0.5 h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition shrink-0"
+          className="mt-0.5 h-11 w-11 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition shrink-0"
           aria-label="Retour"
         >
           <ArrowLeft className="h-4 w-4" />

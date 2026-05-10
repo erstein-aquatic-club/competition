@@ -55,8 +55,8 @@ export function OfflineDetector() {
               "shadow-lg shadow-black/10 dark:shadow-black/30",
               "backdrop-blur-xl border",
               isTransitioning
-                ? "bg-emerald-500/90 text-white border-emerald-400/30"
-                : "bg-red-500/90 text-white border-red-400/30",
+                ? "bg-status-success/90 text-white border-status-success/30"
+                : "bg-status-error/90 text-white border-status-error/30",
             )}
           >
             {isTransitioning ? (

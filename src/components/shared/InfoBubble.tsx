@@ -78,9 +78,9 @@ export function AcwrInfoContent() {
           Basé sur le ratio ACWR, utilisé en sport pro pour prévenir les blessures.
         </p>
         <div className="space-y-1.5">
-          <ZoneIndicator color="bg-emerald-500" label="0.8 – 1.3" description="rythme régulier" />
-          <ZoneIndicator color="bg-amber-500" label="0.6 – 1.5" description="écart notable" />
-          <ZoneIndicator color="bg-red-500" label="< 0.6 ou > 1.5" description="changement brutal" />
+          <ZoneIndicator color="bg-status-success" label="0.8 – 1.3" description="rythme régulier" />
+          <ZoneIndicator color="bg-status-warning" label="0.6 – 1.5" description="écart notable" />
+          <ZoneIndicator color="bg-status-error" label="< 0.6 ou > 1.5" description="changement brutal" />
         </div>
       </div>
     </div>
