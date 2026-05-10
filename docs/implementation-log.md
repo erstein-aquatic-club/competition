@@ -4,6 +4,41 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §241 — Chantier B sub-§A : SW precache slim (audit perf pass 1) (2026-05-10)
+
+**Contexte :** sub-§A du Chantier B issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #1 bundle/SW). Cible : exclure du precache PWA les chunks d'export rarement utilisés (Excel chrono coach + PDF records/séances/pace), tout en préservant leur disponibilité offline via runtime caching à la première utilisation. Numérotation §241 (et non §240) car §240 réservé à Pass 6 audit WCAG livré en parallèle.
+
+**Changements (1 fichier, ~15 LOC) :**
+
+| # | Fichier:ligne | Avant | Après |
+|---|---|---|---|
+| 1 | `vite.config.ts:41-46` | `globIgnores: ['**/version.json']` | `+ '**/exceljs.min-*.js' + '**/jspdf.plugin.autotable-*.js' + '**/html2canvas.esm-*.js'` |
+| 2 | `vite.config.ts:84-93` | aucune règle runtime pour ces chunks | nouvelle règle `StaleWhileRevalidate` sur `/assets/(exceljs.min|jspdf.plugin.autotable|html2canvas.esm)-*.js`, cacheName `heavy-export-chunks`, 6 entrées max, TTL 30j |
+
+**Stratégie** : les 3 chunks restent **`await import()`** côté code (déjà lazy depuis `chronoXlsxExport.ts:301`, `export-records-pdf.ts:6`, `export-session-pdf.ts:1`, `export-pace-pdf.ts:7`). Le SW ne les pré-télécharge plus à l'install — ils sont fetchés à la première feature d'export utilisée, puis cachés en runtime (`StaleWhileRevalidate` : sert depuis le cache, met à jour en arrière-plan).
+
+**Delta mesuré (build local) :**
+- **Avant** §241 : 249 entrées, **7237.31 KiB** precache.
+- **Après** §241 : 246 entrées, **5711.24 KiB** precache.
+- **Gain : -1526 KiB (-21 %)** sur le poids du SW precache, soit ~-360 ms install PWA sur 4G@10 Mbps (estimation audit pass 1).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm run build` 14.49s, PWA generation OK (workbox v1.2.0).
+- Tests : non rerun (changement config build pure, pas de logique métier touchée).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Limites / suivi :**
+- Au premier usage offline d'une feature d'export, le chunk n'est pas dispo (NetworkFirst ratera, StaleWhileRevalidate aussi sans cache préalable). Acceptable : les exports nécessitent le réseau de toute façon (partage / impression).
+- Cache `heavy-export-chunks` indépendant du cache principal — si le SW est wipe, les 3 chunks sont retéléchargés à la première utilisation suivante.
+
+**Hors scope §241 (Chantier B reste sub-§B + Chantiers A/C/D/E) :**
+- Sub-§B : framer-motion → CSS sur 6 banners partagés (UpdateNotification, InstallPrompt, OfflineBanner, InlineBanner, OfflineSyncBanner, OfflineDetector) pour sortir framer-motion (38 KB gzip) du critical path. Touche les animations visibles → /frontend-design avant edit.
+- Chantier A : `persistQueryClient` + queue offline généralisée.
+- Chantier C : RPC `get_user_auth_context` (-800 ms login Slow 3G).
+- Chantier D : `withTimeout` + retry exponentiel.
+- Chantier E : `React.memo` sur listes longues.
+
 ## §240 — Pass 6 sub-§A audit accessibilité WCAG AA (2026-05-10)
 
 **Contexte :** exécution Pass 6 du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md`. Audit WCAG AA via sub-agent sonnet read-only (1 fork, 154s, 53k tokens). Méthode : grep systématique sur 10 catégories (icon-only buttons, hierarchies headings, contraste muted-foreground, focus-visible, inputs labels, div onClick, color-only, tabindex, focus trap Sheet/Dialog, calendrier nav clavier).

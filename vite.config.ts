@@ -38,7 +38,15 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         importScripts: ['push-handler.js'],
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,gif,webp}'],
-        globIgnores: ['**/version.json'],
+        // Exports rarement utilisés (Excel chrono coach + PDF records/séances/pace) :
+        // exclus du precache pour alléger l'install PWA. Chargés en NetworkFirst à la
+        // demande via la règle runtime ci-dessous, puis cachés au premier usage.
+        globIgnores: [
+          '**/version.json',
+          '**/exceljs.min-*.js',
+          '**/jspdf.plugin.autotable-*.js',
+          '**/html2canvas.esm-*.js',
+        ],
         cleanupOutdatedCaches: true,
         clientsClaim: false,  // §171 P1: was true — let UpdateNotification gate the activation
         skipWaiting: false,   // §171 P1: was true — same reason
@@ -88,6 +96,17 @@ export default defineConfig(({ mode }) => ({
               expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
               networkTimeoutSeconds: 8,
+            },
+          },
+          {
+            // Chunks lourds exclus du precache (exceljs/jspdf/html2canvas).
+            // StaleWhileRevalidate : sert depuis le cache si dispo, met à jour en arrière-plan.
+            urlPattern: /\/assets\/(exceljs\.min|jspdf\.plugin\.autotable|html2canvas\.esm)-.*\.js$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'heavy-export-chunks',
+              expiration: { maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],

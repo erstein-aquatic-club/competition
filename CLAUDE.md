@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§240** — Pass 6 sub-§A audit WCAG AA. 28 spots (4 P0 / 17 P1 / 7 P2). Lecture seule.
+Dernier § livré : **§241** — Chantier B sub-§A. SW precache 7237 → 5711 KiB (-21%), -3 entrées.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
