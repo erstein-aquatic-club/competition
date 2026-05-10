@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { PaceTarget } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
-import type { AthleteSummary } from "@/lib/api/types";
+import type { AthleteSummary, Objective } from "@/lib/api/types";
 
 // Full render requires QueryClient + Supabase — covered by manual E2E.
 // Regression §184-bugfix: accordion open state is now controlled via openSwimmerIds
@@ -147,7 +147,7 @@ describe("buildObjectiveSyncOps — auto-sync objectifs → pace targets", () =>
     eventCode: string | null,
     poolLength: number | null,
     targetTimeSeconds: number | null,
-  ) => ({
+  ): Pick<Objective, "id" | "athlete_id" | "competition_ids" | "event_code" | "pool_length" | "target_time_seconds"> => ({
     id: `obj-${authUid}`,
     athlete_id: authUid,
     competition_ids: [] as string[],
@@ -212,6 +212,31 @@ describe("buildObjectiveSyncOps — auto-sync objectifs → pace targets", () =>
     expect(ops[0].target_pool_size).toBe("25m");
   });
 
+  it("convertit pool_length null → '50m' (valeur par défaut)", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-3", 9]]);
+    const objectives = [makeObjective("uuid-3", "200DOS", null, 130)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops[0].target_pool_size).toBe("50m");
+  });
+
+  it("ignore si cible existante même si le temps diffère (ne pas écraser)", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-1", 42]]);
+    const objectives = [makeObjective("uuid-1", "100NL", 50, 65)]; // temps différent (65s vs 60s)
+    const existingTargets = [makeTarget(42, "NL", 100, "50m")]; // target_time_ms: 60000
+    const ops = buildObjectiveSyncOps(objectives, map, existingTargets);
+    expect(ops).toHaveLength(0); // (stroke + distance + bassin) match → pas d'écrasement
+  });
+
+  it("ignore un objectif avec event_code null", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-1", 42]]);
+    const objectives = [makeObjective("uuid-1", null, 50, 60)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops).toHaveLength(0);
+  });
+
   it("traite plusieurs objectifs d'une même équipe correctement", async () => {
     const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
     const map = new Map([["uuid-a", 1], ["uuid-b", 2]]);
@@ -223,6 +248,7 @@ describe("buildObjectiveSyncOps — auto-sync objectifs → pace targets", () =>
     ];
     const ops = buildObjectiveSyncOps(objectives, map, []);
     expect(ops).toHaveLength(2);
-    expect(ops.map((o) => o.ref.kind === "account" && (o.ref as { accountId: number }).accountId)).toEqual([1, 2]);
+    expect(ops[0].ref).toMatchObject({ kind: "account", accountId: 1 });
+    expect(ops[1].ref).toMatchObject({ kind: "account", accountId: 2 });
   });
 });
