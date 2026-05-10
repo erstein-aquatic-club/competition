@@ -208,11 +208,12 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
 
   // Auto-sync : objectifs chronométriques → cibles d'allures (§260)
   // S'exécute une fois après le chargement initial. Silent best-effort.
-  const hasSyncedObjectivesRef = useRef(false);
+  const hasSyncedObjectivesRef = useRef<string | null>(null);
   useEffect(() => {
     if (teamLoading || targetsQuery.isLoading) return;
-    if (hasSyncedObjectivesRef.current) return;
-    hasSyncedObjectivesRef.current = true;
+    const syncKey = String(effectiveCoachId ?? "self");
+    if (hasSyncedObjectivesRef.current === syncKey) return;
+    hasSyncedObjectivesRef.current = syncKey;
 
     const accountIds = team
       .filter((m): m is TeamMember & { kind: "account"; accountId: number } => m.kind === "account" && m.accountId != null)
@@ -244,13 +245,13 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
           ),
         );
         qc.invalidateQueries({ queryKey: ["pace-targets"] });
-      } catch {
-        // silent — best-effort sync
+      } catch (err) {
+        console.warn("[auto-sync] échec — best effort", err);
       }
     };
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamLoading, targetsQuery.isLoading]);
+  }, [teamLoading, targetsQuery.isLoading, effectiveCoachId]);
 
   const upsertMutation = useMutation({
     mutationFn: (args: { ref: SwimmerRef; stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number; target_pool_size: PaceTarget["target_pool_size"] }) =>
