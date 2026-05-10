@@ -128,3 +128,101 @@ describe("accordion open state — regression §184 UX bugfix", () => {
     expect(belongsTo(optimistic, swimmer)).toBe(true);
   });
 });
+
+describe("buildObjectiveSyncOps — auto-sync objectifs → pace targets", () => {
+  const makeTarget = (accountId: number, stroke: string, distance: number, pool = "50m"): PaceTarget => ({
+    id: `t-${accountId}-${stroke}-${distance}`,
+    coach_id: "coach1",
+    swimmer_account_id: accountId,
+    swimmer_manual_id: null,
+    stroke: stroke as PaceTarget["stroke"],
+    target_distance_m: distance,
+    target_time_ms: 60000,
+    target_pool_size: pool as PaceTarget["target_pool_size"],
+    updated_at: "2026-01-01",
+  });
+
+  const makeObjective = (
+    authUid: string,
+    eventCode: string | null,
+    poolLength: number | null,
+    targetTimeSeconds: number | null,
+  ) => ({
+    id: `obj-${authUid}`,
+    athlete_id: authUid,
+    competition_ids: [] as string[],
+    event_code: eventCode,
+    pool_length: poolLength,
+    target_time_seconds: targetTimeSeconds,
+  });
+
+  it("génère un op pour un objectif valide sans cible existante", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-1", 42]]);
+    const objectives = [makeObjective("uuid-1", "100NL", 50, 60)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({
+      ref: { kind: "account", accountId: 42 },
+      stroke: "NL",
+      target_distance_m: 100,
+      target_time_ms: 60000,
+      target_pool_size: "50m",
+    });
+  });
+
+  it("ignore un objectif sans target_time_seconds", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-1", 42]]);
+    const objectives = [makeObjective("uuid-1", "100NL", 50, null)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops).toHaveLength(0);
+  });
+
+  it("ignore un objectif avec event_code invalide", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-1", 42]]);
+    const objectives = [makeObjective("uuid-1", "TRIATHLON", 50, 120)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops).toHaveLength(0);
+  });
+
+  it("ignore un objectif si une cible identique existe déjà", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-1", 42]]);
+    const objectives = [makeObjective("uuid-1", "100NL", 50, 60)];
+    const existingTargets = [makeTarget(42, "NL", 100, "50m")];
+    const ops = buildObjectiveSyncOps(objectives, map, existingTargets);
+    expect(ops).toHaveLength(0);
+  });
+
+  it("ignore un objectif si le nageur n'est pas dans l'équipe", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map<string, number>(); // équipe vide
+    const objectives = [makeObjective("uuid-orphan", "200DOS", 25, 130)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops).toHaveLength(0);
+  });
+
+  it("convertit pool_length 25 → '25m'", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-2", 7]]);
+    const objectives = [makeObjective("uuid-2", "200DOS", 25, 130)];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops[0].target_pool_size).toBe("25m");
+  });
+
+  it("traite plusieurs objectifs d'une même équipe correctement", async () => {
+    const { buildObjectiveSyncOps } = await import("../CoachPaceCalculatorScreen");
+    const map = new Map([["uuid-a", 1], ["uuid-b", 2]]);
+    const objectives = [
+      makeObjective("uuid-a", "100NL", 50, 60),   // valide
+      makeObjective("uuid-a", "200NL", 50, null),  // pas de temps → skip
+      makeObjective("uuid-b", "50BR", 25, 35),     // valide
+      makeObjective("uuid-c", "400QN", 50, 260),   // hors équipe → skip
+    ];
+    const ops = buildObjectiveSyncOps(objectives, map, []);
+    expect(ops).toHaveLength(2);
+    expect(ops.map((o) => o.ref.kind === "account" && (o.ref as { accountId: number }).accountId)).toEqual([1, 2]);
+  });
+});
