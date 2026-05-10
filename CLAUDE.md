@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§262** — Chantier A sub-§C3a : RPC `save_swim_session_atomic` (1 RTT vs N+1, transactionnel, queue offline).
+Dernier § livré : **§260** — Auto-sync objectifs chronométriques → cibles allures équipe au montage.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

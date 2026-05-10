@@ -4,6 +4,40 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §260 — Auto-sync objectifs chronométriques → Allures équipe
+
+**Date :** 2026-05-10
+**Chantier :** Feature autonome (cross-chantier objectifs + allures)
+
+### Contexte
+Le mécanisme `autoSyncPaceTarget` dans `SwimmerObjectivesTab` ne couvrait pas le cas
+où les objectifs existaient avant ce mécanisme ou avaient été créés côté nageur.
+Quand le coach ouvrait « Allures équipe » directement, aucune cible n'était générée.
+
+### Changements
+- `src/pages/coach/CoachPaceCalculatorScreen.tsx` : ajout imports (`supabase`,
+  `getObjectives`, `parseObjectiveForPace`, `shouldAutoSyncToPaceTarget`, `useRef`,
+  `Objective`), extraction de `buildObjectiveSyncOps` (pure function exportée),
+  ajout du `useEffect` de sync au montage (gated par `hasSyncedObjectivesRef`,
+  lecture des targets via `qc.getQueryData` pour éviter la staleness).
+- `src/pages/coach/__tests__/CoachPaceCalculatorScreen.test.tsx` : 11 nouveaux tests
+  pour `buildObjectiveSyncOps` (valide, temps null, event_code null/invalide, cible
+  existante, hors équipe, pool 25m/null, multi-objectifs, dedup time-diff).
+
+### Décisions
+- Pure function extractée pour testabilité sans Supabase mock.
+- `hasSyncedObjectivesRef` évite les re-syncs si le composant se re-rend.
+- `qc.getQueryData` pour lire les targets au moment de l'exécution (anti-staleness).
+- Ne pas écraser les cibles existantes (shouldAutoSyncToPaceTarget retourne false si
+  une cible (nage + distance + bassin) existe déjà).
+- Erreurs silencieuses — best-effort, cohérent avec le pattern `autoSyncPaceTarget`.
+
+### Limites
+- Le sync est côté frontend (N appels `upsertPaceTarget`). Sur les visites suivantes :
+  0 upsert (toutes les cibles existent déjà).
+- Le sync ne se redéclenche pas si le coach change d'équipe (coach selector) en cours
+  de session — acceptable pour la V1.
+
 ## §262 — Chantier A sub-§C3a : RPC `save_swim_session_atomic` (1 RTT vs N+1, transactionnel, queue offline) (2026-05-10)
 
 **Contexte :** suite du plan post-pass-2 (`docs/audits/2026-05-10-perf-audit-pass2-runtime.md` § 4 P1). Chantier A complet 10/12 mutations couvertes offline post-§252 ; restaient 2 cas techniquement difficiles : (1) `Profile.uploadAvatarMutation` (Blob binaire — reporté §263), (2) `SwimSessionView.saveMutation` **multi-étape** : `ensureSwimSession` (UPSERT session) suivi de N × `saveSwimLog` (1 INSERT par bloc d'entraînement). Sur N blocs = N+1 round-trips. Crash réseau au milieu → session orpheline avec logs partiels. Pas de pattern simple « 1 mutation = 1 replay » pour la queue offline.
