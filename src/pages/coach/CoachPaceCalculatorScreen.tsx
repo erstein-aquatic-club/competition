@@ -229,7 +229,8 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
         for (const row of userRows ?? []) {
           if (row.auth_uid) authUidToAccountId.set(row.auth_uid, row.id);
         }
-        const ops = buildObjectiveSyncOps(objectives, authUidToAccountId, targets);
+        const fresh = qc.getQueryData<PaceTarget[]>(["pace-targets"]) ?? [];
+        const ops = buildObjectiveSyncOps(objectives, authUidToAccountId, fresh);
         if (ops.length === 0) return;
         await Promise.all(
           ops.map((op) =>
