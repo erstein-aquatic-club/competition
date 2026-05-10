@@ -4,6 +4,53 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §243 — Chantier B sub-§B : framer-motion → CSS sur 6 banners (audit perf pass 1) (2026-05-10)
+
+**Contexte :** sub-§B du Chantier B issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #1 bundle/SW). Cible : sortir framer-motion (38.27 KB gzip) du critical path online. Les 6 banners partagés montés depuis App.tsx + AppLayout.tsx (UpdateNotification, InstallPrompt, OfflineBanner, InlineBanner, OfflineSyncBanner, OfflineDetector) tiraient `vendor-motion` dans le bundle initial alors qu'ils s'affichent <5 % du temps. Numérotation §243 (et non §242) car §242 réservé Pass 6 sub-§B WCAG livré en parallèle.
+
+**Changements (8 fichiers, ~150 LOC nettes — ajouts CSS/hook + remplacements composants) :**
+
+| # | Fichier | Action | Détail |
+|---|---|---|---|
+| 1 | `src/hooks/useExitAnimation.ts` (NEW, 47 LOC) | nouveau hook | `useExitAnimation(visible, durationMs=280)` — équivalent minimal d'`AnimatePresence` : garde `shouldRender=true` pendant la durée d'exit avant unmount. |
+| 2 | `src/index.css` (+50 LOC en bas du fichier) | extension | 6 `@keyframes` (`banner-pill-enter/exit`, `inline-banner-enter/exit`, `banner-collapse-enter/exit`) + 6 classes utilitaires `.anim-*` + `@media (prefers-reduced-motion: reduce)`. Spring approximé via `cubic-bezier(0.34, 1.56, 0.64, 1)` (entry, slight overshoot) et `cubic-bezier(0.4, 0, 1, 1)` (exit, ease-in). |
+| 3 | `src/components/shared/UpdateNotification.tsx` | migration | retrait `motion`/`AnimatePresence`, intro `useExitAnimation` + classes `.anim-banner-pill-*`. Logique focus-mode + system banner queue préservée intacte. |
+| 4 | `src/components/shared/InstallPrompt.tsx` | migration | idem UpdateNotification. |
+| 5 | `src/components/shared/OfflineSyncBanner.tsx` | migration | idem (auto-dismiss 5s + wasOffline ref préservés). |
+| 6 | `src/components/shared/OfflineDetector.tsx` | migration | idem (transition 2s vert→rouge préservée). |
+| 7 | `src/components/shared/OfflineBanner.tsx` | migration | classes `.anim-banner-collapse-*` (max-height 0 ↔ 200px, overestimation safe pour wrap multi-lignes). |
+| 8 | `src/components/shared/InlineBanner.tsx` | migration | classes `.anim-inline-banner-*` (offsets plus subtils -8px/-6px). API publique `animate`/`visible` préservée — quand `animate=false`, render sans animation. |
+
+**Stratégie animation** :
+- Entry : `cubic-bezier(0.34, 1.56, 0.64, 1)` — overshoot léger qui mime le ressort sous-amorti (damping ratio ~0.67 du spring stiffness:500/damping:30).
+- Exit : `cubic-bezier(0.4, 0, 1, 1)` — ease-in plus rapide (200 ms vs 280 ms entry).
+- InlineBanner : durations réduites (240/180 ms) car offsets plus subtils.
+- OfflineBanner : `max-height` au lieu de `height: auto` (pas animable en CSS pur). 200 px overestimation safe.
+- `prefers-reduced-motion` honoré sur les 6 keyframes.
+
+**Delta mesuré (build local) :**
+- `vendor-motion-C4odFwZ5.js` : **115.94 kB / 38.27 kB gzip** — toujours présent dans le build (utilisé par 30+ pages lazy : Login, Strength, Profile, Records, Progress, etc.) **mais sort du critical path**.
+- `dist/index.html` `<link rel="modulepreload">` : avant §243 préchargeait 5 vendors (react/query/charts/supabase **+ motion**) ; après §243 préchargeait 4 vendors (**plus de motion**).
+- **Gain critical path : -38.27 kB gzip** (~-300 à -500 ms TTI 4G+ selon estimation audit pass 1).
+- `vendor-motion` reste accessible via lazy-load — chargé avec la première page lazy qui l'importe (Login en pratique).
+- SW precache : 5712.92 KiB (stable vs §241, le chunk reste précaché car toujours présent).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean (aucune régression typée).
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- `grep "from \"framer-motion\"" src/components/shared/{Update,Install,OfflineBanner,Inline,OfflineSync,OfflineDetector}.tsx` : 0 résultat (les 6 cibles sont propres ; les commentaires `§243 — migrated from framer-motion` sont de la prose).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes UX / régression potentielle** :
+- Spring framer-motion n'est pas reproduit à l'identique (`cubic-bezier` est une approximation 1-segment vs comportement physique multi-paramètres). Différence visuelle : amortissement légèrement différent en fin d'animation. Acceptable car composants brefs (5/6 sont des pills <300 ms) et invisibles >95 % du temps.
+- 2 autres composants partagés (`BottomActionBar`, `AchievementToast`) importent encore framer-motion mais ne sont pas montés depuis App.tsx/AppLayout.tsx — ils sont déjà lazy-tirés via Dashboard/Strength/Profile. Pas dans le scope §243.
+
+**Hors scope §243 (Chantier B terminé, restent A/C/D/E) :**
+- Chantier A : `persistQueryClient` + queue offline généralisée.
+- Chantier C : RPC `get_user_auth_context` (-800 ms login Slow 3G).
+- Chantier D : `withTimeout` + retry exponentiel sur 40+ modules API.
+- Chantier E : `React.memo` sur listes longues.
+
 ## §242 — Pass 6 sub-§B fixes WCAG AA (vers 9.5/10) (2026-05-10)
 
 **Contexte :** exécution Pass 6 sub-§B du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` post-§240 audit. 4 sub-agents sonnet parallèles, scope par fichier non-overlap. Numérotation §242 (et non §241) car §241 réservé chantier B perf SW livré par utilisateur en parallèle.

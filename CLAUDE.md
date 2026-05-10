@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§242** — Pass 6 sub-§B WCAG AA. 54 edits / 23 fichiers, vers ~9.5/10.
+Dernier § livré : **§243** — Chantier B sub-§B. framer-motion → CSS sur 6 banners. Critical path -38 KB gzip.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

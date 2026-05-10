@@ -1,6 +1,6 @@
 import type { ReactNode, KeyboardEvent } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useExitAnimation } from "@/hooks/useExitAnimation";
 
 // ── Variant config ────────────────────────────────────────────
 // §199 Chantier B — refonte sur tokens sémantiques (--color-status-*).
@@ -92,16 +92,10 @@ const variants = {
 
 export type BannerVariant = keyof typeof variants;
 
-// ── Animation ─────────────────────────────────────────────────
-
-const bannerMotion = {
-  initial: { opacity: 0, y: -8, scale: 0.98 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, y: -6, scale: 0.98 },
-  transition: { type: "spring" as const, stiffness: 500, damping: 32, mass: 0.8 },
-};
-
 // ── Component ─────────────────────────────────────────────────
+// §243 — animation migrée de framer-motion vers CSS @keyframes
+// (`.anim-inline-banner-*` dans index.css), useExitAnimation gère le délai
+// d'unmount pour préserver le pattern AnimatePresence d'origine.
 
 interface InlineBannerProps {
   variant?: BannerVariant;
@@ -116,7 +110,7 @@ interface InlineBannerProps {
   subbadge?: ReactNode;
   /** Animate mount/unmount */
   animate?: boolean;
-  /** Show / hide (for AnimatePresence) */
+  /** Show / hide */
   visible?: boolean;
   /** Click handler */
   onClick?: () => void;
@@ -136,10 +130,17 @@ export function InlineBanner({
   className,
 }: InlineBannerProps) {
   const v = variants[variant];
+  // When animation is disabled, treat `visible` as a plain conditional render.
+  const { shouldRender, isExiting } = useExitAnimation(animate ? visible : true, 220);
 
-  const content = (
-    <motion.div
-      {...(animate ? bannerMotion : {})}
+  if (!animate) {
+    if (!visible) return null;
+  } else if (!shouldRender) {
+    return null;
+  }
+
+  return (
+    <div
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -147,8 +148,8 @@ export function InlineBanner({
       className={cn(
         "rounded-xl border px-3 py-2.5",
         "backdrop-blur-sm",
-        "motion-reduce:animate-none",
         onClick && "cursor-pointer active:scale-[0.98] transition-transform",
+        animate && (isExiting ? "anim-inline-banner-exit" : "anim-inline-banner-enter"),
         v.border,
         v.bg,
         className,
@@ -188,11 +189,6 @@ export function InlineBanner({
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   );
-
-  if (animate) {
-    return <AnimatePresence>{visible && content}</AnimatePresence>;
-  }
-  return visible ? content : null;
 }
