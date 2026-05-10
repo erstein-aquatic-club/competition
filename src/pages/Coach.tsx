@@ -846,6 +846,7 @@ const CoachHome = ({
                         src={athlete.avatar_url}
                         alt=""
                         className="h-9 w-9 shrink-0 rounded-full object-cover border border-border"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">

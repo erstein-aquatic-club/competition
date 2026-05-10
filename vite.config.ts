@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => ({
       registerType: 'prompt',  // §171 P1: was 'autoUpdate' — gated via UpdateNotification
       workbox: {
         importScripts: ['push-handler.js'],
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,gif,webp}'],
         globIgnores: ['**/version.json'],
         cleanupOutdatedCaches: true,
         clientsClaim: false,  // §171 P1: was true — let UpdateNotification gate the activation
@@ -78,6 +78,16 @@ export default defineConfig(({ mode }) => ({
             handler: 'NetworkOnly',
             options: {
               cacheName: 'supabase-auth-no-cache',
+            },
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/functions\/v1\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-functions',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+              networkTimeoutSeconds: 8,
             },
           },
         ],

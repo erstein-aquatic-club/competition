@@ -5,9 +5,9 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { cn } from "@/lib/utils";
 
 /**
- * OfflineSyncBanner — shows a brief notification when the user comes back online.
- * Displays either "Données synchronisées" or "Conflit — données serveur appliquées".
- * Auto-dismisses after 5 seconds.
+ * OfflineSyncBanner — discrete pill confirming the connection has been restored.
+ * Auto-dismisses after 5 seconds. Does not report sync status — the actual queue
+ * replay outcome is surfaced by the toast in OfflineMutationSync (single source of truth).
  */
 export function OfflineSyncBanner() {
   const isOnline = useOnlineStatus();

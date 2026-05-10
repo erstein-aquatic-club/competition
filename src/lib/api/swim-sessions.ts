@@ -151,7 +151,11 @@ export async function getSessions(
 ): Promise<Session[]> {
   const hasAthleteId = athleteId !== null && athleteId !== undefined && String(athleteId) !== "";
   if (canUseSupabase()) {
-    let query = supabase.from("dim_sessions").select("*").order("session_date", { ascending: false });
+    let query = supabase
+      .from("dim_sessions")
+      .select("*")
+      .order("session_date", { ascending: false })
+      .limit(200);
     if (hasAthleteId) {
       query = query.eq("athlete_id", Number(athleteId));
     } else {

@@ -214,7 +214,7 @@ export default function SwimmerHome() {
 
   // ── Section C: Today's sessions ──────────────────────────────
   const { data: assignments } = useQuery({
-    queryKey: ["assignments", user],
+    queryKey: ["assignments", userId ?? user],
     queryFn: () => getAssignments(user!, userId),
     enabled: !!user,
   });

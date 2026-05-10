@@ -21,7 +21,12 @@ import { localStorageGet, localStorageSave } from './localStorage';
 export async function getHallOfFame(fromDate?: string | null) {
   if (canUseSupabase()) {
     const rpcParams = fromDate ? { from_date: fromDate } : {};
-    const { data: rpcData, error: rpcError } = await supabase.rpc("get_hall_of_fame", rpcParams);
+    const strengthParams = fromDate ? { from_date: fromDate } : {};
+    const [swimResult, strengthResult] = await Promise.all([
+      supabase.rpc("get_hall_of_fame", rpcParams),
+      supabase.rpc("get_hall_of_fame_strength", strengthParams),
+    ]);
+    const { data: rpcData, error: rpcError } = swimResult;
     if (!rpcError && rpcData) {
       const hallOfFame = Array.isArray(rpcData) ? rpcData : [];
       const swimDistance = [...hallOfFame]
@@ -50,8 +55,7 @@ export async function getHallOfFame(fromDate?: string | null) {
         .slice(0, 5);
       // Strength stats via SECURITY DEFINER RPC (bypasses RLS for club-wide aggregates)
       let strengthStats: any[] = [];
-      const strengthParams = fromDate ? { from_date: fromDate } : {};
-      const { data: strengthRpc, error: strengthErr } = await supabase.rpc("get_hall_of_fame_strength", strengthParams);
+      const { data: strengthRpc, error: strengthErr } = strengthResult;
       if (!strengthErr && strengthRpc) {
         strengthStats = (Array.isArray(strengthRpc) ? strengthRpc : []).map((row: any) => ({
           athlete_name: row.athlete_name ?? "Inconnu",

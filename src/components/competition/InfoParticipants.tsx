@@ -83,7 +83,7 @@ export default function InfoParticipants({ competitionId }: Props) {
               >
                 <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
                   {row.avatarUrl ? (
-                    <img src={row.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={row.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                   ) : (
                     <span className="text-[10px] font-medium text-muted-foreground">
                       {row.displayName.slice(0, 2).toUpperCase()}

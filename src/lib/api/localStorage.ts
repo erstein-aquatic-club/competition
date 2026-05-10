@@ -15,10 +15,17 @@ export const localStorageGet = <T = unknown>(key: string): T | null => {
   }
 };
 
+const isQuotaError = (error: unknown): boolean =>
+  error instanceof DOMException &&
+  (error.name === 'QuotaExceededError' || error.code === 22 || error.code === 1014);
+
 export const localStorageSave = <T = unknown>(key: string, data: T): void => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
+    if (isQuotaError(error) && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('storage-quota-exceeded', { detail: { key } }));
+    }
     console.error('[localStorage] Failed to save:', key, error);
   }
 };
@@ -53,6 +60,9 @@ export const localStorageSaveVersioned = <T = unknown>(key: string, data: T): vo
     };
     localStorage.setItem(key, JSON.stringify(entry));
   } catch (error) {
+    if (isQuotaError(error) && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('storage-quota-exceeded', { detail: { key } }));
+    }
     console.error('[localStorage] Failed to save:', key, error);
   }
 };

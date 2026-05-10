@@ -4,6 +4,48 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §239 — 8 quick wins perf (audit pass 1) (2026-05-10)
+
+**Contexte :** exécution des 8 quick wins issus de `docs/audits/2026-05-10-perf-audit-pass1.md` (audit perf 3 contextes : online stable, offline PWA, réseau instable). Cible : amorcer le composite 6.1 → 8.0/10 en lot ≤ 10 LOC par item, sans toucher à l'architecture. Numérotation §239 (et non §238) car §238 réservé à un Pass 5 UI/UX livré en parallèle.
+
+**Changements (9 fichiers, ~25 LOC nettes) :**
+
+| # | Fichier:ligne | Avant | Après | Drapeau |
+|---|---|---|---|---|
+| 1 | `vite.config.ts:40` | `globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}']` | `+gif,webp` | #1 bundle/SW |
+| 2 | `src/pages/SwimmerHome.tsx:217` | `["assignments", user]` | `["assignments", userId ?? user]` (aligné `Dashboard.tsx:158`) | #3 chemin critique |
+| 3 | `src/lib/api/swim-sessions.ts:154` | `select("*").order(...)` non borné | `+ .limit(200)` | #3 chemin critique |
+| 4 | `src/lib/api/records.ts:24,54` | RPC swim → RPC strength séquentiels | `Promise.all([rpc(swim), rpc(strength)])` | #3 chemin critique |
+| 5 | `src/lib/api/localStorage.ts:18-24,46-58` | `console.error` silencieux sur erreur save | `+ isQuotaError` helper + `dispatchEvent('storage-quota-exceeded')` sur QuotaExceededError (DOMException name OR code 22/1014) — ×2 (`localStorageSave` + `localStorageSaveVersioned`) | #2 cache/queue offline |
+| 6 | `vite.config.ts:67-83` | runtime caching `/rest/*` + `/auth/*` uniquement | `+ règle /functions/v1/*` NetworkFirst, 30 entrées, TTL 1h, networkTimeout 8s | #2 cache/queue offline |
+| 7 | `src/components/shared/OfflineSyncBanner.tsx:7-10` | JSDoc trompeuse ("Données synchronisées" / "Conflit" — non implémenté) | JSDoc alignée sur l'implémentation réelle ("Connexion rétablie" pill, sync outcome surfacé par `OfflineMutationSync`) | clarification |
+| 8a | `src/components/swim/EquipmentIconCompact.tsx:33` | `<img>` sans loading | `+ loading="lazy"` (utilisé dans `SwimSessionTimeline`, liste scrollable) | #1 bundle/SW |
+| 8b | `src/components/competition/InfoParticipants.tsx:86` | `<img>` sans loading | `+ loading="lazy"` (avatars participants) | #1 bundle/SW |
+| 8c | `src/pages/Coach.tsx:845` | `<img>` sans loading | `+ loading="lazy"` (avatars recent athletes) | #1 bundle/SW |
+
+**Détail #5 — événement `storage-quota-exceeded`** :
+- Helper `isQuotaError` détecte `DOMException` avec `name === 'QuotaExceededError'` ou `code === 22` (Chrome/Firefox) ou `code === 1014` (Safari).
+- Émission `CustomEvent('storage-quota-exceeded', { detail: { key } })` sur `window`.
+- Aucun toast user dans ce patch — le hook est posé pour un futur listener (toast/cleanup automatique). Pas de régression : le `console.error` historique reste, ajout pur.
+
+**Détail #6 — règle Workbox `/functions/v1/`** :
+- Edge Functions appelées depuis le frontend (`admin-user`, `import-club-records`, `ffn-performances` x2, `push-send`) bénéficient désormais du cache : NetworkFirst avec timeout 8s, fallback cache, expiration 1h.
+- La règle `/auth/*` (NetworkOnly) précède dans l'ordre des matchers Workbox — pas de risque de cacher des appels d'auth.
+
+**Hors scope §239 (chantiers structurels, prochaines étapes) :**
+- Chantier A : `persistQueryClient` + queue offline généralisée (8 mutations Profile/Records/Dashboard/SuiviSemaine).
+- Chantier B : framer-motion hors critical path (6 composants partagés) + `globIgnores` exceljs/jspdf/html2canvas.
+- Chantier C : RPC `get_user_auth_context` fusionnant rôle + is_approved (-800 ms login Slow 3G).
+- Chantier D : `withTimeout` + retry exponentiel sur 40+ modules API + pagination 3 SELECT* records restants.
+- Chantier E : `React.memo` sur `SwimSessionTimeline` / `CoachSwimmersOverview` / items `Records`.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis (cf CLAUDE.md règles d'usage).
+
+**Score perf attendu** : composite 6.1 → ~6.7/10 (gain partiel sur les 3 drapeaux, sans encore les chantiers structurels). Mesure réelle à pass 2 perf (Lighthouse mobile + WebPageTest 3G).
+
 ## §238 — Pass 5 caves catégoriels — top 5 fichiers tokenisation (2026-05-10)
 
 **Contexte :** exécution Pass 5 du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md`. Audit pass 3 §236 avait identifié 67 hits cumulés (top 5 contributors hardcodes restants) — grep réel : 79 hits (audit avait sous-compté Pace4NSegmentMatrix 13→22 et SuiviSemaine 14→16). 5 sub-agents sonnet parallèles, un par fichier, avec brief strict (decision tree status-* / intensity-* / cat-* / stroke-* / rank-* / catégoriel pur conservé).

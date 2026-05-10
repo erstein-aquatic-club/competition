@@ -30,7 +30,7 @@ export function EquipmentIconCompact({
     <div className={cn("flex flex-col items-center gap-0.5", className)}>
       <div className={cn(boxSize, "flex items-center justify-center rounded-lg bg-muted")}>
         {iconUrl ? (
-          <img src={iconUrl} alt={equipment} className={cn(imgSize, "opacity-70")} aria-hidden="true" />
+          <img src={iconUrl} alt={equipment} className={cn(imgSize, "opacity-70")} aria-hidden="true" loading="lazy" />
         ) : (
           <span className="text-[10px] font-semibold text-muted-foreground">{label}</span>
         )}
