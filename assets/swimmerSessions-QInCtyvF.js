@@ -1,1 +1,0 @@
-import{t as r,v as i,s as n}from"./index-Bckdd_1s.js";async function u(s,a,e,t=!1){return r()?i(await n.rpc("get_swimmer_sessions",{p_user_id:s,p_from:a,p_to:e,p_include_drafts:t}))??[]:[]}export{u as g};
