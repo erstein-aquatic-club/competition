@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 export default function Login() {
+  const reduceMotion = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   const [showRegister, setShowRegister] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
@@ -280,7 +281,7 @@ export default function Login() {
           <motion.div
             initial="hidden"
             animate="visible"
-            variants={staggerChildren}
+            variants={reduceMotion ? undefined : staggerChildren}
             className="w-full max-w-md"
           >
             <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as "login" | "signup"); setSignupStep(1); }} className="w-full">

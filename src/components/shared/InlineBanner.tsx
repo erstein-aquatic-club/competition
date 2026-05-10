@@ -147,6 +147,7 @@ export function InlineBanner({
       className={cn(
         "rounded-xl border px-3 py-2.5",
         "backdrop-blur-sm",
+        "motion-reduce:animate-none",
         onClick && "cursor-pointer active:scale-[0.98] transition-transform",
         v.border,
         v.bg,

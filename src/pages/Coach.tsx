@@ -107,7 +107,7 @@ type CoachHomeProps = {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 pb-0.5">
-      <span className="text-[9px] font-black uppercase tracking-[0.28em] text-muted-foreground/70">
+      <span className="text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground/70">
         {children}
       </span>
       <div className="flex-1 h-px bg-border/50" />
@@ -182,7 +182,7 @@ function SlotCell({ info, isToday }: { info: CellInfo; isToday: boolean }) {
         ].join(" ")}
         aria-label={`${assigned} sur ${total} séances assignées`}
       >
-        <span className="text-[9px] font-black tabular-nums leading-none">
+        <span className="text-[11px] font-black tabular-nums leading-none">
           {assigned}/{total}
         </span>
         <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-status-warning ring-2 ring-card" />
@@ -495,7 +495,7 @@ const CoachHome = ({
                 >
                   <span
                     className={[
-                      "text-[9px] font-black uppercase tracking-[0.18em]",
+                      "text-[11px] font-black uppercase tracking-[0.18em]",
                       isToday ? "text-primary" : "text-muted-foreground/60",
                     ].join(" ")}
                   >
@@ -523,7 +523,7 @@ const CoachHome = ({
             {/* Matin row label */}
             <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
               <Sunrise className="h-3 w-3 shrink-0 text-amber-500/80" />
-              <span className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">
                 Matin
               </span>
             </div>
@@ -534,7 +534,7 @@ const CoachHome = ({
             {/* Aprèm row label */}
             <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
               <Sunset className="h-3 w-3 shrink-0 text-rose-400/90" />
-              <span className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">
                 Aprèm
               </span>
             </div>
@@ -696,7 +696,7 @@ const CoachHome = ({
                   </span>
                   <span
                     className={[
-                      "text-[9px] font-black uppercase tracking-widest",
+                      "text-[11px] font-black uppercase tracking-widest",
                       isMaxAlert ? "text-status-error" : "text-status-warning",
                     ].join(" ")}
                   >

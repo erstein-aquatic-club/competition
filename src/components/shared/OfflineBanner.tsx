@@ -12,7 +12,7 @@ export function OfflineBanner() {
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          className="bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium"
+          className="bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium motion-reduce:animate-none"
         >
           <WifiOff className="h-4 w-4" />
           Hors connexion — certaines modifications seront synchronisees plus tard

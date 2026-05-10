@@ -70,7 +70,7 @@ export function InstallPrompt() {
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             role="alert"
             aria-live="polite"
-            className="pointer-events-auto inline-flex items-center gap-2.5 rounded-full bg-card/95 backdrop-blur-xl border border-border shadow-lg shadow-black/10 dark:shadow-black/30 pl-3.5 pr-1.5 py-1.5"
+            className="pointer-events-auto inline-flex items-center gap-2.5 rounded-full bg-card/95 backdrop-blur-xl border border-border shadow-lg shadow-black/10 dark:shadow-black/30 pl-3.5 pr-1.5 py-1.5 motion-reduce:animate-none"
           >
             <Download className="h-3.5 w-3.5 text-primary shrink-0" />
             <span className="text-xs font-semibold text-foreground">

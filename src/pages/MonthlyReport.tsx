@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { fadeIn, staggerChildren, listItem } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -254,6 +254,7 @@ function ReportAcwrBadge({ value }: { value: number }) {
 // ---------------------------------------------------------------------------
 
 export default function MonthlyReport() {
+  const reduceMotion = useReducedMotion();
   const [, params] = useRoute("/report/:userId/:month");
   const [, navigate] = useLocation();
   const authUserId = useAuth((s) => s.userId);
@@ -346,7 +347,7 @@ export default function MonthlyReport() {
       {/* Cards grid */}
       <motion.div
         className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-        variants={staggerChildren}
+        variants={reduceMotion ? undefined : staggerChildren}
         initial="hidden"
         animate="visible"
       >

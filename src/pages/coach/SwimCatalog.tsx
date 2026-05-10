@@ -758,7 +758,7 @@ export default function SwimCatalog({
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="absolute right-0 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 aria-label="Effacer la recherche"
               >
                 <X className="h-3.5 w-3.5" />

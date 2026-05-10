@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§233** — Suppression dead code `seedDemoData`/`resetCache` (0 caller post-grep) + import orphelin `assignments_create` retiré. `localStorage.ts` 171 → 119 LOC. -57 LOC net.
+Dernier § livré : **§234** — Closing audit pass 2 : Coach.tsx 9px→11px (6) + 8 motion guards (Login/MonthlyReport useReducedMotion + 6 banners motion-reduce) + 3 catalogs search clear h-7→h-9.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

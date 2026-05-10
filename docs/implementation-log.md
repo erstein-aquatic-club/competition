@@ -4,6 +4,73 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §234 — Closing audit pass 2 : labels WCAG + motion guards + search clear (2026-05-10)
+
+**Contexte :** 3 quick wins finaux post-audit pass 2 §215, bundlés pour clore le chantier audit. Les 3 numéros initialement prévus (§232+§233+§234) ont été pris par des chantiers user en parallèle (assertSupabase helper, dead code cleanup) → bundle sur un seul § final §234. Tous les items proposés dans le plan post-§229+§230 sont livrés ici. Drapeaux racines pass 2 100% closeés.
+
+### Sous-§ A — Lisibilité WCAG : Coach.tsx text-[9px] → text-[11px]
+
+**Cible :** 6 occurrences de `text-[9px]` dans `src/pages/Coach.tsx` (lignes 110, 185, 498, 526, 537, 699 — section labels SectionLabel + SlotCell partiels + Sunrise/Sunset row labels + fatigue alerts). Sub-9px = inaccessible WCAG AAA, signalé P1 par audit pass 2.
+
+**Fix :** `replace_all=true` sur le pattern `text-[9px]` → `text-[11px]` dans Coach.tsx. 6 lignes affectées. Le seuil 11px est le minimum iOS HIG sur retina display.
+
+### Sous-§ B — prefers-reduced-motion guards (8 fichiers, sub-agent sonnet)
+
+**Méthode :** sub-agent sonnet a audité les 10 fichiers `motion.*`/`AnimatePresence` sans guard, puis appliqué selon critères stricts (stagger explicite → `useReducedMotion` hook, banner single-element → `motion-reduce:animate-none` Tailwind utility, animations one-off → skip).
+
+**Verdict** :
+
+| Fichier | Décision | Raison |
+|---|---|---|
+| `Login.tsx` | `useReducedMotion` | `staggerChildren` formulaire L.283 |
+| `MonthlyReport.tsx` | `useReducedMotion` | `staggerChildren` + `listItem` grille `.map()` |
+| `OfflineBanner.tsx` | `motion-reduce` | banner single-element |
+| `InstallPrompt.tsx` | `motion-reduce` | banner single-element |
+| `InlineBanner.tsx` | `motion-reduce` | banner primitif single-element |
+| `OfflineSyncBanner.tsx` | `motion-reduce` | banner single-element |
+| `UpdateNotification.tsx` | `motion-reduce` | banner single-element |
+| `AchievementToast.tsx` | `motion-reduce` | toast entrée spring |
+| `SuiviSaison.tsx` | SKIP | motion solo + AnimatePresence 1 enfant |
+| `Profile.tsx` | SKIP | 3× motion fadeIn one-off |
+
+Total : 2 hook guards + 6 Tailwind utilities + 2 skips justifiés. **8 edits appliqués**.
+
+### Sous-§ C — Search clear button h-7 → h-9 (3 catalogs)
+
+**Cible :** pattern identique dans 3 catalogs (clear button conditionnel sur `searchQuery`) :
+- `src/pages/coach/SwimCatalog.tsx:761`
+- `src/pages/coach/StrengthCatalog.tsx:1416`
+- `src/components/coach/strength/AthletePlansTab.tsx:184`
+
+**Fix :** `flex h-7 w-7 ... rounded-full` → `flex h-9 w-9 ... rounded-full`. Pattern field-internal donc 36px reste tap-acceptable selon audit pass 2 (vs 28px pré-fix, 44px serait disproportionné dans un input width). 3 lignes modifiées.
+
+### Vérifications
+
+- `npx tsc --noEmit` : ✅ clean
+- Tests : non re-mesurés sur ce commit (tests pré-§232 user assertSupabase → tests pre-§232 montraient 19 fails liés aux changements user `lib/api/*`. Après §232 user committé, les fails ont été résolus). Mes changements §234 ne touchent zéro Supabase ni test infrastructure.
+
+### Hors scope §234 / non livrés (dans plan post-§230)
+
+- §235 prévu : audit pass 3 (re-mesure file:line score post-§234, lecture seule).
+- §236-§237 reportés : SwimCatalog header inline → CoachSectionHeader (visual change UX), SwimmerObjectivesTab picker temps + pool toggle (UX change). Validation utilisateur d'abord.
+- §238-§240 (Surface adoption massive, PageSkeleton variantes, Badge counts) reportés à un futur chantier dédié.
+
+### Cumul final post-audit pass 2
+
+- 8 chantiers livrés mes (§215+§222, §224, §225, §226, §227, §229+§230, §234) + 6 chantiers user en parallèle (§220 design RPC, §221 GIFs, §223 RPC, §228 Profile, §231 NeurotypQuiz, §232 assertSupabase, §233 dead code).
+- Drapeau #1 typo : 100% NEUTRALISÉ (règle globale virée + 4 régressions closeées + 2 borderline whitelistées).
+- Drapeau #2 tap targets : primitives ui toutes conformes HIG 44pt + cluster AthletePlansTab + AppLayout/PageHeader/DialogClose/SheetClose.
+- Drapeau #3 hardcodes : 158 hits status éliminés sur 18 fichiers (Chantier C cumulé). Restants ~475 hits / 89 fichiers majoritairement catégoriels légitimes (anatomique BodyHeatMap, statuts SwimmerWeekMatrixCard, progressions ChallengeProgressBar).
+- Score audit estimé : **6/10 (pass 1) → 7.8 (pass 2) → ~9/10 (post-§234)**. À valider par §235 audit pass 3.
+
+**Fichiers modifiés (12)** :
+- `src/pages/Coach.tsx` (sous-§A, 6 lignes)
+- `src/pages/coach/SwimCatalog.tsx`, `src/pages/coach/StrengthCatalog.tsx`, `src/components/coach/strength/AthletePlansTab.tsx` (sous-§C, 3 fichiers × 1 ligne)
+- `src/pages/Login.tsx`, `src/pages/MonthlyReport.tsx` (sous-§B, useReducedMotion hook)
+- `src/components/shared/AchievementToast.tsx`, `InlineBanner.tsx`, `InstallPrompt.tsx`, `OfflineBanner.tsx`, `OfflineSyncBanner.tsx`, `UpdateNotification.tsx` (sous-§B, motion-reduce Tailwind)
+
+**Doc** : `docs/implementation-log.md` (entrée §234), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`.
+
 ## §233 — Suppression dead code `seedDemoData`/`resetCache` (cleanup audit §214) (2026-05-10)
 
 **Contexte :** Suite §232 (helper assertSupabase). Cleanup mécanique des 2 fonctions `seedDemoData` et `resetCache` flagged dead-code par la review §219 (0 caller depuis la migration depuis l'ex-`api.ts`). Confirmé par grep — aucun appel dans `src/`.

@@ -76,7 +76,7 @@ export function UpdateNotification() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-card/95 backdrop-blur-xl border border-border shadow-lg shadow-black/10 dark:shadow-black/30 pl-4 pr-1.5 py-1.5"
+            className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-card/95 backdrop-blur-xl border border-border shadow-lg shadow-black/10 dark:shadow-black/30 pl-4 pr-1.5 py-1.5 motion-reduce:animate-none"
           >
             <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
             <span className="text-xs font-semibold text-foreground">

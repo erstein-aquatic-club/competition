@@ -12,7 +12,7 @@ interface AchievementToastProps {
 export default function AchievementToast({ badge }: AchievementToastProps) {
   return (
     <motion.div
-      className="flex items-center gap-3"
+      className="flex items-center gap-3 motion-reduce:animate-none"
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: "spring", stiffness: 400, damping: 20 }}

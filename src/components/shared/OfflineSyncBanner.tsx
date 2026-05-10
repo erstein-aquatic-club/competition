@@ -45,6 +45,7 @@ export function OfflineSyncBanner() {
               "shadow-lg shadow-black/10 dark:shadow-black/30",
               "backdrop-blur-xl border",
               "bg-emerald-500/90 text-white border-emerald-400/30",
+              "motion-reduce:animate-none",
             )}
           >
             <Check className="h-3.5 w-3.5" />
