@@ -1,0 +1,1 @@
+function t(){return!(typeof window>"u"||!("vibrate"in navigator)||window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)}function e(r){if(t())try{navigator.vibrate(r)}catch{}}const i={light:()=>e(10),medium:()=>e(20),success:()=>e([12,50,12]),error:()=>e([30,40,30])};export{i as h};
