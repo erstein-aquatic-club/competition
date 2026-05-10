@@ -1,0 +1,1 @@
+import{r}from"./vendor-query-kdOL9ykq.js";function f(e,t=5e3){const[s,o]=r.useState(!1);return r.useEffect(()=>{if(!e){o(!1);return}const u=setTimeout(()=>{o(!0)},t);return()=>{clearTimeout(u)}},[e,t]),{showSlowToast:s}}export{f as u};
