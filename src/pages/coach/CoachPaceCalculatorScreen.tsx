@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Accordion } from "@/components/ui/accordion";
@@ -28,6 +28,8 @@ import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import { consumePacePrefill, type PacePrefillPayload } from "@/lib/pace-prefill-handoff";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { getObjectives } from "@/lib/api";
 
 export type ObjectiveSyncOp = {
   ref: SwimmerRef;
@@ -203,6 +205,51 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
     staleTime: 2 * 60 * 1000,
   });
   const targets = targetsQuery.data ?? [];
+
+  // Auto-sync : objectifs chronométriques → cibles d'allures (§260)
+  // S'exécute une fois après le chargement initial. Silent best-effort.
+  const hasSyncedObjectivesRef = useRef(false);
+  useEffect(() => {
+    if (teamLoading || targetsQuery.isLoading) return;
+    if (hasSyncedObjectivesRef.current) return;
+    hasSyncedObjectivesRef.current = true;
+
+    const accountIds = team
+      .filter((m): m is TeamMember & { kind: "account"; accountId: number } => m.kind === "account" && m.accountId != null)
+      .map((m) => m.accountId);
+    if (accountIds.length === 0) return;
+
+    const run = async () => {
+      try {
+        const [{ data: userRows }, objectives] = await Promise.all([
+          supabase.from("users").select("id, auth_uid").in("id", accountIds),
+          getObjectives(),
+        ]);
+        const authUidToAccountId = new Map<string, number>();
+        for (const row of userRows ?? []) {
+          if (row.auth_uid) authUidToAccountId.set(row.auth_uid, row.id);
+        }
+        const ops = buildObjectiveSyncOps(objectives, authUidToAccountId, targets);
+        if (ops.length === 0) return;
+        await Promise.all(
+          ops.map((op) =>
+            upsertPaceTarget({
+              swimmer: op.ref,
+              stroke: op.stroke,
+              target_distance_m: op.target_distance_m,
+              target_time_ms: op.target_time_ms,
+              target_pool_size: op.target_pool_size,
+            }),
+          ),
+        );
+        qc.invalidateQueries({ queryKey: ["pace-targets"] });
+      } catch {
+        // silent — best-effort sync
+      }
+    };
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamLoading, targetsQuery.isLoading]);
 
   const upsertMutation = useMutation({
     mutationFn: (args: { ref: SwimmerRef; stroke: PaceTarget["stroke"]; target_distance_m: number; target_time_ms: number; target_pool_size: PaceTarget["target_pool_size"] }) =>
