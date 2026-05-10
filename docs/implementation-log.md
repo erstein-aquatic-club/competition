@@ -4,6 +4,75 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §260-fix — Hotfix bridge auth_uid manquant dans l'auto-sync allures (2026-05-10)
+
+**Contexte :** L'auto-sync §260 ne créait aucune cible pour Louis Mandras (et probablement tous les nageurs). Diagnostic SQL : la colonne `users.auth_uid` n'existe pas — la requête `supabase.from("users").select("id, auth_uid")` levait une erreur PostgreSQL attrapée silencieusement par le `catch {}`, vidant le Map et produisant 0 ops.
+
+**Cause racine :** Le plan §260 supposait une colonne `auth_uid` sur `public.users`, mais le bridge réel passe par `auth.users.raw_app_meta_data->>'app_user_id'` (voir `get_auth_uid_for_user` existante).
+
+**Changements :**
+- `supabase/migrations/00160_get_auth_uids_for_users_rpc.sql` : nouvelle RPC `get_auth_uids_for_users(p_user_ids int[])` (SECURITY DEFINER) — retourne `TABLE(user_id int, auth_uid uuid)` via `raw_app_meta_data`.
+- `src/pages/coach/CoachPaceCalculatorScreen.tsx` : useEffect remplace `supabase.from("users").select("id, auth_uid")` par `supabase.rpc("get_auth_uids_for_users", { p_user_ids: accountIds })`.
+
+## §264 — Fix 3 régressions/gaps audit final consolidé : Card→Surface, tap targets, tracking tokens (2026-05-10)
+
+**Contexte :** post-audit consolidé `docs/audits/2026-05-10-final-consolidé.md` (composite 9.23/10), 3 régressions/gaps top priorité identifiés. Fixes mécaniques sans modification de scope :
+
+**Gap #1 — Card → Surface (architectural, single-file)**
+
+Plutôt qu'une migration risquée des 17 fichiers / 39 instances `<Card>` (visuel divergent : Surface a `rounded-2xl` + pas de shadow), refactor de `src/components/ui/card.tsx` pour qu'il **wrappe `Surface`** en interne. La primitive Card devient un dérivé de Surface (`variant="solid"` `radius="sm"` + `shadow` + `text-card-foreground`) — visuellement identique au comportement antérieur, objectif "primitive consolidation" atteint sans toucher 16 fichiers complexes (`CardHeader`/`Content`/`Title`/`Footer`/`Description` préservés).
+
+Fichier modifié : `src/components/ui/card.tsx` (ligne 4 import Surface ; lignes 7-15 wrapper).
+
+**Gap #2 — Tap targets contournés (5 fichiers / 14 spots P2)**
+
+Pattern `min-h-11 md:h-X` : 44px sur mobile (WCAG 2.5.5), réduit en desktop sur les UI denses coach.
+
+| Fichier | Lignes | Fix |
+|---|---|---|
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | 538, 551, 561, 921, 960, 974, 984 | 7 `<input>` date/time `h-9` → `h-11 md:h-9` (replace_all sur pattern partagé) |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | 2911, 2916 | 2 `<Button>` `h-8` → `min-h-11 md:h-8` |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | 2924, 2938 | 2 `<Button>` icon prev/next semaine `h-8 w-8` → `h-11 w-11 md:h-8 md:w-8` |
+| `src/pages/Records.tsx` | 846 | bouton "Ajouter record" `h-8` → `min-h-11 md:h-8` |
+| `src/pages/MonthlyReport.tsx` | 330, 336-339 | 2 boutons icon mois prev/next |
+| `src/components/coach/strength/AthletePlansTab.tsx` | 749 | bouton menu `h-8 w-8` → `h-11 w-11 md:h-8 md:w-8` |
+
+Total : **14 spots fixés**, primitives respectées (h-11 mobile/h-8-9 desktop).
+
+**Gap #3 — Migration tracking arbitraires → tokens (14 fichiers / 46 spots)**
+
+Mapping (cf. `index.css:387-398`) :
+- `0.08em` `0.10em` `0.12em` → `tracking-eyebrow-sm` (0.08em base)
+- `0.14em` `0.15em` `0.16em` → `tracking-eyebrow` (0.15em base)
+- `0.18em` `0.20em` `0.22em` → `tracking-eyebrow-lg` (0.20em base)
+
+Fichiers : ChronoRace, ChronoResults, BadgesGrid, SwimmerObjectivesView, SwimSessionTimeline, Administratif, RecordsAdmin, SharedSwimSession, SwimSessionView, CoachGroupsScreen, CoachMySwimmersScreen, CoachSwimmersOverview, CalendarHeader, FeedbackDrawer, SwimmerWeekMatrixCard, CoachTrainingSlotsScreen, FilieresEditor.
+
+**De 47 hits → 1 résiduel** (`Coach.tsx:111` 0.28em SectionLabel — whitelist brand-moment §259).
+
+Méthode : `sed -i ''` mass-replace sur 14 fichiers (changements purement Tailwind, pas de logique).
+
+**Vérifications**
+- `npx tsc --noEmit` : clean ✅
+- `npm run build` : 25.4s, 0 erreur, **243 entries / 5758.23 KiB** precache (vs 245/5757.06 baseline §261, dérive +1 KiB normale)
+- `npm test -- --run` : **694/695 pass** (1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` whitelisté §214)
+- Critical path modulepreload : `vendor-react / vendor-query / vendor-charts / vendor-supabase` (4 vendors, **vendor-motion absent** ✅)
+
+**Impact score composite (estimé)**
+- UI/UX : 9.90 → **~9.95** (Chantier II "primitive consolidation" résolu via wrapper, tap targets résiduels fermés, tracking adoption +46)
+- Perf : 8.20 → 8.20 (inchangé)
+- A11y : 9.60 → 9.65 (tap targets résiduels fermés)
+- **Composite : 9.23 → ~9.27**
+
+**Limites**
+- Card.tsx wrappe Surface mais `<Surface>` JSX direct reste 0 usage call-sites (les nouvelles surfaces utilisent toujours Card par convention shadcn). Architecturalement consolidé.
+- 11 hits `tracking-[0.X.em]` résiduels dans FilieresEditor (déjà migrés via cette passe). 0 `tracking-[…em]` restant hors whitelist Coach.tsx:111.
+- Pas de fix `<Card>` direct dans Admin.tsx/HallOfFame.tsx/Comite.tsx (16 fichiers complexes) — désormais sans objet car Card = Surface.
+
+**Files modifiés** : 24 (1 atomique `card.tsx` + 5 tap targets + 15 tracking + 3 docs) — 132 insertions / 71 deletions
+
+---
+
 ## §263 — Chantier A sub-§C3b : uploadAvatar offline (dataURL + quota guard) — Chantier A complet 12/12 (2026-05-10)
 
 **Contexte :** clôture du Chantier A (queue offline mutations critiques). Post-§262, restait 1 mutation non couverte : `Profile.uploadAvatarMutation` — bloquée par le **payload binaire Blob** qui ne peut pas être JSON-sérialisé dans la queue localStorage. Pattern offline existant (`tryWithOfflineQueue` §251) suppose un payload sérialisable.
