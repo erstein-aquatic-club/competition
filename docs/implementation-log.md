@@ -4,6 +4,47 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §235 — Auto-mark notifications lues à la complétion de l'action (2026-05-10)
+
+**Contexte :** Les notifs « actionnables » (wellness matin, rappel ressenti séance, entretien à compléter / à signer) restaient dans la liste « non lues » même après que l'utilisateur avait effectué l'action demandée. Le seul moyen de les vider était le bouton manuel « Effacer toutes les notifications » dans `SwimmerMessagesView` (§161). Demande user : refléter immédiatement l'action côté badge.
+
+**Architecture :**
+
+- **Helper centralisé** `notifications_mark_read_by_filter({ userId, type?, titleContains? })` ajouté dans `src/lib/api/notifications.ts`. Marque comme lues toutes les notifications non-lues de l'utilisateur qui matchent le filtre. Couvre :
+  - les targets perso (`target_user_id`),
+  - les targets groupe (résolus via `fetchUserGroupIds`),
+  - filtre `read_at IS NULL` côté `.is()` ET côté `.update()` (idempotent, n'écrit pas sur les déjà-lues),
+  - filtre `type` (string ou array) sur le join `notifications!inner`,
+  - filtre `titleContains` (case-insensitive `.ilike('%X%')`).
+  Renvoie `{ updated: N }` pour debug. Compte exact via `{ count: 'exact' }`.
+
+- **Logique pure extraite** : `applyMarkReadFilter(notifs, { userId, types, needle })` exposée pour testabilité (le filtre supabase `or` + jointure n'est pas testable sans mock complexe ; la logique localStorage et la sémantique du filtre type/titre/user sont testées directement sur le helper pur).
+
+- **Branchement frontend** sur 3 sites de complétion :
+  1. **Wellness** (`src/components/wellness/WellnessForm.tsx`) : `useMutation.mutationFn` appelle `notifications_mark_read_by_filter({ userId, type: 'wellness' })` après `upsertWellness` + `upsertPainReports`. `onSuccess` invalide les queries `profile-notifications` et `notifications-home`.
+  2. **Ressenti séance** (`src/components/dashboard/DashboardFeedbackContainer.tsx`) : ajout dans les **deux** mutations (`mutation` create + `updateMutation` edit) — filtre `{ type: 'assignment', titleContains: 'Séance terminée' }` pour cibler uniquement le rappel cron `slot-session-reminder` (00143) sans masquer les vraies assignations coach. `onSuccess` invalide les mêmes queries.
+  3. **Entretien** (`src/components/profile/AthleteInterviewsSection.tsx`) : helper local `markInterviewNotifsRead()` (`type: 'interview'`) appelé dans `submitMut` (envoi au coach) + `signMut` (signature après relecture). Couvre les notifs « Entretien à compléter » + « Entretien à relire » (00104).
+
+- Pattern défensif : try/catch autour de chaque appel auto-mark pour ne pas faire échouer la sauvegarde principale si l'auto-mark échoue (ex: réseau). `console.warn` non-bloquant.
+
+**Tests :**
+- `src/lib/api/__tests__/notifications-mark-read-by-filter.test.ts` (NEW, 4 tests, node:test) : `applyMarkReadFilter` couvre (1) filtre type + skip already-read / other users / wrong type, (2) `titleContains` case-insensitive, (3) broadcast `target_user_id=null`, (4) zéro match. 4/4 verts.
+- Suite globale : 689 tests, 688 pass + 1 fail pré-existant (`transformers.test.ts:18 buildRunUpdatePayload`, déjà documenté MEMORY.md / CLAUDE.md).
+- `npx tsc --noEmit` clean.
+
+**Décisions :**
+- **Pas de RPC SQL côté serveur** : la logique reste 100% client. Acceptable car (a) le helper s'exécute après une mutation déjà en succès, (b) le filtre `notifications!inner(type, title)` Supabase est bien supporté (déjà utilisé dans `notifications_list`), (c) un RPC alourdirait la migration sans gain perf mesurable.
+- **Filtre title sur `Séance terminée`** plutôt que metadata : le cron `slot-session-reminder` (00143) ne pose pas de metadata distinctive et utilise déjà le titre comme discriminant. Si un coach envoie une vraie assignation avec ce titre exact, l'auto-mark serait incorrectement déclenché — risque jugé négligeable.
+- **Auto-mark au moment de la mutation** plutôt que au moment du rendu (e.g., quand le user ouvre le drawer feedback) : la sémantique « j'ai fait l'action » est claire au moment du save, pas avant.
+- **Pas d'auto-mark sur saveMut** (entretien draft athlète) : la notif demande l'envoi au coach, pas juste la sauvegarde de brouillon. Marqué uniquement sur `submitMut` + `signMut`.
+- **Objective notif** : pas implémenté (pas de notif `objective` envoyée côté serveur dans les migrations actuelles, à investiguer §236+ si le besoin émerge).
+
+**Limites :**
+- L'auto-mark sur ressenti séance ne discrimine pas par date : si un user a 3 jours de rappels « Séance terminée ? » accumulés et saisit le ressenti d'aujourd'hui, **les 3** seront marquées lues. Acceptable car le cron pose désormais `expires_at = J+1` (00143) — la fenêtre est limitée à 24h.
+- Pas d'invalidation `["notifications"]` (utilisé par `useInAppPushBridge`) car ce queryKey n'est pas instancié dans nos pages testées. Si une régression apparaît, ajouter dans les `onSuccess`.
+
+**Fichiers** : Modifiés : `src/lib/api/notifications.ts` (+~100 LOC helper + applyMarkReadFilter), `src/lib/api/index.ts` (+1 re-export), `src/components/wellness/WellnessForm.tsx` (+~20 LOC), `src/components/dashboard/DashboardFeedbackContainer.tsx` (+~30 LOC sur 2 mutations), `src/components/profile/AthleteInterviewsSection.tsx` (+~28 LOC). Nouveaux : `src/lib/api/__tests__/notifications-mark-read-by-filter.test.ts` (76 LOC). **Doc** : `docs/implementation-log.md` (entrée §235), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`, `docs/FEATURES_STATUS.md`.
+
 ## §234 — Closing audit pass 2 : labels WCAG + motion guards + search clear (2026-05-10)
 
 **Contexte :** 3 quick wins finaux post-audit pass 2 §215, bundlés pour clore le chantier audit. Les 3 numéros initialement prévus (§232+§233+§234) ont été pris par des chantiers user en parallèle (assertSupabase helper, dead code cleanup) → bundle sur un seul § final §234. Tous les items proposés dans le plan post-§229+§230 sont livrés ici. Drapeaux racines pass 2 100% closeés.

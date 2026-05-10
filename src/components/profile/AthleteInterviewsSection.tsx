@@ -13,6 +13,7 @@ import {
   getMyCompetitionIds,
   getTrainingCycles,
   getTrainingWeeks,
+  notifications_mark_read_by_filter,
 } from "@/lib/api";
 import type { Interview, InterviewAthleteInput, Objective, SwimmerPerformance, TrainingWeek } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -168,11 +169,27 @@ export default function AthleteInterviewsSection({
       }),
   });
 
+  // §235 — entretien soumis OU signé par l'athlète : on marque lues les notifs
+  // `interview` ouvertes (« à compléter » / « à relire »). Non-bloquant.
+  const markInterviewNotifsRead = useCallback(async () => {
+    if (!appUserId) return;
+    try {
+      await notifications_mark_read_by_filter({ userId: appUserId, type: "interview" });
+    } catch (err) {
+      console.warn("[EAC] Failed to mark interview notifications as read:", err);
+    }
+  }, [appUserId]);
+
   const submitMut = useMutation({
-    mutationFn: (id: string) => submitInterviewToCoach(id),
+    mutationFn: async (id: string) => {
+      await submitInterviewToCoach(id);
+      await markInterviewNotifsRead();
+    },
     onSuccess: () => {
       toast({ title: "Envoyé au coach" });
       invalidate();
+      queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
     },
     onError: (e: Error) =>
       toast({
@@ -183,10 +200,15 @@ export default function AthleteInterviewsSection({
   });
 
   const signMut = useMutation({
-    mutationFn: (id: string) => signInterview(id),
+    mutationFn: async (id: string) => {
+      await signInterview(id);
+      await markInterviewNotifsRead();
+    },
     onSuccess: () => {
       toast({ title: "Entretien signé" });
       invalidate();
+      queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
     },
     onError: (e: Error) =>
       toast({

@@ -144,6 +144,7 @@ export {
   markNotificationRead,
   notifications_list,
   notifications_mark_read,
+  notifications_mark_read_by_filter,
   notifications_clear_all,
 } from './notifications';
 

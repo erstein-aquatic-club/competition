@@ -7,6 +7,7 @@ import {
   updateSession,
   setPlannedAbsence,
   removePlannedAbsence,
+  notifications_mark_read_by_filter,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import type { Session, Assignment, PlannedAbsence } from "@/lib/api";
@@ -173,6 +174,19 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
           console.warn("[EAC] Failed to save exercise logs:", e);
         }
       }
+      // §235 — ressenti enregistré : on marque lues les rappels « Séance terminée ? »
+      // que le cron envoie en fin de séance. Non-bloquant.
+      if (userId) {
+        try {
+          await notifications_mark_read_by_filter({
+            userId,
+            type: "assignment",
+            titleContains: "Séance terminée",
+          });
+        } catch (err) {
+          console.warn("[EAC] Failed to mark session-feedback notifications as read:", err);
+        }
+      }
       return result;
     },
     onMutate: () => {
@@ -182,6 +196,8 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
       toast({ title: "Séance enregistrée", description: "Vos données ont été synchronisées." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
@@ -216,6 +232,18 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
           throw e; // Re-throw to show error to user
         }
       }
+      // §235 — idem mutation principale : auto-mark des rappels « Séance terminée ? ».
+      if (userId) {
+        try {
+          await notifications_mark_read_by_filter({
+            userId,
+            type: "assignment",
+            titleContains: "Séance terminée",
+          });
+        } catch (err) {
+          console.warn("[EAC] Failed to mark session-feedback notifications as read:", err);
+        }
+      }
       return result;
     },
     onMutate: () => {
@@ -224,6 +252,8 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
       toast({ title: "Séance mise à jour", description: "Votre saisie a été mise à jour." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);

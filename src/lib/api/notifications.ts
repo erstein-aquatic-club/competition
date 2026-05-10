@@ -288,6 +288,107 @@ export async function notifications_mark_read(payload: {
 }
 
 /**
+ * §235 — Logique pure de filtrage localStorage extraite pour testabilité.
+ * Renvoie le nouveau tableau (immutable map) + le nombre de notifs marquées
+ * comme lues. Une notif matche si :
+ *   - elle est non-lue ET
+ *   - son target_user_id correspond à l'user (ou est null = broadcast) ET
+ *   - son type est dans `types` (si fourni) ET
+ *   - son title contient `needle` case-insensitive (si fourni).
+ */
+export function applyMarkReadFilter(
+  notifs: any[],
+  options: {
+    userId: number;
+    types: string[] | null;
+    needle: string | null;
+  },
+): { updated: any[]; count: number } {
+  let count = 0;
+  const updated = notifs.map((n: any) => {
+    if (n.read) return n;
+    if (n.target_user_id != null && n.target_user_id !== options.userId) return n;
+    if (options.types && !options.types.includes(String(n.type))) return n;
+    if (options.needle && !String(n.title ?? "").toLowerCase().includes(options.needle)) {
+      return n;
+    }
+    count += 1;
+    return { ...n, read: true };
+  });
+  return { updated, count };
+}
+
+/**
+ * §235 — Marque comme lues toutes les notifs non-lues de l'utilisateur qui
+ * matchent un filtre (type + titre). Appelé à la complétion d'une action que
+ * la notif demandait (wellness, ressenti séance, entretien) pour vider le
+ * badge non-lu sans intervention manuelle.
+ *
+ * - Couvre les targets perso (`target_user_id`) ET les targets groupe.
+ * - `read_at IS NULL` only — n'écrit pas sur les déjà-lues.
+ * - Renvoie `{ updated: N }` pour debug (typiquement 0 si l'utilisateur
+ *   réagissait déjà sans notif en attente).
+ */
+export async function notifications_mark_read_by_filter(options: {
+  userId: number;
+  type?: string | string[];
+  titleContains?: string;
+}): Promise<{ updated: number }> {
+  if (!options.userId) return { updated: 0 };
+
+  if (!canUseSupabase()) {
+    const notifs = (localStorageGet(STORAGE_KEYS.NOTIFICATIONS) || []) as any[];
+    const types = Array.isArray(options.type)
+      ? options.type
+      : options.type
+      ? [options.type]
+      : null;
+    const needle = options.titleContains?.toLowerCase() ?? null;
+    const { updated, count } = applyMarkReadFilter(notifs, {
+      userId: options.userId,
+      types,
+      needle,
+    });
+    if (count > 0) localStorageSave(STORAGE_KEYS.NOTIFICATIONS, updated);
+    return { updated: count };
+  }
+
+  const groupIds = await fetchUserGroupIds(options.userId);
+  const orFilters: string[] = [`target_user_id.eq.${options.userId}`];
+  groupIds.forEach((gid) => orFilters.push(`target_group_id.eq.${gid}`));
+
+  let query = supabase
+    .from("notification_targets")
+    .select("id, notifications!inner(type, title)")
+    .or(orFilters.join(","))
+    .is("read_at", null);
+
+  if (options.type) {
+    if (Array.isArray(options.type)) {
+      query = query.in("notifications.type", options.type);
+    } else {
+      query = query.eq("notifications.type", options.type);
+    }
+  }
+  if (options.titleContains) {
+    query = query.ilike("notifications.title", `%${options.titleContains}%`);
+  }
+
+  const { data: targets, error } = await query;
+  if (error) throw new Error(error.message);
+  if (!targets || targets.length === 0) return { updated: 0 };
+
+  const ids = (targets as Array<{ id: number }>).map((t) => t.id);
+  const { error: updError, count } = await supabase
+    .from("notification_targets")
+    .update({ read_at: new Date().toISOString() }, { count: "exact" })
+    .in("id", ids)
+    .is("read_at", null);
+  if (updError) throw new Error(updError.message);
+  return { updated: count ?? ids.length };
+}
+
+/**
  * §161 — Nettoyage serveur des notifications visibles pour l'utilisateur.
  * Personal targets (target_user_id = userId) → DELETE (RLS permet depuis §00139).
  * Group targets (target_group_id, partagées) → INSERT dans notification_dismissals

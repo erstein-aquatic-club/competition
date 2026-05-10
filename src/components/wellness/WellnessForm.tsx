@@ -8,9 +8,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Minus, Plus, Check, Moon, Smile, Battery, BatteryLow, Sparkles, Flame, Frown, Laugh, Wind, Zap, Bed, Bandage, Heart, type LucideIcon } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { upsertWellness, computeReadinessScore, getWellnessForDate } from "@/lib/api/wellness";
 import { getPainReportsForDate, upsertPainReports } from "@/lib/api/painReports";
+import { notifications_mark_read_by_filter } from "@/lib/api";
 import type { WellnessCheck } from "@/lib/api/types";
 import { slideInFromBottom } from "@/lib/animations";
 import { ReadinessGauge } from "./ReadinessGauge";
@@ -57,6 +58,7 @@ const ITEMS: WellnessItem[] = [
 // ── Component ──────────────────────────────────────────────────
 
 export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFormProps) {
+  const queryClient = useQueryClient();
   // Fetch existing data if not provided as prop
   const { data: fetchedData } = useQuery({
     queryKey: ["wellness", userId, date],
@@ -161,10 +163,22 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
         : [];
       await upsertPainReports(userId, date, painEntries);
 
+      // §235 — l'utilisateur vient d'effectuer l'action demandée par les
+      // notifs « Comment te sens-tu ? » : on les marque lues immédiatement
+      // pour vider le badge non-lu sans intervention manuelle. Non-bloquant
+      // (la sauvegarde wellness reste prioritaire côté UX).
+      try {
+        await notifications_mark_read_by_filter({ userId, type: "wellness" });
+      } catch (err) {
+        console.warn("[EAC] Failed to mark wellness notifications as read:", err);
+      }
+
       return wellnessResult;
     },
     onSuccess: (data) => {
       setSavedScore(data.readiness_score);
+      queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
       // Delay so the user can see the gauge
       setTimeout(() => onSaved(), 1800);
     },

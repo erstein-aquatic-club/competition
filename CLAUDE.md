@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§234** — Closing audit pass 2 : Coach.tsx 9px→11px (6) + 8 motion guards (Login/MonthlyReport useReducedMotion + 6 banners motion-reduce) + 3 catalogs search clear h-7→h-9.
+Dernier § livré : **§235** — Auto-mark notifications lues à la complétion de l'action (wellness, ressenti séance, entretien) — helper `notifications_mark_read_by_filter`.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
