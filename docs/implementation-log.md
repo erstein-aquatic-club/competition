@@ -4,6 +4,62 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §236 — Audit UI/UX iOS-like — passe 3 post-§234 (2026-05-10)
+
+**Contexte :** demande utilisateur — re-mener l'audit pass 3 lecture seule pour mesurer le score effectif post-livraison de §215-§234 (8 chantiers UI/UX + 6 user en parallèle). Méthode identique §215 : 3 forks parallèles sonnet (nageur / coach / partagés+NEW) + greps centralisés pour les 3 drapeaux racines. Validation file:line des P0/P1 et régressions.
+
+**Méthode :** lecture ciblée Read offset/limit autour des spots déjà signalés pass 2, comparaison /10 par surface, validation drapeaux racines.
+
+**Résultat synthétique :**
+
+- Score global app : **6/10 (pass 1) → 7.8 (pass 2) → ~8.5/10 (pass 3, +0.7)**
+- Score moyen nageur : **7.94 → 7.99** (+0.05, modeste)
+- Score moyen coach : **7.14 → 7.36** (+0.22, AthletePlansTab principal gain +1.5)
+- Score moyen partagés : **7.6 → 8.4** (+0.8, primitives ui closeées)
+- 3 NEW composants : Surface 8.5/10 (3 call-sites), EmptyState **9.5/10 (5/5 cibles, +0.5)**, systemBanners 9.5/10 (4/4 consumers).
+
+**Drapeaux racines :**
+
+- **#1 typo** : DRAPEAU FERMÉ ✅. 0 régression P0/P1 active. 4 régressions pass 2 toutes soldées (Coach.tsx:1097 §227, AwaitingApproval/ComingSoon §224, SlotSessionSheet:376 §224). 2 borderline (SessionSummary:58, WorkoutRunner:751) whitelistés via `.heading-display` opt-in §229.
+- **#2 tap targets** : DRAPEAU FERMÉ au niveau primitives ✅. SelectTrigger §224 + DialogClose/SheetClose §227 + cluster AthletePlansTab (6 boutons mutations critiques) §224 toutes closeées. Dette ponctuelle locale : ~12 spots P1 résiduels (Dashboard stepper modal, CompetitionDetail back ×2, SwimSessionView mode libre, Profile/SwimmerObjectivesTab ToggleGroup default Radix, etc.).
+- **#3 hardcodes** : RÉDUIT MAJEUR. 540 → 475 hits (-12%). Top 5 cumul 102 → 67 (-34% pass 2→3). Caves coach pass 2 résolues : CoachTrainingSlotsScreen 36→0 (§226), AthletePlansTab 22→8 (§222+§224), FeedbackDrawer 16→9 (§222). 3 régressions ponctuelles P2 résiduelles : `OfflineDetector.tsx:58-59` + `InfoBubble.tsx:82-84 (AcwrInfoContent)` non corrigées depuis pass 2.
+
+**Trajectoire des 5 chantiers structurels pass 1 :**
+
+- A (détox typo) : ✅ STABLE
+- B (Surface) : 🟡 STABLE (BottomActionBar/UpdateNotification consolidation abandonnée §227 — Surface API sans `radius=full`/`top-only`)
+- C (tokens) : 🟢 **CAVES RÉSOLUES** depuis pass 2
+- D (CoachPageHeader + EmptyState + systemBanners) : ✅ **5/5 EmptyState** (+1 vs pass 2)
+- E (sheets) : 🟡 STABLE
+
+**Recommandations pass 4 (chemin vers 9.0/10) :**
+
+P1 (~1 demi-journée, ~15 lignes de code) :
+1. `OfflineDetector.tsx:58-59` + `InfoBubble.tsx:82-84` régressions P2 → tokens status-*
+2. `CoachCommentsScreen.tsx:25-27` indicatorColor → status-*-bg/text-status-*
+3. `CompetitionDetail.tsx:72,95` back buttons h-9 → h-11
+4. `WorkoutRunner.tsx:1028-1034` difficulté → bg-intensity-{1..5}
+5. `WellnessForm.tsx:196` → text-status-success
+6. `Profile.tsx:122` ToggleGroupItem theme h-11
+7. `SwimSessionView.tsx:468,479,486` inputs mode libre h-11
+
+P2 polish (vers 9.5) : top 5 caves catégoriels résiduels (67 hits), SwimCatalog header inline, SwimmerObjectivesTab ToggleGroup, ObjectiveDetailSheet rounded-t cohérence.
+
+**Hallucination détectée + corrigée** : fork partagés a signalé "AthletePlansTab cluster non touché" en P0. Vérification grep file:line a confirmé que les 6 lignes (817, 825, 923, 932, 945, 953) sont bien `h-11 w-11` depuis §224 (commit `6ba4e6549`). Coach fork avait correctement vérifié file:line. Le rapport pass 3 final reflète l'état réel (cluster soldé).
+
+**Vérifications :**
+- Audit lecture seule, aucun edit appliqué.
+- 3 forks parallèles sonnet (~50k tokens combinés).
+- Compatibilité avec chantiers user en cours (lib/api/* assertSupabase, §235 notifications) : ne bloque rien.
+
+**Fichier livrable nouveau** : `docs/audits/2026-05-10-ui-ux-audit-ios-pass3.md` (~280 lignes — rapport pass 3 complet).
+
+**Hors scope §236** :
+- Audit lecture seule, aucun fix appliqué (P1 pass 4 listés ci-dessus à attaquer dans § dédié).
+- Re-audit ligne par ligne de CoachTrainingSlotsScreen non fait (§226 ayant migré 31→0 hits, score conservé pass 2).
+
+**Doc** : `docs/audits/2026-05-10-ui-ux-audit-ios-pass3.md` (NEW), `docs/implementation-log.md` (entrée §236), `CLAUDE.md` (ligne "Dernier § livré"), `docs/ROADMAP.md`.
+
 ## §235 — Auto-mark notifications lues à la complétion de l'action (2026-05-10)
 
 **Contexte :** Les notifs « actionnables » (wellness matin, rappel ressenti séance, entretien à compléter / à signer) restaient dans la liste « non lues » même après que l'utilisateur avait effectué l'action demandée. Le seul moyen de les vider était le bouton manuel « Effacer toutes les notifications » dans `SwimmerMessagesView` (§161). Demande user : refléter immédiatement l'action côté badge.

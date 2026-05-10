@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§235** — Auto-mark notifications lues à la complétion de l'action (wellness, ressenti séance, entretien) — helper `notifications_mark_read_by_filter`.
+Dernier § livré : **§236** — Audit UI/UX pass 3 lecture seule. Score 6→7.8→8.5/10. Drapeaux #1+#2 fermés. Drapeau #3 caves résolues, top 5 -34%.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
