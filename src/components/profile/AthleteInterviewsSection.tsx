@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+import { haptic } from "@/lib/haptic";
 import {
   ArrowLeft,
   MessageSquare,
@@ -186,6 +187,7 @@ export default function AthleteInterviewsSection({
       await markInterviewNotifsRead();
     },
     onSuccess: () => {
+      haptic.success();
       toast({ title: "Envoyé au coach" });
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
@@ -205,6 +207,7 @@ export default function AthleteInterviewsSection({
       await markInterviewNotifsRead();
     },
     onSuccess: () => {
+      haptic.success();
       toast({ title: "Entretien signé" });
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });

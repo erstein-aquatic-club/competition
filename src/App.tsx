@@ -15,6 +15,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import {
+  DashboardSkeleton,
+  HomeSkeleton,
+  CalendarSkeleton,
+  ListSkeleton,
+} from "@/components/shared/skeletons";
 import { UpdateNotification } from "@/components/shared/UpdateNotification";
 import { PWAInstallGate } from "@/components/shared/PWAInstallGate";
 import { PushPermissionBanner } from "@/components/shared/PushPermissionBanner";
@@ -277,34 +283,98 @@ function AppRouter() {
         <Suspense fallback={<PageSkeleton />}>
           <Switch>
             <Route path="/reset-password" component={ResetPassword} />
-            <Route path="/">{role === "coach" || role === "admin" ? <Redirect to="/coach" /> : <SwimmerHome />}</Route>
-            <Route path="/natation" component={Dashboard} />
+            <Route path="/">
+              {role === "coach" || role === "admin" ? (
+                <Redirect to="/coach" />
+              ) : (
+                <Suspense fallback={<HomeSkeleton />}>
+                  <SwimmerHome />
+                </Suspense>
+              )}
+            </Route>
+            <Route path="/natation">
+              <Suspense fallback={<DashboardSkeleton />}>
+                <Dashboard />
+              </Suspense>
+            </Route>
             <Route path="/progress"><Redirect to="/suivi/progression" /></Route>
             <Route path="/hall-of-fame" component={HallOfFame} />
             <Route path="/competition/:id/prep" component={CompetitionPrep} />
             <Route path="/competition/:id" component={CompetitionDetail} />
             <Route path="/coach/swimmer/:id" component={CoachSwimmerDetail} />
-            <Route path="/coach/swim-planning" component={SwimPlanningDemo} />
-            <Route path="/coach/strength-planning" component={StrengthPlanningScreen} />
-            <Route path="/coach" component={Coach} />
+            <Route path="/coach/swim-planning">
+              <Suspense fallback={<CalendarSkeleton />}>
+                <SwimPlanningDemo />
+              </Suspense>
+            </Route>
+            <Route path="/coach/strength-planning">
+              <Suspense fallback={<CalendarSkeleton />}>
+                <StrengthPlanningScreen />
+              </Suspense>
+            </Route>
+            <Route path="/coach">
+              <Suspense fallback={<HomeSkeleton />}>
+                <Coach />
+              </Suspense>
+            </Route>
             <Route path="/admin" component={Admin} />
             <Route path="/administratif" component={Administratif} />
             <Route path="/comite" component={Comite} />
-            <Route path="/strength" component={Strength} />
-            <Route path="/records" component={Records} />
-            <Route path="/records-admin" component={RecordsAdmin} />
-            <Route path="/records-club" component={RecordsClub} />
+            <Route path="/strength">
+              <Suspense fallback={<ListSkeleton />}>
+                <Strength />
+              </Suspense>
+            </Route>
+            <Route path="/records">
+              <Suspense fallback={<ListSkeleton />}>
+                <Records />
+              </Suspense>
+            </Route>
+            <Route path="/records-admin">
+              <Suspense fallback={<ListSkeleton />}>
+                <RecordsAdmin />
+              </Suspense>
+            </Route>
+            <Route path="/records-club">
+              <Suspense fallback={<ListSkeleton />}>
+                <RecordsClub />
+              </Suspense>
+            </Route>
             <Route path="/swim-session" component={SwimSessionView} />
             <Route path="/swim-notes" component={SwimNotes} />
             <Route path="/s/:token" component={SharedSwimSession} />
             <Route path="/share/pace/:token" component={SharedPaceMatrix} />
             <Route path="/report/:userId/:month" component={MonthlyReport} />
-            <Route path="/suivi/semaine" component={SuiviSemaine} />
-            <Route path="/suivi/objectifs" component={SuiviObjectifs} />
-            <Route path="/suivi/saison" component={SuiviPlanification} />
-            <Route path="/suivi/progression" component={SuiviProgression} />
-            <Route path="/suivi/entretiens" component={SuiviEntretiens} />
-            <Route path="/suivi" component={Suivi} />
+            <Route path="/suivi/semaine">
+              <Suspense fallback={<ListSkeleton />}>
+                <SuiviSemaine />
+              </Suspense>
+            </Route>
+            <Route path="/suivi/objectifs">
+              <Suspense fallback={<ListSkeleton />}>
+                <SuiviObjectifs />
+              </Suspense>
+            </Route>
+            <Route path="/suivi/saison">
+              <Suspense fallback={<ListSkeleton />}>
+                <SuiviPlanification />
+              </Suspense>
+            </Route>
+            <Route path="/suivi/progression">
+              <Suspense fallback={<ListSkeleton />}>
+                <SuiviProgression />
+              </Suspense>
+            </Route>
+            <Route path="/suivi/entretiens">
+              <Suspense fallback={<ListSkeleton />}>
+                <SuiviEntretiens />
+              </Suspense>
+            </Route>
+            <Route path="/suivi">
+              <Suspense fallback={<ListSkeleton />}>
+                <Suivi />
+              </Suspense>
+            </Route>
             <Route path="/profile" component={Profile} />
             <Route path="/coming-soon" component={ComingSoon} />
             <Route component={NotFound} />

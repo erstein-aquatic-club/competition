@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { haptic } from "@/lib/haptic";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   deleteSession,
@@ -193,6 +194,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       setSaveState("saving");
     },
     onSuccess: () => {
+      haptic.success();
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
@@ -250,6 +252,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       setSaveState("saving");
     },
     onSuccess: () => {
+      haptic.success();
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });

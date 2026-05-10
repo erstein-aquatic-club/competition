@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§245** — Fix bannière PWA parasite. `handleCheckUpdate` → `__pwaApplyUpdate()` (skipWaiting) au lieu de reload seul.
+Dernier § livré : **§246** — Pass 7 polish iOS premium (A+B+C+E). 9 NEW + 7 modifs, vers ~9.8/10.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

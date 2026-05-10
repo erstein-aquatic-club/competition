@@ -4,6 +4,67 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §246 — Pass 7 polish iOS premium (sub-§ A+B+C+E) (2026-05-10)
+
+**Contexte :** exécution Pass 7 du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` post-audit pass 6. Décisions UX validées par utilisateur via AskUserQuestion : Sub-§ A (animations) + B (skeletons) + C (haptic success/error) + E (bottom nav badges). **Sub-§ D Typography rhythm SKIPPÉ** (ROI marginal) et **Sub-§ F Surface adoption massive 140+ fichiers SKIPPÉ** (risque trop élevé face au gain). Sub-§ G dark mode = audit manuel utilisateur en parallèle.
+
+**Méthode :** dispatching 3 sub-agents sonnet parallèles avec scope par sub-§. Bundle commit unique. Numérotation §246 car §243+§244+§245 livrés par utilisateur en parallèle (chantier B sub-§B framer→CSS, chantier D sub-§A+B perf records, fix bannière PWA parasite).
+
+### Sub-§ A — Animations & transitions (page transitions + spring presets)
+
+- **NEW** `src/components/shared/PageTransition.tsx` (20 LOC) — wrapper `<AnimatePresence mode="wait">` + `motion.div` keyed sur `useLocation()` Wouter. Slide+fade subtil iOS-style (initial `x: 16`, exit `x: -8`, duration 0.18s, easeOut).
+- **NEW** `src/lib/animations.ts` extension (+15 LOC) — 3 spring presets centralisés (`springSoft` stiffness 150 damping 20, `springStiff` 400/25, `springGentle` 100/18) pour réutilisation app-wide.
+- **MODIF** `src/components/layout/AppLayout.tsx` — import `PageTransition` + wrap `{children}` par `<PageTransition>{children}</PageTransition>` ligne ~181.
+- ⚠️ **Timing tokens index.css SKIPPÉS** — conflit avec user §243 framer→CSS migration. Reportés à §247+ si pertinent.
+
+### Sub-§ B — Skeletons fidèles perceived perf
+
+- **NEW dossier** `src/components/shared/skeletons/` avec 5 fichiers :
+  - `DashboardSkeleton.tsx` (~30 LOC) — calendrier 6×7 + header
+  - `ListSkeleton.tsx` (~25 LOC) — `rows={N}` prop
+  - `HomeSkeleton.tsx` (~35 LOC) — greeting + stats + quicklinks
+  - `CalendarSkeleton.tsx` (~25 LOC) — 7 day columns
+  - `index.ts` — barrel export
+- **MODIF** `src/App.tsx` — Suspense fallbacks par route :
+  - `/` SwimmerHome → `HomeSkeleton`
+  - `/natation` Dashboard → `DashboardSkeleton`
+  - `/coach` → `HomeSkeleton`
+  - `/coach/swim-planning`, `/coach/strength-planning` → `CalendarSkeleton`
+  - `/strength`, `/records*`, `/suivi*` → `ListSkeleton`
+  - Outer `PageSkeleton` global préservé en catch-all.
+
+### Sub-§ C — Haptic feedback (success/error)
+
+- **NEW** `src/lib/haptic.ts` (~40 LOC) — wrapper `navigator.vibrate()` SSR-safe + feature detect + **respect strict `prefers-reduced-motion`** (no-op si reduce). Exports `haptic.light()`, `medium()`, `success()` ([12,50,12]), `error()` ([30,40,30]).
+- **MODIF 5 sites haptic.success() après mutations critiques** :
+  - `WellnessForm.tsx` (wellness upsert)
+  - `DashboardFeedbackContainer.tsx` create + edit
+  - `AthleteInterviewsSection.tsx` submit + sign
+- **MODIF 3 sites haptic.error() sur form validation fail** :
+  - `Login.tsx` loginForm + signupForm
+  - `Profile.tsx` passwordForm — branche bundlée par user dans commit §245 (sub-agent §246 a édité Profile.tsx avant que user finalise §245, l'addition haptic est donc dans `149e8d6d7`).
+
+### Sub-§ E — Bottom nav badges
+
+- **NEW** `src/components/shared/NavBadge.tsx` (~20 LOC) — pastille `bg-status-error` `min-w-4 h-4` `text-[10px]` avec `9+` si > 9, `aria-label` non lus.
+- **NEW** `src/hooks/useUnreadCount.ts` (~30 LOC) — React Query staleTime 60s + refetchOnWindowFocus, appelle `notifications_list({ status: "unread", limit: 200 })` filtré par `userId`. Retourne `pagination.total`.
+- **MODIF** `src/components/layout/AppLayout.tsx` — import `NavBadge` + `useUnreadCount`, branchement conditionnel sur l'item nav `/profile` (athlete + comite, qui reçoivent les notifs).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload`.
+- 9 nouveaux fichiers + 7 fichiers modifiés (Profile.tsx haptic.error commité par user §245 dans `149e8d6d7`).
+- Aucun fichier user hors scope touché par les sub-agents.
+
+**Score estimé :** ~9.5/10 → **~9.8/10** (page transitions + skeletons fidèles + haptic feedback contextuel + nav badges = ressenti production iOS app).
+
+**Hors scope §246 :**
+- Sub-§ D Typography rhythm (SKIPPÉ par décision UX utilisateur).
+- Sub-§ F Surface adoption massive 140+ fichiers (SKIPPÉ par décision risque/ROI).
+- Sub-§ G Dark mode audit visuel (manuel utilisateur, non automatisable).
+- Timing tokens `--duration-fast/normal/slow` index.css (reporté pour ne pas conflicter user §243 framer→CSS).
+- Items P2 audit §240 reportés (color-only signaling, contrast décoratifs `/10` `/30`).
+
 ## §245 — Fix bannière "mise à jour disponible" parasite après handleCheckUpdate (2026-05-10)
 
 ### Contexte

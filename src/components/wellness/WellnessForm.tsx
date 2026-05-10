@@ -14,6 +14,7 @@ import { getPainReportsForDate, upsertPainReports } from "@/lib/api/painReports"
 import { notifications_mark_read_by_filter } from "@/lib/api";
 import type { WellnessCheck } from "@/lib/api/types";
 import { slideInFromBottom } from "@/lib/animations";
+import { haptic } from "@/lib/haptic";
 import { ReadinessGauge } from "./ReadinessGauge";
 import { BodyHeatMap } from "./BodyHeatMap";
 
@@ -176,6 +177,7 @@ export function WellnessForm({ userId, date, existingData, onSaved }: WellnessFo
       return wellnessResult;
     },
     onSuccess: (data) => {
+      haptic.success();
       setSavedScore(data.readiness_score);
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });

@@ -86,3 +86,22 @@ export const slideInFromRight: Variants = {
     transition: { duration: durationsSeconds.normal },
   },
 };
+
+/** §244 — Spring presets centralisés (réutilisables via framer transition prop). */
+export const springSoft = {
+  type: "spring" as const,
+  stiffness: 150,
+  damping: 20,
+};
+
+export const springStiff = {
+  type: "spring" as const,
+  stiffness: 400,
+  damping: 25,
+};
+
+export const springGentle = {
+  type: "spring" as const,
+  stiffness: 100,
+  damping: 18,
+};

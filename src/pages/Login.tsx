@@ -22,6 +22,7 @@ import { durationsSeconds } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 const eacLogo = `${import.meta.env.BASE_URL}logo-eac-256.webp`;
 import { getLandingRouteForRole } from "@/pages/loginHelpers";
+import { haptic } from "@/lib/haptic";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -297,7 +298,7 @@ export default function Login() {
               {/* Login Tab */}
               <TabsContent value="login" className="space-y-6">
                 <form
-                  onSubmit={loginForm.handleSubmit(handleLogin)}
+                  onSubmit={loginForm.handleSubmit(handleLogin, () => haptic.error())}
                   className="space-y-4"
                 >
                   <div className="space-y-2">
@@ -382,7 +383,7 @@ export default function Login() {
               {/* Signup Tab */}
               <TabsContent value="signup" className="space-y-6">
                 <form
-                  onSubmit={signupForm.handleSubmit(handleSignup)}
+                  onSubmit={signupForm.handleSubmit(handleSignup, () => haptic.error())}
                   className="space-y-4"
                 >
                   {/* Progress indicator */}

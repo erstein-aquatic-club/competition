@@ -8,6 +8,9 @@ import { getNavItemsForRole } from "@/components/layout/navItems";
 import { OfflineDetector } from "@/components/shared/OfflineDetector";
 import { OfflineSyncBanner } from "@/components/shared/OfflineSyncBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
+import { PageTransition } from "@/components/shared/PageTransition";
+import { NavBadge } from "@/components/shared/NavBadge";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { UserCircle } from "lucide-react";
 
 const COACH_SECTION_LABELS: Record<string, string> = {
@@ -61,6 +64,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const navItems = getNavItemsForRole(role);
+  const unread = useUnreadCount();
 
   const scrollToTop = useCallback(() => {
     mainRef.current?.scrollTo(0, 0);
@@ -177,7 +181,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             );
           })()}
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
 
@@ -207,10 +211,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <div className={cn(
-                  "flex items-center justify-center h-7 w-7 rounded-xl transition-colors",
+                  "relative flex items-center justify-center h-7 w-7 rounded-xl transition-colors",
                   active && "bg-primary/10"
                 )}>
                   <item.icon className={cn("h-5 w-5", active && "text-primary")} />
+                  {item.href === "/profile" && <NavBadge count={unread} />}
                 </div>
                 <span className={cn(
                   "text-[10px] font-semibold tracking-tight truncate w-full text-center px-0.5",
