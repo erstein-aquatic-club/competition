@@ -15,6 +15,8 @@ export type QueuedMutation = {
   retryCount?: number;
   /** Epoch ms of the last replay attempt, useful for debugging. */
   lastAttemptAt?: number;
+  /** Optional key for deduplication — a second enqueue with the same key is silently ignored. */
+  idempotencyKey?: string;
 };
 
 export const QUEUE_UPDATED_EVENT = "eac-offline-queue-updated";
@@ -34,14 +36,16 @@ export class OfflineQueueQuotaError extends Error {
   }
 }
 
-export function enqueue(type: string, payload: Record<string, unknown>) {
+export function enqueue(type: string, payload: Record<string, unknown>, idempotencyKey?: string) {
   const queue = getQueue();
+  if (idempotencyKey && queue.some((it) => it.idempotencyKey === idempotencyKey)) return;
   queue.push({
     id: crypto.randomUUID(),
     type,
     payload,
     timestamp: Date.now(),
     retryCount: 0,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
   });
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
@@ -106,6 +110,9 @@ export function saveQueue(queue: QueuedMutation[]) {
 export function clearQueue() {
   localStorage.removeItem(QUEUE_KEY);
 }
+
+/** Inspect the queue without consuming items (alias of getQueue). */
+export const peekQueue = getQueue;
 
 export function removeQueueItem(id: string) {
   const queue = getQueue().filter((item) => item.id !== id);
@@ -178,16 +185,17 @@ export async function tryWithOfflineQueue<T>(
   type: string,
   payload: Record<string, unknown>,
   fn: () => Promise<T>,
+  idempotencyKey?: string,
 ): Promise<T | OfflineQueuedResult> {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    enqueue(type, payload);
+    enqueue(type, payload, idempotencyKey);
     return OFFLINE_QUEUED_RESULT;
   }
   try {
     return await fn();
   } catch (err) {
     if (isTransientError(err)) {
-      enqueue(type, payload);
+      enqueue(type, payload, idempotencyKey);
       return OFFLINE_QUEUED_RESULT;
     }
     throw err;

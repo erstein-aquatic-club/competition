@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   enqueue,
   getQueue,
+  peekQueue,
   clearQueue,
   markRetry,
   MAX_RETRY_ATTEMPTS,
@@ -60,6 +61,28 @@ describe("offlineQueue.enqueue", () => {
       Storage.prototype.setItem = original;
       window.removeEventListener(QUEUE_UPDATED_EVENT, handler);
     }
+  });
+});
+
+describe("offlineQueue.idempotency", () => {
+  beforeEach(() => clearQueue());
+
+  it("rejects duplicate idempotencyKey within same queue", () => {
+    enqueue("saveSwimSession", { sessionId: 42, logs: [] }, "user-1-2026-05-10-morning");
+    enqueue("saveSwimSession", { sessionId: 42, logs: [] }, "user-1-2026-05-10-morning");
+    expect(peekQueue()).toHaveLength(1);
+  });
+
+  it("allows distinct idempotencyKeys", () => {
+    enqueue("saveSwimSession", { sessionId: 42 }, "key-A");
+    enqueue("saveSwimSession", { sessionId: 43 }, "key-B");
+    expect(peekQueue()).toHaveLength(2);
+  });
+
+  it("allows re-enqueue without a key (no dedup)", () => {
+    enqueue("saveSwimSession", { sessionId: 42 });
+    enqueue("saveSwimSession", { sessionId: 42 });
+    expect(peekQueue()).toHaveLength(2);
   });
 });
 

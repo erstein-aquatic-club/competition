@@ -259,10 +259,12 @@ export default function SwimSessionView() {
         logs: allLogs,
       };
 
+      const idempotencyKey = `swim-${userId}-${date}-${slot ?? "default"}`;
       return tryWithOfflineQueue(
         "swim-session-save",
         payload,
         () => saveSwimSessionAtomic(payload),
+        idempotencyKey,
       );
     },
     onSuccess: (result) => {
@@ -363,7 +365,7 @@ export default function SwimSessionView() {
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Séance natation</div>
+            <div className="text-xs uppercase tracking-eyebrow-lg text-muted-foreground">Séance natation</div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Détails</h1>
           </div>
         </div>
