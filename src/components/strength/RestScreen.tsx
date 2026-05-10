@@ -126,7 +126,7 @@ export function RestScreen({
             {/* Subtle outer glow when timer is low */}
             <div
               className={cn(
-                "absolute inset-0 rounded-full transition-opacity duration-700",
+                "absolute inset-0 rounded-full transition-opacity duration-slower",
                 isLow ? "opacity-100" : "opacity-0",
               )}
               style={{ boxShadow: "0 0 32px 8px hsl(var(--primary) / 0.15)" }}
@@ -153,7 +153,7 @@ export function RestScreen({
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className={cn(
-                "font-[var(--font-display)] text-4xl font-bold tabular-nums tracking-tight transition-colors duration-500",
+                "font-[var(--font-display)] text-4xl font-bold tabular-nums tracking-tight transition-colors duration-slow",
                 isLow && "text-destructive",
               )}>
                 {Math.floor(restTimer / 60)}:{String(restTimer % 60).padStart(2, "0")}
@@ -194,7 +194,7 @@ export function RestScreen({
             tabIndex={i === activeTab ? 0 : -1}
             onClick={() => goTo(i)}
             className={cn(
-              "rounded-full transition-all duration-300",
+              "rounded-full transition-all duration-normal",
               i === activeTab
                 ? "h-1.5 w-6 bg-primary"
                 : "h-1.5 w-1.5 bg-muted-foreground/25 hover:bg-muted-foreground/40",

@@ -4,6 +4,73 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §261 — Chantier IV Timing tokens : `--duration-*` + `--ease-*` dans `@theme` + alignement keyframes §242/§255 (2026-05-10)
+
+**Contexte :** Chantier IV issu de `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` (post-§259 Chantier I, suite vers 10/10 strict). Pré-requis utilisateur : convergence avec §255 PageTransition CSS keyframes (déjà committé via bundle §259) et §242 banners (livrés). L'audit a confirmé que les 6 keyframes existantes utilisaient des `cubic-bezier(...)` littéraux dispersés et 7 valeurs `duration-*` Tailwind ad-hoc (44 occurrences cumulées) — terrain mûr pour centralisation. Numérotation §261 (et non §257-§258) : §256 réservé/livré user (`withTimeout` adoption), §257-§258 réservations user plan post-pass-2 perf (mutations binaires, extractions memo), §260 réservé user (auto-sync objectifs).
+
+**Audit (Sub-§A grep direct) :**
+
+- `duration-*` Tailwind : **7 valeurs distinctes (44 hits)** — `duration-200` (15), `duration-300` (12), `duration-500` (7), `duration-700` (4), `duration-150` (3), `duration-100` (2), `duration-1000` (1). Top 4 (200/300/500/700) cumulent 38/44 = 86% du parc → 4 tokens nommés couvrent l'usage.
+- `cubic-bezier(...)` : **5 valeurs distinctes (8 hits)** dont 6 dans `index.css` (keyframes §242 banners + §255 page-transition) et 1 inline `SwimSessionTimeline.tsx:279` (`(0.16,1,0.3,1)`, ease-out-quint, valeur unique non tokenisée).
+  - `(0.34, 1.56, 0.64, 1)` ×2 — spring entry banners + plan UI/UX
+  - `(0.4, 0, 1, 1)` ×3 — exit banners (ease-in-cubic)
+  - `(0.4, 0, 0.2, 1)` ×1 — banner-collapse-enter (ease-out-cubic)
+  - `(0.34, 1.4, 0.64, 1)` ×1 — inline-banner-enter (spring légèrement adouci, conservé ad-hoc)
+  - `(0.16, 1, 0.3, 1)` ×1 — SwimSessionTimeline timeline-block-reveal (conservé ad-hoc, plus aggressif que ease-out-quart du plan)
+- `ease-*` keyword : `ease-out` (7), `ease-linear` (4), `ease-in-out` (1), `ease-in` (1) — déjà couvert par Tailwind built-in.
+
+**Tokens (`src/index.css` `@theme inline`, +10 LOC) :**
+
+- `--duration-fast: 200ms` / `--duration-normal: 300ms` / `--duration-slow: 500ms` / `--duration-slower: 700ms`
+- `--ease-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1)` / `--ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1)` / `--ease-out-cubic: cubic-bezier(0.4, 0, 0.2, 1)` / `--ease-in-cubic: cubic-bezier(0.4, 0, 1, 1)`
+
+**Décision calibration durations** : valeurs alignées sur l'**usage existant** (top 200/300/500/700) plutôt que sur les valeurs HIG strictes du plan (150/250/400/600) — évite régression visuelle de tous les `duration-200/300/500/700` migrés (38 hits) qui sinon raccourciraient de ~25-50%. Le nommage abstrait (`fast/normal/slow/slower`) reste fidèle au plan ; seules les valeurs sont calibrées.
+
+**`@utility` (+12 LOC)** : 4 classes `duration-fast/normal/slow/slower` exposées via Tailwind. Les `--ease-*` génèrent automatiquement `ease-spring-soft / ease-out-quart / ease-out-cubic / ease-in-cubic` via Tailwind 4 `@theme` (sans `@utility` requis, vérifié au build).
+
+**Migration index.css keyframes §242/§255 (~7 lignes modifiées) :**
+
+| Animation | Avant | Après |
+|---|---|---|
+| `.anim-banner-pill-enter` | `280ms cubic-bezier(0.34, 1.56, 0.64, 1)` | `280ms var(--ease-spring-soft)` |
+| `.anim-banner-pill-exit` | `200ms cubic-bezier(0.4, 0, 1, 1)` | `var(--duration-fast) var(--ease-in-cubic)` |
+| `.anim-inline-banner-enter` | `240ms cubic-bezier(0.34, 1.4, 0.64, 1)` | inchangé (spring variant unique, 240ms ≠ tokens) |
+| `.anim-inline-banner-exit` | `180ms cubic-bezier(0.4, 0, 1, 1)` | `180ms var(--ease-in-cubic)` |
+| `.anim-page-transition` | `180ms ease-out` | inchangé (180ms ≠ tokens, ease-out keyword stable) |
+| `.anim-banner-collapse-enter` | `240ms cubic-bezier(0.4, 0, 0.2, 1)` | `240ms var(--ease-out-cubic)` |
+| `.anim-banner-collapse-exit` | `200ms cubic-bezier(0.4, 0, 1, 1)` | `var(--duration-fast) var(--ease-in-cubic)` |
+
+3 keyframes utilisent désormais `var(--duration-fast)` (200ms) et 4 utilisent `var(--ease-*)` — résultat identique en runtime, source maintenable.
+
+**Migration ciblée 3 surfaces (10 hits sur 38 migrables) :**
+
+| Fichier | Migrations |
+|---|---|
+| `src/components/strength/RestSessionTab.tsx` | L78 `duration-700` → `duration-slower` ; L117 `duration-300` → `duration-normal` ; L137 `duration-500` → `duration-slow` ; L164 `duration-300` → `duration-normal` (4) |
+| `src/components/strength/RestScreen.tsx` | L129 `duration-700` → `duration-slower` ; L156 `duration-500` → `duration-slow` ; L197 `duration-300` → `duration-normal` (3) |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | L480 `duration-300` → `duration-normal` ; L500 `duration-200` → `duration-fast` ; L507 `duration-300` → `duration-normal` (3) |
+
+**Hot files restants hors scope §261** (28 hits Tailwind `duration-*`, prêts pour migration mécanique §262+) : `ui/sidebar.tsx` (3, primitive shadcn — laisser tel quel par défaut), `FilieresEditor`, `SuiviSaison`, `Progress`, `Administratif`, `ReadinessGauge`, `ui/toast`, `ui/sheet`, `ui/dialog`, `ui/alert-dialog`, `ui/accordion`, `SwimSessionTimeline`. Décision conservatrice : toucher uniquement les 3 surfaces avec ≥3 hits non-primitives.
+
+**Conservé ad-hoc** :
+
+- `inline-banner-enter` 240ms `cubic-bezier(0.34, 1.4, 0.64, 1)` — spring variant unique (non rationalisable sur l'`--ease-spring-soft` plus aggressif), valeur expressive maintenue.
+- `SwimSessionTimeline.tsx:279` inline `cubic-bezier(0.16, 1, 0.3, 1)` 0.5s — ease-out-quint, plus aggressif que `--ease-out-quart` (0.25, 1, 0.5, 1) — calibré pour le `timeline-block-reveal`, conservé pour préserver le ressenti.
+- 6 occurrences `duration-100/150/1000` (durées atypiques non couvertes par les 4 tokens) : laissées Tailwind built-in.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 694/695 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- `npm run build` 15.73 s success — `grep duration-fast dist/assets/*.css` confirme génération `.duration-fast{transition-duration:var(--duration-fast)}` ; `grep -oE 'duration-(fast|normal|slow|slower)|ease-(spring-soft|out-quart|out-cubic|in-cubic)' dist/assets/index-*.css` retourne les **8 classes attendues**.
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Hors scope §261 :**
+- Chantier II Surface adoption massive (140+ fichiers `Card` → `Surface`) : risque élevé, session dédiée si décision explicite.
+- Migration 28 hits restants sur `ui/*` primitives shadcn et fichiers à 1 hit unique — mécanique mais ROI faible.
+- Migration `SwimSessionTimeline:279` cubic-bezier inline : valeur unique non-canonique, conservée.
+
+**Score estimé** : ~9.85 → **~9.90/10** (delta marginal mais cohérent avec la philosophie "polish vers 10/10 strict" — chaque chantier ajoute une couche d'infrastructure pour la migration progressive future).
+
 ## §256 — Chantier D sub-§A2 : withTimeout(8s) sur 10 queryFn critiques (audit perf pass 2) (2026-05-10)
 
 **Contexte :** suite directe du plan post-pass-2 (`docs/audits/2026-05-10-perf-audit-pass2-runtime.md` § 4 P0). Le pass 2 avait identifié que **`withTimeout()` n'était utilisé que 3× sur 40+ modules API** (`strength.ts:506,593,754`) — gap inchangé depuis l'audit pass 1 § 63. Conséquence : Dashboard / Coach / Records / SwimmerHome / Login pouvaient rester suspendus 30 s+ sur EDGE / Wi-Fi captive / Supabase incident, car le retry exponential §244 ne s'enclenche que sur les erreurs `isTransientError` (réseau / timeout / 5xx) — un fetch indéfiniment pendu n'émet jamais cette erreur. **§256 ferme ce gap** sur les 10 queryFn qui bloquent le 1er paint des 5 surfaces critiques + l'auth flow.

@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§256** — Chantier D sub-§A2 : `withTimeout(8s)` sur 10 queryFn critiques (audit perf pass 2).
+Dernier § livré : **§261** — Chantier IV Timing tokens : `--duration-*` + `--ease-*` dans `@theme` + alignement keyframes §242/§255.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

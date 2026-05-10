@@ -75,7 +75,7 @@ export function RestSessionTab({
             <circle
               cx="26" cy="26" r="22"
               fill="none" stroke="currentColor"
-              className="text-primary transition-all duration-700 ease-out"
+              className="text-primary transition-all duration-slower ease-out"
               strokeWidth="3.5" strokeLinecap="round"
               strokeDasharray={2 * Math.PI * 22}
               strokeDashoffset={2 * Math.PI * 22 * (1 - progressPct / 100)}
@@ -114,7 +114,7 @@ export function RestSessionTab({
                 <div
                   key={i}
                   className={cn(
-                    "rounded-[3px] transition-all duration-300",
+                    "rounded-[3px] transition-all duration-normal",
                     i < currentSetIndex - 1
                       ? "h-1.5 w-3 bg-primary"
                       : i === currentSetIndex - 1
@@ -134,7 +134,7 @@ export function RestSessionTab({
         <div className="absolute left-[9px] top-0 bottom-0 w-[2px] bg-muted/40 rounded-full" />
         {/* Filled portion of rail */}
         <div
-          className="absolute left-[9px] top-0 w-[2px] bg-primary rounded-full transition-all duration-500 ease-out"
+          className="absolute left-[9px] top-0 w-[2px] bg-primary rounded-full transition-all duration-slow ease-out"
           style={{
             height: totalSteps > 1
               ? `${Math.min(100, ((currentStep - 1) / (totalSteps - 1)) * 100)}%`
@@ -161,7 +161,7 @@ export function RestSessionTab({
               <div key={`${item.exercise_id}-${idx}`} className="relative">
                 {/* Timeline node */}
                 <div className={cn(
-                  "absolute -left-5 rounded-full transition-all duration-300",
+                  "absolute -left-5 rounded-full transition-all duration-normal",
                   isCompleted
                     ? "top-2 h-5 w-5 bg-primary"
                     : isCurrent

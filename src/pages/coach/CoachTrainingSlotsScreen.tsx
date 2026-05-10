@@ -477,7 +477,7 @@ const SlotFormSheet = ({
                 {/* Sliding accent pill */}
                 <div
                   aria-hidden
-                  className={`pointer-events-none absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-xl border transition-all duration-300 ease-out ${
+                  className={`pointer-events-none absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-xl border transition-all duration-normal ease-out ${
                     sessionType === "swim"
                       ? "left-1 border-cat-swim/40 bg-cat-swim/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(59,130,246,0.25)]"
                       : "left-[calc(50%+0.125rem)] border-cat-strength/40 bg-cat-strength/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(245,158,11,0.25)]"
@@ -497,14 +497,14 @@ const SlotFormSheet = ({
                       role="radio"
                       aria-checked={active}
                       onClick={() => setSessionType(id)}
-                      className={`relative z-10 flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold tracking-tight transition-all duration-200 active:scale-[0.98] ${
+                      className={`relative z-10 flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold tracking-tight transition-all duration-fast active:scale-[0.98] ${
                         active
                           ? `${activeColor}`
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <Icon
-                        className={`h-4 w-4 transition-transform duration-300 ${
+                        className={`h-4 w-4 transition-transform duration-normal ${
                           active ? "scale-110" : "scale-100"
                         }`}
                       />
