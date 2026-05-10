@@ -4,6 +4,41 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §238 — Pass 5 caves catégoriels — top 5 fichiers tokenisation (2026-05-10)
+
+**Contexte :** exécution Pass 5 du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md`. Audit pass 3 §236 avait identifié 67 hits cumulés (top 5 contributors hardcodes restants) — grep réel : 79 hits (audit avait sous-compté Pace4NSegmentMatrix 13→22 et SuiviSemaine 14→16). 5 sub-agents sonnet parallèles, un par fichier, avec brief strict (decision tree status-* / intensity-* / cat-* / stroke-* / rank-* / catégoriel pur conservé).
+
+**Méthode :** dispatching parallèle (`Agent` × 5, model sonnet, scope mono-file pour chaque). Chaque agent reçoit la liste exhaustive des tokens disponibles + decision tree + contraintes (no other file, no layout change, dark-aware tokens → retirer `dark:` redondant, `npx tsc --noEmit` post-edits). Vérification croisée par grep avant/après.
+
+**Résultats par fichier (79 → 32 hits, -47, -59%) :**
+
+| Fichier | Avant | Après | Edits | Tokens utilisés |
+|---|---|---|---|---|
+| `src/pages/SuiviSemaine.tsx` | 16 | 4 | 8 | `cat-swim` / `cat-strength` (LoggedCard / MissedCard / AbsentCard borders + pills) + `intensity-prog` (status banner) |
+| `src/components/profile/AthleteInterviewsSection.tsx` | 14 | 10 | 4 | `intensity-prog-bg` / `intensity-prog` (draft coach badge + waiting box) |
+| `src/pages/coach/SwimmerInterviewsTab.tsx` | 13 | 12 | 1 | `status-success-bg` / `status-success` (sent badge) |
+| `src/components/competition/RacesTab.tsx` | 14 | 6 | 8 | `rank-gold` (Star icons + finale CTA + finale toggle + race type badges) |
+| `src/components/coach/pace/Pace4NSegmentMatrix.tsx` | 22 | 0 | 16 | `stroke-pap/dos/br/nl` (STROKE_META) + `intensity-prog` (V0) + `intensity-1..5` (V1-V5) |
+
+**Hardcodes conservés (32 catégoriels purs documentés) :**
+
+- **Bleu = identité nageur / amber = identité coach** (binôme visuel cohérent dans les composants entretiens) : 22 hits sur AthleteInterviewsSection + SwimmerInterviewsTab. Pas de token `role-athlete` / `role-coach` créé (scope §238 limité, à décider §239+ si pattern re-confirmé).
+- **Pastels frame `bg-amber-50/40` / `bg-sky-50/40`** SuiviSemaine LoggedCard/MissedCard frames : 4 hits, `cat-*-bg` token variant inexistant (les `cat-*` sont solides). Décision : laisser hardcodé ; à étendre §239+ si justifié.
+- **Amber accents RacesTab** (empty CTA, Trophy tint, "Série" toggle, "Ajouter" CTA, primary submit) : 6 hits. Pas un statut, pas un rank, pas une nage — décision tampon (créer un token `accent-amber` ou laisser).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload`.
+- 5 fichiers modifiés, aucun autre fichier touché par les sub-agents (vérif `git status`).
+- Working tree propre : 5 fichiers Pass 5 + (non touchés par §238) `.claude/scheduled_tasks.lock` runtime + `docs/audits/2026-05-10-perf-audit-pass1.md` user en parallèle (commit sélectif §238).
+
+**Score estimé :** ~9.0/10 → **~9.3/10** (top 5 caves catégoriels vidés à 41 % de leur état initial).
+
+**Hors scope §238 :**
+- 32 hardcodes catégoriels conservés documentés (identité nageur/coach, pastels frame, amber accents) — décisions à arbitrer §239+.
+- Pass 6 (audit WCAG AA + fixes).
+- Pass 7 (iOS premium polish — décisions UX à valider avant exécution).
+
 ## §237 — Pass 4 closing P1 résiduels (vers 9.0/10) (2026-05-10)
 
 **Contexte :** exécution du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` Pass 4. 8 fixes P1 file:line identifiés par l'audit pass 3 §236, tous documentés.

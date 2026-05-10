@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§237** — Pass 4 closing P1 résiduels. 8 fixes ~20 LOC, vers ~9.0/10.
+Dernier § livré : **§238** — Pass 5 caves catégoriels. 79→32 hits (-59%), 37 edits, vers ~9.3/10.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

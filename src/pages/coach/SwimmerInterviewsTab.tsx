@@ -132,12 +132,13 @@ const STATUS_CONFIG: Record<InterviewStatus, { label: string; variant: "default"
   draft_coach: {
     label: "Préparation coach",
     variant: "secondary",
+    // audit §238 catégoriel pur — pas de token sémantique adapté (blue coach identity)
     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800",
   },
   sent: {
     label: "Envoyé",
     variant: "secondary",
-    className: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-200 dark:border-green-800",
+    className: "bg-status-success-bg text-status-success border-status-success/30",
   },
   signed: {
     label: "Signé",
@@ -169,6 +170,7 @@ async function fetchAuthUidForUser(userId: number): Promise<string | null> {
 // ── Section Cards ───────────────────────────────────────────────
 
 const AthleteSection = ({ label, text }: { label: string; text?: string | null }) => (
+  // audit §238 catégoriel pur — pas de token sémantique adapté (blue = athlete identity)
   <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-1">
     <div className="flex items-center gap-1.5">
       <User className="h-3.5 w-3.5 text-blue-500" />
@@ -181,6 +183,7 @@ const AthleteSection = ({ label, text }: { label: string; text?: string | null }
 );
 
 const CoachSectionReadOnly = ({ label, text }: { label: string; text?: string | null }) => (
+  // audit §238 catégoriel pur — pas de token sémantique adapté (amber = coach identity)
   <div className="border-l-4 border-amber-400 rounded-r-lg bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-1">
     <div className="flex items-center gap-1.5">
       <GraduationCap className="h-3.5 w-3.5 text-amber-500" />
@@ -207,6 +210,7 @@ const CoachSectionEditable = ({
   placeholder?: string;
   rows?: number;
 }) => (
+  // audit §238 catégoriel pur — pas de token sémantique adapté (amber = coach identity)
   <div className="border-l-4 border-amber-400 rounded-r-lg bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-1.5">
     <div className="flex items-center gap-1.5">
       <GraduationCap className="h-3.5 w-3.5 text-amber-500" />
@@ -266,18 +270,21 @@ const CollapsiblePreviousCommitments = ({
       <CollapsibleContent>
         <div className="rounded-b-xl border border-t-0 bg-muted/30 px-3 pb-3 space-y-2">
           {prevInterview.athlete_commitments && (
+            // audit §238 catégoriel pur — pas de token sémantique adapté (blue = athlete identity)
             <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/50 dark:bg-blue-950/20 p-2">
               <p className="text-[10px] font-semibold text-muted-foreground">Engagements nageur</p>
               <p className="text-xs whitespace-pre-wrap">{prevInterview.athlete_commitments}</p>
             </div>
           )}
           {prevInterview.coach_actions && (
+            // audit §238 catégoriel pur — pas de token sémantique adapté (amber = coach identity)
             <div className="border-l-4 border-amber-400 rounded-r-lg bg-amber-50/50 dark:bg-amber-950/20 p-2">
               <p className="text-[10px] font-semibold text-muted-foreground">Actions coach</p>
               <p className="text-xs whitespace-pre-wrap">{prevInterview.coach_actions}</p>
             </div>
           )}
           {commitmentReview && (
+            // audit §238 catégoriel pur — pas de token sémantique adapté (blue = athlete identity)
             <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/80 dark:bg-blue-950/30 p-2">
               <p className="text-[10px] font-semibold text-muted-foreground">Bilan du nageur</p>
               <p className="text-xs whitespace-pre-wrap">{commitmentReview}</p>
@@ -446,6 +453,7 @@ const InlinePlanning = ({
     <div className="space-y-3">
       <div className="rounded-xl border bg-muted/20 p-3">
         <div className="flex items-center gap-2 text-sm flex-wrap">
+          {/* audit §238 catégoriel pur — pas de token sémantique adapté (amber = coach/competition accent) */}
           <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
           <span className="font-medium">{upcomingCompetitions.length} échéance{upcomingCompetitions.length > 1 ? "s" : ""} à planifier</span>
           {daysToComp != null && (
@@ -765,6 +773,7 @@ const CoachInterviewCard = ({
   const borderClass = status === "draft_athlete"
     ? "border-status-warning border-l-4"
     : status === "draft_coach"
+      // audit §238 catégoriel pur — pas de token sémantique adapté (blue = coach identity)
       ? "border-blue-300 dark:border-blue-700 border-l-4"
       : status === "sent"
         ? "border-status-success border-l-4"

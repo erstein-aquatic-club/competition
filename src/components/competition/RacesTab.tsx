@@ -231,7 +231,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
   return (
     <>
       {races.length === 0 ? (
-        /* ── Empty state ──────────────────────────────── */
+        /* ── Empty state — audit §238 catégoriel pur — pas de token sémantique adapté (amber CTA compétition) */
         <button
           type="button"
           onClick={openCreate}
@@ -249,6 +249,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
           {races.map((race) => {
             const isFinale = race.race_type === "finale";
             const stroke = strokeFromCode(race.event_code);
+            // audit §238 catégoriel pur — pas de token sémantique adapté (fallback stroke border)
             const borderColor = stroke ? STROKE_COLORS[stroke] : "border-l-amber-500";
             const typeLabel = raceTypeLabel(race);
             return (
@@ -256,7 +257,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                 key={race.id}
                 className={`rounded-2xl border px-3 py-3 border-l-[3px] ${
                   isFinale
-                    ? "border-l-yellow-500 border-yellow-500/40 bg-gradient-to-r from-yellow-500/[0.07] to-amber-500/[0.03]"
+                    ? "border-l-rank-gold border-rank-gold/40 bg-gradient-to-r from-rank-gold/[0.07] to-rank-gold/[0.03]"
                     : `bg-card ${borderColor}`
                 }`}
               >
@@ -264,7 +265,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       {isFinale && (
-                        <Star className="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500" />
+                        <Star className="h-3.5 w-3.5 shrink-0 fill-rank-gold text-rank-gold" />
                       )}
                       <p className="text-sm font-semibold truncate">
                         {eventLabel(race.event_code)}
@@ -272,8 +273,8 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                       {typeLabel && (
                         <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
                           isFinale
-                            ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300"
-                            : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                            ? "bg-rank-gold/15 text-rank-gold"
+                            : "bg-rank-gold/10 text-rank-gold"
                         }`}>
                           {typeLabel}
                         </span>
@@ -318,9 +319,9 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                   <button
                     type="button"
                     onClick={() => duplicateAsFinale(race)}
-                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-yellow-500/30 bg-yellow-500/[0.06] py-1.5 text-[11px] font-semibold text-yellow-700 dark:text-yellow-300 transition hover:bg-yellow-500/15 hover:border-yellow-500/50 active:scale-[0.98]"
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-rank-gold/30 bg-rank-gold/[0.06] py-1.5 text-[11px] font-semibold text-rank-gold transition hover:bg-rank-gold/15 hover:border-rank-gold/50 active:scale-[0.98]"
                   >
-                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                    <Star className="h-3 w-3 fill-rank-gold text-rank-gold" />
                     Qualifié en finale
                   </button>
                 )}
@@ -328,7 +329,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
             );
           })}
 
-          {/* ── Add button ──────────────────────────────── */}
+          {/* ── Add button — audit §238 catégoriel pur — pas de token sémantique adapté (amber CTA compétition) */}
           <button
             type="button"
             onClick={openCreate}
@@ -381,7 +382,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                   onClick={() => setRaceType("series")}
                   className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                     raceType === "series"
-                      ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300" // audit §238 catégoriel pur — pas de token sémantique adapté (amber série)
                       : "border-border bg-card text-muted-foreground hover:bg-muted"
                   }`}
                 >
@@ -392,7 +393,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                   onClick={() => setRaceType("finale")}
                   className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                     raceType === "finale"
-                      ? "border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300"
+                      ? "border-rank-gold bg-rank-gold/10 text-rank-gold"
                       : "border-border bg-card text-muted-foreground hover:bg-muted"
                   }`}
                 >
@@ -415,7 +416,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
                       onClick={() => setFinalLetter(letter)}
                       className={`h-10 w-10 rounded-xl border text-sm font-semibold transition ${
                         finalLetter === letter
-                          ? "border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300"
+                          ? "border-rank-gold bg-rank-gold/10 text-rank-gold"
                           : "border-border bg-card text-muted-foreground hover:bg-muted"
                       }`}
                     >
@@ -488,7 +489,7 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
               />
             </div>
 
-            {/* Submit */}
+            {/* Submit — audit §238 catégoriel pur — pas de token sémantique adapté (amber primary CTA) */}
             <Button
               onClick={handleSubmit}
               disabled={!eventCode || isSaving}

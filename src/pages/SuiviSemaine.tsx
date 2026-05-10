@@ -1118,8 +1118,9 @@ function LoggedCard({
       className={cn(
         "w-full rounded-2xl border border-l-4 p-3 text-left transition-all",
         isStrength
-          ? "border-amber-200/70 border-l-amber-500 bg-amber-50/40 hover:border-amber-300 dark:border-amber-900/40 dark:border-l-amber-500 dark:bg-amber-950/10"
-          : "border-border border-l-blue-500 bg-blue-50/30 hover:border-blue-300 dark:border-blue-900/40 dark:border-l-blue-500 dark:bg-blue-950/10",
+          // audit §238 catégoriel pur — pas de token sémantique adapté pour les pastels de fond/bordure de carte (seul border-l est remplacé par le token de catégorie)
+          ? "border-amber-200/70 border-l-cat-strength bg-amber-50/40 hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-950/10"
+          : "border-border border-l-cat-swim bg-blue-50/30 hover:border-blue-300 dark:border-blue-900/40 dark:bg-blue-950/10",
       )}
     >
       {/* Top row: slot info */}
@@ -1128,8 +1129,8 @@ function LoggedCard({
           className={cn(
             "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
             isStrength
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-              : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
+              ? "bg-cat-strength/15 text-cat-strength"
+              : "bg-cat-swim/15 text-cat-swim",
           )}
         >
           {isStrength ? <Dumbbell className="h-3 w-3" /> : <Droplets className="h-3 w-3" />}
@@ -1201,9 +1202,9 @@ function LoggedCard({
             <p className="whitespace-pre-wrap text-xs text-foreground">{comments}</p>
           )}
           {session?.coach_notes && (
-            <div className="rounded-lg border-l-4 border-blue-400 bg-blue-50 p-2 dark:bg-blue-950/20">
-              <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Note du coach</p>
-              <p className="text-xs text-blue-800 dark:text-blue-300">{session.coach_notes}</p>
+            <div className="rounded-lg border-l-4 border-intensity-prog bg-intensity-prog-bg p-2">
+              <p className="text-[10px] font-semibold text-intensity-prog">Note du coach</p>
+              <p className="text-xs text-intensity-prog">{session.coach_notes}</p>
             </div>
           )}
         </div>
@@ -1228,8 +1229,9 @@ function MissedCard({
       className={cn(
         "rounded-2xl border-2 border-l-4 border-dashed p-3 opacity-80",
         isStrength
-          ? "border-amber-200/80 border-l-amber-500 bg-amber-50/30 dark:border-amber-900/40 dark:border-l-amber-500 dark:bg-amber-950/10"
-          : "border-border border-l-blue-500 bg-blue-50/20 dark:border-blue-900/40 dark:border-l-blue-500 dark:bg-blue-950/10",
+          // audit §238 catégoriel pur — pas de token sémantique adapté pour les pastels de fond/bordure de carte (seul border-l est remplacé par le token de catégorie)
+          ? "border-amber-200/80 border-l-cat-strength bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10"
+          : "border-border border-l-cat-swim bg-blue-50/20 dark:border-blue-900/40 dark:bg-blue-950/10",
       )}
     >
       {/* Slot info */}
@@ -1238,8 +1240,8 @@ function MissedCard({
           className={cn(
             "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
             isStrength
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-              : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
+              ? "bg-cat-strength/15 text-cat-strength"
+              : "bg-cat-swim/15 text-cat-swim",
           )}
         >
           {isStrength ? <Dumbbell className="h-3 w-3" /> : <Droplets className="h-3 w-3" />}
@@ -1284,7 +1286,7 @@ function MissedCard({
             className={cn(
               "flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-semibold transition active:scale-95",
               isStrength
-                ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                ? "bg-cat-strength/10 text-cat-strength hover:bg-cat-strength/20"
                 : "bg-primary/10 text-primary hover:bg-primary/20",
             )}
           >
@@ -1311,8 +1313,8 @@ function AbsentCard({
       className={cn(
         "flex items-center justify-between gap-2 rounded-2xl border border-l-4 bg-muted/30 p-2.5",
         isStrength
-          ? "border-border border-l-amber-500"
-          : "border-border border-l-blue-500",
+          ? "border-border border-l-cat-strength"
+          : "border-border border-l-cat-swim",
       )}
     >
       <div className="min-w-0">
@@ -1327,8 +1329,8 @@ function AbsentCard({
             className={cn(
               "rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
               isStrength
-                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                : "bg-sky-100 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300",
+                ? "bg-cat-strength/15 text-cat-strength"
+                : "bg-cat-swim/15 text-cat-swim",
             )}
           >
             {isStrength ? "Muscu" : "Natation"}

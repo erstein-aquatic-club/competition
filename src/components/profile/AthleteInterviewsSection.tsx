@@ -378,7 +378,7 @@ function InterviewCard({
       À préparer
     </Badge>
   ) : isDraftCoach ? (
-    <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-700">
+    <Badge className="bg-intensity-prog-bg text-intensity-prog border-intensity-prog/30">
       <Clock className="h-3 w-3 mr-1" />
       En préparation
     </Badge>
@@ -395,7 +395,7 @@ function InterviewCard({
   const borderClass = isDraft
     ? "border-status-warning/40 border-l-4"
     : isDraftCoach
-      ? "border-blue-300 dark:border-blue-700 border-l-4"
+      ? "border-intensity-prog/40 border-l-4"
       : isSent
         ? "border-status-success/40 border-l-4"
         : "";
@@ -439,12 +439,14 @@ function InterviewCard({
                     Bilan des engagements précédents
                   </p>
                   {prevInterview.athlete_commitments && (
+                    // audit §238 catégoriel pur — couleur identité nageur (bleu), pas de token status-* adapté
                     <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/50 dark:bg-blue-950/20 p-2 space-y-0.5">
                       <p className="text-[10px] font-semibold text-muted-foreground">Mes engagements</p>
                       <p className="text-xs whitespace-pre-wrap">{prevInterview.athlete_commitments}</p>
                     </div>
                   )}
                   {prevInterview.coach_actions && (
+                    // audit §238 catégoriel pur — couleur identité coach (amber), pas de token status-* adapté
                     <div className="border-l-4 border-amber-400 rounded-r-lg bg-amber-50/50 dark:bg-amber-950/20 p-2 space-y-0.5">
                       <p className="text-[10px] font-semibold text-muted-foreground">Actions du coach</p>
                       <p className="text-xs whitespace-pre-wrap">{prevInterview.coach_actions}</p>
@@ -547,8 +549,8 @@ function InterviewCard({
           {/* ── Draft coach: waiting state + previous commitments + planning ── */}
           {isDraftCoach && (
             <>
-              <div className="rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20 p-6 text-center space-y-2">
-                <Clock className="h-8 w-8 mx-auto text-blue-500" />
+              <div className="rounded-xl border border-dashed border-intensity-prog/40 bg-intensity-prog-bg/50 p-6 text-center space-y-2">
+                <Clock className="h-8 w-8 mx-auto text-intensity-prog" />
                 <p className="text-sm font-medium">Entretien envoyé au coach</p>
                 <p className="text-xs text-muted-foreground">
                   Votre coach prépare l'entretien. Vous recevrez le compte-rendu complet après l'entretien en présentiel.
@@ -679,18 +681,21 @@ function CollapsiblePreviousCommitments({
       <CollapsibleContent>
         <div className="rounded-b-xl border border-t-0 bg-muted/30 px-3 pb-3 space-y-2">
           {prevInterview.athlete_commitments && (
+            // audit §238 catégoriel pur — couleur identité nageur (bleu), pas de token status-* adapté
             <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/50 dark:bg-blue-950/20 p-2">
               <p className="text-[10px] font-semibold text-muted-foreground">Mes engagements</p>
               <p className="text-xs whitespace-pre-wrap">{prevInterview.athlete_commitments}</p>
             </div>
           )}
           {prevInterview.coach_actions && (
+            // audit §238 catégoriel pur — couleur identité coach (amber), pas de token status-* adapté
             <div className="border-l-4 border-amber-400 rounded-r-lg bg-amber-50/50 dark:bg-amber-950/20 p-2">
               <p className="text-[10px] font-semibold text-muted-foreground">Actions du coach</p>
               <p className="text-xs whitespace-pre-wrap">{prevInterview.coach_actions}</p>
             </div>
           )}
           {commitmentReview && (
+            // audit §238 catégoriel pur — couleur identité nageur (bilan), pas de token status-* adapté
             <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/80 dark:bg-blue-950/30 p-2">
               <p className="text-[10px] font-semibold text-muted-foreground">Mon bilan</p>
               <p className="text-xs whitespace-pre-wrap">{commitmentReview}</p>
@@ -796,6 +801,7 @@ function ReadOnlyPlanning({
     <div className="space-y-3">
       <div className="rounded-xl border bg-muted/20 p-3">
         <div className="flex items-center gap-2 text-sm flex-wrap">
+          {/* audit §238 catégoriel pur — icône décorative trophée, pas de token status-* adapté */}
           <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
           <span className="font-medium">{upcomingCompetitions.length} échéance{upcomingCompetitions.length > 1 ? "s" : ""} visible{upcomingCompetitions.length > 1 ? "s" : ""}</span>
           <Badge variant="secondary" className="text-[10px]">
@@ -947,6 +953,7 @@ function SectionLabel({ label }: { label: string }) {
 }
 
 function AthleteBlock({ text, label }: { text?: string | null; label?: string }) {
+  // audit §238 catégoriel pur — couleur identité nageur (bleu), pas de token status-* adapté
   return (
     <div className="border-l-4 border-blue-400 rounded-r-lg bg-blue-50/50 dark:bg-blue-950/20 p-2.5 space-y-0.5">
       <div className="flex items-center gap-1.5">
@@ -964,6 +971,7 @@ function AthleteBlock({ text, label }: { text?: string | null; label?: string })
 
 function CoachBlock({ text, label }: { text?: string | null; label?: string }) {
   if (!text?.trim()) return null;
+  // audit §238 catégoriel pur — couleur identité coach (amber), pas de token status-* adapté
   return (
     <div className="border-l-4 border-amber-400 rounded-r-lg bg-amber-50/50 dark:bg-amber-950/20 p-2.5 space-y-0.5">
       <div className="flex items-center gap-1.5">

@@ -24,41 +24,41 @@ interface Props {
 const STROKE_META: Record<SegStroke, { label: string; headerBg: string; headerText: string; borderColor: string; rowBg: string }> = {
   papillon: {
     label: "Papillon",
-    headerBg: "bg-violet-500/10",
-    headerText: "text-violet-600 dark:text-violet-400",
-    borderColor: "border-violet-400/40",
-    rowBg: "bg-violet-500/5",
+    headerBg: "bg-stroke-pap/10",
+    headerText: "text-stroke-pap",
+    borderColor: "border-stroke-pap/40",
+    rowBg: "bg-stroke-pap/5",
   },
   dos: {
     label: "Dos",
-    headerBg: "bg-sky-500/10",
-    headerText: "text-sky-600 dark:text-sky-400",
-    borderColor: "border-sky-400/40",
-    rowBg: "bg-sky-500/5",
+    headerBg: "bg-stroke-dos/10",
+    headerText: "text-stroke-dos",
+    borderColor: "border-stroke-dos/40",
+    rowBg: "bg-stroke-dos/5",
   },
   brasse: {
     label: "Brasse",
-    headerBg: "bg-emerald-500/10",
-    headerText: "text-emerald-600 dark:text-emerald-400",
-    borderColor: "border-emerald-400/40",
-    rowBg: "bg-emerald-500/5",
+    headerBg: "bg-stroke-br/10",
+    headerText: "text-stroke-br",
+    borderColor: "border-stroke-br/40",
+    rowBg: "bg-stroke-br/5",
   },
   crawl: {
     label: "Crawl",
-    headerBg: "bg-cyan-500/10",
-    headerText: "text-cyan-600 dark:text-cyan-400",
-    borderColor: "border-cyan-400/40",
-    rowBg: "bg-cyan-500/5",
+    headerBg: "bg-stroke-nl/10",
+    headerText: "text-stroke-nl",
+    borderColor: "border-stroke-nl/40",
+    rowBg: "bg-stroke-nl/5",
   },
 };
 
 const ZONE_COLS: { zone: Zone; label: string; hCls: string; bold: boolean }[] = [
-  { zone: "V0",  label: "V0",  hCls: "text-sky-500",    bold: false },
-  { zone: "V1",  label: "V1",  hCls: "text-teal-500",   bold: false },
-  { zone: "V2",  label: "V2",  hCls: "text-green-500",  bold: false },
-  { zone: "V3",  label: "V3",  hCls: "text-amber-500",  bold: false },
-  { zone: "V4",  label: "V4",  hCls: "text-orange-500", bold: false },
-  { zone: "MAX", label: "MAX", hCls: "text-red-500",    bold: true  },
+  { zone: "V0",  label: "V0",  hCls: "text-intensity-prog", bold: false },
+  { zone: "V1",  label: "V1",  hCls: "text-intensity-1",    bold: false },
+  { zone: "V2",  label: "V2",  hCls: "text-intensity-2",    bold: false },
+  { zone: "V3",  label: "V3",  hCls: "text-intensity-3",    bold: false },
+  { zone: "V4",  label: "V4",  hCls: "text-intensity-4",    bold: false },
+  { zone: "MAX", label: "MAX", hCls: "text-intensity-5",    bold: true  },
 ];
 
 function fmtTime(s: number): string {
