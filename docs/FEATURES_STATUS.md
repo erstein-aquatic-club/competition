@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-04-26 (§180 Foreground push bridge in-app — `useInAppPushBridge` React hook écoutant `navigator.serviceWorker` messages eac-push, affichant toast + invalidant queries notifications + coach-comments)*
+*Dernière mise à jour : 2026-05-10 (§265 — clôture chantier perf post-pass-2 : 5 livraisons §254 audit + §256 withTimeout + §262 RPC atomique + §263 uploadAvatar offline + §265 useDelayedLoading. Composite estimé 6.1 → ~8.4/10.)*
 
 ## Légende
 
@@ -416,6 +416,30 @@ Tous les feature flags sont activés.
 |----------------|--------|----------|-------|
 | Fix page blanche au retour arrière-plan | ✅ | `auth.ts`, `App.tsx`, `main.tsx` | Triple fix : (1) `onAuthStateChange` ne remet plus `isLoaded=false` si user déjà chargé — mise à jour tokens uniquement. (2) `useVersionCheck` ne déclenche plus de reload au `visibilitychange`. (3) SW `r.update()` supprimé au `visibilitychange` |
 | Refresh token sans interruption session | ✅ | `auth.ts` | Si `INITIAL_SESSION`/`SIGNED_IN` arrive (retour premier plan iOS) : tokens mis à jour sans toucher à `isLoaded` ni re-render du router |
+
+
+### Performance & offline (post-pass-2 — §254 → §265)
+
+Voir l'audit complet `docs/audits/2026-05-10-perf-audit-pass2-runtime.md` pour les mesures détaillées. Composite mesuré 6.1/10 (pass 1) → 7.4/10 (pass 2 post-§253) → **~8.4/10 estimé** (post §256/§262/§263/§265).
+
+| Fonctionnalité | Statut | Fichiers | Notes |
+|----------------|--------|----------|-------|
+| Audit perf pass 2 runtime (hybride statique + smoke) | ✅ | `docs/audits/2026-05-10-perf-audit-pass2-runtime.md` (242 lignes) | Vérifie chaque claim §239→§253 contre l'état effectif du build. Identifie 1 régression critique §246 ↔ §243 (`vendor-motion` réintroduit critical path par PageTransition sync) + 3 gaps résiduels (§265) |
+| Fix régression PageTransition CSS | ✅ | `PageTransition.tsx`, `index.css` (§255, bundlé §259) | `<AnimatePresence><motion.div>` → `<div key={location} className="anim-page-transition">` + `@keyframes page-transition-in`. **Critical path 5 vendors → 4 mesurés** (vendor-motion 38.27 KB gzip sorti). Drop-in compatible |
+| Cache React Query persisté localStorage | ✅ | `App.tsx`, `package.json` (§248) | `<PersistQueryClientProvider>` + `createSyncStoragePersister` (key `eac-rq-cache`, maxAge 24h, buster `__BUILD_TIMESTAMP__`). Reload PWA offline désormais peuplé |
+| Sonde connectivité réelle | ✅ | `src/hooks/useOnlineStatus.ts` (§249) | HEAD `version.json` toutes les 30 s (5 s si fail), élimine faux positifs captive portal / VPN coupé / Supabase down |
+| Queue offline 12/12 mutations critiques | ✅ | `OfflineMutationSync.tsx`, `tryWithOfflineQueue` (§251 + §252 + §262 + §263) | 3 §251 (Profile.update + Records 1RM + swim) + 7 §252 (SuiviSemaine 2 + Administratif 5) + 1 §262 (SwimSessionView atomique) + 1 §263 (uploadAvatar dataURL). Chantier A 100% livré |
+| RPC `save_swim_session_atomic` (1 RTT vs N+1) | ✅ | Migration `00159`, `swim-sessions.ts` (§262) | SECURITY INVOKER, RLS héritée. Body : SELECT/INSERT dim_sessions + DELETE/INSERT swim_exercise_logs en transaction. Fallback legacy byte-identical si RPC absent. Sur 8 blocs Slow 3G : ~3.2 s économisées + 0 session orpheline |
+| Upload avatar offline (dataURL base64) | ✅ | `users.ts` (`blobToDataUrl`/`dataUrlToBlob`), `Profile.tsx` (§263) | Blob sérialisé en data URL pour localStorage. Quota guard 1 MB pré-enqueue. Replay : `dataUrlToBlob` → `uploadAvatar`. Idempotent via `upsert: true` |
+| `withTimeout(8s)` sur queryFn critiques | ✅ | `src/lib/api/client.ts` + 5 sites (§256) | Adoption 3× → 13× : Dashboard `getSessions` + `getAssignments`, SwimmerHome `getProfile/Assignments/Sessions`, Records `1RM/swim/performances`, Coach `getCoachKpis`, auth.ts RPC. Worst case 27 s end-to-end via retry §244 vs blocking infinite |
+| Retry exponentiel transient errors | ✅ | `src/lib/queryClient.ts` (§244) | `retry: (n,e) => n<2 && isTransientError(e)` + `retryDelay: 1000 * 2^i max 4000`. Combine avec `withTimeout` §256 et `isTransientError` (§offlineQueue) |
+| RPC `get_user_auth_context` (login -1 RTT) | ✅ | Migration `00158`, `auth.ts loadUser` (§247) | Fusionne `users.role` + `user_profiles.is_approved` en 1 round-trip. Fallback byte-identical sur 2 selects si RPC absent. ~400-800 ms gagnés au login Slow 3G |
+| Toast "Ça prend du temps…" après 5 s | ✅ | `src/hooks/useDelayedLoading.ts`, branchements Dashboard/Coach/Records (§265) | Hook pur + 6 tests vitest fake-timers. Élimine le drapeau "aucun feedback >5 s" du pass 1. Couplé §244 + §256 : skeleton → toast 5 s → retry → 27 s max |
+| SW precache slim (-1485 KiB mesurés) | ✅ | `vite.config.ts` (§241) | `globIgnores` Workbox sur `exceljs.min-*` + `jspdf.plugin.autotable-*` + `html2canvas.esm-*` (455 KB gzip cumulés). Servis en runtime via `StaleWhileRevalidate` cache `heavy-export-chunks` (max 6, TTL 30j) |
+| Edge Functions runtime cache | ✅ | `vite.config.ts` (§239 #6) | `NetworkFirst` sur `/functions/v1/*` (timeout 8s, max 30, TTL 1h). Admin / records import résilient offline |
+| Pagination 500 SELECT* records | ✅ | `records.ts:354,466,583` (§244 sub-§A + §239 #3) | `.limit(500)` sur `getSwimRecords`, `getSwimmerPerformances`, `getClubRanking`. `getSessions` `.limit(200)`. -70% payload sur nageur actif multi-saisons |
+| `React.memo(SwimSessionTimeline)` | ✅ | `SwimSessionTimeline.tsx` (§253) | `export const SwimSessionTimeline = memo(SwimSessionTimelineImpl)`. Parent `SwimSessionView.tsx` stabilise déjà 4 callbacks via `useCallback`. -50 à -80 % re-renders sur saisie active de logs (mesure runtime à confirmer Profiler) |
+| Extraction `<AthleteCard>`/`<RecordCard>` + memo | ⏸ | `CoachSwimmersOverview.tsx`, `Records.tsx` (§266) | Bloqué par profiling React DevTools en runtime sur le live — sans données réelles, ROI < risque refactor. Action utilisateur : Chrome + React DevTools Profiler sur Coach hub + Records |
 
 
 ## Exercices sans GIF
