@@ -4,6 +4,33 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §233 — Suppression dead code `seedDemoData`/`resetCache` (cleanup audit §214) (2026-05-10)
+
+**Contexte :** Suite §232 (helper assertSupabase). Cleanup mécanique des 2 fonctions `seedDemoData` et `resetCache` flagged dead-code par la review §219 (0 caller depuis la migration depuis l'ex-`api.ts`). Confirmé par grep — aucun appel dans `src/`.
+
+**Architecture :**
+
+- `src/lib/api/localStorage.ts` (171 → 119 LOC, -52 LOC) : suppression de :
+  - `seedDemoData` (lines 122-162, ~40 LOC + JSDoc) : initialisait localStorage avec données de démo (4 exercices, 1 séance strength, 1 séance swim, 1 assignment).
+  - `resetCache` (lines 164-171, ~8 LOC + JSDoc) : vidait localStorage + reload de la page.
+  - Import orphelin `import { assignments_create } from './assignments';` (devenu inutilisé après suppression de `seedDemoData`).
+- `src/lib/api/index.ts` : suppression du bloc `// §219 — Demo seed + reset cache` (5 lignes : 2 exports + commentaire + lignes blanches).
+
+**Justification YAGNI :**
+
+- Aucun caller dans `src/` (verified `grep -rn "seedDemoData\|resetCache\b" src/` → 0 hits hors fichier de définition).
+- Aucune exposition `window.api` ou globalThis (verified §219 commit : pas de monkey-patch dev-tools).
+- Le mode offline (CLAUDE.md "Persistance hybride : Supabase primary, localStorage fallback offline") est piloté par `localStorageGet/Save` directement dans les sous-modules (e.g., `swim-sessions.ts` `getSessions` fallback). `seedDemoData` n'est PAS le mécanisme offline — c'était un helper dev-only obsolète.
+- Si le besoin de seed dev re-émerge, le ré-implémenter sera trivial (40 LOC).
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (non lié).
+
+**Bénéfice net :** **-57 LOC** + suppression d'une dépendance inutile (`localStorage.ts` n'importe plus `./assignments`).
+
+**Hors scope §233 :** Refacto D (trio Records 3190 LOC) reporté à un § dédié.
+
+**Fichiers modifiés (2)** : `src/lib/api/localStorage.ts` (-52), `src/lib/api/index.ts` (-5). **Doc** : `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`.
+
 ## §232 — Helper `assertSupabase<T>()` (audit §214 — pattern d'erreur centralisé) (2026-05-10)
 
 **Contexte :** Refacto cleanup mécanique de l'audit §214. 239 occurrences du pattern `if (error) throw new Error(error.message)` dans 36 fichiers `src/lib/api/` — boilerplate dupliqué qui perdait la stack Postgres + codes d'erreur, alourdissait chaque CRUD de 3 lignes.

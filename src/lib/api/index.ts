@@ -99,12 +99,6 @@ export {
   updateSessionCoachNotes,
 } from './swim-sessions';
 
-// §219 — Demo seed + reset cache (extracted from legacy api.ts façade)
-export {
-  seedDemoData,
-  resetCache,
-} from './localStorage';
-
 // Re-export extracted modules
 export {
   getProfile,
