@@ -7,7 +7,7 @@ beforeEach(() => mock.reset());
 describe('coach-quickview — canUseSupabase=false paths', () => {
   it('getSwimmerBriefing returns null when Supabase is unavailable', async () => {
     mock.module('../client', {
-      namedExports: { canUseSupabase: () => false, supabase: {} },
+      namedExports: { canUseSupabase: () => false, supabase: {}, assertSupabase: <T,>(r: { data: T; error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); return r.data; } },
     });
     const { getSwimmerBriefing } = await import('../coach-quickview');
     const result = await getSwimmerBriefing(42);
@@ -16,7 +16,7 @@ describe('coach-quickview — canUseSupabase=false paths', () => {
 
   it('recordAttendanceAsSub throws when Supabase is unavailable', async () => {
     mock.module('../client', {
-      namedExports: { canUseSupabase: () => false, supabase: {} },
+      namedExports: { canUseSupabase: () => false, supabase: {}, assertSupabase: <T,>(r: { data: T; error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); return r.data; } },
     });
     const { recordAttendanceAsSub } = await import('../coach-quickview');
     await assert.rejects(
@@ -27,7 +27,7 @@ describe('coach-quickview — canUseSupabase=false paths', () => {
 
   it('addSessionCommentAsSub throws when Supabase is unavailable', async () => {
     mock.module('../client', {
-      namedExports: { canUseSupabase: () => false, supabase: { auth: { getUser: async () => ({ data: { user: null } }) } } },
+      namedExports: { canUseSupabase: () => false, supabase: { auth: { getUser: async () => ({ data: { user: null } }) } }, assertSupabase: <T,>(r: { data: T; error: { message: string } | null }) => { if (r.error) throw new Error(r.error.message); return r.data; } },
     });
     const { addSessionCommentAsSub } = await import('../coach-quickview');
     await assert.rejects(

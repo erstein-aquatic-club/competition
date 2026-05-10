@@ -10,6 +10,7 @@ import {
   delay,
   fetchUserGroupIds,
   STORAGE_KEYS,
+  assertSupabase,
 } from './client';
 import type { Notification } from './types';
 import type { NotificationListResult } from './helpers';
@@ -31,16 +32,17 @@ export async function notifications_send(payload: {
   reply_to_target_id?: number;
 }) {
   if (canUseSupabase()) {
-    const { data: notif, error } = await supabase
-      .from("notifications")
-      .insert({
-        title: payload.title,
-        body: payload.body ?? null,
-        type: payload.type,
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
+    const notif = assertSupabase(
+      await supabase
+        .from("notifications")
+        .insert({
+          title: payload.title,
+          body: payload.body ?? null,
+          type: payload.type,
+        })
+        .select("id")
+        .single()
+    );
     if (notif && payload.targets.length > 0) {
       const { error: targetError } = await supabase
         .from("notification_targets")
@@ -269,11 +271,12 @@ export async function notifications_mark_read(payload: {
     throw new Error("Missing target id");
   }
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("notification_targets")
-      .update({ read_at: new Date().toISOString() })
-      .eq("id", resolvedId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("notification_targets")
+        .update({ read_at: new Date().toISOString() })
+        .eq("id", resolvedId)
+    );
     return;
   }
 

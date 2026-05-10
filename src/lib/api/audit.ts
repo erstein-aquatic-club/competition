@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 
 export type AuditEntry = {
   id: number;
@@ -13,12 +13,13 @@ export type AuditEntry = {
 
 export async function getAuditLog(limit = 50, offset = 0): Promise<AuditEntry[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("admin_audit_log")
-    .select("*, actor:users!actor_id(display_name), target:users!target_user_id(display_name)")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("admin_audit_log")
+      .select("*, actor:users!actor_id(display_name), target:users!target_user_id(display_name)")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1)
+  );
   return (data ?? []).map((row: any) => ({
     id: row.id,
     actor_id: row.actor_id,

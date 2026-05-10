@@ -2,7 +2,7 @@
  * API Absences - Planned absence management for swimmers
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { PlannedAbsence } from "./types";
 
 export async function getPlannedAbsences(options?: {
@@ -15,19 +15,19 @@ export async function getPlannedAbsences(options?: {
   if (options?.userId) query = query.eq("user_id", options.userId);
   if (options?.from) query = query.gte("date", options.from);
   if (options?.to) query = query.lte("date", options.to);
-  const { data, error } = await query.order("date", { ascending: true });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query.order("date", { ascending: true }));
   return (data ?? []) as PlannedAbsence[];
 }
 
 export async function getMyPlannedAbsences(): Promise<PlannedAbsence[]> {
   if (!canUseSupabase()) return [];
   // RLS filters by app_user_id() automatically
-  const { data, error } = await supabase
-    .from("planned_absences")
-    .select("*")
-    .order("date", { ascending: true });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("planned_absences")
+      .select("*")
+      .order("date", { ascending: true })
+  );
   return (data ?? []) as PlannedAbsence[];
 }
 
@@ -46,12 +46,13 @@ export async function setPlannedAbsence(date: string, reason?: string | null): P
     .eq("date", date)
     .is("scheduled_slot", null);
   if (delError) throw new Error(delError.message);
-  const { data, error } = await supabase
-    .from("planned_absences")
-    .insert({ user_id: appUserId, date, reason: reason ?? null })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("planned_absences")
+      .insert({ user_id: appUserId, date, reason: reason ?? null })
+      .select()
+      .single()
+  );
   return data as PlannedAbsence;
 }
 
@@ -60,10 +61,11 @@ export async function removePlannedAbsence(date: string): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   const appUserId = session?.user?.app_metadata?.app_user_id;
   if (!appUserId) return;
-  const { error } = await supabase
-    .from("planned_absences")
-    .delete()
-    .eq("user_id", appUserId)
-    .eq("date", date);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("planned_absences")
+      .delete()
+      .eq("user_id", appUserId)
+      .eq("date", date)
+  );
 }

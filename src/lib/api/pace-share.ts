@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { SwimmerRef } from "./pace-targets";
 import type { ZoneConfig } from "../paceCalculator";
 import type { PaceTarget } from "./pace-targets";
@@ -31,12 +31,13 @@ export async function createPaceShareLink(
     swimmer_manual_id: swimmer.kind === "manual" ? swimmer.manualId : null,
   };
 
-  const { data, error } = await supabase
-    .from("pace_share_links")
-    .insert(row)
-    .select("token")
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("pace_share_links")
+      .insert(row)
+      .select("token")
+      .single()
+  );
 
   const token = (data as { token: string }).token;
   const url = buildShareUrl(token);
@@ -47,7 +48,6 @@ export async function getPaceSharePayload(
   token: string,
 ): Promise<PaceSharePayload | null> {
   if (!canUseSupabase()) return null;
-  const { data, error } = await supabase.rpc("get_pace_share_payload", { token_in: token });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await supabase.rpc("get_pace_share_payload", { token_in: token }));
   return data as PaceSharePayload | null;
 }

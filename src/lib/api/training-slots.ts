@@ -2,7 +2,7 @@
  * API Training Slots - Recurring weekly training schedule management
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type {
   TrainingSlot,
   TrainingSlotAssignment,
@@ -250,38 +250,39 @@ export async function getSlotOverrides(options?: {
     .order("override_date", { ascending: true });
   if (options?.slotId) query = query.eq("slot_id", options.slotId);
   if (options?.fromDate) query = query.gte("override_date", options.fromDate);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   return (data ?? []) as TrainingSlotOverride[];
 }
 
 export async function createSlotOverride(input: TrainingSlotOverrideInput): Promise<TrainingSlotOverride> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { data, error } = await supabase
-    .from("training_slot_overrides")
-    .upsert(
-      {
-        slot_id: input.slot_id,
-        override_date: input.override_date,
-        status: input.status,
-        new_start_time: input.new_start_time ?? null,
-        new_end_time: input.new_end_time ?? null,
-        new_location: input.new_location ?? null,
-        reason: input.reason ?? null,
-      },
-      { onConflict: "slot_id,override_date" },
-    )
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("training_slot_overrides")
+      .upsert(
+        {
+          slot_id: input.slot_id,
+          override_date: input.override_date,
+          status: input.status,
+          new_start_time: input.new_start_time ?? null,
+          new_end_time: input.new_end_time ?? null,
+          new_location: input.new_location ?? null,
+          reason: input.reason ?? null,
+        },
+        { onConflict: "slot_id,override_date" },
+      )
+      .select()
+      .single()
+  );
   return data as TrainingSlotOverride;
 }
 
 export async function deleteSlotOverride(overrideId: string): Promise<void> {
   if (!canUseSupabase()) return;
-  const { error } = await supabase
-    .from("training_slot_overrides")
-    .delete()
-    .eq("id", overrideId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("training_slot_overrides")
+      .delete()
+      .eq("id", overrideId)
+  );
 }

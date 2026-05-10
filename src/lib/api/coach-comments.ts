@@ -6,6 +6,7 @@ import {
   supabase,
   canUseSupabase,
   normalizeScaleToFive,
+  assertSupabase,
 } from './client';
 
 // ---------------------------------------------------------------------------
@@ -133,11 +134,11 @@ export async function markCommentsRead(
     read_at: now,
   }));
 
-  const { error } = await supabase
-    .from('coach_comment_reads')
-    .upsert(rows, { onConflict: 'coach_user_id,session_id' });
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('coach_comment_reads')
+      .upsert(rows, { onConflict: 'coach_user_id,session_id' })
+  );
 }
 
 // ---------------------------------------------------------------------------

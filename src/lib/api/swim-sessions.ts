@@ -16,6 +16,7 @@ import {
   expandScaleToTen,
   normalizeScaleToFive,
   STORAGE_KEYS,
+  assertSupabase,
 } from "./client";
 import {
   mapToDbSession,
@@ -134,12 +135,13 @@ export async function ensureSwimSession(params: {
   };
   if (params.athleteId) payload.athlete_id = Number(params.athleteId);
 
-  const { data, error } = await supabase
-    .from("dim_sessions")
-    .insert(payload)
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("dim_sessions")
+      .insert(payload)
+      .select("id")
+      .single()
+  )!;
   return data.id as number;
 }
 
@@ -155,8 +157,7 @@ export async function getSessions(
     } else {
       query = query.eq("athlete_name", athleteName);
     }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(await query);
     return (data ?? [])
       .map(mapFromDbSession)
       .filter((session): session is Session => Boolean(session));
@@ -200,8 +201,7 @@ export async function updateSession(session: Session): Promise<{ status: string 
     if (session.assignment_id != null) {
       dbPayload.assignment_id = session.assignment_id;
     }
-    const { error } = await supabase.from("dim_sessions").update(dbPayload).eq("id", session.id);
-    if (error) throw new Error(error.message);
+    assertSupabase(await supabase.from("dim_sessions").update(dbPayload).eq("id", session.id));
     return { status: "updated" };
   }
 
@@ -219,8 +219,7 @@ export async function updateSession(session: Session): Promise<{ status: string 
 
 export async function deleteSession(sessionId: number): Promise<{ status: string }> {
   if (canUseSupabase()) {
-    const { error } = await supabase.from("dim_sessions").delete().eq("id", sessionId);
-    if (error) throw new Error(error.message);
+    assertSupabase(await supabase.from("dim_sessions").delete().eq("id", sessionId));
     return { status: "deleted" };
   }
 
@@ -233,9 +232,10 @@ export async function deleteSession(sessionId: number): Promise<{ status: string
 
 export async function updateSessionCoachNotes(sessionId: number, notes: string | null): Promise<void> {
   if (!canUseSupabase()) return;
-  const { error } = await supabase
-    .from("dim_sessions")
-    .update({ coach_notes: notes })
-    .eq("id", sessionId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("dim_sessions")
+      .update({ coach_notes: notes })
+      .eq("id", sessionId)
+  );
 }

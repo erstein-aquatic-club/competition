@@ -2,7 +2,7 @@
  * API Objectives - CRUD for coach objective management
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { Objective, ObjectiveInput } from "./types";
 
 export async function getObjectives(athleteId?: string): Promise<Objective[]> {
@@ -19,8 +19,7 @@ export async function getObjectives(athleteId?: string): Promise<Objective[]> {
   if (athleteId) {
     query = query.eq("athlete_id", athleteId);
   }
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   const objectives = data ?? [];
 
   // Query 2: join table — fetched separately so a stale PostgREST schema
@@ -84,12 +83,13 @@ export async function createObjective(input: ObjectiveInput): Promise<Objective>
   // and rely entirely on the join table going forward. Existing rows in
   // production keep their column populated for back-compat.
   const { competition_id, ...rest } = input;
-  const { data, error } = await supabase
-    .from("objectives")
-    .insert({ ...rest, created_by: user?.id })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("objectives")
+      .insert({ ...rest, created_by: user?.id })
+      .select()
+      .single()
+  )!;
 
   // If a competition was specified, create the link row.
   if (competition_id) {
@@ -119,30 +119,31 @@ export async function updateObjective(id: string, input: Partial<ObjectiveInput>
   // linkObjectiveToCompetition / unlinkObjectiveFromCompetition instead.
   const { competition_id: _ignored, ...rest } = input;
   void _ignored;
-  const { data, error } = await supabase
-    .from("objectives")
-    .update(rest)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("objectives")
+      .update(rest)
+      .eq("id", id)
+      .select()
+      .single()
+  );
   return data as Objective;
 }
 
 export async function deleteObjective(id: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("objectives")
-    .delete()
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("objectives")
+      .delete()
+      .eq("id", id)
+  );
 }
 
 /** Returns objectives count keyed by numeric user_id. */
 export async function getObjectivesCountsByUser(): Promise<Map<number, number>> {
   if (!canUseSupabase()) return new Map();
-  const { data, error } = await supabase.rpc("get_objectives_counts_by_user");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await supabase.rpc("get_objectives_counts_by_user"));
   const map = new Map<number, number>();
   for (const row of data ?? []) {
     map.set(row.user_id, Number(row.objectives_count));
@@ -152,11 +153,12 @@ export async function getObjectivesCountsByUser(): Promise<Map<number, number>> 
 
 export async function getObjectivesByCompetition(competitionId: string): Promise<Objective[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("objective_competitions")
-    .select("objective_id, objectives(*)")
-    .eq("competition_id", competitionId);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("objective_competitions")
+      .select("objective_id, objectives(*)")
+      .eq("competition_id", competitionId)
+  );
   return (data ?? [])
     .map((row: any) => row.objectives)
     .filter(Boolean)
@@ -183,13 +185,14 @@ export async function linkObjectiveToCompetition(
   competitionId: string,
 ): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("objective_competitions")
-    .upsert({ objective_id: objectiveId, competition_id: competitionId }, {
-      onConflict: "objective_id,competition_id",
-      ignoreDuplicates: true,
-    });
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("objective_competitions")
+      .upsert({ objective_id: objectiveId, competition_id: competitionId }, {
+        onConflict: "objective_id,competition_id",
+        ignoreDuplicates: true,
+      })
+  );
 }
 
 /**
@@ -200,10 +203,11 @@ export async function unlinkObjectiveFromCompetition(
   competitionId: string,
 ): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("objective_competitions")
-    .delete()
-    .eq("objective_id", objectiveId)
-    .eq("competition_id", competitionId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("objective_competitions")
+      .delete()
+      .eq("objective_id", objectiveId)
+      .eq("competition_id", competitionId)
+  );
 }

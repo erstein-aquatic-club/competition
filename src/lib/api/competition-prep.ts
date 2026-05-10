@@ -2,7 +2,7 @@
  * API Competition Prep — Races, Routines, Checklists for swimmer competition preparation
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type {
   CompetitionRace,
   CompetitionRaceInput,
@@ -33,27 +33,29 @@ async function getAppUserId(): Promise<number> {
 export async function getCompetitionRaces(competitionId: string): Promise<CompetitionRace[]> {
   if (!canUseSupabase()) return [];
   const athleteId = await getAppUserId();
-  const { data, error } = await supabase
-    .from("competition_races")
-    .select("*")
-    .eq("competition_id", competitionId)
-    .eq("athlete_id", athleteId)
-    .order("race_day", { ascending: true })
-    .order("start_time", { ascending: true })
-    .order("sort_order", { ascending: true });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competition_races")
+      .select("*")
+      .eq("competition_id", competitionId)
+      .eq("athlete_id", athleteId)
+      .order("race_day", { ascending: true })
+      .order("start_time", { ascending: true })
+      .order("sort_order", { ascending: true })
+  );
   return (data ?? []) as CompetitionRace[];
 }
 
 export async function createCompetitionRace(input: CompetitionRaceInput): Promise<CompetitionRace> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const athleteId = await getAppUserId();
-  const { data, error } = await supabase
-    .from("competition_races")
-    .insert({ ...input, athlete_id: athleteId })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competition_races")
+      .insert({ ...input, athlete_id: athleteId })
+      .select()
+      .single()
+  );
   return data as CompetitionRace;
 }
 
@@ -62,23 +64,25 @@ export async function updateCompetitionRace(
   input: Partial<CompetitionRaceInput>,
 ): Promise<CompetitionRace> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { data, error } = await supabase
-    .from("competition_races")
-    .update(input)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competition_races")
+      .update(input)
+      .eq("id", id)
+      .select()
+      .single()
+  );
   return data as CompetitionRace;
 }
 
 export async function deleteCompetitionRace(id: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("competition_races")
-    .delete()
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("competition_races")
+      .delete()
+      .eq("id", id)
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -87,11 +91,12 @@ export async function deleteCompetitionRace(id: string): Promise<void> {
 
 export async function getRoutineTemplates(): Promise<RoutineTemplate[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("routine_templates")
-    .select("*, steps:routine_steps(*)")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("routine_templates")
+      .select("*, steps:routine_steps(*)")
+      .order("created_at", { ascending: false })
+  );
   // Sort steps within each template
   return ((data ?? []) as RoutineTemplate[]).map((t) => ({
     ...t,
@@ -135,11 +140,12 @@ export async function createRoutineTemplate(
 
 export async function deleteRoutineTemplate(id: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("routine_templates")
-    .delete()
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("routine_templates")
+      .delete()
+      .eq("id", id)
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -158,11 +164,12 @@ export async function getRaceRoutines(competitionId: string): Promise<RaceRoutin
   if (racesErr) throw new Error(racesErr.message);
   const raceIds = (races ?? []).map((r: any) => r.id);
   if (raceIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from("race_routines")
-    .select("*")
-    .in("race_id", raceIds);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("race_routines")
+      .select("*")
+      .in("race_id", raceIds)
+  );
   return (data ?? []) as RaceRoutine[];
 }
 
@@ -170,19 +177,21 @@ export async function setRaceRoutine(raceId: string, routineId: string): Promise
   if (!canUseSupabase()) throw new Error("Supabase not available");
   // Delete existing link for this race (UNIQUE constraint)
   await supabase.from("race_routines").delete().eq("race_id", raceId);
-  const { error } = await supabase
-    .from("race_routines")
-    .insert({ race_id: raceId, routine_id: routineId });
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("race_routines")
+      .insert({ race_id: raceId, routine_id: routineId })
+  );
 }
 
 export async function removeRaceRoutine(raceId: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("race_routines")
-    .delete()
-    .eq("race_id", raceId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("race_routines")
+      .delete()
+      .eq("race_id", raceId)
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -191,11 +200,12 @@ export async function removeRaceRoutine(raceId: string): Promise<void> {
 
 export async function getChecklistTemplates(): Promise<ChecklistTemplate[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("checklist_templates")
-    .select("*, items:checklist_items(*)")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("checklist_templates")
+      .select("*, items:checklist_items(*)")
+      .order("created_at", { ascending: false })
+  );
   return ((data ?? []) as ChecklistTemplate[]).map((t) => ({
     ...t,
     items: (t.items ?? []).sort((a, b) => a.sort_order - b.sort_order),
@@ -235,11 +245,12 @@ export async function createChecklistTemplate(
 
 export async function deleteChecklistTemplate(id: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("checklist_templates")
-    .delete()
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("checklist_templates")
+      .delete()
+      .eq("id", id)
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -250,12 +261,13 @@ export async function getCompetitionChecklist(
   competitionId: string,
 ): Promise<{ checklist: CompetitionChecklist; checks: CompetitionChecklistCheck[] } | null> {
   if (!canUseSupabase()) return null;
-  const { data, error } = await supabase
-    .from("competition_checklists")
-    .select("*")
-    .eq("competition_id", competitionId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competition_checklists")
+      .select("*")
+      .eq("competition_id", competitionId)
+      .maybeSingle()
+  );
   if (!data) return null;
   const checklist = data as CompetitionChecklist;
   const { data: checks, error: checksErr } = await supabase
@@ -308,18 +320,20 @@ export async function applyChecklistTemplate(
 
 export async function toggleChecklistCheck(checkId: string, checked: boolean): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("competition_checklist_checks")
-    .update({ checked, checked_at: checked ? new Date().toISOString() : null })
-    .eq("id", checkId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("competition_checklist_checks")
+      .update({ checked, checked_at: checked ? new Date().toISOString() : null })
+      .eq("id", checkId)
+  );
 }
 
 export async function removeCompetitionChecklist(competitionChecklistId: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("competition_checklists")
-    .delete()
-    .eq("id", competitionChecklistId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("competition_checklists")
+      .delete()
+      .eq("id", competitionChecklistId)
+  );
 }

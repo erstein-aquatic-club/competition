@@ -1,4 +1,4 @@
-# §228 — Helper `assertSupabase<T>()` dans `api/client.ts`
+# §232 — Helper `assertSupabase<T>()` dans `api/client.ts`
 
 *Date : 2026-05-08 — Suite §223 (RPC coach KPIs), §219 (kill façade api.ts), §214 (audit perf/maintenabilité).*
 
@@ -11,7 +11,7 @@ L'audit §214 (code-simplifier sub-agent) a identifié 234 occurrences du patter
 - Bloque toute future télémétrie centralisée.
 - Alourdit visuellement chaque CRUD (3 lignes de boilerplate par opération).
 
-Reporté à un § dédié → c'est §228.
+Reporté à un § dédié → c'est §232.
 
 Helpers existants dans `client.ts` (à conserver intacts) :
 - `parseApiError(error)` (l. 102-112) : extrait `{message, code, status}`.
@@ -146,7 +146,7 @@ Files high-density (à attaquer en premier d'après l'audit §214) :
 - Smoke test prod : flows critiques (login, save séance, save absence, navigation coach/nageur).
 - Grep résiduel post-codemod : `grep -c "if (error) throw new Error(error.message);" src/lib/api/` → entre 30 et 50 (cas non transformables — conditional throws + prefix formatting).
 
-### Hors scope §228
+### Hors scope §232
 
 - Pas de migration vers `summarizeApiError`/messages FR.
 - Pas de modification des sites avec `if (error.code !== ...)`.

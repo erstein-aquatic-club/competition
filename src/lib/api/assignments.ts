@@ -11,6 +11,7 @@ import {
   fetchUserGroupIds,
   fetchUserGroupIdsWithContext,
   STORAGE_KEYS,
+  assertSupabase,
 } from './client';
 import type { Assignment, CoachAssignment, ResolvedSlotAssignment } from './types';
 import { localStorageGet, localStorageSave } from './localStorage';
@@ -56,8 +57,7 @@ export async function getAssignments(
     } else {
       query = query.neq("status", "completed");
     }
-    const { data: rawAssignments, error } = await query;
-    if (error) throw new Error(error.message);
+    const rawAssignments = assertSupabase(await query);
     if (!rawAssignments?.length) return [];
 
     const [swimCatalogs, strengthCatalogs] = await Promise.all([
@@ -161,12 +161,13 @@ export async function assignments_create(
     } else if (data.target_group_id !== null && data.target_group_id !== undefined) {
       insertPayload.target_group_id = data.target_group_id;
     }
-    const { data: _created, error } = await supabase
-      .from("session_assignments")
-      .insert(insertPayload)
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("session_assignments")
+        .insert(insertPayload)
+        .select("id")
+        .single()
+    );
     // Notif + push délégués au trigger SQL `auto_notify_session_assignment`
     // (migration 00045) qui crée 1 notification + 1 target par INSERT, puis le
     // trigger pg_net (00044) appelle push-send. Doublon retiré §194.
@@ -228,11 +229,12 @@ export async function assignments_create(
 
 export async function assignments_delete(assignmentId: number) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("session_assignments")
-      .delete()
-      .eq("id", assignmentId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("session_assignments")
+        .delete()
+        .eq("id", assignmentId)
+    );
     return { status: "deleted" };
   }
 
@@ -270,8 +272,7 @@ export async function getCoachAssignments(filters: {
     return [];
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   if (!data?.length) return [];
 
   const [swimCatalogs, strengthCatalogs] = await Promise.all([
@@ -507,9 +508,7 @@ export async function getSlotAssignments(params: {
     query = query.neq("status", "completed");
   }
 
-  const { data, error } = await query;
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
 
   return (data ?? []).map((row: any) => {
     const catalog = row.swim_sessions_catalog;
@@ -546,13 +545,13 @@ export async function updateSlotVisibility(params: {
 }): Promise<void> {
   if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
-  const { error } = await supabase
-    .from("session_assignments")
-    .update({ visible_from: params.visibleFrom })
-    .eq("training_slot_id", params.trainingSlotId)
-    .eq("scheduled_date", params.scheduledDate);
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("session_assignments")
+      .update({ visible_from: params.visibleFrom })
+      .eq("training_slot_id", params.trainingSlotId)
+      .eq("scheduled_date", params.scheduledDate)
+  );
 }
 
 /**
@@ -568,14 +567,14 @@ export async function deleteSlotAssignments(params: {
 }): Promise<void> {
   if (!canUseSupabase()) throw new Error("Connexion indisponible");
 
-  const { error } = await supabase
-    .from("session_assignments")
-    .delete()
-    .eq("training_slot_id", params.trainingSlotId)
-    .eq("scheduled_date", params.scheduledDate)
-    .is("target_user_id", null);
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("session_assignments")
+      .delete()
+      .eq("training_slot_id", params.trainingSlotId)
+      .eq("scheduled_date", params.scheduledDate)
+      .is("target_user_id", null)
+  );
 }
 
 /** Get distinct swim_catalog_ids that have upcoming (today+) slot assignments */
@@ -583,15 +582,15 @@ export async function getAssignedSwimCatalogIds(): Promise<Set<number>> {
   if (!canUseSupabase()) return new Set();
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabase
-    .from("session_assignments")
-    .select("swim_catalog_id")
-    .eq("assignment_type", "swim")
-    .gte("scheduled_date", today)
-    .neq("status", "completed")
-    .not("swim_catalog_id", "is", null);
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("session_assignments")
+      .select("swim_catalog_id")
+      .eq("assignment_type", "swim")
+      .gte("scheduled_date", today)
+      .neq("status", "completed")
+      .not("swim_catalog_id", "is", null)
+  );
 
   const ids = new Set<number>();
   for (const row of data ?? []) {
@@ -604,13 +603,13 @@ export async function getAssignedSwimCatalogIds(): Promise<Set<number>> {
 export async function getEverAssignedSwimCatalogIds(): Promise<Set<number>> {
   if (!canUseSupabase()) return new Set();
 
-  const { data, error } = await supabase
-    .from("session_assignments")
-    .select("swim_catalog_id")
-    .eq("assignment_type", "swim")
-    .not("swim_catalog_id", "is", null);
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("session_assignments")
+      .select("swim_catalog_id")
+      .eq("assignment_type", "swim")
+      .not("swim_catalog_id", "is", null)
+  );
 
   const ids = new Set<number>();
   for (const row of data ?? []) {
@@ -629,8 +628,7 @@ export async function getUnassignedSlots30d(): Promise<Array<{
   location: string | null;
 }>> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase.rpc("get_unassigned_slot_instances_30d");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await supabase.rpc("get_unassigned_slot_instances_30d"));
   return (data ?? []).map((row: any) => ({
     slot_id: String(row.slot_id),
     scheduled_date: String(row.scheduled_date),

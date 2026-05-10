@@ -7,6 +7,7 @@ import {
   canUseSupabase,
   delay,
   STORAGE_KEYS,
+  assertSupabase,
 } from './client';
 import type { TimesheetShift, TimesheetLocation, TimesheetGroupLabel } from './types';
 import { localStorageGet, localStorageSave } from './localStorage';
@@ -26,8 +27,7 @@ export async function listTimesheetShifts(options?: {
     if (options?.coachId) query = query.eq("coach_id", options.coachId);
     if (options?.from) query = query.gte("shift_date", options.from);
     if (options?.to) query = query.lte("shift_date", options.to);
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(await query);
     const shifts = data ?? [];
     if (shifts.length === 0) return shifts;
 
@@ -68,11 +68,12 @@ export async function listTimesheetShifts(options?: {
 
 export async function listTimesheetLocations(): Promise<TimesheetLocation[]> {
   if (canUseSupabase()) {
-    const { data, error } = await supabase
-      .from("timesheet_locations")
-      .select("*")
-      .order("name");
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(
+      await supabase
+        .from("timesheet_locations")
+        .select("*")
+        .order("name")
+    );
     return data ?? [];
   }
 
@@ -94,10 +95,11 @@ export async function listTimesheetLocations(): Promise<TimesheetLocation[]> {
 
 export async function createTimesheetLocation(payload: { name: string }) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("timesheet_locations")
-      .insert({ name: payload.name.trim() });
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("timesheet_locations")
+        .insert({ name: payload.name.trim() })
+    );
     return { status: "created" };
   }
 
@@ -130,11 +132,12 @@ export async function createTimesheetLocation(payload: { name: string }) {
 
 export async function deleteTimesheetLocation(payload: { id: number }) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("timesheet_locations")
-      .delete()
-      .eq("id", payload.id);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("timesheet_locations")
+        .delete()
+        .eq("id", payload.id)
+    );
     return { status: "deleted" };
   }
 
@@ -149,12 +152,13 @@ export async function listTimesheetCoaches(): Promise<
   { id: number; display_name: string }[]
 > {
   if (canUseSupabase()) {
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, display_name")
-      .eq("role", "coach")
-      .eq("is_active", true);
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(
+      await supabase
+        .from("users")
+        .select("id, display_name")
+        .eq("role", "coach")
+        .eq("is_active", true)
+    );
     return (data ?? []).map((u: any) => ({ id: u.id, display_name: u.display_name }));
   }
   return [];
@@ -164,15 +168,14 @@ export async function createTimesheetShift(
   payload: Omit<TimesheetShift, "id" | "created_at" | "updated_at" | "coach_name">,
 ) {
   if (canUseSupabase()) {
-    const { data, error } = await supabase.from("timesheet_shifts").insert({
+    const data = assertSupabase(await supabase.from("timesheet_shifts").insert({
       coach_id: payload.coach_id,
       shift_date: payload.shift_date,
       start_time: payload.start_time,
       end_time: payload.end_time ?? null,
       location: payload.location ?? null,
       is_travel: payload.is_travel,
-    }).select("id").single();
-    if (error) throw new Error(error.message);
+    }).select("id").single())!;
     if (payload.group_names?.length) {
       await setShiftGroupNames(data.id, payload.group_names);
     }
@@ -191,8 +194,7 @@ export async function updateTimesheetShift(
 ) {
   if (canUseSupabase()) {
     const { id, group_names, ...rest } = payload;
-    const { error } = await supabase.from("timesheet_shifts").update(rest).eq("id", id);
-    if (error) throw new Error(error.message);
+    assertSupabase(await supabase.from("timesheet_shifts").update(rest).eq("id", id));
     if (group_names !== undefined) {
       await setShiftGroupNames(id, group_names ?? []);
     }
@@ -211,11 +213,12 @@ export async function updateTimesheetShift(
 
 export async function deleteTimesheetShift(payload: { id: number }) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("timesheet_shifts")
-      .delete()
-      .eq("id", payload.id);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("timesheet_shifts")
+        .delete()
+        .eq("id", payload.id)
+    );
     return { status: "deleted" };
   }
 
@@ -230,11 +233,12 @@ export async function deleteTimesheetShift(payload: { id: number }) {
 
 export async function listTimesheetGroupLabels(): Promise<TimesheetGroupLabel[]> {
   if (canUseSupabase()) {
-    const { data, error } = await supabase
-      .from("timesheet_group_labels")
-      .select("*")
-      .order("name");
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(
+      await supabase
+        .from("timesheet_group_labels")
+        .select("*")
+        .order("name")
+    );
     return data ?? [];
   }
   await delay(120);
@@ -243,10 +247,11 @@ export async function listTimesheetGroupLabels(): Promise<TimesheetGroupLabel[]>
 
 export async function createTimesheetGroupLabel(payload: { name: string }) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("timesheet_group_labels")
-      .insert({ name: payload.name.trim() });
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("timesheet_group_labels")
+        .insert({ name: payload.name.trim() })
+    );
     return { status: "created" };
   }
   await delay(120);
@@ -262,11 +267,12 @@ export async function createTimesheetGroupLabel(payload: { name: string }) {
 
 export async function deleteTimesheetGroupLabel(payload: { id: number }) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("timesheet_group_labels")
-      .delete()
-      .eq("id", payload.id);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("timesheet_group_labels")
+        .delete()
+        .eq("id", payload.id)
+    );
     return { status: "deleted" };
   }
   await delay(120);
@@ -279,11 +285,12 @@ export async function deleteTimesheetGroupLabel(payload: { id: number }) {
 
 export async function getShiftGroupNames(shiftId: number): Promise<string[]> {
   if (canUseSupabase()) {
-    const { data, error } = await supabase
-      .from("timesheet_shift_groups")
-      .select("group_name")
-      .eq("shift_id", shiftId);
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(
+      await supabase
+        .from("timesheet_shift_groups")
+        .select("group_name")
+        .eq("shift_id", shiftId)
+    );
     return (data ?? []).map((r: { group_name: string }) => r.group_name);
   }
   return [];
@@ -313,13 +320,14 @@ export async function setShiftGroupNames(shiftId: number, groupNames: string[]) 
 
 export async function listPermanentGroupsForTimesheet(): Promise<{ id: number; name: string }[]> {
   if (canUseSupabase()) {
-    const { data, error } = await supabase
-      .from("groups")
-      .select("id, name")
-      .eq("is_temporary", false)
-      .eq("is_active", true)
-      .order("name");
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(
+      await supabase
+        .from("groups")
+        .select("id, name")
+        .eq("is_temporary", false)
+        .eq("is_active", true)
+        .order("name")
+    );
     return data ?? [];
   }
   return [];

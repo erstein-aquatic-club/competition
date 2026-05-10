@@ -4,6 +4,58 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §232 — Helper `assertSupabase<T>()` (audit §214 — pattern d'erreur centralisé) (2026-05-10)
+
+**Contexte :** Refacto cleanup mécanique de l'audit §214. 239 occurrences du pattern `if (error) throw new Error(error.message)` dans 36 fichiers `src/lib/api/` — boilerplate dupliqué qui perdait la stack Postgres + codes d'erreur, alourdissait chaque CRUD de 3 lignes.
+
+§232 (et non §228) suite à 4 conflits de numérotation parallèles (Profile edit/password §228, brand-moments §229+§230, suppression NeurotypQuiz §231).
+
+**Architecture :**
+
+- `src/lib/api/client.ts` (+~25 LOC) : ajout du helper `assertSupabase<T>(res): T` dans la section "Error handling" (après `summarizeApiError`). Comportement **byte-identical** : `if (res.error) throw new Error(res.error.message); return res.data;`. JSDoc complet avec usage examples + caveats "Don't use for". Compatible avec `PostgrestResponse<T>` (data: T[] | null) ET `PostgrestSingleResponse<T>` (data: T | null) via inference générique.
+- `src/lib/api/index.ts` (+1 ligne) : `assertSupabase` ajouté au bloc `export { ... } from './client';`.
+- 36 fichiers `src/lib/api/*.ts` : codemod **237 sites transformés** sur 239 (volume initial supérieur au target ~190 du design : l'implementer a détecté des aliased patterns supplémentaires en plus des 3 cas A/B/C).
+
+**Patterns transformés** :
+
+- **Cas A** (sélection avec data) : `const { data, error } = ...; if (error) throw...; return data ?? []` → `const data = assertSupabase(await ...); return data ?? []`
+- **Cas B** (mutation sans data) : `const { error } = ...; if (error) throw...` → `assertSupabase(await ...);`
+- **Cas C** (RPC) : `const { data, error } = await supabase.rpc(...); if (error) throw...; return data` → `return assertSupabase(await supabase.rpc(...));`
+
+**6 sites résiduels (Cas D légitimes, intentionnellement préservés)** :
+
+- `strength.ts:870` : `count` destructuré alongside `data`/`error` (pagination).
+- `swimmer-slots.ts:33` : `count`-only destructure (head:true).
+- `pace-zones.ts:111` : `count`-only destructure (head:true).
+- `training-slots.ts:232` : pattern §113 silent no-op (length check après pour détecter UPDATE RLS-filtered).
+- `users.ts:335` : `supabase.auth.updateUser()` — `UserResponse` type incompatible avec generic `<T>`.
+- `notifications.ts:181` : `Promise.all([...])` destructure (deux queries en parallèle dans la même const).
+
+**Cas explicitement préservé** : `swim-sessions.ts syncSession` — branche `if (error.code === '23505')` UPDATE existing row + préservation `assignment_id` (multi-line conditional throw, intacte).
+
+**Test mock fix** : `src/lib/api/__tests__/coach-quickview.test.ts` utilisait `mock.module('../client', { namedExports: { ... } })` sans `...real`, donc l'ajout de `assertSupabase` à `client.ts` aurait cassé l'import (3 mocks). Patch : impl inline `assertSupabase` byte-identical dans chaque mock (3× duplication acceptable, dette test-only).
+
+**Méthode** : subagent-driven mais 1er implementer a stallé après 600s sans modif (lecture exhaustive). 2e implementer redispatché avec prompt 3× plus court ("transform-fast", lecture 3 lignes/site) → succès. Spec compliance review ✅ (verified 6 résiduels légitimes, helper signature, re-export). Code quality review manuelle ciblée (le code-quality reviewer a stallé aussi) → approved.
+
+**Tests :** `npx tsc --noEmit` clean. `npm test` 684 pass + 1 fail pré-existant `transformers.test.ts:18` (non lié, déjà documenté §214/§216/§217/§218/§219/§223).
+
+**Bénéfice net :**
+
+- 237 sites simplifiés × ~1 ligne supprimée = **~-237 LOC** dans `src/lib/api/`.
+- + helper ~25 LOC dans `client.ts`.
+- + re-export ~1 LOC dans `index.ts`.
+- + 9 LOC dette test (3× impl inline `coach-quickview.test.ts`).
+- **Net : ~-200 LOC** + 1 source de vérité pour le pattern d'erreur Supabase. Toute future télémétrie/log/enrichissement → 1 modification dans `client.ts`.
+
+**Hors scope §232 :**
+
+- Pas de migration vers `summarizeApiError`/messages FR (Option C écartée du design).
+- Pas de modification des sites avec conditional throws ou prefix formatting.
+- Pas de touche aux consumers `src/hooks/`, `src/pages/`, `src/components/`.
+- Refacto D (trio Records), suppression `seedDemoData`/`resetCache` reportés.
+
+**Fichiers** : Modifiés : `src/lib/api/client.ts` (+~25 LOC helper + JSDoc), `src/lib/api/index.ts` (+1 re-export), 36 fichiers `src/lib/api/*.ts` (codemod 237 sites), `src/lib/api/__tests__/coach-quickview.test.ts` (mock fix). **Doc** : `docs/plans/2026-05-08-assert-supabase-helper-design.md` (commit b95a926e7), `docs/plans/2026-05-08-assert-supabase-helper.md`, `docs/implementation-log.md`, `docs/ROADMAP.md`, `CLAUDE.md`.
+
 ## §231 — Suppression complète NeurotypQuiz (2026-05-09)
 
 **Contexte :** Le NeurotypQuiz n'était plus utilisé. Suppression de toute trace frontend.

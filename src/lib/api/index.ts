@@ -49,6 +49,7 @@ export {
   estimateOneRm,
   parseApiError,
   summarizeApiError,
+  assertSupabase,
   normalizeCycleType,
   normalizeExerciseType,
   normalizeStrengthItem,

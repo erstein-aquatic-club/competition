@@ -2,59 +2,64 @@
  * API Competitions - CRUD for coach competition management
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { Competition, CompetitionInput, CompetitionAssignment } from "./types";
 
 export async function getCompetitions(): Promise<Competition[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("competitions")
-    .select("*")
-    .order("date", { ascending: true });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competitions")
+      .select("*")
+      .order("date", { ascending: true })
+  );
   return (data ?? []) as Competition[];
 }
 
 export async function createCompetition(input: CompetitionInput): Promise<Competition> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data: { user } } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from("competitions")
-    .insert({ ...input, created_by: user?.id })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competitions")
+      .insert({ ...input, created_by: user?.id })
+      .select()
+      .single()
+  );
   return data as Competition;
 }
 
 export async function updateCompetition(id: string, input: Partial<CompetitionInput>): Promise<Competition> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { data, error } = await supabase
-    .from("competitions")
-    .update(input)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competitions")
+      .update(input)
+      .eq("id", id)
+      .select()
+      .single()
+  );
   return data as Competition;
 }
 
 export async function deleteCompetition(id: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { error } = await supabase
-    .from("competitions")
-    .delete()
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("competitions")
+      .delete()
+      .eq("id", id)
+  );
 }
 
 export async function getCompetitionAssignments(competitionId: string): Promise<CompetitionAssignment[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("competition_assignments")
-    .select("*")
-    .eq("competition_id", competitionId);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("competition_assignments")
+      .select("*")
+      .eq("competition_id", competitionId)
+  );
   return (data ?? []) as CompetitionAssignment[];
 }
 
@@ -88,7 +93,6 @@ export async function getMyCompetitionIds(athleteId?: number | null): Promise<st
     .from("competition_assignments")
     .select("competition_id");
   if (athleteId) query = query.eq("athlete_id", athleteId);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   return (data ?? []).map((r: any) => r.competition_id);
 }

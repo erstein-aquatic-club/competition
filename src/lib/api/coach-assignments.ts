@@ -2,7 +2,7 @@
  * API Coach Assignments — coach ↔ swimmer assignment management
  */
 
-import { supabase, canUseSupabase } from './client';
+import { supabase, canUseSupabase, assertSupabase } from './client';
 import type { CoachSwimmerAssignment, CoachSwimmerHistory } from './types';
 
 /**
@@ -16,12 +16,12 @@ export async function getMySwimmers(): Promise<number[]> {
     sessionData?.session?.user?.app_metadata?.app_user_id as number | undefined;
   if (!appUserId) return [];
 
-  const { data, error } = await supabase
-    .from('coach_swimmer_assignments')
-    .select('swimmer_id')
-    .eq('coach_id', appUserId);
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('coach_swimmer_assignments')
+      .select('swimmer_id')
+      .eq('coach_id', appUserId)
+  );
   return (data ?? []).map((row: any) => row.swimmer_id as number);
 }
 
@@ -31,11 +31,11 @@ export async function getMySwimmers(): Promise<number[]> {
 export async function getAllAssignments(): Promise<CoachSwimmerAssignment[]> {
   if (!canUseSupabase()) return [];
 
-  const { data, error } = await supabase
-    .from('coach_swimmer_assignments')
-    .select('*');
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('coach_swimmer_assignments')
+      .select('*')
+  );
   return (data ?? []) as CoachSwimmerAssignment[];
 }
 
@@ -49,11 +49,11 @@ export async function assignSwimmer(
 ): Promise<void> {
   if (!canUseSupabase()) return;
 
-  const { error } = await supabase
-    .from('coach_swimmer_assignments')
-    .insert({ swimmer_id: swimmerId, coach_id: coachId, assigned_by: assignedBy });
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('coach_swimmer_assignments')
+      .insert({ swimmer_id: swimmerId, coach_id: coachId, assigned_by: assignedBy })
+  );
 }
 
 /**
@@ -62,12 +62,12 @@ export async function assignSwimmer(
 export async function unassignSwimmer(swimmerId: number): Promise<void> {
   if (!canUseSupabase()) return;
 
-  const { error } = await supabase
-    .from('coach_swimmer_assignments')
-    .delete()
-    .eq('swimmer_id', swimmerId);
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('coach_swimmer_assignments')
+      .delete()
+      .eq('swimmer_id', swimmerId)
+  );
 }
 
 /**
@@ -80,12 +80,12 @@ export async function reassignSwimmer(
 ): Promise<void> {
   if (!canUseSupabase()) return;
 
-  const { error } = await supabase
-    .from('coach_swimmer_assignments')
-    .update({ coach_id: newCoachId, assigned_by: assignedBy })
-    .eq('swimmer_id', swimmerId);
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('coach_swimmer_assignments')
+      .update({ coach_id: newCoachId, assigned_by: assignedBy })
+      .eq('swimmer_id', swimmerId)
+  );
 }
 
 /**
@@ -96,13 +96,13 @@ export async function getSwimmerCoachHistory(
 ): Promise<CoachSwimmerHistory[]> {
   if (!canUseSupabase()) return [];
 
-  const { data, error } = await supabase
-    .from('coach_swimmer_history')
-    .select('*')
-    .eq('swimmer_id', swimmerId)
-    .order('removed_at', { ascending: false });
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('coach_swimmer_history')
+      .select('*')
+      .eq('swimmer_id', swimmerId)
+      .order('removed_at', { ascending: false })
+  );
   return (data ?? []) as CoachSwimmerHistory[];
 }
 
@@ -112,10 +112,11 @@ export async function getSwimmerCoachHistory(
  */
 export async function getSwimmerIdsForCoach(coachId: number): Promise<number[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from('coach_swimmer_assignments')
-    .select('swimmer_id')
-    .eq('coach_id', coachId);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('coach_swimmer_assignments')
+      .select('swimmer_id')
+      .eq('coach_id', coachId)
+  );
   return (data ?? []).map((row: any) => row.swimmer_id as number);
 }

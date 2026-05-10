@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 
 export type NotificationLogEntry = {
   id: number;
@@ -16,11 +16,12 @@ export async function getNotificationLog(
   offset = 0,
 ): Promise<NotificationLogEntry[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("notification_log")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("notification_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1)
+  );
   return (data ?? []) as NotificationLogEntry[];
 }

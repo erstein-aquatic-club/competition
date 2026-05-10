@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§231** — Suppression complète NeurotypQuiz (fichiers, types, Profile.tsx).
+Dernier § livré : **§232** — Helper `assertSupabase<T>()` audit §214 : 237 sites du pattern `if (error) throw new Error(error.message)` codemodés dans 36 fichiers `src/lib/api/`. -200 LOC, 1 source de vérité.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

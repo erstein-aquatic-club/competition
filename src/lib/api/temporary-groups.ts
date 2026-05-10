@@ -2,18 +2,19 @@
  * API Temporary Groups - CRUD for coach temporary groups (stages)
  */
 
-import { supabase, canUseSupabase, safeInt } from "./client";
+import { supabase, canUseSupabase, safeInt, assertSupabase } from "./client";
 import type { TemporaryGroupSummary, TemporaryGroupDetail, TemporaryGroupMember } from "./types";
 
 export async function getTemporaryGroups(): Promise<TemporaryGroupSummary[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("groups")
-    .select("id, name, is_active, parent_group_id, created_by, created_at")
-    .eq("is_temporary", true)
-    .is("parent_group_id", null)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("groups")
+      .select("id, name, is_active, parent_group_id, created_by, created_at")
+      .eq("is_temporary", true)
+      .is("parent_group_id", null)
+      .order("created_at", { ascending: false })
+  );
   if (!data?.length) return [];
 
   const parentIds = data.map((g: any) => g.id);
@@ -155,17 +156,18 @@ export async function createTemporaryGroup(data: {
     }
   }
 
-  const { data: created, error } = await supabase
-    .from("groups")
-    .insert({
-      name: data.name.trim(),
-      is_temporary: true,
-      is_active: true,
-      parent_group_id: data.parent_group_id ?? null,
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
+  const created = assertSupabase(
+    await supabase
+      .from("groups")
+      .insert({
+        name: data.name.trim(),
+        is_temporary: true,
+        is_active: true,
+        parent_group_id: data.parent_group_id ?? null,
+      })
+      .select("id")
+      .single()
+  )!;
 
   const groupId = created.id;
 
@@ -205,8 +207,7 @@ export async function addTemporaryGroupMembers(groupId: number, userIds: number[
   }
 
   const rows = userIds.map((uid) => ({ group_id: groupId, user_id: uid }));
-  const { error } = await supabase.from("group_members").insert(rows);
-  if (error) throw new Error(error.message);
+  assertSupabase(await supabase.from("group_members").insert(rows));
 }
 
 export async function removeTemporaryGroupMember(groupId: number, userId: number): Promise<void> {
@@ -220,22 +221,24 @@ export async function removeTemporaryGroupMember(groupId: number, userId: number
 
   const groupIds = [groupId, ...(subgroups ?? []).map((sg: any) => sg.id)];
 
-  const { error } = await supabase
-    .from("group_members")
-    .delete()
-    .eq("user_id", userId)
-    .in("group_id", groupIds);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("group_members")
+      .delete()
+      .eq("user_id", userId)
+      .in("group_id", groupIds)
+  );
 }
 
 export async function deactivateTemporaryGroup(groupId: number): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase required");
-  const { error } = await supabase
-    .from("groups")
-    .update({ is_active: false })
-    .or(`id.eq.${groupId},parent_group_id.eq.${groupId}`)
-    .eq("is_temporary", true);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("groups")
+      .update({ is_active: false })
+      .or(`id.eq.${groupId},parent_group_id.eq.${groupId}`)
+      .eq("is_temporary", true)
+  );
 }
 
 export async function reactivateTemporaryGroup(groupId: number): Promise<void> {
@@ -260,12 +263,13 @@ export async function reactivateTemporaryGroup(groupId: number): Promise<void> {
     }
   }
 
-  const { error } = await supabase
-    .from("groups")
-    .update({ is_active: true })
-    .or(`id.eq.${groupId},parent_group_id.eq.${groupId}`)
-    .eq("is_temporary", true);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("groups")
+      .update({ is_active: true })
+      .or(`id.eq.${groupId},parent_group_id.eq.${groupId}`)
+      .eq("is_temporary", true)
+  );
 }
 
 export async function deleteTemporaryGroup(groupId: number): Promise<void> {
@@ -287,10 +291,11 @@ export async function deleteTemporaryGroup(groupId: number): Promise<void> {
     .eq("parent_group_id", groupId)
     .eq("is_temporary", true);
 
-  const { error } = await supabase
-    .from("groups")
-    .delete()
-    .eq("id", groupId)
-    .eq("is_temporary", true);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("groups")
+      .delete()
+      .eq("id", groupId)
+      .eq("is_temporary", true)
+  );
 }

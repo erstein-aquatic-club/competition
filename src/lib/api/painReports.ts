@@ -2,7 +2,7 @@
  * API Pain Reports - Body zone pain tracking CRUD
  */
 
-import { supabase, canUseSupabase } from './client';
+import { supabase, canUseSupabase, assertSupabase } from './client';
 import type { PainReport } from './types';
 
 export async function getPainReportsForDate(
@@ -10,13 +10,14 @@ export async function getPainReportsForDate(
   date: string,
 ): Promise<PainReport[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from('pain_reports')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('date', date)
-    .order('body_zone');
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('pain_reports')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .order('body_zone')
+  );
   return (data ?? []) as PainReport[];
 }
 
@@ -26,14 +27,15 @@ export async function getPainReportsRange(
   endDate: string,
 ): Promise<PainReport[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from('pain_reports')
-    .select('*')
-    .eq('user_id', userId)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: false });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('pain_reports')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false })
+  );
   return (data ?? []) as PainReport[];
 }
 

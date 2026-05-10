@@ -3,7 +3,7 @@
  * coach dans la vue Allures, §186 step 2).
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 
 export interface CoachOption {
   id: number;
@@ -16,13 +16,14 @@ export interface CoachOption {
  */
 export async function listActiveCoaches(): Promise<CoachOption[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, display_name")
-    .eq("role", "coach")
-    .eq("is_active", true)
-    .order("display_name", { ascending: true });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("users")
+      .select("id, display_name")
+      .eq("role", "coach")
+      .eq("is_active", true)
+      .order("display_name", { ascending: true })
+  );
   return (data ?? []).map((u: any) => ({
     id: u.id as number,
     display_name: u.display_name as string,

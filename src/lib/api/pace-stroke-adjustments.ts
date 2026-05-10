@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { EventFamily } from "@/lib/paceData";
 
 type SingleStroke = "crawl" | "dos" | "brasse" | "papillon";
@@ -13,10 +13,11 @@ export interface StrokeAdjustmentRow {
 /** Returns the coach's stroke adjustment overrides. Empty = use STROKE_ADJUSTMENTS_DEFAULT. */
 export async function getMyStrokeAdjustments(): Promise<StrokeAdjustmentRow[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("coach_stroke_adjustments")
-    .select("coach_id, stroke, event_family, m_value");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("coach_stroke_adjustments")
+      .select("coach_id, stroke, event_family, m_value")
+  );
   return (data ?? []) as StrokeAdjustmentRow[];
 }
 
@@ -29,11 +30,10 @@ export async function upsertStrokeAdjustment(args: {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Non authentifié");
-  const { error } = await supabase.from("coach_stroke_adjustments").upsert(
+  assertSupabase(await supabase.from("coach_stroke_adjustments").upsert(
     { coach_id: user.id, ...args, updated_at: new Date().toISOString() },
     { onConflict: "coach_id,stroke,event_family" },
-  );
-  if (error) throw new Error(error.message);
+  ));
 }
 
 /** Deletes all overrides for the current coach (falls back to STROKE_ADJUSTMENTS_DEFAULT). */
@@ -41,9 +41,10 @@ export async function resetMyStrokeAdjustments(): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Non authentifié");
-  const { error } = await supabase
-    .from("coach_stroke_adjustments")
-    .delete()
-    .eq("coach_id", user.id);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("coach_stroke_adjustments")
+      .delete()
+      .eq("coach_id", user.id)
+  );
 }

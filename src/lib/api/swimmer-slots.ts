@@ -2,21 +2,22 @@
  * API Swimmer Slots — Per-swimmer custom training schedule
  */
 
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { SwimmerTrainingSlot, SwimmerTrainingSlotInput } from "./types";
 
 // ── GET swimmer's custom slots ──────────────────────────────
 
 export async function getSwimmerSlots(userId: number): Promise<SwimmerTrainingSlot[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("swimmer_training_slots")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .order("day_of_week")
-    .order("start_time");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("swimmer_training_slots")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .order("day_of_week")
+      .order("start_time")
+  );
   return (data ?? []) as SwimmerTrainingSlot[];
 }
 
@@ -79,21 +80,22 @@ export async function createSwimmerSlot(
   createdBy: number,
 ): Promise<SwimmerTrainingSlot> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { data, error } = await supabase
-    .from("swimmer_training_slots")
-    .insert({
-      user_id: input.user_id,
-      source_assignment_id: input.source_assignment_id ?? null,
-      day_of_week: input.day_of_week,
-      start_time: input.start_time,
-      end_time: input.end_time,
-      location: input.location,
-      session_type: input.session_type,
-      created_by: createdBy,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("swimmer_training_slots")
+      .insert({
+        user_id: input.user_id,
+        source_assignment_id: input.source_assignment_id ?? null,
+        day_of_week: input.day_of_week,
+        start_time: input.start_time,
+        end_time: input.end_time,
+        location: input.location,
+        session_type: input.session_type,
+        created_by: createdBy,
+      })
+      .select()
+      .single()
+  );
   return data as SwimmerTrainingSlot;
 }
 
@@ -104,13 +106,14 @@ export async function updateSwimmerSlot(
   input: Partial<Pick<SwimmerTrainingSlotInput, "day_of_week" | "start_time" | "end_time" | "location" | "session_type">>,
 ): Promise<SwimmerTrainingSlot> {
   if (!canUseSupabase()) throw new Error("Supabase not available");
-  const { data, error } = await supabase
-    .from("swimmer_training_slots")
-    .update(input)
-    .eq("id", slotId)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("swimmer_training_slots")
+      .update(input)
+      .eq("id", slotId)
+      .select()
+      .single()
+  );
   return data as SwimmerTrainingSlot;
 }
 
@@ -118,11 +121,12 @@ export async function updateSwimmerSlot(
 
 export async function deleteSwimmerSlot(slotId: string): Promise<void> {
   if (!canUseSupabase()) return;
-  const { error } = await supabase
-    .from("swimmer_training_slots")
-    .update({ is_active: false })
-    .eq("id", slotId);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("swimmer_training_slots")
+      .update({ is_active: false })
+      .eq("id", slotId)
+  );
 }
 
 // ── RESET swimmer slots (delete all + re-init from group) ───
@@ -152,11 +156,12 @@ export async function getSwimmersAffectedBySlot(
   assignmentId: string,
 ): Promise<Array<{ user_id: number; slot_id: string }>> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("swimmer_training_slots")
-    .select("user_id, id")
-    .eq("source_assignment_id", assignmentId)
-    .eq("is_active", true);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("swimmer_training_slots")
+      .select("user_id, id")
+      .eq("source_assignment_id", assignmentId)
+      .eq("is_active", true)
+  );
   return (data ?? []).map((d: any) => ({ user_id: d.user_id, slot_id: d.id }));
 }

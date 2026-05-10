@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import type { SwimmerSession } from "./types";
 
 /**
@@ -19,12 +19,11 @@ export async function getSwimmerSessions(
   includeDrafts = false,
 ): Promise<SwimmerSession[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase.rpc("get_swimmer_sessions", {
+  const data = assertSupabase(await supabase.rpc("get_swimmer_sessions", {
     p_user_id: userId,
     p_from: from,
     p_to: to,
     p_include_drafts: includeDrafts,
-  });
-  if (error) throw new Error(error.message);
+  }));
   return (data ?? []) as SwimmerSession[];
 }

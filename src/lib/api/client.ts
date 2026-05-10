@@ -133,6 +133,30 @@ export const summarizeApiError = (error: unknown, fallbackMessage: string): ApiE
   return { ...info, message };
 };
 
+/**
+ * §232 — Centralise le pattern `if (error) throw new Error(error.message)`
+ * (~239 occurrences dans src/lib/api/). Comportement byte-identical aux
+ * call-sites avant migration.
+ *
+ * Compatible avec `PostgrestResponse<T>` (data: T[] | null) ET
+ * `PostgrestSingleResponse<T>` (data: T | null) — la TS inference flow
+ * naturellement.
+ *
+ * Usage :
+ *   const data = assertSupabase(await supabase.from("foo").select("*"));
+ *   assertSupabase(await supabase.from("foo").delete().eq("id", id));
+ *   return assertSupabase(await supabase.rpc("my_rpc", { … }));
+ *
+ * NE PAS utiliser pour : conditional throws (`error.code !== '23505'`),
+ * messages d'erreur enrichis (prefix), gestion gracieuse (`return null`).
+ */
+export function assertSupabase<T>(
+  res: { data: T; error: { message: string } | null },
+): T {
+  if (res.error) throw new Error(res.error.message);
+  return res.data;
+}
+
 // --- Cycle type normalization ---
 
 export const normalizeCycleType = (value: unknown): StrengthCycleType => {

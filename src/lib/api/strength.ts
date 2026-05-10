@@ -18,6 +18,7 @@ import {
   BODYWEIGHT_SENTINEL,
   isBodyweight,
   withTimeout,
+  assertSupabase,
 } from './client';
 import type {
   Exercise,
@@ -50,8 +51,7 @@ import { localStorageGet, localStorageSave } from './localStorage';
 export async function getExercises(): Promise<Exercise[]> {
   if (canUseSupabase()) {
     try {
-      const { data, error } = await supabase.from("dim_exercices").select("*");
-      if (error) throw new Error(error.message);
+      const data = assertSupabase(await supabase.from("dim_exercices").select("*"));
       const list = (data ?? []).map(mapDbExerciseToApi);
       // Mirror the catalog into localStorage so a focus session opened after a
       // PWA cold-start with no network can still resolve exercise names + GIF
@@ -76,8 +76,7 @@ export async function createExercise(exercise: Omit<Exercise, "id">) {
 
   if (canUseSupabase()) {
     const dbRow = mapApiExerciseToDb({ ...exercise, exercise_type });
-    const { error } = await supabase.from("dim_exercices").insert(dbRow);
-    if (error) throw new Error(error.message);
+    assertSupabase(await supabase.from("dim_exercices").insert(dbRow));
     return { status: "created" };
   }
 
@@ -96,11 +95,12 @@ export async function updateExercise(exercise: Exercise) {
 
   if (canUseSupabase()) {
     const dbRow = mapApiExerciseToDb({ ...exercise, exercise_type });
-    const { error } = await supabase
-      .from("dim_exercices")
-      .update(dbRow)
-      .eq("id", exercise.id);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("dim_exercices")
+        .update(dbRow)
+        .eq("id", exercise.id)
+    );
     return { status: "updated" };
   }
 
@@ -122,11 +122,12 @@ export async function updateExercise(exercise: Exercise) {
 
 export async function deleteExercise(exerciseId: number) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("dim_exercices")
-      .delete()
-      .eq("id", exerciseId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("dim_exercices")
+        .delete()
+        .eq("id", exerciseId)
+    );
     return { status: "deleted" };
   }
 
@@ -152,13 +153,14 @@ export async function deleteExercise(exerciseId: number) {
 
 export async function getStrengthSessions(): Promise<StrengthSessionTemplate[]> {
   if (canUseSupabase()) {
-    const { data: sessions, error } = await supabase
-      .from("strength_sessions")
-      .select(
-        "*, strength_session_items(*, dim_exercices(nom_exercice, exercise_type))",
-      )
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    const sessions = assertSupabase(
+      await supabase
+        .from("strength_sessions")
+        .select(
+          "*, strength_session_items(*, dim_exercices(nom_exercice, exercise_type))",
+        )
+        .order("created_at", { ascending: false })
+    );
     return (sessions ?? []).map((session: any) => {
       const rawItems = Array.isArray(session.strength_session_items)
         ? session.strength_session_items
@@ -193,13 +195,12 @@ export async function getStrengthSessionsPaginated(opts: {
     const all = await getStrengthSessions();
     return { sessions: all, total: all.length };
   }
-  const { data, error } = await supabase.rpc('get_strength_catalog_paginated', {
+  const data = assertSupabase(await supabase.rpc('get_strength_catalog_paginated', {
     p_offset: opts.offset ?? 0,
     p_limit: opts.limit ?? 20,
     p_search: opts.search ?? null,
     p_folder_id: opts.folderId ?? null,
-  });
-  if (error) throw new Error(error.message);
+  }));
   const rawSessions = data?.sessions ?? [];
   const sessions: StrengthSessionTemplate[] = rawSessions.map((session: any) => {
     const rawItems = Array.isArray(session.items) ? session.items : [];
@@ -227,16 +228,17 @@ export async function createStrengthSession(session: any) {
     prepareStrengthItemsPayload(session);
 
   if (canUseSupabase()) {
-    const { data: created, error } = await supabase
-      .from("strength_sessions")
-      .insert({
-        name: session?.title ?? session?.name ?? "",
-        description: session?.description ?? "",
-        folder_id: session?.folder_id ?? null,
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
+    const created = assertSupabase(
+      await supabase
+        .from("strength_sessions")
+        .insert({
+          name: session?.title ?? session?.name ?? "",
+          description: session?.description ?? "",
+          folder_id: session?.folder_id ?? null,
+        })
+        .select("id")
+        .single()
+    )!;
     const sessionId = created.id;
     if (itemsPayload.length > 0) {
       const { error: itemsError } = await supabase
@@ -289,14 +291,13 @@ export async function updateStrengthSession(session: any) {
         raw_payload: null as unknown,
       }),
     );
-    const { error } = await supabase.rpc('update_strength_session_atomic', {
+    assertSupabase(await supabase.rpc('update_strength_session_atomic', {
       p_session_id: session.id,
       p_name: session?.title ?? session?.name ?? '',
       p_description: session?.description ?? '',
       p_folder_id: session?.folder_id ?? null,
       p_items: rpcItems,
-    });
-    if (error) throw new Error(error.message);
+    }));
     return { status: "updated" };
   }
 
@@ -332,11 +333,12 @@ export async function persistStrengthSessionOrder(
 
 export async function deleteStrengthSession(sessionId: number) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("strength_sessions")
-      .delete()
-      .eq("id", sessionId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("strength_sessions")
+        .delete()
+        .eq("id", sessionId)
+    );
     return { status: "deleted" };
   }
 
@@ -359,19 +361,20 @@ export async function startStrengthRun(data: {
   progress_pct?: number;
 }) {
   if (canUseSupabase()) {
-    const { data: run, error } = await supabase
-      .from("strength_session_runs")
-      .insert({
-        assignment_id: data.assignment_id ?? null,
-        athlete_id: data.athlete_id ?? null,
-        session_id: data.session_id ?? null,
-        status: "in_progress",
-        progress_pct: data.progress_pct ?? 0,
-        started_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
+    const run = assertSupabase(
+      await supabase
+        .from("strength_session_runs")
+        .insert({
+          assignment_id: data.assignment_id ?? null,
+          athlete_id: data.athlete_id ?? null,
+          session_id: data.session_id ?? null,
+          status: "in_progress",
+          progress_pct: data.progress_pct ?? 0,
+          started_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single()
+    )!;
     if (data.assignment_id) {
       await supabase
         .from("session_assignments")
@@ -470,10 +473,11 @@ export async function logStrengthSet(payload: {
         : Number(athleteIdRaw);
 
     if (athleteIdNum === null || !Number.isFinite(athleteIdNum)) {
-      const { error } = await supabase
-        .from("strength_set_logs")
-        .insert(createSetLogDbPayload(payload));
-      if (error) throw new Error(error.message);
+      assertSupabase(
+        await supabase
+          .from("strength_set_logs")
+          .insert(createSetLogDbPayload(payload))
+      );
       return { status: "ok", one_rm_updated: false, one_rm: undefined };
     }
 
@@ -499,8 +503,7 @@ export async function logStrengthSet(payload: {
       p_pct_1rm_suggested: payload.pct_1rm_suggested ?? null,
       p_one_rm_estimate: oneRmEstimate,
     }));
-    const { data, error } = await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic");
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic"));
     const result = (data ?? {}) as {
       set_id?: number;
       one_rm_updated?: boolean;
@@ -628,11 +631,12 @@ export async function updateStrengthRun(update: {
 }) {
   if (canUseSupabase()) {
     const updatePayload = buildRunUpdatePayload(update);
-    const { error } = await supabase
-      .from("strength_session_runs")
-      .update(updatePayload)
-      .eq("id", update.run_id);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("strength_session_runs")
+        .update(updatePayload)
+        .eq("id", update.run_id)
+    );
     if (update.status === "completed" && update.assignment_id) {
       // Previously the error of this 2nd write was not inspected, leaving the
       // run flagged completed while the assignment stayed stuck "in_progress".
@@ -681,11 +685,12 @@ export async function updateStrengthRun(update: {
 
 export async function deleteStrengthRun(runId: number) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("strength_session_runs")
-      .delete()
-      .eq("id", runId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("strength_session_runs")
+        .delete()
+        .eq("id", runId)
+    );
     return { status: "deleted", source: "remote" as const };
   }
 
@@ -1084,8 +1089,7 @@ export async function get1RM(
     ) {
       query = query.eq("athlete_id", Number(athleteId));
     }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(await query);
     return (data ?? []).map((record: any) => ({
       id: safeOptionalInt(record.id),
       athlete_id: safeOptionalInt(record.athlete_id),
@@ -1128,11 +1132,10 @@ export async function update1RM(record: {
       recorded_at: new Date().toISOString(),
     };
     if (record.notes !== undefined) payload.notes = record.notes;
-    const { error } = await supabase.from("one_rm_records").upsert(
+    assertSupabase(await supabase.from("one_rm_records").upsert(
       payload,
       { onConflict: "athlete_id,exercise_id" },
-    );
-    if (error) throw new Error(error.message);
+    ));
     return { status: "ok" };
   }
   const records = (localStorageGet(STORAGE_KEYS.ONE_RM) || []) as any[];
@@ -1214,11 +1217,12 @@ export async function getAllOneRmRecords(): Promise<
   }>
 > {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("one_rm_records")
-    .select("athlete_id, exercise_id, one_rm")
-    .gt("one_rm", 0);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("one_rm_records")
+      .select("athlete_id, exercise_id, one_rm")
+      .gt("one_rm", 0)
+  );
   return (data ?? []).map((r: any) => ({
     athlete_id: safeInt(r.athlete_id),
     exercise_id: safeInt(r.exercise_id),
@@ -1230,11 +1234,12 @@ export async function getPopularExercises(limit = 10): Promise<
   Array<{ exercise_id: number; athlete_count: number }>
 > {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("one_rm_records")
-    .select("exercise_id, athlete_id")
-    .gt("one_rm", 0);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("one_rm_records")
+      .select("exercise_id, athlete_id")
+      .gt("one_rm", 0)
+  );
 
   const countMap = new Map<number, Set<number>>();
   (data ?? []).forEach((r: any) => {
@@ -1313,8 +1318,7 @@ export async function getStrengthFolders(
       }
     }
 
-    const { data, error } = await query.order("sort_order", { ascending: true });
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(await query.order("sort_order", { ascending: true }));
     return (data ?? []).map(mapFolder);
   }
   return [];
@@ -1378,30 +1382,29 @@ export async function createStrengthFolder(
   opts?: { parentId?: number | null; athleteId?: number | null },
 ): Promise<StrengthFolder> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  const { data, error } = await supabase
-    .from("strength_folders")
-    .insert({
-      name,
-      type,
-      parent_id: opts?.parentId ?? null,
-      athlete_id: opts?.athleteId ?? null,
-    })
-    .select("*")
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("strength_folders")
+      .insert({
+        name,
+        type,
+        parent_id: opts?.parentId ?? null,
+        athlete_id: opts?.athleteId ?? null,
+      })
+      .select("*")
+      .single()
+  );
   return mapFolder(data);
 }
 
 export async function renameStrengthFolder(id: number, name: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  const { error } = await supabase.from("strength_folders").update({ name }).eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(await supabase.from("strength_folders").update({ name }).eq("id", id));
 }
 
 export async function deleteStrengthFolder(id: number): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  const { error } = await supabase.from("strength_folders").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  assertSupabase(await supabase.from("strength_folders").delete().eq("id", id));
 }
 
 export async function moveToFolder(
@@ -1410,8 +1413,7 @@ export async function moveToFolder(
   table: 'strength_sessions' | 'dim_exercices',
 ): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  const { error } = await supabase.from(table).update({ folder_id: folderId }).eq("id", itemId);
-  if (error) throw new Error(error.message);
+  assertSupabase(await supabase.from(table).update({ folder_id: folderId }).eq("id", itemId));
 }
 
 // --- Duplication helpers ---
@@ -1528,13 +1530,14 @@ export async function duplicateAthletePlan(
   if (!canUseSupabase()) throw new Error("Supabase requis");
 
   // Find all root folders for source athlete
-  const { data: roots, error } = await supabase
-    .from("strength_folders")
-    .select("id")
-    .eq("athlete_id", sourceAthleteId)
-    .eq("type", "session")
-    .is("parent_id", null);
-  if (error) throw new Error(error.message);
+  const roots = assertSupabase(
+    await supabase
+      .from("strength_folders")
+      .select("id")
+      .eq("athlete_id", sourceAthleteId)
+      .eq("type", "session")
+      .is("parent_id", null)
+  );
 
   for (const r of roots ?? []) {
     await duplicateFolder(safeInt(r.id), targetAthleteId, null);

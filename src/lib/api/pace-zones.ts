@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from "./client";
+import { supabase, canUseSupabase, assertSupabase } from "./client";
 import {
   ZONE_COEFFICIENTS,
   type EventFamily,
@@ -38,10 +38,11 @@ export async function getMyPaceZonesV2(): Promise<
   Partial<Record<EventFamily, Partial<Record<Zone, number>>>>
 > {
   if (!canUseSupabase()) return {};
-  const { data, error } = await supabase
-    .from("coach_pace_zones")
-    .select("event_family, zone, k_value");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("coach_pace_zones")
+      .select("event_family, zone, k_value")
+  );
   if (!data || data.length === 0) return {};
   const result: Partial<Record<EventFamily, Partial<Record<Zone, number>>>> = {};
   for (const row of data) {
@@ -62,11 +63,10 @@ export async function upsertPaceZoneCell(args: {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Non authentifié");
-  const { error } = await supabase.from("coach_pace_zones").upsert(
+  assertSupabase(await supabase.from("coach_pace_zones").upsert(
     { coach_id: user.id, ...args, updated_at: new Date().toISOString() },
     { onConflict: "coach_id,event_family,zone" },
-  );
-  if (error) throw new Error(error.message);
+  ));
 }
 
 /** Deletes a single (family, zone) cell for the current coach (used by toggleV4). */
@@ -77,13 +77,14 @@ export async function deletePaceZoneCell(args: {
   if (!canUseSupabase()) throw new Error("Supabase not available");
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Non authentifié");
-  const { error } = await supabase
-    .from("coach_pace_zones")
-    .delete()
-    .eq("coach_id", user.id)
-    .eq("event_family", args.event_family)
-    .eq("zone", args.zone);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("coach_pace_zones")
+      .delete()
+      .eq("coach_id", user.id)
+      .eq("event_family", args.event_family)
+      .eq("zone", args.zone)
+  );
 }
 
 /** Resets all zones to doc defaults (DELETE all + bulk INSERT 27 rows). */

@@ -2,19 +2,19 @@
  * API Swim Logs - Technical notes per swim exercise
  */
 
-import { supabase, canUseSupabase } from './client';
+import { supabase, canUseSupabase, assertSupabase } from './client';
 import type { SwimExerciseLog, SwimExerciseLogInput } from './types';
 
 export async function getSwimExerciseLogs(sessionId: number): Promise<SwimExerciseLog[]> {
   if (!canUseSupabase()) return [];
 
-  const { data, error } = await supabase
-    .from('swim_exercise_logs')
-    .select('id, session_id, user_id, exercise_label, source_item_id, split_times, tempo, stroke_count, notes, event_code, pool_length, equipment, created_at, updated_at')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('swim_exercise_logs')
+      .select('id, session_id, user_id, exercise_label, source_item_id, split_times, tempo, stroke_count, notes, event_code, pool_length, equipment, created_at, updated_at')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true })
+  );
 
   return (data ?? []).map(mapFromDb);
 }
@@ -25,14 +25,14 @@ export async function getSwimExerciseLogsHistory(
 ): Promise<SwimExerciseLog[]> {
   if (!canUseSupabase()) return [];
 
-  const { data, error } = await supabase
-    .from('swim_exercise_logs')
-    .select('id, session_id, user_id, exercise_label, source_item_id, split_times, tempo, stroke_count, notes, event_code, pool_length, equipment, created_at, updated_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('swim_exercise_logs')
+      .select('id, session_id, user_id, exercise_label, source_item_id, split_times, tempo, stroke_count, notes, event_code, pool_length, equipment, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  );
 
   return (data ?? []).map(mapFromDb);
 }
@@ -69,8 +69,7 @@ export async function saveSwimExerciseLogs(
     equipment: log.equipment ?? ['aucun'],
   }));
 
-  const { error } = await supabase.from('swim_exercise_logs').insert(rows);
-  if (error) throw new Error(error.message);
+  assertSupabase(await supabase.from('swim_exercise_logs').insert(rows));
 }
 
 export async function createStandaloneSwimLog(
@@ -79,25 +78,25 @@ export async function createStandaloneSwimLog(
 ): Promise<string> {
   if (!canUseSupabase()) return '';
 
-  const { data, error } = await supabase
-    .from('swim_exercise_logs')
-    .insert({
-      user_id: userId,
-      session_id: null,
-      exercise_label: log.exercise_label,
-      source_item_id: null,
-      split_times: log.split_times ?? [],
-      tempo: log.tempo ?? null,
-      stroke_count: log.stroke_count ?? [],
-      notes: log.notes ?? null,
-      event_code: log.event_code ?? null,
-      pool_length: log.pool_length ?? null,
-      equipment: log.equipment ?? ['aucun'],
-    })
-    .select('id')
-    .single();
-
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('swim_exercise_logs')
+      .insert({
+        user_id: userId,
+        session_id: null,
+        exercise_label: log.exercise_label,
+        source_item_id: null,
+        split_times: log.split_times ?? [],
+        tempo: log.tempo ?? null,
+        stroke_count: log.stroke_count ?? [],
+        notes: log.notes ?? null,
+        event_code: log.event_code ?? null,
+        pool_length: log.pool_length ?? null,
+        equipment: log.equipment ?? ['aucun'],
+      })
+      .select('id')
+      .single()
+  );
   return data?.id ?? '';
 }
 
@@ -117,23 +116,23 @@ export async function updateSwimExerciseLog(
   if (patch.pool_length !== undefined) row.pool_length = patch.pool_length;
   if (patch.equipment !== undefined) row.equipment = patch.equipment;
 
-  const { error } = await supabase
-    .from('swim_exercise_logs')
-    .update(row)
-    .eq('id', logId);
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('swim_exercise_logs')
+      .update(row)
+      .eq('id', logId)
+  );
 }
 
 export async function deleteSwimExerciseLog(logId: string): Promise<void> {
   if (!canUseSupabase()) return;
 
-  const { error } = await supabase
-    .from('swim_exercise_logs')
-    .delete()
-    .eq('id', logId);
-
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('swim_exercise_logs')
+      .delete()
+      .eq('id', logId)
+  );
 }
 
 function mapFromDb(row: Record<string, unknown>): SwimExerciseLog {

@@ -9,17 +9,19 @@ import {
   safeOptionalInt,
   parseRawPayload,
   STORAGE_KEYS,
+  assertSupabase,
 } from './client';
 import type { SwimSessionTemplate, SwimSessionItem, SwimCatalogFolder } from './types';
 import { localStorageGet, localStorageSave } from './localStorage';
 
 export async function getSwimCatalog(): Promise<SwimSessionTemplate[]> {
   if (canUseSupabase()) {
-    const { data: catalogs, error } = await supabase
-      .from("swim_sessions_catalog")
-      .select("*, swim_session_items(*)")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    const catalogs = assertSupabase(
+      await supabase
+        .from("swim_sessions_catalog")
+        .select("*, swim_session_items(*)")
+        .order("created_at", { ascending: false })
+    );
     return (catalogs ?? []).map((catalog: any) => ({
       id: safeInt(catalog.id, Date.now()),
       name: String(catalog.name || ""),
@@ -135,27 +137,25 @@ export async function createSwimSession(session: any) {
         }));
     if (session.id) {
       // Update existing — atomic RPC (DELETE + INSERT in single transaction)
-      const { data, error } = await supabase.rpc('update_swim_session_atomic', {
+      assertSupabase(await supabase.rpc('update_swim_session_atomic', {
         p_session_id: session.id,
         p_name: session.name,
         p_description: session.description ?? null,
         p_total_distance: session.total_distance ?? null,
         p_folder: session.folder ?? null,
         p_items: items,
-      });
-      if (error) throw new Error(error.message);
+      }));
       return { status: "updated" };
     }
     // Create new — atomic RPC
-    const { data, error } = await supabase.rpc('create_swim_session_atomic', {
+    const data = assertSupabase(await supabase.rpc('create_swim_session_atomic', {
       p_name: session.name,
       p_description: session.description ?? null,
       p_total_distance: session.total_distance ?? null,
       p_folder: session.folder ?? null,
       p_created_by: session.created_by ?? null,
       p_items: items,
-    });
-    if (error) throw new Error(error.message);
+    }));
     return { status: "created", sessionId: data?.session_id };
   }
 
@@ -174,11 +174,12 @@ export async function createSwimSession(session: any) {
 
 export async function deleteSwimSession(sessionId: number) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("swim_sessions_catalog")
-      .delete()
-      .eq("id", sessionId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("swim_sessions_catalog")
+        .delete()
+        .eq("id", sessionId)
+    );
     return { status: "deleted" };
   }
   const sessions = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];
@@ -191,11 +192,12 @@ export async function deleteSwimSession(sessionId: number) {
 
 export async function archiveSwimSession(sessionId: number, archived: boolean) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("swim_sessions_catalog")
-      .update({ is_archived: archived })
-      .eq("id", sessionId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("swim_sessions_catalog")
+        .update({ is_archived: archived })
+        .eq("id", sessionId)
+    );
     return { status: archived ? "archived" : "restored" };
   }
   const sessions = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];
@@ -208,11 +210,12 @@ export async function archiveSwimSession(sessionId: number, archived: boolean) {
 
 export async function moveSwimSession(sessionId: number, folder: string | null) {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("swim_sessions_catalog")
-      .update({ folder })
-      .eq("id", sessionId);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("swim_sessions_catalog")
+        .update({ folder })
+        .eq("id", sessionId)
+    );
     return { status: "moved" };
   }
   const sessions = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];
@@ -225,11 +228,12 @@ export async function moveSwimSession(sessionId: number, folder: string | null) 
 
 export async function migrateLocalStorageArchive(archivedIds: number[]) {
   if (!canUseSupabase() || archivedIds.length === 0) return;
-  const { error } = await supabase
-    .from("swim_sessions_catalog")
-    .update({ is_archived: true })
-    .in("id", archivedIds);
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("swim_sessions_catalog")
+      .update({ is_archived: true })
+      .in("id", archivedIds)
+  );
 }
 
 /**
@@ -240,20 +244,19 @@ export async function generateShareToken(catalogId: number): Promise<string> {
   if (!canUseSupabase()) throw new Error("Supabase required for sharing");
 
   // Check if token already exists
-  const { data: existing, error: fetchError } = await supabase
-    .from("swim_sessions_catalog")
-    .select("share_token")
-    .eq("id", catalogId)
-    .single();
-  if (fetchError) throw new Error(fetchError.message);
+  const existing = assertSupabase(
+    await supabase
+      .from("swim_sessions_catalog")
+      .select("share_token")
+      .eq("id", catalogId)
+      .single()
+  );
   if (existing?.share_token) return existing.share_token as string;
 
   // Generate new token via RPC
-  const { data, error } = await supabase.rpc("generate_swim_share_token", {
+  return assertSupabase(await supabase.rpc("generate_swim_share_token", {
     p_catalog_id: catalogId,
-  });
-  if (error) throw new Error(error.message);
-  return data as string;
+  })) as string;
 }
 
 /**
@@ -304,13 +307,12 @@ export async function getSwimSessionsPaginated(opts: {
     const all = await getSwimCatalog();
     return { sessions: all, total: all.length };
   }
-  const { data, error } = await supabase.rpc('get_swim_catalog_paginated', {
+  const data = assertSupabase(await supabase.rpc('get_swim_catalog_paginated', {
     p_offset: opts.offset ?? 0,
     p_limit: opts.limit ?? 20,
     p_search: opts.search ?? null,
     p_folder: opts.folder ?? null,
-  });
-  if (error) throw new Error(error.message);
+  }));
   const rawSessions = data?.sessions ?? [];
   const sessions: SwimSessionTemplate[] = rawSessions.map((catalog: any) => ({
     id: safeInt(catalog.id, Date.now()),
@@ -346,11 +348,12 @@ export async function getSwimSessionsPaginated(opts: {
 
 export async function getSwimCatalogFolders(): Promise<SwimCatalogFolder[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from("swim_catalog_folders")
-    .select("*")
-    .order("path");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("swim_catalog_folders")
+      .select("*")
+      .order("path")
+  );
   return (data ?? []).map((f: any) => ({
     id: f.id,
     path: f.path,
@@ -361,12 +364,13 @@ export async function getSwimCatalogFolders(): Promise<SwimCatalogFolder[]> {
 
 export async function createSwimCatalogFolder(path: string): Promise<SwimCatalogFolder> {
   if (!canUseSupabase()) throw new Error("Supabase required");
-  const { data, error } = await supabase
-    .from("swim_catalog_folders")
-    .upsert({ path }, { onConflict: "path" })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from("swim_catalog_folders")
+      .upsert({ path }, { onConflict: "path" })
+      .select()
+      .single()
+  )!;
   return { id: data.id, path: data.path, created_by: data.created_by, created_at: data.created_at };
 }
 
@@ -413,6 +417,5 @@ export async function deleteSwimCatalogFolder(path: string): Promise<void> {
 
   // Delete sub-folders then the folder itself
   await supabase.from("swim_catalog_folders").delete().like("path", `${path}/%`);
-  const { error } = await supabase.from("swim_catalog_folders").delete().eq("path", path);
-  if (error) throw new Error(error.message);
+  assertSupabase(await supabase.from("swim_catalog_folders").delete().eq("path", path));
 }

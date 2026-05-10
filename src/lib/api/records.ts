@@ -7,6 +7,7 @@ import {
   canUseSupabase,
   delay,
   STORAGE_KEYS,
+  assertSupabase,
 } from './client';
 import type {
   Session,
@@ -173,15 +174,13 @@ export async function getClubRecords(filters: {
   if (filters.sex) query = query.eq("sex", filters.sex);
   if (filters.age) query = query.eq("age", filters.age);
   if (filters.event_code) query = query.eq("event_code", filters.event_code);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   return data ?? [];
 }
 
 export async function getClubRecordSwimmers(): Promise<ClubRecordSwimmer[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase.from("club_record_swimmers").select("*");
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await supabase.from("club_record_swimmers").select("*"));
   return (data ?? []).map((s: any) => ({ ...s, is_active: s.is_active ? 1 : 0 }));
 }
 
@@ -210,7 +209,7 @@ export async function createClubRecordSwimmer(payload: {
     }
   }
 
-  const { data, error } = await supabase
+  const data = assertSupabase(await supabase
     .from("club_record_swimmers")
     .insert({
       source_type: "manual",
@@ -221,8 +220,7 @@ export async function createClubRecordSwimmer(payload: {
       is_active: payload.is_active !== false,
     })
     .select()
-    .single();
-  if (error) throw new Error(error.message);
+    .single());
   return data ? { ...data, is_active: data.is_active ? 1 : 0 } : null;
 }
 
@@ -262,13 +260,12 @@ export async function updateClubRecordSwimmer(
   if (payload.is_active !== undefined) updatePayload.is_active = payload.is_active;
   if (payload.sex !== undefined) updatePayload.sex = payload.sex;
   if (payload.birthdate !== undefined) updatePayload.birthdate = payload.birthdate;
-  const { data, error } = await supabase
+  const data = assertSupabase(await supabase
     .from("club_record_swimmers")
     .update(updatePayload)
     .eq("id", id)
     .select()
-    .single();
-  if (error) throw new Error(error.message);
+    .single());
   return data ? { ...data, is_active: data.is_active ? 1 : 0 } : null;
 }
 
@@ -287,14 +284,13 @@ export async function updateClubRecordSwimmerForUser(
   if (payload.is_active !== undefined) updatePayload.is_active = payload.is_active;
   if (payload.sex !== undefined) updatePayload.sex = payload.sex;
   if (payload.birthdate !== undefined) updatePayload.birthdate = payload.birthdate;
-  const { data, error } = await supabase
+  const data = assertSupabase(await supabase
     .from("club_record_swimmers")
     .update(updatePayload)
     .eq("user_id", userId)
     .eq("source_type", "user")
     .select()
-    .single();
-  if (error) throw new Error(error.message);
+    .single());
   return data ? { ...data, is_active: data.is_active ? 1 : 0 } : null;
 }
 
@@ -319,8 +315,7 @@ export async function getImportLogs(filters?: {
     .order("started_at", { ascending: false });
   if (filters?.swimmerIuf) query = query.eq("swimmer_iuf", filters.swimmerIuf);
   if (filters?.limit) query = query.limit(filters.limit);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   return data ?? [];
 }
 
@@ -367,8 +362,7 @@ export async function getSwimRecords(options: {
       // Only training records in the real table
       query = query.eq("record_type", "training");
     }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const data = assertSupabase(await query) as any[] | null;
     const records = data ?? [];
     return {
       records,
@@ -412,14 +406,14 @@ export async function upsertSwimRecord(payload: {
       record_type: payload.record_type ?? "training",
     };
     if (payload.id) {
-      const { error } = await supabase
-        .from("swim_records")
-        .update(dbPayload)
-        .eq("id", payload.id);
-      if (error) throw new Error(error.message);
+      assertSupabase(
+        await supabase
+          .from("swim_records")
+          .update(dbPayload)
+          .eq("id", payload.id)
+      );
     } else {
-      const { error } = await supabase.from("swim_records").insert(dbPayload);
-      if (error) throw new Error(error.message);
+      assertSupabase(await supabase.from("swim_records").insert(dbPayload));
     }
     return { status: "ok" };
   }
@@ -446,11 +440,12 @@ export async function upsertSwimRecord(payload: {
 
 export async function deleteSwimRecord(id: number): Promise<void> {
   if (canUseSupabase()) {
-    const { error } = await supabase
-      .from("swim_records")
-      .delete()
-      .eq("id", id);
-    if (error) throw new Error(error.message);
+    assertSupabase(
+      await supabase
+        .from("swim_records")
+        .delete()
+        .eq("id", id)
+    );
     return;
   }
   const records = (localStorageGet(STORAGE_KEYS.SWIM_RECORDS) || []) as any[];
@@ -478,8 +473,7 @@ export async function getSwimmerPerformances(filters: {
   if (filters.fromDate) query = query.gte("competition_date", filters.fromDate);
   if (filters.toDate) query = query.lte("competition_date", filters.toDate);
   if (filters.limit) query = query.limit(filters.limit);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   return data ?? [];
 }
 
@@ -590,8 +584,7 @@ export async function getClubRanking(filters: {
     .eq("sex", filters.sex)
     .order("time_ms", { ascending: true });
   if (filters.age != null) query = query.eq("age", filters.age);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await query);
   return data ?? [];
 }
 
@@ -613,19 +606,18 @@ export async function mergeClubRecordSwimmers(
   userSwimmerId: number,
 ): Promise<{ merged_into: number; iuf_transferred: string | null; performances_reassigned: number }> {
   if (!canUseSupabase()) throw new Error("Supabase not configured");
-  const { data, error } = await supabase.rpc("merge_club_record_swimmers", {
+  return assertSupabase(await supabase.rpc("merge_club_record_swimmers", {
     p_manual_id: manualId,
     p_user_swimmer_id: userSwimmerId,
-  });
-  if (error) throw new Error(error.message);
-  return data;
+  }));
 }
 
 /** Update app settings by key */
 export async function updateAppSettings(key: string, value: any): Promise<void> {
   if (!canUseSupabase()) return;
-  const { error } = await supabase
-    .from("app_settings")
-    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from("app_settings")
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" })
+  );
 }

@@ -1,4 +1,4 @@
-import { supabase, canUseSupabase } from './client';
+import { supabase, canUseSupabase, assertSupabase } from './client';
 
 export interface SwimmerBriefingProfile {
   id: number;
@@ -64,8 +64,7 @@ export interface SwimmerBriefing {
 
 export async function getSwimmerBriefing(athleteId: number): Promise<SwimmerBriefing | null> {
   if (!canUseSupabase()) return null;
-  const { data, error } = await supabase.rpc('get_swimmer_quickview_briefing', { p_athlete_id: athleteId });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(await supabase.rpc('get_swimmer_quickview_briefing', { p_athlete_id: athleteId }));
   return data as SwimmerBriefing;
 }
 
@@ -79,19 +78,20 @@ export async function recordAttendanceAsSub(input: {
   comment?: string;
 }): Promise<void> {
   if (!canUseSupabase()) throw new Error('Supabase not configured');
-  const { error } = await supabase
-    .from('session_attendance')
-    .upsert(
-      {
-        session_id: input.dimSessionId,
-        athlete_id: input.athleteId,
-        status: input.status,
-        recorded_by: input.recordedBy,
-        comment: input.comment ?? null,
-      },
-      { onConflict: 'session_id,athlete_id' },
-    );
-  if (error) throw new Error(error.message);
+  assertSupabase(
+    await supabase
+      .from('session_attendance')
+      .upsert(
+        {
+          session_id: input.dimSessionId,
+          athlete_id: input.athleteId,
+          status: input.status,
+          recorded_by: input.recordedBy,
+          comment: input.comment ?? null,
+        },
+        { onConflict: 'session_id,athlete_id' },
+      )
+  );
 }
 
 export async function addSessionCommentAsSub(input: {
@@ -103,14 +103,13 @@ export async function addSessionCommentAsSub(input: {
   if (!canUseSupabase()) throw new Error('Supabase not configured');
   const { data: auth } = await supabase.auth.getUser();
   const recordedBy = auth.user?.id;
-  const { error } = await supabase.from('session_comments').insert({
+  assertSupabase(await supabase.from('session_comments').insert({
     dim_session_id: input.dimSessionId,
     athlete_id: input.athleteId,
     author_user_id: input.authorUserId ?? null,
     recorded_by: recordedBy,
     body: input.body,
-  });
-  if (error) throw new Error(error.message);
+  }));
 }
 
 export async function assignSessionToSlotAsSub(input: {
@@ -122,7 +121,7 @@ export async function assignSessionToSlotAsSub(input: {
   if (!canUseSupabase()) throw new Error('Supabase not configured');
   const { data: auth } = await supabase.auth.getUser();
   const recordedBy = auth.user?.id;
-  const { error } = await supabase.from('session_assignments').insert({
+  assertSupabase(await supabase.from('session_assignments').insert({
     assignment_type: 'swim',
     swim_catalog_id: input.catalogSessionId,
     target_user_id: input.athleteId,
@@ -131,8 +130,7 @@ export async function assignSessionToSlotAsSub(input: {
     status: 'assigned',
     assigned_by: null,
     training_slot_id: null,
-  });
-  if (error) throw new Error(error.message);
+  }));
   // Record attribution on the slot override if slotId is provided
   if (input.slotId) {
     await supabase

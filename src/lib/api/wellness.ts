@@ -2,7 +2,7 @@
  * API Wellness - Daily wellness check CRUD
  */
 
-import { supabase, canUseSupabase } from './client';
+import { supabase, canUseSupabase, assertSupabase } from './client';
 import type { WellnessCheck } from './types';
 
 // --- Readiness score computation ---
@@ -51,13 +51,14 @@ export async function getWellnessForDate(
   date: string,
 ): Promise<WellnessCheck | null> {
   if (!canUseSupabase()) return null;
-  const { data, error } = await supabase
-    .from('wellness_checks')
-    .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
-    .eq('user_id', userId)
-    .eq('date', date)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('wellness_checks')
+      .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .maybeSingle()
+  );
   return data as WellnessCheck | null;
 }
 
@@ -67,14 +68,15 @@ export async function getWellnessRange(
   endDate: string,
 ): Promise<WellnessCheck[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from('wellness_checks')
-    .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
-    .eq('user_id', userId)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: false });
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('wellness_checks')
+      .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
+      .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false })
+  );
   return (data ?? []) as WellnessCheck[];
 }
 
@@ -82,11 +84,12 @@ export async function getGroupWellnessForDate(
   date: string,
 ): Promise<WellnessCheck[]> {
   if (!canUseSupabase()) return [];
-  const { data, error } = await supabase
-    .from('wellness_checks')
-    .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
-    .eq('date', date);
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('wellness_checks')
+      .select('id, user_id, date, sleep_quality, sleep_hours, fatigue, soreness, mood, stress, readiness_score, notes, created_at')
+      .eq('date', date)
+  );
   return (data ?? []) as WellnessCheck[];
 }
 
@@ -94,11 +97,12 @@ export async function upsertWellness(
   input: Omit<WellnessCheck, 'id' | 'created_at'>,
 ): Promise<WellnessCheck> {
   if (!canUseSupabase()) throw new Error('Supabase not available');
-  const { data, error } = await supabase
-    .from('wellness_checks')
-    .upsert(input, { onConflict: 'user_id,date' })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const data = assertSupabase(
+    await supabase
+      .from('wellness_checks')
+      .upsert(input, { onConflict: 'user_id,date' })
+      .select()
+      .single()
+  );
   return data as WellnessCheck;
 }
