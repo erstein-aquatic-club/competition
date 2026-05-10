@@ -34,6 +34,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const userRoleOptions = ["athlete", "coach", "comite", "admin"] as const;
@@ -146,6 +151,8 @@ export default function Admin() {
 
   const [createdCoachPassword, setCreatedCoachPassword] = useState<string | null>(null);
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
+  const [rejectPending, setRejectPending] = useState<{ userId: number; displayName: string } | null>(null);
+  const [disablePending, setDisablePending] = useState<{ userId: number; displayName: string } | null>(null);
   const [ficheSearch, setFicheSearch] = useState("");
 
   const {
@@ -511,13 +518,7 @@ export default function Admin() {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => {
-                        const confirmed = window.confirm(
-                          `Rejeter l'inscription de "${pending.display_name}" ? Le compte sera désactivé.`,
-                        );
-                        if (!confirmed) return;
-                        rejectUser.mutate(pending.user_id);
-                      }}
+                      onClick={() => setRejectPending({ userId: pending.user_id, displayName: pending.display_name })}
                       disabled={approveUser.isPending || rejectUser.isPending}
                       className="h-10"
                     >
@@ -724,11 +725,7 @@ export default function Admin() {
                                 });
                                 return;
                               }
-                              const confirmed = window.confirm(
-                                `Confirmer la désactivation du compte "${user.display_name}" ?`,
-                              );
-                              if (!confirmed) return;
-                              disableUser.mutate({ userId: user.id });
+                              setDisablePending({ userId: user.id, displayName: user.display_name });
                             }}
                             disabled={!active || disableUser.isPending || isSelf}
                             className="h-10"
@@ -978,6 +975,52 @@ export default function Admin() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={rejectPending !== null} onOpenChange={(open) => { if (!open) setRejectPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rejeter cette inscription ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le compte de &laquo; {rejectPending?.displayName} &raquo; sera désactivé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (rejectPending) rejectUser.mutate(rejectPending.userId);
+                setRejectPending(null);
+              }}
+            >
+              Rejeter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={disablePending !== null} onOpenChange={(open) => { if (!open) setDisablePending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Désactiver ce compte ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le compte de &laquo; {disablePending?.displayName} &raquo; sera désactivé. Cette action peut être annulée manuellement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (disablePending) disableUser.mutate({ userId: disablePending.userId });
+                setDisablePending(null);
+              }}
+            >
+              Désactiver
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

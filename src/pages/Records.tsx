@@ -23,6 +23,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -249,6 +254,7 @@ export default function Records() {
   const [swimMode, setSwimMode] = useState<SwimMode>("comp");
   const [swimForm, setSwimForm] = useState(emptySwimForm);
   const [swimSheetOpen, setSwimSheetOpen] = useState(false);
+  const [deleteRecordConfirmOpen, setDeleteRecordConfirmOpen] = useState(false);
   const [editingExerciseId, setEditingExerciseId] = useState<number | null>(null);
   const [editingOneRmValue, setEditingOneRmValue] = useState<string>("");
   const [expandedExerciseId, setExpandedExerciseId] = useState<number | null>(null);
@@ -710,6 +716,7 @@ export default function Records() {
   }
 
   return (
+    <>
     <div className="min-h-[100dvh]">
       <div className="mx-auto max-w-lg">
         <PageHeader
@@ -966,11 +973,7 @@ export default function Records() {
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => {
-                                if (swimForm.id && confirm("Supprimer ce record ?")) {
-                                  deleteSwimRecordMut.mutate(swimForm.id);
-                                }
-                              }}
+                              onClick={() => setDeleteRecordConfirmOpen(true)}
                               disabled={deleteSwimRecordMut.isPending}
                               className="rounded-xl h-11 px-3 text-destructive border-destructive/30 hover:bg-destructive/10"
                             >
@@ -1453,5 +1456,28 @@ export default function Records() {
         </div>
       </div>
     </div>
+
+    <AlertDialog open={deleteRecordConfirmOpen} onOpenChange={setDeleteRecordConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer ce record ?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Cette action est irréversible. Le record sera définitivement supprimé.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              if (swimForm.id) deleteSwimRecordMut.mutate(swimForm.id);
+            }}
+          >
+            Supprimer
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

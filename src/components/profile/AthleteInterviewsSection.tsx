@@ -20,6 +20,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ObjectiveCard } from "@/components/shared/ObjectiveCard";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
@@ -104,6 +109,8 @@ export default function AthleteInterviewsSection({
 }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [submitConfirmId, setSubmitConfirmId] = useState<string | null>(null);
+  const [signConfirmId, setSignConfirmId] = useState<string | null>(null);
 
   // Resolve athlete's own app_user_id from auth
   const { data: authUser } = useQuery({
@@ -273,27 +280,53 @@ export default function AthleteInterviewsSection({
             performances={performances}
             appUserId={appUserId ?? null}
             onSave={(id, input) => saveMut.mutate({ id, input })}
-            onSubmit={(id) => {
-              if (
-                window.confirm(
-                  "Envoyer votre préparation au coach ? Vous ne pourrez plus la modifier.",
-                )
-              ) {
-                submitMut.mutate(id);
-              }
-            }}
-            onSign={(id) => {
-              if (
-                window.confirm("Confirmer la signature de cet entretien ?")
-              ) {
-                signMut.mutate(id);
-              }
-            }}
+            onSubmit={(id) => setSubmitConfirmId(id)}
+            onSign={(id) => setSignConfirmId(id)}
             isSaving={saveMut.isPending}
             isSubmitting={submitMut.isPending}
             isSigning={signMut.isPending}
           />
         ))}
+
+      <AlertDialog open={submitConfirmId !== null} onOpenChange={(open) => { if (!open) setSubmitConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Envoyer votre préparation au coach ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous ne pourrez plus modifier cet entretien une fois envoyé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (submitConfirmId) submitMut.mutate(submitConfirmId);
+              setSubmitConfirmId(null);
+            }}>
+              Envoyer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={signConfirmId !== null} onOpenChange={(open) => { if (!open) setSignConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Signer cet entretien ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est définitive et engage votre responsabilité.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (signConfirmId) signMut.mutate(signConfirmId);
+              setSignConfirmId(null);
+            }}>
+              Signer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

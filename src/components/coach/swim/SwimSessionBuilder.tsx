@@ -1,7 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { SwimSessionTimeline } from "@/components/swim/SwimSessionTimeline";
 import { SwimExerciseForm } from "./SwimExerciseForm";
 import { SessionMetadataForm } from "../shared/SessionMetadataForm";
@@ -94,6 +99,8 @@ export function SwimSessionBuilder({
 }: SwimSessionBuilderProps) {
   const { toast } = useToast();
   const [editorMode, setEditorMode] = React.useState<"blocks" | "text">("blocks");
+  const [splitWarnOpen, setSplitWarnOpen] = useState(false);
+  const [pendingBlocks, setPendingBlocks] = useState<SwimBlock[] | null>(null);
   const [rawText, setRawText] = React.useState(session.description || "");
   const [expandedExercise, setExpandedExercise] = React.useState<{
     blockIndex: number;
@@ -376,10 +383,9 @@ export function SwimSessionBuilder({
                 }
                 const splitWarnings = textWarnings.filter((w) => w.type === "split_distance");
                 if (splitWarnings.length > 0) {
-                  const proceed = window.confirm(
-                    `${splitWarnings.length} ligne(s) avec distance partielle (ex: "10 EZ" perdu après le /). Convertir quand même ?`,
-                  );
-                  if (!proceed) return;
+                  setPendingBlocks(blocks);
+                  setSplitWarnOpen(true);
+                  return;
                 }
                 onSessionChange({ ...session, blocks, description: rawText });
                 setEditorMode("blocks");
@@ -564,6 +570,33 @@ export function SwimSessionBuilder({
 
         <div className="h-8" />
       </div>
+
+      <AlertDialog open={splitWarnOpen} onOpenChange={setSplitWarnOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Distances partielles détectées</AlertDialogTitle>
+            <AlertDialogDescription>
+              Certaines lignes contiennent des distances partielles (ex: "10 EZ" perdu après le /).
+              Convertir quand même ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingBlocks(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingBlocks) {
+                  onSessionChange({ ...session, blocks: pendingBlocks, description: rawText });
+                  setEditorMode("blocks");
+                  toast({ title: `${pendingBlocks.length} bloc(s) importé(s)` });
+                  setPendingBlocks(null);
+                }
+              }}
+            >
+              Convertir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={Boolean(selectedSession)}
