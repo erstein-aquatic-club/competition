@@ -1,105 +1,138 @@
 # Suivi Natation V2
 
-Application web de suivi des séances de natation et de musculation pour l'Erstein Aquatic Club.
+Application web PWA de suivi sportif et opérationnel pour l'Erstein Aquatic Club : natation, musculation, objectifs, allures, compétitions, pointage des heures, notifications et administration.
+
+**Statut actuel : production fonctionnelle, très avancée.** Tous les grands modules métier sont livrés et activés. Les derniers chantiers documentés au **2026-05-10 (§265)** ont surtout porté sur la performance perçue, l'offline, l'accessibilité et la cohérence iOS/mobile.
 
 ## Stack technique
 
 | Catégorie | Technologies |
 |-----------|-------------|
 | **Frontend** | React 19, TypeScript, Vite 7, Tailwind CSS 4 |
-| **UI** | Radix UI + Shadcn (55 composants) |
-| **State** | Zustand 5, React Query 5 |
-| **Backend** | Supabase (PostgreSQL, Auth, Edge Functions) |
-| **Déploiement** | GitHub Pages (frontend), Supabase Cloud (backend) |
+| **UI** | Radix UI, Shadcn-style primitives, lucide-react, Recharts |
+| **State/data** | React Query 5 + cache persisté, Zustand 5 |
+| **Backend** | Supabase : PostgreSQL, Auth, RLS, Edge Functions, pg_cron |
+| **PWA** | vite-plugin-pwa / Workbox, push notifications, offline queue |
+| **Tests/outillage** | Node test, Vitest RLS/e2e, Storybook, TypeScript |
+| **Déploiement** | GitHub Pages pour le frontend, Supabase Cloud pour le backend |
 
-## Fonctionnalités
+## État global
 
-### 🔐 Authentification & Rôles
-- Multi-rôles : nageur, coach, comité, admin
-- Connexion sécurisée avec Supabase Auth
-- Navigation dynamique selon le rôle
+| Domaine | Statut | Commentaire |
+|---------|--------|-------------|
+| Fonctionnel métier | ✅ Stable | Auth, nage, muscu, coach, records, compétitions, objectifs, allures, pointage, admin |
+| Mobile / PWA | ✅ Très avancé | Installation PWA, safe areas, push, offline, cache React Query, gestes mobiles |
+| UI/UX | ✅ ~9.9/10 | Drapeaux majeurs fermés : typo globale, tap targets primitives, tokens couleur |
+| Accessibilité | ✅ ~9.6/10 | P0/P1 WCAG traités, ARIA/focus améliorés, quelques P2 cosmétiques résiduels |
+| Performance/offline | ✅ ~8.4/10 estimé | Critical path corrigé, timeouts, retry, queue offline 12/12 mutations critiques |
+| Dette restante | ⚠️ Localisée | Profiling React DevTools pour memo Coach/Records, quelques migrations Surface/tokens et tap targets coach denses |
 
-### 🏊 Natation
+Sources principales : [`docs/FEATURES_STATUS.md`](docs/FEATURES_STATUS.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/audits/2026-05-10-final-consolidé.md`](docs/audits/2026-05-10-final-consolidé.md), [`docs/audits/2026-05-10-perf-audit-pass2-runtime.md`](docs/audits/2026-05-10-perf-audit-pass2-runtime.md).
 
-| Côté | Fonctionnalités |
-|------|-----------------|
-| **Coach** | Création/édition de séances, catalogue, assignation aux nageurs |
-| **Nageur** | Consultation, exécution, saisie ressenti, historique, progression |
+## Fonctionnalités livrées
 
-### 🏋️ Musculation
+### Authentification, rôles et sécurité
 
-| Côté | Fonctionnalités |
-|------|-----------------|
-| **Coach** | Builder séances, catalogue exercices par cycle, assignation |
-| **Nageur** | Lancement séance, mode focus mobile, saisie charge/reps, historique, 1RM |
+- Connexion Supabase Auth, refresh JWT, reset password.
+- Rôles `nageur`, `coach`, `comité`, `admin`.
+- Inscription self-service avec validation coach/admin.
+- RLS renforcée sur les tables sensibles, tests RLS dédiés, RPC critiques sécurisées.
+- Edge Functions verrouillées côté rôle/service selon usage.
 
-### 💬 Messagerie
-- Fils de discussion (threads)
-- Indicateurs lu/non-lu
-- Envoi coach → nageur/groupe
+### Nageur
 
-### 🕒 Pointage des heures (Comité)
-- Shifts avec heures d'arrivée/sortie
-- Lieu de travail, temps de trajet
-- Dashboards totaux semaine/mois
+- Dashboard calendrier natation avec créneaux matin/soir, absences, compétitions, ressenti et plan muscu.
+- Saisie de ressenti, présence/absence, notes techniques par exercice, historique et progression.
+- Home nageur avec bien-être, semaine compacte, prochaine compétition et accès rapide au suivi.
+- Module `Suivi` découpé en sous-vues : semaine, planification, objectifs, progression.
+- Profil complet : infos, avatar, sécurité, objectifs, records, entretiens.
 
-### 📱 PWA
-- Application installable
-- Safe-areas mobile
-- Réactivité sans refresh
+### Natation coach
 
-## État des fonctionnalités
+- Catalogue de séances, builder blocs/exercices, parser texte coach vers séance structurée.
+- Assignation par nageur, groupe, sous-groupe, groupe temporaire et créneau.
+- Gestion des créneaux récurrents, exceptions, créneaux personnalisés par nageur.
+- Quick-compose sur créneau vide, PDF séance bord de bassin, partage public de séance.
+- Planning natation par groupe et par nageur, overrides filière/semaine, vue nageur fusionnée.
+- Chrono coach complet : lignes/vagues, nageurs club et manuels, historique, éditeur splits, export xlsx.
 
-| Module | Statut | Notes |
-|--------|--------|-------|
-| Auth Supabase | ✅ OK | Login, rôles, refresh JWT |
-| Inscription | ⚠️ Partiel | Formulaire OK, UX post-inscription à refaire |
-| Natation nageur | ✅ OK | Dashboard, ressenti, progression |
-| Natation coach | ✅ OK | Catalogue, assignation |
-| Musculation nageur | ✅ OK | WorkoutRunner, historique, 1RM |
-| Musculation coach | ✅ OK | Builder activé (`coachStrength: true`) |
-| Messagerie | ✅ OK | Threads, individuel/groupe |
-| Pointage heures | ✅ OK | Shifts, dashboard, vue comité |
-| Records perso FFN | ✅ OK | Sync via Edge Function |
-| Records club | ✅ OK | Table + classements, nécessite déploiement Edge Functions |
-| Hall of Fame | ✅ OK | Top 5 nage + muscu |
-| Admin | ✅ OK | Gestion utilisateurs, rôles |
+### Musculation
 
-Détail complet : [`docs/FEATURES_STATUS.md`](docs/FEATURES_STATUS.md)
+- Côté nageur : séances assignées, mode focus mobile, timer repos enrichi, saisie charge/reps, historique, 1RM, notes personnelles.
+- Côté coach : builder muscu, catalogue exercices, dossiers, planification hebdomadaire groupe/nageur, copie vers athlète.
+- Saisie robuste : RPC atomiques, brouillons locaux, queue offline et replay.
+
+### Records, FFN et Hall of Fame
+
+- Records personnels CRUD, historiques performances et graphiques.
+- Import FFN individuel et historique complet via Edge Function.
+- Records club recalculés avec filtre d'appartenance historique EAC.
+- Hall of Fame nage et muscu.
+- Admin records : gestion nageurs, imports, auto-sync hebdomadaire.
+
+### Compétitions, objectifs et allures
+
+- CRUD compétitions, assignations, SMS groupé, vue détail nageur.
+- Préparation compétition : courses, routines, timeline jour J, checklist.
+- Objectifs coach/nageur, lien objectif ↔ allures, progression par épreuve.
+- Calculateur d'allures v2 non linéaire : familles 50/100/200/400/800-1500, 4 nages segmenté, conversion bassin 25/50, modulations départ plot et combinaison.
+- Export PDF allures et liens de partage.
+
+Voir aussi : [`docs/pace-calculator-scenarios.md`](docs/pace-calculator-scenarios.md).
+
+### Communication, push et administratif
+
+- Notifications push PWA, rappels de ressenti, auto-purge TTL, auto-mark après action.
+- Inbox commentaires nageur côté coach et notifications côté nageur.
+- Email coach via `mailto:` et SMS coach.
+- Pointage des heures : shifts, lieux, trajets, groupes encadrés, tableaux de bord et vue comité.
+- Admin utilisateurs, rôles, inscriptions en attente et configuration.
+
+## Performance, PWA et offline
+
+Le dernier état documenté post-§265 indique :
+
+- Critical path revenu à 4 vendors préchargés, `vendor-motion` sorti du chemin critique.
+- Service Worker allégé : environ -1.48 MiB de precache vs baseline.
+- Cache React Query persisté en localStorage avec buster de build.
+- Sonde réseau réelle via `HEAD /version.json`.
+- Retry exponentiel + `withTimeout(8s)` sur les requêtes critiques.
+- Queue offline couvrant **12/12 mutations critiques** : profil, records, absences, pointage, sauvegarde séance natation atomique, avatar.
+- Toast après 5 s de chargement lent sur Dashboard, Coach et Records.
+
+Limite connue : l'extraction/mémoïsation de certaines cards Coach/Records est volontairement bloquée en attente d'un profilage React DevTools runtime.
 
 ## Structure du projet
 
-```
+```text
 competition/
 ├── src/
-│   ├── pages/           # Pages React (19 pages)
-│   ├── components/      # Composants UI et métier
-│   ├── lib/
-│   │   ├── api.ts       # Client API Supabase (~2200 lignes)
-│   │   ├── api/         # Modules API extraits
-│   │   │   ├── types.ts        # Interfaces TypeScript
-│   │   │   ├── client.ts       # Supabase client, utilitaires
-│   │   │   ├── transformers.ts # Transformations données strength
-│   │   │   ├── helpers.ts      # Fonctions de mapping
-│   │   │   ├── localStorage.ts # Stockage local fallback
-│   │   │   └── index.ts        # Re-exports centralisés
-│   │   ├── auth.ts      # Gestion authentification
-│   │   ├── supabase.ts  # Client Supabase
-│   │   └── features.ts  # Feature flags
-│   └── hooks/           # Hooks React personnalisés
+│   ├── pages/                  # Pages React, routes nageur/coach/admin/comité
+│   ├── components/             # Composants UI et métier
+│   ├── hooks/                  # Hooks React et React Query
+│   └── lib/
+│       ├── api/                # Modules API Supabase post-suppression façade api.ts
+│       ├── auth.ts             # Auth, rôles, chargement contexte utilisateur
+│       ├── supabase.ts         # Client Supabase
+│       ├── offlineQueue.ts     # Queue mutations offline
+│       ├── paceCalculatorV2.ts # Moteur allures v2
+│       └── design-tokens.ts    # Tokens design historiques
 ├── supabase/
-│   ├── migrations/      # Migrations PostgreSQL
-│   └── functions/       # Edge Functions (ffn-sync, admin-user, ffn-performances, import-club-records)
-├── docs/                # Documentation
-└── public/              # Assets statiques
+│   ├── migrations/             # Migrations PostgreSQL/RLS/RPC
+│   ├── functions/              # push-send, admin-user, ffn-performances, import-club-records
+│   └── tests/rls/              # Tests RLS
+├── docs/                       # État fonctionnel, roadmap, audits, plans, QA
+├── public/                     # Assets PWA, manifest, service worker helpers
+└── .github/workflows/          # Déploiement GitHub Pages
 ```
 
 ## Démarrage local
 
 ### Prérequis
+
 - Node.js 18+
 - npm
-- Compte Supabase (optionnel pour dev local)
+- Accès Supabase si l'on veut tester contre les données réelles
 
 ### Installation
 
@@ -116,6 +149,8 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+Sans ces variables, le build local peut réussir mais l'app affichera que Supabase n'est pas configuré.
+
 ### Développement
 
 ```bash
@@ -124,87 +159,80 @@ npm run dev
 
 L'application est servie sur `http://localhost:8080`.
 
-### Build production
+### Vérifications utiles
 
 ```bash
+npm run check
+npm test
 npm run build
+npm run test:rls
 ```
+
+Les tests RLS demandent l'environnement Supabase local décrit dans [`docs/rls-testing.md`](docs/rls-testing.md).
 
 ## Déploiement
 
 ### GitHub Pages
 
-> **IMPORTANT : Ne JAMAIS déployer localement avec `npx gh-pages -d dist`.**
-> Le build local n'a pas les credentials Supabase → l'app affiche "Supabase not configured".
+> Ne pas déployer localement avec `npx gh-pages -d dist`.
+> Le build local n'a pas forcément les credentials Supabase et peut produire une app non configurée.
 
-Le déploiement se fait exclusivement via **GitHub Actions** :
+Le frontend est déployé par GitHub Actions sur push vers `main`.
 
-1. Configurer les secrets dans GitHub :
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
+Secrets requis :
 
-2. Le workflow `.github/workflows/pages.yml` déploie automatiquement sur push vers `main`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
 
-3. Déploiement manuel : `gh workflow run "Deploy to GitHub Pages"`
+Déploiement manuel :
+
+```bash
+gh workflow run "Deploy to GitHub Pages"
+```
 
 ### Edge Functions Supabase
 
+Les Edge Functions ne sont pas déployées automatiquement par GitHub Actions. Après modification de `supabase/functions/`, redéployer la fonction concernée :
+
 ```bash
-# Installation CLI
-npm install -g supabase
-
-# Connexion
-supabase login
-
-# Lier le projet
-supabase link --project-ref <project-id>
-
-# Déployer TOUTES les fonctions
-supabase functions deploy ffn-sync
+supabase functions deploy push-send
 supabase functions deploy admin-user
 supabase functions deploy ffn-performances
 supabase functions deploy import-club-records
-
-# Configurer les secrets
-supabase secrets set SERVICE_ROLE_KEY=<service-role-key>
 ```
 
-> **Important** : Les Edge Functions ne sont PAS déployées automatiquement par GitHub Actions.
-> Après chaque modification dans `supabase/functions/`, redéployer manuellement la fonction modifiée.
+Configurer aussi les secrets Supabase nécessaires, notamment service role, VAPID et clés liées aux imports.
 
-## Documentation additionnelle
+## Documentation
 
-| Document | Description |
-|----------|-------------|
-| `docs/FEATURES_STATUS.md` | Matrice détaillée des fonctionnalités |
-| `docs/ROADMAP.md` | Plan de développement futur (chantiers à implémenter) |
-| `docs/audit-projet-complet.md` | Audit qualité code (score B+) |
-| `docs/implementation-log.md` | Journal des implémentations |
-| `docs/patch-report.md` | Rapport d'audit UI/UX (items restants) |
-| `docs/roadmap-data-contract.md` | Contrats de données (legacy, réf. Cloudflare) |
+| Document | Rôle |
+|----------|------|
+| [`docs/FEATURES_STATUS.md`](docs/FEATURES_STATUS.md) | Matrice détaillée des fonctionnalités et état le plus récent |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Journal roadmap synthétique, derniers § livrés et reste à faire |
+| [`docs/implementation-log.md`](docs/implementation-log.md) | Source de vérité chronologique de chaque patch |
+| [`docs/audits/2026-05-10-final-consolidé.md`](docs/audits/2026-05-10-final-consolidé.md) | Audit consolidé UI/UX, perf, accessibilité |
+| [`docs/audits/2026-05-10-perf-audit-pass2-runtime.md`](docs/audits/2026-05-10-perf-audit-pass2-runtime.md) | Audit performance/offline détaillé |
+| [`docs/plans/2026-05-10-ui-ux-roadmap-to-10.md`](docs/plans/2026-05-10-ui-ux-roadmap-to-10.md) | Chemin vers 10/10 strict et dette restante |
+| [`docs/pace-calculator-scenarios.md`](docs/pace-calculator-scenarios.md) | Explication métier du calculateur d'allures |
+| [`docs/rls-testing.md`](docs/rls-testing.md) | Guide tests RLS locaux |
+| [`docs/claude/files-map.md`](docs/claude/files-map.md) | Carte détaillée des fichiers clés |
 
-## Roadmap
+## Roadmap courte
 
-### Fait
-- [x] Refonte du parcours d'inscription (approbation admin)
-- [x] Import de toutes les performances FFN d'un nageur (historique complet)
-- [x] Edge Function `import-club-records` + recalcul automatique
-- [x] Gestion coach des imports de performances (+ rate limiting)
-- [x] Records club avec classements par épreuve/âge
-- [x] Dette UI/UX (API refactoring, tokens CSS, skeletons, reset mot de passe)
+Priorité actuelle recommandée par les audits :
 
-### En cours
-- [ ] Déployer les Edge Functions `ffn-performances` et `import-club-records` sur Supabase Cloud
-
-Détail complet : [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- Stopper les gros refactors UI risqués : la valeur marginale est faible autour de 9.2-9.9/10 selon pondération.
+- Faire seulement les nettoyages opportunistes : tokens `tracking-*`, quelques tap targets coach denses, adoption `Surface` fichier par fichier si une zone est déjà touchée.
+- Mesurer en runtime avant d'extraire davantage : React DevTools Profiler sur Coach hub et Records.
+- Garder les tests `check`, `test`, `build` et `test:rls` comme garde-fous avant PR.
 
 ## Contribuer
 
-1. Créer une branche depuis `main`
-2. Implémenter les changements
-3. Vérifier : `npm run build`
-4. Créer une PR vers `main`
+1. Créer une branche depuis `main`.
+2. Implémenter un changement ciblé.
+3. Vérifier au minimum `npm run check` et `npm run build`; ajouter `npm test` ou `npm run test:rls` selon le périmètre.
+4. Créer une PR vers `main`.
 
 ---
 
-*Dernière mise à jour : 2026-02-07*
+*Dernière mise à jour README : 2026-05-10, alignée sur les docs jusqu'au §265.*
