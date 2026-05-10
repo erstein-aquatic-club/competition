@@ -126,6 +126,86 @@ export function computeZoneTime(args: {
   return tMax_s / k;
 }
 
+// ─── Race context adjustments: start block + tech suit ────────────────────
+
+export interface RaceContextOptions {
+  hasStartBlock: boolean;
+  hasTechSuit: boolean;
+}
+
+const START_GAIN_MAX_BY_FAMILY: Record<EventFamily, number> = {
+  "50m": 0.75,
+  "100m": 0.90,
+  "200m": 1.00,
+  "400m": 1.05,
+  "800m_1500m": 1.05,
+};
+
+const ZONE_START_FACTOR: Record<Zone, number> = {
+  V0: 0.55,
+  V1: 0.65,
+  V2: 0.78,
+  V3: 0.90,
+  V4: 0.96,
+  MAX: 1.00,
+};
+
+const SUIT_BASE_BY_FAMILY: Record<EventFamily, number> = {
+  "50m": 0.006,
+  "100m": 0.009,
+  "200m": 0.011,
+  "400m": 0.010,
+  "800m_1500m": 0.008,
+};
+
+const ZONE_SUIT_FACTOR: Record<Zone, number> = {
+  V0: 0.35,
+  V1: 0.50,
+  V2: 0.70,
+  V3: 0.90,
+  V4: 1.00,
+  MAX: 1.05,
+};
+
+const STROKE_SUIT_FACTOR: Record<SingleStroke, number> = {
+  crawl: 1.00,
+  dos: 0.95,
+  brasse: 0.85,
+  papillon: 1.05,
+};
+
+export function computeRaceContextAdjustedTime(args: {
+  time_s: number;
+  D: number;
+  d: number;
+  stroke: SingleStroke;
+  zone: Zone;
+  context: RaceContextOptions;
+}): number {
+  const { time_s, D, d, stroke, zone, context } = args;
+  const family = eventFamily(D);
+  let adjusted = time_s;
+
+  if (!context.hasStartBlock) {
+    const startGainMax = START_GAIN_MAX_BY_FAMILY[family];
+    const lambdaStart = D <= 50 ? 10 : 14;
+    const startShape = 1 - Math.exp(-d / lambdaStart);
+    adjusted += startGainMax * startShape * ZONE_START_FACTOR[zone];
+  }
+
+  if (!context.hasTechSuit) {
+    const distanceShape = 0.65 + 0.35 * Math.sqrt(Math.min(Math.max(d / D, 0), 1));
+    const suitPenalty =
+      SUIT_BASE_BY_FAMILY[family] *
+      ZONE_SUIT_FACTOR[zone] *
+      STROKE_SUIT_FACTOR[stroke] *
+      distanceShape;
+    adjusted *= 1 + suitPenalty;
+  }
+
+  return adjusted;
+}
+
 // ─── Task 10: compute4NSegment + compute4NCumulative ──────────────────────
 
 export function compute4NSegment(args: {

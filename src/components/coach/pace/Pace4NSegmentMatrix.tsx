@@ -1,11 +1,14 @@
 import React from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   eventFamily,
   compute4NSegment,
   compute4NCumulative,
   computeZoneTime,
+  computeRaceContextAdjustedTime,
   type StrokeAdjustmentOverrides,
   type ZoneCoefficientsOverride,
+  type RaceContextOptions,
 } from "@/lib/paceCalculatorV2";
 import { SEGMENTS_4N, type EventFamily, type Zone } from "@/lib/paceData";
 
@@ -74,6 +77,10 @@ export function Pace4NSegmentMatrix({
   zones,
   strokeAdjustments,
 }: Props) {
+  const [raceContext, setRaceContext] = React.useState<RaceContextOptions>({
+    hasStartBlock: true,
+    hasTechSuit: true,
+  });
   const Tobj_4N_s = targetTimeMs / 1000;
   const mode = targetDistanceM === 200 ? "200" : "400";
   const segments = SEGMENTS_4N[mode];
@@ -110,7 +117,15 @@ export function Pace4NSegmentMatrix({
         family,
         coefficientsOverride: zones as ZoneCoefficientsOverride,
       });
-      return fmtTime(tZone);
+      const adjusted = computeRaceContextAdjustedTime({
+        time_s: tZone,
+        D: segDist,
+        d,
+        stroke: segStroke,
+        zone,
+        context: raceContext,
+      });
+      return fmtTime(adjusted);
     } catch {
       return "—";
     }
@@ -119,7 +134,15 @@ export function Pace4NSegmentMatrix({
   function cumulTime(dCumul: number): string {
     try {
       const t = compute4NCumulative({ Tobj_4N_s, mode, d_cumulative: dCumul });
-      return fmtTime(t);
+      const adjusted = computeRaceContextAdjustedTime({
+        time_s: t,
+        D: targetDistanceM,
+        d: dCumul,
+        stroke: "crawl",
+        zone: "MAX",
+        context: raceContext,
+      });
+      return fmtTime(adjusted);
     } catch {
       return "—";
     }
@@ -127,6 +150,33 @@ export function Pace4NSegmentMatrix({
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <div className="flex items-center gap-3 rounded border border-border/30 bg-muted/20 px-2 py-1">
+          <label className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+            <Checkbox
+              checked={raceContext.hasStartBlock}
+              onCheckedChange={(checked) =>
+                setRaceContext((prev) => ({ ...prev, hasStartBlock: checked === true }))
+              }
+              aria-label="Inclure le départ plot"
+              className="h-3.5 w-3.5"
+            />
+            Départ plot
+          </label>
+          <label className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+            <Checkbox
+              checked={raceContext.hasTechSuit}
+              onCheckedChange={(checked) =>
+                setRaceContext((prev) => ({ ...prev, hasTechSuit: checked === true }))
+              }
+              aria-label="Inclure la combinaison"
+              className="h-3.5 w-3.5"
+            />
+            Combinaison
+          </label>
+        </div>
+      </div>
+
       {/* Segment sub-matrices */}
       {segments.map((seg) => {
         const stroke = seg.stroke as SegStroke;

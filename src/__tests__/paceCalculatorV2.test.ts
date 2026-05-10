@@ -7,6 +7,7 @@ import {
   strokeAdjustment,
   computeTMax,
   computeZoneTime,
+  computeRaceContextAdjustedTime,
   compute4NSegment,
   compute4NCumulative,
   getDistanceRowsV2,
@@ -176,6 +177,75 @@ describe("computeZoneTime — doc §12.1", () => {
       coefficientsOverride: { "400m": { V4: 0.97 } },
     });
     assert.equal(t, 100 / 0.97);
+  });
+});
+
+// ─── Race context adjustments ─────────────────────────────────────────────
+
+describe("computeRaceContextAdjustedTime", () => {
+  it("keeps the exact same time when start block and tech suit are enabled", () => {
+    const got = computeRaceContextAdjustedTime({
+      time_s: 24,
+      D: 50,
+      d: 50,
+      stroke: "crawl",
+      zone: "MAX",
+      context: { hasStartBlock: true, hasTechSuit: true },
+    });
+    assert.equal(got, 24);
+  });
+
+  it("adds a non-linear start penalty when start block is disabled", () => {
+    const short = computeRaceContextAdjustedTime({
+      time_s: 6,
+      D: 50,
+      d: 15,
+      stroke: "crawl",
+      zone: "MAX",
+      context: { hasStartBlock: false, hasTechSuit: true },
+    });
+    const full = computeRaceContextAdjustedTime({
+      time_s: 24,
+      D: 50,
+      d: 50,
+      stroke: "crawl",
+      zone: "MAX",
+      context: { hasStartBlock: false, hasTechSuit: true },
+    });
+    assert.ok(short > 6, `got ${short}`);
+    assert.ok(full > 24, `got ${full}`);
+    assert.ok(full - 24 > short - 6, `full penalty should be larger`);
+    assert.ok(full - 24 < 0.76, `start penalty should cap near configured gain`);
+  });
+
+  it("applies the tech suit penalty multiplicatively by zone and stroke", () => {
+    const maxCrawl = computeRaceContextAdjustedTime({
+      time_s: 24,
+      D: 50,
+      d: 50,
+      stroke: "crawl",
+      zone: "MAX",
+      context: { hasStartBlock: true, hasTechSuit: false },
+    });
+    const v0Crawl = computeRaceContextAdjustedTime({
+      time_s: 24,
+      D: 50,
+      d: 50,
+      stroke: "crawl",
+      zone: "V0",
+      context: { hasStartBlock: true, hasTechSuit: false },
+    });
+    const maxBrasse = computeRaceContextAdjustedTime({
+      time_s: 24,
+      D: 50,
+      d: 50,
+      stroke: "brasse",
+      zone: "MAX",
+      context: { hasStartBlock: true, hasTechSuit: false },
+    });
+    assert.ok(maxCrawl > 24, `got ${maxCrawl}`);
+    assert.ok(maxCrawl - 24 > v0Crawl - 24, "MAX should be affected more than V0");
+    assert.ok(maxCrawl - 24 > maxBrasse - 24, "crawl factor should exceed brasse factor");
   });
 });
 

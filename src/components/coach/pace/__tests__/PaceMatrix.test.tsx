@@ -39,6 +39,19 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
     assert.ok(html.includes("15.2"), `expected 15.2, html=${html.substring(0, 400)}`);
   });
 
+  it("affiche les conditions course cochées par défaut", () => {
+    const html = render({
+      ...BASE_PROPS,
+      targetTimeMs: 23_620,
+      targetDistanceM: 50,
+      stroke: "crawl",
+    });
+    assert.ok(html.includes("Départ plot"), "case Départ plot absente");
+    assert.ok(html.includes("Combinaison"), "case Combinaison absente");
+    assert.ok(html.includes("aria-label=\"Inclure le départ plot\""), "label accessible départ absent");
+    assert.ok(html.includes("aria-label=\"Inclure la combinaison\""), "label accessible combinaison absent");
+  });
+
   it("50m et 100m → colonne V4 toujours visible", () => {
     for (const D of [50, 100] as const) {
       const html = render({
@@ -111,8 +124,8 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
       stroke: "crawl",
       swimmerSex: null,
     });
-    // Avec sexe inconnu, on utilise la moyenne M/F → le bouton n'est pas disabled
-    assert.ok(!html.includes("cursor-not-allowed"), "bouton 25m ne doit pas être grisé sans sexe");
+    // Avec sexe inconnu, on utilise la moyenne M/F → aucun bouton bassin n'est disabled
+    assert.ok(!html.includes("disabled=\"\""), "bouton 25m ne doit pas être désactivé sans sexe");
   });
 
   it("distance cible (d=D) présente comme ligne dans le tableau", () => {

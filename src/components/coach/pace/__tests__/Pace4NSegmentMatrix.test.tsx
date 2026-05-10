@@ -25,6 +25,16 @@ const BASE_PROPS = {
 };
 
 describe("Pace4NSegmentMatrix — 200 4N", () => {
+  it("affiche les conditions course cochées par défaut", () => {
+    const html = render({
+      ...BASE_PROPS,
+      targetTimeMs: 158_000,
+      targetDistanceM: 200,
+    });
+    assert.ok(html.includes("Départ plot"), "case Départ plot absente");
+    assert.ok(html.includes("Combinaison"), "case Combinaison absente");
+  });
+
   it("4 sous-matrices visibles (papillon, dos, brasse, crawl)", () => {
     const html = render({
       ...BASE_PROPS,

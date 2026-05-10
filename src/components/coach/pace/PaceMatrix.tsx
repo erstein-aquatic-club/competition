@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tooltip,
   TooltipContent,
@@ -9,10 +10,12 @@ import {
   eventFamily,
   computeTMax,
   computeZoneTime,
+  computeRaceContextAdjustedTime,
   getDistanceRowsV2,
   type StrokeV2,
   type StrokeAdjustmentOverrides,
   type ZoneCoefficientsOverride,
+  type RaceContextOptions,
 } from "@/lib/paceCalculatorV2";
 import type { EventFamily, Zone } from "@/lib/paceData";
 import { convertTargetTime } from "@/lib/poolConversion";
@@ -82,6 +85,10 @@ export function PaceMatrix({
   compact = false,
 }: Props) {
   const [viewPool, setViewPool] = useState<PoolSize>(targetPool);
+  const [raceContext, setRaceContext] = useState<RaceContextOptions>({
+    hasStartBlock: true,
+    hasTechSuit: true,
+  });
 
   if (stroke === "4N") {
     return (
@@ -145,7 +152,15 @@ export function PaceMatrix({
         family,
         coefficientsOverride: zones as ZoneCoefficientsOverride,
       });
-      return fmtTime(tZone);
+      const adjusted = computeRaceContextAdjustedTime({
+        time_s: tZone,
+        D: targetDistanceM,
+        d,
+        stroke: stroke as SingleStroke,
+        zone,
+        context: raceContext,
+      });
+      return fmtTime(adjusted);
     } catch {
       return "—";
     }
@@ -154,47 +169,75 @@ export function PaceMatrix({
   return (
     <TooltipProvider>
       <div className="space-y-2">
-        {/* Pool toggle — hidden in compact mode */}
-        {!compact && <div className="flex items-center gap-1.5">
-          {(["50m", "25m"] as const).map((p) => {
-            const isActive = viewPool === p;
-            const isDisabled = !isActive && disabledReason !== "";
-            const btn = (
-              <button
-                key={p}
-                type="button"
-                disabled={isDisabled}
-                onClick={() => !isDisabled && setViewPool(p)}
-                className={[
-                  "h-7 rounded px-3 text-[10px] font-semibold uppercase tracking-wider transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : isDisabled
-                    ? "cursor-not-allowed border border-dashed border-border/40 text-muted-foreground/30"
-                    : "border border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                ].join(" ")}
-              >
-                {p}
-              </button>
-            );
-            if (isDisabled) {
-              return (
-                <Tooltip key={p}>
-                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[240px] text-xs">
-                    {disabledReason}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
-            return btn;
-          })}
-          {conversionApplied && (
-            <span className="ml-1 text-[9px] uppercase tracking-widest text-muted-foreground/40">
-              converti
-            </span>
-          )}
-        </div>}
+        {!compact && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              {(["50m", "25m"] as const).map((p) => {
+                const isActive = viewPool === p;
+                const isDisabled = !isActive && disabledReason !== "";
+                const btn = (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => !isDisabled && setViewPool(p)}
+                    className={[
+                      "h-7 rounded px-3 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : isDisabled
+                        ? "cursor-not-allowed border border-dashed border-border/40 text-muted-foreground/30"
+                        : "border border-input text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {p}
+                  </button>
+                );
+                if (isDisabled) {
+                  return (
+                    <Tooltip key={p}>
+                      <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[240px] text-xs">
+                        {disabledReason}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+                return btn;
+              })}
+              {conversionApplied && (
+                <span className="ml-1 text-[9px] uppercase tracking-widest text-muted-foreground/40">
+                  converti
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 rounded border border-border/30 bg-muted/20 px-2 py-1">
+              <label className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                <Checkbox
+                  checked={raceContext.hasStartBlock}
+                  onCheckedChange={(checked) =>
+                    setRaceContext((prev) => ({ ...prev, hasStartBlock: checked === true }))
+                  }
+                  aria-label="Inclure le départ plot"
+                  className="h-3.5 w-3.5"
+                />
+                Départ plot
+              </label>
+              <label className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                <Checkbox
+                  checked={raceContext.hasTechSuit}
+                  onCheckedChange={(checked) =>
+                    setRaceContext((prev) => ({ ...prev, hasTechSuit: checked === true }))
+                  }
+                  aria-label="Inclure la combinaison"
+                  className="h-3.5 w-3.5"
+                />
+                Combinaison
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Matrix table — table-fixed+w-full distributes columns across available width, no horizontal scroll */}
         <div className="rounded-md border border-border/30 overflow-hidden">
