@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Accordion } from "@/components/ui/accordion";
@@ -18,6 +18,10 @@ import { listActiveCoaches } from "@/lib/api/coaches";
 import { useCoachPaceZonesV2 } from "@/hooks/useCoachPaceZonesV2";
 import { useCoachStrokeAdjustments } from "@/hooks/useCoachStrokeAdjustments";
 import { listMyPaceTargets, upsertPaceTarget, deletePaceTarget } from "@/lib/api/pace-targets";
+import { supabase } from "@/lib/supabase";
+import { getObjectives } from "@/lib/api";
+import { parseObjectiveForPace, shouldAutoSyncToPaceTarget } from "@/lib/objective-pace-link";
+import type { Objective } from "@/lib/api/types";
 import { ZONE_COEFFICIENTS, type EventFamily, type Zone } from "@/lib/paceData";
 import { downloadBlob } from "@/lib/downloadBlob";
 import { createPaceShareLink } from "@/lib/api/pace-share";
@@ -26,6 +30,48 @@ import type { PaceTarget, SwimmerRef } from "@/lib/api/pace-targets";
 import type { TeamMember } from "@/hooks/useMyTeam";
 import { consumePacePrefill, type PacePrefillPayload } from "@/lib/pace-prefill-handoff";
 import { toast } from "sonner";
+
+export type ObjectiveSyncOp = {
+  ref: SwimmerRef;
+  stroke: PaceTarget["stroke"];
+  target_distance_m: number;
+  target_time_ms: number;
+  target_pool_size: PaceTarget["target_pool_size"];
+};
+
+/**
+ * Calcule les upserts de cibles d'allures manquantes à partir des objectifs
+ * chronométriques. Pure function — testable sans Supabase.
+ *
+ * Règles :
+ * - Ignore les objectifs sans target_time_seconds
+ * - Ignore les event_code non-FFN (parseObjectiveForPace → null)
+ * - Ignore si une cible (nage + distance + bassin) existe déjà (ne pas écraser)
+ * - Ignore si le nageur n'est pas dans l'équipe (auth_uid absent du Map)
+ */
+export function buildObjectiveSyncOps(
+  objectives: Objective[],
+  authUidToAccountId: Map<string, number>,
+  existingTargets: PaceTarget[],
+): ObjectiveSyncOp[] {
+  const ops: ObjectiveSyncOp[] = [];
+  for (const obj of objectives) {
+    if (obj.target_time_seconds == null) continue;
+    const accountId = authUidToAccountId.get(obj.athlete_id ?? "");
+    if (accountId == null) continue;
+    const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
+    if (!parsed) continue;
+    if (!shouldAutoSyncToPaceTarget(obj, parsed, existingTargets, accountId)) continue;
+    ops.push({
+      ref: { kind: "account", accountId },
+      stroke: parsed.stroke,
+      target_distance_m: parsed.distance,
+      target_time_ms: obj.target_time_seconds * 1000,
+      target_pool_size: parsed.pool_size,
+    });
+  }
+  return ops;
+}
 
 const FAMILIES: EventFamily[] = ["50m", "100m", "200m", "400m", "800m_1500m"];
 const TOGGLABLE_FAMILIES: { family: EventFamily; label: string }[] = [
