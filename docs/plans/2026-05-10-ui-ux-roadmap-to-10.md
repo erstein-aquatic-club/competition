@@ -238,8 +238,209 @@ Contraintes :
 
 ---
 
+# Reste vers 10/10 strict — post-§246 Pass 7 partiel (état au 2026-05-10)
+
+## État livré
+
+| § | Pass | Score atteint |
+|---|---|---|
+| §237 | Pass 4 closing P1 | 9.0/10 |
+| §238 | Pass 5 caves catégoriels (-59% hits top 5) | 9.3/10 |
+| §240 | Pass 6 sub-§A audit WCAG (28 spots) | (lecture) |
+| §242 | Pass 6 sub-§B fixes WCAG (54 edits) | 9.5/10 |
+| §246 | Pass 7 polish iOS A+B+C+E | **~9.8/10** |
+
+**Sub-§ D, F, G** non livrés. Le delta vers 10/10 strict = **~0.2 point**, réparti sur 5 chantiers indépendants.
+
+---
+
+## Chantier I — Sub-§ D Typography rhythm (SKIPPÉ §246, à faire ~1 j)
+
+**ROI estimé** : marginal (texte déjà cohérent post-passes 1-3) mais nécessaire pour 10/10 strict.
+
+### Méthode
+
+1. **Audit current state** (sub-agent sonnet, lecture seule) — grep `leading-*` et `tracking-*` ad-hoc. Lister les fichiers avec ≥ 3 valeurs distinctes (signe de dérive).
+2. **Définir scale typographique** alignée iOS HIG, exposée comme `@utility` Tailwind 4 dans `index.css` (post-convergence avec §243 framer→CSS) :
+
+```css
+@utility type-display {
+  font-family: var(--font-display);
+  font-size: 3rem;          /* text-5xl */
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+@utility type-title {
+  font-size: 1.875rem;      /* text-3xl */
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+@utility type-headline {
+  font-size: 1.25rem;       /* text-xl */
+  font-weight: 600;
+  line-height: 1.3;
+}
+@utility type-body {
+  font-size: 1rem;          /* text-base */
+  font-weight: 400;
+  line-height: 1.5;
+}
+@utility type-caption {
+  font-size: 0.75rem;       /* text-xs */
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+```
+
+3. **Migration progressive** sur 5 surfaces clés (pas obligatoire pour scoring) :
+   - `Login.tsx` h1 hero / sous-titre
+   - `Dashboard.tsx` headers calendrier
+   - `SwimmerHome.tsx` greeting + section labels
+   - `Coach.tsx` hub headers
+   - `Profile.tsx` section titles
+
+**Effort** : audit 0.3 j + scale 0.2 j + migration ciblée 0.5 j = **~1 jour**.
+
+**Risque** : moyen — régression visuelle si scale mal calibrée. Mitigation : migration ciblée 5 surfaces, pas massive.
+
+**Numérotation** : §247 (audit) + §248 (fixes) si en 2 commits, ou §247 unique si bundle.
+
+---
+
+## Chantier II — Sub-§ F Surface adoption massive (SKIPPÉ §246, à faire ~2-3 j si voulu)
+
+**ROI estimé** : moyen — cohérence radius/variants. **Risque ÉLEVÉ** : 140+ fichiers shadcn `<Card>` à migrer vers `<Surface>`.
+
+### Méthode prudente
+
+1. **Étendre Surface API d'abord** (~50 LOC) :
+   - `radius="full"` (pour FAB / pills)
+   - `radius="top-only"` (pour BottomActionBar / UpdateNotification)
+   - `variant="elevated"` (avec shadow renforcé)
+   - `variant="ghost"` (sans border)
+2. **Codemod automatisé** via `ts-morph` (script TypeScript dans `scripts/migrate-card-to-surface.ts`) :
+   - Match `<Card>...</Card>` → `<Surface variant="solid" radius="md">...</Surface>`
+   - Match `<CardHeader>...</CardHeader>` → `<div className="surface-header">` (ou prop dédiée)
+   - Match `<CardContent>...</CardContent>` → `<div className="surface-body">`
+   - Output : liste fichiers modifiés + diff par fichier
+3. **Sub-agents par batch de 20 fichiers** (7 batches au total) — chaque batch :
+   - Run codemod
+   - Visual diff manuel sur 3-5 surfaces clés du batch
+   - Smoke test browser dev server
+   - Commit isolé `feat(§N+i): surface migration batch i/7`
+4. **QA finale** : navigation complète app, screenshot diff vs baseline.
+
+### Décisions UX requises
+
+- **Retained `<Card>` cas légitimes** : `<CardHeader>` pattern shadcn (avec gap interne calibré) — soit étendre Surface API, soit conserver Card pour ces cas.
+- **Threshold acceptation** : combien de % de régressions visuelles tolérées ? Recommandation : 0 (revert batch en cas de regression).
+
+**Effort** : 2-3 jours full-time. **Risque** : élevé. **Recommandation** : à faire en session dédiée, pas en parallèle d'autres chantiers.
+
+**Numérotation** : §249-§255 (7 batches) ou §249 unique avec gros diff.
+
+---
+
+## Chantier III — Sub-§ G Dark mode audit (manuel utilisateur, ~0.5 j)
+
+**Méthode non automatisable depuis Claude** (pas accès navigateur).
+
+### Checklist utilisateur
+
+1. Activer Chrome DevTools `Rendering` → `Emulate CSS prefers-color-scheme: dark`.
+2. Naviguer toutes les surfaces principales :
+   - Login (mobile + desktop)
+   - SwimmerHome / Dashboard / Strength
+   - Coach hub + sous-écrans (CoachTrainingSlotsScreen, CoachMySwimmersScreen, etc.)
+   - Profile (toutes sections)
+   - Records / RecordsClub / HallOfFame
+   - Suivi (toutes sous-pages)
+   - Compétitions / RacesTab
+3. Pour chaque écran, screenshot dark vs light side-by-side.
+4. Identifier régressions :
+   - Contrastes faibles (texte gris foncé sur fond gris foncé)
+   - Couleurs hardcodées qui ne se sont pas dark-aware (ex : éventuels `bg-white` non migrés)
+   - Borders invisibles
+   - Icônes qui se confondent avec backgrounds
+5. **Lighthouse Accessibility** sur 5-10 surfaces principales — vise ≥ 95.
+
+### Output attendu
+
+Liste file:line des régressions à fournir en GitHub issue ou message à Claude pour fixes en §256+.
+
+**Effort utilisateur** : ~0.5 jour. **Effort Claude (fixes ensuite)** : ~0.5 jour selon nombre de régressions.
+
+**Numérotation** : §256 (fixes post-audit user).
+
+---
+
+## Chantier IV — Timing tokens index.css (reporté §246 pour conflit user §243)
+
+**Méthode** : post-convergence avec `useExitAnimation` + 6 keyframes user §243.
+
+### Livrable
+
+Ajouter dans `src/index.css` `@theme` block :
+
+```css
+@theme inline {
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+  --ease-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+```
+
+Migration : grep tous les `transition-duration-*` et `transition-[duration=...]` ad-hoc, remplacer par `transition-[var(--duration-fast)]` ou variantes Tailwind exposées via `@theme`.
+
+**Effort** : 0.5 j (audit grep + migration).
+
+**Numérotation** : §257.
+
+---
+
+## Chantier V — P2 cosmétiques audit §240 (reportés §242)
+
+7 spots P2 audit §240 jugés "nice-to-have" :
+
+1. `ChallengeProgressBar.tsx` — labels textuels de zone (Débutant / En cours / Atteint) en + de la couleur tricolore.
+2. `WellnessTrend.tsx:286` — remplacer `title=` du `⚠` par `aria-label="Tendance en baisse"` + `role="img"`.
+3. `InlineBanner.tsx:164` — vérifier que `label` prop est obligatoire (color-only signaling) ou ajouter assertion runtime.
+4. `SessionRow.tsx:34,45` — décider si icônes décoratives `text-muted-foreground/50` `/30` sont acceptables ou à monter à `/70` (P2 borderline).
+5. `ReadinessGauge.tsx:48` — fond décoratif `text-muted-foreground/10` (acceptable WCAG car pas porteur d'info).
+6-7. Tooltip enrichments sur boutons critiques (post-audit user).
+
+**Effort** : 0.5 j.
+
+**Numérotation** : §258.
+
+---
+
+## Récapitulatif : chemin vers 10/10 strict
+
+| Chantier | Effort | Risque | Score visé | Numérotation |
+|---|---|---|---|---|
+| I — Typography rhythm | 1 j | Moyen | 9.85 | §247-§248 |
+| II — Surface adoption massive | 2-3 j | **Élevé** | 9.95 | §249-§255 (7 batches) |
+| III — Dark mode audit | 0.5 j (user) + 0.5 j (Claude) | Faible | 9.97 | §256 |
+| IV — Timing tokens index.css | 0.5 j | Faible | 9.99 | §257 |
+| V — P2 cosmétiques audit §240 | 0.5 j | Faible | **10.00** | §258 |
+
+**Total chemin critique vers 10/10 strict** : **~5-6 jours**.
+
+**Recommandation pragmatique** : la valeur marginale entre 9.8 et 10.0 est très faible pour l'utilisateur final. Le chantier II (Surface migration) en particulier est risqué et probablement pas worth it pour 0.1 point. **9.8/10 est une excellente note iOS-quality** ; les 0.2 restants sont du polish de sigle.
+
+**Si décision de pousser** : prioriser III (dark mode, ROI utilisateur réel) > V (cosmétiques §240, faible coût) > I (typography, polish) > IV (timing tokens, technical debt) > II (Surface, à faire seulement si volonté de cohérence architecturale stricte).
+
+---
+
 *Sources* :
 - Audit pass 3 : `docs/audits/2026-05-10-ui-ux-audit-ios-pass3.md`
 - Audit pass 2 : `docs/audits/2026-05-08-ui-ux-audit-ios-pass2.md`
 - Audit pass 1 : `docs/audits/2026-05-08-ui-ux-audit-ios.md`
-- Implementation log : `docs/implementation-log.md` §197-§236
+- Implementation log : `docs/implementation-log.md` §197-§246
