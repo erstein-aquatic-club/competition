@@ -1,4 +1,4 @@
-# Suivi Natation V2
+# Suivi Natation
 
 Application web PWA de suivi sportif et opérationnel pour l'Erstein Aquatic Club : natation, musculation, objectifs, allures, compétitions, pointage des heures, notifications et administration.
 
