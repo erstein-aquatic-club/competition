@@ -221,13 +221,13 @@ export default function CoachPaceCalculatorScreen({ athletes, allAthletes, onBac
 
     const run = async () => {
       try {
-        const [{ data: userRows }, objectives] = await Promise.all([
-          supabase.from("users").select("id, auth_uid").in("id", accountIds),
+        const [{ data: authRows }, objectives] = await Promise.all([
+          supabase.rpc("get_auth_uids_for_users", { p_user_ids: accountIds }),
           getObjectives(),
         ]);
         const authUidToAccountId = new Map<string, number>();
-        for (const row of userRows ?? []) {
-          if (row.auth_uid) authUidToAccountId.set(row.auth_uid, row.id);
+        for (const row of authRows ?? []) {
+          authUidToAccountId.set(row.auth_uid, row.user_id);
         }
         const fresh = qc.getQueryData<PaceTarget[]>(["pace-targets"]) ?? [];
         const ops = buildObjectiveSyncOps(objectives, authUidToAccountId, fresh);
