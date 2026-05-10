@@ -4,6 +4,68 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §266 — Chantier R1 : fix P0 robustesse (idempotency, auto-sync, chrono, 5 confirm natifs) (2026-05-10)
+
+**Contexte :** Phase 1 du plan `docs/plans/2026-05-10-vers-9-10-robustesse-perf-friction.md`. L'audit `docs/audits/2026-05-10-robustesse-perf-fluidite.md` identifiait 4 correctifs P0 bloquants pour atteindre ≥ 9/10 en robustesse/friction : (A) doublons offline queue, (B) auto-sync coach non retriggered sur changement de coach, (C) persistance chrono synchrone sans debounce → freeze iOS, (D) 5 `window.confirm` natifs non-iOS-aligned.
+
+**Changements :**
+
+**sub-§A — idempotencyKey queue offline** (`src/lib/offlineQueue.ts`, `SwimSessionView.tsx`)
+- Ajout de `idempotencyKey?: string` sur `QueuedMutation`
+- `enqueue(type, payload, idempotencyKey?)` : garde avant push, skip si même key déjà en queue
+- `tryWithOfflineQueue` forwarde la key
+- `SwimSessionView` calcule `swim-${userId}-${date}-${slot}` et la passe
+- `peekQueue` exporté comme alias de `getQueue` (test convenience)
+- 3 nouveaux cas dans `src/lib/__tests__/offlineQueue.test.ts`
+
+**sub-§B — auto-sync ref par coach** (`src/pages/coach/CoachPaceCalculatorScreen.tsx`)
+- `hasSyncedObjectivesRef` : `useRef(false)` → `useRef<string | null>(null)`
+- syncKey = `String(effectiveCoachId ?? "self")` → retriggered si le coach change via Select admin
+- `catch {}` → `catch (err) { console.warn("[auto-sync] échec — best effort", err) }`
+- `effectiveCoachId` ajouté aux dépendances du useEffect
+
+**sub-§C — chrono persistance debounce** (`src/pages/coach/CoachChronoScreen.tsx`)
+- `useEffect` de persistance localStorage : ajout debounce 500 ms via `persistTimeoutRef`
+- `quotaWarnedRef` : le toast quota n'est affiché qu'une fois par session (anti-spam)
+- `toast.error("Sauvegarde locale impossible", ...)` avec description actionnable
+- `useRef` ajouté aux imports
+
+**sub-§D — migration 5× window.confirm → AlertDialog Radix** (4 fichiers)
+- Pattern §198 réutilisé (`SwimSessionView` comme référence)
+- `Records.tsx` : delete record (1 confirm → AlertDialog + state `deleteRecordConfirmOpen`)
+- `Admin.tsx` : reject pending user + disable user (2 confirms → 2 states + 2 AlertDialogs)
+- `SwimSessionBuilder.tsx` : conversion text avec split warnings (1 confirm → AlertDialog + `pendingBlocks` state)
+- `AthleteInterviewsSection.tsx` : submit + sign interview (2 confirms → 2 states + 2 AlertDialogs)
+- Vérification finale : `grep -rn "window\.confirm" src/` → 0 résultat (hors commentaire §198)
+
+**Fichiers modifiés :**
+
+| Fichier | Changement |
+|---------|------------|
+| `src/lib/offlineQueue.ts` | +idempotencyKey field + enqueue guard + peekQueue export + tryWithOfflineQueue key forward |
+| `src/lib/__tests__/offlineQueue.test.ts` | +3 cas idempotency |
+| `src/pages/SwimSessionView.tsx` | idempotencyKey câblé sur tryWithOfflineQueue |
+| `src/pages/coach/CoachPaceCalculatorScreen.tsx` | ref string\|null + syncKey + deps + catch loggué |
+| `src/pages/coach/CoachChronoScreen.tsx` | debounce 500ms + toast quota |
+| `src/pages/Records.tsx` | AlertDialog delete record |
+| `src/pages/Admin.tsx` | AlertDialog reject/disable user ×2 |
+| `src/components/coach/swim/SwimSessionBuilder.tsx` | AlertDialog split warn |
+| `src/components/profile/AthleteInterviewsSection.tsx` | AlertDialog submit/sign ×2 |
+
+**Tests :**
+- `npx tsc --noEmit` : 0 erreur. ✅
+- `npm test` : 695/696 pass (1 pre-existing `transformers.test.ts`). ✅
+- Nouveau test offlineQueue idempotency : 3 cas, tous verts. ✅
+- Pas de `npm run test:rls` : aucune policy RLS modifiée.
+
+**Décisions :**
+- `idempotencyKey` comme 3ème param optionnel (pas objet) : 0 breaking change sur callers existants (`Strength.tsx` etc. qui passent `(type, payload)`).
+- Fragment `<>` wrappant le return de `Records.tsx` : AlertDialog doit être frère du div racine.
+- Pour `SwimSessionBuilder`, les `blocks` (parsed) sont stockés en state `pendingBlocks` pour survivre à la fermeture/ouverture de l'AlertDialog.
+- `Admin.tsx` : 2 states séparés `rejectPending` / `disablePending` (pas 1 objet générique) pour typage strict et copy explicite dans les AlertDialog.
+
+**Limites :** Le debounce chrono 500ms ne couvre pas les appels de flush (navigation rapide entre nageurs) — acceptable car le flush est déclenché par le `useEffect` cleanup, pas par le debounce timer.
+
 ## §265 — Chantier D sub-§C : useDelayedLoading + toast 5 s sur Dashboard/Coach/Records (2026-05-10)
 
 **Contexte :** dernier item structurel du plan post-pass-2 (`docs/audits/2026-05-10-perf-audit-pass2-runtime.md` § 4 P2). L'audit pass 1 §3 et le pass 2 § 4 P2 mentionnaient « Aucun feedback >5 s » comme drapeau UX : sur Slow 3G / Wi-Fi captive, le skeleton initial peut tenir 8-15 s sans signal à l'utilisateur, qui ne sait pas si l'app est gelée ou si elle continue de tenter. **§265 fournit le signal manquant**.
