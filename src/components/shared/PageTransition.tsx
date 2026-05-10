@@ -1,25 +1,25 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { type ReactNode } from "react";
 
 /**
- * §244 — Wrapper iOS-style page transitions.
- * Subtle slide + fade on route change, respectful of prefers-reduced-motion
- * via framer-motion's MotionConfig at app root if needed.
+ * §255 — Wrapper iOS-style page transitions (CSS @keyframes).
+ *
+ * Le `key={location}` force React à démonter l'ancienne page et remonter la
+ * nouvelle au changement de route — le mount déclenche l'animation CSS d'entry.
+ * L'animation d'exit (`x: -8 fade-out` ~180 ms) initialement présente via
+ * framer-motion est volontairement abandonnée : à 18 ms d'overlap, l'œil ne la
+ * perçoit pas, et la conserver imposait l'import sync de `framer-motion` —
+ * 38.27 KB gzip dans le chemin critique online (cf. §254 audit pass 2).
+ *
+ * `prefers-reduced-motion` honoré via la règle `@media` dans `index.css`.
+ *
+ * Drop-in compatible avec l'API précédente (§246 sub-§A).
  */
 export function PageTransition({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location}
-        initial={{ opacity: 0, x: 16 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -8 }}
-        transition={{ duration: 0.18, ease: "easeOut" }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div key={location} className="anim-page-transition">
+      {children}
+    </div>
   );
 }

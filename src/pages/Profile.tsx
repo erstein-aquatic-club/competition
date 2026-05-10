@@ -163,7 +163,7 @@ function ProfileActionRow({
         {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
       </div>
       {badgeLabel ? (
-        <Badge variant="secondary" className="shrink-0 text-[10px] uppercase tracking-[0.08em]">
+        <Badge variant="secondary" className="shrink-0 text-[10px] uppercase tracking-eyebrow-sm">
           {badgeLabel}
         </Badge>
       ) : null}
@@ -595,13 +595,13 @@ export default function Profile() {
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-xl font-semibold tracking-tight">Modifier le profil</h1>
+          <h1 className="type-headline">Modifier le profil</h1>
         </div>
 
         <form onSubmit={handleSaveProfile} className="space-y-4">
           {/* Photo de profil */}
           <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Photo de profil</p>
+            <p className="text-sm font-semibold uppercase tracking-eyebrow-sm text-muted-foreground">Photo de profil</p>
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-20 w-20 ring-2 ring-primary/20">
                 <AvatarImage src={avatarSrc} alt="Avatar" />
@@ -645,7 +645,7 @@ export default function Profile() {
 
           {/* Informations */}
           <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Informations</p>
+            <p className="text-sm font-semibold uppercase tracking-eyebrow-sm text-muted-foreground">Informations</p>
 
             <div className="space-y-1.5">
               <Label>Groupe</Label>
@@ -711,7 +711,7 @@ export default function Profile() {
           {/* IUF FFN — athletes uniquement */}
           {showRecords ? (
             <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Identifiant FFN</p>
+              <p className="text-sm font-semibold uppercase tracking-eyebrow-sm text-muted-foreground">Identifiant FFN</p>
               <div className="space-y-1.5">
                 <Label htmlFor="profile-ffn-iuf">IUF FFN</Label>
                 <Input
@@ -760,12 +760,12 @@ export default function Profile() {
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-xl font-semibold tracking-tight">Sécurité</h1>
+          <h1 className="type-headline">Sécurité</h1>
         </div>
 
         <form onSubmit={handleUpdatePassword} className="space-y-4">
           <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Mot de passe</p>
+            <p className="text-sm font-semibold uppercase tracking-eyebrow-sm text-muted-foreground">Mot de passe</p>
             <p className="text-xs text-muted-foreground">
               Au moins 8 caractères, une majuscule et un chiffre.
             </p>
@@ -837,7 +837,7 @@ export default function Profile() {
         {role === "admin" ? (
           <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base uppercase tracking-[0.08em]">Administration</CardTitle>
+              <CardTitle className="text-base uppercase tracking-eyebrow-sm">Administration</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <ProfileActionRow
@@ -866,7 +866,7 @@ export default function Profile() {
 
         <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base uppercase tracking-[0.08em]">Mon compte</CardTitle>
+            <CardTitle className="text-base uppercase tracking-eyebrow-sm">Mon compte</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <ProfileActionRow

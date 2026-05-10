@@ -262,7 +262,7 @@ export default function Login() {
             <h1 className="text-3xl font-display font-bold text-center mt-6 tracking-tight text-foreground">
               SUIVI <span className="text-primary">NATATION</span>
             </h1>
-            <p className="text-[11px] text-muted-foreground text-center mt-2 uppercase tracking-[0.3em] font-bold">
+            <p className="text-[11px] text-muted-foreground text-center mt-2 uppercase tracking-hero font-bold">
               Erstein Aquatic Club
             </p>
           </motion.div>
@@ -679,7 +679,7 @@ export default function Login() {
               <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
               <div className="h-px w-8 bg-primary/30" />
             </div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-[0.3em] font-bold">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-hero font-bold">
               EAC Performance Tracking
             </p>
           </motion.div>

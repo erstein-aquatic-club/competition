@@ -14,6 +14,7 @@ import {
   getAllAssignments,
   getGroups,
   getCoachKpis,
+  withTimeout,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
@@ -495,7 +496,7 @@ const CoachHome = ({
                 >
                   <span
                     className={[
-                      "text-[11px] font-black uppercase tracking-[0.18em]",
+                      "text-[11px] font-black uppercase tracking-eyebrow-lg",
                       isToday ? "text-primary" : "text-muted-foreground/60",
                     ].join(" ")}
                   >
@@ -523,7 +524,7 @@ const CoachHome = ({
             {/* Matin row label */}
             <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
               <Sunrise className="h-3 w-3 shrink-0 text-amber-500/80" />
-              <span className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-[11px] font-black uppercase tracking-eyebrow-sm text-muted-foreground">
                 Matin
               </span>
             </div>
@@ -534,7 +535,7 @@ const CoachHome = ({
             {/* Aprèm row label */}
             <div className="flex items-center justify-end gap-1 pr-1.5 whitespace-nowrap">
               <Sunset className="h-3 w-3 shrink-0 text-rose-400/90" />
-              <span className="text-[11px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-[11px] font-black uppercase tracking-eyebrow-sm text-muted-foreground">
                 Aprèm
               </span>
             </div>
@@ -549,7 +550,7 @@ const CoachHome = ({
               <span className="text-base font-black tabular-nums leading-none">
                 {weekGrid.assignedSlots}
               </span>
-              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
+              <span className="text-[10px] uppercase tracking-eyebrow text-muted-foreground/70">
                 / {weekGrid.totalSlots} créneaux planifiés
               </span>
             </div>
@@ -614,7 +615,7 @@ const CoachHome = ({
               <div className="border-t border-status-warning/20">
                 {unassignedByWeek.map(([mondayIso, weekSlots]) => (
                   <div key={mondayIso}>
-                    <div className="bg-status-warning/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-status-warning/70">
+                    <div className="bg-status-warning/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-eyebrow text-status-warning/70">
                       {formatWeekLabel(mondayIso)}
                     </div>
                     <div className="divide-y divide-status-warning/20">
@@ -1043,7 +1044,11 @@ export default function Coach() {
         .map((a) => a.id)
         .filter((id): id is number => typeof id === "number");
 
-      const fatigueByAthlete = await getCoachKpis(athleteIds, fromDate, toDate);
+      const fatigueByAthlete = await withTimeout(
+        getCoachKpis(athleteIds, fromDate, toDate),
+        8_000,
+        "coach.kpis",
+      );
 
       const fatigueAlerts = topAthletes
         .map((athlete) => {

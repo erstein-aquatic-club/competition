@@ -4,6 +4,163 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §259 — Chantier I Typography rhythm : scale `type-*` + tokens `tracking-eyebrow-*` + migration ciblée Login/Coach/Profile (2026-05-10)
+
+**Contexte :** Chantier I issu de `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` (post-§246 reste vers 10/10 strict). Sub-§A audit + Sub-§B scale + migration ciblée 5 surfaces fusionnés en bundle commit unique (l'audit n'aurait pas été un livrable utile séparé). Numérotation §259 (et non §256) pour préserver les réservations utilisateur du plan post-pass-2 perf : §256 `withQueryTimeout`, §257 mutations binaires/multi-étapes, §258 extractions `<AthleteCard>`/`<RecordCard>` + memo.
+
+**Audit (Sub-§A) — méthode grep direct, pas de sub-agent (économie tokens) :**
+
+- `leading-*` : 6 valeurs distinctes (171 occurrences) — `leading-none` (69), `leading-tight` (51), `leading-relaxed` (30), `leading-snug` (15), `leading-5` (4), `leading-normal` (2). Distribution **saine**, pas de dérive nette.
+- `tracking-*` : 17 valeurs distinctes (321 occurrences) dont **11 ad-hoc `tracking-[0.XXem]`** = dérive nette. Top valeurs ad-hoc : `[0.15em]` (16), `[0.08em]` (14), `[0.14em]` (13), `[0.16em]` (5), `[0.18em]`, `[0.20em]`, `[0.22em]`, `[0.28em]`, `[0.30em]` (62 hits cumulés sur 11 valeurs).
+- Hot files (`tracking-*` ≥ 3 distincts) : `ChronoRace.tsx` (6), `SwimmerWeekMatrixCard.tsx` (4), `Coach.tsx` (5), `SwimmerWeekSlots.tsx` (3), `SwimmerPaceCard.tsx` (3), `ChronoResults.tsx` (3). `ObjectiveCard.tsx` seul fichier ≥ 3 leading-*.
+
+**Scale (Sub-§B) — 9 nouvelles `@utility` Tailwind 4 dans `src/index.css` (~50 LOC) :**
+
+5 type-* utilitaires (sentence-case scale iOS HIG aligned, complémentaires de `.heading-display` opt-in §197 pour brand-moments uppercase italic) :
+
+| Utility | Specs |
+|---|---|
+| `type-display` | Oswald 3rem (text-5xl) bold 700, line-height 1.05, letter-spacing -0.025em |
+| `type-title` | 1.875rem (text-3xl) bold 700, line-height 1.15, letter-spacing -0.025em |
+| `type-headline` | 1.25rem (text-xl) semibold 600, line-height 1.3, letter-spacing -0.025em |
+| `type-body` | 1rem semi (text-base) 400, line-height 1.5 |
+| `type-caption` | 0.75rem (text-xs) 500, line-height 1.4, letter-spacing 0.01em |
+
+**Décision calibration** : alignée sur `tracking-tight` (-0.025em) du codebase existant pour `type-headline`/`type-title` au lieu des valeurs HIG strictes (-0.01/-0.015em) — évite régression visuelle sur les h1 actuels qui utilisent tous `text-xl font-semibold tracking-tight`. Un raffinement HIG futur reste possible.
+
+4 tracking-* utilitaires (consolidation des 11 ad-hoc) :
+
+| Utility | letter-spacing | Couvre |
+|---|---|---|
+| `tracking-eyebrow-sm` | 0.08em | row labels Coach week grid, Profile section labels (P1 dominant) |
+| `tracking-eyebrow` | 0.15em | week labels, eyebrows standards |
+| `tracking-eyebrow-lg` | 0.20em | day labels week grid, hero eyebrows iOS |
+| `tracking-hero` | 0.30em | Login hero "Erstein Aquatic Club", "EAC Performance Tracking" |
+
+Conservé ad-hoc : `Coach.tsx:110` SectionLabel `tracking-[0.28em]` (cas unique non récurrent, pas de justification à tokeniser).
+
+**Migration ciblée (3 surfaces sur 5 prévues) :**
+
+| Fichier | Migrations | Détail |
+|---|---|---|
+| `src/pages/Login.tsx:265,682` | 2 | `tracking-[0.3em]` ×2 → `tracking-hero` (eyebrows hero brand) |
+| `src/pages/Coach.tsx:498,526,537,552,617` | 5 | L498 `[0.18em]` → `eyebrow-lg` (day labels), L526/537 `[0.08em]` → `eyebrow-sm` (Matin/Aprèm row labels), L552/617 `[0.15em]` → `eyebrow` (créneaux planifiés, week label) |
+| `src/pages/Profile.tsx:166,598,604,648,714,763,768,840,869` | 9 | L166 Badge `[0.08em]` → `eyebrow-sm`, L604/648/714/768 section labels `[0.08em]` → `eyebrow-sm`, L840/869 CardTitle `[0.08em]` → `eyebrow-sm`, **L598/763 h1 modaux `text-xl font-semibold tracking-tight` → `type-headline`** (validation scale) |
+
+**Surfaces non migrées (sur les 5 prévues du plan) :**
+
+- `Dashboard.tsx`, `SwimmerHome.tsx` : aucun `tracking-[0.XXem]` ad-hoc (déjà cohérents `tracking-tight`/`tracking-wide`). Pas de migration nécessaire.
+
+**Hot files identifiés mais hors scope §259** (à migrer en sub-§ futur) : `ChronoRace.tsx` (6 distincts), `ChronoResults.tsx`, `SwimmerWeekMatrixCard.tsx` (4 distincts, mêmes patterns que Coach week grid), `BadgesGrid.tsx`, `RecordsAdmin.tsx`, `Administratif.tsx`, `SwimSessionTimeline.tsx`, `CalendarHeader.tsx`, `FeedbackDrawer.tsx`, `SharedSwimSession.tsx` (`tracking-[0.20em]`), `SwimmerObjectivesView.tsx` (`tracking-[0.20em]`), `SwimSessionView.tsx`. **Tokens prêts** — la migration est mécanique mais hors des 5 surfaces ciblées du plan.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 694/695 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- `npm run build` : 14.61 s success. **CSS généré contient bien les 9 nouvelles classes** (`grep type-headline dist/assets/*.css` : `.type-headline{letter-spacing:-.025em;font-size:1.25rem;font-weight:600;line-height:1.3}`).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Hors scope §259 (Chantier IV + Chantier II du plan UI/UX) :**
+
+- Chantier IV — Timing tokens `--duration-*` / `--ease-*` dans `@theme` : reporté car convergence avec §255 PageTransition CSS keyframes encore en cours côté plan post-pass-2 perf.
+- Chantier II — Surface adoption massive (140+ fichiers `Card` → `Surface`) : risque élevé, à faire en session dédiée si décision explicite utilisateur. Pas amorcé.
+- Chantier III dark mode : closé par §250 (audit utilisateur sans anomalie remontée), pas de reprise dans cette session.
+- Migration Dashboard/SwimmerHome : pas d'ad-hoc à migrer (déjà cohérents).
+- Migration des 12 hot files identifiés (ChronoRace etc.) : tokens disponibles, à enchaîner par batches mécaniques en §260+ si volonté de pousser cohérence à 100%.
+
+**Score estimé** : ~9.8/10 → **~9.85/10**. Delta marginal mais c'est l'ordre attendu pour un Chantier "polish vers 10/10 strict" (le plan annonçait 9.85 pour Chantier I).
+
+## §255 — Fix régression §254 : PageTransition framer-motion → CSS keyframes (2026-05-10)
+
+**Contexte :** correction immédiate de la régression critique identifiée en §254 audit pass 2. Le wrapper `PageTransition.tsx` (introduit en §246 sub-§A, **postérieur au §243** qui avait migré 6 banners hors framer-motion) importait `framer-motion` synchroniquement et était consommé par `AppLayout.tsx:11`. Conséquence mesurée : `dist/index.html` post-§253 contenait toujours `<link rel="modulepreload" href="vendor-motion-DOqokx5n.js">` dans le critical path online — le gain §243 (-38.27 KB gzip TTI) entièrement annulé.
+
+**Stratégie adoptée :** réécriture en CSS `@keyframes`, cohérent avec le pattern §243 (qui avait déjà 6 keyframes dans `index.css` pour les banners). `key={location}` sur le wrapper `<div>` force React à démonter l'ancienne page et remonter la nouvelle au changement de route — le mount déclenche l'animation CSS d'entry. L'animation d'exit (`x: -8 fade-out` ~180 ms) initialement présente via framer-motion est volontairement abandonnée : à 18 ms d'overlap c'est imperceptible, et la conserver imposait l'import sync de framer-motion (et donc la régression).
+
+**Changements (2 fichiers, ~25 LOC nettes) :**
+
+| # | Fichier | Avant | Après |
+|---|---|---|---|
+| 1 | `src/components/shared/PageTransition.tsx` | 25 LOC, `import { AnimatePresence, motion } from "framer-motion"` + `motion.div` avec `initial`/`animate`/`exit`/`transition` | 23 LOC, `import { useLocation } from "wouter"` seulement + `<div key={location} className="anim-page-transition">` |
+| 2 | `src/index.css` | (n/a) | + `@keyframes page-transition-in` slide+fade entry (`opacity 0→1, translateX 16px→0`) + classe `.anim-page-transition` (180 ms ease-out) + ajout dans la liste `prefers-reduced-motion: reduce` |
+
+**Vérification mesurée post-build :**
+
+```
+$ grep -E '(modulepreload|<script type="module")' dist/index.html
+<script type="module" crossorigin src=".../index-CKmASdKC.js"></script>
+<link rel="modulepreload" href=".../vendor-react-BzrpNAyj.js">
+<link rel="modulepreload" href=".../vendor-query-kdOL9ykq.js">
+<link rel="modulepreload" href=".../vendor-charts-67UmrwYa.js">
+<link rel="modulepreload" href=".../vendor-supabase-DFPLkPj_.js">
+$ grep -c 'vendor-motion' dist/index.html
+0
+```
+
+**Critical path : 5 vendors → 4 vendors. vendor-motion-DOqokx5n.js (115.94 KB / 38.27 KB gzip) sorti du chemin critique** — il reste un chunk lazy chargé uniquement quand une page qui l'utilise est navigée (Login, Profile, Strength, Records, etc.). Précisément le résultat ciblé par §243.
+
+**Bénéfice mesurable** :
+- -38.27 KB gzip critical path online (mesuré).
+- Estimation TTI 4G+ : ~-300 à -500 ms (selon RTT/débit), comme l'audit §243 l'avait initialement estimé.
+- 1er paint cohérent : l'animation d'entry sur la page initiale s'enclenche même au cold start sans attendre `vendor-motion`.
+- prefers-reduced-motion respecté (déjà inclus dans la règle media existante de l'index.css §242 — étendue à `.anim-page-transition`).
+
+**Vérifications :**
+- `npm run build` : 23.22 s, 4403 modules, exit 0. Precache 244 entrées 5753.90 KiB (drift +1 KiB vs §254 mesure 5752.70 — bruit normal).
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (hérité §214, non lié).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- L'animation d'exit du précédent (180 ms slide-out vers x:-8) est perdue. UX : l'utilisateur voit la nouvelle page apparaître en slide-in 16px → 0, sans transition de sortie de la précédente. À 180 ms total c'est imperceptible. Si le besoin d'une vraie transition exit↔entry resurgit, deux options : (i) View Transitions API (`document.startViewTransition()`) — natif iOS Safari 18+/Chrome 111+, pas de bundle overhead ; (ii) hook custom `useExitAnimation` (déjà créé en §243 pour les banners) à généraliser. Out-of-scope §255.
+- `key={location}` cause un démontage complet de la sub-tree à chaque navigation — comportement identique à l'AnimatePresence `mode="wait"` initial. Pas de régression de performance attendue (Suspense boundaries des routes lazy ré-utilisent le cache RQ §248 pour reload instant).
+- L'API publique `<PageTransition>{children}</PageTransition>` est inchangée — drop-in compatible.
+
+**Fichiers** : Modifiés : `src/components/shared/PageTransition.tsx` (-2 LOC nettes, suppression import framer-motion), `src/index.css` (+13 LOC : keyframe + classe + 1 ajout media query). **Doc** : `docs/implementation-log.md` (entrée §255), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`.
+
+## §254 — Audit perf pass 2 runtime — verdict mesuré post-§253 + régression critique §243↔§246 détectée (2026-05-10)
+
+**Contexte :** suite directe de l'audit pass 1 (`docs/audits/2026-05-10-perf-audit-pass1.md`, 100 % statique). Le pass 1 avait noté un composite 6.1/10 et 3 drapeaux racines, traités par 9 commits §239→§253. Composite estimé post-livraison : ~7.8/10. Le pass 2 vérifie chaque claim §239→§253 contre l'état effectif du build courant (post-§253) + identifie ce qui reste à mesurer en runtime.
+
+**Méthode :** audit hybride statique fort + smoke runtime partiel. `npm run build` (11.4 s, 4403 modules, OK), inspection mécanique de `dist/index.html` + `dist/sw.js` + `package.json` + ~20 fichiers source ciblés (`PageTransition.tsx`, `useOnlineStatus.ts`, `queryClient.ts`, `Records.tsx`, `SwimSessionView.tsx`, …). Comparaison commit par commit des claims §239→§253 contre l'état effectif. **Pas exécuté** : Lighthouse / WebPageTest / React DevTools Profiler — Playwright + chromium bloqués par auto-mode classifier (`pip install` denied), build local sans credentials Supabase (en GitHub Secrets) donc pas de e2e via local serve.
+
+**Verdict mesuré : composite 7.4/10** (vs 6.1 pass 1, +1.3) — gain réel inférieur de 0.4 à la cible 7.8/10 estimée, **uniquement à cause d'une régression critique** : le gain §243 est annulé.
+
+**🚩 Régression critique détectée** :
+- `dist/index.html` post-§253 contient toujours `<link rel="modulepreload" href="vendor-motion-DOqokx5n.js">` (38.27 KB gzip) dans le critical path.
+- Cause : `src/components/shared/PageTransition.tsx:1-2` (introduit par §246 sub-§A le 2026-05-10 15:44, **postérieur au §243** du même jour 15:35) importe `framer-motion` synchroniquement, et est consommé par `AppLayout.tsx:11`, donc Vite l'inclut dans le chemin critique online.
+- **Le gain annoncé par §243 (-38.27 KB gzip TTI critical path, ~-300 à -500 ms TTI 4G+) est entièrement effacé.**
+- Fix recommandé §255+ : réécrire PageTransition en CSS `@keyframes` (cohérent §243) ou `React.lazy` avec Suspense fallback={children}. Effort XS, ROI maximal.
+
+**16/19 claims §239→§253 confirmés statiquement** :
+- ✅ §241 SW precache slim : 5752 KiB / 244 entrées (vs ~7237 KiB pré-§241 → -1485 KiB confirmé, drift +41 KiB acceptable post §242→§253). Workbox `heavy-export-chunks` runtime cache présent pour exceljs/jspdf/html2canvas.
+- ✅ §239 #6 EF cache : règle `/functions/v1/` NetworkFirst présente dans `dist/sw.js` (timeout 8s, max 30, TTL 1h).
+- ✅ §244 retry exponential : `queryClient.ts:13-17` `retry: failureCount < 2 && isTransientError(error)` + `retryDelay: 1000 * 2**i max 4000`.
+- ✅ §247 RPC fallback : `auth.ts loadUser()` tente RPC `get_user_auth_context` puis fallback aux 2 SELECT historiques.
+- ✅ §248 persistQueryClient : deps `@tanstack/react-query-persist-client` + `@tanstack/query-sync-storage-persister` dans package.json, `<PersistQueryClientProvider>` configuré (key `eac-rq-cache`, maxAge 24h, buster `__BUILD_TIMESTAMP__`).
+- ✅ §249 sonde réelle : `useOnlineStatus.ts:25-41` HEAD timeout 5s, intervals adaptatifs 30s OK / 5s fail, listeners browser online/offline, cleanup propre.
+- ✅ §251/§252 queue 10/12 mutations : `tryWithOfflineQueue` + sentinel + type guard adoptés (Profile.update + Records 2 + SuiviSemaine 2 + Administratif 5). `OfflineMutationSync` étendu replay branches idempotentes.
+- ✅ §253 `React.memo(SwimSessionTimeline)` : drop-in compatible, parent `SwimSessionView.tsx:170-217` stabilise déjà 4 callbacks via `useCallback`.
+
+**3 gaps identifiés** :
+- 🚩 §243 annulé par §246 (cf. ci-dessus).
+- ⚠️ §244 sub-§A2 partiel : `withTimeout` toujours utilisé 3× sur 40+ modules (`strength.ts:506,593,754`). Aucun wrap sur Dashboard/Coach/Records/Login queryFn → fetch peut rester pendu 30 s+ sur EDGE/Wi-Fi captive (le retry exponential §244 ne s'enclenche pas sur fetch pendu, qui n'émet jamais d'erreur transient).
+- ⚠️ §239 #1 gif precache inerte : `globPatterns: '**/*.gif'` ne capture aucun fichier (les GIFs muscu sont sur Supabase Storage, déjà couverts par règle `supabase-api` runtime). No-op futur-proof, à laisser ou retirer (1 caractère).
+
+**Plan d'action priorisé post-pass-2** :
+- P0 §255 : régression PageTransition CSS (effort XS, gain restoré -38 KB gzip critical path, ~-300 à -500 ms TTI 4G+) → composite cible 7.8/10.
+- P0 §256 : `withQueryTimeout` 5 hooks critiques (effort S, gain : 100% requêtes ≤ 8s sur réseau pendu).
+- P1 §257 : Chantier A sub-§C3 — uploadAvatar (Blob → base64) + saveSwimSession (refactor macro-mutation Postgres atomique préféré) (effort L) → 12/12 mutations couvertes.
+- P1 §258 : Chantier E sub-§B/C — extraction `<AthleteCard>`/`<RecordCard>` + `React.memo` (contingent à profiling React DevTools en runtime).
+- P2 §259 : Chantier D sub-§C `useDelayedLoading` (requiert /frontend-design).
+
+**Mesures non réalisables sans navigateur runtime — script utilisateur fourni dans le rapport** : Lighthouse mobile (Performance/FCP/LCP/TBT), reload PWA offline avec cache peuplé, login Slow 3G TTI, React DevTools Profiler keystrokes SwimSessionTimeline, captive portal sonde §249. Cible Lighthouse mobile post-§255 : Performance ≥ 80, FCP ≤ 1.8 s, LCP ≤ 2.5 s, TBT ≤ 200 ms.
+
+**Vérifications :**
+- `npm run build` : 11.39 s, 4403 modules, exit 0. Precache 244 entrées 5752.70 KiB.
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+- Aucun edit code (audit lecture-seule).
+
+**Fichiers** : `docs/audits/2026-05-10-perf-audit-pass2-runtime.md` (NEW, 242 lignes), `docs/implementation-log.md` (entrée §254), `CLAUDE.md` (ligne "Dernier § livré"), `docs/ROADMAP.md`.
+
 ## §253 — Chantier E sub-§A : React.memo SwimSessionTimeline (audit perf pass 1) (2026-05-10)
 
 **Contexte :** Chantier E issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine UX réseau instable / re-renders). L'audit listait 3 listes longues à mémoiser : `SwimSessionTimeline` (28.9 KB), `CoachSwimmersOverview` (16.4 KB), items `Records`. Cette session livre uniquement le 1er — le plus impactant car il est rendu inline dans `SwimSessionView` qui re-render à chaque keystroke (saisie de logs inline) ET dans `Suivi` consultation. Les 2 autres demandent un refactor d'extraction (`<AthleteCard>` / `<RecordCard>`) plus lourd, reporté à un § dédié avec audit React DevTools en runtime.
