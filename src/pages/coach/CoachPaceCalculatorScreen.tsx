@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Accordion } from "@/components/ui/accordion";
@@ -18,8 +18,6 @@ import { listActiveCoaches } from "@/lib/api/coaches";
 import { useCoachPaceZonesV2 } from "@/hooks/useCoachPaceZonesV2";
 import { useCoachStrokeAdjustments } from "@/hooks/useCoachStrokeAdjustments";
 import { listMyPaceTargets, upsertPaceTarget, deletePaceTarget } from "@/lib/api/pace-targets";
-import { supabase } from "@/lib/supabase";
-import { getObjectives } from "@/lib/api";
 import { parseObjectiveForPace, shouldAutoSyncToPaceTarget } from "@/lib/objective-pace-link";
 import type { Objective } from "@/lib/api/types";
 import { ZONE_COEFFICIENTS, type EventFamily, type Zone } from "@/lib/paceData";
@@ -57,7 +55,7 @@ export function buildObjectiveSyncOps(
   const ops: ObjectiveSyncOp[] = [];
   for (const obj of objectives) {
     if (obj.target_time_seconds == null) continue;
-    const accountId = authUidToAccountId.get(obj.athlete_id ?? "");
+    const accountId = authUidToAccountId.get(obj.athlete_id);
     if (accountId == null) continue;
     const parsed = parseObjectiveForPace(obj.event_code, obj.pool_length);
     if (!parsed) continue;
