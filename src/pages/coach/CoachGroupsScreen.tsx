@@ -544,7 +544,7 @@ const GroupDetailView = ({
                         name: m.display_name,
                       })
                     }
-                    title="Retirer du groupe"
+                    aria-label="Retirer du groupe"
                   >
                     <UserMinus className="h-4 w-4" />
                   </Button>

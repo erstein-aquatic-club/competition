@@ -166,6 +166,7 @@ export default function HallOfFame() {
 
   return (
     <div className="space-y-6">
+      <h1 className="sr-only">Hall of Fame</h1>
       <PageHeader
         title="Classements"
         icon={<Medal className="h-3.5 w-3.5" />}

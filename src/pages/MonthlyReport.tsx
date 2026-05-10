@@ -327,7 +327,7 @@ export default function MonthlyReport() {
 
       {/* Month selector */}
       <div className="flex items-center justify-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrev}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrev} aria-label="Mois précédent">
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="text-sm font-semibold min-w-[160px] text-center">
@@ -339,6 +339,7 @@ export default function MonthlyReport() {
           className="h-8 w-8"
           onClick={handleNext}
           disabled={!canGoNext}
+          aria-label="Mois suivant"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

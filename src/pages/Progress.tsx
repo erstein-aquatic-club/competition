@@ -1149,6 +1149,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className="space-y-4 pb-4">
+      <h1 className="sr-only">Progression</h1>
       <PageHeader
         title="Analyse"
         icon={<BarChart3 className="h-3.5 w-3.5" />}

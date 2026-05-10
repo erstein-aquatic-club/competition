@@ -360,7 +360,7 @@ export default function SwimmerWeekMatrixCard() {
                 <span
                   className={[
                     "text-[11px] tabular-nums",
-                    isToday ? "font-black text-primary" : "font-semibold text-muted-foreground/50",
+                    isToday ? "font-black text-primary" : "font-semibold text-muted-foreground/70",
                   ].join(" ")}
                 >
                   {dayDate.getDate()}

@@ -391,7 +391,7 @@ function SwimmerCard({
                 ? "text-muted-foreground"
                 : launched
                   ? "text-foreground"
-                  : "text-muted-foreground/50"
+                  : "text-muted-foreground/70"
             }`}
           >
             {launched ? formatTime(elapsed) : "--:--.--"}
@@ -549,7 +549,7 @@ function KPICell({
             highlight
               ? "text-destructive"
               : muted
-                ? "text-muted-foreground/60"
+                ? "text-muted-foreground/70"
                 : "text-foreground"
           }`}
         >
@@ -610,7 +610,7 @@ function LaneWaveMatrix({
     <div className="px-3">
       <div className="grid gap-x-2 gap-y-1 items-stretch" style={{ gridTemplateColumns: gridTemplate }}>
         {/* ── Header row : corner + wave GO/status controllers ── */}
-        <div className="flex items-end justify-center pb-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+        <div className="flex items-end justify-center pb-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/70">
           Lig.
         </div>
         {activeWaves.map((w) => {

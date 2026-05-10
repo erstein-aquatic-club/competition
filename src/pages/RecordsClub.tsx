@@ -321,6 +321,7 @@ export default function RecordsClub() {
 
   return (
     <div className="space-y-3">
+      <h1 className="sr-only">Records du club</h1>
       {/* Header */}
       <PageHeader
         title="Records du club"

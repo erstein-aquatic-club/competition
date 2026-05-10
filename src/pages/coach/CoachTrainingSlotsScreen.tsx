@@ -518,8 +518,8 @@ const SlotFormSheet = ({
             {/* Recurring / One-off toggle (n/a for swimmer slots — always recurring) */}
             {!isEdit && !isSwimmerSlot && (
               <div className="flex gap-1 rounded-xl border bg-muted/30 p-0.5">
-                <button type="button" onClick={() => setSlotMode("recurring")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${slotMode === "recurring" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Récurrent</button>
-                <button type="button" onClick={() => setSlotMode("oneoff")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${slotMode === "oneoff" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Ponctuel</button>
+                <button type="button" onClick={() => setSlotMode("recurring")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${slotMode === "recurring" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Récurrent</button>
+                <button type="button" onClick={() => setSlotMode("oneoff")} className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${slotMode === "oneoff" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Ponctuel</button>
               </div>
             )}
             {slotMode === "recurring" ? (
@@ -2901,6 +2901,7 @@ const CoachTrainingSlotsScreen = ({
               size="icon"
               className="h-8 w-8 text-muted-foreground"
               disabled={exporting || slotsLoading}
+              aria-label="Partager la semaine"
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
             </Button>

@@ -267,7 +267,7 @@ export default function ChronoSetup({
             }
             <span>Avancé</span>
             {!advancedOpen && advancedSummary && (
-              <span className="text-muted-foreground/60 font-normal">{advancedSummary}</span>
+              <span className="text-muted-foreground/70 font-normal">{advancedSummary}</span>
             )}
           </button>
 
@@ -278,14 +278,17 @@ export default function ChronoSetup({
                 <span className="text-sm text-muted-foreground">Séries :</span>
                 <div className="flex items-center gap-1">
                   <Button variant="outline" size="icon" className="h-11 w-11"
+                    aria-label="Diminuer le nombre de séries"
                     onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
                     disabled={state.seriesCount <= 0}
                   ><Minus className="h-3.5 w-3.5" /></Button>
                   <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
+                    aria-label="Nombre de séries"
                     onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
                     className="w-10 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
                   />
                   <Button variant="outline" size="icon" className="h-11 w-11"
+                    aria-label="Augmenter le nombre de séries"
                     onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
                   ><Plus className="h-3.5 w-3.5" /></Button>
                 </div>
@@ -335,7 +338,7 @@ export default function ChronoSetup({
                   Ligne {lane}
                 </span>
                 {swimmers.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                  <span className="text-[10px] text-muted-foreground/70 tabular-nums">
                     {swimmers.length} nageur{swimmers.length > 1 ? "s" : ""}
                   </span>
                 )}
@@ -355,7 +358,7 @@ export default function ChronoSetup({
                 ))}
 
                 {isEmpty && (
-                  <p className="flex-1 py-1 text-xs italic text-muted-foreground/50 select-none">
+                  <p className="flex-1 py-1 text-xs italic text-muted-foreground/70 select-none">
                     Vide — appuyez sur + pour ajouter un nageur
                   </p>
                 )}
@@ -382,6 +385,7 @@ export default function ChronoSetup({
           variant="outline"
           size="icon"
           className="h-11 w-11"
+          aria-label="Réduire le nombre de lignes"
           onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })}
           disabled={state.laneCount <= 1}
         >
@@ -394,6 +398,7 @@ export default function ChronoSetup({
           variant="outline"
           size="icon"
           className="h-11 w-11"
+          aria-label="Augmenter le nombre de lignes"
           onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })}
           disabled={state.laneCount >= maxLanes}
         >
@@ -516,7 +521,7 @@ export default function ChronoSetup({
                               type="button"
                               onClick={() => m.manualId && delManualMutation.mutate(m.manualId)}
                               disabled={delManualMutation.isPending}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors disabled:opacity-40"
                               aria-label={`Supprimer ${m.displayName}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -741,6 +746,7 @@ function PresetDistanceField({
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <div className="flex items-center gap-1">
         <Button variant="outline" size="icon" className="h-10 w-10"
+          aria-label={`Diminuer ${label}`}
           onClick={onDecrement}
           disabled={value <= minValue}
         ><Minus className="h-3.5 w-3.5" /></Button>
@@ -752,6 +758,7 @@ function PresetDistanceField({
         />
         <span className="text-xs text-muted-foreground">{suffix}</span>
         <Button variant="outline" size="icon" className="h-10 w-10"
+          aria-label={`Augmenter ${label}`}
           onClick={onIncrement}
         ><Plus className="h-3.5 w-3.5" /></Button>
       </div>

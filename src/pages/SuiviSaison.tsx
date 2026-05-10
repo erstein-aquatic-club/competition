@@ -555,6 +555,7 @@ export default function SuiviSaison() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 pb-24">
+      <h1 className="sr-only">Suivi de saison</h1>
       {/* Sticky header */}
       <PageHeader
         title="Ma saison"

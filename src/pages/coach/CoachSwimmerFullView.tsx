@@ -165,7 +165,7 @@ export default function CoachSwimmerFullView({
     return (
       <div className="p-4 text-center text-muted-foreground">
         <p>Aucun nageur sélectionné.</p>
-        <button type="button" onClick={handleBack} className="mt-2 text-primary underline">
+        <button type="button" onClick={handleBack} className="mt-2 text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1">
           Retour
         </button>
       </div>

@@ -143,7 +143,7 @@ export function PaceTeamPanel({ team, allAthletes, selectedIds, onChange }: Prop
               })}
             </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground/50">
+            <p className="text-[11px] text-muted-foreground/70">
               Aucun autre nageur dans le club.
             </p>
           )

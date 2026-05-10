@@ -654,8 +654,9 @@ export default function Profile() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Bio</Label>
+              <Label htmlFor="profile-bio">Bio</Label>
               <Textarea
+                id="profile-bio"
                 {...profileForm.register("bio")}
                 maxLength={500}
                 className="resize-none w-full"
@@ -669,9 +670,9 @@ export default function Profile() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Date de naissance</Label>
+              <Label htmlFor="profile-birthdate">Date de naissance</Label>
               <div className="w-full">
-                <Input type="date" className="w-full" {...profileForm.register("birthdate")} />
+                <Input id="profile-birthdate" type="date" className="w-full" {...profileForm.register("birthdate")} />
               </div>
               {profileForm.formState.errors.birthdate && (
                 <p className="text-xs text-destructive" role="alert" aria-live="assertive">
@@ -698,8 +699,9 @@ export default function Profile() {
             <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-4 space-y-3">
               <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Identifiant FFN</p>
               <div className="space-y-1.5">
-                <Label>IUF FFN</Label>
+                <Label htmlFor="profile-ffn-iuf">IUF FFN</Label>
                 <Input
+                  id="profile-ffn-iuf"
                   {...profileForm.register("ffn_iuf")}
                   placeholder="879576"
                   inputMode="numeric"

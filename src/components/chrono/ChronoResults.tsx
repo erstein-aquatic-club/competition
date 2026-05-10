@@ -624,7 +624,7 @@ function RankRow({
             key={`c-${i}`}
             className="text-right font-mono tabular-nums text-sm text-muted-foreground leading-tight"
           >
-            {split ? formatTime(split.cumulativeMs) : <span className="text-muted-foreground/30">—</span>}
+            {split ? formatTime(split.cumulativeMs) : <span className="text-muted-foreground/70">—</span>}
           </div>
         );
       })}
@@ -634,7 +634,7 @@ function RankRow({
         <div
           className={`text-right font-mono tabular-nums text-sm font-semibold leading-tight ${
             isLeader
-              ? "text-muted-foreground/40"
+              ? "text-muted-foreground/70"
               : diffMs <= 1000
                 ? "text-green-600 dark:text-green-400"
                 : diffMs <= 3000

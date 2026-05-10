@@ -225,9 +225,9 @@ export default function Login() {
         >
           <img src={eacLogo} alt="EAC Logo" className="h-32 w-32 mx-auto drop-shadow-2xl" />
           <div className="space-y-4">
-            <h1 className="text-5xl md:text-6xl font-display font-bold text-white tracking-tight">
+            <p className="text-5xl md:text-6xl font-display font-bold text-white tracking-tight">
               SUIVI NATATION
-            </h1>
+            </p>
             <p className="text-lg md:text-xl text-white/90 max-w-md mx-auto">
               Plateforme d'entraînement pour l'Erstein Aquatic Club
             </p>

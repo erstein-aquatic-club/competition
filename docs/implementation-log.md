@@ -4,6 +4,45 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §242 — Pass 6 sub-§B fixes WCAG AA (vers 9.5/10) (2026-05-10)
+
+**Contexte :** exécution Pass 6 sub-§B du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` post-§240 audit. 4 sub-agents sonnet parallèles, scope par fichier non-overlap. Numérotation §242 (et non §241) car §241 réservé chantier B perf SW livré par utilisateur en parallèle.
+
+**Méthode :** dispatching 4 forks parallèles avec scope par batch :
+- Batch A : Profile + SwimmerSlotsTab + ChronoSetup (inputs id+htmlFor + aria-label icon-only +/- + contrast secondaire)
+- Batch B : MonthlyReport + SwimmerPaceCard + CoachTrainingSlotsScreen + CoachMySwimmersScreen + CoachGroupsScreen + SwimSessionBuilder + CoachSwimmerFullView + CoachSwimmerQuickView (aria-label icon-only + focus-visible boutons natifs)
+- Batch C : ChronoResults + PaceStrokeAdjustments + Login + ChronoRace + PaceTeamPanel + SwimmerWeekMatrixCard (P0 contrast `/30` `/40` sur données + Login h1 refactor + contrast secondaire)
+- Batch D : Strength + Progress + HallOfFame + SuiviSaison + Suivi + RecordsClub (h1 sr-only sémantique)
+
+**Résultats : 54 edits / 23 fichiers, tsc clean.**
+
+**Détail par batch :**
+
+| Batch | Fichiers | Edits | Catégories |
+|---|---|---|---|
+| A | 3 | 22 | 3 inputs Profile id+htmlFor (P0), 6 inputs SwimmerSlotsTab id+htmlFor + 1 Trash aria-label (P0/P1), 6 aria-label +/- ChronoSetup + 1 input numeric + 4 contrast `/50`-`/60`→`/70` (P1) |
+| B | 8 | 17 | 11 aria-label icon-only + 8 focus-visible boutons natifs (3 SwimSessionBuilder cumulent les 2). Dont 3 `title="..."` remplacés par `aria-label`. Templates literals avec `m.displayName` pour CoachMySwimmersScreen Pencil/Trash. |
+| C | 6 | 9 | 5 contrast P0 `/30` `/40` → `/70` sur données (ChronoResults ×2, PaceStrokeAdjustments ×3) + Login.tsx L228 `<h1>` décoratif → `<p>` (L261/L276 conservés mutuellement exclusifs via `lg:hidden` / `hidden lg:block`) + 5 contrast secondaire (ChronoRace ×3, PaceTeamPanel ×1, SwimmerWeekMatrixCard ×1) |
+| D | 6 | 6 | `<h1 className="sr-only">` ajouté au début du JSX racine de Strength, Progress (`ProgressInner`), HallOfFame, SuiviSaison, Suivi, RecordsClub |
+
+**Fichiers touchés (23) :** `Profile.tsx`, `SwimmerSlotsTab.tsx`, `ChronoSetup.tsx`, `MonthlyReport.tsx`, `SwimmerPaceCard.tsx`, `SwimSessionBuilder.tsx`, `CoachTrainingSlotsScreen.tsx`, `CoachMySwimmersScreen.tsx`, `CoachGroupsScreen.tsx`, `CoachSwimmerFullView.tsx`, `CoachSwimmerQuickView.tsx`, `ChronoResults.tsx`, `PaceStrokeAdjustments.tsx`, `Login.tsx`, `ChronoRace.tsx`, `PaceTeamPanel.tsx`, `SwimmerWeekMatrixCard.tsx`, `Strength.tsx`, `Progress.tsx`, `HallOfFame.tsx`, `SuiviSaison.tsx`, `Suivi.tsx`, `RecordsClub.tsx`.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean (sortie vide).
+- `npm test -- --run` : 688/689 + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Aucun fichier hors scope touché par les sub-agents (vérif `git status`).
+
+**Couverture WCAG AA des 28 spots audit §240 :**
+- ✅ 4 P0 closeés (Profile inputs, Login h1, ChronoResults/PaceStrokeAdjustments contrast)
+- ✅ 17 P1 closeés (19 aria-label icon-only — 11 dans Batch B + 6 ChronoSetup +/- + 1 ChronoSetup numeric + 1 SwimmerSlotsTab Trash ; 6 pages h1 sr-only ; 8 focus-visible boutons natifs ; 6 inputs SwimmerSlotsTab htmlFor ; ~10 muted-foreground `/50`-`/60`)
+- ⏳ 7 P2 reportés (color-only signaling ChallengeProgressBar/WellnessTrend dot, contrast décoratifs `/10` `/30` sur fond/icônes — décision Pass 7+ ou tolérance acceptable)
+
+**Hors scope §242 :**
+- P2 cosmétiques reportés (ChallengeProgressBar zones labels, WellnessTrend `&#9888;` aria-label, tooltip InlineBanner, contrast `/10` `/30` purement décoratifs).
+- Tests manuels Lighthouse / axe DevTools en complément (non automatisable depuis Claude).
+
+**Score estimé :** ~9.3/10 → **~9.5/10** (conformité WCAG AA atteinte sur tous les P0/P1 audités, dette résiduelle = P2 mineure).
+
 ## §241 — Chantier B sub-§A : SW precache slim (audit perf pass 1) (2026-05-10)
 
 **Contexte :** sub-§A du Chantier B issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #1 bundle/SW). Cible : exclure du precache PWA les chunks d'export rarement utilisés (Excel chrono coach + PDF records/séances/pace), tout en préservant leur disponibilité offline via runtime caching à la première utilisation. Numérotation §241 (et non §240) car §240 réservé à Pass 6 audit WCAG livré en parallèle.

@@ -428,17 +428,20 @@ export function SwimSessionBuilder({
                         placeholder="1"
                       />
                       <button type="button" onClick={() => moveBlock(blockIndex, "up")}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40"
+                        aria-label="Déplacer le bloc vers le haut"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                         disabled={blockIndex === 0}>
                         <ArrowUp className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => moveBlock(blockIndex, "down")}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40"
+                        aria-label="Déplacer le bloc vers le bas"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                         disabled={blockIndex === session.blocks.length - 1}>
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => removeBlock(blockIndex)}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-destructive hover:bg-destructive/10">
+                        aria-label="Supprimer le bloc"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>

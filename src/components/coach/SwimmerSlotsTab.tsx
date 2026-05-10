@@ -586,17 +586,17 @@ function SlotEditForm({
       <SessionTypeToggle value={sessionType} onChange={setSessionType} />
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>Début</Label>
-          <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <Label htmlFor="slot-edit-start">Début</Label>
+          <Input id="slot-edit-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
         </div>
         <div>
-          <Label>Fin</Label>
-          <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          <Label htmlFor="slot-edit-end">Fin</Label>
+          <Input id="slot-edit-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
         </div>
       </div>
       <div>
-        <Label>Lieu</Label>
-        <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+        <Label htmlFor="slot-edit-location">Lieu</Label>
+        <Input id="slot-edit-location" value={location} onChange={(e) => setLocation(e.target.value)} />
       </div>
       <div className="flex gap-2">
         <Button
@@ -606,7 +606,7 @@ function SlotEditForm({
         >
           Enregistrer
         </Button>
-        <Button variant="destructive" size="icon" onClick={onDelete}>
+        <Button variant="destructive" size="icon" onClick={onDelete} aria-label="Supprimer le créneau">
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -645,17 +645,17 @@ function SlotAddForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>Début</Label>
-          <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <Label htmlFor="slot-add-start">Début</Label>
+          <Input id="slot-add-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
         </div>
         <div>
-          <Label>Fin</Label>
-          <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          <Label htmlFor="slot-add-end">Fin</Label>
+          <Input id="slot-add-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
         </div>
       </div>
       <div>
-        <Label>Lieu</Label>
-        <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Piscine, Salle..." />
+        <Label htmlFor="slot-add-location">Lieu</Label>
+        <Input id="slot-add-location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Piscine, Salle..." />
       </div>
       <Button
         className="w-full"

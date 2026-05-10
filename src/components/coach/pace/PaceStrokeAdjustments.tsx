@@ -128,11 +128,11 @@ export function PaceStrokeAdjustments({
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="w-[76px] pb-2.5 pr-2 text-left text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                  <th className="w-[76px] pb-2.5 pr-2 text-left text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/70">
                     Nage
                   </th>
                   {FAMILIES.map((f) => (
-                    <th key={f} className="pb-2.5 px-1 text-center text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                    <th key={f} className="pb-2.5 px-1 text-center text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/70">
                       {FAMILY_LABELS[f]}
                     </th>
                   ))}
@@ -149,7 +149,7 @@ export function PaceStrokeAdjustments({
                   </td>
                   {FAMILIES.map((f) => (
                     <td key={f} className="py-3 px-1 text-center">
-                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground/30">
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground/70">
                         0.000
                       </span>
                     </td>

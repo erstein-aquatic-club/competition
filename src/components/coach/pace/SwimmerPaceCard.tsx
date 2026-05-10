@@ -147,7 +147,7 @@ export function SwimmerPaceCard({
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={() => setPdfDialogOpen(true)}
               disabled={isPdfExporting}
-              title="Exporter PDF"
+              aria-label="Exporter en PDF"
             >
               {isPdfExporting
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -160,7 +160,7 @@ export function SwimmerPaceCard({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                  title="Partager"
+                  aria-label="Partager la fiche"
                 >
                   <Share2 className="h-3.5 w-3.5" />
                 </Button>
@@ -235,6 +235,7 @@ export function SwimmerPaceCard({
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 shrink-0 rounded-none text-muted-foreground/30 hover:bg-destructive/5 hover:text-destructive"
+                              aria-label="Supprimer la référence"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>

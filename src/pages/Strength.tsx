@@ -809,6 +809,7 @@ export default function Strength() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      <h1 className="sr-only">Musculation</h1>
       {screenMode === "focus" && activeSession ? (
         exercises ? (
           <div className="animate-in fade-in motion-reduce:animate-none">

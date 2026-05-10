@@ -494,6 +494,7 @@ export default function CoachMySwimmersScreen({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
+                            aria-label={`Modifier ${m.displayName}`}
                             onClick={() => {
                               const raw = { id: m.manualId!, coach_id: "", display_name: m.displayName, birthdate: m.birthdate ?? null, sex: m.sex ?? null, created_at: "" };
                               setEditingManual(raw);
@@ -506,6 +507,7 @@ export default function CoachMySwimmersScreen({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
+                            aria-label={`Supprimer ${m.displayName}`}
                             disabled={deleteMutation.isPending}
                             onClick={() => m.manualId && deleteMutation.mutate(m.manualId)}
                           >

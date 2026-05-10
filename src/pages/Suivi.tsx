@@ -292,6 +292,7 @@ export default function Suivi() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 pb-28">
+      <h1 className="sr-only">Suivi d'entraînement</h1>
       <PageHeader
         title="Mon suivi"
         icon={<Sparkles className="h-3.5 w-3.5" />}
