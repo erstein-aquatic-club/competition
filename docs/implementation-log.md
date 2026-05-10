@@ -4,6 +4,46 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §248 — Chantier A sub-§A : persistQueryClient (audit perf pass 1) (2026-05-10)
+
+**Contexte :** Chantier A sub-§A issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #2 cache/queue offline). Cible : faire survivre le cache React Query aux reloads PWA. Aujourd'hui, après un cold start offline, **toutes les surfaces sont vides** parce que `staleTime: 10min/gcTime: 60min` ne s'applique qu'au cache in-memory non persisté. Reload offline = écran blanc sur Dashboard, Coach, Records, etc.
+
+**Changements (2 fichiers, ~30 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `package.json` | `+ @tanstack/react-query-persist-client@^5.100.9` `+ @tanstack/query-sync-storage-persister@^5.100.9` |
+| 2 | `src/App.tsx` | Import + intro `rqPersister` (createSyncStoragePersister localStorage, key `eac-rq-cache`) + `rqPersistOptions` (maxAge 24h, buster `__BUILD_TIMESTAMP__`, `shouldDehydrateQuery: query.state.status === 'success'`). Remplace `<QueryClientProvider client>` par `<PersistQueryClientProvider client persistOptions>`. |
+
+**Configuration** :
+- **Storage** : `window.localStorage` (synchronous, ~5-10 MB iOS Safari, déjà la stratégie du projet pour le fallback offline).
+- **Key** : `eac-rq-cache` (namespacée pour ne pas collider avec les autres clés storage du projet).
+- **maxAge** : 24h. Au-delà, le cache est considéré obsolète et reset au prochain restore.
+- **buster** : `__BUILD_TIMESTAMP__` (déjà global via `vite.config.ts define`). À chaque déploiement, le timestamp change → l'ancien cache est **automatiquement invalidé**, évite le risque de cache schémas obsolètes (ex: shape de données qui a changé).
+- **shouldDehydrateQuery** : ne persiste que les queries en `status === 'success'` (skip erreurs et pending). Évite de restorer un état d'erreur stale.
+
+**Bénéfices attendus** :
+- **Reload PWA offline** : Dashboard, Coach hub, Records, SwimmerHome, Profile s'affichent avec les données précédemment vues (jusqu'à 24h). Aujourd'hui : tout vide sauf Strength/WorkoutRunner (qui ont un fallback localStorage dédié).
+- **Premier paint après cold start** : queries hydratées depuis le cache instantanément, puis revalidation réseau en arrière-plan (staleTime: 10min toujours actif).
+- **Multi-onglet** : cache partagé via localStorage, données cohérentes entre instances.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- `npm run build` : 12.52 s, success. PWA precache 5712 KiB → **5749 KiB (+37 KiB)** — coût des 2 nouvelles deps persist-client (gzipped, négligeable face au gain UX offline).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Limites / suivi** :
+- localStorage quota (5-10 MB iOS Safari) : si le cache RQ + autres clés du projet (catalogue exercices GIF, sessions historiques, queue offline) dépasse, `localStorageSave` dispatch maintenant `storage-quota-exceeded` (§239 quick win) — mais aucun listener UI n'est encore branché pour rotation ou alerte user. À surveiller.
+- Données sensibles : le cache contient ce que l'utilisateur a déjà vu côté serveur (session Supabase + RLS) — pas pire qu'en mémoire. Pas de token / secret persisté.
+- Ne couvre pas les **mutations** offline — Chantier A sub-§C (queue offline généralisée) reste à faire.
+
+**Hors scope §248 (Chantier A sub-§B + sub-§C, Chantier E, Chantier D sub-§C) :**
+- Chantier A sub-§B : sonde de connectivité réelle (HEAD `version.json` toutes 30 s) en complément de `navigator.onLine`.
+- Chantier A sub-§C : étendre la queue offline aux 8 mutations (Profile, Records, Dashboard, SuiviSemaine, Administratif).
+- Chantier E : `React.memo` sur listes longues.
+- Chantier D sub-§C optionnel : `useDelayedLoading` hook + toast 5 s — UX, /frontend-design requis.
+
 ## §247 — Chantier C : RPC get_user_auth_context (audit perf pass 1) (2026-05-10)
 
 **Contexte :** Chantier C issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #3 chemin critique réseau, login waterfall). Cible : fusionner les 2 selects séquentiels post-signIn (`users.role` puis `user_profiles.is_approved`) en 1 round-trip RPC. Sur Slow 3G (RTT 400 ms), gain estimé **-400 à -800 ms** sur le TTI login. Numérotation §247 (et non §245 ou §246) car §245 réservé Fix bannière PWA + §246 réservé Pass 7 polish iOS premium livrés en parallèle.

@@ -2,7 +2,8 @@
 import React, { Suspense, useState, useEffect } from "react";
 import { Switch, Route, Redirect, Router } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, handlePasswordReset } from "@/lib/auth";
@@ -32,6 +33,32 @@ import { usePushSubscriptionRefresh } from "@/hooks/usePushSubscriptionRefresh";
 
 // Clear the reload flag on successful app load
 sessionStorage.removeItem('chunk_reload');
+
+// §248 — React Query cache persistence (Chantier A sub-§A audit perf pass 1).
+// Survives reloads — critical for offline PWA: without this, a cold start
+// offline shows blank surfaces because the in-memory cache is empty.
+// `buster` ties cache to the current build → automatic invalidation on deploy
+// when the schema/types change.
+declare const __BUILD_TIMESTAMP__: string;
+const rqPersister =
+  typeof window !== "undefined"
+    ? createSyncStoragePersister({
+        storage: window.localStorage,
+        key: "eac-rq-cache",
+      })
+    : undefined;
+const rqPersistOptions = rqPersister
+  ? {
+      persister: rqPersister,
+      maxAge: 24 * 60 * 60 * 1000, // 24h
+      buster: __BUILD_TIMESTAMP__,
+      dehydrateOptions: {
+        // Skip queries in error/pending state — persist only successful data.
+        shouldDehydrateQuery: (query: { state: { status: string } }) =>
+          query.state.status === "success",
+      },
+    }
+  : null;
 
 // Fallback version check — bypasses SW entirely for stuck PWA installs.
 // Fetches a tiny version file (cache-busted) and reloads if build differs.
@@ -491,22 +518,41 @@ function App() {
     }
   }, []);
 
+  const queryProviderContent = (
+    <>
+      <DarkModeApplier />
+      <CacheWarmer />
+      <PushBridge />
+      <TooltipProvider>
+        <UpdateNotification />
+        <OfflineMutationSync />
+        <PushPermissionBanner />
+        <Toaster />
+        <Router hook={useHashLocation}>
+          <AppRouter />
+        </Router>
+      </TooltipProvider>
+    </>
+  );
+
   return (
     <PWAInstallGate>
-      <QueryClientProvider client={queryClient}>
-        <DarkModeApplier />
-        <CacheWarmer />
-        <PushBridge />
-        <TooltipProvider>
-          <UpdateNotification />
-          <OfflineMutationSync />
-          <PushPermissionBanner />
-          <Toaster />
-          <Router hook={useHashLocation}>
-            <AppRouter />
-          </Router>
-        </TooltipProvider>
-      </QueryClientProvider>
+      {rqPersistOptions ? (
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={rqPersistOptions}
+        >
+          {queryProviderContent}
+        </PersistQueryClientProvider>
+      ) : (
+        // SSR fallback (jamais utilisé en pratique côté Vite SPA, défensif).
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: rqPersister! }}
+        >
+          {queryProviderContent}
+        </PersistQueryClientProvider>
+      )}
     </PWAInstallGate>
   );
 }
