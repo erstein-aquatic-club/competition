@@ -215,7 +215,8 @@ describe("computeRaceContextAdjustedTime", () => {
     assert.ok(short > 6, `got ${short}`);
     assert.ok(full > 24, `got ${full}`);
     assert.ok(full - 24 > short - 6, `full penalty should be larger`);
-    assert.ok(full - 24 < 0.76, `start penalty should cap near configured gain`);
+    assert.ok(full - 24 > 0.99, `start penalty should reflect in-water start cost`);
+    assert.ok(full - 24 < 1.01, `start penalty should cap near configured gain`);
   });
 
   it("applies the tech suit penalty multiplicatively by zone and stroke", () => {
@@ -246,6 +247,38 @@ describe("computeRaceContextAdjustedTime", () => {
     assert.ok(maxCrawl > 24, `got ${maxCrawl}`);
     assert.ok(maxCrawl - 24 > v0Crawl - 24, "MAX should be affected more than V0");
     assert.ok(maxCrawl - 24 > maxBrasse - 24, "crawl factor should exceed brasse factor");
+  });
+
+  it("applies a slightly larger modern tech-suit penalty for women", () => {
+    const male = computeRaceContextAdjustedTime({
+      time_s: 60,
+      D: 100,
+      d: 100,
+      stroke: "crawl",
+      zone: "MAX",
+      sex: "M",
+      context: { hasStartBlock: true, hasTechSuit: false },
+    });
+    const female = computeRaceContextAdjustedTime({
+      time_s: 60,
+      D: 100,
+      d: 100,
+      stroke: "crawl",
+      zone: "MAX",
+      sex: "F",
+      context: { hasStartBlock: true, hasTechSuit: false },
+    });
+    const unknown = computeRaceContextAdjustedTime({
+      time_s: 60,
+      D: 100,
+      d: 100,
+      stroke: "crawl",
+      zone: "MAX",
+      sex: null,
+      context: { hasStartBlock: true, hasTechSuit: false },
+    });
+    assert.ok(female > unknown, `female=${female}, unknown=${unknown}`);
+    assert.ok(unknown > male, `unknown=${unknown}, male=${male}`);
   });
 });
 

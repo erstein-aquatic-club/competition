@@ -158,6 +158,7 @@ export function PaceMatrix({
         d,
         stroke: stroke as SingleStroke,
         zone,
+        sex: swimmerSex,
         context: raceContext,
       });
       return fmtTime(adjusted);

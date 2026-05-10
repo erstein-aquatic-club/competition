@@ -74,6 +74,7 @@ function fmtTime(s: number): string {
 export function Pace4NSegmentMatrix({
   targetTimeMs,
   targetDistanceM,
+  swimmerSex,
   zones,
   strokeAdjustments,
 }: Props) {
@@ -123,6 +124,7 @@ export function Pace4NSegmentMatrix({
         d,
         stroke: segStroke,
         zone,
+        sex: swimmerSex,
         context: raceContext,
       });
       return fmtTime(adjusted);
@@ -140,6 +142,7 @@ export function Pace4NSegmentMatrix({
         d: dCumul,
         stroke: "crawl",
         zone: "MAX",
+        sex: swimmerSex,
         context: raceContext,
       });
       return fmtTime(adjusted);
