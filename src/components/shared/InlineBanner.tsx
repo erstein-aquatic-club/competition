@@ -132,10 +132,17 @@ export function InlineBanner({
   const v = variants[variant];
   // When animation is disabled, treat `visible` as a plain conditional render.
   const { shouldRender, isExiting } = useExitAnimation(animate ? visible : true, 220);
+  const hasLabel = label != null && label !== false && label !== "";
 
   if (!animate) {
     if (!visible) return null;
   } else if (!shouldRender) {
+    return null;
+  }
+  if (!hasLabel) {
+    if (import.meta.env.DEV) {
+      console.warn("InlineBanner requires a non-empty label.");
+    }
     return null;
   }
 
@@ -143,6 +150,7 @@ export function InlineBanner({
     <div
       onClick={onClick}
       role={onClick ? "button" : undefined}
+      aria-label={onClick && typeof label === "string" ? label : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
       className={cn(
@@ -162,7 +170,7 @@ export function InlineBanner({
             {icon}
           </span>
         ) : (
-          <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", v.dot)} />
+          <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", v.dot)} aria-hidden="true" />
         )}
         <span className={cn("text-[13px] font-semibold truncate", v.text)}>
           {label}

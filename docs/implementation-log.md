@@ -4,6 +4,27 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §250 — Chantier V : P2 cosmétiques audit §240 (2026-05-10)
+
+**Contexte :** suite du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` post-§246, priorité utilisateur après le Chantier III dark mode. L'audit manuel dark mode n'a pas remonté d'anomalie pour l'instant, donc aucun correctif dark mode appliqué. Ce lot ferme les P2 cosmétiques restants de l'audit accessibilité §240 : color-only signaling, contrastes décoratifs borderline et tooltip natif.
+
+**Changements (6 fichiers, faible risque UI) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/components/shared/ChallengeProgressBar.tsx` | Barre de défi : couleurs progress remplacées par tokens `status-*`, ajout des labels textuels `Débutant / En cours / Atteint` + statut courant visible à droite. L'info n'est plus portée par la couleur seule. |
+| 2 | `src/components/coach/WellnessTrend.tsx` | Icône warning `&#9888;` : `title=` natif remplacé par `role="img"` + `aria-label="Tendance en baisse"` et couleur token `text-status-warning`. |
+| 3 | `src/components/shared/InlineBanner.tsx` | Assertion runtime dev : `label` non vide requis avant rendu. Les banners cliquables reçoivent un `aria-label` quand le label est string, et le dot fallback devient `aria-hidden`. |
+| 4 | `src/components/shared/SessionRow.tsx` | Icônes décoratives remontées de `/50` → `/70` et chevron de `/30` → `/50`, avec `aria-hidden`. |
+| 5 | `src/components/wellness/ReadinessGauge.tsx` | Anneau de fond décoratif `/10` → `/15` pour préserver la perception en low contrast sans en faire un canal d'information. |
+| 6 | `src/components/shared/ObjectiveCard.tsx` | Bouton coach "Allures" : `title` natif remplacé par tooltip Radix accessible, y compris pour les états disabled (code épreuve/temps/nageur manquant). |
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+
+**Score estimé :** ~9.8/10 inchangé fonctionnellement, mais dette P2 accessibilité/cosmétique §240 quasi soldée. Reste vers 10/10 strict : Chantier I Typography rhythm, Chantier IV Timing tokens, et Chantier II Surface adoption massive uniquement si volonté explicite malgré le risque.
+
 ## §249 — Chantier A sub-§B : sonde connectivité réelle (audit perf pass 1) (2026-05-10)
 
 **Contexte :** Chantier A sub-§B issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #2 cache/queue offline). Cible : éliminer les faux positifs de `navigator.onLine` (captive portal Wi-Fi, VPN coupé, Supabase down avec interface réseau OK) — qui empêchent aujourd'hui le fallback localStorage de se déclencher et exposent l'utilisateur à des erreurs Supabase brutes au lieu du banner offline.

@@ -11,6 +11,7 @@
 import React, { type ReactNode } from "react";
 import { Calculator, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Objective } from "@/lib/api";
 import {
   eventLabel,
@@ -336,11 +337,11 @@ export function ObjectiveCard({
                 : swimmerAccountId == null
                   ? "Nageur sans compte (manuel) — non lié aux allures"
                   : "Pré-remplir le calculateur d'allures";
-          return (
+          const button = (
             <button
               type="button"
               disabled={!canCalculate}
-              title={tooltipText}
+              aria-label={tooltipText}
               onClick={(e) => {
                 e.stopPropagation();
                 if (
@@ -358,13 +359,26 @@ export function ObjectiveCard({
                 }
               }}
               className={[
-                "mt-2 inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium",
+                "inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium",
                 canCalculate ? "hover:bg-muted" : "cursor-not-allowed opacity-50",
               ].join(" ")}
             >
-              <Calculator className="h-3.5 w-3.5" />
+              <Calculator className="h-3.5 w-3.5" aria-hidden="true" />
               → Allures
             </button>
+          );
+
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="mt-2 inline-flex">{button}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[240px] text-xs">
+                  {tooltipText}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           );
         })()}
       </div>

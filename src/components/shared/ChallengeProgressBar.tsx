@@ -26,10 +26,15 @@ export function ChallengeProgressBar({ challenge }: ChallengeProgressBarProps) {
   const pct = challenge.target > 0 ? Math.min((Number(challenge.current_value) / Number(challenge.target)) * 100, 100) : 0;
   const remaining = Math.max(0, Number(challenge.target) - Number(challenge.current_value));
 
-  // Color based on progress
-  let barColor = "bg-red-500";
-  if (pct >= 66) barColor = "bg-emerald-500";
-  else if (pct >= 33) barColor = "bg-amber-500";
+  let barColor = "bg-status-error";
+  let zoneLabel = "Débutant";
+  if (pct >= 66) {
+    barColor = "bg-status-success";
+    zoneLabel = "Atteint";
+  } else if (pct >= 33) {
+    barColor = "bg-status-warning";
+    zoneLabel = "En cours";
+  }
 
   return (
     <div className="rounded-xl border bg-card p-3 space-y-2">
@@ -47,12 +52,18 @@ export function ChallengeProgressBar({ challenge }: ChallengeProgressBarProps) {
           style={{ width: `${pct}%` }}
         />
       </div>
+      <div className="grid grid-cols-3 text-[10px] font-medium text-muted-foreground">
+        <span className={pct < 33 ? "text-status-error" : undefined}>Débutant</span>
+        <span className={`text-center ${pct >= 33 && pct < 66 ? "text-status-warning" : ""}`}>En cours</span>
+        <span className={pct >= 66 ? "text-status-success text-right" : "text-right"}>Atteint</span>
+      </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="tabular-nums">
           {Number(challenge.current_value)} / {Number(challenge.target)}
           {remaining > 0 ? ` — encore ${remaining} pour l'objectif` : " — objectif atteint !"}
         </span>
+        <span className="ml-2 shrink-0 font-semibold text-foreground">{zoneLabel}</span>
       </div>
 
       <p className="text-[10px] text-muted-foreground">

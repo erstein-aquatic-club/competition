@@ -45,7 +45,7 @@ export function ReadinessGauge({ score, size = 80, showLabel = true }: Readiness
           fill="none"
           stroke="currentColor"
           strokeWidth={strokeWidth}
-          className="text-muted-foreground/10"
+          className="text-muted-foreground/15"
         />
         {/* Progress arc */}
         <circle

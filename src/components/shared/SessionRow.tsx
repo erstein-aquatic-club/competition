@@ -31,7 +31,7 @@ export function SessionRow({
         className,
       )}
     >
-      <Icon className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+      <Icon className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" aria-hidden="true" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-medium truncate">{title}</span>
@@ -42,7 +42,7 @@ export function SessionRow({
         )}
       </div>
       {trailing ?? (
-        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 transition-transform group-hover:translate-x-0.5 shrink-0" />
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 shrink-0" aria-hidden="true" />
       )}
     </button>
   );

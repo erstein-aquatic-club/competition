@@ -283,7 +283,11 @@ export function ReadinessBadge({
       >
         {score}
       </span>
-      {declining && <span className="text-amber-500 text-xs" title="Tendance en baisse (3j+)">&#9888;</span>}
+      {declining && (
+        <span className="text-status-warning text-xs" role="img" aria-label="Tendance en baisse">
+          &#9888;
+        </span>
+      )}
     </span>
   );
 }
