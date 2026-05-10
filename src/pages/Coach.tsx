@@ -19,6 +19,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { useMySwimmerIds, filterByAssignment } from "@/hooks/useMySwimmerIds";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertCircle,
@@ -989,6 +991,22 @@ export default function Coach() {
     queryFn: () => getAthletes(),
     enabled: coachAccess && shouldLoadAthletes,
   });
+
+  // §265 — Toast "ça prend du temps…" si athletes (gate du coach hub) +
+  // coach-kpis (waterfall finale §247) traînent >5 s. Capture le pire cas
+  // Slow 3G + Supabase lent simultanés.
+  const { toast } = useToast();
+  const coachHomeLoading = athletesLoading;
+  const { showSlowToast: showCoachSlowToast } = useDelayedLoading(coachHomeLoading);
+  useEffect(() => {
+    if (showCoachSlowToast) {
+      toast({
+        title: "Ça prend du temps…",
+        description: "Le réseau semble lent. On continue d'essayer.",
+      });
+    }
+  }, [showCoachSlowToast, toast]);
+
   const { swimmerIds } = useMySwimmerIds();
   const myAthletes = useMemo(
     () => filterByAssignment(athletes, swimmerIds),

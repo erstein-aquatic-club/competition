@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { shouldShowRecords } from "@/pages/Profile";
 import { Check, ChevronDown, ChevronRight, Dumbbell, Edit2, Download, RefreshCw, StickyNote, Trash2, Trophy, Waves, X, AlertCircle } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
@@ -512,6 +513,20 @@ export default function Records() {
   const { data: exercises, isLoading: exercisesLoading, isError: exercisesIsError } = exercisesQuery;
   const { data: swimRecords, isLoading: swimLoading, isError: swimIsError } = swimRecordsQuery;
 
+  // §265 — Toast "ça prend du temps…" si l'une des 3 queryFn critiques
+  // (1RM / swim records / exercises) traîne >5 s. Combiné §244 retry +
+  // §256 withTimeout 8s.
+  const recordsLoading = oneRmLoading || swimLoading || exercisesLoading;
+  const { showSlowToast: showRecordsSlowToast } = useDelayedLoading(recordsLoading);
+  useEffect(() => {
+    if (showRecordsSlowToast) {
+      toast({
+        title: "Ça prend du temps…",
+        description: "Le réseau semble lent. On continue d'essayer.",
+      });
+    }
+  }, [showRecordsSlowToast, toast]);
+
   const activePoolLen = histPoolLen;
 
   // Training swim records filtered by pool length
@@ -843,7 +858,7 @@ export default function Records() {
                     </motion.div>
                   )}
 
-                  <Button type="button" size="sm" variant="outline" onClick={openAddSwim} className="w-full rounded-xl text-xs h-8 gap-1">
+                  <Button type="button" size="sm" variant="outline" onClick={openAddSwim} className="w-full rounded-xl text-xs min-h-11 md:h-8 gap-1">
                     Ajouter un record
                   </Button>
 

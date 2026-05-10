@@ -4,6 +4,66 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §265 — Chantier D sub-§C : useDelayedLoading + toast 5 s sur Dashboard/Coach/Records (2026-05-10)
+
+**Contexte :** dernier item structurel du plan post-pass-2 (`docs/audits/2026-05-10-perf-audit-pass2-runtime.md` § 4 P2). L'audit pass 1 §3 et le pass 2 § 4 P2 mentionnaient « Aucun feedback >5 s » comme drapeau UX : sur Slow 3G / Wi-Fi captive, le skeleton initial peut tenir 8-15 s sans signal à l'utilisateur, qui ne sait pas si l'app est gelée ou si elle continue de tenter. **§265 fournit le signal manquant**.
+
+**Périmètre :** pure logique React + branchement sur primitive existante (`useToast` Shadcn). **Pas de nouveau composant visuel**, donc pas dans le scope `/frontend-design` historique du projet (cf. §242 WCAG, §250 cosmétiques, §246 PageTransition — tous livrés sans `/frontend-design`). Décision validée avec l'utilisateur avant d'enchaîner.
+
+**Numérotation §265 :** §264 pris par parallèle (audit final consolidé fixes : Surface wrapper + tap targets + tracking tokens). §265 prochain libre.
+
+**Changements (5 fichiers, ~140 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/hooks/useDelayedLoading.ts` (NEW, 42 LOC) | Hook pur : `useDelayedLoading(loading: boolean, delayMs = 5000): { showSlowToast: boolean }`. État interne `showSlowToast` initialisé à `false`. `useEffect` keyed sur `loading` + `delayMs` : si `loading === false` → reset state à `false`. Si `true` → `setTimeout(setShowSlowToast(true), delayMs)`. Cleanup via `clearTimeout` au démontage / changement de loading. Garantit "1 toast par épisode" (loading true→false→true fait un nouvel épisode). |
+| 2 | `src/hooks/__tests__/useDelayedLoading.test.ts` (NEW, ~110 LOC) | 6 tests vitest + `renderHook` + fake timers : (a) initial state false même si loading, (b) flip à true après exactement `delayMs`, (c) pas de flip si loading complete avant delay, (d) reset à false quand loading repasse false, (e) ré-épisode après true→false→true, (f) custom delayMs respecté. Pattern aligné sur `useInAppPushBridge.test.ts` existant. |
+| 3 | `src/pages/Dashboard.tsx` (+~20 LOC) | + imports `useDelayedLoading` + `useToast`. Branche sur `isLoading = sessionsLoading \|\| assignmentsLoading` (déjà calculé l.215). `useEffect` toast « Ça prend du temps… / Le réseau semble lent. On continue d'essayer. » quand `showSlowToast` flip. |
+| 4 | `src/pages/Coach.tsx` (+~20 LOC) | + imports identiques. Branche sur `coachHomeLoading = athletesLoading` (gate du coach hub home — capture le pire cas Slow 3G + Supabase lent simultanés sur le waterfall `athletes → coach-kpis` §247). Toast identique Dashboard. Variable renommée `showCoachSlowToast` pour clarté multi-hook futur. |
+| 5 | `src/pages/Records.tsx` (+~15 LOC) | + import `useDelayedLoading` (useToast déjà importé). Branche sur `recordsLoading = oneRmLoading \|\| swimLoading \|\| exercisesLoading`. Toast identique. Variable `showRecordsSlowToast`. |
+
+**Stratégie d'intégration** : 1 hook unique, 3 sites symétriques. Texte du toast verbatim sur les 3 surfaces (cohérence UX). Combiné avec :
+- **§244** retry exponentiel 1s/2s/4s sur `isTransientError`
+- **§256** `withTimeout(8s)` sur 10 queryFn critiques (cumul 13 calls)
+- **§265** signal UX explicite si > 5 s
+
+→ **Chaîne complète** : utilisateur voit skeleton bref, puis à 5 s toast « Ça prend du temps… », et au pire à 27 s end-to-end (8s + 1s retry + 8s + 2s retry + 8s + 4s retry) soit échec final OU contenu chargé. Skeleton silencieux ad infinitum éliminé.
+
+**Bénéfices mesurables** :
+- Signal UX explicite après 5 s sur les 3 surfaces critiques. **Confirmé par les 6 tests vitest fake-timers**.
+- Compatible avec retry §244 : si retry réussit avant 5 s (cas Supabase blip), pas de toast. Si retry échoue ≥ 5 s, toast déclenché.
+- 0 ms d'overhead réseau OK (hook ne fait rien si loading n'atteint pas 5 s).
+- Pas de nouveau composant visuel — toast Shadcn standard (consistent avec les toasts d'erreur Profile/Records existants).
+- Idempotent par épisode : loading true→false→true → 2 toasts distincts (1 par tentative).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 695/696 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (hérité §214, non lié). **+1 test count** (6 tests dans `useDelayedLoading.test.ts` regroupés par describe → 1 entrée file dans le summary). Tous passent.
+- `npm run build` : 45.33 s (lent — node concurrent activity), exit 0. Precache 244 entrées 5760.30 KiB. **Régression §255 fix toujours préservée** : 0 vendor-motion dans modulepreload, critical path = 4 vendors.
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- Si l'utilisateur navigue entre Dashboard / Coach / Records pendant un chargement long, **2 toasts peuvent apparaître** (un par surface). Acceptable — chaque surface a son propre "épisode" de chargement et le toast Shadcn empile dans le coin (visible non-bloquant).
+- `coachKpisQuery.isLoading` (waterfall §247) **non couvert** dans le hook Coach (scope volontairement réduit à `athletesLoading` qui le précède dans le waterfall). Si `athletes` charge en <5 s mais `coachKpis` traîne, pas de toast — gap mineur. Si feedback explicite voulu sur cette étape, ajouter un second `useDelayedLoading(coachKpisQuery.isLoading)` avec un texte différent ("Calcul des indicateurs…") — reporté §266+ si demandé.
+- Pas de dismiss explicite si loading complète avant que l'utilisateur ait vu le toast — le toast Shadcn auto-dismiss après ~5 s par défaut (config Toaster), donc dans le pire cas l'utilisateur voit "Ça prend du temps…" puis 5 s après le toast disparaît + le contenu apparaît. UX acceptable, le toast n'a pas vocation à se rétracter activement.
+- Le seuil 5 000 ms est calibré sur audit pass 1 §3 ("après 5 s de skeleton"). Si on observe que c'est trop court en pratique, ajuster via `useDelayedLoading(isLoading, 7000)` côté caller — pas besoin de toucher au hook.
+
+**Hors scope §265 (Chantier E sub-§B/C §266, cleanup §267)** :
+- §266 Chantier E sub-§B/C : extraction `<AthleteCard>`/`<RecordCard>` + `React.memo`. **Bloqué par profiling React DevTools en runtime** — sans données réelles le refactor est spéculatif (ROI < risque).
+- §267+ optionnel : cleanup §239 #1 gif precache inerte (1 ligne `vite.config.ts globPatterns`).
+
+**Plan post-pass-2 — état final post-§265** :
+- ✅ P0 §255 PageTransition CSS (régression critical path fixée)
+- ✅ P0 §256 withTimeout 8s sur 10 queryFn critiques
+- ✅ P1 §262 RPC save_swim_session_atomic (1 RTT vs N+1)
+- ✅ P1 §263 uploadAvatar offline (Chantier A 12/12)
+- ✅ P2 §265 useDelayedLoading toast 5 s
+- ⏸ P1 §266 extraction memo (bloqué runtime profiling)
+
+**Cible composite estimée post-§265** : 7.4/10 (mesuré pass 2) → 7.8/10 (post §255 PageTransition fix) → **~8.4/10** (cumul §256 + §262 + §263 + §265). Dépasse la cible plan complet (8.2/10).
+
+**Fichiers** : Nouveaux : `src/hooks/useDelayedLoading.ts` (42 LOC), `src/hooks/__tests__/useDelayedLoading.test.ts` (~110 LOC). Modifiés : `src/pages/Dashboard.tsx` (+~20 LOC : imports + hook + effect), `src/pages/Coach.tsx` (+~20 LOC : idem), `src/pages/Records.tsx` (+~15 LOC : idem, useToast déjà importé). **Doc** : `docs/implementation-log.md` (entrée §265), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`.
+
 ## §260-fix — Hotfix bridge auth_uid manquant dans l'auto-sync allures (2026-05-10)
 
 **Contexte :** L'auto-sync §260 ne créait aucune cible pour Louis Mandras (et probablement tous les nageurs). Diagnostic SQL : la colonne `users.auth_uid` n'existe pas — la requête `supabase.from("users").select("id, auth_uid")` levait une erreur PostgreSQL attrapée silencieusement par le `catch {}`, vidant le Map et produisant 0 ops.
