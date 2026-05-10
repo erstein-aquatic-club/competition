@@ -24,7 +24,8 @@ import {
   type SyncSessionInputWithId,
 } from "./helpers";
 import { localStorageGet, localStorageSave } from "./localStorage";
-import type { Session, ApiCapabilities } from "./types";
+import type { Session, ApiCapabilities, SwimExerciseLogInput } from "./types";
+import { saveSwimExerciseLogs } from "./swim-logs";
 
 // ── Capabilities ──
 export async function getCapabilities(): Promise<ApiCapabilities> {
@@ -143,6 +144,72 @@ export async function ensureSwimSession(params: {
       .single()
   )!;
   return data.id as number;
+}
+
+/**
+ * §262 — Atomic save of a swim session + its exercise logs in 1 round-trip.
+ *
+ * Calls the Postgres RPC `save_swim_session_atomic` (migration 00159) which
+ * finds-or-creates the dim_sessions row and replaces the user's swim_exercise_logs
+ * for that session in a single transaction. Returns `dim_sessions.id`.
+ *
+ * Falls back byte-identically to the legacy sequence (`ensureSwimSession` +
+ * `saveSwimExerciseLogs`) if the RPC errors — migration not yet deployed,
+ * transient network issue caught client-side, etc. The `athleteName` /
+ * `athleteId` arguments are only needed by the fallback; the RPC derives both
+ * from `auth.uid()` + `app_user_id()` internally.
+ *
+ * Idempotent under replay: the RPC's DELETE-then-INSERT on swim_exercise_logs
+ * makes re-running with the same payload safe (key invariant for §251 offline
+ * queue replay).
+ */
+export async function saveSwimSessionAtomic(params: {
+  athleteName: string;
+  athleteId?: number | string | null;
+  date: string;
+  slot: string;
+  logs: SwimExerciseLogInput[];
+}): Promise<number> {
+  if (!canUseSupabase()) throw new Error("Supabase required");
+
+  const logsJsonb = params.logs.map((log) => ({
+    exercise_label: log.exercise_label,
+    source_item_id: log.source_item_id ?? null,
+    split_times: log.split_times ?? [],
+    tempo: log.tempo ?? null,
+    stroke_count: log.stroke_count ?? [],
+    notes: log.notes ?? null,
+    event_code: log.event_code ?? null,
+    pool_length: log.pool_length ?? null,
+    equipment: log.equipment ?? ["aucun"],
+  }));
+
+  try {
+    const { data, error } = await supabase.rpc("save_swim_session_atomic", {
+      p_date: params.date,
+      p_slot: params.slot,
+      p_logs: logsJsonb,
+    });
+    if (!error && data != null) return Number(data);
+    // RPC errored or returned null — fall through to legacy.
+  } catch {
+    // Network / RPC build error — fall through.
+  }
+
+  // Legacy fallback: 2-step sequence preserved verbatim.
+  const sessionId = await ensureSwimSession({
+    athleteName: params.athleteName,
+    athleteId: params.athleteId,
+    date: params.date,
+    slot: params.slot,
+  });
+
+  const { data: authData } = await supabase.auth.getSession();
+  const authUid = authData.session?.user?.id;
+  if (!authUid) throw new Error("Non authentifié");
+
+  await saveSwimExerciseLogs(sessionId, authUid, params.logs);
+  return sessionId;
 }
 
 export async function getSessions(

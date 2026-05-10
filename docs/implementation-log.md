@@ -4,6 +4,52 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §262 — Chantier A sub-§C3a : RPC `save_swim_session_atomic` (1 RTT vs N+1, transactionnel, queue offline) (2026-05-10)
+
+**Contexte :** suite du plan post-pass-2 (`docs/audits/2026-05-10-perf-audit-pass2-runtime.md` § 4 P1). Chantier A complet 10/12 mutations couvertes offline post-§252 ; restaient 2 cas techniquement difficiles : (1) `Profile.uploadAvatarMutation` (Blob binaire — reporté §263), (2) `SwimSessionView.saveMutation` **multi-étape** : `ensureSwimSession` (UPSERT session) suivi de N × `saveSwimLog` (1 INSERT par bloc d'entraînement). Sur N blocs = N+1 round-trips. Crash réseau au milieu → session orpheline avec logs partiels. Pas de pattern simple « 1 mutation = 1 replay » pour la queue offline.
+
+**Stratégie adoptée :** option (a) du plan §256 § 4 — refactor RPC unique côté Postgres `save_swim_session_atomic(p_date, p_slot, p_logs jsonb)` qui fait tout en transaction PostgreSQL (1 BEGIN, INSERT/SELECT session + DELETE logs antérieurs + INSERT N logs, COMMIT). Côté client : 1 seul appel RPC → s'inscrit naturellement dans la queue offline existante (§251 pattern `tryWithOfflineQueue`). Pattern fallback identique §247 (RPC en priorité + fallback byte-identical sur séquence legacy en cas d'erreur).
+
+**Numérotation §262 :** §259 (Typography), §260 (auto-sync objectifs), §261 (Timing tokens) livrés par terminal parallèle. §262 prochain libre.
+
+**Changements (5 fichiers, ~190 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `supabase/migrations/00159_save_swim_session_atomic_rpc.sql` (NEW, ~80 LOC) | Fonction `save_swim_session_atomic(p_date date, p_slot text, p_logs jsonb) RETURNS bigint`. `SECURITY INVOKER` (RLS héritée des policies existantes sur dim_sessions + swim_exercise_logs). Body : (a) résout `v_athlete_id := app_user_id()` + `v_user_uuid := auth.uid()`, throw si null ; (b) SELECT dim_sessions WHERE athlete_id+date+slot, INSERT avec defaults legacy (rpe=10, duration=0, athlete_name depuis users.display_name) si absent ; (c) DELETE swim_exercise_logs WHERE session_id+user_id (idempotent replay-safe) ; (d) INSERT N rows depuis `jsonb_array_elements(p_logs)` avec casts colonne par colonne (`split_times/stroke_count` jsonb, `equipment` text[] via `jsonb_array_elements_text`). GRANT EXECUTE TO authenticated. Appliquée via `mcp__plugin_supabase_supabase__apply_migration` retournant `{success: true}`. |
+| 2 | `src/lib/api/swim-sessions.ts` (+~70 LOC) | + import `SwimExerciseLogInput` (`./types`) + `saveSwimExerciseLogs` (`./swim-logs`). NEW `saveSwimSessionAtomic({athleteName, athleteId?, date, slot, logs})` : tente le RPC en priorité (`supabase.rpc("save_swim_session_atomic", {p_date, p_slot, p_logs})` avec mapping verbatim du `SwimExerciseLogInput[]` → JSONB array). Sur succès → return Number(data). Sur erreur ou null → fallback legacy byte-identical : `ensureSwimSession` + `saveSwimExerciseLogs`. |
+| 3 | `src/lib/api/index.ts` (+1 LOC) | + re-export `saveSwimSessionAtomic` depuis `./swim-sessions`. |
+| 4 | `src/pages/SwimSessionView.tsx` (~+15 / −15 LOC nettes) | `saveMutation.mutationFn` réécrit : remplace `ensureSwimSession` + `saveSwimExerciseLogs` séquentiels par 1 appel `saveSwimSessionAtomic(payload)` wrappé dans `tryWithOfflineQueue("swim-session-save", payload, ...)`. `onSuccess(result)` switch : si `isOfflineQueuedResult(result)` → toast "Sauvegarde en attente / Sera synchronisée au retour en ligne", sinon toast "Notes techniques sauvegardées" inchangé. Imports nettoyés : `ensureSwimSession`, `saveSwimExerciseLogs` retirés. |
+| 5 | `src/components/shared/OfflineMutationSync.tsx` (+~15 LOC) | + import `saveSwimSessionAtomic` depuis `@/lib/api`. + type guard `isQueuedSwimSessionSave` (`m.type === "swim-session-save"`). + replay branch qui appelle `saveSwimSessionAtomic(mutation.payload)` directement (RPC idempotent par DELETE-then-INSERT). + invalidate queries `["swim-exercise-logs-by-catalog"]` + `["swim-exercise-logs-history"]` au succès du sync. |
+
+**Cumul Chantier A complet post-§262 :** 11/12 mutations critiques couvertes par la queue offline (3 §251 Profile/Records + 7 §252 SuiviSemaine/Administratif + 1 §262 SwimSessionView). **Reste hors offline : `Profile.uploadAvatarMutation`** (Blob binaire — §263 prévu).
+
+**Bénéfices mesurables** :
+- **1 RTT vs N+1** sur le save d'une séance complète. Sur Slow 3G (RTT ~400 ms), pour 8 blocs : ~3.2 s gagnées (8 × 400 ms d'AR auparavant séquentiels).
+- **Atomicité transactionnelle** : 0 session orpheline si crash réseau au milieu (la transaction Postgres rollback complète si échec partiel).
+- **Queue offline** : la session entière + tous ses blocs survivent au mode offline. UX : toast "Sauvegarde en attente" au lieu d'erreur Supabase brute, replay automatique au retour online via `OfflineMutationSync`.
+- **Zéro régression** : pattern fallback §247 — si RPC absent/cassé, fallback legacy byte-identical (préserve les contrats existants ensureSwimSession + saveSwimExerciseLogs).
+
+**Vérifications :**
+- Migration appliquée via MCP Supabase (`mcp__plugin_supabase_supabase__apply_migration` → `{success: true}`).
+- Vérification metadata DB : `routine_name=save_swim_session_atomic, return_type=bigint, security_type=INVOKER, external_language=PLPGSQL` ✓
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 694/695 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (hérité §214, non lié).
+- `npm run build` : 19.96 s, exit 0. Precache 243 entrées 5757.14 KiB. **Régression §255 fix toujours préservée** : 0 vendor-motion dans modulepreload, critical path = 4 vendors.
+
+**Notes / régression potentielle** :
+- Le RPC suppose que l'utilisateur est mappé dans `public.users` via `app_user_id()`. Pour un athlète historique sans entrée users (data legacy improbable post-trigger `handle_new_auth_user`), le RPC throw "unauthorized" → fallback legacy kicks in et matche par `athlete_name` côté ensureSwimSession (préserve comportement legacy).
+- Race condition concurrent saves : si l'utilisateur enchaîne 2 saves dans la même seconde côté client, les 2 RPC s'exécutent en transactions Postgres concurrentes. Premier finit → INSERT session. Deuxième trouve la session via SELECT, DELETE puis INSERT logs. Last-write-wins, comportement identique au legacy (qui faisait pareil avec UPSERT + DELETE/INSERT). Acceptable.
+- Cas multi-utilisateurs / partage session : `swim_exercise_logs.user_id` filtre par utilisateur dans le DELETE, donc le RPC ne supprime QUE les logs de l'appelant. Si un coach a ajouté des logs au nom de l'athlète (cas rare), le coach garde ses logs, l'athlète remplace les siens. Comportement identique au legacy (`saveSwimExerciseLogs(sessionId, authUid, logs)` filtre déjà par user_id).
+- RLS : `swim_exercise_logs.user_id = auth.uid()` policy garantit que le RPC ne peut DELETE/INSERT que les logs de l'appelant. Coach/admin peuvent agir au nom d'autrui via le bypass `app_user_role()`. Pas de leak possible.
+- Pas de test RLS dédié ajouté (pattern aligné sur §247 `get_user_auth_context` qui n'avait pas non plus de test RLS dédié — les policies en place sur dim_sessions + swim_exercise_logs couvrent déjà le risque). Si régression suspectée, ajouter test ciblé dans `supabase/tests/rls/`.
+
+**Hors scope §262 (Chantier A sub-§C3b §263, Chantier E sub-§B/C §264)** :
+- §263 Chantier A sub-§C3b : `Profile.uploadAvatarMutation` (Blob → base64 dans payload `tryWithOfflineQueue`, attention quota localStorage iOS Safari 5-10 MB → contraindre avatar à <500 KB ou alerter via `storage-quota-exceeded` déjà branché §239 #5). Effort S, complète le Chantier A à 12/12.
+- §264 Chantier E sub-§B/C : extraction `<AthleteCard>`/`<RecordCard>` + `React.memo`. Contingent à profiling React DevTools en runtime.
+
+**Fichiers** : Nouveaux : `supabase/migrations/00159_save_swim_session_atomic_rpc.sql` (~80 LOC). Modifiés : `src/lib/api/swim-sessions.ts` (+~70 LOC : saveSwimSessionAtomic), `src/lib/api/index.ts` (+1 LOC re-export), `src/pages/SwimSessionView.tsx` (~+15 / −15 LOC nettes : saveMutation simplifiée + tryWithOfflineQueue), `src/components/shared/OfflineMutationSync.tsx` (+~15 LOC : type guard + replay branch + invalidations). **Doc** : `docs/claude/files-map.md` (swim-sessions.ts 241 → 312 LOC + mention saveSwimSessionAtomic), `docs/implementation-log.md` (entrée §262), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`.
+
 ## §261 — Chantier IV Timing tokens : `--duration-*` + `--ease-*` dans `@theme` + alignement keyframes §242/§255 (2026-05-10)
 
 **Contexte :** Chantier IV issu de `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` (post-§259 Chantier I, suite vers 10/10 strict). Pré-requis utilisateur : convergence avec §255 PageTransition CSS keyframes (déjà committé via bundle §259) et §242 banners (livrés). L'audit a confirmé que les 6 keyframes existantes utilisaient des `cubic-bezier(...)` littéraux dispersés et 7 valeurs `duration-*` Tailwind ad-hoc (44 occurrences cumulées) — terrain mûr pour centralisation. Numérotation §261 (et non §257-§258) : §256 réservé/livré user (`withTimeout` adoption), §257-§258 réservations user plan post-pass-2 perf (mutations binaires, extractions memo), §260 réservé user (auto-sync objectifs).

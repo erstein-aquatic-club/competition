@@ -15,6 +15,7 @@ import {
   deleteTimesheetShift,
   createTimesheetLocation,
   deleteTimesheetLocation,
+  saveSwimSessionAtomic,
 } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
@@ -125,6 +126,17 @@ function isQueuedDeleteLocation(
   m: QueuedMutation,
 ): m is QueuedMutation & { payload: QueuedDeleteLocationPayload } {
   return m.type === "delete-location";
+}
+
+// §262 — Swim session atomic save replay. Payload is the exact `saveSwimSessionAtomic`
+// argument; the RPC's DELETE-then-INSERT on swim_exercise_logs makes replay
+// idempotent. Falls back internally to the legacy 2-step path if the RPC fails.
+type QueuedSwimSessionSavePayload = Parameters<typeof saveSwimSessionAtomic>[0];
+
+function isQueuedSwimSessionSave(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedSwimSessionSavePayload } {
+  return m.type === "swim-session-save";
 }
 
 async function getRemoteRunLogCount(runId: number): Promise<number | null> {
@@ -282,6 +294,13 @@ export function OfflineMutationSync() {
             syncedCount += 1;
             continue;
           }
+          // §262 — Swim session atomic save replay.
+          if (isQueuedSwimSessionSave(mutation)) {
+            await saveSwimSessionAtomic(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
           // Unrecognised type: typically means the queue was written by a
           // newer build and the swimmer reverted to an older PWA. Track it
           // so we can surface a single user-visible warning instead of the
@@ -321,6 +340,9 @@ export function OfflineMutationSync() {
         queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
         queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
         queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
+        // §262 — invalidate swim session logs queries after atomic save replay.
+        queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-by-catalog"] });
+        queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history"] });
         toast({
           title: "Données synchronisées",
           description: `${syncedCount} mise(s) à jour hors ligne ont été enregistrée(s).`,

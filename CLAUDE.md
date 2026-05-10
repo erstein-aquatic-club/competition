@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§261** — Chantier IV Timing tokens : `--duration-*` + `--ease-*` dans `@theme` + alignement keyframes §242/§255.
+Dernier § livré : **§262** — Chantier A sub-§C3a : RPC `save_swim_session_atomic` (1 RTT vs N+1, transactionnel, queue offline).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

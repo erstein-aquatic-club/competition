@@ -94,6 +94,7 @@ export {
   getCapabilities,
   syncSession,
   ensureSwimSession,
+  saveSwimSessionAtomic,
   getSessions,
   updateSession,
   deleteSession,

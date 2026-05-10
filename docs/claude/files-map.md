@@ -16,7 +16,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/helpers.ts` | Fonctions de mapping | ~161 lignes |
 | `src/lib/api/localStorage.ts` | Stockage local fallback + seedDemoData/resetCache (§219) | 171 lignes |
 | `src/lib/api/index.ts` | Re-exports centralisés (point d'entrée unique post-§219) | 522 lignes |
-| `src/lib/api/swim-sessions.ts` | CRUD dim_sessions (syncSession 23505 dedup, ensureSwimSession, getSessions, updateSession, deleteSession, updateSessionCoachNotes, getCapabilities) — migré depuis ex-api.ts (§219) | 241 lignes |
+| `src/lib/api/swim-sessions.ts` | CRUD dim_sessions (syncSession 23505 dedup, ensureSwimSession, saveSwimSessionAtomic §262 RPC+fallback, getSessions, updateSession, deleteSession, updateSessionCoachNotes, getCapabilities) — migré depuis ex-api.ts (§219) | 312 lignes |
 | `src/lib/api/coach-kpis.ts` | Wrapper TS du RPC `get_coach_kpis` — 1 round-trip pour fatigue values multi-athlètes (Refacto C §223) | 56 lignes |
 | `src/lib/api/strength-planning.ts` | CRUD strength_planning_* : slots groupe + overrides athlete + week meta (Phase 2 §157) | 170 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |

@@ -28,11 +28,11 @@ import {
   getAssignments,
   getSessions,
   getSwimExerciseLogs,
-  ensureSwimSession,
-  saveSwimExerciseLogs,
+  saveSwimSessionAtomic,
   assignments_delete,
 } from "@/lib/api";
 import type { SwimExerciseLog, SwimExerciseLogInput } from "@/lib/api";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { generateShareToken, getSwimSessionById } from "@/lib/api/swim";
@@ -216,26 +216,20 @@ export default function SwimSessionView() {
     setDirty(true);
   }, []);
 
-  // Save mutation
+  // §262 — Atomic save via RPC `save_swim_session_atomic` (1 round-trip,
+  // transactional). Wrapped in `tryWithOfflineQueue` so the whole session save
+  // survives offline / transient network failures (§251 pattern). Replays at
+  // OfflineMutationSync.
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { data: authData } = await supabase.auth.getSession();
-      const authUid = authData.session?.user?.id;
-      if (!authUid || !user) throw new Error("Non authentifié");
+      if (!user) throw new Error("Non authentifié");
 
       const date = assignment?.assigned_date
         ? new Date(assignment.assigned_date).toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10);
       const slot = inferSlot(assignment?.assigned_date);
 
-      const sessionId = await ensureSwimSession({
-        athleteName: user,
-        athleteId: userId,
-        date,
-        slot,
-      });
-
-      // Collect logs from assignment mode or manual mode
+      // Collect logs from assignment mode or manual mode.
       const allLogs: SwimExerciseLogInput[] = [];
 
       if (assignment) {
@@ -257,14 +251,33 @@ export default function SwimSessionView() {
 
       if (allLogs.length === 0) throw new Error("Aucune donnée à sauvegarder");
 
-      await saveSwimExerciseLogs(sessionId, authUid, allLogs);
+      const payload = {
+        athleteName: user,
+        athleteId: userId,
+        date,
+        slot,
+        logs: allLogs,
+      };
+
+      return tryWithOfflineQueue(
+        "swim-session-save",
+        payload,
+        () => saveSwimSessionAtomic(payload),
+      );
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setDirty(false);
       if (!assignment) setManualExercises([]);
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-by-catalog"] });
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history"] });
-      toast({ title: "Notes techniques sauvegardées" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Sauvegarde en attente",
+          description: "Sera synchronisée au retour en ligne.",
+        });
+      } else {
+        toast({ title: "Notes techniques sauvegardées" });
+      }
     },
     onError: (err) => {
       toast({
