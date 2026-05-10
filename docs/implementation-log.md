@@ -4,6 +4,53 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §256 — Chantier D sub-§A2 : withTimeout(8s) sur 10 queryFn critiques (audit perf pass 2) (2026-05-10)
+
+**Contexte :** suite directe du plan post-pass-2 (`docs/audits/2026-05-10-perf-audit-pass2-runtime.md` § 4 P0). Le pass 2 avait identifié que **`withTimeout()` n'était utilisé que 3× sur 40+ modules API** (`strength.ts:506,593,754`) — gap inchangé depuis l'audit pass 1 § 63. Conséquence : Dashboard / Coach / Records / SwimmerHome / Login pouvaient rester suspendus 30 s+ sur EDGE / Wi-Fi captive / Supabase incident, car le retry exponential §244 ne s'enclenche que sur les erreurs `isTransientError` (réseau / timeout / 5xx) — un fetch indéfiniment pendu n'émet jamais cette erreur. **§256 ferme ce gap** sur les 10 queryFn qui bloquent le 1er paint des 5 surfaces critiques + l'auth flow.
+
+**Numérotation §256 :** réservation explicite préservée par §259 parallèle (Chantier I Typography rhythm) — la note §259 ROADMAP indiquait « sauts §256-258 réservations user plan post-pass-2 perf : §256 `withQueryTimeout`, §257 mutations binaires, §258 extractions memo ». §256 honoré ici.
+
+**Stratégie adoptée** : pas de nouveau helper. `withTimeout(promise, ms, label)` existe déjà dans `src/lib/api/client.ts:349-363` (déjà testé, déjà importé par `strength.ts`). Adoption directe par adjonction d'1 import + wrap de chaque `queryFn` cible — 8 s timeout cohérent avec la cible audit pass 1. Le label permet à `isTransientError` (`offlineQueue.ts:200-203` matche `msg.includes("timeout")`) de reconnaître l'erreur comme transient → le retry exponentiel §244 (1s/2s/4s, max 2 tentatives) prend le relais. **Worst case end-to-end : 8s + 1s + 8s + 2s + 8s = ~27s** avant échec final, vs blocking ad infinitum.
+
+**Changements (7 fichiers, ~30 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/lib/api/client.ts` | `withTimeout` signature relâchée : `Promise<T>` → `PromiseLike<T>`. Permet de passer directement les builders Supabase (`supabase.rpc(...)`, `supabase.from(...).select(...)` qui sont thenables mais pas Promise) sans `Promise.resolve()` wrap. Runtime inchangé : `Promise.race` accepte déjà les thenables. |
+| 2 | `src/lib/api/index.ts` | + re-export `withTimeout` depuis `./client` (cohérent avec les ~25 autres re-exports `client.ts`). |
+| 3 | `src/pages/Dashboard.tsx` | + import `withTimeout`. Wrap 2 sites bloquants : `getSessions(user!, userId)` (label `"dashboard.sessions"`) + `getAssignments(user!, userId)` (label `"dashboard.assignments"`). |
+| 4 | `src/pages/SwimmerHome.tsx` | + import. Wrap 3 sites bloquants : `getProfile({ ... })` (`"swimmerhome.profile"`) + `getAssignments` (`"swimmerhome.assignments"`) + `getSessions` (`"swimmerhome.sessions"`). |
+| 5 | `src/pages/Records.tsx` | + import. Wrap 3 sites bloquants : `oneRmQuery` `get1RM(...)` (`"records.1rm"`) + `swimRecordsQuery` `getSwimRecords(...)` (`"records.swim"`) + `performancesQuery` `getSwimmerPerformances({...})` (`"records.performances"`). |
+| 6 | `src/pages/Coach.tsx` | + import. Wrap `coachKpisQuery` queryFn interne : `await getCoachKpis(athleteIds, fromDate, toDate)` (`"coach.kpis"`). Wrap minimal sur l'appel réseau, pas sur l'async function entière (qui contient aussi du processing client). |
+| 7 | `src/lib/auth.ts` | + import `withTimeout` depuis `./api/client` (path direct, auth.ts est dans `src/lib/`). Wrap RPC `supabase.rpc("get_user_auth_context")` du fallback §247 (`"auth.get_user_auth_context"`). Le fallback 2-select existant prend le relais en cas de timeout (préserve §247). |
+
+**Total adoption `withTimeout` post-§256 :** **13 calls** (vs 3 pré-§256). Audit pass 1 § 63 « `withTimeout()` utilisé 3× sur 40+ modules » désormais résolu sur les 5 surfaces critiques + login. Les modules secondaires (notifications list, competitions, etc.) restent non-wrappés volontairement — ils ne bloquent pas le 1er paint.
+
+**Bénéfice mesurable** :
+- **100 % des queryFn critiques terminent ≤ 27 s end-to-end** sur réseau pendu (vs blocking ad infinitum). Garantie hard.
+- Sur réseau OK : **0 ms d'overhead** (timeout déclenche jamais).
+- Sur réseau lent intermittent (5xx, blip) : retry exponentiel §244 prend le relais sur le 1er timeout, l'utilisateur voit le contenu après 1 retry réussi (~9-10 s).
+- Login Slow 3G : si le RPC §247 timeout, fallback 2-select séquentiel kicks in (préserve §247 fonctionnel).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 694/695 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (hérité §214, non lié à §256). Test count +6 vs §255 : tests ajoutés par §259 parallèle (Typography). Aucun test cassé par §256.
+- `npm run build` : 16.35 s, exit 0. Precache 244 entrées 5754.47 KiB. **Régression §255 fix toujours effective** : 4 modulepreload, vendor-motion absent.
+- Pas de migration RLS, pas de helpers auth (`app_user_id`/`app_user_role`) touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- Cas limite : si la réponse Supabase est lente mais arrive juste après 8 s, l'erreur timeout est levée et la donnée arrive perdue. React Query retry kicks in → la 2e tentative récupère la donnée. UX : skeleton un peu plus long (~9-10 s) puis contenu. Acceptable vs blocking 30s+.
+- `withTimeout` rejette mais ne **cancelle pas** la requête sous-jacente (Supabase n'a pas d'AbortSignal exposé sur les builders). La requête continue côté serveur, payload jeté côté client. Coût marginal (un peu de bande passante perdue), pas de fuite mémoire (la promise est garbage-collected après race).
+- `isTransientError` matche `msg.includes("timeout")` — le message généré par `withTimeout` est `${label}: timeout after ${ms}ms`. Match assuré.
+- Surfaces secondaires non couvertes (volontaire, scope §256) : 12+ queryFn moins critiques (notifications, competitions, athlete-objectives, swimmer comments, etc.). À étendre si besoin réel — pour l'instant, le 1er paint est protégé, c'est l'objectif principal.
+
+**Hors scope §256 (Chantier A sub-§C3 §257, Chantier E sub-§B/C §258, Chantier D sub-§C optionnel)** :
+- §257 Chantier A sub-§C3 : `Profile.uploadAvatarMutation` (Blob → base64) + `SwimSessionView.saveMutation` (RPC atomique côté Postgres préféré). 12/12 mutations couvertes offline.
+- §258 Chantier E sub-§B/C : extraction `<AthleteCard>`/`<RecordCard>` + `React.memo`. Contingent à profiling React DevTools en runtime.
+- §260+ Chantier D sub-§C optionnel : `useDelayedLoading` + toast 5 s (requiert `/frontend-design`).
+
+**Fichiers** : Modifiés : `src/lib/api/client.ts` (+5 LOC commentaire + 1 type relâché), `src/lib/api/index.ts` (+1 LOC re-export), `src/pages/Dashboard.tsx` (+5 LOC : 1 import + 2 wraps + 3 LOC commentaire), `src/pages/SwimmerHome.tsx` (+4 LOC : 1 import + 3 wraps), `src/pages/Records.tsx` (+10 LOC : 1 import + 3 wraps dont 1 multi-ligne), `src/pages/Coach.tsx` (+5 LOC : 1 import + 1 wrap multi-ligne), `src/lib/auth.ts` (+5 LOC : 1 import + 1 wrap multi-ligne avec commentaire). **Doc** : `docs/implementation-log.md` (entrée §256), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`.
+
 ## §259 — Chantier I Typography rhythm : scale `type-*` + tokens `tracking-eyebrow-*` + migration ciblée Login/Coach/Profile (2026-05-10)
 
 **Contexte :** Chantier I issu de `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` (post-§246 reste vers 10/10 strict). Sub-§A audit + Sub-§B scale + migration ciblée 5 surfaces fusionnés en bundle commit unique (l'audit n'aurait pas été un livrable utile séparé). Numérotation §259 (et non §256) pour préserver les réservations utilisateur du plan post-pass-2 perf : §256 `withQueryTimeout`, §257 mutations binaires/multi-étapes, §258 extractions `<AthleteCard>`/`<RecordCard>` + memo.

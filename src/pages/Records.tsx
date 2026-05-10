@@ -14,6 +14,7 @@ import {
   updateExerciseNote as updateExerciseNoteApi,
   upsertSwimRecord as upsertSwimRecordApi,
   deleteSwimRecord,
+  withTimeout,
 } from "@/lib/api";
 import type { SwimRecordWithPool } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -289,7 +290,7 @@ export default function Records() {
   // --- SOURCE OF TRUTH: queries / keys / endpoints unchanged ---
   const oneRmQuery = useQuery<OneRmRecord[]>({
     queryKey: ["1rm", user, userId],
-    queryFn: () => get1RM({ athleteName: user, athleteId: userId }),
+    queryFn: () => withTimeout(get1RM({ athleteName: user, athleteId: userId }), 8_000, "records.1rm"),
     enabled: !!user && showRecords,
   });
 
@@ -301,7 +302,7 @@ export default function Records() {
 
   const swimRecordsQuery = useQuery({
     queryKey: ["swim-records", userId, user, "training"],
-    queryFn: () => getSwimRecords({ athleteId: userId ?? undefined, athleteName: user ?? undefined, recordType: "training" }),
+    queryFn: () => withTimeout(getSwimRecords({ athleteId: userId ?? undefined, athleteName: user ?? undefined, recordType: "training" }), 8_000, "records.swim"),
     enabled: !!user && showRecords && swimMode === "training",
   });
 
@@ -324,11 +325,15 @@ export default function Records() {
   const performancesQuery = useQuery<SwimmerPerformance[]>({
     queryKey: ["swimmer-performances", userId, userIuf, histPoolLen],
     queryFn: () =>
-      getSwimmerPerformances({
-        userId: userId ?? undefined,
-        iuf: userIuf || undefined,
-        poolLength: histPoolLen,
-      }),
+      withTimeout(
+        getSwimmerPerformances({
+          userId: userId ?? undefined,
+          iuf: userIuf || undefined,
+          poolLength: histPoolLen,
+        }),
+        8_000,
+        "records.performances",
+      ),
     enabled: !!userIuf && showRecords,
   });
 

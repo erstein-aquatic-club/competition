@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { supabase } from "./supabase";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { requiresApprovalForRole } from "./authRules";
+import { withTimeout } from "./api/client";
 
 const COACH_SELECTED_ATHLETE_ID_KEY = "coach_selected_athlete_id";
 const COACH_SELECTED_ATHLETE_NAME_KEY = "coach_selected_athlete_name";
@@ -262,8 +263,12 @@ export const useAuth = create<AuthState>((set) => ({
       let rpcApproved: boolean | null = null;
       let rpcOk = false;
       try {
-        const { data: ctxData, error: ctxError } = await supabase.rpc(
-          "get_user_auth_context",
+        // §260 — withTimeout 8s pour éviter blocage indéfini login Slow 3G/EDGE.
+        // Le fallback 2-select ci-dessous prend le relais en cas de timeout.
+        const { data: ctxData, error: ctxError } = await withTimeout(
+          supabase.rpc("get_user_auth_context"),
+          8_000,
+          "auth.get_user_auth_context",
         );
         if (!ctxError && ctxData && typeof ctxData === "object") {
           const ctx = ctxData as { role?: string | null; is_approved?: boolean | null };

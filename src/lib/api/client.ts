@@ -343,11 +343,16 @@ export const fetchUserGroupIdsWithContext = async (
 // --- Promise timeout helper ---
 
 /**
- * Race a promise against a timeout. On expiration, rejects with a typed error
- * containing the label so callers (and `isTransientError`) can recognize it.
+ * Race a promise (or thenable) against a timeout. On expiration, rejects with
+ * a typed error containing the label so callers (and `isTransientError`) can
+ * recognize it.
+ *
+ * §260 — Accepts `PromiseLike<T>` (not just `Promise<T>`) so callers can pass
+ * Supabase query builders / RPC builders directly without a `Promise.resolve()`
+ * wrap. Runtime is unchanged: `Promise.race` already accepts thenables.
  */
 export async function withTimeout<T>(
-  promise: Promise<T>,
+  promise: PromiseLike<T>,
   ms: number,
   label = "rpc",
 ): Promise<T> {

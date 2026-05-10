@@ -9,6 +9,7 @@ import {
   getMyCompetitionIds,
   getMyPlannedAbsences,
   getSwimmerSlots,
+  withTimeout,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -148,15 +149,18 @@ export default function Dashboard() {
     };
   }, []);
 
+  // §260 — withTimeout 8s sur les 2 queryFn qui bloquent le 1er paint Dashboard.
+  // Combiné au retry exponentiel §244 (`isTransientError` reconnaît "timeout"),
+  // garantit max 27s end-to-end vs blocking ad infinitum sur EDGE/captive portal.
   const { data: sessions, isLoading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useQuery({
     queryKey: ["sessions", userId ?? user],
-    queryFn: () => getSessions(user!, userId),
+    queryFn: () => withTimeout(getSessions(user!, userId), 8_000, "dashboard.sessions"),
     enabled: !!user,
   });
 
   const { data: assignments, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery({
     queryKey: ["assignments", userId ?? user],
-    queryFn: () => getAssignments(user!, userId),
+    queryFn: () => withTimeout(getAssignments(user!, userId), 8_000, "dashboard.assignments"),
     enabled: !!user,
   });
 

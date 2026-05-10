@@ -63,6 +63,7 @@ export {
   fetchUserGroupIdsWithContext,
   BODYWEIGHT_SENTINEL,
   isBodyweight,
+  withTimeout,
 } from './client';
 
 // Re-export localStorage utilities

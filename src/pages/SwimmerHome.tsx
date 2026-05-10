@@ -10,6 +10,7 @@ import {
   getMyCompetitionIds,
   getMyPlannedAbsences,
   notifications_list,
+  withTimeout,
 } from "@/lib/api";
 import { filterVisibleNotifications, readDismissedNotificationTargetIds } from "@/lib/notificationsVisibility";
 import type { Competition, Session } from "@/lib/api";
@@ -204,7 +205,7 @@ export default function SwimmerHome() {
   // ── Profile ──────────────────────────────────────────────────
   const { data: profile } = useQuery({
     queryKey: ["profile", user, userId],
-    queryFn: () => getProfile({ displayName: user, userId }),
+    queryFn: () => withTimeout(getProfile({ displayName: user, userId }), 8_000, "swimmerhome.profile"),
     enabled: !!user,
   });
 
@@ -215,13 +216,13 @@ export default function SwimmerHome() {
   // ── Section C: Today's sessions ──────────────────────────────
   const { data: assignments } = useQuery({
     queryKey: ["assignments", userId ?? user],
-    queryFn: () => getAssignments(user!, userId),
+    queryFn: () => withTimeout(getAssignments(user!, userId), 8_000, "swimmerhome.assignments"),
     enabled: !!user,
   });
 
   const { data: sessions } = useQuery({
     queryKey: ["sessions", userId ?? user],
-    queryFn: () => getSessions(user!, userId),
+    queryFn: () => withTimeout(getSessions(user!, userId), 8_000, "swimmerhome.sessions"),
     enabled: !!user,
   });
 
