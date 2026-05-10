@@ -341,6 +341,42 @@ export async function authPasswordUpdate(payload: {
   return { status: "updated" };
 }
 
+/**
+ * §263 — Serialize/deserialize avatar Blob ↔ data URL for the offline queue.
+ *
+ * `tryWithOfflineQueue` stores payloads as JSON in localStorage, which can't
+ * hold a raw `Blob`. We round-trip via base64 data URLs (e.g.
+ * `"data:image/png;base64,iVBOR..."`). The data URL embeds the MIME type so
+ * the replay path can reconstruct the original Blob exactly.
+ *
+ * iOS Safari localStorage caps at ~5-10 MB; the caller is expected to enforce
+ * a per-avatar size budget before enqueueing (cf. `MAX_AVATAR_OFFLINE_BYTES`
+ * in Profile.tsx).
+ */
+export async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const commaIndex = dataUrl.indexOf(",");
+  if (!dataUrl.startsWith("data:") || commaIndex < 0) {
+    throw new Error("dataUrlToBlob: not a valid data URL");
+  }
+  const meta = dataUrl.slice(5, commaIndex);
+  const b64 = dataUrl.slice(commaIndex + 1);
+  const mimeMatch = meta.match(/^([^;]+)/);
+  const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 export async function uploadAvatar(payload: {
   userId: number;
   blob: Blob;

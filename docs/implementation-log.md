@@ -4,6 +4,51 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §263 — Chantier A sub-§C3b : uploadAvatar offline (dataURL + quota guard) — Chantier A complet 12/12 (2026-05-10)
+
+**Contexte :** clôture du Chantier A (queue offline mutations critiques). Post-§262, restait 1 mutation non couverte : `Profile.uploadAvatarMutation` — bloquée par le **payload binaire Blob** qui ne peut pas être JSON-sérialisé dans la queue localStorage. Pattern offline existant (`tryWithOfflineQueue` §251) suppose un payload sérialisable.
+
+**Stratégie adoptée :** round-trip Blob ↔ **data URL base64** (`"data:image/png;base64,..."`). La data URL embarque le MIME type, donc 1 seule string sérialisable suffit pour reconstruire le Blob original à l'identique côté replay. **Quota guard** : refus pré-enqueue si la data URL dépasse 1 MB en mode offline (iOS Safari plafonne localStorage à ~5-10 MB, partagé avec la queue strength + Profile/Records/etc.). `compressImage` (déjà présent dans Profile) garantit en pratique des avatars <500 KB → quota rarement atteint.
+
+**Numérotation §263 :** prochain numéro libre après §262 (mien) et §260 (parallèle auto-sync). §261-§262 déjà consommés.
+
+**Changements (4 fichiers, ~80 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/lib/api/users.ts` (+~30 LOC) | NEW helpers `blobToDataUrl(blob): Promise<string>` (FileReader.readAsDataURL) + `dataUrlToBlob(dataUrl): Blob` (parse `data:MIME;base64,XXX`, atob, Uint8Array). Co-locatés avec `uploadAvatar` car spécifiques au flow avatar offline. |
+| 2 | `src/lib/api/index.ts` (+2 LOC) | + re-exports `blobToDataUrl`, `dataUrlToBlob` depuis `./users`. |
+| 3 | `src/pages/Profile.tsx` (~+25 / −5 LOC nettes) | + import `blobToDataUrl` depuis `@/lib/api`. `uploadAvatarMutation.mutationFn` étendu : après `compressImage`, sérialise `blob` en data URL, vérifie quota (1 MB max offline), wrap dans `tryWithOfflineQueue("avatar-upload", { userId, dataUrl, mimeType, extension }, () => uploadAvatar({...}))`. `onSuccess(result)` switch : `isOfflineQueuedResult` → toast "Photo en attente / Sera synchronisée au retour en ligne", sinon "Photo de profil mise à jour" inchangé. `onError` inchangé (refus quota throw normalement → toast "Image trop lourde pour le mode hors-ligne..."). |
+| 4 | `src/components/shared/OfflineMutationSync.tsx` (+~20 LOC) | + imports `uploadAvatar` + `dataUrlToBlob` depuis `@/lib/api`. + type `QueuedAvatarUploadPayload` (`{userId, dataUrl, mimeType, extension}`) + type guard `isQueuedAvatarUpload` (`m.type === "avatar-upload"`). + replay branch : `const blob = dataUrlToBlob(dataUrl)` → `await uploadAvatar({ userId, blob, mimeType, extension })`. + invalidate `["profile"]` au succès (l'URL avatar change → re-fetch). Idempotence garantie par `upsert: true` côté Supabase Storage (même path utilisateur écrasé). |
+
+**Cumul Chantier A complet :** **12/12 mutations critiques couvertes par la queue offline** (3 §251 Profile/Records + 7 §252 SuiviSemaine/Administratif + 1 §262 SwimSessionView + 1 §263 avatar). Chantier A 100 % livré.
+
+**Bénéfices mesurables** :
+- Avatar upload survit au mode offline. UX : toast "Photo en attente" au lieu d'erreur Supabase Storage brute.
+- Replay automatique au retour online via `OfflineMutationSync` (`avatar-upload` branch).
+- Quota guard explicite (1 MB pré-enqueue) : pas de surprise QuotaExceededError côté replay sur iOS Safari.
+- Zéro régression : online path identique au pré-§263 (même appel `uploadAvatar` + même chemin de succès, juste enveloppé dans `tryWithOfflineQueue`).
+- Idempotence du replay : Supabase Storage `upsert: true` sur path déterministe (`{userId}.{extension}`) → replay tardif réécrit le même fichier sans dupliquer.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 694/695 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (hérité §214, non lié).
+- `npm run build` : 21.03 s, exit 0. Precache 243 entrées 5758.58 KiB. **Régression §255 fix toujours préservée** : 0 vendor-motion dans modulepreload, critical path = 4 vendors.
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- Quota guard 1 MB : si compressImage produit un avatar >1 MB (cas extrême — résolution très haute conservée, JPEG qualité maximale), l'utilisateur offline est refusé avec un toast clair. Acceptable — par défaut compressImage compresse à <500 KB sur images normales.
+- Replay tardif après que l'utilisateur a re-uploadé un autre avatar entre-temps : `upsert: true` écrase le path utilisateur. Si l'utilisateur a déjà changé son avatar online, le replay écrasera avec l'avatar offline préalable. Cas limite mais acceptable (TTL queue 7j limite la fenêtre).
+- Pas d'optimistic update sur l'avatar offline (`avatar_url` queryClient cache reste inchangé jusqu'au sync). Acceptable : l'utilisateur voit "Photo en attente" toast, pas besoin de voir l'avatar mis à jour avant sync — celui-ci arrivera au prochain replay.
+- L'avatar serializé dans la queue (~700 KB pour un avatar 500 KB raw + overhead base64 ~33%) reste sous le seuil de TTL 7j.
+
+**Hors scope §263 (Chantier E sub-§B/C §264, Chantier D sub-§C §265+)** :
+- §264 Chantier E sub-§B/C : extraction `<AthleteCard>`/`<RecordCard>` + `React.memo`. **Bloqué par profiling React DevTools en runtime**.
+- §265+ Chantier D sub-§C : `useDelayedLoading` + toast 5 s. **Bloqué par `/frontend-design`** (règle CLAUDE.md).
+- §266+ optionnel : cleanup §239 #1 gif precache inerte (1 ligne `vite.config.ts`).
+
+**Fichiers** : Modifiés : `src/lib/api/users.ts` (+~30 LOC : blobToDataUrl + dataUrlToBlob), `src/lib/api/index.ts` (+2 LOC re-exports), `src/pages/Profile.tsx` (~+25 / −5 LOC : uploadAvatarMutation wrap + toast adaptatif), `src/components/shared/OfflineMutationSync.tsx` (+~20 LOC : type guard + replay branch + invalidation). **Doc** : `docs/implementation-log.md` (entrée §263), `CLAUDE.md` (Dernier § livré), `docs/ROADMAP.md`.
+
 ## §260 — Auto-sync objectifs chronométriques → Allures équipe
 
 **Date :** 2026-05-10

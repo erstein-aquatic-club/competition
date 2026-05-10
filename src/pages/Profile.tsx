@@ -7,6 +7,7 @@ import {
   authPasswordUpdate,
   uploadAvatar,
   deleteAvatar,
+  blobToDataUrl,
 } from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
@@ -445,18 +446,43 @@ export default function Profile() {
     },
   });
 
+  // §263 — Avatar upload via `tryWithOfflineQueue`. Blob est sérialisé en
+  // data URL (base64) pour survivre au localStorage. Garde de quota : refus
+  // si l'image dépasse ~1 MB et que l'on est offline (iOS Safari plafonne
+  // localStorage à ~5-10 MB, partagé avec les autres mutations queue).
+  // Replay côté OfflineMutationSync convertit le data URL → Blob → uploadAvatar.
   const uploadAvatarMutation = useMutation({
     mutationFn: async (croppedBlob: Blob) => {
       if (!userId) throw new Error("Utilisateur non identifié");
       const file = new File([croppedBlob], "avatar.png", { type: "image/png" });
       const { blob, mimeType, extension } = await compressImage(file);
-      return uploadAvatar({ userId, blob, mimeType, extension });
+      const dataUrl = await blobToDataUrl(blob);
+
+      const MAX_AVATAR_OFFLINE_BYTES = 1_000_000;
+      if (!navigator.onLine && dataUrl.length > MAX_AVATAR_OFFLINE_BYTES) {
+        throw new Error(
+          "Image trop lourde pour le mode hors-ligne. Reconnectez-vous pour réessayer.",
+        );
+      }
+
+      return tryWithOfflineQueue(
+        "avatar-upload",
+        { userId, dataUrl, mimeType, extension },
+        () => uploadAvatar({ userId, blob, mimeType, extension }),
+      );
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setCropDialogSrc(null);
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      toast({ title: "Photo de profil mise à jour" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Photo en attente",
+          description: "Sera synchronisée au retour en ligne.",
+        });
+      } else {
+        toast({ title: "Photo de profil mise à jour" });
+      }
     },
     onError: (error: unknown) => {
       toast({

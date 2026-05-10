@@ -16,6 +16,8 @@ import {
   createTimesheetLocation,
   deleteTimesheetLocation,
   saveSwimSessionAtomic,
+  uploadAvatar,
+  dataUrlToBlob,
 } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
@@ -137,6 +139,24 @@ function isQueuedSwimSessionSave(
   m: QueuedMutation,
 ): m is QueuedMutation & { payload: QueuedSwimSessionSavePayload } {
   return m.type === "swim-session-save";
+}
+
+// §263 — Avatar upload replay. The Blob is serialised as a data URL
+// (`"data:image/png;base64,..."`) at enqueue time (Profile.tsx) so it survives
+// localStorage. Replay path : `dataUrlToBlob` → `uploadAvatar(...)`. Storage
+// upload uses `upsert: true`, so replaying after the original eventually
+// succeeded just overwrites the same path with the same bytes — idempotent.
+type QueuedAvatarUploadPayload = {
+  userId: number;
+  dataUrl: string;
+  mimeType: string;
+  extension: string;
+};
+
+function isQueuedAvatarUpload(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedAvatarUploadPayload } {
+  return m.type === "avatar-upload";
 }
 
 async function getRemoteRunLogCount(runId: number): Promise<number | null> {
@@ -301,6 +321,15 @@ export function OfflineMutationSync() {
             syncedCount += 1;
             continue;
           }
+          // §263 — Avatar upload replay (data URL → Blob → uploadAvatar).
+          if (isQueuedAvatarUpload(mutation)) {
+            const { userId, dataUrl, mimeType, extension } = mutation.payload;
+            const blob = dataUrlToBlob(dataUrl);
+            await uploadAvatar({ userId, blob, mimeType, extension });
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
           // Unrecognised type: typically means the queue was written by a
           // newer build and the swimmer reverted to an older PWA. Track it
           // so we can surface a single user-visible warning instead of the
@@ -343,6 +372,9 @@ export function OfflineMutationSync() {
         // §262 — invalidate swim session logs queries after atomic save replay.
         queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-by-catalog"] });
         queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history"] });
+        // §263 — invalidate hall-of-fame already covered above; profile query
+        // re-invalidated here so the new avatar URL surfaces immediately.
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
         toast({
           title: "Données synchronisées",
           description: `${syncedCount} mise(s) à jour hors ligne ont été enregistrée(s).`,

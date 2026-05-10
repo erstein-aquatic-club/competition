@@ -119,6 +119,8 @@ export {
   authPasswordUpdate,
   uploadAvatar,
   deleteAvatar,
+  blobToDataUrl,
+  dataUrlToBlob,
   getRecentSessionsAllAthletes,
   getFeedbackRatesAllAthletes,
 } from './users';

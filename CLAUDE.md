@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§260** — Auto-sync objectifs chronométriques → cibles allures équipe au montage.
+Dernier § livré : **§263** — Chantier A sub-§C3b : `uploadAvatarMutation` offline (dataURL + quota guard). **12/12 mutations couvertes.**
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
