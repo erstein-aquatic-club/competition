@@ -4,6 +4,46 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §244 — Chantier D sub-§A+B : pagination SELECT* + retry exponentiel (audit perf pass 1) (2026-05-10)
+
+**Contexte :** Chantier D issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #3 chemin critique réseau). Cible : (1) plafonner les payloads des 3 SELECT* records non bornés résiduels (le 4e — `getSessions` — a déjà été plafonné en §239) ; (2) remplacer le `retry: 1` global par un retry exponentiel intelligent qui ne retry que les erreurs transient (réseau / timeout / 5xx). Sub-§C reportée (`useDelayedLoading` hook + toast 5s — UX pure, /frontend-design requis).
+
+**Changements (2 fichiers, ~10 LOC nettes) :**
+
+| # | Fichier:ligne | Avant | Après |
+|---|---|---|---|
+| 1 | `src/lib/api/records.ts:354-374` (`getSwimRecords`) | `select("*").order(...)` non borné | `+ .limit(500)` |
+| 2 | `src/lib/api/records.ts:466-481` (`getSwimmerPerformances`) | `if (filters.limit) query = query.limit(filters.limit)` (no-op si caller omet `limit`) | `query = query.limit(filters.limit ?? 500)` (default 500) |
+| 3 | `src/lib/api/records.ts:583-592` (`getClubRanking`) | `select("*").order("time_ms")` non borné | `+ .limit(500)` |
+| 4 | `src/lib/queryClient.ts:1-21` | `retry: 1` global, pas de `retryDelay` | `retry: (failureCount, error) => failureCount < 2 && isTransientError(error)` + `retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 4000)` |
+
+**Stratégie retry exponentiel** :
+- Avant : retry 1× sur **toute** erreur (4xx métier inclus → spam inutile, +1 RTT systématique en cas d'erreur).
+- Après : retry **0×** sur erreurs non-transient (4xx, validations métier — fail fast) + retry **2×** sur erreurs transient (5xx, network blip, timeout) avec backoff 1 s / 2 s / 4 s.
+- Net : -1 RTT en cas d'erreur métier, +2 RTT max en cas de blip réseau (mais avec backoff qui laisse le serveur récupérer). Comportement aligné sur `offlineQueue.ts isTransientError`.
+- Helper `isTransientError` (`offlineQueue.ts:147-155`) déjà testé, importé tel quel.
+
+**Plafonds 500** :
+- `getSwimRecords` : 500 records suffit pour tout nageur (records training type rare, ~50/an max) et pour vue club agrégée.
+- `getSwimmerPerformances` : 500 perfs suffit pour FFN history par nageur (compétitions × année × bassin = quelques centaines max sur une carrière).
+- `getClubRanking` : 500 perfs sur 1 event/1 piscine/1 sexe est largement au-delà de la taille réelle du club (~100-200 nageurs).
+- Ordre `.order()` préservé en premier (les 500 plus pertinentes — récentes ou les plus rapides selon le cas).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Pas de migration RLS (pas de policy modifiée), pas de helpers auth touchés, mais `queryClient.ts` change la logique de retry. Les tests existants des wrappers API ne dépendent pas de retry → pas de régression attendue. `npm run test:rls` non requis (pas de wrapper API qui change la logique d'autorisation).
+
+**Notes / régression potentielle** :
+- Une UI qui affichait silencieusement <500 records ne change pas. Une UI qui affichait >500 records (très improbable) verrait la liste tronquée à 500. À surveiller en production sur Records.tsx pour les nageurs avec >500 perfs FFN. Caller `getSwimmerPerformances` peut explicitement passer `limit: 1000` pour outrepasser.
+- Le retry conditionnel ne s'applique qu'aux **queries** (`useQuery`). Les mutations restent à `retry: false` (cohérent avec la queue offline qui gère le replay).
+
+**Hors scope §244 (sub-§C de Chantier D + Chantiers A/C/E) :**
+- Sub-§C optionnel : `withTimeout` autour des queryFn critiques (Dashboard/Coach/Records/SwimmerHome) + hook `useDelayedLoading` + toast "ça prend du temps…" après 5 s. UX pure → requiert /frontend-design.
+- Chantier A : `persistQueryClient` + queue offline généralisée (8 mutations Profile/Records/Dashboard/SuiviSemaine).
+- Chantier C : RPC `get_user_auth_context` (-800 ms login Slow 3G).
+- Chantier E : `React.memo` sur listes longues.
+
 ## §243 — Chantier B sub-§B : framer-motion → CSS sur 6 banners (audit perf pass 1) (2026-05-10)
 
 **Contexte :** sub-§B du Chantier B issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #1 bundle/SW). Cible : sortir framer-motion (38.27 KB gzip) du critical path online. Les 6 banners partagés montés depuis App.tsx + AppLayout.tsx (UpdateNotification, InstallPrompt, OfflineBanner, InlineBanner, OfflineSyncBanner, OfflineDetector) tiraient `vendor-motion` dans le bundle initial alors qu'ils s'affichent <5 % du temps. Numérotation §243 (et non §242) car §242 réservé Pass 6 sub-§B WCAG livré en parallèle.

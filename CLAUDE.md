@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§243** — Chantier B sub-§B. framer-motion → CSS sur 6 banners. Critical path -38 KB gzip.
+Dernier § livré : **§244** — Chantier D sub-§A+B. 3 SELECT* records `.limit(500)` + retry exponentiel `isTransientError`.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

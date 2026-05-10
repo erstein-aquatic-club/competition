@@ -358,7 +358,8 @@ export async function getSwimRecords(options: {
     let query = (supabase as any)
       .from(table)
       .select("*")
-      .order("record_date", { ascending: false });
+      .order("record_date", { ascending: false })
+      .limit(500);
     if (options.athleteId) {
       query = query.eq("athlete_id", options.athleteId);
     }
@@ -476,7 +477,7 @@ export async function getSwimmerPerformances(filters: {
   if (filters.poolLength) query = query.eq("pool_length", filters.poolLength);
   if (filters.fromDate) query = query.gte("competition_date", filters.fromDate);
   if (filters.toDate) query = query.lte("competition_date", filters.toDate);
-  if (filters.limit) query = query.limit(filters.limit);
+  query = query.limit(filters.limit ?? 500);
   const data = assertSupabase(await query);
   return data ?? [];
 }
@@ -586,7 +587,8 @@ export async function getClubRanking(filters: {
     .eq("event_code", filters.event_code)
     .eq("pool_m", filters.pool_m)
     .eq("sex", filters.sex)
-    .order("time_ms", { ascending: true });
+    .order("time_ms", { ascending: true })
+    .limit(500);
   if (filters.age != null) query = query.eq("age", filters.age);
   const data = assertSupabase(await query);
   return data ?? [];
