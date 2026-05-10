@@ -33,6 +33,7 @@ import {
   removePlannedAbsence,
 } from "@/lib/api";
 import type { Session, PlannedAbsence, Assignment } from "@/lib/api";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import type { ResolvedSlotAssignment } from "@/lib/api/types";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
@@ -499,20 +500,43 @@ export default function SuiviSemaine() {
 
   const absenceMutation = useMutation({
     mutationFn: ({ date, reason }: { date: string; reason?: string }) =>
-      setPlannedAbsence(date, reason),
-    onSuccess: () => {
+      tryWithOfflineQueue(
+        "set-planned-absence",
+        { date, reason: reason ?? null },
+        () => setPlannedAbsence(date, reason),
+      ),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
       queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
-      toast({ title: "Absence enregistree" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Absence en attente",
+          description: "Sera synchronisée au retour en ligne.",
+        });
+      } else {
+        toast({ title: "Absence enregistree" });
+      }
     },
   });
 
   const removeAbsenceMutation = useMutation({
-    mutationFn: (date: string) => removePlannedAbsence(date),
-    onSuccess: () => {
+    mutationFn: (date: string) =>
+      tryWithOfflineQueue(
+        "remove-planned-absence",
+        { date },
+        () => removePlannedAbsence(date),
+      ),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
       queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
-      toast({ title: "Absence annulee" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Annulation en attente",
+          description: "Sera synchronisée au retour en ligne.",
+        });
+      } else {
+        toast({ title: "Absence annulee" });
+      }
     },
   });
 

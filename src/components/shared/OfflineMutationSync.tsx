@@ -8,6 +8,13 @@ import {
   updateProfile,
   update1RM,
   upsertSwimRecord,
+  setPlannedAbsence,
+  removePlannedAbsence,
+  createTimesheetShift,
+  updateTimesheetShift,
+  deleteTimesheetShift,
+  createTimesheetLocation,
+  deleteTimesheetLocation,
 } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
@@ -71,6 +78,53 @@ function isQueuedSwimRecord(
   mutation: QueuedMutation,
 ): mutation is QueuedMutation & { payload: QueuedSwimRecordPayload } {
   return mutation.type === "swim-record-upsert";
+}
+
+// §252 — Sub-§C2 : SuiviSemaine + Administratif mutations replay.
+// Same pattern as §251 sub-§C : payload stored as the API function args.
+
+type QueuedPlannedAbsencePayload = { date: string; reason?: string | null };
+type QueuedRemovePlannedAbsencePayload = { date: string };
+type QueuedCreateShiftPayload = Parameters<typeof createTimesheetShift>[0];
+type QueuedUpdateShiftPayload = Parameters<typeof updateTimesheetShift>[0];
+type QueuedDeleteShiftPayload = Parameters<typeof deleteTimesheetShift>[0];
+type QueuedCreateLocationPayload = Parameters<typeof createTimesheetLocation>[0];
+type QueuedDeleteLocationPayload = Parameters<typeof deleteTimesheetLocation>[0];
+
+function isQueuedSetPlannedAbsence(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedPlannedAbsencePayload } {
+  return m.type === "set-planned-absence";
+}
+function isQueuedRemovePlannedAbsence(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedRemovePlannedAbsencePayload } {
+  return m.type === "remove-planned-absence";
+}
+function isQueuedCreateShift(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedCreateShiftPayload } {
+  return m.type === "create-shift";
+}
+function isQueuedUpdateShift(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedUpdateShiftPayload } {
+  return m.type === "update-shift";
+}
+function isQueuedDeleteShift(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedDeleteShiftPayload } {
+  return m.type === "delete-shift";
+}
+function isQueuedCreateLocation(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedCreateLocationPayload } {
+  return m.type === "create-location";
+}
+function isQueuedDeleteLocation(
+  m: QueuedMutation,
+): m is QueuedMutation & { payload: QueuedDeleteLocationPayload } {
+  return m.type === "delete-location";
 }
 
 async function getRemoteRunLogCount(runId: number): Promise<number | null> {
@@ -185,6 +239,49 @@ export function OfflineMutationSync() {
             syncedCount += 1;
             continue;
           }
+          // §252 sub-§C2 — SuiviSemaine + Administratif replay branches.
+          if (isQueuedSetPlannedAbsence(mutation)) {
+            await setPlannedAbsence(mutation.payload.date, mutation.payload.reason ?? null);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedRemovePlannedAbsence(mutation)) {
+            await removePlannedAbsence(mutation.payload.date);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedCreateShift(mutation)) {
+            await createTimesheetShift(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedUpdateShift(mutation)) {
+            await updateTimesheetShift(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedDeleteShift(mutation)) {
+            await deleteTimesheetShift(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedCreateLocation(mutation)) {
+            await createTimesheetLocation(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedDeleteLocation(mutation)) {
+            await deleteTimesheetLocation(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
           // Unrecognised type: typically means the queue was written by a
           // newer build and the swimmer reverted to an older PWA. Track it
           // so we can surface a single user-visible warning instead of the
@@ -219,6 +316,11 @@ export function OfflineMutationSync() {
         // updated via the offline queue, so the UI reflects the synced state.
         queryClient.invalidateQueries({ queryKey: ["profile"] });
         queryClient.invalidateQueries({ queryKey: ["swim-records"] });
+        // §252 sub-§C2 — SuiviSemaine absences + Administratif timesheet.
+        queryClient.invalidateQueries({ queryKey: ["my-absences"] });
+        queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
+        queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
+        queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
         toast({
           title: "Données synchronisées",
           description: `${syncedCount} mise(s) à jour hors ligne ont été enregistrée(s).`,

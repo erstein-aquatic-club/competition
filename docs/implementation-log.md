@@ -4,6 +4,39 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §252 — Chantier A sub-§C2 : queue offline étendue (SuiviSemaine + Administratif) (audit perf pass 1) (2026-05-10)
+
+**Contexte :** suite directe de §251, applique le pattern `tryWithOfflineQueue` aux 7 mutations restantes côté nageur/coach simples : 2 absences SuiviSemaine + 5 timesheet Administratif. **Skip délibéré pour 2 sites incompatibles avec le pattern actuel** : `Profile.uploadAvatarMutation` (payload binaire Blob, requiert conversion base64 ou stratégie spéciale) et `SwimSessionView.saveMutation` (multi-étape : `ensureSwimSession` + N `saveSwimLog` + ...) — ces 2 demandent un refactor de la queue (multi-step, binaire) reporté à un § dédié.
+
+**Changements (3 fichiers, ~155 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/components/shared/OfflineMutationSync.tsx` (+~75 LOC) | + 7 imports API (`setPlannedAbsence`, `removePlannedAbsence`, `createTimesheetShift`, `updateTimesheetShift`, `deleteTimesheetShift`, `createTimesheetLocation`, `deleteTimesheetLocation`). + 7 type guards + 7 replay branches dans `runSync`. + invalidate `["my-absences"]`, `["swimmer-sessions-week"]`, `["timesheet-shifts"]`, `["timesheet-locations"]` au succès du sync. |
+| 2 | `src/pages/SuiviSemaine.tsx` (+~25 LOC) | Import `tryWithOfflineQueue` + `isOfflineQueuedResult`. `absenceMutation` wrap (`set-planned-absence`, payload `{date, reason}`) + `removeAbsenceMutation` wrap (`remove-planned-absence`, payload `{date}`). `onSuccess(result)` switch toast "enregistree" / "en attente". |
+| 3 | `src/pages/Administratif.tsx` (+~55 LOC) | Import `tryWithOfflineQueue` + `isOfflineQueuedResult`. 5 mutations wrap : `createShift`, `updateShift`, `deleteShift`, `createLocation`, `deleteLocation` (types : `create-shift`, `update-shift`, `delete-shift`, `create-location`, `delete-location`). Toast titre adaptatif "X en attente / X enregistré". `createGroupLabel`/`deleteGroupLabel` non touchés (admin-rare, scope minimisé). |
+
+**Bénéfice cumulé Chantier A complet** :
+- §248 sub-§A : cache RQ persisté → reload PWA offline peuplé.
+- §249 sub-§B : sonde connectivité réelle → faux positifs détectés.
+- §251 sub-§C : 3 mutations queue (Profile.update, Records 1RM + swim).
+- §252 sub-§C2 : **+7 mutations queue** (SuiviSemaine 2 + Administratif 5) → **10/12 mutations critiques couvertes** (skip = avatar binaire + saveSwimSession multi-étape).
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- Replay idempotent : `setPlannedAbsence` (UPSERT par date), `removePlannedAbsence` (DELETE idempotent), `createTimesheetShift` (INSERT — risque doublon si replayed après que l'utilisateur a re-créé manuellement, mais TTL 7j + logique métier permissive limitent l'impact), `updateTimesheetShift` (UPDATE idempotent), `deleteTimesheetShift` (DELETE idempotent), `createTimesheetLocation` (INSERT — pareil), `deleteTimesheetLocation` (DELETE idempotent).
+- Cas limite createShift double : si l'utilisateur enqueue offline puis re-crée online avant le replay, deux shifts identiques. Acceptable car shifts admin-only et réversibles via `deleteShift`.
+- Cas limite ID-bound (deleteShift, deleteLocation) : si l'item n'existe plus côté serveur au moment du replay, l'API retourne probablement 404 / no-op. Pas une erreur transient → `markRetry` puis poison après 5 tentatives. Comportement raisonnable.
+
+**Hors scope §252 (Chantier E + sub-§C3 + sub-§C optionnel) :**
+- Sub-§C3 future : `Profile.uploadAvatarMutation` (binaire — base64 + chunking) + `SwimSessionView.saveMutation` (multi-étape — refactor queue ou wrapper macro-mutation).
+- Chantier E : `React.memo` sur listes longues.
+- Chantier D sub-§C optionnel : `useDelayedLoading` hook + toast 5 s.
+
 ## §251 — Chantier A sub-§C : queue offline étendue (Profile + Records) (audit perf pass 1) (2026-05-10)
 
 **Contexte :** Chantier A sub-§C issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #2 cache/queue offline). Cible : étendre la queue offline existante (qui ne couvrait que 2 types Strength) à 3 mutations critiques côté nageur — `updateProfile`, `update1RM`, `upsertSwimRecord`. Pose un pattern réutilisable (`tryWithOfflineQueue` helper) qui pourra être appliqué aux 5 mutations restantes (`uploadAvatar`, `SwimSessionView.save`, `Administratif.shifts/locations`, `SuiviSemaine absences`) en sub-§C2 future. Numérotation §251 (et non §250) car §250 réservé Chantier V P2 cosmétiques livré en parallèle.

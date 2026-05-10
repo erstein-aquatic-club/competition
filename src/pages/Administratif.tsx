@@ -22,6 +22,7 @@ import {
   deleteTimesheetGroupLabel,
 } from "@/lib/api";
 import { supabaseConfig } from "@/lib/config";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,11 +198,21 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   }, [defaultLocation]);
 
   const createShift = useMutation({
-    mutationFn: (payload: Omit<TimesheetShift, "id" | "coach_name">) => createTimesheetShift(payload),
-    onSuccess: () => {
+    mutationFn: (payload: Omit<TimesheetShift, "id" | "coach_name">) =>
+      tryWithOfflineQueue(
+        "create-shift",
+        payload as unknown as Record<string, unknown>,
+        () => createTimesheetShift(payload),
+      ),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
       resetForm();
-      toast({ title: "Shift enregistré" });
+      toast({
+        title: isOfflineQueuedResult(result) ? "Shift en attente" : "Shift enregistré",
+        ...(isOfflineQueuedResult(result) && {
+          description: "Sera synchronisé au retour en ligne.",
+        }),
+      });
     },
     onError: (error: unknown) => {
       toast({ title: "Erreur", description: summarizeApiError(error, "Impossible d'enregistrer le shift.").message });
@@ -209,13 +220,23 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const updateShift = useMutation({
-    mutationFn: (payload: Partial<TimesheetShift> & { id: number }) => updateTimesheetShift(payload),
-    onSuccess: () => {
+    mutationFn: (payload: Partial<TimesheetShift> & { id: number }) =>
+      tryWithOfflineQueue(
+        "update-shift",
+        payload as unknown as Record<string, unknown>,
+        () => updateTimesheetShift(payload),
+      ),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
       setIsSheetOpen(false);
       setEditingShiftId(null);
       resetForm();
-      toast({ title: "Shift mis à jour" });
+      toast({
+        title: isOfflineQueuedResult(result) ? "Mise à jour en attente" : "Shift mis à jour",
+        ...(isOfflineQueuedResult(result) && {
+          description: "Sera synchronisée au retour en ligne.",
+        }),
+      });
     },
     onError: (error: unknown) => {
       toast({ title: "Erreur", description: summarizeApiError(error, "Impossible de modifier le shift.").message });
@@ -223,7 +244,12 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const deleteShift = useMutation({
-    mutationFn: (payload: { id: number }) => deleteTimesheetShift(payload),
+    mutationFn: (payload: { id: number }) =>
+      tryWithOfflineQueue(
+        "delete-shift",
+        payload as Record<string, unknown>,
+        () => deleteTimesheetShift(payload),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
     },
@@ -233,7 +259,12 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const createLocation = useMutation({
-    mutationFn: (payload: { name: string }) => createTimesheetLocation(payload),
+    mutationFn: (payload: { name: string }) =>
+      tryWithOfflineQueue(
+        "create-location",
+        payload as Record<string, unknown>,
+        () => createTimesheetLocation(payload),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
     },
@@ -243,7 +274,12 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   });
 
   const deleteLocation = useMutation({
-    mutationFn: (payload: { id: number }) => deleteTimesheetLocation(payload),
+    mutationFn: (payload: { id: number }) =>
+      tryWithOfflineQueue(
+        "delete-location",
+        payload as Record<string, unknown>,
+        () => deleteTimesheetLocation(payload),
+      ),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
       const remaining = locations.filter((item) => item.id !== variables.id);
