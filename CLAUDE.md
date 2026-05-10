@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§248** — Chantier A sub-§A : `persistQueryClient` localStorage. Reload PWA offline peuplé, cache 24h busté par build.
+Dernier § livré : **§249** — Chantier A sub-§B : sonde connectivité réelle. Élimine faux positifs `navigator.onLine` (captive portal, etc.).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

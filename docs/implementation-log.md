@@ -4,6 +4,42 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §249 — Chantier A sub-§B : sonde connectivité réelle (audit perf pass 1) (2026-05-10)
+
+**Contexte :** Chantier A sub-§B issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #2 cache/queue offline). Cible : éliminer les faux positifs de `navigator.onLine` (captive portal Wi-Fi, VPN coupé, Supabase down avec interface réseau OK) — qui empêchent aujourd'hui le fallback localStorage de se déclencher et exposent l'utilisateur à des erreurs Supabase brutes au lieu du banner offline.
+
+**Changements (1 fichier, +88 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/hooks/useOnlineStatus.ts` | Réécriture (20 LOC → 88 LOC). API publique préservée (`useOnlineStatus(): boolean`). Ajoute `probeConnectivity()` : HEAD `${BASE_URL}version.json?_=${Date.now()}` (cache-bust forcé), timeout 5s via `AbortController`. Loop interne (`tick()`) qui ping toutes les 30 s en cas de succès, 5 s en cas d'échec (recover faster). Skip ping quand `navigator.onLine === false` (no point trying). Listener `online` browser event → trigger probe immédiat 100 ms après. Listener `offline` → bypass probe, mark offline directement. |
+
+**Logique combinée** :
+- `isOnline = navigator.onLine && lastPingOk` — exige les 2 pour reporter "en ligne".
+- `navigator.onLine === false` → `isOnline = false` instantané (pas de waste de fetch).
+- `navigator.onLine === true` mais `lastPingOk === false` → `isOnline = false` (faux positif détecté, ex: captive portal).
+- `lastPingOk` est mis à jour toutes les 30 s sur succès, 5 s sur échec (récupération rapide).
+
+**Bénéfices** :
+- **Captive portal Wi-Fi** : auparavant `isOnline = true` → fetch Supabase échouait avec erreur réseau brute. Maintenant `isOnline = false` → fallback localStorage déclenché, banner offline affiché.
+- **Supabase incident** : si l'API est down mais le réseau marche, la sonde `version.json` continue à passer (servie par GitHub Pages, indépendant de Supabase). `isOnline = true` reste correct → l'utilisateur ne voit pas un faux banner offline. **C'est volontaire** : la sonde mesure la connectivité réseau, pas la disponibilité Supabase.
+- **Coût** : 1 HEAD `version.json` (~50 octets, no-store) toutes les 30 s = ~6 KB/heure. Quasi-zero.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- Si **GitHub Pages descend**, la sonde fail → `isOnline = false` même si Supabase est dispo. Mais c'est un cas extrême : si version.json (servi par le même CDN que tout le reste de l'app) est inaccessible, l'app entière est probablement indisponible. Le faux négatif "offline" est acceptable.
+- Sur iOS Safari PWA en background, le polling peut être suspendu (throttled). Le hook reprend au foreground. Pas de fuite mémoire (cleanup propre dans `useEffect`).
+- Tous les consumers (`OfflineDetector`, `OfflineMutationSync`, `OfflineSyncBanner`, `client.ts isOnlineCheck` indirectement) bénéficient automatiquement — API non changée.
+
+**Hors scope §249 (Chantier A sub-§C, Chantier E, Chantier D sub-§C) :**
+- Chantier A sub-§C : étendre la queue offline aux 8 mutations critiques (Profile, Records, Dashboard, SuiviSemaine, Administratif). Effort L, risque élevé.
+- Chantier E : `React.memo` sur listes longues (SwimSessionTimeline, CoachSwimmersOverview, items Records).
+- Chantier D sub-§C optionnel : `useDelayedLoading` hook + toast 5 s — UX, /frontend-design requis.
+
 ## §248 — Chantier A sub-§A : persistQueryClient (audit perf pass 1) (2026-05-10)
 
 **Contexte :** Chantier A sub-§A issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #2 cache/queue offline). Cible : faire survivre le cache React Query aux reloads PWA. Aujourd'hui, après un cold start offline, **toutes les surfaces sont vides** parce que `staleTime: 10min/gcTime: 60min` ne s'applique qu'au cache in-memory non persisté. Reload offline = écran blanc sur Dashboard, Coach, Records, etc.
