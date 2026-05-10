@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§244** — Chantier D sub-§A+B. 3 SELECT* records `.limit(500)` + retry exponentiel `isTransientError`.
+Dernier § livré : **§245** — Fix bannière PWA parasite. `handleCheckUpdate` → `__pwaApplyUpdate()` (skipWaiting) au lieu de reload seul.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

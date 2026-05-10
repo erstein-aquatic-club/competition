@@ -4,6 +4,26 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §245 — Fix bannière "mise à jour disponible" parasite après handleCheckUpdate (2026-05-10)
+
+### Contexte
+
+Après un clic sur "Mettre à jour l'app" (Profile), l'app se rechargeait correctement avec la dernière version, mais une bannière "Mise à jour disponible" réapparaissait peu après. Le bug était dans `handleCheckUpdate` : il appelait `reg.update()` (qui met le nouveau SW en état "waiting" → déclenche `onNeedRefresh` → bannière), puis `window.location.reload()` sans avoir appelé `skipWaiting`. Après le rechargement, le nouveau SW était toujours en "waiting" → `onNeedRefresh` se redéclenchait → bannière parasite.
+
+### Changements
+
+- **`src/pages/Profile.tsx`** : `handleCheckUpdate` — remplacé `window.location.reload()` final par `__pwaApplyUpdate()` (qui fait `skipWaiting` + vide les caches + reload, identique au bouton "Recharger" de la bannière). Supprimé le bloc cache-clearing redondant du milieu (déjà géré par `applyUpdate`). Fallback `window.location.reload()` si `__pwaApplyUpdate` absent.
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- Test manuel : non réalisable localement (PWA nécessite déploiement GitHub Pages).
+
+### Décisions
+
+- Utiliser `__pwaApplyUpdate` plutôt que `updateSW(true)` directement : c'est l'API publique déjà exposée par `main.tsx`, évite de dupliquer la logique.
+- Pas de test unitaire ajouté : la fonction `handleCheckUpdate` est un handler async avec effets de bord navigateur (SW, caches, reload) — difficile à mocker utilement.
+
 ## §244 — Chantier D sub-§A+B : pagination SELECT* + retry exponentiel (audit perf pass 1) (2026-05-10)
 
 **Contexte :** Chantier D issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #3 chemin critique réseau). Cible : (1) plafonner les payloads des 3 SELECT* records non bornés résiduels (le 4e — `getSessions` — a déjà été plafonné en §239) ; (2) remplacer le `retry: 1` global par un retry exponentiel intelligent qui ne retry que les erreurs transient (réseau / timeout / 5xx). Sub-§C reportée (`useDelayedLoading` hook + toast 5s — UX pure, /frontend-design requis).

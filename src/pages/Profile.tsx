@@ -36,6 +36,7 @@ import { useAchievementChecker } from "@/hooks/useAchievementChecker";
 import AchievementToast from "@/components/shared/AchievementToast";
 import type { BadgeDefinition } from "@/lib/achievementRules";
 import SwimmerMessagesView from "@/components/profile/SwimmerMessagesView";
+import { haptic } from "@/lib/haptic";
 
 type ProfileSection =
   | "home"
@@ -328,14 +329,15 @@ export default function Profile() {
           new Promise((r) => setTimeout(r, 3000)),
         ]);
       }
-      // 2. Clear all Workbox caches so reload fetches fresh assets
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((key) => caches.delete(key)));
-      }
     } catch { /* best-effort — always reload below */ }
-    // 3. Always hard reload, even if SW check or cache clear failed
-    window.location.reload();
+    // 2. Use __pwaApplyUpdate (skipWaiting + cache clear + reload) so the waiting SW
+    // activates before reload — avoids onNeedRefresh re-firing after the page comes back.
+    const applyUpdate = (window as any).__pwaApplyUpdate;
+    if (typeof applyUpdate === "function") {
+      await applyUpdate();
+    } else {
+      window.location.reload();
+    }
   };
 
   // Profile edit form with React Hook Form + Zod
@@ -509,9 +511,10 @@ export default function Profile() {
     updateProfile.mutate(data);
   });
 
-  const handleUpdatePassword = passwordForm.handleSubmit((data) => {
-    updatePassword.mutate({ password: data.password });
-  });
+  const handleUpdatePassword = passwordForm.handleSubmit(
+    (data) => { updatePassword.mutate({ password: data.password }); },
+    () => { haptic.error(); },
+  );
 
   const groupLabel =
     groups.find((g) => g.id === profile?.group_id)?.name ||
