@@ -4,6 +4,42 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §253 — Chantier E sub-§A : React.memo SwimSessionTimeline (audit perf pass 1) (2026-05-10)
+
+**Contexte :** Chantier E issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine UX réseau instable / re-renders). L'audit listait 3 listes longues à mémoiser : `SwimSessionTimeline` (28.9 KB), `CoachSwimmersOverview` (16.4 KB), items `Records`. Cette session livre uniquement le 1er — le plus impactant car il est rendu inline dans `SwimSessionView` qui re-render à chaque keystroke (saisie de logs inline) ET dans `Suivi` consultation. Les 2 autres demandent un refactor d'extraction (`<AthleteCard>` / `<RecordCard>`) plus lourd, reporté à un § dédié avec audit React DevTools en runtime.
+
+**Changements (1 fichier, +5 LOC nettes) :**
+
+| # | Fichier:ligne | Avant | Après |
+|---|---|---|---|
+| 1 | `src/components/swim/SwimSessionTimeline.tsx:1` | `import { useState, useMemo } from "react"` | `import { memo, useState, useMemo } from "react"` |
+| 2 | `src/components/swim/SwimSessionTimeline.tsx:127-137` | `export function SwimSessionTimeline(...)` | `function SwimSessionTimelineImpl(...)` (renommé interne) |
+| 3 | `src/components/swim/SwimSessionTimeline.tsx:596` | (fin de fichier) | `+ export const SwimSessionTimeline = memo(SwimSessionTimelineImpl);` |
+
+**Logique** :
+- L'export public `SwimSessionTimeline` reste identique côté caller (drop-in compatible).
+- `React.memo` compare les props via `Object.is` — re-render uniquement si l'une des 9 props change de référence.
+- Si les parents passent les callbacks inline (`onLogChange={() => ...}`), memo no-op → pas de régression. Mais si parents stabilisent via `useCallback` (déjà le cas dans `SwimSessionView` via `updateManualLog` / `removeManualExercise` lignes 207-217), memo est efficace.
+
+**Bénéfice attendu** :
+- `SwimSessionView.tsx` saisie inline d'un log : aujourd'hui, chaque keystroke re-render le composant entier (~590 LOC de `SwimSessionTimelineImpl` + sub-composants). Avec memo + props stables, **seul le sub-composant `ExerciseLogInline` qui reçoit le log modifié re-render** (memo no-op sur SwimSessionTimeline si `items`/`exerciseLogs` Map ne sont pas remplacées).
+- Estimation audit : -50 à -80 % re-renders sur saisie active.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+
+**Notes / régression potentielle** :
+- `exerciseLogs` est une `Map<number, SwimExerciseLogInput>` — si le parent crée une nouvelle Map à chaque update (`new Map(prev).set(id, log)`), la référence change et memo no-op. Le parent `SwimSessionView` utilise `setLogsMap(new Map(prev).set(id, log))` (vu en §240 audit) — bon pour la cohérence React mais limite l'efficacité memo. Le bénéfice principal vient quand l'utilisateur tape dans un input : c'est le state local du formulaire qui change, et le parent re-render — sans memo, tout SwimSessionTimeline re-render aussi.
+- Aucun changement d'API publique : `SwimSessionTimeline` est toujours exporté nommé, types préservés.
+
+**Hors scope §253 (Chantier E sub-§B + sub-§C, Chantier D sub-§C optionnel) :**
+- Sub-§B future : extraire `<AthleteCard>` de `CoachSwimmersOverview.tsx:562-720` (closure ~150 LOC dans `.map`) + memo. Refactor moyen avec stabilisation du callback `onOpenAthlete` parent.
+- Sub-§C future : extraire `<RecordCard>` de `Records.tsx:816-837` (closure courte ~22 LOC) + memo. Refactor petit mais nécessite audit React DevTools en runtime pour confirmer le gain (ce qui demande un browser).
+- Chantier D sub-§C optionnel : `useDelayedLoading` hook + toast 5 s — UX, /frontend-design requis.
+- Chantier A sub-§C3 : `Profile.uploadAvatarMutation` (binaire) + `SwimSessionView.saveMutation` (multi-étape) — refactor queue.
+
 ## §252 — Chantier A sub-§C2 : queue offline étendue (SuiviSemaine + Administratif) (audit perf pass 1) (2026-05-10)
 
 **Contexte :** suite directe de §251, applique le pattern `tryWithOfflineQueue` aux 7 mutations restantes côté nageur/coach simples : 2 absences SuiviSemaine + 5 timesheet Administratif. **Skip délibéré pour 2 sites incompatibles avec le pattern actuel** : `Profile.uploadAvatarMutation` (payload binaire Blob, requiert conversion base64 ou stratégie spéciale) et `SwimSessionView.saveMutation` (multi-étape : `ensureSwimSession` + N `saveSwimLog` + ...) — ces 2 demandent un refactor de la queue (multi-step, binaire) reporté à un § dédié.

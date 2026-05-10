@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§252** — Chantier A sub-§C2. +7 mutations queue offline (SuiviSemaine 2 + Administratif 5). 10/12 critiques couvertes.
+Dernier § livré : **§253** — Chantier E sub-§A : `React.memo(SwimSessionTimeline)`. -50 à -80% re-renders sur saisie active.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

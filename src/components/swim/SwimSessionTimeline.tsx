@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { memo, useState, useMemo } from "react";
 import type { SwimSessionItem, SwimExerciseLogInput } from "@/lib/api";
 import { ExerciseLogInline } from "./ExerciseLogInline";
 import type { SwimPayloadFields } from "@/lib/types";
@@ -123,8 +123,13 @@ const formatExerciseLabel = (item: SwimSessionItem): string => {
 
 // ---------------------------------------------------------------------------
 // Component
+// §253 — wrap with React.memo : the parent (SwimSessionView, Suivi…) re-renders
+// frequently as the user expands/edits inline logs ; without memo, the entire
+// 590-LOC tree (blocks + items + dots + railColorMap...) re-renders on each
+// keystroke. Pass stable callbacks (`useCallback`) from parents to maximize
+// the memo hit rate.
 // ---------------------------------------------------------------------------
-export function SwimSessionTimeline({
+function SwimSessionTimelineImpl({
   title: _title,
   description: _description,
   items = [],
@@ -588,3 +593,5 @@ export function SwimSessionTimeline({
     </div>
   );
 }
+
+export const SwimSessionTimeline = memo(SwimSessionTimelineImpl);
