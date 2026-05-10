@@ -1,7 +1,14 @@
 import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { logStrengthSet, updateStrengthRun, saveStrengthRun } from "@/lib/api";
+import {
+  logStrengthSet,
+  updateStrengthRun,
+  saveStrengthRun,
+  updateProfile,
+  update1RM,
+  upsertSwimRecord,
+} from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
 import { runSyncOnce } from "@/lib/offlineSync";
@@ -37,6 +44,33 @@ function isQueuedStrengthSetLog(
   mutation: QueuedMutation,
 ): mutation is QueuedMutation & { payload: QueuedStrengthSetLogPayload } {
   return mutation.type === "strength-set-log";
+}
+
+// §250 — Profile / Records mutations replay (Chantier A sub-§C).
+// Payloads stored as the exact arguments of the API functions, so replay is a
+// 1-line passthrough. Idempotent operations (PATCH/UPSERT) by design — replay
+// after intermittent reconnect produces the same end state.
+
+type QueuedProfileUpdatePayload = Parameters<typeof updateProfile>[0];
+type QueuedRecord1rmPayload = Parameters<typeof update1RM>[0];
+type QueuedSwimRecordPayload = Parameters<typeof upsertSwimRecord>[0];
+
+function isQueuedProfileUpdate(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedProfileUpdatePayload } {
+  return mutation.type === "profile-update";
+}
+
+function isQueuedRecord1rm(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedRecord1rmPayload } {
+  return mutation.type === "record-1rm-update";
+}
+
+function isQueuedSwimRecord(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedSwimRecordPayload } {
+  return mutation.type === "swim-record-upsert";
 }
 
 async function getRemoteRunLogCount(runId: number): Promise<number | null> {
@@ -133,6 +167,24 @@ export function OfflineMutationSync() {
             syncedCount += 1;
             continue;
           }
+          if (isQueuedProfileUpdate(mutation)) {
+            await updateProfile(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedRecord1rm(mutation)) {
+            await update1RM(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedSwimRecord(mutation)) {
+            await upsertSwimRecord(mutation.payload);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
           // Unrecognised type: typically means the queue was written by a
           // newer build and the swimmer reverted to an older PWA. Track it
           // so we can surface a single user-visible warning instead of the
@@ -163,9 +215,13 @@ export function OfflineMutationSync() {
         queryClient.invalidateQueries({ queryKey: ["assignments"] });
         queryClient.invalidateQueries({ queryKey: ["1rm"] });
         queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
+        // §250 — invalidate Profile / Records queries that may have been
+        // updated via the offline queue, so the UI reflects the synced state.
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
+        queryClient.invalidateQueries({ queryKey: ["swim-records"] });
         toast({
           title: "Données synchronisées",
-          description: `${syncedCount} séance(s) hors ligne ont été enregistrée(s).`,
+          description: `${syncedCount} mise(s) à jour hors ligne ont été enregistrée(s).`,
         });
       }
 

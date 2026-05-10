@@ -4,6 +4,59 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §251 — Chantier A sub-§C : queue offline étendue (Profile + Records) (audit perf pass 1) (2026-05-10)
+
+**Contexte :** Chantier A sub-§C issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #2 cache/queue offline). Cible : étendre la queue offline existante (qui ne couvrait que 2 types Strength) à 3 mutations critiques côté nageur — `updateProfile`, `update1RM`, `upsertSwimRecord`. Pose un pattern réutilisable (`tryWithOfflineQueue` helper) qui pourra être appliqué aux 5 mutations restantes (`uploadAvatar`, `SwimSessionView.save`, `Administratif.shifts/locations`, `SuiviSemaine absences`) en sub-§C2 future. Numérotation §251 (et non §250) car §250 réservé Chantier V P2 cosmétiques livré en parallèle.
+
+**Changements (4 fichiers, ~120 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `src/lib/offlineQueue.ts` (+45 LOC) | NEW : helper `tryWithOfflineQueue<T>(type, payload, fn)`. Si `navigator.onLine === false` ⇒ enqueue directement (skip network). Sinon tente `fn()` ; si erreur transient (`isTransientError`) ⇒ enqueue + return sentinel `OFFLINE_QUEUED_RESULT`. Sinon rethrow. + sentinel object `OFFLINE_QUEUED_RESULT` (`{__eac_offline_queued: true}`) + type guard `isOfflineQueuedResult`. |
+| 2 | `src/components/shared/OfflineMutationSync.tsx` (+45 LOC) | Imports `updateProfile`, `update1RM`, `upsertSwimRecord` depuis `@/lib/api`. Type guards `isQueuedProfileUpdate`, `isQueuedRecord1rm`, `isQueuedSwimRecord` (types : `Parameters<typeof apiFn>[0]`). 3 nouvelles branches replay dans `runSync` qui appellent les API directement avec le payload (idempotent : PATCH/UPSERT). Toast batch "Données synchronisées — N mise(s) à jour" + invalidate `["profile"]` + `["swim-records"]` au succès. |
+| 3 | `src/pages/Profile.tsx` (+15 LOC) | Import `tryWithOfflineQueue` + `isOfflineQueuedResult`. `updateProfile mutation`: `mutationFn` wrap `updateProfileApi` avec `tryWithOfflineQueue("profile-update", { userId, profile }, ...)`. `onSuccess(result)` switch toast "Profil mis à jour" / "Mise à jour en attente — sera synchronisée au retour en ligne". |
+| 4 | `src/pages/Records.tsx` (+18 LOC) | Idem pour `update1RM mutation` (type `record-1rm-update`) et `upsertSwimRecord mutation` (type `swim-record-upsert`). `onSuccess(result)` switch toast normal/queued. |
+
+**Pattern adopté** :
+```ts
+mutationFn: (data) => tryWithOfflineQueue(
+  "kind-name",
+  payload,
+  () => apiCall(payload),
+),
+onSuccess: (result) => {
+  invalidateQueries(...);
+  if (isOfflineQueuedResult(result)) {
+    toast({ title: "En attente", description: "Sera synchronisé au retour en ligne." });
+  } else {
+    toast({ title: "Sauvegardé" });
+  }
+},
+```
+
+**Comportement utilisateur** :
+- **Online OK** : comportement identique à avant (toast "Profil mis à jour", queue vide).
+- **Online avec erreur transient (5xx, network blip, timeout)** : la mutation est mise en queue, l'utilisateur voit "Mise à jour en attente". `OfflineMutationSync` rejouera au prochain tick online.
+- **Offline (`navigator.onLine === false`)** : `tryWithOfflineQueue` skip le network, enqueue directement, l'utilisateur voit "Mise à jour en attente". Même flow de replay au retour en ligne.
+- **Erreur métier (4xx, validation, RLS)** : rethrow → `onError` traditionnel → toast "Mise à jour impossible". Inchangé.
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Pas de migration RLS, pas de helpers auth touchés → `npm run test:rls` non requis.
+- 3 fails transitoires `ObjectiveCard.paceLink` vus en cours de session ont disparu après commit §250 du parallèle (effet de mock pollution lié à des modifs concurrentes sur `InlineBanner` — non causés par §251).
+
+**Notes / régression potentielle** :
+- Replay idempotent : `updateProfile` (PATCH), `update1RM` (UPSERT), `upsertSwimRecord` (UPSERT) sont tous idempotents par design → un replay tardif réapplique le même état sans dupliquer.
+- Pas d'`onMutate` optimistic update : l'UI affiche "En attente" mais la donnée n'est pas reflétée dans le cache RQ avant le replay. Acceptable pour Profile/Records (rare édition, peu de feedback temps réel) ; pas adapté aux séances en cours (déjà géré par Strength queue avec optimistic).
+- Cas limite : utilisateur édite hors-ligne, ferme l'app, rouvre 8 jours plus tard — la queue a expiré (TTL 7j, `getQueue` reap), événement `QUEUE_REAPED_EVENT` déjà branché à un toast user "Données hors-ligne abandonnées" (§229). UX déjà correcte.
+- Le payload `swim-record-upsert` peut contenir un `id` quand c'est une mise à jour. Le replay fonctionne car `upsertSwimRecord` route vers UPDATE ou INSERT selon `id`.
+
+**Hors scope §251 (Chantier A sub-§C2 + Chantier E + Chantier D sub-§C) :**
+- Sub-§C2 future : appliquer le pattern aux 5 mutations restantes : `Profile.uploadAvatarMutation` (binaire — nécessite stratégie spéciale, ex: payload base64), `SwimSessionView.saveMutation`, `Administratif shifts/locations`, `SuiviSemaine absenceMutation`/`removeAbsenceMutation`.
+- Chantier E : `React.memo` sur listes longues.
+- Chantier D sub-§C optionnel : `useDelayedLoading` hook + toast 5 s.
+
 ## §250 — Chantier V : P2 cosmétiques audit §240 (2026-05-10)
 
 **Contexte :** suite du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` post-§246, priorité utilisateur après le Chantier III dark mode. L'audit manuel dark mode n'a pas remonté d'anomalie pour l'instant, donc aucun correctif dark mode appliqué. Ce lot ferme les P2 cosmétiques restants de l'audit accessibilité §240 : color-only signaling, contrastes décoratifs borderline et tooltip natif.

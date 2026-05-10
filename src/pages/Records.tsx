@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import type { SwimRecordWithPool } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -522,10 +523,24 @@ export default function Records() {
 
   // --- SOURCE OF TRUTH: mutations / invalidateQueries unchanged ---
   const update1RM = useMutation({
-    mutationFn: (data: { exercise_id: number; one_rm?: number; weight?: number }) => update1RMApi({ ...data, athlete_id: userId, athlete_name: user }),
-    onSuccess: () => {
+    mutationFn: (data: { exercise_id: number; one_rm?: number; weight?: number }) => {
+      const payload = { ...data, athlete_id: userId, athlete_name: user };
+      return tryWithOfflineQueue(
+        "record-1rm-update",
+        payload as Record<string, unknown>,
+        () => update1RMApi(payload),
+      );
+    },
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
-      toast({ title: "1RM mis à jour" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Mise à jour en attente",
+          description: "Sera synchronisée au retour en ligne.",
+        });
+      } else {
+        toast({ title: "1RM mis à jour" });
+      }
     },
   });
 
@@ -539,12 +554,24 @@ export default function Records() {
   });
 
   const upsertSwimRecord = useMutation({
-    mutationFn: (data: Parameters<typeof upsertSwimRecordApi>[0]) => upsertSwimRecordApi(data),
-    onSuccess: () => {
+    mutationFn: (data: Parameters<typeof upsertSwimRecordApi>[0]) =>
+      tryWithOfflineQueue(
+        "swim-record-upsert",
+        data as Record<string, unknown>,
+        () => upsertSwimRecordApi(data),
+      ),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["swim-records"] });
       setSwimForm(emptySwimForm);
       setSwimSheetOpen(false);
-      toast({ title: "Record mis à jour" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Record en attente",
+          description: "Sera synchronisé au retour en ligne.",
+        });
+      } else {
+        toast({ title: "Record mis à jour" });
+      }
     },
   });
 

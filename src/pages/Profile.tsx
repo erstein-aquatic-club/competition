@@ -9,6 +9,7 @@ import {
   deleteAvatar,
 } from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -391,24 +392,34 @@ export default function Profile() {
 
 
   const updateProfile = useMutation({
-    mutationFn: (data: ProfileEditForm) =>
-      updateProfileApi({
-        userId,
-        profile: {
-          group_id: data.group_id ? Number(data.group_id) : null,
-          group_label: data.group_id
-            ? groups.find((g) => g.id === Number(data.group_id))?.name ?? null
-            : null,
-          birthdate: data.birthdate || null,
-          bio: data.bio,
-          ffn_iuf: (data.ffn_iuf || "").trim() || null,
-          phone: data.phone || null,
-        },
-      }),
-    onSuccess: () => {
+    mutationFn: (data: ProfileEditForm) => {
+      const profile = {
+        group_id: data.group_id ? Number(data.group_id) : null,
+        group_label: data.group_id
+          ? groups.find((g) => g.id === Number(data.group_id))?.name ?? null
+          : null,
+        birthdate: data.birthdate || null,
+        bio: data.bio,
+        ffn_iuf: (data.ffn_iuf || "").trim() || null,
+        phone: data.phone || null,
+      };
+      return tryWithOfflineQueue(
+        "profile-update",
+        { userId, profile },
+        () => updateProfileApi({ userId, profile }),
+      );
+    },
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       setActiveSection("home");
-      toast({ title: "Profil mis à jour" });
+      if (isOfflineQueuedResult(result)) {
+        toast({
+          title: "Mise à jour en attente",
+          description: "Sera synchronisée au retour en ligne.",
+        });
+      } else {
+        toast({ title: "Profil mis à jour" });
+      }
     },
     onError: (error: unknown) => {
       toast({

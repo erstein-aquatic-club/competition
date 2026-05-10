@@ -143,6 +143,57 @@ export function dequeue(): QueuedMutation | undefined {
   return item;
 }
 
+/**
+ * §250 — Sentinel returned by `tryWithOfflineQueue` when a mutation could not
+ * reach the server and was queued for replay. Mutation `onSuccess` callers
+ * use `isOfflineQueuedResult(result)` to switch their toast wording from
+ * "Saved" to "Pending sync".
+ */
+export const OFFLINE_QUEUED_RESULT = Object.freeze({
+  __eac_offline_queued: true as const,
+});
+export type OfflineQueuedResult = typeof OFFLINE_QUEUED_RESULT;
+
+export function isOfflineQueuedResult(value: unknown): value is OfflineQueuedResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "__eac_offline_queued" in (value as Record<string, unknown>)
+  );
+}
+
+/**
+ * §250 — Wrap a mutation `mutationFn` body so that:
+ *  - if `navigator.onLine === false`, the mutation is enqueued without
+ *    even trying the network (fail fast, save battery);
+ *  - if the network attempt fails with a transient error, the mutation is
+ *    enqueued so `OfflineMutationSync` can replay it on the next online tick.
+ *
+ * In both cases, returns the `OFFLINE_QUEUED_RESULT` sentinel — `onSuccess`
+ * sees a "success" with the queued marker, callers tweak the toast accordingly.
+ * Non-transient errors (4xx, validation, RLS denial) are rethrown unchanged so
+ * the existing `onError` handlers stay intact.
+ */
+export async function tryWithOfflineQueue<T>(
+  type: string,
+  payload: Record<string, unknown>,
+  fn: () => Promise<T>,
+): Promise<T | OfflineQueuedResult> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    enqueue(type, payload);
+    return OFFLINE_QUEUED_RESULT;
+  }
+  try {
+    return await fn();
+  } catch (err) {
+    if (isTransientError(err)) {
+      enqueue(type, payload);
+      return OFFLINE_QUEUED_RESULT;
+    }
+    throw err;
+  }
+}
+
 /** True if the error is recoverable on retry (network blip, server overload). */
 export function isTransientError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
