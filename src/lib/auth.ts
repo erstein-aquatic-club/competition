@@ -249,52 +249,94 @@ export const useAuth = create<AuthState>((set) => ({
       ? "unknown"
       : "not_required";
 
-    // Fetch the authoritative role from public.users to handle stale JWT claims.
-    // The JWT claim (app_user_role) can be outdated if the role was changed
-    // without a subsequent token refresh.
+    // Fetch the authoritative role + approval status from public.users + user_profiles
+    // to handle stale JWT claims. The JWT claim (app_user_role) can be outdated
+    // if the role was changed without a subsequent token refresh.
+    //
+    // §247 — Try the unified RPC `get_user_auth_context` first (1 round-trip).
+    // Falls back to the legacy 2-select sequential path if the RPC is missing
+    // (migration 00158 not yet applied) or returns an error. -1 RTT login Slow 3G
+    // when the RPC is available, no regression otherwise.
     if (userId) {
+      let rpcRole: string | null = null;
+      let rpcApproved: boolean | null = null;
+      let rpcOk = false;
       try {
-        const { data: dbUser } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", userId)
-          .maybeSingle();
-        if (dbUser?.role) {
-          role = dbUser.role;
+        const { data: ctxData, error: ctxError } = await supabase.rpc(
+          "get_user_auth_context",
+        );
+        if (!ctxError && ctxData && typeof ctxData === "object") {
+          const ctx = ctxData as { role?: string | null; is_approved?: boolean | null };
+          rpcRole = ctx.role ?? null;
+          rpcApproved = ctx.is_approved ?? null;
+          rpcOk = true;
         }
       } catch {
-        // Fall back to JWT claim if DB query fails
+        // Fall through to legacy path below
       }
 
-      // Fetch approval status from user_profiles
-      const requiresApproval = requiresApprovalForRole(role);
-      isApproved = requiresApproval ? null : true;
-      approvalStatus = requiresApproval ? "unknown" : "not_required";
-
-      if (requiresApproval) {
+      if (rpcOk) {
+        if (rpcRole) {
+          role = rpcRole;
+        }
+        const requiresApproval = requiresApprovalForRole(role);
+        if (!requiresApproval) {
+          isApproved = true;
+          approvalStatus = "not_required";
+        } else if (rpcApproved === true) {
+          isApproved = true;
+          approvalStatus = "approved";
+        } else if (rpcApproved === false) {
+          isApproved = false;
+          approvalStatus = "pending";
+        } else {
+          isApproved = null;
+          approvalStatus = "unknown";
+        }
+      } else {
+        // Legacy path: 2 sequential selects (preserved verbatim for back-compat).
         try {
-          const { data: profile, error: profileError } = await supabase
-            .from("user_profiles")
-            .select("is_approved")
-            .eq("user_id", userId)
+          const { data: dbUser } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", userId)
             .maybeSingle();
-          if (profileError) {
-            throw profileError;
+          if (dbUser?.role) {
+            role = dbUser.role;
           }
-          if (profile?.is_approved === true) {
-            isApproved = true;
-            approvalStatus = "approved";
-          } else if (profile?.is_approved === false) {
-            isApproved = false;
-            approvalStatus = "pending";
-          } else {
+        } catch {
+          // Fall back to JWT claim if DB query fails
+        }
+
+        const requiresApproval = requiresApprovalForRole(role);
+        isApproved = requiresApproval ? null : true;
+        approvalStatus = requiresApproval ? "unknown" : "not_required";
+
+        if (requiresApproval) {
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from("user_profiles")
+              .select("is_approved")
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (profileError) {
+              throw profileError;
+            }
+            if (profile?.is_approved === true) {
+              isApproved = true;
+              approvalStatus = "approved";
+            } else if (profile?.is_approved === false) {
+              isApproved = false;
+              approvalStatus = "pending";
+            } else {
+              isApproved = null;
+              approvalStatus = "unknown";
+            }
+          } catch {
+            // Keep the gate closed when approval cannot be verified
             isApproved = null;
             approvalStatus = "unknown";
           }
-        } catch {
-          // Keep the gate closed when approval cannot be verified
-          isApproved = null;
-          approvalStatus = "unknown";
         }
       }
     }

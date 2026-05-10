@@ -4,6 +4,51 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §247 — Chantier C : RPC get_user_auth_context (audit perf pass 1) (2026-05-10)
+
+**Contexte :** Chantier C issu de `docs/audits/2026-05-10-perf-audit-pass1.md` (drapeau racine #3 chemin critique réseau, login waterfall). Cible : fusionner les 2 selects séquentiels post-signIn (`users.role` puis `user_profiles.is_approved`) en 1 round-trip RPC. Sur Slow 3G (RTT 400 ms), gain estimé **-400 à -800 ms** sur le TTI login. Numérotation §247 (et non §245 ou §246) car §245 réservé Fix bannière PWA + §246 réservé Pass 7 polish iOS premium livrés en parallèle.
+
+**Changements (3 fichiers, ~85 LOC nettes) :**
+
+| # | Fichier | Action |
+|---|---|---|
+| 1 | `supabase/migrations/00158_get_user_auth_context_rpc.sql` (NEW, 42 LOC) | Migration RPC `get_user_auth_context()` SECURITY DEFINER, lit `users.role` + `user_profiles.is_approved` en 1 SELECT JOIN. Check `app_user_id()` interne empêche l'exfiltration cross-user. Pattern aligné sur §223 `get_coach_kpis_rpc`. `grant execute ... to authenticated`. |
+| 2 | `src/lib/auth.ts loadUser()` | Tente `supabase.rpc("get_user_auth_context")` en priorité. Si succès (`rpcOk = true`), utilise `ctx.role` + `ctx.is_approved` pour driver `role`/`isApproved`/`approvalStatus`. Fallback **byte-identical** sur les 2 selects historiques en cas d'erreur RPC (preservation totale du legacy path pour zero régression). |
+| 3 | (migration appliquée) | `mcp__plugin_supabase_supabase__apply_migration` sur projet `fscnobivsgornxdwqwlk` retournant `{success: true}`. |
+
+**Logique RPC** (`get_user_auth_context()`, jsonb) :
+```sql
+v_user_id := app_user_id();        -- résolu côté SQL via JWT
+SELECT u.role, p.is_approved INTO v_role, v_is_approved
+FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
+WHERE u.id = v_user_id LIMIT 1;
+RETURN jsonb_build_object('role', v_role, 'is_approved', v_is_approved);
+```
+
+**Sécurité** : `SECURITY DEFINER` bypass RLS pour permettre la lecture du role propre (les policies SELECT sur `users` peuvent être restreintes admin-only). Le check `app_user_id() = users.id` interne assure qu'un utilisateur ne peut récupérer QUE son propre contexte. Aucun paramètre — l'identité vient du JWT côté serveur, impossible d'usurper.
+
+**Stratégie défensive client** :
+- `try { rpc(...) } catch { ... }` + `if (rpcOk)` branche → utilise les valeurs RPC.
+- `else` branche → exécute les 2 selects legacy intacts.
+- Migration non appliquée OU erreur réseau intermittente → fallback transparent, zéro régression.
+- Migration en prod après ce commit → gain -1 RTT sur tous les loadUser().
+
+**Vérifications :**
+- `npx tsc --noEmit` clean.
+- `npm test -- --run` : 688/689 pass + 1 fail pré-existant `transformers.test.ts buildRunUpdatePayload` (whitelist plan, hérité §214).
+- Migration appliquée via MCP Supabase → `{success: true}`.
+- Pas de test RLS dédié : la function utilise `app_user_id()` (helper existant non modifié), pas de policy RLS modifiée, pattern identique à `get_coach_kpis_rpc` (§223) qui couvre déjà ce risque. Strictement non requis selon CLAUDE.md règles d'usage `test:rls`.
+
+**Notes / régression potentielle** :
+- En cas d'erreur intermittente du RPC (timeout, 5xx), le fallback rajoute +1 RTT (legacy path) au lieu de bloquer — comportement net identique à avant §247.
+- Le RPC n'est pas conditionné par `requiresApprovalForRole(role)` côté client (contrairement au legacy qui ne lisait `is_approved` que pour rôles concernés). Net : 1 lecture supplémentaire de `is_approved` même pour admin/comité — coût négligeable (1 LEFT JOIN, données déjà cachées par Postgres).
+- Header SQL inline et commentaire `auth.ts` portent `§247` ; le nom MCP de la migration est `get_user_auth_context_rpc` (sans préfixe numérique).
+
+**Hors scope §247 (Chantiers A + E + sub-§C de D restants) :**
+- Chantier A : `persistQueryClient` + queue offline généralisée (8 mutations Profile/Records/Dashboard/SuiviSemaine).
+- Chantier E : `React.memo` sur listes longues (SwimSessionTimeline, CoachSwimmersOverview, items Records).
+- Chantier D sub-§C optionnel : `useDelayedLoading` hook + toast 5 s — UX pure, requiert /frontend-design.
+
 ## §246 — Pass 7 polish iOS premium (sub-§ A+B+C+E) (2026-05-10)
 
 **Contexte :** exécution Pass 7 du plan figé `docs/plans/2026-05-10-ui-ux-roadmap-to-10.md` post-audit pass 6. Décisions UX validées par utilisateur via AskUserQuestion : Sub-§ A (animations) + B (skeletons) + C (haptic success/error) + E (bottom nav badges). **Sub-§ D Typography rhythm SKIPPÉ** (ROI marginal) et **Sub-§ F Surface adoption massive 140+ fichiers SKIPPÉ** (risque trop élevé face au gain). Sub-§ G dark mode = audit manuel utilisateur en parallèle.
