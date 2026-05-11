@@ -37,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -496,6 +497,13 @@ export default function StrengthCatalog() {
     initialPageParam: 0,
   });
   const sessions = sessionPages?.pages.flatMap((p) => p.sessions) ?? [];
+
+  const { showSlowToast: showCatalogSlowToast } = useDelayedLoading(isLoadingExercises || isLoadingSessions);
+  useEffect(() => {
+    if (showCatalogSlowToast) {
+      toast("Ça prend du temps…", { description: "Le chargement du catalogue musculation prend plus de temps que prévu." });
+    }
+  }, [showCatalogSlowToast]);
 
   const { data: athletes = [] } = useQuery({
     queryKey: ["athletes"],

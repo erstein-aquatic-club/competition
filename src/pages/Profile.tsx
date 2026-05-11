@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { useLocation } from "wouter";
 import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronLeft, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
@@ -363,6 +364,14 @@ export default function Profile() {
     refetchProfile();
     refetchGroups();
   };
+
+  const isLoading = profileLoading || groupsLoading;
+  const { showSlowToast } = useDelayedLoading(isLoading);
+  useEffect(() => {
+    if (showSlowToast) {
+      toast("Ça prend du temps…", { description: "Le réseau semble lent. On continue d'essayer." });
+    }
+  }, [showSlowToast]);
 
 
 

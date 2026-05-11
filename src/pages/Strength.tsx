@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dumbbell, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
 import { SessionBrowser } from "@/components/strength/SessionBrowser";
 import { SessionSummary } from "@/components/strength/SessionSummary";
@@ -728,6 +729,13 @@ export default function Strength() {
   }, [screenMode]);
 
   const isLoading = assignmentsLoading || catalogLoading;
+
+  const { showSlowToast } = useDelayedLoading(isLoading);
+  useEffect(() => {
+    if (showSlowToast) {
+      toast("Ça prend du temps…", { description: "Le réseau semble lent. On continue d'essayer." });
+    }
+  }, [showSlowToast]);
 
   if (isLoading) {
     return (

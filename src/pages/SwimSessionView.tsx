@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -35,6 +35,7 @@ import type { SwimExerciseLog, SwimExerciseLogInput } from "@/lib/api";
 import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { generateShareToken, getSwimSessionById } from "@/lib/api/swim";
 import { supabase } from "@/lib/supabase";
 import { ShareMenu } from "@/components/shared/ShareMenu";
@@ -123,6 +124,13 @@ export default function SwimSessionView() {
     queryFn: () => getAssignments(user!, userId),
     enabled: !!user,
   });
+
+  const { showSlowToast } = useDelayedLoading(isLoading);
+  useEffect(() => {
+    if (showSlowToast) {
+      toast("Ça prend du temps…", { description: "Le réseau semble lent. On continue d'essayer." });
+    }
+  }, [showSlowToast]);
 
   type SwimAssignment = Assignment & { session_type: "swim"; items?: SwimSessionItem[] };
   const swimAssignments = assignments?.filter(

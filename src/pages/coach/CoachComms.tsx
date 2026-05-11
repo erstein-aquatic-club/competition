@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { getNotificationLog } from "@/lib/api";
 import type { NotificationLogEntry } from "@/lib/api/notificationLog";
 import { BellRing, Clock, MessageSquare, Users, User } from "lucide-react";
@@ -108,6 +110,13 @@ export default function CoachComms({
   initialAthleteId,
 }: CoachCommsProps) {
   const [tab, setTab] = useState<CoachCommsTab>(initialTab ?? "notifications");
+
+  const { showSlowToast } = useDelayedLoading(athletesLoading);
+  useEffect(() => {
+    if (showSlowToast) {
+      toast("Ça prend du temps…", { description: "Le chargement des données prend plus de temps que prévu." });
+    }
+  }, [showSlowToast]);
 
   useEffect(() => {
     setTab(initialTab ?? "notifications");

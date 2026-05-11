@@ -35,6 +35,7 @@ import {
   calculateSwimTotalDistance,
 } from "@/lib/swimSessionUtils";
 import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -1810,6 +1811,13 @@ const CoachTrainingSlotsScreen = ({
     staleTime: 30_000,
     gcTime: 5 * 60 * 1000,
   });
+
+  const { showSlowToast: showSlotsSlowToast } = useDelayedLoading(slotsLoading);
+  useEffect(() => {
+    if (showSlotsSlowToast) {
+      toast("Ça prend du temps…", { description: "Le chargement des créneaux prend plus de temps que prévu." });
+    }
+  }, [showSlotsSlowToast]);
 
   // Fetch all overrides (we filter client-side per week)
   const { data: allOverrides = [] } = useQuery({

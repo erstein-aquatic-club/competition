@@ -40,6 +40,7 @@ import { SwimSessionBuilder } from "@/components/coach/swim/SwimSessionBuilder";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Loader2, Plus, Route, Search, Timer, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useAuth } from "@/lib/auth";
 import { formatSwimSessionDefaultTitle } from "@/lib/date";
@@ -279,6 +280,13 @@ export default function SwimCatalog({
     queryKey: ["swim_catalog_folders"],
     queryFn: getSwimCatalogFolders,
   });
+
+  const { showSlowToast: showCatalogSlowToast } = useDelayedLoading(sessionsLoading || assignmentsLoading);
+  useEffect(() => {
+    if (showCatalogSlowToast) {
+      toast("Ça prend du temps…", { description: "Le chargement du catalogue prend plus de temps que prévu." });
+    }
+  }, [showCatalogSlowToast]);
 
   const createFolderMutation = useMutation({
     mutationFn: (path: string) => createSwimCatalogFolder(path),
