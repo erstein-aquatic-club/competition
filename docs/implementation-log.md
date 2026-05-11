@@ -167,6 +167,60 @@ L'audit robustesse (§266 R1) avait identifié 4 zones grises : onError manquant
 
 **Limites :** Le fix Dashboard error supprime le full-screen. Si l'erreur survient avant que les données initiales soient disponibles (premier load), la page affiche le calendar vide avec le banner inline — UX préférable au plein-écran bloquant.
 
+## §267 — Chantier R2 : memoization hubs runtime (SetRow, Strength listes, RecordCard) (2026-05-11)
+
+**Contexte :** Phase 2 du plan `docs/plans/2026-05-10-vers-9-10-robustesse-perf-friction.md`. Cible fluidité +1.0. L'audit identifiait 3 points de re-render cascade : WorkoutRunner re-rend tous les items de l'aperçu à chaque set logué, Strength.tsx re-rend HistoryTable/MyPlanTab sur chaque frappe, Records.tsx re-rend toutes les RecordCard + stagger animé O(n×0.05s) bloquant.
+
+**Changements :**
+
+**sub-§A — extraire SetRow memo** (`SetRow.tsx` NEW, `WorkoutRunner.tsx`)
+- Extraction de la JSX inline `workoutPlan.map(...)` (aperçu séance) dans `src/components/strength/SetRow.tsx`
+- `SetRow` = `memo(SetRowImpl, comparator)` avec comparateur custom sur `loggedSets`, `isActive`, `hasPr`, `index`, `item`, `exercise`
+- `hasPr` pré-calculé dans `WorkoutRunner` avant le render (évite `Array.from` inline dans JSX)
+- `item.sets ?? 0` défensif pour `StrengthSessionItem` (sets: number non-nullable mais sécurité accrue)
+
+**sub-§B — memoize Strength.tsx listes dérivées + wrap onglets** (`Strength.tsx`, `MyPlanTab.tsx`, `HistoryTable.tsx`)
+- `import { useCallback }` ajouté dans `Strength.tsx`
+- `startPlanSession` et `startPlanSessionDirect` wrappés en `useCallback` (deps: `exerciseLookup`, `toast`) → refs stables pour `MyPlanTab`
+- `sessionExerciseNames` memoïsé (remplace `new Map(...)` inline dans `SessionSummary` — recréé à chaque render du parent)
+- `MyPlanTab` : `export function MyPlanTabImpl` + `export const MyPlanTab = memo(MyPlanTabImpl)` — no-re-render si `athleteId` / callbacks ne changent pas
+- `HistoryTable` : idem `memo(HistoryTableImpl)` — props primitifs stables → 0 re-render sur switch onglet Muscu
+
+**sub-§C — memo RecordCard + plafond stagger** (`RecordCard.tsx` NEW, `Records.tsx`)
+- `src/components/records/RecordCard.tsx` : extraction card record nage inline → composant `memo(RecordCardImpl, comparator)` (compare `record` + `onClick`)
+- `openEditSwim` wrappé en `useCallback` (deps: `setSwimForm`, `setSwimSheetOpen`) → ref stable pour RecordCard
+- Plafond stagger : items > index 10 reçoivent `variants={undefined}` + `initial={false}` → pas d'animation (évite 50×0.05s=2.5s de délai avec une grande liste)
+- Container stagger réduit à 0.02s quand `filteredSwimRecords.length > 10`
+
+**Fichiers modifiés :**
+
+| Fichier | Changement |
+|---------|------------|
+| `src/components/strength/SetRow.tsx` | NEW — SetRow memoïsé (66 lignes) |
+| `src/components/strength/WorkoutRunner.tsx` | import SetRow + remplacement JSX inline (1484 lignes) |
+| `src/pages/Strength.tsx` | useCallback startPlanSession/Direct + useMemo sessionExerciseNames (1163 lignes) |
+| `src/components/strength/MyPlanTab.tsx` | memo wrap (357 lignes) |
+| `src/components/strength/HistoryTable.tsx` | memo wrap (331 lignes) |
+| `src/components/records/RecordCard.tsx` | NEW — RecordCard memoïsée (56 lignes) |
+| `src/pages/Records.tsx` | useCallback openEditSwim + RecordCard + stagger cap (1475 lignes) |
+
+**Tests :**
+- `npx tsc --noEmit` : 0 erreur. ✅
+- `npm test` : 695/696 pass (1 pre-existing `transformers.test.ts`). ✅
+- Pas de `npm run test:rls` : aucune policy RLS modifiée (modifications purement UI/memoization).
+
+**Décisions :**
+- `SetRow` extrait de l'aperçu séance (Sheet `Voir les séries`) — c'est la liste la plus longue (N exercices) qui re-render à chaque set validé. Hors scope : l'interface principale (charge/reps/difficulté) n'est pas mise en composant séparé car elle n'est pas dans un `.map`.
+- `startPlanSession` deps = `[exerciseLookup, toast]` : `exerciseLookup` est lui-même `useMemo` stable tant que `exercises` ne change pas. `toast` est stable (ref Zustand). Les setters d'état Zustand/useState sont stables par définition.
+- `sessionExerciseNames` dépend de `activeSession?.items` (ref stable tant que la séance active ne change pas) et `exerciseLookup`.
+- Pour RecordCard, le `formatTimeSeconds` et `formatDateShort` sont des fonctions module-level → pas besoin de les passer en props.
+- Stagger cap : `variants={undefined}` sur item + `initial={false}` retire l'animation pour les items au-delà de 10, sans toucher à la logique de liste. Le container stagger réduit (0.02s vs 0.05s) améliore aussi les listes de 10-15 items.
+
+**Limites / dette :**
+- Validation perf React Profiler à faire par l'utilisateur en runtime (pas d'accès navigateur dans le worktree) : vérifier WorkoutRunner keystroke → seul SetRow actif re-render.
+- MyPlanTab : si `onSelectSession`/`onLaunchSessionDirect` ne sont pas useCallback-stables côté parent, le memo ne bénéficiera pas. Le `useCallback` ajouté sur `startPlanSession`/`startPlanSessionDirect` garantit la stabilité pour les props passées depuis `Strength.tsx`.
+
+
 ## §266 — Chantier R1 : fix P0 robustesse (idempotency, auto-sync, chrono, 5 confirm natifs) (2026-05-10)
 
 **Contexte :** Phase 1 du plan `docs/plans/2026-05-10-vers-9-10-robustesse-perf-friction.md`. L'audit `docs/audits/2026-05-10-robustesse-perf-fluidite.md` identifiait 4 correctifs P0 bloquants pour atteindre ≥ 9/10 en robustesse/friction : (A) doublons offline queue, (B) auto-sync coach non retriggered sur changement de coach, (C) persistance chrono synchrone sans debounce → freeze iOS, (D) 5 `window.confirm` natifs non-iOS-aligned.

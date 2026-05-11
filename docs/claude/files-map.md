@@ -61,7 +61,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/Strength.tsx` | Module musculation nageur | ~921 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
-| `src/pages/Records.tsx` | Records personnels + FFN sync | ~1376 lignes |
+| `src/pages/Records.tsx` | Records personnels + FFN sync | 1475 lignes |
+| `src/components/records/RecordCard.tsx` | Card record de natation memoïsée — utilisée dans Records.tsx filteredSwimRecords.map (§267 R2 sub-§C) | 56 lignes |
 | `src/pages/RecordsClub.tsx` | Records club (sections nage, drill-down progressif) | ~840 lignes |
 | `src/pages/RecordsAdmin.tsx` | Admin records + gestion nageurs | ~300 lignes |
 | `src/pages/Login.tsx` | Login + inscription | ~340 lignes |
@@ -150,7 +151,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/competition/ChecklistTab.tsx` | Onglet checklist (templates, progress bar, toggle) | ~415 lignes |
 | `src/components/strength/ExercisePicker.tsx` | Picker substitution/ajout exercices en mode focus (§89) — utilise ExerciseGif offline-aware (§170) | |
 | `src/components/strength/ExerciseGif.tsx` | Composant `<img>` partagé focus muscu : key={src} + skeleton + onError fallback Dumbbell/ImageOff offline-aware (§170) | 83 lignes |
-| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur — consomme strength_planning_* BDD avec fallback cycles Phase 1 (§156+§157) | 325 lignes |
+| `src/components/strength/MyPlanTab.tsx` | Onglet Mon plan nageur — consomme strength_planning_* BDD avec fallback cycles Phase 1 (§156+§157) (memo §267) | 357 lignes |
 | `src/components/strength/MyPlanWeekCard.tsx` | Carte semaine collapse/expand : rail dot, header S/dates/phase/chips compétitions, grille 7j (§156) | 215 lignes |
 | `src/components/strength/MyPlanSessionSheet.tsx` | Bottom Sheet aperçu séance muscu (titre, phase badge, liste items, Lancer) (§156) | 103 lignes |
 | `src/components/strength/MyPlanSessionRow.tsx` | Ligne jour×séance dans carte semaine (check, badge jour, titre, compteur) (§156) | 99 lignes |
@@ -218,7 +219,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/swim/SwimPlanningTimeline.tsx` | Timeline semaines + micro-grille jour × créneau + chips filière (présentationnel, partagé coach/nageur) — ring+icon override, opacity inherited, `readOnly` (§153) | ~780 lignes |
 | `src/components/coach/swim/swimPlanningShared.ts` | Helpers/constantes partagés timeline swim (WeekInfo, DAY_ROWS, getMonday, generateWeeks, fmtDD_MM, isCurrentWeek) | ~75 lignes |
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach (formulaire épuré sans Cards, §196) | 244 lignes |
-| `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | ~1330 lignes |
+| `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | 1484 lignes |
+| `src/components/strength/SetRow.tsx` | Ligne exercice memoïsée pour l'aperçu séance dans WorkoutRunner (§267 R2 sub-§A) | 66 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
 | `src/components/dashboard/DashboardCalendar.tsx` | Wrapper React.memo de CalendarHeader + CalendarGrid — isole le calendrier des re-renders d'écriture (§216) | 69 lignes |
 | `src/components/dashboard/DashboardFeedbackContainer.tsx` | Conteneur React.memo du FeedbackDrawer — possède saveState/draftState/alternativeOverride + 5 mutations + handlers markAbsent/markPresent/clearOverride/saveFeedback (§216) | 440 lignes |
@@ -246,7 +248,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/strength/SessionDetailPreview.tsx` | Aperçu détail séance muscu | ~382 lignes |
 | `src/components/strength/SessionList.tsx` | Liste séances muscu | ~399 lignes |
 | `src/components/strength/ExerciseProgressChart.tsx` | Graphe progression exercice | ~335 lignes |
-| `src/components/strength/HistoryTable.tsx` | Tableau historique muscu | ~329 lignes |
+| `src/components/strength/HistoryTable.tsx` | Tableau historique muscu (memo §267) | 331 lignes |
 | `src/components/strength/StrengthLeaderboard.tsx` | Leaderboard muscu | ~294 lignes |
 | `src/components/strength/InProgressCard.tsx` | Carte séance en cours | ~212 lignes |
 | `src/components/wellness/WellnessForm.tsx` | Formulaire wellness check | ~342 lignes |
