@@ -233,14 +233,20 @@ export const useAuth = create<AuthState>((set) => ({
     let userId = extractAppUserId(supabaseUser);
 
     // If userId is missing (JWT generated before signup trigger updated app_metadata),
-    // force a session refresh to get the latest claims.
+    // force session refresh with exponential backoff — up to 3 attempts.
+    // Delays: 200ms, 400ms, 800ms. Covers race condition on fresh signups.
     if (!userId) {
-      const { data: refreshed } = await supabase.auth.refreshSession();
-      if (refreshed.session) {
-        session = refreshed.session;
-        supabaseUser = session.user;
-        displayName = extractDisplayName(supabaseUser);
-        userId = extractAppUserId(supabaseUser);
+      const retryDelays = [200, 400, 800];
+      for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+        await new Promise((r) => setTimeout(r, retryDelays[attempt]));
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (refreshed.session) {
+          session = refreshed.session;
+          supabaseUser = session.user;
+          displayName = extractDisplayName(supabaseUser);
+          userId = extractAppUserId(supabaseUser);
+        }
+        if (userId) break;
       }
     }
 

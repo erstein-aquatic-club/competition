@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getGroups } from "@/lib/api";
+import { getGroups, withTimeout } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -150,22 +150,33 @@ export default function Login() {
 
   const handleSignup = async (data: SignupFormData) => {
     try {
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: data.email.trim(),
-        password: data.password,
-        options: {
-          emailRedirectTo: window.location.origin + "/competition/#/",
-          data: {
-            display_name: data.name.trim(),
-            role: data.role,
-            birthdate: data.birthdate,
-            group_id: Number(data.groupId),
-            sex: data.sex,
-            phone: data.phone.trim(),
+      const { data: authData, error: signUpError } = await withTimeout(
+        supabase.auth.signUp({
+          email: data.email.trim(),
+          password: data.password,
+          options: {
+            emailRedirectTo: window.location.origin + "/competition/#/",
+            data: {
+              display_name: data.name.trim(),
+              role: data.role,
+              birthdate: data.birthdate,
+              group_id: Number(data.groupId),
+              sex: data.sex,
+              phone: data.phone.trim(),
+            },
           },
-        },
-      });
+        }),
+        15_000,
+        "auth.signUp",
+      );
       if (signUpError) {
+        // Intercept "already registered" error: switch to login tab instead of showing error
+        if (signUpError.message?.toLowerCase().includes("already registered")) {
+          setActiveTab("login");
+          signupForm.reset();
+          setError("Ce compte existe déjà — connecte-toi.");
+          return;
+        }
         throw new Error(signUpError.message);
       }
       if (authData.user) {
