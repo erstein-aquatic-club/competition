@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createTemporaryGroup,
@@ -92,18 +93,19 @@ const SwimmerPicker = ({
   filterToUserIds,
 }: SwimmerPickerProps) => {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
 
   const filtered = useMemo(() => {
     let list = athletes.filter((a) => a.id != null);
     if (filterToUserIds) {
       list = list.filter((a) => filterToUserIds.has(a.id!));
     }
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter((a) => a.display_name.toLowerCase().includes(q));
     }
     return list;
-  }, [athletes, filterToUserIds, search]);
+  }, [athletes, filterToUserIds, debouncedSearch]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>();

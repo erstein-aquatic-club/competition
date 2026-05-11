@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllAssignments, assignSwimmer, unassignSwimmer, reassignSwimmer } from "@/lib/api";
@@ -210,6 +211,7 @@ export default function CoachMySwimmersScreen({
   const [, navigate] = useLocation();
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const [removingSwimmer, setRemovingSwimmer] = useState<AthleteSummary | null>(null);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -310,10 +312,10 @@ export default function CoachMySwimmersScreen({
   }, [assignments]);
 
   const filteredAthletes = useMemo(() => {
-    if (!search.trim()) return athletes;
-    const q = search.toLowerCase().trim();
+    if (!debouncedSearch.trim()) return athletes;
+    const q = debouncedSearch.toLowerCase().trim();
     return athletes.filter((a) => a.display_name.toLowerCase().includes(q));
-  }, [athletes, search]);
+  }, [athletes, debouncedSearch]);
 
   // ── Coach view derivations ───────────────────────────────────
 

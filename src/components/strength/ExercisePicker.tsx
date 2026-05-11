@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
@@ -25,10 +26,11 @@ export function ExercisePicker({
   title = "Choisir un exercice",
 }: ExercisePickerProps) {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const isOnline = useOnlineStatus();
 
   const filtered = useMemo(() => {
-    const q = stripAccents(search.trim().toLowerCase());
+    const q = stripAccents(debouncedSearch.trim().toLowerCase());
     let list = exercises.filter((e) => e.exercise_type === "strength");
     if (q) {
       list = list.filter((e) =>
@@ -43,7 +45,7 @@ export function ExercisePicker({
       });
     }
     return list;
-  }, [exercises, search, preferredType]);
+  }, [exercises, debouncedSearch, preferredType]);
 
   return (
     <Sheet open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setSearch(""); }}>

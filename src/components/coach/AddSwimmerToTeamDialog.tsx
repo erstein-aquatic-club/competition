@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, UserPlus, Loader2 } from "lucide-react";
 import {
@@ -39,13 +40,14 @@ export function AddSwimmerToTeamDialog({
 
   // ── Tab "Du club" ─────────────────────────────────────────
   const [clubSearch, setClubSearch] = useState("");
+  const debouncedClubSearch = useDebouncedValue(clubSearch, 200);
   const filteredAvailable = useMemo(() => {
-    const q = clubSearch.trim().toLowerCase();
+    const q = debouncedClubSearch.trim().toLowerCase();
     if (!q) return availableSwimmers;
     return availableSwimmers.filter((a) =>
       (a.display_name ?? "").toLowerCase().includes(q),
     );
-  }, [availableSwimmers, clubSearch]);
+  }, [availableSwimmers, debouncedClubSearch]);
 
   // ── Tab "Sans compte" ─────────────────────────────────────
   const queryClient = useQueryClient();

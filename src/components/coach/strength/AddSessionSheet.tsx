@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getStrengthSessions, duplicateStrengthSession } from "@/lib/api";
 import { Dumbbell, Loader2, Plus, Search } from "lucide-react";
@@ -33,6 +34,7 @@ export function AddSessionSheet({
 }: AddSessionSheetProps) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
 
   const { data: allSessions = [], isLoading } = useQuery({
@@ -59,9 +61,9 @@ export function AddSessionSheet({
     onSettled: () => setDuplicatingId(null),
   });
 
-  const filtered = search.trim()
+  const filtered = debouncedSearch.trim()
     ? allSessions.filter((s) =>
-        (s.title ?? "").toLowerCase().includes(search.toLowerCase()),
+        (s.title ?? "").toLowerCase().includes(debouncedSearch.toLowerCase()),
       )
     : allSessions;
 

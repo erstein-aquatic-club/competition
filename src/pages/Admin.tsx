@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, ShieldCheck, UserMinus, UserPlus, Search, CheckCircle, XCircle, Clock, Pen, Save, History, Sun } from "lucide-react";
@@ -153,6 +154,9 @@ export default function Admin() {
   const [rejectPending, setRejectPending] = useState<{ userId: number; displayName: string } | null>(null);
   const [disablePending, setDisablePending] = useState<{ userId: number; displayName: string } | null>(null);
   const [ficheSearch, setFicheSearch] = useState("");
+
+  const debouncedSearchValue = useDebouncedValue(searchValue, 200);
+  const debouncedFicheSearch = useDebouncedValue(ficheSearch, 200);
 
   const {
     register,
@@ -368,7 +372,7 @@ export default function Admin() {
   }, [users]);
 
   const filteredUsers = useMemo(() => {
-    const normalizedSearch = searchValue.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchValue.trim().toLowerCase();
     return users.filter((user) => {
       if (roleFilter !== "all" && user.role !== roleFilter) {
         return false;
@@ -380,7 +384,7 @@ export default function Admin() {
       }
       return true;
     });
-  }, [users, roleFilter, searchValue]);
+  }, [users, roleFilter, debouncedSearchValue]);
 
   const selectedUser = useMemo(() => {
     if (!selectedUserId) return null;
@@ -388,17 +392,17 @@ export default function Admin() {
   }, [selectedUserId, users]);
 
   const ficheFilteredUsers = useMemo(() => {
-    const q = ficheSearch.trim().toLowerCase();
+    const q = debouncedFicheSearch.trim().toLowerCase();
     if (!q) return users;
     return users.filter((u) =>
       (u.display_name?.toLowerCase() ?? "").includes(q) ||
       (u.email?.toLowerCase() ?? "").includes(q),
     );
-  }, [users, ficheSearch]);
+  }, [users, debouncedFicheSearch]);
 
   // Reset pagination when filters change
-  React.useEffect(() => { setUsersShown(50); }, [searchValue, roleFilter, includeInactive]);
-  React.useEffect(() => { setFichesShown(50); }, [ficheSearch]);
+  React.useEffect(() => { setUsersShown(50); }, [debouncedSearchValue, roleFilter, includeInactive]);
+  React.useEffect(() => { setFichesShown(50); }, [debouncedFicheSearch]);
 
   // Populate form when profile data arrives while sheet is open
   React.useEffect(() => {

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -710,6 +711,7 @@ function QuickComposeBody({
   const submittingRef = useRef(false);
   const [assigningCatalogId, setAssigningCatalogId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const [splitDistanceAlertOpen, setSplitDistanceAlertOpen] = useState(false);
   const splitDistanceConfirmRef = useRef<((proceed: boolean) => void) | null>(null);
 
@@ -795,7 +797,7 @@ function QuickComposeBody({
 
   const filteredCatalog = useMemo<SwimSessionTemplate[]>(() => {
     if (!catalog) return [];
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return catalog
       .filter((s) => !s.is_archived)
       .filter((s) => !assignedIds?.has(s.id))
@@ -806,7 +808,7 @@ function QuickComposeBody({
           (s.folder ?? "").toLowerCase().includes(q),
       )
       .slice(0, 40);
-  }, [catalog, search, assignedIds]);
+  }, [catalog, debouncedSearch, assignedIds]);
 
   const libraryDisabled = !hasGroup || !isVisibleFromValid || submitting;
 

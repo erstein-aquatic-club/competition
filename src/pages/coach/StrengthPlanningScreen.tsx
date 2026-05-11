@@ -12,6 +12,7 @@
  * - 7 day rows (uses shared DAY_ROWS from swimPlanningShared which already has 7).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery } from "@tanstack/react-query";
 import {
   getGroups,
@@ -294,6 +295,7 @@ export default function StrengthPlanningScreen() {
     existing: EffectiveStrengthSlot | null;
   } | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
+  const debouncedPickerSearch = useDebouncedValue(pickerSearch, 200);
 
   // ── Detail sheet state (tap case pleine) ──
   const [detailSlot, setDetailSlot] = useState<EffectiveStrengthSlot | null>(null);
@@ -361,8 +363,8 @@ export default function StrengthPlanningScreen() {
   }, [sessionTemplates]);
 
   const filteredCatalog = useMemo(() => {
-    if (!pickerSearch.trim()) return catalogGrouped;
-    const q = pickerSearch.toLowerCase();
+    if (!debouncedPickerSearch.trim()) return catalogGrouped;
+    const q = debouncedPickerSearch.toLowerCase();
     return catalogGrouped
       .map((g) => ({
         ...g,
@@ -373,7 +375,7 @@ export default function StrengthPlanningScreen() {
         ),
       }))
       .filter((g) => g.sessions.length > 0);
-  }, [catalogGrouped, pickerSearch]);
+  }, [catalogGrouped, debouncedPickerSearch]);
 
   const handlePickSession = (templateId: number) => {
     if (!picker) return;

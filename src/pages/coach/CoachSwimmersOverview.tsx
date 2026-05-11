@@ -1,4 +1,5 @@
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { getRecentSessionsAllAthletes, getObjectivesCountsByUser } from "@/lib/api";
 import { getAthletesPaginated, getFeedbackRatesAllAthletes } from "@/lib/api/users";
@@ -197,7 +198,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [coachFilter, setCoachFilter] = useState<number | null>(null);
   const [searchText, setSearchText] = useState("");
-  const deferredSearch = useDeferredValue(searchText);
+  const debouncedSearchText = useDebouncedValue(searchText, 200);
 
   // Paginated athletes query
   const {
@@ -207,12 +208,12 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
     isFetchingNextPage,
     isLoading: paginatedLoading,
   } = useInfiniteQuery({
-    queryKey: ['athletes-paginated', deferredSearch, groupFilter],
+    queryKey: ['athletes-paginated', debouncedSearchText, groupFilter],
     queryFn: ({ pageParam = 0 }) =>
       getAthletesPaginated({
         offset: pageParam,
         limit: PAGE_SIZE,
-        search: deferredSearch || undefined,
+        search: debouncedSearchText || undefined,
         groupId: groupFilter ?? undefined,
       }),
     getNextPageParam: (lastPage, allPages) => {

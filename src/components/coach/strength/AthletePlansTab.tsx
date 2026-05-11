@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getStrengthFolders,
@@ -101,6 +102,7 @@ export function AthletePlansTab({
     onSelectedAthleteChange?.(id);
   };
   const [athleteSearch, setAthleteSearch] = useState("");
+  const debouncedAthleteSearch = useDebouncedValue(athleteSearch, 200);
 
   /* Count sessions per athlete across all their folders */
   const { data: allFolders = [] } = useQuery({
@@ -161,8 +163,8 @@ export function AthletePlansTab({
   const filtered = athletes.filter(
     (a) =>
       a.id != null &&
-      (!athleteSearch.trim() ||
-        a.display_name.toLowerCase().includes(athleteSearch.toLowerCase())),
+      (!debouncedAthleteSearch.trim() ||
+        a.display_name.toLowerCase().includes(debouncedAthleteSearch.toLowerCase())),
   );
 
   return (

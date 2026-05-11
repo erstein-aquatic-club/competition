@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMyTeam } from "../../hooks/useMyTeam";
 import { Play, Plus, Minus, Search, Users, Trash2, BookmarkPlus, Loader2, Pencil, Check, AlertTriangle, ArrowLeftRight, Waves, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
@@ -40,6 +41,7 @@ export default function ChronoSetup({
   const maxWaves = isMobile ? 2 : 6;
   const [addLane, setAddLane] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const [activeTab, setActiveTab] = useState<"team" | "club">("team");
   const [justAddedManual, setJustAddedManual] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -90,7 +92,7 @@ export default function ChronoSetup({
 
   // Group athletes by group_label for the picker
   const groupedAthletes = useMemo(() => {
-    const lowerSearch = search.toLowerCase();
+    const lowerSearch = debouncedSearch.toLowerCase();
     const filtered = displayAthletes.filter(
       (a) =>
         a.id != null &&
@@ -104,12 +106,12 @@ export default function ChronoSetup({
       else groups.set(label, [a]);
     }
     return groups;
-  }, [displayAthletes, search]);
+  }, [displayAthletes, debouncedSearch]);
 
   const filteredManuals = useMemo(() => {
-    const lower = search.toLowerCase();
+    const lower = debouncedSearch.toLowerCase();
     return manuals.filter((m) => m.displayName.toLowerCase().includes(lower));
-  }, [manuals, search]);
+  }, [manuals, debouncedSearch]);
 
   /** Count of swimmers currently in the target lane (for limit display). */
   const laneCount = useMemo(

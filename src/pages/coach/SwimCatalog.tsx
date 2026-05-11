@@ -1,4 +1,5 @@
-import React, { useEffect, useDeferredValue, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Assignment,
@@ -215,7 +216,7 @@ export default function SwimCatalog({
   const [pendingDeleteSession, setPendingDeleteSession] = useState<SwimSessionTemplate | null>(null);
   const [pendingArchiveSession, setPendingArchiveSession] = useState<SwimSessionTemplate | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
 
   // Folder navigation
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
@@ -253,12 +254,12 @@ export default function SwimCatalog({
     hasNextPage: hasNextSwimPage,
     isFetchingNextPage: isFetchingNextSwimPage,
   } = useInfiniteQuery({
-    queryKey: ["swim_catalog_paginated", deferredSearchQuery, currentFolder],
+    queryKey: ["swim_catalog_paginated", debouncedSearchQuery, currentFolder],
     queryFn: ({ pageParam = 0 }) =>
       getSwimSessionsPaginated({
         offset: pageParam,
         limit: SWIM_PAGE_SIZE,
-        search: deferredSearchQuery || undefined,
+        search: debouncedSearchQuery || undefined,
         folder: currentFolder ?? undefined,
       }),
     getNextPageParam: (lastPage, allPages) => {

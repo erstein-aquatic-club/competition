@@ -1,4 +1,5 @@
-import { Suspense, useEffect, useDeferredValue, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -404,7 +405,7 @@ export default function StrengthCatalog() {
   const [editWarmupMode, setEditWarmupMode] = useState<"reps" | "duration">("reps");
   const [gifUploading, setGifUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
   const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises">("sessions");
   const [planSelectedAthleteId, setPlanSelectedAthleteId] = useState<number | null>(null);
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
@@ -482,12 +483,12 @@ export default function StrengthCatalog() {
     hasNextPage: hasNextStrengthPage,
     isFetchingNextPage: isFetchingNextStrengthPage,
   } = useInfiniteQuery({
-    queryKey: ["strength_catalog_paginated", deferredSearchQuery],
+    queryKey: ["strength_catalog_paginated", debouncedSearchQuery],
     queryFn: ({ pageParam = 0 }) =>
       getStrengthSessionsPaginated({
         offset: pageParam,
         limit: STRENGTH_PAGE_SIZE,
-        search: deferredSearchQuery || undefined,
+        search: debouncedSearchQuery || undefined,
       }),
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.sessions.length < STRENGTH_PAGE_SIZE) return undefined;

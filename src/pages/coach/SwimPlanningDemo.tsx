@@ -4,6 +4,7 @@
  * Route: /#/coach/swim-planning
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery } from "@tanstack/react-query";
 import {
   getGroups,
@@ -334,17 +335,18 @@ export default function SwimPlanningDemo() {
     currentSessionId?: string | null;
   } | null>(null);
   const [sessionSearch, setSessionSearch] = useState("");
+  const debouncedSessionSearch = useDebouncedValue(sessionSearch, 200);
 
   const filteredCatalog = useMemo(() => {
-    if (!sessionSearch.trim()) return catalogByDate;
-    const q = sessionSearch.toLowerCase();
+    if (!debouncedSessionSearch.trim()) return catalogByDate;
+    const q = debouncedSessionSearch.toLowerCase();
     return catalogByDate
       .map((g) => ({
         ...g,
         sessions: g.sessions.filter((s) => s.name.toLowerCase().includes(q)),
       }))
       .filter((g) => g.sessions.length > 0);
-  }, [catalogByDate, sessionSearch]);
+  }, [catalogByDate, debouncedSessionSearch]);
 
   // Map session IDs to names for display
   const sessionNameMap = useMemo(() => {

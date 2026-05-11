@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   StrengthCycleType,
@@ -207,6 +208,7 @@ export default function Strength() {
     wasRestored,
   } = useStrengthState({ athleteKey: historyAthleteKey });
 
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
   const isOnline = useOnlineStatus();
   const wasOfflineRef = useRef(false);
 
@@ -1008,7 +1010,7 @@ export default function Strength() {
                   athleteId={historyAthleteId}
                   athleteKey={historyAthleteKey}
                   cycleType={cycleType}
-                  searchQuery={searchQuery}
+                  searchQuery={debouncedSearchQuery}
                   isLoading={isListLoading}
                   setSaveState={setSaveState}
                   onCycleChange={setCycleType}
