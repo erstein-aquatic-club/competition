@@ -473,11 +473,24 @@ export async function logStrengthSet(payload: {
         : Number(athleteIdRaw);
 
     if (athleteIdNum === null || !Number.isFinite(athleteIdNum)) {
-      assertSupabase(
-        await supabase
-          .from("strength_set_logs")
-          .insert(createSetLogDbPayload(payload))
-      );
+      const setLogPayload = createSetLogDbPayload(payload);
+      // Use UPSERT when set_index is present so that offline-queue replay
+      // and reconcileStrengthRunLogs never create duplicate rows.
+      // The partial unique index on (run_id, exercise_id, set_index) WHERE
+      // set_index IS NOT NULL (migration 00161) backs this conflict target.
+      if (setLogPayload.set_index != null) {
+        assertSupabase(
+          await supabase
+            .from("strength_set_logs")
+            .upsert(setLogPayload, { onConflict: "run_id,exercise_id,set_index" })
+        );
+      } else {
+        assertSupabase(
+          await supabase
+            .from("strength_set_logs")
+            .insert(setLogPayload)
+        );
+      }
       return { status: "ok", one_rm_updated: false, one_rm: undefined };
     }
 
