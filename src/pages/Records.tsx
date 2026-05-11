@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, Suspense, lazy, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy, type FormEvent } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth } from "@/lib/auth";
 import {
   type Exercise,
@@ -537,6 +538,15 @@ export default function Records() {
       .sort((a, b) => compareSwimEvents(String(a.event_name ?? ""), String(b.event_name ?? "")));
   }, [swimRecords, histPoolLen]);
 
+  const swimRecordsParentRef = useRef<HTMLDivElement>(null);
+  const swimRecordRowCount = Math.ceil(filteredSwimRecords.length / 2);
+  const swimRecordVirtualizer = useVirtualizer({
+    count: swimRecordRowCount,
+    getScrollElement: () => swimRecordsParentRef.current,
+    estimateSize: () => 104,
+    overscan: 3,
+  });
+
   // --- SOURCE OF TRUTH: mutations / invalidateQueries unchanged ---
   const update1RM = useMutation({
     mutationFn: (data: { exercise_id: number; one_rm?: number; weight?: number }) => {
@@ -834,6 +844,37 @@ export default function Records() {
                     <div className="px-4 py-6 text-center text-sm text-muted-foreground">
                       <Waves className="h-8 w-8 mx-auto text-muted-foreground/30" />
                       <p className="mt-2">Aucun record en {histPoolLen}m</p>
+                    </div>
+                  ) : filteredSwimRecords.length > 30 ? (
+                    <div
+                      ref={swimRecordsParentRef}
+                      className="overflow-y-auto"
+                      style={{ maxHeight: "70vh" }}
+                    >
+                      <div
+                        style={{ height: swimRecordVirtualizer.getTotalSize(), position: "relative" }}
+                      >
+                        {swimRecordVirtualizer.getVirtualItems().map((row) => {
+                          const a = filteredSwimRecords[row.index * 2];
+                          const b = filteredSwimRecords[row.index * 2 + 1];
+                          return (
+                            <div
+                              key={row.key}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                transform: `translateY(${row.start}px)`,
+                              }}
+                              className="grid grid-cols-2 gap-2 pb-2"
+                            >
+                              {a && <RecordCard record={a} onClick={openEditSwim} />}
+                              {b && <RecordCard record={b} onClick={openEditSwim} />}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : (
                     <motion.div
