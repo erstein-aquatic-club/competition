@@ -86,6 +86,86 @@ L'audit robustesse (§266 R1) avait identifié 4 zones grises : onError manquant
 
 - Le RPC `log_strength_set_atomic` (chemin principal quand `athleteId` est présent) fait toujours un INSERT — il n'a pas été modifié. Si on veut l'idempotence complète via RPC, il faudrait un patch SQL séparé (`INSERT ... ON CONFLICT DO UPDATE`). Pour l'instant, les doublons du chemin RPC ne peuvent survenir que si le caller appelle 2× le RPC avec les mêmes params, ce qui n'arrive pas en pratique.
 - R2 (memoization hubs runtime) et R3 (friction UX) sont exécutés en parallèle dans d'autres worktrees — ce chantier R4 est strict-scopé pour éviter les conflits de merge.
+## §268 — Chantier R3 : friction tunnel mutation (toast unifié sonner, useDelayedLoading ×8, retry ×17, skeletons coach ×12, fix double erreur Dashboard) (2026-05-11)
+
+**Contexte :** Phase 3 du plan `docs/plans/2026-05-10-vers-9-10-robustesse-perf-friction.md`. Cibles friction +0.7, fluidité +0.2. 5 sub-§ exécutés en parallèle avec §267 (R2 memoization) et §269 (R4 robustesse mutations) dans des worktrees isolés.
+
+**Changements :**
+
+**sub-§A — Unification toast stack sur sonner** (52 fichiers + 3 supprimés)
+- Migration mécanique de tous les `useToast()` (Radix) → `toast` (sonner) : 51 fichiers call-sites + App.tsx
+- Pattern : `toast({title, description, variant:"destructive"})` → `toast.error(title, {description})` ; `toast({title})` → `toast(title)`
+- Suppression de `src/hooks/use-toast.ts`, `src/components/ui/toast.tsx`, `src/components/ui/toaster.tsx` (plus aucun import)
+- App.tsx monte désormais `<Toaster>` de `@/components/ui/sonner` (sonner v2)
+- 1 fix manuel : `useInAppPushBridge.ts` avait un toast avec `duration` dans l'objet — converti à la signature sonner
+- Suppression du seul dep `toast` dans le tableau deps de `useCallback` (Dashboard.tsx)
+
+**sub-§B — useDelayedLoading sur 8 nouveaux écrans** (7 fichiers)
+- Pattern §265 (Dashboard) généralisé à : SwimSessionView, Strength, Profile, CoachTrainingSlotsScreen, SwimCatalog, StrengthCatalog, CoachComms
+- Note : CoachWeekView est une façade lazy → branchement dans CoachTrainingSlotsScreen (le vrai loader)
+- CoachComms reçoit `athletesLoading` comme prop → branchement sur ce boolean
+
+**sub-§C — Retry action sur 17 toasts d'erreur transient** (10 fichiers)
+- Tous les `toast.error(...)` réseau/timeout ont désormais `action: { label: "Réessayer", onClick: ... }`
+- WorkoutRunner: onProgress + onLogSets (×2)
+- SwimSessionView: saveMutation.onError + deleteAssignmentMutation.onError (×2), correction dep array
+- Records: update1RM.onError + updateExerciseNote.onError + upsertSwimRecord.onError (×3 nouveaux onError)
+- QuickViewCommentDialog, QuickViewAttendanceDialog, QuickViewAssignDrawer (×4)
+- SwimmerInterviewsTab: saveMutation + sendMutation + deleteMutation (×3)
+- CoachMessagesScreen: handleSendMessage (×1)
+- CoachSmsScreen: clipboard fallback (×1)
+- CoachChronoScreen: handleRetryQueue (×1)
+
+**sub-§D — Skeletons spécifiques Coach.tsx (×12)** (1 fichier)
+- Mapping : week/chrono → `<CalendarSkeleton/>`, library/swimmers/groups/competitions/comms/chrono-history/my-swimmers/comments → `<ListSkeleton/>`, athlete/pace-calculator → `<HomeSkeleton/>`
+- Supprime import `PageSkeleton` devenu orphelin dans Coach.tsx
+- Ajoute import `{ HomeSkeleton, CalendarSkeleton, ListSkeleton }` from `@/components/shared/skeletons`
+
+**sub-§E — Fix double erreur Dashboard** (1 fichier)
+- Supprime l'early-return full-screen `if (error) { return <div centered>...</div> }` (lignes 536-547)
+- L'unique affichage d'erreur est désormais le banner inline (lignes 599-608) avec bouton "Réessayer"
+
+**Fichiers modifiés :**
+
+| Fichier | Changement |
+|---------|------------|
+| `src/App.tsx` | Toaster Radix → Toaster sonner |
+| `src/hooks/useInAppPushBridge.ts` | toast() → toast(title, {description, duration}) |
+| 50 autres fichiers src/ | migration useToast → toast sonner |
+| `src/hooks/use-toast.ts` | **SUPPRIMÉ** |
+| `src/components/ui/toast.tsx` | **SUPPRIMÉ** |
+| `src/components/ui/toaster.tsx` | **SUPPRIMÉ** |
+| `src/pages/SwimSessionView.tsx` | +useDelayedLoading, +retry onError, fix dep array |
+| `src/pages/Strength.tsx` | +useDelayedLoading |
+| `src/pages/Profile.tsx` | +useDelayedLoading |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | +useDelayedLoading |
+| `src/pages/coach/SwimCatalog.tsx` | +useDelayedLoading |
+| `src/pages/coach/StrengthCatalog.tsx` | +useDelayedLoading |
+| `src/pages/coach/CoachComms.tsx` | +useDelayedLoading |
+| `src/components/strength/WorkoutRunner.tsx` | +retry action ×2 |
+| `src/pages/Records.tsx` | +onError retry ×3 |
+| `src/pages/coach/QuickViewCommentDialog.tsx` | +retry action |
+| `src/pages/coach/QuickViewAttendanceDialog.tsx` | +retry action |
+| `src/pages/coach/QuickViewAssignDrawer.tsx` | +retry action ×2 |
+| `src/pages/coach/SwimmerInterviewsTab.tsx` | +retry action ×3 |
+| `src/pages/coach/CoachMessagesScreen.tsx` | +retry action |
+| `src/pages/coach/CoachSmsScreen.tsx` | +retry action |
+| `src/pages/coach/CoachChronoScreen.tsx` | +retry action |
+| `src/pages/Coach.tsx` | 12× PageSkeleton → skeletons sémantiques |
+| `src/pages/Dashboard.tsx` | Supprime early-return error full-screen |
+
+**Tests :**
+- `npx tsc --noEmit` : 0 erreur. ✅
+- `npm test` : 695/696 pass (1 pre-existing `transformers.test.ts`). ✅
+- Pas de `npm run test:rls` : aucune policy RLS modifiée.
+
+**Décisions :**
+- Le script Python de migration toast a correctement transformé 356 appels `toast({})` en forme sonner. Un seul cas manuel nécessaire (`useInAppPushBridge.ts` : `duration` non standard dans l'objet).
+- `CoachWeekView` est une façade lazy (pas de query directe) — `useDelayedLoading` branché sur `CoachTrainingSlotsScreen` (le vrai loader de créneaux).
+- Records.tsx : les mutations sans `onError` (R4 les a pour CoachMySwimmersScreen etc.) reçoivent ici leur `onError` avec retry — cohérent avec Task 3.3 (pas de doublon avec R4).
+- `toast` de sonner est une référence stable → retiré des dep arrays useCallback où présent.
+
+**Limites :** Le fix Dashboard error supprime le full-screen. Si l'erreur survient avant que les données initiales soient disponibles (premier load), la page affiche le calendar vide avec le banner inline — UX préférable au plein-écran bloquant.
 
 ## §266 — Chantier R1 : fix P0 robustesse (idempotency, auto-sync, chrono, 5 confirm natifs) (2026-05-10)
 
