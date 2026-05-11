@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   StrengthCycleType,
@@ -577,7 +577,7 @@ export default function Strength() {
   };
 
   /** Launch from "Mon plan" — uses the session's own cycle, no cycle selector */
-  const startPlanSession = (session: StrengthSessionTemplate) => {
+  const startPlanSession = useCallback((session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
     const cycle = normalizeStrengthCycle(session.cycle ?? sessionItems.find((item) => item.cycle_type)?.cycle_type);
     const items = resolveStrengthItems(sessionItems, cycle, exerciseLookup);
@@ -595,7 +595,7 @@ export default function Strength() {
     setScreenMode("reader");
     setSubstitutions(new Map());
     setOriginalItemCount(items.length);
-  };
+  }, [exerciseLookup, toast]);
 
   /**
    * Same as startPlanSession but skips the reader screen — used for the
@@ -607,10 +607,10 @@ export default function Strength() {
    * triggers a useEffect once the new session has committed, then fires
    * handleLaunchFocus from a fresh closure.
    */
-  const startPlanSessionDirect = (session: StrengthSessionTemplate) => {
+  const startPlanSessionDirect = useCallback((session: StrengthSessionTemplate) => {
     startPlanSession(session);
     setAutoLaunchKey((k) => k + 1);
-  };
+  }, [startPlanSession]);
 
   // Wait for activeSession + activeFilteredItems to be committed before
   // launching focus. handleLaunchFocus has its own guards (empty session,
@@ -736,6 +736,17 @@ export default function Strength() {
       toast("Ça prend du temps…", { description: "Le réseau semble lent. On continue d'essayer." });
     }
   }, [showSlowToast]);
+
+  const sessionExerciseNames = useMemo(
+    () =>
+      new Map(
+        (activeSession?.items ?? []).map((item) => [
+          item.exercise_id,
+          item.exercise_name ?? exerciseLookup.get(item.exercise_id)?.nom_exercice ?? `Ex #${item.exercise_id}`,
+        ]),
+      ),
+    [activeSession?.items, exerciseLookup],
+  );
 
   if (isLoading) {
     return (
@@ -964,12 +975,7 @@ export default function Strength() {
           sessionTitle={activeSession.title ?? "Séance"}
           logs={activeRunLogs ?? []}
           durationMinutes={sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 60000) : null}
-          exerciseNames={new Map(
-            (activeSession.items ?? []).map((item) => [
-              item.exercise_id,
-              item.exercise_name ?? exerciseLookup.get(item.exercise_id)?.nom_exercice ?? `Ex #${item.exercise_id}`,
-            ]),
-          )}
+          exerciseNames={sessionExerciseNames}
           onClose={() => {
             setScreenMode("list");
             setActiveSession(null);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   getProfile,
@@ -48,7 +48,7 @@ interface MyPlanTabProps {
   onLaunchSessionDirect?: (session: StrengthSessionTemplate) => void;
 }
 
-export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }: MyPlanTabProps) {
+function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: MyPlanTabProps) {
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
@@ -353,3 +353,5 @@ export function MyPlanTab({ athleteId, onSelectSession, onLaunchSessionDirect }:
     </div>
   );
 }
+
+export const MyPlanTab = memo(MyPlanTabImpl);

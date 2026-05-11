@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getStrengthHistory, getExercises } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ interface HistoryTableProps {
   athleteKey: number | string | null;
 }
 
-export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTableProps) {
+function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTableProps) {
   const [historyStatus, setHistoryStatus] = useState("all");
   const [progressExercise, setProgressExercise] = useState<{ id: number; name: string } | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<number | null>(null);
@@ -327,3 +327,5 @@ export function HistoryTable({ athleteName, athleteId, athleteKey }: HistoryTabl
     </div>
   );
 }
+
+export const HistoryTable = memo(HistoryTableImpl);
