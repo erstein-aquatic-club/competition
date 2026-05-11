@@ -30,6 +30,7 @@ import { ScaleSelector5 } from "@/components/shared/ScaleSelector5";
 import { ExercisePicker } from "@/components/strength/ExercisePicker";
 import { ExerciseGif } from "@/components/strength/ExerciseGif";
 import { RestScreen } from "./RestScreen";
+import { SetRow } from "./SetRow";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -1191,43 +1192,23 @@ export function WorkoutRunner({
           >
             {workoutPlan.map((item, index) => {
               const exercise = exercises.find((ex) => ex.id === item.exercise_id);
-              const loggedSets = Array.from({ length: item.sets }).filter((_, setIndex) =>
+              const loggedSets = Array.from({ length: item.sets ?? 0 }).filter((_, setIndex) =>
                 logLookup.get(`${item.exercise_id}-${setIndex + 1}`),
               ).length;
               const isActive = index === currentExerciseIndex;
-              const isDone = loggedSets >= item.sets;
+              const hasPr = Array.from({ length: item.sets ?? 0 }).some((_, si) =>
+                prSets.has(`${item.exercise_id}-${si + 1}`),
+              );
               return (
-                <div
+                <SetRow
                   key={`${item.exercise_id}-${index}`}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
-                    isActive && "border-primary bg-primary/5",
-                    isDone && !isActive && "opacity-50",
-                  )}
-                >
-                  <div className={cn(
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                    isDone ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-                  )}>
-                    {isDone ? <Check className="h-3.5 w-3.5" /> : index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">
-                      {exercise?.nom_exercice ?? item.exercise_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatStrengthValue(item.sets)}×{formatStrengthValue(item.reps)}
-                    </p>
-                  </div>
-                  {Array.from({ length: item.sets }).some((_, si) =>
-                    prSets.has(`${item.exercise_id}-${si + 1}`)
-                  ) && (
-                    <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                  )}
-                  <span className="text-xs font-mono font-semibold text-muted-foreground shrink-0">
-                    {loggedSets}/{formatStrengthValue(item.sets)}
-                  </span>
-                </div>
+                  item={item}
+                  index={index}
+                  exercise={exercise}
+                  loggedSets={loggedSets}
+                  isActive={isActive}
+                  hasPr={hasPr}
+                />
               );
             })}
           </div>
