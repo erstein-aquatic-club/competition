@@ -50,7 +50,11 @@ export default function QuickViewAssignDrawer({ open, onOpenChange, slotId, athl
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast.error('Erreur', { description: e.message });
+      const sid = selectedId;
+      toast.error('Assignation impossible', {
+        description: e.message || "Réseau instable.",
+        action: sid ? { label: "Réessayer", onClick: () => void handleAssignLibrary() } : undefined,
+      });
     } finally {
       setSaving(false);
     }
@@ -74,7 +78,10 @@ export default function QuickViewAssignDrawer({ open, onOpenChange, slotId, athl
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast.error('Erreur', { description: e.message });
+      toast.error('Création/assignation impossible', {
+        description: e.message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => void handleAssignAdHoc() },
+      });
     } finally {
       setSaving(false);
     }

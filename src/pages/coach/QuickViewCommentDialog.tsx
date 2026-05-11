@@ -31,7 +31,14 @@ export default function QuickViewCommentDialog({ open, onOpenChange, dimSessionI
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast.error('Erreur', { description: e.message });
+      const body_ = body.trim();
+      toast.error('Commentaire non envoyé', {
+        description: e.message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => {
+          setBody(body_);
+          handleSubmit();
+        }},
+      });
     } finally {
       setSaving(false);
     }

@@ -554,11 +554,10 @@ export default function Records() {
         toast("1RM mis à jour");
       }
     },
-    onError: (err: Error) => {
-      toast({
-        title: "Échec mise à jour 1RM",
-        description: err.message,
-        variant: "destructive",
+    onError: (_err, vars) => {
+      toast.error("Échec mise à jour 1RM", {
+        description: "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => update1RM.mutate(vars) },
       });
     },
   });
@@ -570,11 +569,10 @@ export default function Records() {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
       toast("Note mise à jour");
     },
-    onError: (err: Error) => {
-      toast({
-        title: "Échec mise à jour note",
-        description: err.message,
-        variant: "destructive",
+    onError: (_err, vars) => {
+      toast.error("Échec mise à jour note", {
+        description: "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => updateExerciseNote.mutate(vars) },
       });
     },
   });
@@ -596,11 +594,10 @@ export default function Records() {
         toast("Record mis à jour");
       }
     },
-    onError: (err: Error) => {
-      toast({
-        title: "Échec enregistrement record",
-        description: err.message,
-        variant: "destructive",
+    onError: (_err, vars) => {
+      toast.error("Échec enregistrement record", {
+        description: "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => upsertSwimRecord.mutate(vars) },
       });
     },
   });

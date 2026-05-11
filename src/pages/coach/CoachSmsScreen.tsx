@@ -149,7 +149,10 @@ const CoachSmsScreen = ({
       navigator.clipboard.writeText(selectedPhones.join(", ")).then(() => {
         toast("Numéros copiés", { description: `${selectedPhones.length} numéro${selectedPhones.length > 1 ? "s" : ""} copié${selectedPhones.length > 1 ? "s" : ""} dans le presse-papiers.` });
       }).catch(() => {
-        toast.error("Erreur", { description: "Impossible de copier les numéros." });
+        toast.error("Copie impossible", {
+          description: "Impossible de copier les numéros.",
+          action: { label: "Réessayer", onClick: () => void navigator.clipboard.writeText(selectedPhones.join(", ")) },
+        });
       });
     }
   };

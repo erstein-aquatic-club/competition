@@ -37,7 +37,10 @@ export default function QuickViewAttendanceDialog({ open, onOpenChange, dimSessi
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast.error('Erreur', { description: e.message });
+      toast.error('Présence non enregistrée', {
+        description: e.message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => void handleSubmit() },
+      });
     } finally {
       setSaving(false);
     }

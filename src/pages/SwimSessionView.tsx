@@ -286,7 +286,10 @@ export default function SwimSessionView() {
       }
     },
     onError: (err) => {
-      toast.error("Erreur", { description: (err as Error).message });
+      toast.error("Sauvegarde impossible", {
+        description: (err as Error).message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => saveMutation.mutate(saveMutation.variables!) },
+      });
     },
   });
 
@@ -297,8 +300,11 @@ export default function SwimSessionView() {
       toast("Séance retirée", { description: "La séance a été retirée de votre feed." });
       setLocation("/");
     },
-    onError: () => {
-      toast.error("Erreur", { description: "Impossible de retirer la séance." });
+    onError: (_err, assignmentId) => {
+      toast.error("Suppression impossible", {
+        description: "Impossible de retirer la séance. Réseau instable.",
+        action: { label: "Réessayer", onClick: () => deleteAssignmentMutation.mutate(assignmentId) },
+      });
     },
   });
 
@@ -333,7 +339,7 @@ export default function SwimSessionView() {
     } finally {
       setExportingPdf(false);
     }
-  }, [assignment, queryClient, toast]);
+  }, [assignment, queryClient]);
 
   if (error) {
     return (

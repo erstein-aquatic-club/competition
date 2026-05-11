@@ -153,7 +153,9 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
     const res = await flush();
     setPendingCount(getPending().length);
     if (res.succeeded > 0) toast.success(`${res.succeeded} sauvegarde${res.succeeded > 1 ? "s" : ""} renvoyée${res.succeeded > 1 ? "s" : ""}`);
-    else if (res.failed > 0) toast.error("Renvoi impossible — pas de réseau ?");
+    else if (res.failed > 0) toast.error("Renvoi impossible — pas de réseau ?", {
+      action: { label: "Réessayer", onClick: () => void handleRetryQueue() },
+    });
   }, []);
 
   const handleSaveDraft = useCallback(() => {

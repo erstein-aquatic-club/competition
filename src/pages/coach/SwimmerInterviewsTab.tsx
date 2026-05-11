@@ -717,8 +717,11 @@ const CoachInterviewCard = ({
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
       toast("Sections coach enregistrées");
     },
-    onError: (err: Error) => {
-      toast.error("Erreur", { description: err.message });
+    onError: (err: Error, vars) => {
+      toast.error("Sauvegarde impossible", {
+        description: err.message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => saveMutation.mutate(vars) },
+      });
     },
   });
 
@@ -733,7 +736,10 @@ const CoachInterviewCard = ({
       setShowSmsPrompt(true);
     },
     onError: (err: Error) => {
-      toast.error("Erreur", { description: err.message });
+      toast.error("Envoi impossible", {
+        description: err.message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => sendMutation.mutate() },
+      });
     },
   });
 
@@ -762,7 +768,10 @@ const CoachInterviewCard = ({
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
     },
     onError: (err: Error) => {
-      toast.error("Erreur", { description: err.message });
+      toast.error("Suppression impossible", {
+        description: err.message || "Réseau instable.",
+        action: { label: "Réessayer", onClick: () => deleteMutation.mutate() },
+      });
     },
   });
 

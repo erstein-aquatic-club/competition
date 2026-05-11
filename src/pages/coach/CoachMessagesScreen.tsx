@@ -115,7 +115,10 @@ const CoachMessagesScreen = ({
       setMessage("");
       setTargetValue("");
     } catch (error) {
-      toast.error("Envoi impossible", { description: error instanceof Error ? error.message : "La notification n'a pas pu être envoyée." });
+      toast.error("Envoi impossible", {
+        description: error instanceof Error ? error.message : "La notification n'a pas pu être envoyée.",
+        action: { label: "Réessayer", onClick: () => void handleSendMessage() },
+      });
     } finally {
       sendingRef.current = false;
       setSending(false);

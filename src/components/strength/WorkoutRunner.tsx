@@ -553,8 +553,11 @@ export function WorkoutRunner({
     );
     try {
       await onProgress?.(progressPct);
-    } catch (err) {
-      toast.error("Erreur de sauvegarde", { description: "Réessayez" });
+    } catch (_err) {
+      toast.error("Erreur de sauvegarde", {
+        description: "Progression non enregistrée. Réseau instable.",
+        action: { label: "Réessayer", onClick: () => void onProgress?.(progressPct) },
+      });
     }
   };
 
@@ -624,8 +627,11 @@ export function WorkoutRunner({
     isLoggingRef.current = true;
     try {
       await onLogSets?.([newLog]);
-    } catch (err) {
-      toast.error("Erreur de sauvegarde", { description: "Réessayez" });
+    } catch (_err) {
+      toast.error("Erreur de sauvegarde", {
+        description: "Série non enregistrée. Réseau instable.",
+        action: { label: "Réessayer", onClick: () => void onLogSets?.([newLog]) },
+      });
     } finally {
       isLoggingRef.current = false;
     }
