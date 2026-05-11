@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import { DelayedPageSkeleton } from "@/components/shared/PageSkeleton";
 import type { SwimLibraryEntryContext } from "./swimLibraryEntryContext";
 
 const CoachTrainingSlotsScreen = lazy(() => import("./CoachTrainingSlotsScreen"));
@@ -40,7 +40,7 @@ export default function CoachWeekView({
           <ArrowLeft className="h-4 w-4" />
           Retour à la semaine
         </button>
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<DelayedPageSkeleton />}>
           <SwimCatalog
             entryContext={libraryContext}
             onEntryContextConsumed={() => setLibraryContext(null)}
@@ -53,7 +53,7 @@ export default function CoachWeekView({
   return (
     <div className="space-y-2">
       {/* Content */}
-      <Suspense fallback={<PageSkeleton />}>
+      <Suspense fallback={<DelayedPageSkeleton />}>
         <CoachTrainingSlotsScreen
           groups={groups}
           onOpenLibrary={handleOpenLibrary}
