@@ -32,7 +32,7 @@ import { ManualSwimmerDialog } from "@/components/coach/ManualSwimmerDialog";
 import { AddSwimmerToTeamDialog } from "@/components/coach/AddSwimmerToTeamDialog";
 import { deleteManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 import type { CoachManualSwimmer } from "@/lib/api/coach-manual-swimmers";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -206,7 +206,6 @@ export default function CoachMySwimmersScreen({
   const role = useAuth((s) => s.role);
   const userId = useAuth((s) => s.userId);
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const isAdmin = role === "admin";
   const [, navigate] = useLocation();
 
@@ -268,11 +267,10 @@ export default function CoachMySwimmersScreen({
     mutationFn: ({ swimmerId, coachId }: { swimmerId: number; coachId: number }) =>
       assignSwimmer(swimmerId, coachId, userId ?? 0),
     onSuccess: invalidateKeys,
-    onError: (err: Error) => {
-      toast({
-        title: "Échec attribution nageur",
+    onError: (err: Error, vars) => {
+      toast.error("Échec attribution nageur", {
         description: err.message,
-        variant: "destructive",
+        action: { label: "Réessayer", onClick: () => assignMutation.mutate(vars) },
       });
     },
   });
@@ -280,11 +278,10 @@ export default function CoachMySwimmersScreen({
   const unassignMutation = useMutation({
     mutationFn: (swimmerId: number) => unassignSwimmer(swimmerId),
     onSuccess: invalidateKeys,
-    onError: (err: Error) => {
-      toast({
-        title: "Échec retrait nageur",
+    onError: (err: Error, vars) => {
+      toast.error("Échec retrait nageur", {
         description: err.message,
-        variant: "destructive",
+        action: { label: "Réessayer", onClick: () => unassignMutation.mutate(vars) },
       });
     },
   });
@@ -293,11 +290,10 @@ export default function CoachMySwimmersScreen({
     mutationFn: ({ swimmerId, newCoachId }: { swimmerId: number; newCoachId: number }) =>
       reassignSwimmer(swimmerId, newCoachId, userId ?? 0),
     onSuccess: invalidateKeys,
-    onError: (err: Error) => {
-      toast({
-        title: "Échec réattribution nageur",
+    onError: (err: Error, vars) => {
+      toast.error("Échec réattribution nageur", {
         description: err.message,
-        variant: "destructive",
+        action: { label: "Réessayer", onClick: () => reassignMutation.mutate(vars) },
       });
     },
   });
