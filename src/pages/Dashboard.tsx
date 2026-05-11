@@ -533,19 +533,6 @@ export default function Dashboard() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="font-semibold">Impossible de charger les données</h3>
-        <p className="text-sm text-muted-foreground mt-2">{(error as Error).message}</p>
-        <Button onClick={() => refetch()} className="mt-4">
-          Réessayer
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-muted">
       {/* Mobile: fixed top header */}
