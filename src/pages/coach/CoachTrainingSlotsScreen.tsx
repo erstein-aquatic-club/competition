@@ -44,6 +44,7 @@ import { fetchUserGroupIdsWithContext } from "@/lib/api/client";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import type { SwimmerSession } from "@/lib/api/types";
 import { filterCoachTrainingSlots } from "./coachTrainingSlotsFilter";
+import { CalendarSkeleton } from "@/components/shared/skeletons/CalendarSkeleton";
 import {
   TIMELINE_START,
   TIMELINE_END,
@@ -2779,6 +2780,14 @@ const CoachTrainingSlotsScreen = ({
       setExporting(false);
     }
   }, [buildFallbackWeekPng, weekMondayIso]);
+
+  // Guard: when a swimmer filter is active, wait for hasCustomSlots to resolve
+  // before rendering the week grid to avoid a flicker between the "all slots"
+  // view and the "swimmer custom slots" view (undefined → false → true transition).
+  const swimmerResolutionLoading = swimmerFilterId != null && swimmerHasCustom === undefined;
+  if (swimmerResolutionLoading) {
+    return <CalendarSkeleton />;
+  }
 
   return (
     <div className="space-y-4 pb-24">
