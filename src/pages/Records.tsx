@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, Suspense, lazy, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense, lazy, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 import {
   type Exercise,
@@ -37,6 +37,7 @@ import { shouldShowRecords } from "@/pages/Profile";
 import { Check, ChevronDown, ChevronRight, Dumbbell, Edit2, Download, RefreshCw, StickyNote, Trash2, Trophy, Waves, X, AlertCircle } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
 const PerformanceChart = lazy(() => import("@/components/records/PerformanceChart"));
+import { RecordCard } from "@/components/records/RecordCard";
 import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
@@ -617,7 +618,7 @@ export default function Records() {
     setSwimSheetOpen(true);
   };
 
-  const openEditSwim = (record: SwimRecordWithPool) => {
+  const openEditSwim = useCallback((record: SwimRecordWithPool) => {
     setSwimForm({
       id: record.id,
       event_name: record.event_name ?? "",
@@ -627,7 +628,7 @@ export default function Records() {
       notes: record.notes ?? "",
     });
     setSwimSheetOpen(true);
-  };
+  }, [setSwimForm, setSwimSheetOpen]);
 
   const submitSwimForm = () => {
     if (!swimForm.event_name.trim()) {
@@ -837,30 +838,21 @@ export default function Records() {
                   ) : (
                     <motion.div
                       className="grid grid-cols-2 gap-2 motion-reduce:animate-none"
-                      variants={prefersReducedMotion ? undefined : staggerChildren}
+                      variants={prefersReducedMotion ? undefined : (
+                        filteredSwimRecords.length > 10
+                          ? { visible: { transition: { staggerChildren: 0.02 } } }
+                          : staggerChildren
+                      )}
                       initial={prefersReducedMotion ? false : "hidden"}
                       animate={prefersReducedMotion ? false : "visible"}
                     >
-                      {filteredSwimRecords.map((record) => (
-                        <motion.div key={record.id} variants={listItem}>
-                          <Card
-                            className="rounded-2xl h-full cursor-pointer active:scale-[0.97] transition-transform"
-                            onClick={() => openEditSwim(record)}
-                          >
-                            <CardContent className="p-0">
-                              <div className="flex flex-col gap-1 px-3 py-3">
-                                <span className="text-sm font-semibold truncate">{record.event_name}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-primary font-bold tabular-nums text-sm">
-                                    {formatTimeSeconds(record.time_seconds)}
-                                  </span>
-                                  <span className="text-[11px] text-muted-foreground tabular-nums">
-                                    {formatDateShort(record.record_date)}
-                                  </span>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
+                      {filteredSwimRecords.map((record, idx) => (
+                        <motion.div
+                          key={record.id}
+                          variants={idx < 10 ? listItem : undefined}
+                          initial={idx >= 10 ? false : undefined}
+                        >
+                          <RecordCard record={record} onClick={openEditSwim} />
                         </motion.div>
                       ))}
                     </motion.div>
