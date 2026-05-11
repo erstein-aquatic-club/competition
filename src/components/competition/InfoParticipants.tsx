@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getCompetitionAssignments, getAthletes } from "@/lib/api";
 import { groupAndSortAssignments, type ParticipantProfile } from "./info-helpers";
-import { Users } from "lucide-react";
+import { Users, UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   competitionId: string;
@@ -69,9 +70,18 @@ export default function InfoParticipants({ competitionId }: Props) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Aucun nageur assigné pour le moment.
-        </p>
+        <div className="py-4 text-center space-y-3">
+          <p className="text-xs text-muted-foreground">Aucun nageur assigné pour le moment.</p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 text-xs"
+            onClick={() => navigate(`/competition/${competitionId}/prep`)}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Assigner des nageurs
+          </Button>
+        </div>
       ) : (
         <ul className="divide-y divide-border">
           {rows.map((row) => (

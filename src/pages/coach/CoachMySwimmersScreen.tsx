@@ -543,9 +543,17 @@ export default function CoachMySwimmersScreen({
             )}
 
             {team.length === 0 && (
-              <p className="text-sm text-muted-foreground py-6 text-center">
-                {search ? "Aucun nageur correspondant." : "Votre équipe est vide. Ajoutez des nageurs ci-dessus."}
-              </p>
+              <div className="py-8 text-center space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {debouncedSearch ? "Aucun nageur correspondant." : "Votre équipe est vide."}
+                </p>
+                {!debouncedSearch && (
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => setAddDialogOpen(true)}>
+                    <UserPlus className="h-4 w-4" />
+                    Inviter un nageur
+                  </Button>
+                )}
+              </div>
             )}
         </div>
       )}

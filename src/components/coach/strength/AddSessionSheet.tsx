@@ -95,11 +95,17 @@ export function AddSessionSheet({
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
               <Dumbbell className="h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">
-                {search.trim() ? "Aucune séance trouvée" : "Aucune séance dans la bibliothèque"}
+                {debouncedSearch.trim() ? "Aucune séance trouvée" : "Aucune séance dans la bibliothèque"}
               </p>
+              {!debouncedSearch.trim() && (
+                <Button size="sm" variant="outline" className="gap-2" onClick={onCreateNew}>
+                  <Plus className="h-4 w-4" />
+                  Créer une séance
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">

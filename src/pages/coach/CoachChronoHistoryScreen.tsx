@@ -179,9 +179,12 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
           Chargement…
         </div>
       ) : records.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
           <Timer className="h-10 w-10 opacity-40" />
           <p className="text-sm font-medium">Aucun chrono enregistré</p>
+          <Button size="sm" variant="outline" onClick={onBack}>
+            Lancer un chrono
+          </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

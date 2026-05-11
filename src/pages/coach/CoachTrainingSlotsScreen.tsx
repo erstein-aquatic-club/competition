@@ -1329,6 +1329,7 @@ type MobileViewProps = {
   weekNumber: number;
   competitionsByDate: Map<string, CompetitionDayEntry[]>;
   onOpenCompetition: (competition: Competition) => void;
+  onCreateNew: () => void;
 };
 
 const MobileView = ({
@@ -1344,6 +1345,7 @@ const MobileView = ({
   weekNumber,
   competitionsByDate,
   onOpenCompetition,
+  onCreateNew,
 }: MobileViewProps) => {
   // Auto-select today's day (1=Mon...7=Sun), or Monday if today isn't in this week
   const [selectedDay, setSelectedDay] = useState<number>(() => {
@@ -1526,8 +1528,12 @@ const MobileView = ({
         </h3>
 
         {selectedDaySlots.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 py-8 text-center">
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 py-8 text-center space-y-3">
             <p className="text-sm text-muted-foreground">Aucun créneau</p>
+            <Button size="sm" variant="outline" className="gap-2" onClick={onCreateNew}>
+              <Plus className="h-4 w-4" />
+              Créer un créneau
+            </Button>
           </div>
         ) : (
           <div className="space-y-2">
@@ -3001,6 +3007,7 @@ const CoachTrainingSlotsScreen = ({
               weekNumber={weekNumber}
               competitionsByDate={competitionsByDate}
               onOpenCompetition={handleOpenCompetition}
+              onCreateNew={handleCreate}
             />
           </div>
 
