@@ -42,7 +42,11 @@ import {
   Timer,
   Waves,
 } from "lucide-react";
-import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import {
+  HomeSkeleton,
+  CalendarSkeleton,
+  ListSkeleton,
+} from "@/components/shared/skeletons";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
   formatRelativeDate,
@@ -1150,7 +1154,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "week" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<CalendarSkeleton />}>
           <CoachWeekView
             groups={groups}
             initialWeekDate={routeState.weekDate}
@@ -1159,13 +1163,13 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "library" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachLibrary />
         </Suspense>
       ) : null}
 
       {activeSection === "swimmers" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachSwimmersOverview
             athletes={myAthletes}
             athletesLoading={athletesLoading}
@@ -1178,7 +1182,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "athlete" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<HomeSkeleton />}>
           <CoachSwimmerDetail
             athleteId={selectedCoachAthlete?.id ?? null}
             athleteName={selectedCoachAthlete?.display_name ?? null}
@@ -1188,7 +1192,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "groups" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachGroupsScreen
             onBack={() => setRouteState({ section: "home" })}
             athletes={athletes}
@@ -1199,7 +1203,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "competitions" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachCompetitionsScreen
             onBack={() => setRouteState({ section: "home" })}
           />
@@ -1207,7 +1211,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "comms" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachComms
             athletes={myAthletes}
             groups={groups}
@@ -1219,13 +1223,13 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "chrono" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<CalendarSkeleton />}>
           <CoachChronoScreen athletes={myAthletes} allAthletes={athletes} />
         </Suspense>
       ) : null}
 
       {activeSection === "chrono-history" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachChronoHistoryScreen
             onBack={() => setRouteState({ section: "home" })}
           />
@@ -1233,7 +1237,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "my-swimmers" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachMySwimmersScreen
             athletes={athletes}
             athletesLoading={athletesLoading}
@@ -1243,7 +1247,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "comments" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<ListSkeleton />}>
           <CoachCommentsScreen
             onBack={() => setRouteState({ section: "home" })}
             onOpenAthlete={handleOpenAthlete}
@@ -1252,7 +1256,7 @@ export default function Coach() {
       ) : null}
 
       {activeSection === "pace-calculator" ? (
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<HomeSkeleton />}>
           <CoachPaceCalculatorScreen
             athletes={athletes}
             allAthletes={athletes}
