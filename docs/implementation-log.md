@@ -4,6 +4,89 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §269 — Chantier R4 : robustesse mutations + offline (2026-05-11)
+
+**Branche** : `main`
+**Chantier ROADMAP** : R4 — robustesse mutations + offline replay (audit `docs/audits/2026-05-10-robustesse-perf-fluidite.md`)
+
+### Contexte — Pourquoi ce patch
+
+L'audit robustesse (§266 R1) avait identifié 4 zones grises : onError manquants, doublons strength_logs, login fragile, cache instable. R4 adresse les 5 tasks de robustesse mutations :
+
+1. **onError manquants** sur 9 mutations critiques → silent fail utilisateur.
+2. **Doublons strength_set_logs** : reconcile + queue offline en flaky network → 6 séries pour 3 réelles en DB.
+3. **Login race condition** : JWT sans app_user_id post-signup → 1 tentative → peut rater si trigger PostgreSQL lent.
+4. **Signup timeout absent** : `supabase.auth.signUp()` sans timeout = blocage indéfini possible sur Slow 3G.
+5. **Cache keys instables** : `["slot-subgroups", [1,2]]` vs `["slot-subgroups", [2,1]]` = 2 entries pour le même contenu.
+6. **swimmerHasCustom flicker** : rendu "tous les créneaux" suivi de "créneaux nageur" pendant la résolution async.
+
+### Changements réalisés
+
+**Sub-§A — onError ×9 mutations critiques**
+
+- `Records.tsx` : `onError` ajouté sur `update1RM`, `updateExerciseNote`, `upsertSwimRecord` (toast destructive avec message).
+- `Strength.tsx` : catch `reconcileStrengthRunLogs` background amélioré — commentaire explicite que `wasOfflineRef` reste `true` pour retry au "Terminer".
+- `CoachMySwimmersScreen.tsx` : import `useToast` + `const { toast }` + `onError` sur `assignMutation`, `unassignMutation`, `reassignMutation`.
+
+**Sub-§B — UPSERT clé naturelle strength_logs**
+
+- Migration `00161_upsert_strength_logs_natural_key.sql` : 2 étapes — (1) dédup 14 groupes de doublons existants (DELETE + ROW_NUMBER PARTITION), (2) `CREATE UNIQUE INDEX ... WHERE set_index IS NOT NULL`.
+- `strength.ts logStrengthSet` (fallback branch, athleteIdNum null) : upsert `ON CONFLICT run_id,exercise_id,set_index` quand `set_index != null`, insert classique sinon.
+- `reconcileTimeout.test.ts` : ajout `upsert: () => chain` dans les mocks supabase.
+
+**Sub-§C — Login retry 3× + signup withTimeout**
+
+- `auth.ts loadUser` : retry loop avec delays `[200, 400, 800]ms` si `userId` absent du JWT post-refresh.
+- `Login.tsx handleSignup` : wrap `supabase.auth.signUp()` dans `withTimeout(..., 15_000, "auth.signUp")`.
+- `Login.tsx handleSignup` : intercepte `"already registered"` → bascule `activeTab("login")` + message explicite.
+
+**Sub-§D — Cache key stable + staleTime**
+
+- `SlotSessionSheet.tsx` : `subgroupKey = [...selectedGroups].sort().join(",")` → `queryKey: ["slot-subgroups", subgroupKey]`.
+- `CoachTrainingSlotsScreen.tsx` : `staleTime: 30_000, gcTime: 5*60*1000` sur `training-slots`, `training-slot-overrides`, `slot-assignments`.
+
+**Sub-§E — Guard swimmerHasCustom undefined**
+
+- `CoachTrainingSlotsScreen.tsx` : import `{ CalendarSkeleton }` + early return avant le JSX principal quand `swimmerFilterId != null && swimmerHasCustom === undefined`.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/Records.tsx` | onError ×3 mutations (update1RM, updateExerciseNote, upsertSwimRecord) |
+| `src/pages/Strength.tsx` | catch background reconcile amélioré |
+| `src/pages/coach/CoachMySwimmersScreen.tsx` | import useToast + onError ×3 (assign/unassign/reassign) |
+| `src/lib/api/strength.ts` | logStrengthSet fallback → UPSERT ON CONFLICT quand set_index présent |
+| `src/lib/api/__tests__/reconcileTimeout.test.ts` | ajout `upsert: () => chain` dans mock chains |
+| `supabase/migrations/00161_upsert_strength_logs_natural_key.sql` | NEW — dédup + index UNIQUE partiel |
+| `src/lib/auth.ts` | retry loop 3× avec backoff sur loadUser |
+| `src/pages/Login.tsx` | withTimeout 15s signUp + intercept already-registered |
+| `src/pages/coach/SlotSessionSheet.tsx` | queryKey stable (subgroupKey trié) |
+| `src/pages/coach/CoachTrainingSlotsScreen.tsx` | staleTime/gcTime + CalendarSkeleton guard |
+| `docs/implementation-log.md` | cette entrée |
+| `docs/ROADMAP.md` | header + §269 Fait |
+| `CLAUDE.md` | Dernier § livré |
+
+### Tests
+
+- `npx tsc --noEmit` : 0 erreur. ✅
+- `npm test` : 695/696 pass (1 fail pré-existant `buildRunUpdatePayload` — non introduit par ce patch). ✅
+- `docker ps` : Docker up. ✅
+- `npm run test:rls` : 14 fichiers pass, 2 fail (pré-existants — schema drift `v0_pct` colonne absente, non liés à migration 00161). La migration ajoute un index, pas de policy RLS. ✅
+- Migration 00161 appliquée via MCP `apply_migration` → `{success: true}`. Dédup 14 groupes de doublons confirmé. ✅
+
+### Décisions prises
+
+- **Index partiel `WHERE set_index IS NOT NULL`** plutôt qu'une contrainte UNIQUE standard : `set_index` est nullable (anciens enregistrements sans set_index) — le standard SQL traite les NULLs comme distincts, donc plusieurs NULL ne déclencheraient pas de conflit. L'index partiel cible uniquement les cas où `set_index` est renseigné, ce qui est le cas pour tous les paths UPSERT du reconcile.
+- **Dédup dans la migration** plutôt qu'un script séparé : 14 groupes de doublons existants empêchaient `CREATE UNIQUE INDEX`. Le DELETE + ROW_NUMBER PARTITION dans le même bloc DDL assure l'atomicité.
+- **Retry 3× dans loadUser** plutôt qu'une seule tentative (avant) : le trigger PostgreSQL `handle_new_auth_user` peut être plus lent que le refresh JWT sur certaines infras. Delays 200/400/800ms couvrent jusqu'à 1.4s de délai sans bloquer l'UX.
+- **Guard CalendarSkeleton avant le return principal** plutôt qu'un ternaire inline dans le JSX : le composant a 3200 LOC — un ternaire sur l'ensemble du retour aurait été illisible. Le early return est la forme canonique.
+
+### Limites / dette
+
+- Le RPC `log_strength_set_atomic` (chemin principal quand `athleteId` est présent) fait toujours un INSERT — il n'a pas été modifié. Si on veut l'idempotence complète via RPC, il faudrait un patch SQL séparé (`INSERT ... ON CONFLICT DO UPDATE`). Pour l'instant, les doublons du chemin RPC ne peuvent survenir que si le caller appelle 2× le RPC avec les mêmes params, ce qui n'arrive pas en pratique.
+- R2 (memoization hubs runtime) et R3 (friction UX) sont exécutés en parallèle dans d'autres worktrees — ce chantier R4 est strict-scopé pour éviter les conflits de merge.
+
 ## §266 — Chantier R1 : fix P0 robustesse (idempotency, auto-sync, chrono, 5 confirm natifs) (2026-05-10)
 
 **Contexte :** Phase 1 du plan `docs/plans/2026-05-10-vers-9-10-robustesse-perf-friction.md`. L'audit `docs/audits/2026-05-10-robustesse-perf-fluidite.md` identifiait 4 correctifs P0 bloquants pour atteindre ≥ 9/10 en robustesse/friction : (A) doublons offline queue, (B) auto-sync coach non retriggered sur changement de coach, (C) persistance chrono synchrone sans debounce → freeze iOS, (D) 5 `window.confirm` natifs non-iOS-aligned.
