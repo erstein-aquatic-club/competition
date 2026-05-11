@@ -4,7 +4,7 @@ import { getStrengthHistory, getExercises } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 import { Dumbbell, ChevronDown, Clock, Flame, TrendingUp, Zap } from "lucide-react";
@@ -33,6 +33,9 @@ interface HistoryTableProps {
 }
 
 function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTableProps) {
+  const reduce = useReducedMotion();
+  const listVariants = reduce ? {} : staggerChildren;
+  const itemVariants = reduce ? {} : listItem;
   const [historyStatus, setHistoryStatus] = useState("all");
   const [progressExercise, setProgressExercise] = useState<{ id: number; name: string } | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<number | null>(null);
@@ -123,7 +126,7 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
       {historyRuns.length > 0 ? (
         <motion.div
           className="space-y-1.5"
-          variants={staggerChildren}
+          variants={listVariants}
           initial="hidden"
           animate="visible"
         >
@@ -139,7 +142,7 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
             return (
               <div key={run.id}>
                 <motion.div
-                  variants={listItem}
+                  variants={itemVariants}
                   onClick={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
                   role="button"
                   className="flex items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 transition-all hover:border-primary/30 cursor-pointer"
@@ -275,7 +278,7 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
           </h3>
           <motion.div
             className="space-y-1.5"
-            variants={staggerChildren}
+            variants={listVariants}
             initial="hidden"
             animate="visible"
           >

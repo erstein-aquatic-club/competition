@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
@@ -71,6 +71,7 @@ export function RestScreen({
   onSkip,
   onAdd30s,
 }: RestScreenProps) {
+  const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState(0);
 
   const goTo = (next: number) => {
@@ -208,7 +209,7 @@ export function RestScreen({
         <motion.div
           className="absolute inset-0 flex will-change-transform"
           animate={{ x: `${-activeTab * 100}%` }}
-          transition={{ type: "tween", duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+          transition={reduce ? { duration: 0 } : { type: "tween", duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
         >
           <div className="w-full shrink-0 overflow-y-auto px-5 pt-1">
             <RestExerciseTab

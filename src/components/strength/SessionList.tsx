@@ -16,7 +16,7 @@ import { InProgressCard } from "@/components/strength/InProgressCard";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn, stripAccents } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren } from "@/lib/animations";
 import { SaveState } from "@/components/shared/BottomActionBar";
 
@@ -83,6 +83,9 @@ export function SessionList({
   onStartCatalog,
   onResumeInProgress,
 }: SessionListProps) {
+  const reduce = useReducedMotion();
+  const listVariants = reduce ? {} : staggerChildren;
+  const itemVariants = reduce ? {} : cardVariant;
   const [selectedSessionIndex, setSelectedSessionIndex] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -314,8 +317,8 @@ export function SessionList({
       {totalSessions > 0 ? (
         <motion.div
           className="space-y-1.5 motion-reduce:animate-none"
-          variants={staggerChildren}
-          initial="hidden"
+          variants={listVariants}
+          initial={reduce ? false : "hidden"}
           animate="visible"
         >
           {filteredDisplaySessions.map((session, index) => {
@@ -329,7 +332,7 @@ export function SessionList({
                 tabIndex={isFocused ? 0 : -1}
                 data-session-card="true"
                 onKeyDown={(e) => handleSessionListKeyDown(e, index)}
-                variants={cardVariant}
+                variants={itemVariants}
                 className={cn(
                   "group w-full rounded-xl border bg-card text-left transition-all active:scale-[0.98] focus:outline-none motion-reduce:animate-none",
                   isAssignment

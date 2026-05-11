@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ChevronDown, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Competition, StrengthSessionTemplate } from "@/lib/api/types";
@@ -36,6 +36,7 @@ export function MyPlanWeekCard({
   onSelectSession,
   onSelectCompetition,
 }: MyPlanWeekCardProps) {
+  const reduce = useReducedMotion();
   const todayIdx = isCurrent ? todayPlanDayIndex() : -1;
   const style = PHASE_STYLES[instance.phase];
   const hasCompetition = competitions.length > 0;
@@ -94,8 +95,8 @@ export function MyPlanWeekCard({
           )}
           <div className="flex-1" />
           <motion.span
-            animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
+            animate={{ rotate: reduce ? 0 : (isExpanded ? 180 : 0) }}
+            transition={{ duration: reduce ? 0 : 0.2 }}
             className="text-muted-foreground/60 flex items-center"
           >
             <ChevronDown className="h-4 w-4" />
@@ -132,10 +133,10 @@ export function MyPlanWeekCard({
           {isExpanded && (
             <motion.div
               key="expand"
-              initial={{ height: 0, opacity: 0 }}
+              initial={reduce ? false : { height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
+              exit={reduce ? {} : { height: 0, opacity: 0 }}
+              transition={{ duration: reduce ? 0 : 0.2, ease: "easeInOut" }}
               className="overflow-hidden"
             >
               <div className="bg-muted/20 px-3 py-2 rounded-b-xl space-y-1">

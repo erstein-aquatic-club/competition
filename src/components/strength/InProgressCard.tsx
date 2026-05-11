@@ -20,7 +20,7 @@ import {
 import { X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { orderStrengthItems } from "@/components/strength/utils";
 import { SaveState } from "@/components/shared/BottomActionBar";
@@ -60,6 +60,7 @@ export function InProgressCard({
   setSaveState,
   onResumeInProgress,
 }: InProgressCardProps) {
+  const reduce = useReducedMotion();
   const queryClient = useQueryClient();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<number | null>(null);
@@ -94,9 +95,9 @@ export function InProgressCard({
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
+        initial={reduce ? false : { opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 25 }}
         className="rounded-xl bg-primary text-primary-foreground p-3.5 shadow-sm"
       >
         {/* Header line */}
@@ -120,9 +121,9 @@ export function InProgressCard({
           <div className="h-1 rounded-full bg-white/15 overflow-hidden">
             <motion.div
               className="h-full rounded-full bg-white"
-              initial={{ width: 0 }}
+              initial={reduce ? false : { width: 0 }}
               animate={{ width: `${inProgressRun.progress_pct ?? 0}%` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={reduce ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}
             />
           </div>
           <p className="text-[10px] text-white/50 font-semibold mt-1 tabular-nums">
