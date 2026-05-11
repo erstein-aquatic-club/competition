@@ -29,7 +29,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CopyToAthleteDialog } from "./CopyToAthleteDialog";
 import { AddSessionSheet } from "./AddSessionSheet";
@@ -257,7 +257,6 @@ function AthletePlanDetail({
   onStartEditSession,
   onDeleteSession,
 }: AthletePlanDetailProps) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   /* ----- queries ----- */
@@ -309,7 +308,7 @@ function AthletePlanDetail({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Cycle créé" });
+      toast("Cycle créé");
     },
   });
 
@@ -318,7 +317,7 @@ function AthletePlanDetail({
       renameStrengthFolder(id, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Renommé" });
+      toast("Renommé");
     },
   });
 
@@ -328,7 +327,7 @@ function AthletePlanDetail({
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
-      toast({ title: "Cycle supprimé" });
+      toast("Cycle supprimé");
     },
   });
 
@@ -377,12 +376,12 @@ function AthletePlanDetail({
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
-      toast({ title: "Copie effectuée" });
+      toast("Copie effectuée");
       setCopyDialog(null);
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Copie échouée";
-      toast({ title: "Erreur", description: message, variant: "destructive" });
+      toast.error("Erreur", { description: message });
     },
   });
 
@@ -398,11 +397,11 @@ function AthletePlanDetail({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      toast({ title: "Séance assignée pour aujourd’hui" });
+      toast("Séance assignée pour aujourd’hui");
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Erreur";
-      toast({ title: "Erreur", description: message, variant: "destructive" });
+      toast.error("Erreur", { description: message });
     },
   });
 

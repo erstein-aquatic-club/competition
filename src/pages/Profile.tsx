@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronLeft, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
@@ -219,7 +219,6 @@ export default function Profile() {
   const userId = useAuth((s) => s.userId);
   const logout = useAuth((s) => s.logout);
   const role = useAuth((s) => s.role);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
@@ -238,11 +237,7 @@ export default function Profile() {
   useAchievementChecker({
     userId: isSwimmer && userId ? userId : 0,
     onBadgeUnlocked: (badge: BadgeDefinition) => {
-      toast({
-        title: "Badge débloqué !",
-        description: <AchievementToast badge={badge} />,
-        duration: 5000,
-      });
+      toast("Badge débloqué !", { description: <AchievementToast badge={badge} /> });
     },
   });
 
@@ -287,32 +282,20 @@ export default function Profile() {
       if (pushEnabled) {
         const ok = await unsubscribeFromPush(userId);
         if (!ok) {
-          toast({
-            title: "Désactivation impossible",
-            description: "Le service worker push n'est pas disponible sur cet appareil.",
-            variant: "destructive",
-          });
+          toast.error("Désactivation impossible", { description: "Le service worker push n'est pas disponible sur cet appareil." });
           return;
         }
         setPushEnabled(false);
       } else {
         const ok = await subscribeToPush(userId);
         if (!ok) {
-          toast({
-            title: "Activation impossible",
-            description: "Vérifiez que l'app est installée, que les notifications sont autorisées et que la configuration push est disponible.",
-            variant: "destructive",
-          });
+          toast.error("Activation impossible", { description: "Vérifiez que l'app est installée, que les notifications sont autorisées et que la configuration push est disponible." });
           return;
         }
         setPushEnabled(true);
       }
     } catch (error) {
-      toast({
-        title: "Notifications push indisponibles",
-        description: error instanceof Error ? error.message : "Une erreur est survenue pendant l'activation.",
-        variant: "destructive",
-      });
+      toast.error("Notifications push indisponibles", { description: error instanceof Error ? error.message : "Une erreur est survenue pendant l'activation." });
     } finally {
       setPushLoading(false);
     }
@@ -414,20 +397,13 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       setActiveSection("home");
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Mise à jour en attente",
-          description: "Sera synchronisée au retour en ligne.",
-        });
+        toast("Mise à jour en attente", { description: "Sera synchronisée au retour en ligne." });
       } else {
-        toast({ title: "Profil mis à jour" });
+        toast("Profil mis à jour");
       }
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Mise à jour impossible",
-        description: String((error as Error)?.message || error),
-        variant: "destructive",
-      });
+      toast.error("Mise à jour impossible", { description: String((error as Error)?.message || error) });
     },
   });
 
@@ -435,14 +411,10 @@ export default function Profile() {
     mutationFn: (payload: { password: string }) => authPasswordUpdate(payload),
     onSuccess: () => {
       passwordForm.reset();
-      toast({ title: "Mot de passe mis à jour" });
+      toast("Mot de passe mis à jour");
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Mise à jour impossible",
-        description: String((error as Error)?.message || error),
-        variant: "destructive",
-      });
+      toast.error("Mise à jour impossible", { description: String((error as Error)?.message || error) });
     },
   });
 
@@ -476,38 +448,23 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Photo en attente",
-          description: "Sera synchronisée au retour en ligne.",
-        });
+        toast("Photo en attente", { description: "Sera synchronisée au retour en ligne." });
       } else {
-        toast({ title: "Photo de profil mise à jour" });
+        toast("Photo de profil mise à jour");
       }
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Impossible de charger la photo",
-        description: String((error as Error)?.message || error),
-        variant: "destructive",
-      });
+      toast.error("Impossible de charger la photo", { description: String((error as Error)?.message || error) });
     },
   });
 
   const handleFileSelected = (file: File) => {
     if (!isAcceptedImageType(file)) {
-      toast({
-        title: "Format non supporté",
-        description: "Utilisez JPEG, PNG ou WebP.",
-        variant: "destructive",
-      });
+      toast.error("Format non supporté", { description: "Utilisez JPEG, PNG ou WebP." });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: "Fichier trop volumineux",
-        description: "La taille maximale est de 10 Mo.",
-        variant: "destructive",
-      });
+      toast.error("Fichier trop volumineux", { description: "La taille maximale est de 10 Mo." });
       return;
     }
     const objectUrl = URL.createObjectURL(file);
@@ -522,14 +479,10 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      toast({ title: "Photo supprimée" });
+      toast("Photo supprimée");
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Impossible de supprimer la photo",
-        description: String((error as Error)?.message || error),
-        variant: "destructive",
-      });
+      toast.error("Impossible de supprimer la photo", { description: String((error as Error)?.message || error) });
     },
   });
 

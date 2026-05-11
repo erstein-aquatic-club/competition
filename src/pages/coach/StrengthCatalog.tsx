@@ -36,7 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -387,7 +387,6 @@ function AssignAthleteSelect({
 }
 
 export default function StrengthCatalog() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [planCreationContext, setPlanCreationContext] = useState<{
@@ -423,7 +422,7 @@ export default function StrengthCatalog() {
   const handleGifUpload = async (media: File | Blob, isGif: boolean, setter: (url: string) => void) => {
     const maxSize = 10 * 1024 * 1024;
     if (media.size > maxSize) {
-      toast({ title: "Fichier trop volumineux", description: "La taille maximale est de 10 Mo.", variant: "destructive" });
+      toast.error("Fichier trop volumineux", { description: "La taille maximale est de 10 Mo." });
       return;
     }
     setGifUploading(true);
@@ -434,10 +433,10 @@ export default function StrengthCatalog() {
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("exercise-gifs").getPublicUrl(path);
       setter(urlData.publicUrl);
-      toast({ title: "Illustration uploadée" });
+      toast("Illustration uploadée");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Réessayez.";
-      toast({ title: "Erreur d'upload", description: message, variant: "destructive" });
+      toast.error("Erreur d'upload", { description: message });
     } finally {
       setGifUploading(false);
     }
@@ -565,7 +564,7 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       setExerciseDialogOpen(false);
-      toast({ title: "Exercice ajouté" });
+      toast("Exercice ajouté");
     },
   });
 
@@ -586,19 +585,15 @@ export default function StrengthCatalog() {
             session_id: sessionId,
             target_user_id: afterSaveId,
           }).then(() => {
-            toast({ title: "Séance créée et assignée" });
+            toast("Séance créée et assignée");
           }).catch((err: Error) => {
-            toast({
-              title: "Séance créée mais non assignée",
-              description: err.message,
-              variant: "destructive",
-            });
+            toast.error("Séance créée mais non assignée", { description: err.message });
           });
         } else {
-          toast({ title: "Séance créée avec succès" });
+          toast("Séance créée avec succès");
         }
       } else {
-        toast({ title: "Séance créée avec succès" });
+        toast("Séance créée avec succès");
       }
     },
     onError: () => {
@@ -614,7 +609,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setExerciseEditOpen(false);
       setEditingExercise(null);
-      toast({ title: "Exercice mis à jour" });
+      toast("Exercice mis à jour");
     },
   });
 
@@ -625,7 +620,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setPendingDeleteExercise(null);
-      toast({ title: "Exercice supprimé" });
+      toast("Exercice supprimé");
     },
   });
 
@@ -635,7 +630,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       setPendingDeleteSession(null);
-      toast({ title: "Séance supprimée" });
+      toast("Séance supprimée");
     },
   });
 
@@ -647,7 +642,7 @@ export default function StrengthCatalog() {
       setIsCreating(false);
       setEditingSessionId(null);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
-      toast({ title: "Séance mise à jour" });
+      toast("Séance mise à jour");
     }
   });
 
@@ -663,7 +658,7 @@ export default function StrengthCatalog() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Dossier créé" });
+      toast("Dossier créé");
     },
   });
 
@@ -672,7 +667,7 @@ export default function StrengthCatalog() {
       renameStrengthFolder(id, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Dossier renommé" });
+      toast("Dossier renommé");
     },
   });
 
@@ -683,7 +678,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
-      toast({ title: "Dossier supprimé" });
+      toast("Dossier supprimé");
     },
   });
 
@@ -694,7 +689,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
-      toast({ title: "Déplacé" });
+      toast("Déplacé");
     },
   });
 
@@ -719,12 +714,12 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
-      toast({ title: "Copie effectuée" });
+      toast("Copie effectuée");
       setCopyDialog(null);
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Copie échouée";
-      toast({ title: "Erreur", description: message, variant: "destructive" });
+      toast.error("Erreur", { description: message });
     },
   });
 
@@ -772,11 +767,7 @@ export default function StrengthCatalog() {
 
   const handleSaveAndAssign = () => {
     if (!newSession.title.trim()) {
-      toast({
-        title: "Titre requis",
-        description: "Ajoutez un nom de séance avant d'assigner.",
-        variant: "destructive",
-      });
+      toast.error("Titre requis", { description: "Ajoutez un nom de séance avant d'assigner." });
       return;
     }
     setAssignDialogOpen(true);
@@ -791,9 +782,9 @@ export default function StrengthCatalog() {
         session_id: editingSessionId,
         target_user_id: assignTargetAthleteId,
       }).then(() => {
-        toast({ title: "Séance assignée" });
+        toast("Séance assignée");
       }).catch((err: Error) => {
-        toast({ title: "Erreur d'assignation", description: err.message, variant: "destructive" });
+        toast.error("Erreur d'assignation", { description: err.message });
       });
       setAssignDialogOpen(false);
       setAssignTargetAthleteId(null);

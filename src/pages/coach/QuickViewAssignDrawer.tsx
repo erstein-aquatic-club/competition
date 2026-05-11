@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,6 @@ type Props = {
 };
 
 export default function QuickViewAssignDrawer({ open, onOpenChange, slotId, athleteId, timeSlot, onSuccess }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -46,12 +45,12 @@ export default function QuickViewAssignDrawer({ open, onOpenChange, slotId, athl
     setSaving(true);
     try {
       await assignSessionToSlotAsSub({ slotId, athleteId, catalogSessionId: selectedId, scheduledSlot: timeSlot ?? undefined });
-      toast({ title: 'Séance assignée' });
+      toast('Séance assignée');
       queryClient.invalidateQueries({ queryKey: ['coach-quickview-briefing', athleteId] });
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+      toast.error('Erreur', { description: e.message });
     } finally {
       setSaving(false);
     }
@@ -70,12 +69,12 @@ export default function QuickViewAssignDrawer({ open, onOpenChange, slotId, athl
         .single();
       if (error) throw new Error(error.message);
       await assignSessionToSlotAsSub({ slotId, athleteId, catalogSessionId: newSession.id, scheduledSlot: timeSlot ?? undefined });
-      toast({ title: 'Séance créée et assignée' });
+      toast('Séance créée et assignée');
       queryClient.invalidateQueries({ queryKey: ['coach-quickview-briefing', athleteId] });
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+      toast.error('Erreur', { description: e.message });
     } finally {
       setSaving(false);
     }

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dumbbell, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
 import { SessionBrowser } from "@/components/strength/SessionBrowser";
 import { SessionSummary } from "@/components/strength/SessionSummary";
@@ -171,7 +171,6 @@ export default function Strength() {
   const role = useAuth((s) => s.role);
   const selectedAthleteId = useAuth((s) => s.selectedAthleteId);
   const selectedAthleteName = useAuth((s) => s.selectedAthleteName);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasCoachSelection =
     (role === "coach" || role === "admin") &&
@@ -213,10 +212,7 @@ export default function Strength() {
   // Show recovery toast when a focus session is restored from localStorage
   useEffect(() => {
     if (wasRestored) {
-      toast({
-        title: "Séance en cours récupérée",
-        description: "Votre progression a été restaurée automatiquement.",
-      });
+      toast("Séance en cours récupérée", { description: "Votre progression a été restaurée automatiquement." });
     }
   }, [wasRestored, toast]);
 
@@ -337,10 +333,7 @@ export default function Strength() {
       };
       return { ...prev, items };
     });
-    toast({
-      title: "Exercice remplacé",
-      description: `${newExercise.nom_exercice} — paramètres mis à jour.`,
-    });
+    toast("Exercice remplacé", { description: `${newExercise.nom_exercice} — paramètres mis à jour.` });
   };
 
   // Task 12: Add exercise handler — uses cycle-aware defaults so an exercise
@@ -416,7 +409,7 @@ export default function Strength() {
     onError: () => {
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
-      toast({ title: "Erreur", description: "Impossible de démarrer la séance.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de démarrer la séance." });
     },
   });
 
@@ -432,21 +425,14 @@ export default function Strength() {
       }
       if (data?.one_rm_updated) {
         queryClient.invalidateQueries({ queryKey: ["1rm", user, userId] });
-        toast({
-          title: "Nouveau 1RM détecté",
-          description: "Ton record vient d'être mis à jour.",
-        });
+        toast("Nouveau 1RM détecté", { description: "Ton record vient d'être mis à jour." });
       }
     },
     onError: () => {
       if (screenMode === "focus") return; // data is in localStorage — silent in focus mode
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
-      toast({
-        title: "Erreur",
-        description: "Impossible d'enregistrer une série.",
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: "Impossible d'enregistrer une série." });
     },
   });
 
@@ -479,7 +465,7 @@ export default function Strength() {
       queryClient.invalidateQueries({ queryKey: ["1rm", user, userId] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       setScreenMode("summary");
-      toast({ title: "Séance sauvegardée", description: "Bravo pour l'effort !" });
+      toast("Séance sauvegardée", { description: "Bravo pour l'effort !" });
     },
     onError: () => {
       setSaveState("error");
@@ -507,7 +493,7 @@ export default function Strength() {
     onError: () => {
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
-      toast({ title: "Erreur", description: "Impossible de sauvegarder la note.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de sauvegarder la note." });
     },
   });
 
@@ -541,10 +527,7 @@ export default function Strength() {
   const startAssignment = (assign: StrengthAssignment) => {
     const sessionItems = assign.items ?? [];
     if (sessionItems.length === 0) {
-      toast({
-        title: "Séance vide",
-        description: "Aucun exercice n'est disponible pour cette séance.",
-      });
+      toast("Séance vide", { description: "Aucun exercice n'est disponible pour cette séance." });
       return;
     }
     handleStartAssignment(assign, cycleType);
@@ -578,10 +561,7 @@ export default function Strength() {
         : normalizeStrengthCycle(session.cycle ?? sessionItems.find((item) => item.cycle_type)?.cycle_type);
     const items = resolveStrengthItems(sessionItems, cycle, exerciseLookup);
     if (items.length === 0) {
-      toast({
-        title: "Séance vide",
-        description: "Aucun exercice n'est disponible pour cette séance.",
-      });
+      toast("Séance vide", { description: "Aucun exercice n'est disponible pour cette séance." });
       return;
     }
     setIsPlanMode(false);
@@ -601,10 +581,7 @@ export default function Strength() {
     const cycle = normalizeStrengthCycle(session.cycle ?? sessionItems.find((item) => item.cycle_type)?.cycle_type);
     const items = resolveStrengthItems(sessionItems, cycle, exerciseLookup);
     if (items.length === 0) {
-      toast({
-        title: "Séance vide",
-        description: "Aucun exercice n'est disponible pour cette séance.",
-      });
+      toast("Séance vide", { description: "Aucun exercice n'est disponible pour cette séance." });
       return;
     }
     setIsPlanMode(true);
@@ -655,10 +632,7 @@ export default function Strength() {
     if (startRun.isPending) return;
     const lockedCycle = activeSession.cycle ?? cycleType;
     if (activeFilteredItems.length === 0) {
-      toast({
-        title: "Séance vide",
-        description: "Aucun exercice n'est disponible pour cette séance.",
-      });
+      toast("Séance vide", { description: "Aucun exercice n'est disponible pour cette séance." });
       return;
     }
 
@@ -672,11 +646,7 @@ export default function Strength() {
     if (!activeRunId) {
       const sessionId = activeAssignment?.session_id ?? activeSession?.id ?? null;
       if (!sessionId) {
-        toast({
-          title: "Session manquante",
-          description: "Impossible de démarrer sans session associée.",
-          variant: "destructive",
-        });
+        toast.error("Session manquante", { description: "Impossible de démarrer sans session associée." });
         return;
       }
       try {
@@ -726,11 +696,7 @@ export default function Strength() {
           setActiveRunLogs((prev) => prev ?? []);
         }
       } catch {
-        toast({
-          title: "Erreur de démarrage",
-          description: "Impossible de démarrer la séance. Vérifiez votre connexion.",
-          variant: "destructive",
-        });
+        toast.error("Erreur de démarrage", { description: "Impossible de démarrer la séance. Vérifiez votre connexion." });
         return;
       }
     }
@@ -858,11 +824,7 @@ export default function Strength() {
                     }
                   });
                   if (quotaErrored) {
-                    toast({
-                      title: "Mémoire pleine",
-                      description: "Reconnecte-toi au réseau pour libérer l'espace de stockage.",
-                      variant: "destructive",
-                    });
+                    toast.error("Mémoire pleine", { description: "Reconnecte-toi au réseau pour libérer l'espace de stockage." });
                   }
                   return;
                 }
@@ -886,11 +848,7 @@ export default function Strength() {
                       try {
                         enqueue("strength-set-log", payload as Record<string, unknown>);
                       } catch {
-                        toast({
-                          title: "Mémoire pleine",
-                          description: "Reconnecte-toi au réseau pour libérer l'espace de stockage.",
-                          variant: "destructive",
-                        });
+                        toast.error("Mémoire pleine", { description: "Reconnecte-toi au réseau pour libérer l'espace de stockage." });
                       }
                     },
                   });
@@ -910,11 +868,7 @@ export default function Strength() {
                 if (!activeRunId) return;
                 if (isFinishing) return;
                 if (!activeRunLogs || activeRunLogs.length === 0) {
-                  toast({
-                    title: "Aucune série enregistrée",
-                    description: "Valide au moins une série avant de terminer la séance.",
-                    variant: "destructive",
-                  });
+                  toast.error("Aucune série enregistrée", { description: "Valide au moins une série avant de terminer la séance." });
                   return;
                 }
                 // Full payload for the offline queue (includes athlete_name + started_at for saveStrengthRun)
@@ -933,14 +887,10 @@ export default function Strength() {
                 if (!isOnline) {
                   try {
                     enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
-                    toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                    toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                     setScreenMode("summary");
                   } catch {
-                    toast({
-                      title: "Mémoire pleine",
-                      description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau.",
-                      variant: "destructive",
-                    });
+                    toast.error("Mémoire pleine", { description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau." });
                   }
                   return;
                 }
@@ -972,21 +922,13 @@ export default function Strength() {
                   if (isTransientError(err)) {
                     try {
                       enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
-                      toast({ title: "Séance sauvegardée hors-ligne", description: "Sera synchronisée au retour du réseau." });
+                      toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                       setScreenMode("summary");
                     } catch {
-                      toast({
-                        title: "Mémoire pleine",
-                        description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau.",
-                        variant: "destructive",
-                      });
+                      toast.error("Mémoire pleine", { description: "Impossible d'enregistrer la séance hors-ligne. Reconnecte-toi au réseau." });
                     }
                   } else {
-                    toast({
-                      title: "Erreur d'enregistrement",
-                      description: "Une erreur inattendue est survenue. Réessaie.",
-                      variant: "destructive",
-                    });
+                    toast.error("Erreur d'enregistrement", { description: "Une erreur inattendue est survenue. Réessaie." });
                     // Stay on WorkoutRunner so the user can retry
                   }
                 } finally {

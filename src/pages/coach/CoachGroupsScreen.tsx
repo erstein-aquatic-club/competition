@@ -10,7 +10,7 @@ import {
   reactivateTemporaryGroup,
   deleteTemporaryGroup,
 } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -183,7 +183,6 @@ const CreateGroupSheet = ({
   parentMembers,
   onCreated,
 }: CreateGroupSheetProps) => {
-  const { toast } = useToast();
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -204,31 +203,20 @@ const CreateGroupSheet = ({
         parent_group_id: parentGroupId ?? undefined,
       }),
     onSuccess: () => {
-      toast({
-        title: "Groupe créé",
-        description: `Le groupe "${name.trim()}" a été créé avec ${selected.size} nageur${selected.size > 1 ? "s" : ""}.`,
-      });
+      toast("Groupe créé", { description: `Le groupe "${name.trim()}" a été créé avec ${selected.size} nageur${selected.size > 1 ? "s" : ""}.` });
       setName("");
       setSelected(new Set());
       onOpenChange(false);
       onCreated();
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      toast({
-        title: "Nom requis",
-        description: "Veuillez saisir un nom pour le groupe.",
-        variant: "destructive",
-      });
+      toast.error("Nom requis", { description: "Veuillez saisir un nom pour le groupe." });
       return;
     }
     createMutation.mutate();
@@ -303,7 +291,6 @@ const AddMembersSheet = ({
   existingMemberIds,
   onAdded,
 }: AddMembersSheetProps) => {
-  const { toast } = useToast();
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const availableAthletes = useMemo(
@@ -323,20 +310,13 @@ const AddMembersSheet = ({
   const addMutation = useMutation({
     mutationFn: () => addTemporaryGroupMembers(groupId, [...selected]),
     onSuccess: () => {
-      toast({
-        title: "Nageurs ajoutés",
-        description: `${selected.size} nageur${selected.size > 1 ? "s" : ""} ajouté${selected.size > 1 ? "s" : ""}.`,
-      });
+      toast("Nageurs ajoutés", { description: `${selected.size} nageur${selected.size > 1 ? "s" : ""} ajouté${selected.size > 1 ? "s" : ""}.` });
       setSelected(new Set());
       onOpenChange(false);
       onAdded();
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -387,7 +367,6 @@ const GroupDetailView = ({
   athletes,
   onBack,
 }: GroupDetailViewProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateSub, setShowCreateSub] = useState(false);
@@ -405,18 +384,14 @@ const GroupDetailView = ({
     mutationFn: (userId: number) =>
       removeTemporaryGroupMember(groupId, userId),
     onSuccess: () => {
-      toast({ title: "Nageur retiré" });
+      toast("Nageur retiré");
       void queryClient.invalidateQueries({
         queryKey: ["temp-group-detail", groupId],
       });
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -766,7 +741,6 @@ const CoachGroupsScreen = ({
   athletes,
   athletesLoading,
 }: CoachGroupsScreenProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -793,45 +767,33 @@ const CoachGroupsScreen = ({
   const deactivateMutation = useMutation({
     mutationFn: (groupId: number) => deactivateTemporaryGroup(groupId),
     onSuccess: () => {
-      toast({ title: "Groupe terminé" });
+      toast("Groupe terminé");
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const reactivateMutation = useMutation({
     mutationFn: (groupId: number) => reactivateTemporaryGroup(groupId),
     onSuccess: () => {
-      toast({ title: "Groupe réactivé" });
+      toast("Groupe réactivé");
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (groupId: number) => deleteTemporaryGroup(groupId),
     onSuccess: () => {
-      toast({ title: "Groupe supprimé" });
+      toast("Groupe supprimé");
       void queryClient.invalidateQueries({ queryKey: ["temp-groups"] });
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 

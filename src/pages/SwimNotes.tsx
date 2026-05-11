@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { SwimTimeInput } from "@/components/swim/SwimTimeInput";
 import { formatSwimTime, parseSwimTime } from "@/lib/swimConsultationUtils";
 
@@ -90,7 +90,6 @@ function CreateNoteDialog({
   userId: string;
 }) {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [eventCode, setEventCode] = useState("");
   const [poolLength, setPoolLength] = useState<number | null>(null);
   const [equipment, setEquipment] = useState<string[]>(["aucun"]);
@@ -127,12 +126,12 @@ function CreateNoteDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history", userId] });
-      toast({ title: "Note enregistrée" });
+      toast("Note enregistrée");
       reset();
       onOpenChange(false);
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'enregistrer.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible d'enregistrer." });
     },
   });
 

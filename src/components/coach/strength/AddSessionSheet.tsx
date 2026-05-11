@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface AddSessionSheetProps {
   open: boolean;
@@ -31,7 +31,6 @@ export function AddSessionSheet({
   dayPrefix,
   onCreateNew,
 }: AddSessionSheetProps) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
@@ -50,12 +49,12 @@ export function AddSessionSheet({
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
-      toast({ title: "Séance ajoutée" });
+      toast("Séance ajoutée");
       onOpenChange(false);
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Erreur lors de la copie";
-      toast({ title: "Erreur", description: message, variant: "destructive" });
+      toast.error("Erreur", { description: message });
     },
     onSettled: () => setDuplicatingId(null),
   });

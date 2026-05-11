@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { update1RM } from "@/lib/api";
 import { useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -24,7 +24,6 @@ export function OneRmGate({
   onSaveAndContinue,
   onSkipToFreeWeight,
 }: Props) {
-  const { toast } = useToast();
   const [values, setValues] = useState<Record<number, string>>({});
 
   const saveMutation = useMutation({
@@ -41,11 +40,11 @@ export function OneRmGate({
       }
     },
     onSuccess: () => {
-      toast({ title: "1RM sauvegardés" });
+      toast("1RM sauvegardés");
       onSaveAndContinue();
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de sauvegarder les 1RM.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de sauvegarder les 1RM." });
     },
   });
 

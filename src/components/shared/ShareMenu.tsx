@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/shared/icons/WhatsAppIcon";
 import { buildShareOptions } from "@/lib/share/buildShareOptions";
 import type { SharePayload, ShareOptionId } from "@/lib/share/types";
@@ -35,7 +35,6 @@ export const ICONS: Record<ShareOptionId, ReactNode> = {
 };
 
 export function useShareActions(resolvedPayload: SharePayload | null) {
-  const { toast } = useToast();
   return useCallback(
     async (id: ShareOptionId) => {
       if (!resolvedPayload) return;
@@ -43,27 +42,21 @@ export function useShareActions(resolvedPayload: SharePayload | null) {
         switch (id) {
           case "whatsapp-link":
             openWhatsAppLink(resolvedPayload.url ?? resolvedPayload.text ?? "");
-            toast({
-              title: "WhatsApp ouvert",
-              description: "Lien aussi copié — collez avec ⌘+V si besoin.",
-            });
+            toast("WhatsApp ouvert", { description: "Lien aussi copié — collez avec ⌘+V si besoin." });
             break;
           case "whatsapp-image":
             if (!resolvedPayload.imageBlob) return;
             await openWhatsAppWithImage(resolvedPayload.imageBlob);
-            toast({
-              title: "Image copiée",
-              description: "Sélectionnez un contact puis collez avec ⌘+V.",
-            });
+            toast("Image copiée", { description: "Sélectionnez un contact puis collez avec ⌘+V." });
             break;
           case "copy-link":
             await copyText(resolvedPayload.url ?? resolvedPayload.text ?? "");
-            toast({ title: "Lien copié !" });
+            toast("Lien copié !");
             break;
           case "copy-image":
             if (!resolvedPayload.imageBlob) return;
             await copyImage(resolvedPayload.imageBlob);
-            toast({ title: "Image copiée !" });
+            toast("Image copiée !");
             break;
           case "download-image":
             if (!resolvedPayload.imageBlob || !resolvedPayload.imageFileName) return;
@@ -74,11 +67,7 @@ export function useShareActions(resolvedPayload: SharePayload | null) {
             break;
         }
       } catch (err) {
-        toast({
-          title: "Erreur",
-          description: (err as Error)?.message ?? "Partage impossible.",
-          variant: "destructive",
-        });
+        toast.error("Erreur", { description: (err as Error)?.message ?? "Partage impossible." });
       }
     },
     [resolvedPayload, toast],
@@ -86,7 +75,6 @@ export function useShareActions(resolvedPayload: SharePayload | null) {
 }
 
 export function ShareMenu({ trigger, payload, onOpen }: Props) {
-  const { toast } = useToast();
   const [resolvedPayload, setResolvedPayload] = useState<SharePayload | null>(payload ?? null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -100,11 +88,7 @@ export function ShareMenu({ trigger, payload, onOpen }: Props) {
           setResolvedPayload(p);
           setOpen(true);
         } catch {
-          toast({
-            title: "Erreur",
-            description: "Impossible de préparer le partage.",
-            variant: "destructive",
-          });
+          toast.error("Erreur", { description: "Impossible de préparer le partage." });
         } finally {
           setLoading(false);
         }
@@ -144,7 +128,6 @@ export function ShareMenuInline({
   payload?: SharePayload;
   onOpen?: () => Promise<SharePayload>;
 }) {
-  const { toast } = useToast();
   const [resolved, setResolved] = useState<SharePayload | null>(payload ?? null);
   const run = useShareActions(resolved);
 
@@ -157,11 +140,7 @@ export function ShareMenuInline({
       })
       .catch(() => {
         if (!cancelled) {
-          toast({
-            title: "Erreur",
-            description: "Impossible de préparer le partage.",
-            variant: "destructive",
-          });
+          toast.error("Erreur", { description: "Impossible de préparer le partage." });
         }
       });
     return () => {

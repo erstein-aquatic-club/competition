@@ -25,7 +25,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { ObjectiveCard } from "@/components/shared/ObjectiveCard";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import {
@@ -107,7 +107,6 @@ export default function AthleteInterviewsSection({
   onBack,
   embedded = false,
 }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [submitConfirmId, setSubmitConfirmId] = useState<string | null>(null);
   const [signConfirmId, setSignConfirmId] = useState<string | null>(null);
@@ -166,15 +165,11 @@ export default function AthleteInterviewsSection({
       input: InterviewAthleteInput;
     }) => updateInterviewAthleteSections(id, input),
     onSuccess: () => {
-      toast({ title: "Sauvegardé" });
+      toast("Sauvegardé");
       invalidate();
     },
     onError: (e: Error) =>
-      toast({
-        title: "Erreur",
-        description: e.message,
-        variant: "destructive",
-      }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   // §235 — entretien soumis OU signé par l'athlète : on marque lues les notifs
@@ -195,17 +190,13 @@ export default function AthleteInterviewsSection({
     },
     onSuccess: () => {
       haptic.success();
-      toast({ title: "Envoyé au coach" });
+      toast("Envoyé au coach");
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
     },
     onError: (e: Error) =>
-      toast({
-        title: "Erreur",
-        description: e.message,
-        variant: "destructive",
-      }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const signMut = useMutation({
@@ -215,17 +206,13 @@ export default function AthleteInterviewsSection({
     },
     onSuccess: () => {
       haptic.success();
-      toast({ title: "Entretien signé" });
+      toast("Entretien signé");
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
     },
     onError: (e: Error) =>
-      toast({
-        title: "Erreur",
-        description: e.message,
-        variant: "destructive",
-      }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   return (

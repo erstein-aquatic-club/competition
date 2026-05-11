@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, Check, ChevronsUpDown, X, Smartphone } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +29,6 @@ const CoachSmsScreen = ({
   athletesLoading,
   initialAthleteId,
 }: CoachSmsScreenProps) => {
-  const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [selectedGroups, setSelectedGroups] = useState<Set<number>>(new Set());
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
@@ -139,11 +138,7 @@ const CoachSmsScreen = ({
 
   const handleSendSms = () => {
     if (selectedPhones.length === 0) {
-      toast({
-        title: "Aucun numéro",
-        description: "Aucun nageur avec un numéro de téléphone dans cette sélection.",
-        variant: "destructive",
-      });
+      toast.error("Aucun numéro", { description: "Aucun nageur avec un numéro de téléphone dans cette sélection." });
       return;
     }
 
@@ -152,12 +147,9 @@ const CoachSmsScreen = ({
       window.location.href = uri;
     } else {
       navigator.clipboard.writeText(selectedPhones.join(", ")).then(() => {
-        toast({
-          title: "Numéros copiés",
-          description: `${selectedPhones.length} numéro${selectedPhones.length > 1 ? "s" : ""} copié${selectedPhones.length > 1 ? "s" : ""} dans le presse-papiers.`,
-        });
+        toast("Numéros copiés", { description: `${selectedPhones.length} numéro${selectedPhones.length > 1 ? "s" : ""} copié${selectedPhones.length > 1 ? "s" : ""} dans le presse-papiers.` });
       }).catch(() => {
-        toast({ title: "Erreur", description: "Impossible de copier les numéros.", variant: "destructive" });
+        toast.error("Erreur", { description: "Impossible de copier les numéros." });
       });
     }
   };

@@ -11,7 +11,7 @@ import {
 import type { Objective, ObjectiveInput } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,7 +61,6 @@ type Props = {
 type ObjectiveType = "chrono" | "texte" | "both";
 
 export default function SwimmerObjectivesView({ onBack, embedded = false }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
@@ -181,35 +180,35 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
   const createMut = useMutation({
     mutationFn: (input: ObjectiveInput) => createObjective(input),
     onSuccess: () => {
-      toast({ title: "Objectif créé" });
+      toast("Objectif créé");
       invalidate();
       setShowForm(false);
     },
     onError: (e: Error) =>
-      toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const updateMut = useMutation({
     mutationFn: (input: Partial<ObjectiveInput>) =>
       updateObjective(editingObj!.id, input),
     onSuccess: () => {
-      toast({ title: "Objectif mis à jour" });
+      toast("Objectif mis à jour");
       invalidate();
       setShowForm(false);
     },
     onError: (e: Error) =>
-      toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteObjective(id),
     onSuccess: () => {
-      toast({ title: "Objectif supprimé" });
+      toast("Objectif supprimé");
       invalidate();
       setDeleteTarget(null);
     },
     onError: (e: Error) =>
-      toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const showChrono = objType === "chrono" || objType === "both";
@@ -218,19 +217,15 @@ export default function SwimmerObjectivesView({ onBack, embedded = false }: Prop
 
   const handleSubmit = () => {
     if (showChrono && !eventCode) {
-      toast({ title: "Épreuve requise", variant: "destructive" });
+      toast.error("Épreuve requise");
       return;
     }
     if (showChrono && targetTime && parseTime(targetTime) === null) {
-      toast({
-        title: "Format invalide",
-        description: "Format : m:ss:cc (ex: 1:05:30)",
-        variant: "destructive",
-      });
+      toast.error("Format invalide", { description: "Format : m:ss:cc (ex: 1:05:30)" });
       return;
     }
     if (showText && !text.trim()) {
-      toast({ title: "Texte requis", variant: "destructive" });
+      toast.error("Texte requis");
       return;
     }
     if (!authUid) return;

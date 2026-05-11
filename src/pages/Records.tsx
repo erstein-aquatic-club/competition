@@ -31,7 +31,7 @@ import {
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { shouldShowRecords } from "@/pages/Profile";
 import { Check, ChevronDown, ChevronRight, Dumbbell, Edit2, Download, RefreshCw, StickyNote, Trash2, Trophy, Waves, X, AlertCircle } from "lucide-react";
@@ -228,7 +228,6 @@ export default function Records() {
   const userId = useAuth((s) => s.userId);
   const role = useAuth((s) => s.role);
   const [, navigate] = useLocation();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const prefersReducedMotion = useReducedMotion();
 
@@ -375,19 +374,12 @@ export default function Records() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["swimmer-performances"] });
-      toast({
-        title: "Import terminé",
-        description: `${data.total_found} trouvée(s), ${data.new_imported} importée(s), ${data.already_existed} déjà existante(s)`,
-      });
+      toast("Import terminé", { description: `${data.total_found} trouvée(s), ${data.new_imported} importée(s), ${data.already_existed} déjà existante(s)` });
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 2000);
     },
     onError: (e: Error) => {
-      toast({
-        title: "Import impossible",
-        description: String(e?.message || e),
-        variant: "destructive",
-      });
+      toast.error("Import impossible", { description: String(e?.message || e) });
     },
   });
 
@@ -526,10 +518,7 @@ export default function Records() {
   const { showSlowToast: showRecordsSlowToast } = useDelayedLoading(recordsLoading);
   useEffect(() => {
     if (showRecordsSlowToast) {
-      toast({
-        title: "Ça prend du temps…",
-        description: "Le réseau semble lent. On continue d'essayer.",
-      });
+      toast("Ça prend du temps…", { description: "Le réseau semble lent. On continue d'essayer." });
     }
   }, [showRecordsSlowToast, toast]);
 
@@ -560,12 +549,9 @@ export default function Records() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Mise à jour en attente",
-          description: "Sera synchronisée au retour en ligne.",
-        });
+        toast("Mise à jour en attente", { description: "Sera synchronisée au retour en ligne." });
       } else {
-        toast({ title: "1RM mis à jour" });
+        toast("1RM mis à jour");
       }
     },
     onError: (err: Error) => {
@@ -582,7 +568,7 @@ export default function Records() {
       updateExerciseNoteApi({ athlete_id: userId!, exercise_id: data.exercise_id, notes: data.notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
-      toast({ title: "Note mise à jour" });
+      toast("Note mise à jour");
     },
     onError: (err: Error) => {
       toast({
@@ -605,12 +591,9 @@ export default function Records() {
       setSwimForm(emptySwimForm);
       setSwimSheetOpen(false);
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Record en attente",
-          description: "Sera synchronisé au retour en ligne.",
-        });
+        toast("Record en attente", { description: "Sera synchronisé au retour en ligne." });
       } else {
-        toast({ title: "Record mis à jour" });
+        toast("Record mis à jour");
       }
     },
     onError: (err: Error) => {
@@ -628,7 +611,7 @@ export default function Records() {
       queryClient.invalidateQueries({ queryKey: ["swim-records"] });
       setSwimSheetOpen(false);
       setSwimForm(emptySwimForm);
-      toast({ title: "Record supprimé" });
+      toast("Record supprimé");
     },
   });
 
@@ -651,16 +634,16 @@ export default function Records() {
 
   const submitSwimForm = () => {
     if (!swimForm.event_name.trim()) {
-      toast({ title: "Nom d'épreuve requis", variant: "destructive" });
+      toast.error("Nom d'épreuve requis");
       return;
     }
     if (!swimForm.pool_length) {
-      toast({ title: "Bassin requis", variant: "destructive" });
+      toast.error("Bassin requis");
       return;
     }
     const seconds = parseTimeInputToSeconds(swimForm.time_seconds);
     if (seconds === null) {
-      toast({ title: "Temps invalide", description: "Ex: 1:02.34 ou 62.34", variant: "destructive" });
+      toast.error("Temps invalide", { description: "Ex: 1:02.34 ou 62.34" });
       return;
     }
     upsertSwimRecord.mutate({
@@ -699,7 +682,7 @@ export default function Records() {
   const saveOneRmEdit = (exerciseId: number, draft: string) => {
     const v = Number(String(draft ?? "").replace(",", "."));
     if (!Number.isFinite(v) || v <= 0) {
-      toast({ title: "Valeur invalide", description: "Entrez un nombre > 0", variant: "destructive" });
+      toast.error("Valeur invalide", { description: "Entrez un nombre > 0" });
       return;
     }
     update1RM.mutate({ exercise_id: exerciseId, one_rm: v });

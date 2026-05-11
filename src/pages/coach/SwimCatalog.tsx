@@ -39,7 +39,7 @@ import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { SwimSessionBuilder } from "@/components/coach/swim/SwimSessionBuilder";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AlertCircle, Archive, FolderOpen, FolderPlus, Home, Layers, Loader2, Plus, Route, Search, Timer, Trash2, X } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useAuth } from "@/lib/auth";
 import { formatSwimSessionDefaultTitle } from "@/lib/date";
@@ -205,7 +205,6 @@ export default function SwimCatalog({
   entryContext = null,
   onEntryContextConsumed,
 }: SwimCatalogProps = {}) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const userId = useAuth((s) => s.userId);
   const role = useAuth((s) => s.role);
@@ -408,16 +407,10 @@ export default function SwimCatalog({
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setIsCreating(false);
       setNewSession(createEmptySession());
-      toast({
-        title: variables?.id ? "Séance natation mise à jour" : "Séance natation créée",
-      });
+      toast(variables?.id ? "Séance natation mise à jour" : "Séance natation créée");
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message || "Impossible d'enregistrer la séance.",
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message || "Impossible d'enregistrer la séance." });
     },
   });
 
@@ -427,14 +420,10 @@ export default function SwimCatalog({
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setPendingDeleteSession(null);
-      toast({ title: "Séance supprimée" });
+      toast("Séance supprimée");
     },
     onError: () => {
-      toast({
-        title: "Suppression impossible",
-        description: "Cette séance est utilisée dans une assignation.",
-        variant: "destructive",
-      });
+      toast.error("Suppression impossible", { description: "Cette séance est utilisée dans une assignation." });
     },
   });
 
@@ -445,9 +434,7 @@ export default function SwimCatalog({
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setPendingArchiveSession(null);
-      toast({
-        title: variables.archived ? "Séance archivée" : "Séance restaurée",
-      });
+      toast(variables.archived ? "Séance archivée" : "Séance restaurée");
     },
   });
 
@@ -458,17 +445,13 @@ export default function SwimCatalog({
       queryClient.invalidateQueries({ queryKey: ["swim_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["swim_catalog"] });
       setPendingMoveSession(null);
-      toast({ title: "Séance déplacée" });
+      toast("Séance déplacée");
     },
   });
 
   const handleSave = () => {
     if (!newSession.name.trim()) {
-      toast({
-        title: "Titre requis",
-        description: "Ajoutez un nom de séance avant d'enregistrer.",
-        variant: "destructive",
-      });
+      toast.error("Titre requis", { description: "Ajoutez un nom de séance avant d'enregistrer." });
       return;
     }
     createSession.mutate({
@@ -519,11 +502,7 @@ export default function SwimCatalog({
     );
 
     if (!sessionToEdit) {
-      toast({
-        title: "Séance introuvable",
-        description: "La séance liée à ce créneau n'est plus disponible.",
-        variant: "destructive",
-      });
+      toast.error("Séance introuvable", { description: "La séance liée à ce créneau n'est plus disponible." });
       onEntryContextConsumed?.();
       return;
     }
@@ -575,11 +554,7 @@ export default function SwimCatalog({
   const handleMoveToFolder = (folder: string | null) => {
     if (!pendingMoveSession) return;
     if (folder !== null && !allFolders.includes(folder)) {
-      toast({
-        title: "Dossier introuvable",
-        description: "Ce dossier a été supprimé entre-temps. Rafraîchissez la page.",
-        variant: "destructive",
-      });
+      toast.error("Dossier introuvable", { description: "Ce dossier a été supprimé entre-temps. Rafraîchissez la page." });
       setPendingMoveSession(null);
       return;
     }

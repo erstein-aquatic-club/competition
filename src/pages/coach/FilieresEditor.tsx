@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types & helpers
@@ -558,7 +558,6 @@ function DetailScreen({
   onRequestReset: () => void;
   reducedMotion: boolean;
 }) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const style = FILIERE_STYLES[filiere.color] ?? FILIERE_STYLES.sky;
   const constFiliere = FILIERE_MAP.get(filiere.id);
@@ -567,15 +566,11 @@ function DetailScreen({
     mutationFn: (input: SwimFiliereInput) => updateSwimFiliere(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["swim-filieres"] });
-      toast({ title: "Filière mise à jour" });
+      toast("Filière mise à jour");
       onBack();
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -1021,22 +1016,17 @@ function ResetDialog({
   filiere: SwimFiliere;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const resetMutation = useMutation({
     mutationFn: () => resetSwimFiliere(filiere.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["swim-filieres"] });
-      toast({ title: "Valeurs par défaut restaurées" });
+      toast("Valeurs par défaut restaurées");
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 

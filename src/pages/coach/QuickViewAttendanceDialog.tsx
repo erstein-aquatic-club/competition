@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,6 @@ const OPTIONS: { value: AttendanceStatus; label: string }[] = [
 ];
 
 export default function QuickViewAttendanceDialog({ open, onOpenChange, dimSessionId, athleteId, onSuccess }: Props) {
-  const { toast } = useToast();
   const [status, setStatus] = useState<AttendanceStatus>('present');
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
@@ -34,11 +33,11 @@ export default function QuickViewAttendanceDialog({ open, onOpenChange, dimSessi
     setSaving(true);
     try {
       await recordAttendanceAsSub({ dimSessionId, athleteId, status, recordedBy: user.id, comment: comment || undefined });
-      toast({ title: 'Présence enregistrée' });
+      toast('Présence enregistrée');
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+      toast.error('Erreur', { description: e.message });
     } finally {
       setSaving(false);
     }

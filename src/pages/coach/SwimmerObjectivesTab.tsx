@@ -10,7 +10,7 @@ import {
   getSwimmerPerformances,
 } from "@/lib/api";
 import type { Objective, ObjectiveInput, Competition } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,7 +140,6 @@ const ObjectiveFormSheet = ({
   athleteAccountId,
   competitions,
 }: ObjectiveFormProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!objective;
 
@@ -181,17 +180,13 @@ const ObjectiveFormSheet = ({
   const createMutation = useMutation({
     mutationFn: (input: ObjectiveInput) => createObjective(input),
     onSuccess: (data: Objective) => {
-      toast({ title: "Objectif créé" });
+      toast("Objectif créé");
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
       void autoSyncPaceTarget(data, athleteAccountId, queryClient);
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -199,33 +194,25 @@ const ObjectiveFormSheet = ({
     mutationFn: (input: Partial<ObjectiveInput>) =>
       updateObjective(objective!.id, input),
     onSuccess: (data: Objective) => {
-      toast({ title: "Objectif mis à jour" });
+      toast("Objectif mis à jour");
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
       void autoSyncPaceTarget(data, athleteAccountId, queryClient);
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteObjective(objective!.id),
     onSuccess: () => {
-      toast({ title: "Objectif supprimé" });
+      toast("Objectif supprimé");
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -234,30 +221,18 @@ const ObjectiveFormSheet = ({
 
   const handleSubmit = () => {
     if (showChrono && !eventCode) {
-      toast({
-        title: "Épreuve requise",
-        description: "Veuillez sélectionner une épreuve.",
-        variant: "destructive",
-      });
+      toast.error("Épreuve requise", { description: "Veuillez sélectionner une épreuve." });
       return;
     }
     if (showChrono && targetTime) {
       const parsed = parseTime(targetTime);
       if (parsed === null) {
-        toast({
-          title: "Format invalide",
-          description: "Le temps doit être au format m:ss:cc (ex: 1:05:30)",
-          variant: "destructive",
-        });
+        toast.error("Format invalide", { description: "Le temps doit être au format m:ss:cc (ex: 1:05:30)" });
         return;
       }
     }
     if (showText && !text.trim()) {
-      toast({
-        title: "Texte requis",
-        description: "Veuillez saisir un objectif texte.",
-        variant: "destructive",
-      });
+      toast.error("Texte requis", { description: "Veuillez saisir un objectif texte." });
       return;
     }
 

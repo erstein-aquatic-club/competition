@@ -13,7 +13,7 @@ import { formatRelativeDate } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { ChevronRight, Inbox, ArrowLeft, Trash2, X } from "lucide-react";
 
 type Props = {
@@ -27,7 +27,6 @@ export default function SwimmerMessagesView({
   onBack,
   onOpenProfileSection: _onOpenProfileSection,
 }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const syncedDismissedUnreadIdsRef = useRef<Set<number>>(new Set());
   const [selectedTargetId, setSelectedTargetId] = useState<number | null>(null);
@@ -166,22 +165,11 @@ export default function SwimmerMessagesView({
       syncedDismissedUnreadIdsRef.current = new Set();
 
       const totalCleared = result.deleted + result.dismissed;
-      toast({
-        title: "Messages effacés",
-        description:
-          totalCleared > 0
-            ? `${totalCleared} notification${totalCleared > 1 ? "s" : ""} nettoyée${totalCleared > 1 ? "s" : ""}.`
-            : "Aucune notification à nettoyer.",
-      });
+      toast("Messages effacés", { description: totalCleared > 0 });
     } catch (error) {
       // Local dismiss already applied — degrade gracefully but warn the user
       // that the cleanup isn't persisted cross-device.
-      toast({
-        title: "Nettoyage serveur incomplet",
-        description:
-          "Les notifications sont masquées sur cet appareil. Réessayez plus tard pour effacer définitivement.",
-        variant: "destructive",
-      });
+      toast.error("Nettoyage serveur incomplet", { description: "Les notifications sont masquées sur cet appareil. Réessayez plus tard pour effacer définitivement." });
       console.error("[notifications_clear_all] failed", error);
     }
   };
@@ -192,10 +180,7 @@ export default function SwimmerMessagesView({
 
   const handleRestoreHiddenNotifications = () => {
     setDismissedTargetIds([]);
-    toast({
-      title: "Messages réaffichés",
-      description: "Les notifications masquées sur cet appareil sont de nouveau visibles.",
-    });
+    toast("Messages réaffichés", { description: "Les notifications masquées sur cet appareil sont de nouveau visibles." });
   };
 
   return (

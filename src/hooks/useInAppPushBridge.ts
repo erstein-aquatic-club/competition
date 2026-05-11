@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { queryClient } from '@/lib/queryClient';
 
 interface PushPayload {
@@ -18,8 +18,6 @@ interface PushPayload {
  * Safe on SSR and when Service Worker is unavailable.
  */
 export function useInAppPushBridge() {
-  const { toast } = useToast();
-
   useEffect(() => {
     // Early return on SSR or no SW support
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
@@ -42,11 +40,7 @@ export function useInAppPushBridge() {
       const body = payload.body || '';
 
       // Show in-app toast
-      toast({
-        title,
-        description: body,
-        duration: 5000,
-      });
+      toast(title, { description: body, duration: 5000 });
 
       // Invalidate notification-related queries to refresh stale data
       void queryClient.invalidateQueries({

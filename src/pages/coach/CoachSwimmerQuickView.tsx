@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { ArrowLeft, ShieldAlert, Activity, Target, Trophy, ClipboardList, CheckSquare, MessageSquare, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -279,7 +279,6 @@ type Props = {
 export default function CoachSwimmerQuickView({ athleteId: athleteIdProp, onBack }: Props = {}) {
   const [, navigate] = useLocation();
   const { selectedAthleteId } = useAuth();
-  const { toast } = useToast();
   const athleteId = athleteIdProp ?? selectedAthleteId;
 
   const [attendanceOpen, setAttendanceOpen] = useState(false);
@@ -316,7 +315,7 @@ export default function CoachSwimmerQuickView({ athleteId: athleteIdProp, onBack
   }
 
   if (error || !briefing) {
-    toast({ title: 'Erreur', description: 'Impossible de charger les données du nageur.', variant: 'destructive' });
+    toast.error('Erreur', { description: 'Impossible de charger les données du nageur.' });
     return (
       <div className="p-4 text-center text-muted-foreground">
         <p>Erreur de chargement.</p>

@@ -23,7 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { intensityTone } from "@/components/swim/IntensityDots";
 import { buildItemsFromBlocks, calculateSwimTotalDistance } from "@/lib/swimSessionUtils";
 import { detectTextWarnings, normalizeIntensityValue, parseSwimText } from "@/lib/swimTextParser";
@@ -97,7 +97,6 @@ export function SwimSessionBuilder({
   userId,
   isSaving,
 }: SwimSessionBuilderProps) {
-  const { toast } = useToast();
   const [editorMode, setEditorMode] = React.useState<"blocks" | "text">("blocks");
   const [splitWarnOpen, setSplitWarnOpen] = useState(false);
   const [pendingBlocks, setPendingBlocks] = useState<SwimBlock[] | null>(null);
@@ -374,11 +373,7 @@ export function SwimSessionBuilder({
                 if (!rawText.trim()) return;
                 const blocks = parseSwimText(rawText);
                 if (blocks.length === 0) {
-                  toast({
-                    title: "Aucun bloc reconnu",
-                    description: "Vérifiez le format du texte.",
-                    variant: "destructive",
-                  });
+                  toast.error("Aucun bloc reconnu", { description: "Vérifiez le format du texte." });
                   return;
                 }
                 const splitWarnings = textWarnings.filter((w) => w.type === "split_distance");
@@ -389,7 +384,7 @@ export function SwimSessionBuilder({
                 }
                 onSessionChange({ ...session, blocks, description: rawText });
                 setEditorMode("blocks");
-                toast({ title: `${blocks.length} bloc(s) importé(s)` });
+                toast(`${blocks.length} bloc(s) importé(s)`);
               }}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
@@ -587,7 +582,7 @@ export function SwimSessionBuilder({
                 if (pendingBlocks) {
                   onSessionChange({ ...session, blocks: pendingBlocks, description: rawText });
                   setEditorMode("blocks");
-                  toast({ title: `${pendingBlocks.length} bloc(s) importé(s)` });
+                  toast(`${pendingBlocks.length} bloc(s) importé(s)`);
                   setPendingBlocks(null);
                 }
               }}

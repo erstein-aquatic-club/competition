@@ -15,7 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useDashboardState } from "@/hooks/useDashboardState";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
@@ -218,14 +218,10 @@ export default function Dashboard() {
   // §265 — Toast "ça prend du temps…" si le chargement initial dépasse 5 s.
   // Combiné au retry exponentiel §244 et au timeout 8s §256, donne un signal
   // UX au lieu d'un skeleton silencieux sur réseau lent.
-  const { toast } = useToast();
   const { showSlowToast } = useDelayedLoading(isLoading);
   useEffect(() => {
     if (showSlowToast) {
-      toast({
-        title: "Ça prend du temps…",
-        description: "Le réseau semble lent. On continue d'essayer.",
-      });
+      toast("Ça prend du temps…", { description: "Le réseau semble lent. On continue d'essayer." });
     }
   }, [showSlowToast, toast]);
 

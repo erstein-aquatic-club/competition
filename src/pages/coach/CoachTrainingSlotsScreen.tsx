@@ -34,7 +34,7 @@ import {
   buildItemsFromBlocks,
   calculateSwimTotalDistance,
 } from "@/lib/swimSessionUtils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { buildHtml2CanvasOnClone } from "@/lib/html2canvas-export";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -234,7 +234,6 @@ const SlotFormSheet = ({
   coaches,
   swimmerContext,
 }: SlotFormSheetProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userId: coachUserId } = useAuth();
   const isEdit = !!slot;
@@ -292,23 +291,15 @@ const SlotFormSheet = ({
 
   const buildInput = (): TrainingSlotInput | null => {
     if (!startTime || !endTime) {
-      toast({
-        title: "Horaires requis",
-        description: "Veuillez saisir les heures de debut et fin.",
-        variant: "destructive",
-      });
+      toast.error("Horaires requis", { description: "Veuillez saisir les heures de debut et fin." });
       return null;
     }
     if (!location.trim()) {
-      toast({
-        title: "Lieu requis",
-        description: "Veuillez saisir un lieu.",
-        variant: "destructive",
-      });
+      toast.error("Lieu requis", { description: "Veuillez saisir un lieu." });
       return null;
     }
     if (slotMode === "oneoff" && !scheduledDate) {
-      toast({ title: "Date requise", description: "Veuillez saisir la date du créneau ponctuel.", variant: "destructive" });
+      toast.error("Date requise", { description: "Veuillez saisir la date du créneau ponctuel." });
       return null;
     }
     let effectiveDayOfWeek = Number(dayOfWeek);
@@ -368,16 +359,12 @@ const SlotFormSheet = ({
       await createTrainingSlot(input);
     },
     onSuccess: () => {
-      toast({ title: "Creneau cree" });
+      toast("Creneau cree");
       invalidateAfterSlotMutation();
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -396,16 +383,12 @@ const SlotFormSheet = ({
       await updateTrainingSlot(slot!.id, input);
     },
     onSuccess: () => {
-      toast({ title: "Creneau mis a jour" });
+      toast("Creneau mis a jour");
       invalidateAfterSlotMutation();
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -418,16 +401,12 @@ const SlotFormSheet = ({
       await deleteTrainingSlot(slot!.id);
     },
     onSuccess: () => {
-      toast({ title: "Creneau supprime" });
+      toast("Creneau supprime");
       invalidateAfterSlotMutation();
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -755,7 +734,6 @@ const OverrideFormSheet = ({
   initialDate,
   coaches,
 }: OverrideFormSheetProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [overrideDate, setOverrideDate] = useState("");
@@ -857,7 +835,7 @@ const OverrideFormSheet = ({
       await createSlotOverride(input);
     },
     onSuccess: () => {
-      toast({ title: "Exception enregistree" });
+      toast("Exception enregistree");
       void queryClient.invalidateQueries({
         queryKey: ["training-slot-overrides"],
       });
@@ -868,30 +846,18 @@ const OverrideFormSheet = ({
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const handleSubmit = () => {
     if (!slot) return;
     if (!overrideDate) {
-      toast({
-        title: "Date requise",
-        description: "Veuillez saisir la date de l'exception.",
-        variant: "destructive",
-      });
+      toast.error("Date requise", { description: "Veuillez saisir la date de l'exception." });
       return;
     }
     if (status === "modified" && !effectiveDate) {
-      toast({
-        title: "Date cible requise",
-        description: "Veuillez saisir la date du créneau modifié.",
-        variant: "destructive",
-      });
+      toast.error("Date cible requise", { description: "Veuillez saisir la date du créneau modifié." });
       return;
     }
     saveMutation.mutate();
@@ -1735,7 +1701,6 @@ const CoachTrainingSlotsScreen = ({
   onOpenLibrary,
   initialWeekDate,
 }: CoachTrainingSlotsScreenProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userId } = useAuth();
 
@@ -2271,20 +2236,13 @@ const CoachTrainingSlotsScreen = ({
       setShowSessionSheet(false);
       const preserved = result?.preservedIndividuals ?? [];
       if (preserved.length > 0) {
-        toast({
-          title: "Séance créée et assignée — séances personnelles préservées",
-          description: `${preserved.length} nageur${preserved.length > 1 ? "s" : ""} garde${preserved.length > 1 ? "nt" : ""} leur séance perso : ${preserved.map((p) => p.displayName).join(", ")}`,
-        });
+        toast("Séance créée et assignée — séances personnelles préservées", { description: `${preserved.length} nageur${preserved.length > 1 ? "s" : ""} garde${preserved.length > 1 ? "nt" : ""} leur séance perso : ${preserved.map((p) => p.displayName).join(", ")}` });
       } else {
-        toast({ title: "Séance créée et assignée" });
+        toast("Séance créée et assignée");
       }
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -2323,20 +2281,13 @@ const CoachTrainingSlotsScreen = ({
       setShowSessionSheet(false);
       const preserved = result?.preservedIndividuals ?? [];
       if (preserved.length > 0) {
-        toast({
-          title: "Séance assignée — séances personnelles préservées",
-          description: `${preserved.length} nageur${preserved.length > 1 ? "s" : ""} garde${preserved.length > 1 ? "nt" : ""} leur séance perso : ${preserved.map((p) => p.displayName).join(", ")}`,
-        });
+        toast("Séance assignée — séances personnelles préservées", { description: `${preserved.length} nageur${preserved.length > 1 ? "s" : ""} garde${preserved.length > 1 ? "nt" : ""} leur séance perso : ${preserved.map((p) => p.displayName).join(", ")}` });
       } else {
-        toast({ title: "Séance assignée au créneau" });
+        toast("Séance assignée au créneau");
       }
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 

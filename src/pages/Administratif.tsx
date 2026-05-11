@@ -23,7 +23,7 @@ import {
 } from "@/lib/api";
 import { supabaseConfig } from "@/lib/config";
 import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -126,7 +126,6 @@ const cardReveal = {
 
 export default function Administratif({ initialTab = "POINTAGE" }: AdministratifProps) {
   const { useMemo, useState } = React;
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((s) => s.role);
   const userId = typeof window === "undefined" ? useAuth.getState().userId : useAuth((s) => s.userId);
@@ -207,15 +206,10 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
       resetForm();
-      toast({
-        title: isOfflineQueuedResult(result) ? "Shift en attente" : "Shift enregistré",
-        ...(isOfflineQueuedResult(result) && {
-          description: "Sera synchronisé au retour en ligne.",
-        }),
-      });
+      toast(isOfflineQueuedResult(result) ? "Shift en attente" : "Shift enregistré", { description: "Sera synchronisé au retour en ligne." });
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible d'enregistrer le shift.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible d'enregistrer le shift.").message });
     },
   });
 
@@ -231,15 +225,10 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       setIsSheetOpen(false);
       setEditingShiftId(null);
       resetForm();
-      toast({
-        title: isOfflineQueuedResult(result) ? "Mise à jour en attente" : "Shift mis à jour",
-        ...(isOfflineQueuedResult(result) && {
-          description: "Sera synchronisée au retour en ligne.",
-        }),
-      });
+      toast(isOfflineQueuedResult(result) ? "Mise à jour en attente" : "Shift mis à jour", { description: "Sera synchronisée au retour en ligne." });
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible de modifier le shift.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible de modifier le shift.").message });
     },
   });
 
@@ -254,7 +243,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       queryClient.invalidateQueries({ queryKey: ["timesheet-shifts"] });
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible de supprimer le shift.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible de supprimer le shift.").message });
     },
   });
 
@@ -269,7 +258,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       queryClient.invalidateQueries({ queryKey: ["timesheet-locations"] });
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible d'ajouter le lieu.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible d'ajouter le lieu.").message });
     },
   });
 
@@ -288,7 +277,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       }
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible de supprimer le lieu.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible de supprimer le lieu.").message });
     },
   });
 
@@ -298,7 +287,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       queryClient.invalidateQueries({ queryKey: ["timesheet-group-labels"] });
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible d'ajouter le groupe.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible d'ajouter le groupe.").message });
     },
   });
 
@@ -308,7 +297,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
       queryClient.invalidateQueries({ queryKey: ["timesheet-group-labels"] });
     },
     onError: (error: unknown) => {
-      toast({ title: "Erreur", description: summarizeApiError(error, "Impossible de supprimer le groupe.").message });
+      toast("Erreur", { description: summarizeApiError(error, "Impossible de supprimer le groupe.").message });
     },
   });
 
@@ -466,15 +455,15 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!date || !startTime) {
-      toast({ title: "Champs requis", description: "Date et heure de début obligatoires." });
+      toast("Champs requis", { description: "Date et heure de début obligatoires." });
       return;
     }
     if (endTime && endTime <= startTime) {
-      toast({ title: "Heures invalides", description: "La fin doit être après le début." });
+      toast("Heures invalides", { description: "La fin doit être après le début." });
       return;
     }
     if (!userId) {
-      toast({ title: "Utilisateur manquant" });
+      toast("Utilisateur manquant");
       return;
     }
     if (editingShiftId) {

@@ -34,7 +34,7 @@ import {
 import type { SwimExerciseLog, SwimExerciseLogInput } from "@/lib/api";
 import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { generateShareToken, getSwimSessionById } from "@/lib/api/swim";
 import { supabase } from "@/lib/supabase";
 import { ShareMenu } from "@/components/shared/ShareMenu";
@@ -89,7 +89,6 @@ export default function SwimSessionView() {
   const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
   const [location, setLocation] = useLocation();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Edit mode state
@@ -273,20 +272,13 @@ export default function SwimSessionView() {
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-by-catalog"] });
       queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history"] });
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Sauvegarde en attente",
-          description: "Sera synchronisée au retour en ligne.",
-        });
+        toast("Sauvegarde en attente", { description: "Sera synchronisée au retour en ligne." });
       } else {
-        toast({ title: "Notes techniques sauvegardées" });
+        toast("Notes techniques sauvegardées");
       }
     },
     onError: (err) => {
-      toast({
-        title: "Erreur",
-        description: (err as Error).message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: (err as Error).message });
     },
   });
 
@@ -294,11 +286,11 @@ export default function SwimSessionView() {
     mutationFn: (assignmentId: number) => assignments_delete(assignmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      toast({ title: "Séance retirée", description: "La séance a été retirée de votre feed." });
+      toast("Séance retirée", { description: "La séance a été retirée de votre feed." });
       setLocation("/");
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de retirer la séance.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de retirer la séance." });
     },
   });
 
@@ -329,11 +321,7 @@ export default function SwimSessionView() {
         filenameSlug: `seance-${dateSlug}`,
       });
     } catch {
-      toast({
-        title: "Erreur",
-        description: "Impossible de générer le PDF.",
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: "Impossible de générer le PDF." });
     } finally {
       setExportingPdf(false);
     }

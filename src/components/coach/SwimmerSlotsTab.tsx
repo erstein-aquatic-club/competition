@@ -13,7 +13,7 @@ import {
 } from "@/lib/api";
 import type { SwimmerTrainingSlot, SwimmerTrainingSlotInput } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,7 +62,6 @@ type Props = {
 
 export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Props) {
   const { userId } = useAuth();
-  const { toast } = useToast();
   const qc = useQueryClient();
 
   // ── Week offset (0 = current week, +1 = next, etc.) ──
@@ -124,32 +123,32 @@ export default function SwimmerSlotsTab({ athleteId, athleteName, groupId }: Pro
 
   const initMut = useMutation({
     mutationFn: () => initSwimmerSlots(athleteId, groupId, userId!),
-    onSuccess: () => { invalidate(); toast({ title: "Planning personnalisé créé" }); },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onSuccess: () => { invalidate(); toast("Planning personnalisé créé"); },
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const resetMut = useMutation({
     mutationFn: () => resetSwimmerSlots(athleteId, groupId, userId!),
-    onSuccess: () => { invalidate(); toast({ title: "Planning réinitialisé" }); },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onSuccess: () => { invalidate(); toast("Planning réinitialisé"); },
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const deleteMut = useMutation({
     mutationFn: (slotId: string) => deleteSwimmerSlot(slotId),
-    onSuccess: () => { invalidate(); toast({ title: "Créneau supprimé" }); },
+    onSuccess: () => { invalidate(); toast("Créneau supprimé"); },
   });
 
   const createMut = useMutation({
     mutationFn: (input: SwimmerTrainingSlotInput) => createSwimmerSlot(input, userId!),
-    onSuccess: () => { invalidate(); toast({ title: "Créneau ajouté" }); },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onSuccess: () => { invalidate(); toast("Créneau ajouté"); },
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const updateMut = useMutation({
     mutationFn: ({ slotId, input }: { slotId: string; input: Partial<SwimmerTrainingSlotInput> }) =>
       updateSwimmerSlot(slotId, input),
-    onSuccess: () => { invalidate(); toast({ title: "Créneau modifié" }); },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onSuccess: () => { invalidate(); toast("Créneau modifié"); },
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   // ── Sheet state for add/edit ────────────────────

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,6 @@ type Props = {
 const MAX = 500;
 
 export default function QuickViewCommentDialog({ open, onOpenChange, dimSessionId, athleteId, authorUserId, onSuccess }: Props) {
-  const { toast } = useToast();
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -27,12 +26,12 @@ export default function QuickViewCommentDialog({ open, onOpenChange, dimSessionI
     setSaving(true);
     try {
       await addSessionCommentAsSub({ dimSessionId, athleteId, body: body.trim(), authorUserId });
-      toast({ title: 'Commentaire enregistré' });
+      toast('Commentaire enregistré');
       setBody('');
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+      toast.error('Erreur', { description: e.message });
     } finally {
       setSaving(false);
     }

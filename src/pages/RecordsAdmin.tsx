@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertCircle, ArrowRight, ChevronDown, Eye, GitMerge, Plus, RefreshCw, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -222,7 +222,6 @@ const SwimmerCard = ({ swimmer, onUpdate, onImport, onMerge, importPending }: Sw
 
 export default function RecordsAdmin() {
   const role = useAuth((state) => state.role);
-  const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [newSwimmer, setNewSwimmer] = useState({
@@ -298,13 +297,13 @@ export default function RecordsAdmin() {
         is_active: true,
       }),
     onSuccess: () => {
-      toast({ title: "Nageur ajouté" });
+      toast("Nageur ajouté");
       setNewSwimmer({ display_name: "", iuf: "", sex: "" });
       setShowAddForm(false);
       void load();
     },
     onError: (err: any) => {
-      toast({ title: err?.message || "Impossible d'ajouter le nageur", variant: "destructive" });
+      toast.error(err?.message || "Impossible d'ajouter le nageur");
     },
   });
 
@@ -313,10 +312,10 @@ export default function RecordsAdmin() {
       updateClubRecordSwimmer(id, payload),
     onSuccess: () => {
       void load();
-      toast({ title: "Sauvegardé" });
+      toast("Sauvegardé");
     },
     onError: (err: any) => {
-      toast({ title: err?.message || "Mise à jour impossible", variant: "destructive" });
+      toast.error(err?.message || "Mise à jour impossible");
     },
   });
 
@@ -325,10 +324,10 @@ export default function RecordsAdmin() {
       updateClubRecordSwimmerForUser(userId, payload),
     onSuccess: () => {
       void load();
-      toast({ title: "Sauvegardé" });
+      toast("Sauvegardé");
     },
     onError: () => {
-      toast({ title: "Mise à jour impossible", variant: "destructive" });
+      toast.error("Mise à jour impossible");
     },
   });
 
@@ -354,7 +353,7 @@ export default function RecordsAdmin() {
         desc += ` Records: ${s.club_records_upserted} (${s.processed} perfs traitées).`;
         if (s.skipped_no_age) desc += ` Ignorées (pas d'âge): ${s.skipped_no_age}.`;
       }
-      toast({ title: "Import terminé", description: desc });
+      toast("Import terminé", { description: desc });
       void load();
       void refetchLogs();
       void queryClient.invalidateQueries({ queryKey: ["club-records"] });
@@ -363,7 +362,7 @@ export default function RecordsAdmin() {
       const msg = err?.message?.includes("Rate limit") || err?.message?.includes("Limite")
         ? err.message
         : "Import impossible";
-      toast({ title: msg, variant: "destructive" });
+      toast.error(msg);
       void refetchLogs();
     },
   });
@@ -373,10 +372,7 @@ export default function RecordsAdmin() {
     mutationFn: ({ iuf, name }: { iuf: string; name?: string }) =>
       importSingleSwimmer(iuf, name),
     onSuccess: (result, variables) => {
-      toast({
-        title: `Import de ${variables.name ?? variables.iuf}`,
-        description: `${result.total_found} performances trouvées, ${result.new_imported} nouvelles importées.`,
-      });
+      toast(`Import de ${variables.name ?? variables.iuf}`, { description: `${result.total_found} performances trouvées, ${result.new_imported} nouvelles importées.` });
       void refetchLogs();
       // Trigger club records recalculation after individual import
       void recalculateClubRecords().then(() => {
@@ -388,7 +384,7 @@ export default function RecordsAdmin() {
       const msg = _err?.message?.includes("Rate limit") || _err?.message?.includes("Limite")
         ? _err.message
         : `Erreur import ${variables.name ?? variables.iuf}`;
-      toast({ title: msg, variant: "destructive" });
+      toast.error(msg);
       void refetchLogs();
     },
   });
@@ -397,10 +393,10 @@ export default function RecordsAdmin() {
     mutationFn: (limits: { coach_monthly: number; athlete_monthly: number; admin_monthly: number }) =>
       updateAppSettings("import_rate_limits", limits),
     onSuccess: () => {
-      toast({ title: "Limites sauvegardées" });
+      toast("Limites sauvegardées");
     },
     onError: () => {
-      toast({ title: "Erreur de sauvegarde", variant: "destructive" });
+      toast.error("Erreur de sauvegarde");
     },
   });
 
@@ -408,10 +404,10 @@ export default function RecordsAdmin() {
     mutationFn: (config: { enabled: boolean; day: number; hour: number; last_run: string | null }) =>
       updateAppSettings("ffn_auto_sync", config),
     onSuccess: () => {
-      toast({ title: "Planning sauvegardé" });
+      toast("Planning sauvegardé");
     },
     onError: () => {
-      toast({ title: "Erreur de sauvegarde", variant: "destructive" });
+      toast.error("Erreur de sauvegarde");
     },
   });
 
@@ -419,17 +415,14 @@ export default function RecordsAdmin() {
     mutationFn: ({ manualId, userSwimmerId }: { manualId: number; userSwimmerId: number }) =>
       mergeClubRecordSwimmers(manualId, userSwimmerId),
     onSuccess: (result) => {
-      toast({
-        title: "Profils fusionnés",
-        description: `IUF ${result.iuf_transferred ?? "—"} transféré, ${result.performances_reassigned} performance(s) rattachée(s).`,
-      });
+      toast("Profils fusionnés", { description: `IUF ${result.iuf_transferred ?? "—"} transféré, ${result.performances_reassigned} performance(s) rattachée(s).` });
       setMergeSource(null);
       setMergeTargetId(null);
       void load();
       void queryClient.invalidateQueries({ queryKey: ["club-records"] });
     },
     onError: (err: any) => {
-      toast({ title: err?.message || "Fusion impossible", variant: "destructive" });
+      toast.error(err?.message || "Fusion impossible");
     },
   });
 
@@ -470,11 +463,11 @@ export default function RecordsAdmin() {
             s.skipped_no_age ? ` Ignorées (pas d'âge): ${s.skipped_no_age}.` : ""
           }${s.unmapped_event_codes?.length ? ` Épreuves inconnues: ${s.unmapped_event_codes.join(", ")}` : ""}`
         : "";
-      toast({ title: "Records recalculés", description: desc });
+      toast("Records recalculés", { description: desc });
       void queryClient.invalidateQueries({ queryKey: ["club-records"] });
     },
     onError: () => {
-      toast({ title: "Erreur de recalcul", variant: "destructive" });
+      toast.error("Erreur de recalcul");
     },
   });
 

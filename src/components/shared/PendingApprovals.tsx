@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, X, UserPlus } from "lucide-react";
@@ -11,7 +11,6 @@ interface Props {
 }
 
 export function PendingApprovals({ compact = false }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const role = useAuth((s) => s.role);
 
@@ -47,10 +46,10 @@ export function PendingApprovals({ compact = false }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
-      toast({ title: "Utilisateur approuvé" });
+      toast("Utilisateur approuvé");
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'approuver.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible d'approuver." });
     },
   });
 
@@ -69,10 +68,10 @@ export function PendingApprovals({ compact = false }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
-      toast({ title: "Inscription rejetée" });
+      toast("Inscription rejetée");
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de rejeter.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de rejeter." });
     },
   });
 

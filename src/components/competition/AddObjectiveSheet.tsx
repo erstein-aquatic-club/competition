@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   FFN_EVENTS,
   eventLabel,
@@ -57,8 +57,6 @@ export default function AddObjectiveSheet({
   authUid,
 }: Props) {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   /* ── Linkable objectives query ─────────────────── */
   // Gate on authUid: getAthleteObjectives() relies on supabase.auth.getUser()
   // which returns null during the auth-bootstrap window. Without this gate,
@@ -126,16 +124,12 @@ export default function AddObjectiveSheet({
   const createMut = useMutation({
     mutationFn: (input: ObjectiveInput) => createObjective(input),
     onSuccess: () => {
-      toast({ title: "Objectif créé" });
+      toast("Objectif créé");
       invalidate();
       onOpenChange(false);
     },
     onError: (e: Error) =>
-      toast({
-        title: "Erreur",
-        description: e.message,
-        variant: "destructive",
-      }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const linkMut = useMutation({
@@ -147,21 +141,12 @@ export default function AddObjectiveSheet({
       }
     },
     onSuccess: (_data, ids) => {
-      toast({
-        title:
-          ids.length === 1
-            ? "Objectif lié à la compétition"
-            : `${ids.length} objectifs liés à la compétition`,
-      });
+      toast(ids.length === 1);
       invalidate();
       onOpenChange(false);
     },
     onError: (e: Error) =>
-      toast({
-        title: "Erreur",
-        description: e.message,
-        variant: "destructive",
-      }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const isPending = createMut.isPending || linkMut.isPending;
@@ -171,23 +156,19 @@ export default function AddObjectiveSheet({
 
   const handleCreate = () => {
     if (showChrono && !eventCode) {
-      toast({ title: "Épreuve requise", variant: "destructive" });
+      toast.error("Épreuve requise");
       return;
     }
     if (showChrono && targetTime && parseTime(targetTime) === null) {
-      toast({
-        title: "Format invalide",
-        description: "Format : m:ss:cc (ex: 1:05:30)",
-        variant: "destructive",
-      });
+      toast.error("Format invalide", { description: "Format : m:ss:cc (ex: 1:05:30)" });
       return;
     }
     if (showText && !text.trim()) {
-      toast({ title: "Texte requis", variant: "destructive" });
+      toast.error("Texte requis");
       return;
     }
     if (!authUid) {
-      toast({ title: "Session expirée", variant: "destructive" });
+      toast.error("Session expirée");
       return;
     }
 

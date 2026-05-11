@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
@@ -169,8 +169,6 @@ export default function SlotSessionSheet({
   onManageOverride,
 }: SlotSessionSheetProps) {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   // ── Local state ──────────────────────────────────────────
   const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
   const [selectedSubgroupId, setSelectedSubgroupId] = useState<number | undefined>(undefined);
@@ -241,10 +239,10 @@ export default function SlotSessionSheet({
     onSuccess: () => {
       invalidateSlotAssignments();
       setShowVisibilityPicker(false);
-      toast({ title: "Visibilité mise à jour" });
+      toast("Visibilité mise à jour");
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de modifier la visibilité.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de modifier la visibilité." });
     },
   });
 
@@ -257,13 +255,10 @@ export default function SlotSessionSheet({
       invalidateSlotAssignments();
       setDeleteConfirmOpen(false);
       onOpenChange(false);
-      toast({
-        title: "Séance supprimée du créneau",
-        description: "Cette action est irréversible.",
-      });
+      toast("Séance supprimée du créneau", { description: "Cette action est irréversible." });
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de supprimer la séance.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de supprimer la séance." });
     },
   });
 
@@ -291,11 +286,7 @@ export default function SlotSessionSheet({
         filenameSlug: `coach-seance-${dateSlug}`,
       });
     } catch {
-      toast({
-        title: "Erreur",
-        description: "Impossible de générer le PDF.",
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: "Impossible de générer le PDF." });
     } finally {
       setExportingPdf(false);
     }

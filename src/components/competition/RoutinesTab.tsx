@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 import type { CompetitionRace, RoutineTemplate, RoutineStepInput } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { eventLabel } from "@/lib/objectiveHelpers";
 import {
   Sheet,
@@ -60,7 +60,6 @@ function formatOffset(minutes: number): string {
 /* ── Main component ────────────────────────────────────── */
 
 export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
-  const { toast } = useToast();
   const [pickerRaceId, setPickerRaceId] = useState<string | null>(null);
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
 
@@ -107,21 +106,21 @@ export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
       setRaceRoutine(raceId, routineId),
     onSuccess: () => {
       invalidateAll();
-      toast({ title: "Routine assignee" });
+      toast("Routine assignee");
       setPickerRaceId(null);
     },
     onError: (e: Error) =>
-      toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const removeRoutineMutation = useMutation({
     mutationFn: (raceId: string) => removeRaceRoutine(raceId),
     onSuccess: () => {
       invalidateAll();
-      toast({ title: "Routine retiree" });
+      toast("Routine retiree");
     },
     onError: (e: Error) =>
-      toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const deleteTemplateMutation = useMutation({
@@ -129,9 +128,9 @@ export default function RoutinesTab({ competitionId }: RoutinesTabProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["routine-templates"] });
       queryClient.invalidateQueries({ queryKey: ["race-routines", competitionId] });
-      toast({ title: "Template supprime" });
+      toast("Template supprime");
     },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+    onError: () => toast.error("Erreur"),
   });
 
   /* ── Loading state ────────────────────────────────────── */
@@ -378,7 +377,6 @@ function CreateRoutineSheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { toast } = useToast();
   const [name, setName] = useState("");
   const [steps, setSteps] = useState<Array<{ offset: string; label: string }>>([
     { offset: "-60", label: "" },
@@ -389,12 +387,12 @@ function CreateRoutineSheet({
       createRoutineTemplate(n, s),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["routine-templates"] });
-      toast({ title: "Template cree" });
+      toast("Template cree");
       setName("");
       setSteps([{ offset: "-60", label: "" }]);
       onOpenChange(false);
     },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+    onError: () => toast.error("Erreur"),
   });
 
   function addStep() {

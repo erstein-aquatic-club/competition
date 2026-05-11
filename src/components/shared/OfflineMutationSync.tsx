@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   logStrengthSet,
   updateStrengthRun,
@@ -220,7 +220,6 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
 export function OfflineMutationSync() {
   const isOnline = useOnlineStatus();
   const user = useAuth((s) => s.user);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const runSync = useCallback(async () => {
@@ -375,26 +374,13 @@ export function OfflineMutationSync() {
         // §263 — invalidate hall-of-fame already covered above; profile query
         // re-invalidated here so the new avatar URL surfaces immediately.
         queryClient.invalidateQueries({ queryKey: ["profile"] });
-        toast({
-          title: "Données synchronisées",
-          description: `${syncedCount} mise(s) à jour hors ligne ont été enregistrée(s).`,
-        });
+        toast("Données synchronisées", { description: `${syncedCount} mise(s) à jour hors ligne ont été enregistrée(s).` });
       }
 
       if (poisonedCount > 0) {
-        toast({
-          title: "Synchronisation partielle",
-          description: `${poisonedCount} séance(s) n'ont pas pu être synchronisées après plusieurs tentatives et ont été abandonnées.`,
-          variant: "destructive",
-        });
+        toast.error("Synchronisation partielle", { description: `${poisonedCount} séance(s) n'ont pas pu être synchronisées après plusieurs tentatives et ont été abandonnées.` });
       } else if (lastError && syncedCount === 0) {
-        toast({
-          title: "Synchronisation en attente",
-          description: lastError instanceof Error
-            ? lastError.message
-            : "Impossible de synchroniser les données hors ligne pour le moment.",
-          variant: "destructive",
-        });
+        toast.error("Synchronisation en attente", { description: lastError instanceof Error });
       }
 
       if (unsupportedCount > 0) {
@@ -402,11 +388,7 @@ export function OfflineMutationSync() {
         // Helps support track down "data lost after PWA downgrade" reports
         // and tells the swimmer something happened — previous silent drop
         // was the worst-of-both: data lost AND no signal.
-        toast({
-          title: "Données obsolètes ignorées",
-          description: `${unsupportedCount} mutation(s) d'un format inconnu (${Array.from(unsupportedTypes).join(", ")}) ont été abandonnées. Mets l'app à jour si le problème persiste.`,
-          variant: "destructive",
-        });
+        toast.error("Données obsolètes ignorées", { description: `${unsupportedCount} mutation(s) d'un format inconnu (${Array.from(unsupportedTypes).join(", ")}) ont été abandonnées. Mets l'app à jour si le problème persiste.` });
       }
     });
   }, [isOnline, queryClient, toast, user]);
@@ -432,11 +414,7 @@ export function OfflineMutationSync() {
     const handleReaped = (e: Event) => {
       const count = (e as CustomEvent<{ count: number }>).detail?.count ?? 0;
       if (count <= 0) return;
-      toast({
-        title: "Données hors-ligne abandonnées",
-        description: `${count} mutation(s) trop ancienne(s) ou ayant échoué trop de fois ont été abandonnées. Si tu attendais une synchronisation, ouvre l'app plus régulièrement quand tu retrouves le réseau.`,
-        variant: "destructive",
-      });
+      toast.error("Données hors-ligne abandonnées", { description: `${count} mutation(s) trop ancienne(s) ou ayant échoué trop de fois ont été abandonnées. Si tu attendais une synchronisation, ouvre l'app plus régulièrement quand tu retrouves le réseau.` });
     };
     window.addEventListener(QUEUE_REAPED_EVENT, handleReaped);
     return () => window.removeEventListener(QUEUE_REAPED_EVENT, handleReaped);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTrainingCycle, createObjective, initSwimmerSlots } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,7 +60,6 @@ export default function PlanningWizard({
   competitions,
   onComplete,
 }: Props) {
-  const { toast } = useToast();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<WizardStep>(1);
@@ -93,12 +92,12 @@ export default function PlanningWizard({
       });
     },
     onSuccess: () => {
-      toast({ title: "Cycle créé" });
+      toast("Cycle créé");
       void queryClient.invalidateQueries({ queryKey: ["training-cycles"] });
       setStep(2);
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -122,13 +121,13 @@ export default function PlanningWizard({
     },
     onSuccess: () => {
       if (objectives.some((o) => (o.type === "chrono" && o.eventCode) || (o.type === "texte" && o.text.trim()))) {
-        toast({ title: "Objectifs créés" });
+        toast("Objectifs créés");
       }
       void queryClient.invalidateQueries({ queryKey: ["objectives", athleteAuthId] });
       setStep(3);
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -141,13 +140,13 @@ export default function PlanningWizard({
     },
     onSuccess: () => {
       if (inheritSlots) {
-        toast({ title: "Planning personnalisé créé" });
+        toast("Planning personnalisé créé");
         void queryClient.invalidateQueries({ queryKey: ["swimmer-slots", athleteId] });
       }
       onComplete();
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 

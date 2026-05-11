@@ -25,7 +25,7 @@ import {
   type TrainingWeekInput,
   type SwimmerPerformance,
 } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -305,7 +305,6 @@ const InlinePlanning = ({
   athleteId: number;
   interviewDate: string;
 }) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: competitions = [] } = useQuery({
@@ -418,12 +417,12 @@ const InlinePlanning = ({
       return cycle;
     },
     onSuccess: () => {
-      toast({ title: "Planification créée" });
+      toast("Planification créée");
       void queryClient.invalidateQueries({ queryKey: ["training-cycles"] });
       void queryClient.invalidateQueries({ queryKey: ["training-weeks"] });
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -432,10 +431,10 @@ const InlinePlanning = ({
     onSuccess: () => {
       setEditingWeekKey(null);
       void queryClient.invalidateQueries({ queryKey: ["training-weeks"] });
-      toast({ title: "Semaine planifiée" });
+      toast("Semaine planifiée");
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -660,7 +659,6 @@ const CoachInterviewCard = ({
   objectives: Objective[];
   performances: SwimmerPerformance[];
 }) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
 
@@ -717,10 +715,10 @@ const CoachInterviewCard = ({
     mutationFn: (input: InterviewCoachInput) => updateInterviewCoachSections(interview.id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
-      toast({ title: "Sections coach enregistrées" });
+      toast("Sections coach enregistrées");
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -730,12 +728,12 @@ const CoachInterviewCard = ({
       return sendInterviewToAthlete(interview.id);
     },
     onSuccess: () => {
-      toast({ title: "Entretien envoyé au nageur" });
+      toast("Entretien envoyé au nageur");
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
       setShowSmsPrompt(true);
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -749,9 +747,9 @@ const CoachInterviewCard = ({
       window.location.href = uri;
     } else {
       navigator.clipboard.writeText(`${athletePhone}\n${body}`).then(() => {
-        toast({ title: "Copié", description: "Numéro et message copiés dans le presse-papiers." });
+        toast("Copié", { description: "Numéro et message copiés dans le presse-papiers." });
       }).catch(() => {
-        toast({ title: "Erreur", description: "Impossible de copier.", variant: "destructive" });
+        toast.error("Erreur", { description: "Impossible de copier." });
       });
     }
     setShowSmsPrompt(false);
@@ -760,11 +758,11 @@ const CoachInterviewCard = ({
   const deleteMutation = useMutation({
     mutationFn: () => deleteInterview(interview.id),
     onSuccess: () => {
-      toast({ title: "Entretien supprimé" });
+      toast("Entretien supprimé");
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -1079,7 +1077,6 @@ function InterviewStatusBar({ status }: { status: InterviewStatus }) {
 // ── Main Component ──────────────────────────────────────────────
 
 const SwimmerInterviewsTab = ({ athleteId, athleteName }: Props) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Resolve auth UUID (for objective context)
@@ -1127,11 +1124,11 @@ const SwimmerInterviewsTab = ({ athleteId, athleteName }: Props) => {
     mutationFn: () =>
       createInterview({ athlete_id: athleteId }),
     onSuccess: () => {
-      toast({ title: "Entretien créé" });
+      toast("Entretien créé");
       void queryClient.invalidateQueries({ queryKey: ["interviews", athleteId] });
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast.error("Erreur", { description: err.message });
     },
   });
 

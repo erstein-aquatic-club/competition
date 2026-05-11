@@ -12,7 +12,7 @@ import {
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import type { Session, Assignment, PlannedAbsence } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { FeedbackDrawer } from "./FeedbackDrawer";
 import { useFeedbackDraft } from "@/hooks/dashboard/useFeedbackDraft";
 import type { PlannedSession } from "@/hooks/dashboard/internal";
@@ -120,7 +120,6 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
   setAttendanceOverrideBySessionId,
   stableDurationMin,
 }: DashboardFeedbackContainerProps) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, startTransition] = React.useTransition();
 
@@ -148,12 +147,12 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      toast({ title: "Séance supprimée", description: "La saisie a été supprimée." });
+      toast("Séance supprimée", { description: "La saisie a été supprimée." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de supprimer la séance.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de supprimer la séance." });
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
     },
@@ -200,7 +199,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
-      toast({ title: "Séance enregistrée", description: "Vos données ont été synchronisées." });
+      toast("Séance enregistrée", { description: "Vos données ont été synchronisées." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
       setTimeout(() => {
@@ -211,7 +210,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       }, 1200);
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'enregistrer la séance.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible d'enregistrer la séance." });
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
     },
@@ -257,7 +256,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       queryClient.invalidateQueries({ queryKey: ["profile-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications-home"] });
-      toast({ title: "Séance mise à jour", description: "Votre saisie a été mise à jour." });
+      toast("Séance mise à jour", { description: "Votre saisie a été mise à jour." });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
       setTimeout(() => {
@@ -268,7 +267,7 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
       }, 1200);
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour la séance.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de mettre à jour la séance." });
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
     },
@@ -289,11 +288,11 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["my-planned-absences"] });
       void queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
-      toast({ title: "Jour marqué indisponible" });
+      toast("Jour marqué indisponible");
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["my-planned-absences"], context.previous);
-      toast({ title: "Erreur", description: "Impossible de marquer ce jour indisponible.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de marquer ce jour indisponible." });
     },
   });
 
@@ -310,11 +309,11 @@ export const DashboardFeedbackContainer = React.memo(function DashboardFeedbackC
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["my-planned-absences"] });
       void queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
-      toast({ title: "Disponibilité restaurée" });
+      toast("Disponibilité restaurée");
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["my-planned-absences"], context.previous);
-      toast({ title: "Erreur", description: "Impossible de restaurer la disponibilité.", variant: "destructive" });
+      toast.error("Erreur", { description: "Impossible de restaurer la disponibilité." });
     },
   });
 

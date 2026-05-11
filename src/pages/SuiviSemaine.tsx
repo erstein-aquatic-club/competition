@@ -39,7 +39,7 @@ import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
 import { getWellnessForDate } from "@/lib/api/wellness";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { computeAvgDifficulty } from "@/lib/strengthHistoryUtils";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { WellnessForm } from "@/components/wellness/WellnessForm";
@@ -376,7 +376,6 @@ export default function SuiviSemaine() {
   const [, navigate] = useLocation();
   const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Week navigation
@@ -509,12 +508,9 @@ export default function SuiviSemaine() {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
       queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Absence en attente",
-          description: "Sera synchronisée au retour en ligne.",
-        });
+        toast("Absence en attente", { description: "Sera synchronisée au retour en ligne." });
       } else {
-        toast({ title: "Absence enregistree" });
+        toast("Absence enregistree");
       }
     },
   });
@@ -530,12 +526,9 @@ export default function SuiviSemaine() {
       queryClient.invalidateQueries({ queryKey: ["my-absences"] });
       queryClient.invalidateQueries({ queryKey: ["swimmer-sessions-week"] });
       if (isOfflineQueuedResult(result)) {
-        toast({
-          title: "Annulation en attente",
-          description: "Sera synchronisée au retour en ligne.",
-        });
+        toast("Annulation en attente", { description: "Sera synchronisée au retour en ligne." });
       } else {
-        toast({ title: "Absence annulee" });
+        toast("Absence annulee");
       }
     },
   });

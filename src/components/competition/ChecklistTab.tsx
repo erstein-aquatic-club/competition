@@ -13,7 +13,7 @@ import {
   type CompetitionChecklistCheck,
 } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
@@ -44,7 +44,6 @@ interface ChecklistTabProps {
 /* ── Main component ─────────────────────────────────────── */
 
 export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
-  const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   /* ── Queries ────────────────────────────────────────── */
@@ -69,9 +68,9 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
       applyChecklistTemplate(competitionId, templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competition-checklist", competitionId] });
-      toast({ title: "Checklist appliquee" });
+      toast("Checklist appliquee");
     },
-    onError: () => toast({ title: "Erreur", description: "Impossible d'appliquer la checklist", variant: "destructive" }),
+    onError: () => toast.error("Erreur", { description: "Impossible d'appliquer la checklist" }),
   });
 
   const toggleMutation = useMutation({
@@ -92,7 +91,7 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(["competition-checklist", competitionId], ctx.prev);
-      toast({ title: "Erreur", variant: "destructive" });
+      toast.error("Erreur");
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["competition-checklist", competitionId] }),
   });
@@ -101,18 +100,18 @@ export default function ChecklistTab({ competitionId }: ChecklistTabProps) {
     mutationFn: (id: string) => removeCompetitionChecklist(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competition-checklist", competitionId] });
-      toast({ title: "Checklist retirée" });
+      toast("Checklist retirée");
     },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+    onError: () => toast.error("Erreur"),
   });
 
   const deleteTemplateMutation = useMutation({
     mutationFn: (id: string) => deleteChecklistTemplate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
-      toast({ title: "Template supprime" });
+      toast("Template supprime");
     },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+    onError: () => toast.error("Erreur"),
   });
 
   /* ── Loading state ──────────────────────────────────── */
@@ -268,7 +267,6 @@ function CreateTemplateSheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { toast } = useToast();
   const [name, setName] = useState("");
   const [items, setItems] = useState<string[]>([""]);
 
@@ -277,12 +275,12 @@ function CreateTemplateSheet({
       createChecklistTemplate(n, its),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
-      toast({ title: "Template cree" });
+      toast("Template cree");
       setName("");
       setItems([""]);
       onOpenChange(false);
     },
-    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+    onError: () => toast.error("Erreur"),
   });
 
   function addItem() {

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface ManualSwimmerDialogProps {
   open: boolean;
@@ -23,8 +23,6 @@ interface ManualSwimmerDialogProps {
 export function ManualSwimmerDialog({ open, onOpenChange, swimmer }: ManualSwimmerDialogProps) {
   const isEdit = !!swimmer;
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-
   const [name, setName] = useState("");
   const [sex, setSex] = useState<"M" | "F" | "">("");
   const [birthdate, setBirthdate] = useState("");
@@ -54,9 +52,9 @@ export function ManualSwimmerDialog({ open, onOpenChange, swimmer }: ManualSwimm
     onSuccess: () => {
       invalidate();
       onOpenChange(false);
-      toast({ title: "Nageur ajouté" });
+      toast("Nageur ajouté");
     },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const updateMutation = useMutation({
@@ -69,9 +67,9 @@ export function ManualSwimmerDialog({ open, onOpenChange, swimmer }: ManualSwimm
     onSuccess: () => {
       invalidate();
       onOpenChange(false);
-      toast({ title: "Nageur mis à jour" });
+      toast("Nageur mis à jour");
     },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;

@@ -21,7 +21,7 @@ import { X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion } from "framer-motion";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { orderStrengthItems } from "@/components/strength/utils";
 import { SaveState } from "@/components/shared/BottomActionBar";
 import type { LocalStrengthRun } from "@/lib/types";
@@ -60,7 +60,6 @@ export function InProgressCard({
   setSaveState,
   onResumeInProgress,
 }: InProgressCardProps) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<number | null>(null);
@@ -83,19 +82,12 @@ export function InProgressCard({
         data?.source === "local"
           ? "Suppression locale : le serveur n'est pas disponible."
           : undefined;
-      toast({
-        title: "Séance supprimée",
-        description: fallbackMessage,
-      });
+      toast("Séance supprimée", { description: fallbackMessage });
     },
     onError: () => {
       setSaveState("error");
       setTimeout(() => setSaveState("idle"), 3000);
-      toast({
-        title: "Erreur",
-        description: "Impossible de supprimer la séance en cours.",
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: "Impossible de supprimer la séance en cours." });
     },
   });
 

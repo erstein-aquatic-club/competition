@@ -22,7 +22,7 @@ import {
 } from "@/lib/api";
 import { getAppSettings, updateAppSettings } from "@/lib/api/records";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -139,7 +139,6 @@ export default function Admin() {
   const { useMemo, useState } = React;
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((state) => state.role);
   const userId = useAuth((state) => state.userId);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [searchValue, setSearchValue] = useState("");
@@ -189,16 +188,10 @@ export default function Admin() {
         reset();
         setCreatedCoachPassword(data.initialPassword ?? null);
       }
-      toast({
-        title: feedback.title,
-        description: feedback.description ?? undefined,
-      });
+      toast(feedback.title, { description: feedback.description ?? undefined });
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur création coach",
-        description: parseErrorMessage(error, "Impossible de créer le coach."),
-      });
+      toast("Erreur création coach", { description: parseErrorMessage(error, "Impossible de créer le coach.") });
     },
   });
 
@@ -214,16 +207,10 @@ export default function Admin() {
       if (feedback.shouldInvalidate) {
         queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       }
-      toast({
-        title: feedback.title,
-        description: feedback.description ?? undefined,
-      });
+      toast(feedback.title, { description: feedback.description ?? undefined });
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur mise à jour rôle",
-        description: parseErrorMessage(error, "Impossible de mettre à jour le rôle."),
-      });
+      toast("Erreur mise à jour rôle", { description: parseErrorMessage(error, "Impossible de mettre à jour le rôle.") });
     },
   });
 
@@ -234,16 +221,10 @@ export default function Admin() {
       if (feedback.shouldInvalidate) {
         queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       }
-      toast({
-        title: feedback.title,
-        description: feedback.description ?? undefined,
-      });
+      toast(feedback.title, { description: feedback.description ?? undefined });
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur désactivation",
-        description: parseErrorMessage(error, "Impossible de désactiver le compte."),
-      });
+      toast("Erreur désactivation", { description: parseErrorMessage(error, "Impossible de désactiver le compte.") });
     },
   });
 
@@ -270,13 +251,10 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-audit-log"] });
-      toast({ title: "Inscription validée" });
+      toast("Inscription validée");
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur validation",
-        description: parseErrorMessage(error, "Impossible de valider l'inscription."),
-      });
+      toast("Erreur validation", { description: parseErrorMessage(error, "Impossible de valider l'inscription.") });
     },
   });
 
@@ -297,13 +275,10 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-audit-log"] });
-      toast({ title: "Inscription rejetée" });
+      toast("Inscription rejetée");
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur rejet",
-        description: parseErrorMessage(error, "Impossible de rejeter l'inscription."),
-      });
+      toast("Erreur rejet", { description: parseErrorMessage(error, "Impossible de rejeter l'inscription.") });
     },
   });
 
@@ -348,13 +323,10 @@ export default function Admin() {
     mutationFn: (mode: string) => updateAppSettings("dark_mode", { mode }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["app-setting", "dark_mode"] });
-      toast({ title: "Apparence mise à jour" });
+      toast("Apparence mise à jour");
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur",
-        description: parseErrorMessage(error, "Impossible de mettre à jour l'apparence."),
-      });
+      toast("Erreur", { description: parseErrorMessage(error, "Impossible de mettre à jour l'apparence.") });
     },
   });
 
@@ -378,13 +350,10 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["admin-user-profile", selectedUserId] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setIsProfileEditOpen(false);
-      toast({ title: "Fiche mise à jour" });
+      toast("Fiche mise à jour");
     },
     onError: (error: unknown) => {
-      toast({
-        title: "Erreur mise à jour",
-        description: parseErrorMessage(error, "Impossible de mettre à jour la fiche."),
-      });
+      toast("Erreur mise à jour", { description: parseErrorMessage(error, "Impossible de mettre à jour la fiche.") });
     },
   });
 
@@ -719,10 +688,7 @@ export default function Admin() {
                             onClick={() => {
                               if (!user.id) return;
                               if (isSelf) {
-                                toast({
-                                  title: "Action impossible",
-                                  description: "Vous ne pouvez pas désactiver votre propre compte.",
-                                });
+                                toast("Action impossible", { description: "Vous ne pouvez pas désactiver votre propre compte." });
                                 return;
                               }
                               setDisablePending({ userId: user.id, displayName: user.display_name });

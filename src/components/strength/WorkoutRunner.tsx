@@ -31,7 +31,7 @@ import { ExercisePicker } from "@/components/strength/ExercisePicker";
 import { ExerciseGif } from "@/components/strength/ExerciseGif";
 import { RestScreen } from "./RestScreen";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
 import type { Exercise, StrengthSessionTemplate } from "@/lib/api";
 import { BODYWEIGHT_SENTINEL, isBodyweight } from "@/lib/api/client";
@@ -165,7 +165,6 @@ export function WorkoutRunner({
    *  PWA background-kill or accidental tab close. */
   runId?: string | number | null;
 }) {
-  const { toast } = useToast();
   const isLoggingRef = useRef(false);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -264,7 +263,7 @@ export function WorkoutRunner({
       setRestTimer(remaining);
       if (remaining <= 0) {
         notifyRestEnd();
-        toast({ title: "Temps de récupération terminé" });
+        toast("Temps de récupération terminé");
         setIsResting(false);
         setIsRestPaused(false);
       }
@@ -351,10 +350,7 @@ export function WorkoutRunner({
       clearDraft(draftKey);
       return;
     }
-    toast({
-      title: "Brouillon retrouvé",
-      description: "Une saisie non enregistrée a été restaurée.",
-    });
+    toast("Brouillon retrouvé", { description: "Une saisie non enregistrée a été restaurée." });
     if (typeof payload.difficulty === "number") setDifficulty(payload.difficulty);
     if (typeof payload.fatigue === "number") setFatigue(payload.fatigue);
     if (typeof payload.comments === "string") setComments(payload.comments);
@@ -558,7 +554,7 @@ export function WorkoutRunner({
     try {
       await onProgress?.(progressPct);
     } catch (err) {
-      toast({ title: "Erreur de sauvegarde", description: "Réessayez", variant: "destructive" });
+      toast.error("Erreur de sauvegarde", { description: "Réessayez" });
     }
   };
 
@@ -600,10 +596,7 @@ export function WorkoutRunner({
       if (pr) {
         const setKey = `${currentBlock.exercise_id}-${currentSetIndex}`;
         setPrSets((prev) => new Set(prev).add(setKey));
-        toast({
-          title: "🏆 Nouveau record !",
-          description: `1RM estimé : ${pr.newValue}kg (+${pr.improvement}%)`,
-        });
+        toast("🏆 Nouveau record !", { description: `1RM estimé : ${pr.newValue}kg (+${pr.improvement}%)` });
       }
     }
 
@@ -632,7 +625,7 @@ export function WorkoutRunner({
     try {
       await onLogSets?.([newLog]);
     } catch (err) {
-      toast({ title: "Erreur de sauvegarde", description: "Réessayez", variant: "destructive" });
+      toast.error("Erreur de sauvegarde", { description: "Réessayez" });
     } finally {
       isLoggingRef.current = false;
     }

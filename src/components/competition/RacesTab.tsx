@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import type { CompetitionRace, CompetitionRaceInput } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { eventLabel, FFN_EVENTS, STROKE_COLORS, strokeFromCode } from "@/lib/objectiveHelpers";
 import {
   Sheet,
@@ -89,7 +89,6 @@ function raceTypeLabel(race: CompetitionRace): string | null {
 /* ── Component ──────────────────────────────────────────── */
 
 export default function RacesTab({ competitionId, competitionDate, competitionEndDate }: RacesTabProps) {
-  const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingRace, setEditingRace] = useState<CompetitionRace | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompetitionRace | null>(null);
@@ -121,10 +120,10 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
     mutationFn: (input: CompetitionRaceInput) => createCompetitionRace(input),
     onSuccess: () => {
       invalidate();
-      toast({ title: "Course ajoutée" });
+      toast("Course ajoutée");
       closeSheet();
     },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const updateMutation = useMutation({
@@ -132,20 +131,20 @@ export default function RacesTab({ competitionId, competitionDate, competitionEn
       updateCompetitionRace(id, input),
     onSuccess: () => {
       invalidate();
-      toast({ title: "Course modifiée" });
+      toast("Course modifiée");
       closeSheet();
     },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCompetitionRace(id),
     onSuccess: () => {
       invalidate();
-      toast({ title: "Course supprimée" });
+      toast("Course supprimée");
       setDeleteTarget(null);
     },
-    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
   });
 
   /* ── Sheet helpers ───────────────────────────────────── */

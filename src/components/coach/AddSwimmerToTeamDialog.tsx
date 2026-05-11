@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { createManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 import type { AthleteSummary } from "@/lib/api/types";
 
@@ -49,7 +49,6 @@ export function AddSwimmerToTeamDialog({
 
   // ── Tab "Sans compte" ─────────────────────────────────────
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [name, setName] = useState("");
   const [sex, setSex] = useState<"M" | "F" | "">("");
   const [birthdate, setBirthdate] = useState("");
@@ -70,12 +69,12 @@ export function AddSwimmerToTeamDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-manual-swimmers"] });
       queryClient.invalidateQueries({ queryKey: ["my-team"] });
-      toast({ title: "Nageur ajouté à votre équipe" });
+      toast("Nageur ajouté à votre équipe");
       resetManual();
       onOpenChange(false);
     },
     onError: (e: Error) =>
-      toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+      toast.error("Erreur", { description: e.message }),
   });
 
   const handleManualSubmit = (e: React.FormEvent) => {

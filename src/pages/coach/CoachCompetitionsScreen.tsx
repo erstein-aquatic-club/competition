@@ -13,7 +13,7 @@ import {
 import type { Competition, CompetitionInput } from "@/lib/api";
 import { getAllPendingInterviews } from "@/lib/api/interviews";
 import { getTrainingCycles } from "@/lib/api/planning";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import CoachSectionHeader from "./CoachSectionHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,7 +96,6 @@ const CompetitionFormSheet = ({
   onOpenChange,
   competition,
 }: CompetitionFormProps) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!competition;
 
@@ -158,17 +157,13 @@ const CompetitionFormSheet = ({
           console.warn("[EAC] Failed to save competition assignments:", e);
         }
       }
-      toast({ title: "Competition creee" });
+      toast("Competition creee");
       void queryClient.invalidateQueries({ queryKey: ["competitions"] });
       void queryClient.invalidateQueries({ queryKey: ["competition-assignments"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
@@ -182,51 +177,35 @@ const CompetitionFormSheet = ({
       } catch (e) {
         console.warn("[EAC] Failed to save competition assignments:", e);
       }
-      toast({ title: "Competition mise a jour" });
+      toast("Competition mise a jour");
       void queryClient.invalidateQueries({ queryKey: ["competitions"] });
       void queryClient.invalidateQueries({ queryKey: ["competition-assignments"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteCompetition(competition!.id),
     onSuccess: () => {
-      toast({ title: "Competition supprimee" });
+      toast("Competition supprimee");
       void queryClient.invalidateQueries({ queryKey: ["competitions"] });
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
   });
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      toast({
-        title: "Nom requis",
-        description: "Veuillez saisir un nom pour la competition.",
-        variant: "destructive",
-      });
+      toast.error("Nom requis", { description: "Veuillez saisir un nom pour la competition." });
       return;
     }
     if (!date) {
-      toast({
-        title: "Date requise",
-        description: "Veuillez saisir une date.",
-        variant: "destructive",
-      });
+      toast.error("Date requise", { description: "Veuillez saisir une date." });
       return;
     }
 

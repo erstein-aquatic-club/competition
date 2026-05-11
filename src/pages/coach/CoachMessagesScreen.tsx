@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, BellRing, SendHorizontal } from "lucide-react";
 import { notifications_send } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,6 @@ const CoachMessagesScreen = ({
   athletesLoading,
   initialAthleteId,
 }: CoachMessagesScreenProps) => {
-  const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [targetValue, setTargetValue] = useState("");
@@ -91,19 +90,11 @@ const CoachMessagesScreen = ({
 
   const handleSendMessage = async () => {
     if (!selectedTarget.target || selectedTarget.recipients === 0) {
-      toast({
-        title: "Aucun destinataire",
-        description: "Choisissez un groupe ou un nageur avec au moins un compte actif.",
-        variant: "destructive",
-      });
+      toast.error("Aucun destinataire", { description: "Choisissez un groupe ou un nageur avec au moins un compte actif." });
       return;
     }
     if (!title.trim()) {
-      toast({
-        title: "Titre requis",
-        description: "Ajoutez un titre avant d'envoyer la notification.",
-        variant: "destructive",
-      });
+      toast.error("Titre requis", { description: "Ajoutez un titre avant d'envoyer la notification." });
       return;
     }
 
@@ -118,23 +109,13 @@ const CoachMessagesScreen = ({
         targets: [selectedTarget.target],
       });
 
-      toast({
-        title: "Notification envoyée",
-        description:
-          selectedTarget.recipients === 1
-            ? "Le nageur recevra la notification sur ses appareils abonnés."
-            : `${selectedTarget.recipients} nageurs ciblés recevront la notification sur leurs appareils abonnés.`,
-      });
+      toast("Notification envoyée", { description: selectedTarget.recipients === 1 });
 
       setTitle("");
       setMessage("");
       setTargetValue("");
     } catch (error) {
-      toast({
-        title: "Envoi impossible",
-        description: error instanceof Error ? error.message : "La notification n'a pas pu être envoyée.",
-        variant: "destructive",
-      });
+      toast.error("Envoi impossible", { description: error instanceof Error ? error.message : "La notification n'a pas pu être envoyée." });
     } finally {
       sendingRef.current = false;
       setSending(false);

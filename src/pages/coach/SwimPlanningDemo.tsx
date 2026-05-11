@@ -26,7 +26,7 @@ import { useSwimPlanningAthleteMode } from "@/hooks/coach/useSwimPlanningAthlete
 
 const FilieresEditor = lazyWithRetry(() => import("./FilieresEditor"));
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -80,8 +80,6 @@ const LOAD_MORE_COUNT = 4;
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function SwimPlanningDemo() {
-  const { toast } = useToast();
-
   // ── Group selection ──
   const { data: groups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ["groups"],
@@ -260,11 +258,7 @@ export default function SwimPlanningDemo() {
     writeWeekMeta(editingWeekKey, weekType, notes, {
       onSuccess: () => setEditingWeekKey(null),
       onError: (err: Error) => {
-        toast({
-          title: "Erreur",
-          description: err.message,
-          variant: "destructive",
-        });
+        toast.error("Erreur", { description: err.message });
       },
     });
   };
@@ -301,11 +295,7 @@ export default function SwimPlanningDemo() {
 
   const onWriteError = useCallback(
     (err: Error) => {
-      toast({
-        title: "Erreur",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error("Erreur", { description: err.message });
     },
     [toast],
   );

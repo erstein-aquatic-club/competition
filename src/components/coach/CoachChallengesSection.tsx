@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2, Pencil } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { ChallengeProgressBar } from "@/components/shared/ChallengeProgressBar";
 
@@ -42,7 +42,6 @@ function formatDateShort(iso: string): string {
 
 export default function CoachChallengesSection({ groups }: CoachChallengesSectionProps) {
   const { userId } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -68,11 +67,11 @@ export default function CoachChallengesSection({ groups }: CoachChallengesSectio
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["active-challenges"] });
-      toast({ title: "Challenge créé" });
+      toast("Challenge créé");
       resetForm();
       setDialogOpen(false);
     },
-    onError: () => toast({ title: "Erreur", description: "Impossible de créer le challenge.", variant: "destructive" }),
+    onError: () => toast.error("Erreur", { description: "Impossible de créer le challenge." }),
   });
 
   const updateProgressMut = useMutation({
@@ -82,7 +81,7 @@ export default function CoachChallengesSection({ groups }: CoachChallengesSectio
       queryClient.invalidateQueries({ queryKey: ["all-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["active-challenges"] });
       setEditProgressId(null);
-      toast({ title: "Progression mise à jour" });
+      toast("Progression mise à jour");
     },
   });
 
@@ -91,7 +90,7 @@ export default function CoachChallengesSection({ groups }: CoachChallengesSectio
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["active-challenges"] });
-      toast({ title: "Challenge supprimé" });
+      toast("Challenge supprimé");
     },
   });
 
