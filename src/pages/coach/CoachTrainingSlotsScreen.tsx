@@ -1841,12 +1841,16 @@ const CoachTrainingSlotsScreen = ({
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
     queryKey: ["training-slots"],
     queryFn: () => getTrainingSlots(),
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
   });
 
   // Fetch all overrides (we filter client-side per week)
   const { data: allOverrides = [] } = useQuery({
     queryKey: ["training-slot-overrides"],
     queryFn: () => getSlotOverrides(),
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
   });
 
   // Fetch coaches
@@ -1958,6 +1962,8 @@ const CoachTrainingSlotsScreen = ({
         from: weekMondayIso,
         to: weekSundayIso,
       }),
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
   });
 
   // When a swimmer with custom slots is selected, his swimmer_training_slots

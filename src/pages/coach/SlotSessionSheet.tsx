@@ -189,9 +189,15 @@ export default function SlotSessionSheet({
     staleTime: 5 * 60 * 1000,
   });
 
+  // Stable cache key: sort group ids so [1,2] and [2,1] map to the same entry.
+  const subgroupKey = useMemo(
+    () => [...selectedGroups].sort((a, b) => a - b).join(","),
+    [selectedGroups],
+  );
+
   // Fetch subgroups (temporary groups that are children of the selected groups)
   const { data: subgroups = [] } = useQuery({
-    queryKey: ["slot-subgroups", selectedGroups],
+    queryKey: ["slot-subgroups", subgroupKey],
     queryFn: async () => {
       if (!canUseSupabase() || selectedGroups.length === 0) return [];
       const { data, error } = await supabase
