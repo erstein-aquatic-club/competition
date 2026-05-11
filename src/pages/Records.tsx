@@ -568,6 +568,13 @@ export default function Records() {
         toast({ title: "1RM mis à jour" });
       }
     },
+    onError: (err: Error) => {
+      toast({
+        title: "Échec mise à jour 1RM",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const updateExerciseNote = useMutation({
@@ -576,6 +583,13 @@ export default function Records() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["1rm"] });
       toast({ title: "Note mise à jour" });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Échec mise à jour note",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -598,6 +612,13 @@ export default function Records() {
       } else {
         toast({ title: "Record mis à jour" });
       }
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Échec enregistrement record",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 

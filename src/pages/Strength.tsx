@@ -247,8 +247,9 @@ export default function Strength() {
       .then(() => {
         wasOfflineRef.current = false;
       })
-      .catch((err) => {
-        console.warn("[strength] background reconcile failed:", err);
+      .catch((err: unknown) => {
+        console.warn("[strength] background reconcile failed — will retry at Terminer:", err);
+        // wasOfflineRef stays true: "Terminer" path will call reconcile again
       });
   }, [isOnline, activeRunId, activeRunLogs, userId, user]);
 
