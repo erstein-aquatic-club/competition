@@ -61,7 +61,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/Strength.tsx` | Module musculation nageur | ~921 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
-| `src/pages/Records.tsx` | Records personnels + FFN sync | 1475 lignes |
+| `src/pages/Records.tsx` | Records personnels + FFN sync + virtualisation @tanstack/react-virtual grille natation (§270 R5 sub-§C) | 1517 lignes |
 | `src/components/records/RecordCard.tsx` | Card record de natation memoïsée — utilisée dans Records.tsx filteredSwimRecords.map (§267 R2 sub-§C) | 56 lignes |
 | `src/pages/RecordsClub.tsx` | Records club (sections nage, drill-down progressif) | ~840 lignes |
 | `src/pages/RecordsAdmin.tsx` | Admin records + gestion nageurs | ~300 lignes |
@@ -172,6 +172,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/hooks/useCompetitionsByWeek.ts` | Hook partagé : competitionsByWeek Map + getDayCompetitions par jour (§156) | 67 lignes |
 | `src/hooks/useStrengthPlanByISO.ts` | Hook nageur — fusionne plan groupe + overrides (mergeStrengthSlots §157) et expose `planByISO`/`resolvedByISO`/`strengthByISO` au calendrier Dashboard et au FeedbackDrawer (§172). Helpers `buildWeekStarts`/`isoFromWeekStartAndDay` exportés (TZ-safe via local-date components, fix bug latent toISOString shift UTC). | 176 lignes |
 | `src/hooks/__tests__/useStrengthPlanByISO.test.ts` | 8 tests unitaires sur les helpers TZ-safe (régression boundaries mois/année, dimanche edge case `getDay()=0`, no shift UTC) (§172) | 61 lignes |
+| `src/hooks/useDebouncedValue.ts` | Hook debounce générique `<T>(value, delay) → T` — useState+useEffect+setTimeout/clearTimeout (§270 R5 sub-§A) | 10 lignes |
+| `src/hooks/__tests__/useDebouncedValue.test.ts` | 3 tests TDD (valeur initiale, délai respecté, debounce reset) (§270 R5 sub-§A) | 56 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |
 | `src/components/strength/TeamPlansSection.tsx` | Plans d'équipe visibles entre nageurs (§93) | |

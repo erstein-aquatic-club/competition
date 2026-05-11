@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §269 livré (2026-05-11) — Chantier R4 : robustesse mutations + offline (onError ×9, UPSERT strength_logs clé naturelle + dédup 14 groupes, login retry 3×, signup withTimeout 15s, cache key stable slot-subgroups, swimmerHasCustom guard anti-flicker). 695/696 tests pass, tsc clean, migration 00161 appliquée.*
+*Dernière mise à jour : §270 livré (2026-05-11) — Chantier R5 : polish vers 9.5/10 (useDebouncedValue hook TDD + 17 substitutions, useReducedMotion 5 composants, @tanstack/react-virtual Records.tsx, empty states CTA ×5). tsc clean.*
+
+*Précédente : §269 livré (2026-05-11) — Chantier R4 : robustesse mutations + offline (onError ×9, UPSERT strength_logs clé naturelle + dédup 14 groupes, login retry 3×, signup withTimeout 15s, cache key stable slot-subgroups, swimmerHasCustom guard anti-flicker). 695/696 tests pass, tsc clean, migration 00161 appliquée.*
 
 *Précédente : §268 livré (2026-05-11) — Chantier R3 : friction tunnel mutation (toast unifié sonner 52 fichiers + 3 supprimés, useDelayedLoading ×8 écrans, retry action ×17 toasts transient, skeletons spécifiques Coach ×12, fix double erreur Dashboard). 695/696 tests pass, tsc clean.*
 

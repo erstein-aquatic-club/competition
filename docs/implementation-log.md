@@ -4,6 +4,78 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §270 — Chantier R5 : polish vers 9.5/10 (2026-05-11)
+
+**Branche** : `main`
+**Chantier ROADMAP** : R5 — polish 4 axes (debounce, reduced-motion, virtualisation, empty states)
+
+### Contexte — Pourquoi ce patch
+
+Après §266-§269 (R1-R4), le score composite estimé était 9.0/10. R5 cible 9.5/10 sur 4 axes orthogonaux : consistance UX debounce, accessibilité motion, perf listes longues, et friction empty states.
+
+### Changements — 4 sub-§ livrés séparément
+
+#### sub-§A — `useDebouncedValue` hook (TDD) + 17 substitutions
+
+**Nouveau fichier** `src/hooks/useDebouncedValue.ts` : hook générique `<T>(value, delay) → T` avec `useState + useEffect + window.setTimeout/clearTimeout`. Nettoyage propre au unmount et à chaque changement de valeur. **Nouveau fichier** `src/hooks/__tests__/useDebouncedValue.test.ts` : 3 tests (valeur initiale immédiate, délai respecté avec fake timers, debounce reset sur rapid updates). Tests passent avec `npm test`.
+
+**17 fichiers consommateurs** substitués (3 remplacent `useDeferredValue`, 14 ajoutent debounce là où il manquait) :
+- `src/pages/Admin.tsx` (debouncedSearchValue + debouncedFicheSearch)
+- `src/pages/Strength.tsx` (debouncedSearchQuery → SessionBrowser)
+- `src/pages/coach/CoachGroupsScreen.tsx`, `CoachMySwimmersScreen.tsx`
+- `src/pages/coach/CoachSwimmersOverview.tsx` (remplace useDeferredValue)
+- `src/pages/coach/SlotSessionSheet.tsx`, `StrengthCatalog.tsx` (remplace useDeferredValue), `StrengthPlanningScreen.tsx`
+- `src/pages/coach/SwimCatalog.tsx` (remplace useDeferredValue), `SwimPlanningDemo.tsx`
+- `src/components/chrono/ChronoSetup.tsx`, `src/components/coach/AddSwimmerToTeamDialog.tsx`
+- `src/components/coach/strength/AddSessionSheet.tsx`, `AthletePlansTab.tsx`
+- `src/components/strength/ExercisePicker.tsx`
+
+Délai uniforme 200 ms sur toutes les recherches.
+
+#### sub-§B — `useReducedMotion` guards (top 5 framer-motion)
+
+5 composants renforcés pour désactiver animations si `prefers-reduced-motion: reduce` :
+- `src/components/strength/HistoryTable.tsx` — variants stagger/listItem conditionnels (`reduce ? {} : variant`)
+- `src/components/strength/SessionList.tsx` — idem staggerChildren/cardVariant + `initial={reduce ? false : "hidden"}`
+- `src/components/strength/MyPlanWeekCard.tsx` — chevron rotate + accordion height/opacity transition durée 0
+- `src/components/strength/InProgressCard.tsx` — scale/opacity entry + progress bar width transition durée 0
+- `src/components/strength/RestScreen.tsx` — tab slide transition durée 0
+
+Pattern uniforme : `const reduce = useReducedMotion()` puis guards inline.
+
+#### sub-§C — Virtualisation Records.tsx
+
+`@tanstack/react-virtual@3.13.24` ajouté. Dans `src/pages/Records.tsx` : `useVirtualizer` sur grille 2 colonnes (swimRecordsParentRef, `estimateSize: () => 104`, overscan 3). Seuil 30 items : > 30 → virtualisation absolue ; ≤ 30 → animation framer-motion conservée. Les records de nage (habituellement > 50) sont donc systématiquement virtualisés.
+
+#### sub-§D — Empty states CTA (top 5 sites)
+
+5 messages `text-muted-foreground` transformés en points d'entrée actionnables :
+1. `src/pages/coach/CoachMySwimmersScreen.tsx` — "Aucun nageur" → bouton "Inviter un nageur" (`setAddDialogOpen(true)`)
+2. `src/components/competition/InfoParticipants.tsx` — "Aucun nageur assigné" → bouton "Assigner des nageurs" (navigate `/competition/${id}/prep`)
+3. `src/components/coach/strength/AddSessionSheet.tsx` — "Aucune séance dans la bibliothèque" → bouton "Créer une séance" (`onCreateNew`)
+4. `src/pages/coach/CoachTrainingSlotsScreen.tsx` — "Aucun créneau" (vue jour mobile) → bouton "Créer un créneau" (nouveau prop `onCreateNew` sur `MobileView`, passé `handleCreate` depuis parent)
+5. `src/pages/coach/CoachChronoHistoryScreen.tsx` — "Aucun chrono enregistré" → bouton "Lancer un chrono" (`onBack`, ramène à la surface chrono)
+
+### Tests
+
+- `npm test` : 3 nouveaux tests useDebouncedValue passent. 1 fail pré-existant `transformers.test.ts` (non introduit). ✅
+- `npx tsc --noEmit` : exit 0 après chaque sub-§. ✅
+- Tests RLS : non lancés — aucune policy RLS modifiée (patch 100% JS/TSX). ✅
+
+### Décisions prises
+
+- **`useDebouncedValue` plutôt que `useDeferredValue`** : délai contrôlé explicitement (200 ms) vs. délai opaque React scheduler — plus prévisible, plus testable avec fake timers.
+- **Seuil 30 items pour virtualisation** : les listes courtes n'ont pas besoin de virtual DOM overhead, et framer-motion stagger reste agréable sous 30 items.
+- **`MobileView.onCreateNew` prop** : `handleCreate` est déclaré après le JSX day-view dans le fichier ; pour éviter le TDZ TypeScript, prop explicite plutôt que closure implicite.
+- **`CoachChronoHistoryScreen` CTA → `onBack`** : la surface n'a pas de route dédiée "démarrer chrono" ; `onBack` est le chemin naturel vers l'interface chrono.
+
+### Limites / dette
+
+- `useReducedMotion` couvre les 5 composants les plus visibles ; les composants secondaires (competitionDetail animations, etc.) restent non gardés.
+- La virtualisation ne couvre que la grille Records natation ; les records musculation et les autres listes longues pourraient bénéficier du même traitement.
+
+---
+
 ## §269 — Chantier R4 : robustesse mutations + offline (2026-05-11)
 
 **Branche** : `main`

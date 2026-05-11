@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§269** — Chantier R4 : robustesse mutations + offline (onError ×9, UPSERT strength_logs, login retry, cache keys).
+Dernier § livré : **§270** — Chantier R5 : polish (useDebouncedValue ×17, useReducedMotion ×5, virtualisation Records, empty CTAs ×5).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
