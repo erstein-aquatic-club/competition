@@ -77,6 +77,12 @@ export interface StrengthPlanningTimelineProps {
   onEditTypeChange: (v: string) => void;
   onEditNotesChange: (v: string) => void;
   showOverrideBadge?: boolean;
+  /**
+   * In athlete mode: per-dayIndex (0=Mon … 6=Sun) sessions inferred from the
+   * athlete's biblio plan (cycle sessions prefixed with Lun/Mar/...). Cells
+   * with no explicit slot fall back to a "ghost" rendering of this session.
+   */
+  athletePlanByDay?: Map<number, StrengthSessionTemplate>;
   readOnly?: boolean;
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
   isLoading?: boolean;
@@ -110,6 +116,7 @@ export default function StrengthPlanningTimeline(
     onCancelEditMeta,
     onEditTypeChange,
     onEditNotesChange,
+    athletePlanByDay,
     sentinelRef,
     isLoading = false,
     isEmpty = false,
@@ -195,6 +202,7 @@ export default function StrengthPlanningTimeline(
                 onSlotTap(week.weekKey, dayIndex, existing ?? null);
               }}
               showOverrideBadge={showOverrideBadge}
+              athletePlanByDay={athletePlanByDay}
               sessionTemplatesById={sessionTemplatesById}
               readOnly={readOnly}
             />
@@ -238,6 +246,7 @@ interface WeekCardProps {
   ) => EffectiveStrengthSlot | undefined;
   onCellTap: (dayIndex: number) => void;
   showOverrideBadge: boolean;
+  athletePlanByDay?: Map<number, StrengthSessionTemplate>;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
 }
@@ -265,6 +274,7 @@ function WeekCard({
   findSlot,
   onCellTap,
   showOverrideBadge,
+  athletePlanByDay,
   sessionTemplatesById,
   readOnly,
 }: WeekCardProps) {
@@ -373,31 +383,41 @@ function WeekCard({
                       {meta.week_type}
                     </Badge>
                   )}
-                  {filledCount > 0 && (
-                    <span className="inline-flex items-center gap-[3px] shrink-0">
-                      {/* One mini-dot per day (Lun → Dim) */}
-                      {DAY_ROWS.map((day) => {
-                        const slot = weekSlots.find(
-                          (s) => s.day_of_week === day.index,
-                        );
-                        if (!slot) return null;
-                        const tpl = slot.session_template_id
+                  {(() => {
+                    // One mini-dot per day. Slot wins; otherwise fall back to
+                    // the biblio plan session for that day (ghost = ring-only).
+                    const dots = DAY_ROWS.map((day) => {
+                      const slot = weekSlots.find(
+                        (s) => s.day_of_week === day.index,
+                      );
+                      const tpl = slot
+                        ? slot.session_template_id
                           ? sessionTemplatesById.get(slot.session_template_id)
-                          : null;
-                        const phase = tpl ? detectPhase(tpl.title ?? tpl.name ?? "") : "force";
-                        const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-                        return (
-                          <span
-                            key={day.index}
-                            className={cn(
-                              "h-[6px] w-[6px] rounded-full shrink-0",
-                              style.dot,
-                            )}
-                          />
-                        );
-                      })}
-                    </span>
-                  )}
+                          : null
+                        : athletePlanByDay?.get(day.index);
+                      if (!tpl && !slot) return null;
+                      const phase = tpl ? detectPhase(tpl.title ?? tpl.name ?? "") : "force";
+                      const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+                      const isGhost = !slot;
+                      return (
+                        <span
+                          key={day.index}
+                          className={cn(
+                            "h-[6px] w-[6px] rounded-full shrink-0",
+                            isGhost
+                              ? cn("bg-transparent ring-1 ring-inset", style.dot.replace("bg-", "ring-"))
+                              : style.dot,
+                          )}
+                        />
+                      );
+                    }).filter(Boolean);
+                    if (dots.length === 0) return null;
+                    return (
+                      <span className="inline-flex items-center gap-[3px] shrink-0">
+                        {dots}
+                      </span>
+                    );
+                  })()}
                 </div>
                 {meta.notes && (
                   <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
@@ -477,6 +497,7 @@ function WeekCard({
                     getDayCompetitions={getDayCompetitions}
                     onSelectCompetition={onSelectCompetition}
                     showOverrideBadge={showOverrideBadge}
+                    athletePlanByDay={athletePlanByDay}
                     sessionTemplatesById={sessionTemplatesById}
                     readOnly={readOnly}
                   />
@@ -502,6 +523,7 @@ function MicroGrid({
   getDayCompetitions,
   onSelectCompetition,
   showOverrideBadge,
+  athletePlanByDay,
   sessionTemplatesById,
   readOnly,
 }: {
@@ -515,6 +537,7 @@ function MicroGrid({
   getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
   onSelectCompetition: (c: Competition) => void;
   showOverrideBadge: boolean;
+  athletePlanByDay?: Map<number, StrengthSessionTemplate>;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
 }) {
@@ -524,9 +547,10 @@ function MicroGrid({
       <div className="px-3 pt-2 pb-3 space-y-1">
         {DAY_ROWS.map((day) => {
           const slot = findSlot(weekKey, day.index);
+          const inherited = !slot ? athletePlanByDay?.get(day.index) : null;
           const dayComps = getDayCompetitions(weekMonday, day.index);
           const hasComp = dayComps.length > 0;
-          const emptyDay = !slot;
+          const emptyDay = !slot && !inherited;
           const primaryComp = dayComps[0];
 
           return (
@@ -581,6 +605,7 @@ function MicroGrid({
               ) : (
                 <SlotCell
                   slot={slot}
+                  inheritedTpl={inherited ?? null}
                   onTap={() => onCellTap(day.index)}
                   showOverrideBadge={showOverrideBadge}
                   sessionTemplatesById={sessionTemplatesById}
@@ -601,17 +626,78 @@ function MicroGrid({
 
 function SlotCell({
   slot,
+  inheritedTpl,
   onTap,
   showOverrideBadge,
   sessionTemplatesById,
   readOnly,
 }: {
   slot: EffectiveStrengthSlot | undefined;
+  /**
+   * When `slot` is empty: optional session inherited from the athlete's
+   * biblio plan (matched on day-of-week prefix). Rendered as a faded
+   * "ghost" — visually distinct from an explicit slot. Tapping it goes
+   * through the picker so the coach can adopt or override.
+   */
+  inheritedTpl?: StrengthSessionTemplate | null;
   onTap: () => void;
   showOverrideBadge: boolean;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
 }) {
+  if (!slot && inheritedTpl) {
+    const sessionName = inheritedTpl.title ?? inheritedTpl.name ?? null;
+    const phase = sessionName ? detectPhase(sessionName) : "force";
+    const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+    const itemCount = inheritedTpl.items?.length ?? 0;
+    const displayName = sessionName
+      ? sessionName.replace(/^[A-Za-z]{3,4}\s*[—–-]\s*/u, "").slice(0, 16)
+      : "Séance";
+    const ghostClass = cn(
+      "relative h-9 w-full rounded-lg flex items-center gap-1.5 px-1.5 transition-all overflow-hidden border border-dashed",
+      style.bg,
+      "opacity-60 border-muted-foreground/30",
+    );
+    const body = (
+      <>
+        <span className={cn("h-2 w-2 rounded-full shrink-0", style.dot)} />
+        <span
+          className={cn(
+            "text-[10px] font-semibold truncate leading-tight flex-1 text-left",
+            style.text,
+          )}
+        >
+          {displayName}
+        </span>
+        {itemCount > 0 && (
+          <span className={cn("text-[9px] font-semibold shrink-0 opacity-70", style.text)}>
+            {itemCount}ex
+          </span>
+        )}
+      </>
+    );
+    if (readOnly) {
+      return (
+        <div
+          className={ghostClass}
+          aria-label={`${sessionName ?? "Séance"} (plan biblio, non planifiée)`}
+        >
+          {body}
+        </div>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className={cn(ghostClass, "active:scale-[0.97]")}
+        onClick={onTap}
+        aria-label={`Adopter : ${sessionName ?? "Séance"} (plan biblio)`}
+      >
+        {body}
+      </button>
+    );
+  }
+
   if (!slot) {
     if (readOnly) {
       return (

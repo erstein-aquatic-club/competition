@@ -204,6 +204,30 @@ export default function StrengthPlanningScreen() {
     enabled: selectedAthleteId != null,
   });
 
+  // Map dayIndex → session inferred from the athlete's biblio plan based on
+  // the session title prefix (Lundi/Mardi/...). Used to auto-fill timeline
+  // cells in athlete mode as a "ghost" overlay below explicit slots. When
+  // multiple cycles supply a session for the same day, the last one wins
+  // (most recently created tends to be the active cycle).
+  const athletePlanByDay = useMemo(() => {
+    const map = new Map<number, StrengthSessionTemplate>();
+    if (selectedAthleteId == null) return map;
+    const folderIds = new Set(athletePlanFolders.map((f) => f.id));
+    if (folderIds.size === 0) return map;
+    const dayPrefixes = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
+    for (const s of sessionTemplates) {
+      if (s.folder_id == null || !folderIds.has(s.folder_id)) continue;
+      const title = (s.title ?? s.name ?? "").trim().toLowerCase();
+      for (let i = 0; i < 7; i += 1) {
+        if (title.startsWith(dayPrefixes[i])) {
+          map.set(i, s);
+          break;
+        }
+      }
+    }
+    return map;
+  }, [selectedAthleteId, athletePlanFolders, sessionTemplates]);
+
   // ── Competitions (context for planning) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
@@ -609,6 +633,7 @@ export default function StrengthPlanningScreen() {
         onEditTypeChange={setEditWeekType}
         onEditNotesChange={setEditWeekNotes}
         showOverrideBadge={selectedAthleteId != null}
+        athletePlanByDay={athletePlanByDay}
         sentinelRef={sentinelRef}
         isLoading={slotsLoading}
         isEmpty={slots.length === 0}

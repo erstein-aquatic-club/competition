@@ -4,6 +4,47 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §274.1 — Auto-fill timeline depuis le plan biblio du nageur (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale que le plan biblio de François (coach connecté) n'apparaît pas dans la timeline Planification muscu alors qu'il existe en DB.
+
+### Contexte
+
+§274 (commit `d9bf2d95a`) avait choisi l'option "Picker prioritise plans" : les sessions du plan biblio apparaissaient dans le bottom-sheet quand le coach tapait sur une case vide. Mais l'utilisateur attendait que le plan **alimente la vue** = soit visible directement dans les cellules de la timeline (option "Auto-fill timeline" du brainstorm initial).
+
+### Implémentation
+
+`StrengthPlanningScreen.tsx` :
+
+- Nouveau `athletePlanByDay` : `Map<dayIndex (0-6), StrengthSessionTemplate>` calculé depuis `athletePlanFolders` (déjà fetched) + `sessionTemplates` filtrés sur les folder_ids du plan du nageur, puis matchés par préfixe jour-de-semaine (`lun`, `mar`, ...). Dernier match gagne (= cycle le plus récent en pratique).
+- Map passée en prop à `<StrengthPlanningTimeline />`.
+
+`StrengthPlanningTimeline.tsx` :
+
+- Nouvelle prop `athletePlanByDay?: Map<number, StrengthSessionTemplate>`.
+- `MicroGrid` : pour chaque cellule sans slot explicite, lookup `athletePlanByDay` ; passe `inheritedTpl` à `SlotCell`.
+- `SlotCell` étendu : rendu "ghost" (border dashed, opacity 60%, même phase bg/text/dot) quand `!slot && inheritedTpl`. Tap → même handler que cellule vide (ouvre le picker → adoption/override explicite).
+- Mini-dots du header replié : dot plein pour slot explicite, dot creux (ring-only) pour session héritée.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/StrengthPlanningScreen.tsx` | Calcul `athletePlanByDay` + prop passée au Timeline |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Prop `athletePlanByDay` propagée WeekCard→MicroGrid→SlotCell, rendu "ghost" pour les cellules héritées, mini-dots dédoublés (plein/creux) |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `npx vitest run src/lib/__tests__/strengthPlanningMerge.test.ts` : 13/13 pass. ✅
+- Vérification manuelle attendue : un coach connecté qui sélectionne "(moi)" dans le dropdown de Planification muscu doit voir ses séances de plan biblio en "ghost" sur chaque semaine, sur le bon jour de la semaine (parsé depuis le préfixe Lundi/Mardi/... du titre de session).
+
+### Limites
+
+- Si plusieurs cycles ont une séance pour le même jour, la dernière itérée gagne. UI de sélection de cycle "actif" à faire si besoin.
+- L'adoption d'une séance héritée passe encore par le picker (2 taps). Un tap-to-adopt direct serait plus rapide mais ambigu (override vs adopter).
+
 ## §274 — Planif muscu coach : 1 slot/jour + picker nourri par biblio plans (2026-05-13)
 
 **Branche** : `main`
