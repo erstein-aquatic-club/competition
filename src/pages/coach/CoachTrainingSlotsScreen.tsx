@@ -3045,13 +3045,13 @@ const CoachTrainingSlotsScreen = ({
               {weekDates.map((date, i) => {
                 const entries = competitionsByDate.get(toIsoDate(date)) ?? [];
                 return (
-                  <div key={`comp-${i}`} className="px-0.5 pb-1">
+                  <div key={`comp-${i}`} className="px-0.5 pb-1 min-w-0">
                     {entries.map((entry) => (
                       <button
                         key={`${entry.competition.id}-desk`}
                         type="button"
                         onClick={() => handleOpenCompetition(entry.competition)}
-                        className="w-full text-left px-1.5 py-1 mb-1 rounded-md bg-gradient-to-r from-cat-competition/15 to-cat-override/10 border border-cat-competition/30 flex items-center gap-1 hover:bg-cat-competition/20 transition-colors"
+                        className="w-full text-left px-1.5 py-1 mb-1 rounded-md bg-gradient-to-r from-cat-competition/15 to-cat-override/10 border border-cat-competition/30 flex items-center gap-1 hover:bg-cat-competition/20 transition-colors overflow-hidden"
                       >
                         <Trophy className="h-3 w-3 text-cat-competition shrink-0" />
                         <span className="text-[10px] font-semibold truncate text-foreground">
