@@ -321,14 +321,18 @@ export default function Profile() {
           new Promise((r) => setTimeout(r, 3000)),
         ]);
       }
-    } catch { /* best-effort — always reload below */ }
-    // 2. Use __pwaApplyUpdate (skipWaiting + cache clear + reload) so the waiting SW
-    // activates before reload — avoids onNeedRefresh re-firing after the page comes back.
-    const applyUpdate = (window as any).__pwaApplyUpdate;
-    if (typeof applyUpdate === "function") {
-      await applyUpdate();
-    } else {
-      window.location.reload();
+      // 2. Use __pwaApplyUpdate (skipWaiting + cache clear + reload) so the waiting SW
+      // activates before reload — avoids onNeedRefresh re-firing after the page comes back.
+      const applyUpdate = (window as any).__pwaApplyUpdate;
+      if (typeof applyUpdate === "function") {
+        await applyUpdate();
+      } else {
+        window.location.reload();
+      }
+    } catch { /* best-effort */ }
+    finally {
+      // Reset loading state — reload may not happen if no SW update is waiting
+      setIsCheckingUpdate(false);
     }
   };
 
