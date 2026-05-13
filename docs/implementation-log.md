@@ -4,6 +4,86 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.8-fix — Drawer détail session : refonte lisibilité 5s (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale que le drawer §275.8 est "trop petit et n'est pas suffisamment épuré pour une lecture en 5s".
+
+### Diagnostic UX
+
+Le drawer initial empilait toutes les métriques sur UNE ligne séparée par des "·", avec des fontes 10-13px. Difficile à scanner rapidement, surtout sur mobile.
+
+### Refonte
+
+Repensé pour lecture instantanée :
+
+**Header** (taille augmentée) :
+- Titre : `text-base` → `text-lg font-bold` + dot 2.5px → 3px.
+- Sub-line : `text-xs muted` → `text-sm font-medium` aligné sous le dot.
+- Cycle (Force/Hypertrophie/Endurance) : transformé en `Badge` coloré (couleur de phase) au lieu d'un texte muted.
+
+**Description** : encapsulée dans une box `bg-muted/40 rounded-xl` pour la séparer visuellement du contenu. `text-sm` au lieu de `text-[13px]`.
+
+**Exercices** (carte par exercice au lieu d'une liste divide-y dense) :
+- Index : chip rond `h-7 w-7 bg-muted` avec numéro `text-sm font-bold`. Repère visuel.
+- Nom : `text-[15px] font-semibold leading-snug`. C'est l'info la plus importante.
+- Métriques primaires : ligne dédiée
+  - `N × M reps` en `text-base font-bold tabular-nums` (lecture instantanée du couple séries×reps)
+  - `P% 1RM` en chip primary (`px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold`)
+- Repos : ligne secondaire `text-xs muted`, **formatage M'SS** (`formatRest(seconds)` : 180s → "3'", 90s → "1'30", 45s → "45s")
+- Notes : `text-xs italic muted` (inchangé)
+
+**Espacement** : `space-y-4` entre la description, la liste et les actions ; `space-y-2` entre les cartes d'exercices ; padding `px-3.5 py-3` dans chaque carte au lieu de `px-3 py-2.5`.
+
+**Actions** : min-height 52px (au lieu de 48px), `font-semibold` (au lieu de `font-medium`).
+
+### Helper ajouté
+
+```ts
+function formatRest(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return sec === 0 ? `${m}'` : `${m}'${String(sec).padStart(2, "0")}`;
+}
+```
+
+Style course / haltérophilie (`3'`, `1'30`, `45s`) plus facile à lire que `180s`.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | Refonte `CellDetailDrawer` (~135 → ~155 LOC) + helper `formatRest` |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+
+### Avant/après (visuel)
+
+**Avant** :
+```
+🟢 Lundi — Tractions + Squat
+S2 — Lun · Cycle : Force
+
+1. Tractions
+   4 séries · 6 reps · 85% 1RM · Repos 180s
+```
+
+**Après** :
+```
+🟢 Lundi — Tractions + Squat
+S2 · Lun  [FORCE]
+
+╭───────────────────╮
+│ (1)  Tractions    │
+│      4 × 6 reps   [85% 1RM]
+│      Repos 3'
+╰───────────────────╯
+```
+
 ## §275.8 — Plan editor : add/remove week + drawer détail session (2026-05-13)
 
 **Branche** : `main`

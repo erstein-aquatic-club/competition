@@ -1310,6 +1310,8 @@ function formatFrenchDate(iso: string): string {
 
 /* ═══════════════════════════════════════════════════════════════════
    Cell detail drawer — shows the session's exercises with sets/reps/%1RM/rest
+   Designed for "5-second read" : large names, compact metric chips, clear
+   visual rhythm between exercises.
    ═══════════════════════════════════════════════════════════════════ */
 
 const CYCLE_LABEL: Record<string, string> = {
@@ -1317,6 +1319,15 @@ const CYCLE_LABEL: Record<string, string> = {
   hypertrophie: "Hypertrophie",
   force: "Force",
 };
+
+/** Convert a rest duration in seconds to a runner-style "M'SS" string.
+ *  60 → "1'", 90 → "1'30", 180 → "3'", 45 → "45s". */
+function formatRest(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return sec === 0 ? `${m}'` : `${m}'${String(sec).padStart(2, "0")}`;
+}
 
 function CellDetailDrawer({
   cell,
@@ -1343,107 +1354,116 @@ function CellDetailDrawer({
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
-        <SheetHeader className="pb-2 shrink-0">
-          <SheetTitle className="text-base flex items-center gap-2">
-            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", style.dot)} />
+        {/* Header — large title for instant scan */}
+        <SheetHeader className="pb-3 shrink-0">
+          <SheetTitle className="text-lg font-bold flex items-center gap-2.5 leading-tight">
+            <span className={cn("h-3 w-3 rounded-full shrink-0", style.dot)} />
             <span className="truncate">{sessionName}</span>
           </SheetTitle>
           {cell && (
-            <SheetDescription className="text-xs text-muted-foreground">
-              S{cell.relative_week} — {DAY_LABELS[cell.day_of_week]}
+            <SheetDescription className="text-sm text-muted-foreground font-medium pl-[22px] flex items-center gap-2 flex-wrap">
+              <span>S{cell.relative_week} · {DAY_LABELS[cell.day_of_week]}</span>
               {cycleLabel && (
-                <span className="ml-2 inline-flex items-center gap-1">
-                  <span aria-hidden className="text-muted-foreground/40">·</span>
-                  Cycle : {cycleLabel}
-                </span>
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px] uppercase tracking-wide font-bold border-0", style.bg, style.text)}
+                >
+                  {cycleLabel}
+                </Badge>
               )}
             </SheetDescription>
           )}
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-3">
+        <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-4">
           {template?.description && (
-            <p className="text-[13px] text-muted-foreground leading-relaxed">
-              {template.description}
-            </p>
+            <div className="rounded-xl bg-muted/40 px-3.5 py-2.5">
+              <p className="text-sm text-foreground/85 leading-relaxed">
+                {template.description}
+              </p>
+            </div>
           )}
 
           {items.length === 0 ? (
-            <div className="text-center py-8">
-              <Dumbbell className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
+            <div className="text-center py-10">
+              <Dumbbell className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2.5" />
               <p className="text-sm text-muted-foreground">
                 Aucun exercice dans cette séance.
               </p>
             </div>
           ) : (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5 px-1">
-                Exercices ({items.length})
-              </p>
-              <ul className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-                {items
-                  .slice()
-                  .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                  .map((item, idx) => (
-                    <li key={idx} className="px-3 py-2.5">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium truncate">
-                          {idx + 1}. {item.exercise_name ?? `Exercice #${item.exercise_id}`}
+            <ul className="space-y-2">
+              {items
+                .slice()
+                .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                .map((item, idx) => {
+                  const hasPercent = item.percent_1rm != null && item.percent_1rm > 0;
+                  const hasRest = item.rest_seconds != null && item.rest_seconds > 0;
+                  return (
+                    <li
+                      key={idx}
+                      className="rounded-xl border border-border bg-card px-3.5 py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Index chip — large enough to ground the eye */}
+                        <span className="inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-full bg-muted text-foreground text-sm font-bold tabular-nums">
+                          {idx + 1}
                         </span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground tabular-nums">
-                        <span>
-                          <span className="font-semibold text-foreground">{item.sets}</span> séries
-                        </span>
-                        <span aria-hidden className="text-muted-foreground/40">·</span>
-                        <span>
-                          <span className="font-semibold text-foreground">{item.reps}</span> reps
-                        </span>
-                        {item.percent_1rm != null && item.percent_1rm > 0 && (
-                          <>
-                            <span aria-hidden className="text-muted-foreground/40">·</span>
-                            <span>
-                              <span className="font-semibold text-foreground">{item.percent_1rm}</span>% 1RM
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          {/* Exercise name — biggest text in the card */}
+                          <p className="text-[15px] font-semibold leading-snug">
+                            {item.exercise_name ?? `Exercice #${item.exercise_id}`}
+                          </p>
+                          {/* Primary metrics — bold "N × M" + %1RM chip */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-base font-bold tabular-nums leading-none">
+                              {item.sets} <span className="text-muted-foreground/60 font-medium mx-0.5">×</span> {item.reps}
+                              <span className="ml-1.5 text-xs font-medium text-muted-foreground">reps</span>
                             </span>
-                          </>
-                        )}
-                        {item.rest_seconds != null && item.rest_seconds > 0 && (
-                          <>
-                            <span aria-hidden className="text-muted-foreground/40">·</span>
-                            <span>
-                              Repos <span className="font-semibold text-foreground">{item.rest_seconds}</span>s
-                            </span>
-                          </>
-                        )}
+                            {hasPercent && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold tabular-nums">
+                                {item.percent_1rm}% 1RM
+                              </span>
+                            )}
+                          </div>
+                          {/* Secondary line — rest time only */}
+                          {hasRest && (
+                            <p className="text-xs text-muted-foreground">
+                              Repos <span className="font-semibold text-foreground/80 tabular-nums">{formatRest(item.rest_seconds)}</span>
+                            </p>
+                          )}
+                          {item.notes && (
+                            <p className="text-xs text-muted-foreground italic leading-snug">
+                              {item.notes}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      {item.notes && (
-                        <p className="mt-1 text-[11px] text-muted-foreground italic">{item.notes}</p>
-                      )}
                     </li>
-                  ))}
-              </ul>
-            </div>
+                  );
+                })}
+            </ul>
           )}
 
           {/* Actions */}
-          <div className="pt-2 space-y-1">
+          <div className="pt-3 space-y-1">
             <div className="h-px bg-border" />
             <button
               type="button"
-              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-primary hover:bg-primary/10 active:scale-[0.98]"
+              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3.5 text-left transition-all min-h-[52px] text-primary hover:bg-primary/10 active:scale-[0.98]"
               onClick={onChangeSession}
             >
               <Dumbbell className="h-4 w-4 shrink-0" />
-              <span className="text-sm font-medium">Changer de séance</span>
+              <span className="text-sm font-semibold">Changer de séance</span>
             </button>
             <button
               type="button"
-              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-50"
+              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3.5 text-left transition-all min-h-[52px] text-destructive hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-50"
               onClick={onRemove}
               disabled={removePending}
             >
               <Trash2 className="h-4 w-4 shrink-0" />
-              <span className="text-sm font-medium">Retirer de la grille</span>
+              <span className="text-sm font-semibold">Retirer de la grille</span>
             </button>
           </div>
         </div>

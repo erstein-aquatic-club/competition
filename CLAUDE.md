@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.8** — Plan editor : add/remove week (cascade delete) + drawer détail session (sets/reps/%1RM/repos) sur tap cellule pleine.
+Dernier § livré : **§275.8-fix** — Refonte lisibilité 5s du drawer détail session (carte par exercice, fontes augmentées, repos `M'SS`).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

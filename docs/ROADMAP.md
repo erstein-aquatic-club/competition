@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.8 livré (2026-05-13) — Plan editor enrichi : boutons add/remove week (cascade delete sur les sessions de la dernière semaine) + drawer détail session sur tap d'une cellule pleine (liste exercices avec sets/reps/%1RM/repos/notes). Tap cellule vide → picker (inchangé) ; tap pleine → drawer (nouveau). +284 LOC dans TrainingPlansBrowser (1513 total). Build OK.*
+*Dernière mise à jour : §275.8-fix livré (2026-05-13) — Refonte lisibilité 5s du drawer détail session : header titre `text-lg font-bold`, cycle en badge coloré, description en box muted, chaque exercice en carte avec chip index `h-7 w-7`, nom `text-[15px] font-semibold`, métriques `N × M reps` en `text-base font-bold` + chip primary `%1RM`, repos formaté `M'SS` (180s → 3'). Build OK.*
+
+*Précédente : §275.8 livré (2026-05-13) — Plan editor : add/remove week + drawer détail session.*
 
 *Précédente : §275.7-fix livré (2026-05-13) — Hotfix React error #310 dans TrainingPlanEditor.*
 
