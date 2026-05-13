@@ -55,10 +55,14 @@ export interface StrengthPlanningTimelineProps {
   currentWeekKey?: string;
   expandedWeekKey: string | null;
   onToggleExpand: (weekKey: string) => void;
+  /**
+   * Tap callback. One slot per day — `existingSlot` carries the actual
+   * `time_slot` value to preserve when the existing entry is "evening"
+   * (legacy data). New cells always create "morning".
+   */
   onSlotTap: (
     weekKey: string,
     dayIndex: number,
-    timeSlot: "morning" | "evening",
     slot: EffectiveStrengthSlot | null,
   ) => void;
   onWeekMetaTap: (weekKey: string, e: React.MouseEvent) => void;
@@ -114,16 +118,18 @@ export default function StrengthPlanningTimeline(
 
   const showOverrideBadge = props.showOverrideBadge ?? false;
 
+  // One slot per day: prefer "morning" (canonical) and fall back to legacy
+  // "evening" so previously stored data still surfaces in the UI.
   const findSlot = useCallback(
-    (
-      weekKey: string,
-      dayIndex: number,
-      timeSlot: "morning" | "evening",
-    ): EffectiveStrengthSlot | undefined => {
+    (weekKey: string, dayIndex: number): EffectiveStrengthSlot | undefined => {
       const weekSlots = effectiveSlotsByWeek.get(weekKey);
       if (!weekSlots) return undefined;
+      const morning = weekSlots.find(
+        (s) => s.day_of_week === dayIndex && s.time_slot === "morning",
+      );
+      if (morning) return morning;
       return weekSlots.find(
-        (s) => s.day_of_week === dayIndex && s.time_slot === timeSlot,
+        (s) => s.day_of_week === dayIndex && s.time_slot === "evening",
       );
     },
     [effectiveSlotsByWeek],
@@ -152,10 +158,15 @@ export default function StrengthPlanningTimeline(
           const expanded = expandedWeekKey === week.weekKey;
           const editing = editingWeekKey === week.weekKey;
           const meta = getEffectiveWeekMeta(week.weekKey);
-          const weekSlots = effectiveSlotsByWeek.get(week.weekKey) ?? [];
-          const filledCount = weekSlots.length;
           const weekCompetitions = competitionsByWeek.get(week.weekKey) ?? [];
 
+          // De-duplicate slots per day for the mini-dots in the collapsed header
+          // (one slot per day after collapsing matin/soir).
+          const slotsPerDay: EffectiveStrengthSlot[] = [];
+          for (let d = 0; d < 7; d += 1) {
+            const s = findSlot(week.weekKey, d);
+            if (s) slotsPerDay.push(s);
+          }
           return (
             <WeekCard
               key={week.weekKey}
@@ -164,8 +175,8 @@ export default function StrengthPlanningTimeline(
               isExpanded={expanded}
               isEditing={editing}
               meta={meta}
-              filledCount={filledCount}
-              weekSlots={weekSlots}
+              filledCount={slotsPerDay.length}
+              weekSlots={slotsPerDay}
               weekCompetitions={weekCompetitions}
               getDayCompetitions={getDayCompetitions}
               onSelectCompetition={onCompetitionTap}
@@ -179,9 +190,9 @@ export default function StrengthPlanningTimeline(
               onSaveMeta={onSaveMeta}
               onCancelEditMeta={onCancelEditMeta}
               findSlot={findSlot}
-              onCellTap={(dayIndex, timeSlot) => {
-                const existing = findSlot(week.weekKey, dayIndex, timeSlot);
-                onSlotTap(week.weekKey, dayIndex, timeSlot, existing ?? null);
+              onCellTap={(dayIndex) => {
+                const existing = findSlot(week.weekKey, dayIndex);
+                onSlotTap(week.weekKey, dayIndex, existing ?? null);
               }}
               showOverrideBadge={showOverrideBadge}
               sessionTemplatesById={sessionTemplatesById}
@@ -224,9 +235,8 @@ interface WeekCardProps {
   findSlot: (
     weekKey: string,
     dayIndex: number,
-    timeSlot: "morning" | "evening",
   ) => EffectiveStrengthSlot | undefined;
-  onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
+  onCellTap: (dayIndex: number) => void;
   showOverrideBadge: boolean;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
@@ -365,30 +375,27 @@ function WeekCard({
                   )}
                   {filledCount > 0 && (
                     <span className="inline-flex items-center gap-[3px] shrink-0">
-                      {/* Mini-dots: ordered Lun matin, Lun soir, Mar matin... */}
-                      {DAY_ROWS.flatMap((day) =>
-                        (["morning", "evening"] as const).map((ts) => {
-                          const slot = weekSlots.find(
-                            (s) =>
-                              s.day_of_week === day.index && s.time_slot === ts,
-                          );
-                          if (!slot) return null;
-                          const tpl = slot.session_template_id
-                            ? sessionTemplatesById.get(slot.session_template_id)
-                            : null;
-                          const phase = tpl ? detectPhase(tpl.title ?? tpl.name ?? "") : "force";
-                          const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-                          return (
-                            <span
-                              key={`${day.index}-${ts}`}
-                              className={cn(
-                                "h-[6px] w-[6px] rounded-full shrink-0",
-                                style.dot,
-                              )}
-                            />
-                          );
-                        }),
-                      )}
+                      {/* One mini-dot per day (Lun → Dim) */}
+                      {DAY_ROWS.map((day) => {
+                        const slot = weekSlots.find(
+                          (s) => s.day_of_week === day.index,
+                        );
+                        if (!slot) return null;
+                        const tpl = slot.session_template_id
+                          ? sessionTemplatesById.get(slot.session_template_id)
+                          : null;
+                        const phase = tpl ? detectPhase(tpl.title ?? tpl.name ?? "") : "force";
+                        const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+                        return (
+                          <span
+                            key={day.index}
+                            className={cn(
+                              "h-[6px] w-[6px] rounded-full shrink-0",
+                              style.dot,
+                            )}
+                          />
+                        );
+                      })}
                     </span>
                   )}
                 </div>
@@ -484,7 +491,7 @@ function WeekCard({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Micro Grid — 7 rows x 2 columns (Matin / Soir)
+   Micro Grid — 7 rows (Lun–Dim), one session slot per day
    ═══════════════════════════════════════════════════════════════════ */
 
 function MicroGrid({
@@ -503,9 +510,8 @@ function MicroGrid({
   findSlot: (
     weekKey: string,
     dayIndex: number,
-    timeSlot: "morning" | "evening",
   ) => EffectiveStrengthSlot | undefined;
-  onCellTap: (dayIndex: number, timeSlot: "morning" | "evening") => void;
+  onCellTap: (dayIndex: number) => void;
   getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
   onSelectCompetition: (c: Competition) => void;
   showOverrideBadge: boolean;
@@ -514,32 +520,20 @@ function MicroGrid({
 }) {
   return (
     <div className="border-t bg-muted/20">
-      {/* Column headers */}
-      <div className="grid grid-cols-[48px_1fr_1fr] gap-1 px-3 pt-2 pb-1">
-        <span />
-        <span className="text-[10px] font-semibold text-muted-foreground text-center uppercase tracking-wider">
-          Matin
-        </span>
-        <span className="text-[10px] font-semibold text-muted-foreground text-center uppercase tracking-wider">
-          Soir
-        </span>
-      </div>
-
-      {/* Day rows — all 7 (Lun–Dim) */}
-      <div className="px-3 pb-3 space-y-1">
+      {/* Day rows — all 7 (Lun–Dim), one cell per day */}
+      <div className="px-3 pt-2 pb-3 space-y-1">
         {DAY_ROWS.map((day) => {
-          const morning = findSlot(weekKey, day.index, "morning");
-          const evening = findSlot(weekKey, day.index, "evening");
+          const slot = findSlot(weekKey, day.index);
           const dayComps = getDayCompetitions(weekMonday, day.index);
           const hasComp = dayComps.length > 0;
-          const emptyDay = !morning && !evening;
+          const emptyDay = !slot;
           const primaryComp = dayComps[0];
 
           return (
             <div
               key={day.index}
               className={cn(
-                "grid grid-cols-[48px_1fr_1fr] gap-1 items-center rounded-lg transition-colors",
+                "grid grid-cols-[48px_1fr] gap-1 items-center rounded-lg transition-colors",
                 hasComp &&
                   !emptyDay &&
                   "bg-amber-50/60 dark:bg-amber-900/15 ring-1 ring-amber-200/60 dark:ring-amber-800/40 pr-1",
@@ -561,7 +555,7 @@ function MicroGrid({
                 <button
                   type="button"
                   onClick={() => onSelectCompetition(primaryComp)}
-                  className="col-span-2 relative h-9 w-full rounded-lg flex items-center gap-1.5 px-2 overflow-hidden
+                  className="relative h-9 w-full rounded-lg flex items-center gap-1.5 px-2 overflow-hidden
                              bg-gradient-to-r from-amber-100 via-amber-50 to-amber-100
                              dark:from-amber-900/40 dark:via-amber-900/20 dark:to-amber-900/40
                              border border-amber-300/70 dark:border-amber-700/60
@@ -585,22 +579,13 @@ function MicroGrid({
                   )}
                 </button>
               ) : (
-                <>
-                  <SlotCell
-                    slot={morning}
-                    onTap={() => onCellTap(day.index, "morning")}
-                    showOverrideBadge={showOverrideBadge}
-                    sessionTemplatesById={sessionTemplatesById}
-                    readOnly={readOnly}
-                  />
-                  <SlotCell
-                    slot={evening}
-                    onTap={() => onCellTap(day.index, "evening")}
-                    showOverrideBadge={showOverrideBadge}
-                    sessionTemplatesById={sessionTemplatesById}
-                    readOnly={readOnly}
-                  />
-                </>
+                <SlotCell
+                  slot={slot}
+                  onTap={() => onCellTap(day.index)}
+                  showOverrideBadge={showOverrideBadge}
+                  sessionTemplatesById={sessionTemplatesById}
+                  readOnly={readOnly}
+                />
               )}
             </div>
           );

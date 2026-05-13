@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§273** — Parité finale muscu coach : carte "séance du jour" + accès `/records` muscu sur hub.
+Dernier § livré : **§274** — Planif muscu coach : grille 1 slot/jour + picker nourri par les cycles du plan biblio.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

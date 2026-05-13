@@ -4,6 +4,63 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §274 — Planif muscu coach : 1 slot/jour + picker nourri par biblio plans (2026-05-13)
+
+**Branche** : `main`
+**Demande utilisateur** : « Via la vue accès rapide coach, j'ai accès à une vue "Planification muscu", celle ci diffère de la vue accessible via biblio>plans. J'aimerais que tu te bases sur les infos présentes dans biblio>plans pour nourrir "Planification muscu" dans un premier temps. Sur cette vue "planification muscu", il n'y a pas besoin de slot matin/soir. Un seul slot par jour est suffisant. »
+
+### Contexte
+
+Deux vues coexistaient pour la muscu coach :
+
+- **Biblio > Plans** (`AthletePlansTab.tsx`) — modèle de référence par nageur : root folder → cycles (sous-folders) → sessions préfixées Lun/Mar/... avec UNE séance par jour.
+- **Planification muscu** (`StrengthPlanningScreen.tsx` via accès rapide hub coach) — timeline de semaines avec une grille 7j × **2 colonnes (Matin/Soir)**, picker générique listant tout le catalogue, indépendamment du plan biblio du nageur sélectionné.
+
+Décalage entre les deux paradigmes : la planif muscu n'exploitait ni la structure cycles de biblio, ni la convention "une séance par jour" déjà bien établie côté plans.
+
+### Implémentation
+
+**1. Réduction matin/soir → 1 slot/jour** (UI-only, aucune migration SQL) :
+
+- `StrengthPlanningTimeline.tsx` :
+  - `findSlot(weekKey, dayIndex)` (sans `timeSlot`) — préfère `morning`, retombe sur `evening` legacy si présent. Les données existantes restent visibles et éditables.
+  - `MicroGrid` passe de `grid-cols-[48px_1fr_1fr]` (Matin/Soir) à `grid-cols-[48px_1fr]` (1 cellule par jour). Suppression des headers "Matin"/"Soir".
+  - Mini-dots collapsed header : 1 dot par jour au lieu de 2.
+  - Signature `onSlotTap`/`onCellTap` : `(dayIndex)` au lieu de `(dayIndex, timeSlot)`.
+- `StrengthPlanningScreen.tsx` :
+  - États `picker.timeSlot` et `detailTimeSlot` retirés. Picker labels : "Lun" au lieu de "Lun — Matin".
+  - Nouvelles écritures : `timeSlot = "morning"` systématiquement. Mises à jour de slots existants : préservent `slot.time_slot` d'origine (un slot legacy "evening" reste un slot "evening" en DB tant qu'il n'est pas détaché/supprimé).
+
+**2. Picker nourri par biblio plans** (mode nageur uniquement) :
+
+- Query supplémentaire : `getStrengthFolders("session", { athleteId })` quand `selectedAthleteId != null`, retourne root folder + cycles du nageur.
+- `catalogGrouped` réécrit :
+  - Mode nageur + plan présent : sections par **cycle** (nom du folder) avec les séances du cycle, puis section "Catalogue général" pour le reste.
+  - Mode groupe ou nageur sans plan : section unique "Séances" (comportement antérieur).
+- Badge **Suggéré** (variant outline, anneau primary léger) sur les séances dont le titre commence par le préfixe jour-de-semaine ciblé (`lun`, `mar`, ...). Fonctionne pour le flow d'ajout (picker) et de changement (detail sheet).
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Grille 1 col/jour, signature slot sans `timeSlot`, fallback morning→evening, mini-dots dédupliqués (-14 lignes) |
+| `src/pages/coach/StrengthPlanningScreen.tsx` | États picker/detail sans `timeSlot`, query plan biblio nageur, regroupement par cycle + badge "Suggéré" (+65 lignes) |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `npx vitest run src/lib/__tests__/strengthPlanningMerge.test.ts src/hooks/__tests__/useStrengthPlanByISO.test.ts` : 21/21 pass. ✅
+- Échecs vitest pré-existants (`strengthPlanWeeks.test.ts`, etc.) confirmés présents avant le patch via `git stash`.
+- Vérification manuelle attendue (côté coach) :
+  1. Accès rapide coach → "Planif. Muscu" : grille étendue d'une semaine montre 7 lignes (Lun–Dim) avec UNE cellule par jour, plus de colonnes Matin/Soir.
+  2. Sélection d'un nageur ayant un plan biblio → bottom sheet "Choisir une séance" affiche en premier les cycles du nageur, puis "Catalogue général". Badge "Suggéré" sur la séance du jour correspondant au préfixe.
+  3. Tap cellule remplie → detail sheet sans mention "Matin"/"Soir". Changer/détacher/supprimer cible bien le bon slot existant (y compris si legacy "evening").
+
+### Limites & suites
+
+- `time_slot` reste en DB avec valeur `evening` possible pour les données héritées — l'UI les affiche, l'écriture neuve utilise `morning`. Migration SQL non requise (réversible).
+- "Nourrir" en mode timeline (auto-fill des cellules depuis le plan biblio) reste à faire si désiré dans un second temps — l'utilisateur a confirmé "Picker prioritise plans" comme première étape.
+
 ## §273-fix — Hotfix accès `/records` coach (2026-05-13)
 
 **Branche** : `main`

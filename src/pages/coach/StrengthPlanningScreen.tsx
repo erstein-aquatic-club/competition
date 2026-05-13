@@ -16,12 +16,14 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery } from "@tanstack/react-query";
 import {
   getGroups,
+  getStrengthFolders,
   getStrengthPlanningSlots,
   getStrengthSessions,
   getCompetitions,
   getMyCompetitionIds,
 } from "@/lib/api";
 import type {
+  StrengthFolder,
   StrengthSessionTemplate,
   Competition,
   AthleteSummary,
@@ -194,6 +196,14 @@ export default function StrengthPlanningScreen() {
     return map;
   }, [sessionTemplates]);
 
+  // ── Athlete biblio plan folders (cycles) — feeds the picker in athlete mode ──
+  const { data: athletePlanFolders = [] } = useQuery({
+    queryKey: ["strength_folders", "session", selectedAthleteId],
+    queryFn: () =>
+      getStrengthFolders("session", { athleteId: selectedAthleteId! }),
+    enabled: selectedAthleteId != null,
+  });
+
   // ── Competitions (context for planning) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
@@ -287,11 +297,10 @@ export default function StrengthPlanningScreen() {
     setEditingWeekKey(null);
   };
 
-  // ── Slot picker state ──
+  // ── Slot picker state (one slot per day — always writes "morning") ──
   const [picker, setPicker] = useState<{
     weekKey: string;
     dayIndex: number;
-    timeSlot: "morning" | "evening";
     existing: EffectiveStrengthSlot | null;
   } | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -301,7 +310,6 @@ export default function StrengthPlanningScreen() {
   const [detailSlot, setDetailSlot] = useState<EffectiveStrengthSlot | null>(null);
   const [detailWeekKey, setDetailWeekKey] = useState<string | null>(null);
   const [detailDayIndex, setDetailDayIndex] = useState<number | null>(null);
-  const [detailTimeSlot, setDetailTimeSlot] = useState<"morning" | "evening" | null>(null);
   const [detailNotes, setDetailNotes] = useState("");
 
   // Open detail sheet or picker depending on whether cell is filled
@@ -309,7 +317,6 @@ export default function StrengthPlanningScreen() {
     (
       weekKey: string,
       dayIndex: number,
-      timeSlot: "morning" | "evening",
       slot: EffectiveStrengthSlot | null,
     ) => {
       if (!selectedGroupId) return;
@@ -317,10 +324,9 @@ export default function StrengthPlanningScreen() {
         setDetailSlot(slot);
         setDetailWeekKey(weekKey);
         setDetailDayIndex(dayIndex);
-        setDetailTimeSlot(timeSlot);
         setDetailNotes(slot.notes ?? "");
       } else {
-        setPicker({ weekKey, dayIndex, timeSlot, existing: null });
+        setPicker({ weekKey, dayIndex, existing: null });
         setPickerSearch("");
       }
     },
@@ -335,32 +341,62 @@ export default function StrengthPlanningScreen() {
   );
 
   // ── Session search & grouping ──
+  // In athlete mode, sessions from the athlete's biblio plan are surfaced
+  // first (grouped by cycle), with the rest of the catalog below as
+  // "Catalogue général". In group mode, fall back to a single flat list.
   const catalogGrouped = useMemo(() => {
-    // Group sessions by folder — simple flat list with folder label
+    const inPlanIds = new Set<number>();
     const groups: { label: string; sessions: StrengthSessionTemplate[] }[] = [];
-    const folderMap = new Map<number | null, StrengthSessionTemplate[]>();
-    for (const t of sessionTemplates) {
-      if (!t.items || t.items.length === 0) continue; // skip empty templates
-      const fid = t.folder_id ?? null;
-      const arr = folderMap.get(fid) ?? [];
-      arr.push(t);
-      folderMap.set(fid, arr);
-    }
-    // No folder first
-    const noFolder = folderMap.get(null) ?? [];
-    if (noFolder.length > 0) {
-      groups.push({ label: "Séances", sessions: noFolder });
-      folderMap.delete(null);
-    }
-    // Remaining folders by key order
-    for (const [, sessions] of folderMap) {
-      if (sessions.length > 0) {
-        // Use first session's folder reference as label
-        groups.push({ label: "Séances", sessions });
+
+    if (selectedAthleteId != null && athletePlanFolders.length > 0) {
+      const rootFolders = athletePlanFolders.filter((f) => !f.parent_id);
+      const subFoldersByRoot = new Map<number, StrengthFolder[]>();
+      for (const f of athletePlanFolders) {
+        if (f.parent_id != null) {
+          const arr = subFoldersByRoot.get(f.parent_id) ?? [];
+          arr.push(f);
+          subFoldersByRoot.set(f.parent_id, arr);
+        }
+      }
+      const folderSessions = new Map<number, StrengthSessionTemplate[]>();
+      for (const t of sessionTemplates) {
+        if (!t.items || t.items.length === 0) continue;
+        if (t.folder_id == null) continue;
+        const arr = folderSessions.get(t.folder_id) ?? [];
+        arr.push(t);
+        folderSessions.set(t.folder_id, arr);
+      }
+      for (const root of rootFolders) {
+        const cycles = subFoldersByRoot.get(root.id) ?? [];
+        for (const cycle of cycles) {
+          const sessions = folderSessions.get(cycle.id) ?? [];
+          if (sessions.length === 0) continue;
+          groups.push({ label: cycle.name, sessions });
+          for (const s of sessions) inPlanIds.add(s.id);
+        }
+        const rootSessions = folderSessions.get(root.id) ?? [];
+        if (rootSessions.length > 0) {
+          groups.push({ label: `${root.name} — non classé`, sessions: rootSessions });
+          for (const s of rootSessions) inPlanIds.add(s.id);
+        }
       }
     }
+
+    // Everything else → general catalog
+    const generalSessions: StrengthSessionTemplate[] = [];
+    for (const t of sessionTemplates) {
+      if (!t.items || t.items.length === 0) continue;
+      if (inPlanIds.has(t.id)) continue;
+      generalSessions.push(t);
+    }
+    if (generalSessions.length > 0) {
+      groups.push({
+        label: groups.length > 0 ? "Catalogue général" : "Séances",
+        sessions: generalSessions,
+      });
+    }
     return groups;
-  }, [sessionTemplates]);
+  }, [sessionTemplates, selectedAthleteId, athletePlanFolders]);
 
   const filteredCatalog = useMemo(() => {
     if (!debouncedPickerSearch.trim()) return catalogGrouped;
@@ -377,13 +413,31 @@ export default function StrengthPlanningScreen() {
       .filter((g) => g.sessions.length > 0);
   }, [catalogGrouped, debouncedPickerSearch]);
 
+  // Day-of-week prefix matching ("Lun", "Mardi", etc. in the session title)
+  // → highlight suggested sessions for the currently-targeted day. Works
+  // both for the create flow (picker) and the change-session flow (detail).
+  const dayPickerPrefixes = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
+  const targetDayIndex = picker?.dayIndex ?? detailDayIndex ?? null;
+  const isDaySuggested = useCallback(
+    (s: StrengthSessionTemplate): boolean => {
+      if (targetDayIndex == null) return false;
+      const prefix = dayPickerPrefixes[targetDayIndex];
+      if (!prefix) return false;
+      const title = (s.title ?? s.name ?? "").trim().toLowerCase();
+      return title.startsWith(prefix);
+    },
+    // dayPickerPrefixes is a stable inline const — no need to add as dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [targetDayIndex],
+  );
+
   const handlePickSession = (templateId: number) => {
     if (!picker) return;
     writeSlot(
       {
         weekKey: picker.weekKey,
         dayIndex: picker.dayIndex,
-        timeSlot: picker.timeSlot,
+        timeSlot: "morning",
         session_template_id: templateId,
         notes: null,
       },
@@ -394,13 +448,15 @@ export default function StrengthPlanningScreen() {
     );
   };
 
+  // Editing an existing slot: preserve its original time_slot (could be a
+  // legacy "evening" row) so the update targets the right DB record.
   const handleChangeSession = (templateId: number) => {
-    if (!detailSlot || !detailWeekKey || detailDayIndex == null || !detailTimeSlot) return;
+    if (!detailSlot || !detailWeekKey || detailDayIndex == null) return;
     writeSlot(
       {
         weekKey: detailWeekKey,
         dayIndex: detailDayIndex,
-        timeSlot: detailTimeSlot,
+        timeSlot: detailSlot.time_slot,
         session_template_id: templateId,
         notes: detailSlot.notes,
         existingSlot: detailSlot,
@@ -416,13 +472,13 @@ export default function StrengthPlanningScreen() {
   };
 
   const handleSaveNotes = () => {
-    if (!detailSlot || !detailWeekKey || detailDayIndex == null || !detailTimeSlot) return;
+    if (!detailSlot || !detailWeekKey || detailDayIndex == null) return;
     const tplId = detailSlot.session_template_id;
     writeSlot(
       {
         weekKey: detailWeekKey,
         dayIndex: detailDayIndex,
-        timeSlot: detailTimeSlot,
+        timeSlot: detailSlot.time_slot,
         session_template_id: tplId,
         notes: detailNotes.trim() || null,
         existingSlot: detailSlot,
@@ -435,12 +491,12 @@ export default function StrengthPlanningScreen() {
   };
 
   const handleDetachSession = () => {
-    if (!detailSlot || !detailWeekKey || detailDayIndex == null || !detailTimeSlot) return;
+    if (!detailSlot || !detailWeekKey || detailDayIndex == null) return;
     writeSlot(
       {
         weekKey: detailWeekKey,
         dayIndex: detailDayIndex,
-        timeSlot: detailTimeSlot,
+        timeSlot: detailSlot.time_slot,
         session_template_id: null,
         notes: null,
         existingSlot: detailSlot,
@@ -576,7 +632,7 @@ export default function StrengthPlanningScreen() {
             <SheetTitle className="text-base">Choisir une séance</SheetTitle>
             <SheetDescription className="text-xs text-muted-foreground">
               {picker
-                ? `${DAY_ROWS[picker.dayIndex]?.label ?? ""} — ${picker.timeSlot === "morning" ? "Matin" : "Soir"}`
+                ? (DAY_ROWS[picker.dayIndex]?.label ?? "")
                 : "Changer la séance assignée"}
             </SheetDescription>
           </SheetHeader>
@@ -618,6 +674,7 @@ export default function StrengthPlanningScreen() {
                         ? detailSlot?.session_template_id
                         : picker?.existing?.session_template_id;
                       const isSelected = currentId === s.id;
+                      const suggested = isDaySuggested(s);
 
                       return (
                         <button
@@ -627,7 +684,9 @@ export default function StrengthPlanningScreen() {
                             "w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] active:scale-[0.98]",
                             isSelected
                               ? cn(style.bg, "ring-2 ring-primary/30")
-                              : "hover:bg-muted/50",
+                              : suggested
+                                ? cn(style.bg, "ring-1 ring-primary/20")
+                                : "hover:bg-muted/50",
                           )}
                           onClick={() => {
                             if (changeSessionMode) {
@@ -651,6 +710,14 @@ export default function StrengthPlanningScreen() {
                               </span>
                             )}
                           </div>
+                          {suggested && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] shrink-0 border-primary/40 text-primary"
+                            >
+                              Suggéré
+                            </Badge>
+                          )}
                           {itemCount > 0 && (
                             <Badge
                               variant="secondary"
@@ -681,8 +748,8 @@ export default function StrengthPlanningScreen() {
               {detailTemplate?.title ?? detailTemplate?.name ?? "Séance"}
             </SheetTitle>
             <SheetDescription className="text-xs text-muted-foreground">
-              {detailWeekKey && detailDayIndex != null && detailTimeSlot
-                ? `S${weeks.find((w) => w.weekKey === detailWeekKey)?.weekNumber ?? ""} — ${DAY_ROWS[detailDayIndex]?.label ?? ""} ${detailTimeSlot === "morning" ? "Matin" : "Soir"}`
+              {detailWeekKey && detailDayIndex != null
+                ? `S${weeks.find((w) => w.weekKey === detailWeekKey)?.weekNumber ?? ""} — ${DAY_ROWS[detailDayIndex]?.label ?? ""}`
                 : ""}
             </SheetDescription>
           </SheetHeader>

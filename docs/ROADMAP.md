@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §273 livré (2026-05-13) — Parité finale muscu coach : carte "Mon entraînement" du hub coach affiche la séance muscu du jour (détection via `getAssignments` scopé coach.userId) avec CTA Démarrer, + carte secondaire "Mes records muscu" → `/records?tab=1rm` (édition 1RM). Ferme les 2 deltas UX restants vs nageur. 701/701 pass, tsc clean, build OK.*
+*Dernière mise à jour : §274 livré (2026-05-13) — Planif muscu coach : grille 1 slot/jour (suppression colonnes Matin/Soir, fallback morning→evening sur données legacy, écritures neuves toujours `morning`) + picker bottom-sheet nourri par les cycles du plan biblio du nageur sélectionné, badge "Suggéré" sur les séances matchant le préfixe jour-de-semaine. tsc clean, tests merge/ISO OK.*
+
+*Précédente : §273 livré (2026-05-13) — Parité finale muscu coach : carte "Mon entraînement" du hub coach affiche la séance muscu du jour (détection via `getAssignments` scopé coach.userId) avec CTA Démarrer, + carte secondaire "Mes records muscu" → `/records?tab=1rm` (édition 1RM). Ferme les 2 deltas UX restants vs nageur. 701/701 pass, tsc clean, build OK.*
 
 *Précédente : §272 livré (2026-05-13) — Dock mobile coach/admin : item Chrono remplacé par Profil sur ≤ md (navItems + AppLayout + 6 tests). 701/701 pass, tsc clean.*
 
