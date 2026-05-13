@@ -73,6 +73,9 @@ const CopyToAthleteDialog = lazyWithRetry(
 const AthletePlansTab = lazyWithRetry(
   () => import("@/components/coach/strength/AthletePlansTab"),
 );
+const TrainingPlansBrowser = lazyWithRetry(
+  () => import("@/components/coach/strength/TrainingPlansBrowser"),
+);
 const MediaSourceSheet = lazyWithRetry(
   () => import("@/components/coach/strength/MediaSourceSheet"),
 );
@@ -407,6 +410,18 @@ export default function StrengthCatalog() {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
   const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises">("sessions");
+  // §275.4 — toggle inside "Plans" tab between new generic plans and legacy
+  // per-athlete plans. Persisted in localStorage for a stable default.
+  const [plansSubTab, setPlansSubTab] = useState<"templates" | "athletes">(() => {
+    try {
+      const v = localStorage.getItem("eac-coach-plans-subtab");
+      return v === "athletes" ? "athletes" : "templates";
+    } catch { return "templates"; }
+  });
+  const switchPlansSubTab = (t: "templates" | "athletes") => {
+    setPlansSubTab(t);
+    try { localStorage.setItem("eac-coach-plans-subtab", t); } catch {}
+  };
   const [planSelectedAthleteId, setPlanSelectedAthleteId] = useState<number | null>(null);
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
   const [mediaSheetTarget, setMediaSheetTarget] = useState<"edit" | "create" | null>(null);
@@ -1508,25 +1523,56 @@ export default function StrengthCatalog() {
             </div>
           </TabsContent>
 
-          {/* === PLANS NAGEURS TAB === */}
-          <TabsContent value="plans" className="mt-4">
+          {/* === PLANS TAB — toggle templates (§275) vs. legacy per-athlete === */}
+          <TabsContent value="plans" className="mt-4 space-y-3">
+            <div className="flex gap-1 rounded-xl border bg-card p-1">
+              <button
+                type="button"
+                onClick={() => switchPlansSubTab("templates")}
+                className={[
+                  "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+                  plansSubTab === "templates"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                Plans
+              </button>
+              <button
+                type="button"
+                onClick={() => switchPlansSubTab("athletes")}
+                className={[
+                  "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+                  plansSubTab === "athletes"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                Plans nageurs
+              </button>
+            </div>
+
             <Suspense fallback={null}>
-              <AthletePlansTab
-                athletes={athletes}
-                selectedAthleteId={planSelectedAthleteId}
-                onSelectedAthleteChange={setPlanSelectedAthleteId}
-                onStartCreateSession={(folderId: number | null, context: unknown) => {
-                  setEditingSessionId(null);
-                  setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
-                  setPlanCreationContext((context as typeof planCreationContext) ?? null);
-                  setIsCreating(true);
-                }}
-                onStartEditSession={(session: StrengthSessionTemplate, context: unknown) => {
-                  startEditSession(session);
-                  setPlanCreationContext((context as typeof planCreationContext) ?? null);
-                }}
-                onDeleteSession={(session: StrengthSessionTemplate) => setPendingDeleteSession(session)}
-              />
+              {plansSubTab === "templates" ? (
+                <TrainingPlansBrowser />
+              ) : (
+                <AthletePlansTab
+                  athletes={athletes}
+                  selectedAthleteId={planSelectedAthleteId}
+                  onSelectedAthleteChange={setPlanSelectedAthleteId}
+                  onStartCreateSession={(folderId: number | null, context: unknown) => {
+                    setEditingSessionId(null);
+                    setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: folderId });
+                    setPlanCreationContext((context as typeof planCreationContext) ?? null);
+                    setIsCreating(true);
+                  }}
+                  onStartEditSession={(session: StrengthSessionTemplate, context: unknown) => {
+                    startEditSession(session);
+                    setPlanCreationContext((context as typeof planCreationContext) ?? null);
+                  }}
+                  onDeleteSession={(session: StrengthSessionTemplate) => setPendingDeleteSession(session)}
+                />
+              )}
             </Suspense>
           </TabsContent>
 

@@ -4,6 +4,70 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.4 — Refonte biblio>plans UI : TrainingPlansBrowser + Editor (2026-05-13)
+
+**Branche** : `main`
+**Suite de** : §275.2 (API).
+
+### Implémentation
+
+Nouveau fichier `src/components/coach/strength/TrainingPlansBrowser.tsx` (792 lignes) :
+
+1. **TrainingPlansList** — vue liste :
+   - Header avec bouton "Nouveau plan".
+   - Pour chaque plan : carte (nom, badge "Brouillon"/"Publié", badge num_weeks, description tronquée, count séances).
+   - Tap → ouvre l'éditeur.
+   - Empty state CTA "Créer un plan".
+   - Compteur de sessions calculé en client-side (Promise.all sur `getTrainingPlanSessions(planId)`) — à wrapper en RPC plus tard si beaucoup de plans.
+
+2. **CreatePlanDialog** — modal de création :
+   - Champs : nom (required), num_weeks (1-104, défaut 8).
+   - is_draft=true par défaut. Owner = `useAuth(s.userId)`.
+   - On success : invalide query + ouvre directement l'éditeur sur le plan créé.
+
+3. **TrainingPlanEditor** — éditeur inline :
+   - Breadcrumb retour + édition inline (name/description blur-save, switch is_draft/publié, menu "Supprimer").
+   - Grille `num_weeks × 7` (table HTML responsive) : `Sem.` + Lun..Dim.
+   - Chaque `PlanCell` : si session attachée → chip phase color + clear button (X au hover) ; sinon → "+ ajouter".
+   - Tap cell → bottom-sheet picker des `strength_sessions` (recherche debounced 200ms, badge "ex." count, sélection sur tap).
+   - Dialog confirm pour la suppression du plan.
+
+### Intégration dans StrengthCatalog
+
+Le tab "Plans" existant héberge maintenant un sous-toggle :
+- **Plans** (sous-tab par défaut) → `<TrainingPlansBrowser />` (nouveau).
+- **Plans nageurs** → `<AthletePlansTab />` (legacy, conservé).
+
+Sous-tab persisté dans `localStorage["eac-coach-plans-subtab"]`. Lazy-load via `lazyWithRetry`.
+
+### Données vérifiées
+
+Avec le seed §275.3 (plan id=1 "Prépa sprint 50m"), un admin connecté voit :
+- Liste : 1 carte "Prépa sprint 50m" (Brouillon, 10 sem., 32 séances).
+- Éditeur : grille 10×7 remplie selon le mapping (S1=Ven, S2-3=Lun+Mar+Jeu+Ven, S4=Lun-Mar-Mer-Jeu, S5-7=Lun+Mar+Jeu+Ven, S8=Lun+Mar+Jeu+Ven, S9=Lun+Mar, S10=Lun).
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | **Nouveau** — 792 lignes (list + create dialog + editor + picker + delete) |
+| `src/pages/coach/StrengthCatalog.tsx` | Sous-toggle "Plans"/"Plans nageurs" dans tab Plans (+ lazy import) (~+50 lignes) |
+| `docs/claude/files-map.md` | Entrées TrainingPlansBrowser + AthletePlansTab mise à jour |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `node --test … training-plans.test.ts` (§275.2) : 4/4 pass. ✅
+- `npx vitest run strengthPlanningMerge.test.ts` : 13/13 pass. ✅
+- Build Vite : vérification manuelle attendue (composant non testé en runtime ici).
+
+### Limites & suites
+
+- Pas d'UI d'application (assigner un plan à un nageur/groupe) — délivré en §275.5.
+- Pas de duplication / copie de plan — peut s'ajouter facilement via `createTrainingPlan` + boucle d'insert de sessions.
+- num_weeks non-éditable après création (UI). Si besoin, ajouter un dialog "Changer la durée" qui supprime les sessions hors-fenêtre.
+- Le picker affiche toutes les séances `strength_sessions` du club sans filtre par auteur — à itérer si beaucoup de séances.
+
 ## §275.2 — API training_plans CRUD (2026-05-13)
 
 **Branche** : `main`

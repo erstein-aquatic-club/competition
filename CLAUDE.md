@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.2** — API training_plans CRUD (14 fonctions + helper derivation) + 4 tests pass.
+Dernier § livré : **§275.4** — Refonte biblio>plans UI : TrainingPlansBrowser (liste + dialog + éditeur grille num_weeks × 7) + sous-toggle "Plans"/"Plans nageurs" dans StrengthCatalog.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

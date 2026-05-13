@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.2 livré (2026-05-13) — Module API `src/lib/api/training-plans.ts` : 14 fonctions CRUD (plans, sessions, applications) + helper `getActiveTrainingPlanApplicationsForUser` pour la dérivation timeline. Validations client : XOR target, lundi-only, `.select("id")` sur deletes (§113). 4/4 tests pass, tsc clean.*
+*Dernière mise à jour : §275.4 livré (2026-05-13) — Refonte biblio>plans UI : nouveau `TrainingPlansBrowser` (792 LOC) avec liste + dialog création + éditeur grille `num_weeks × 7` + picker bottom-sheet + delete. Intégré dans StrengthCatalog via sous-toggle "Plans" (nouveau) / "Plans nageurs" (legacy AthletePlansTab). tsc clean, tests OK.*
+
+*Précédente : §275.2 livré (2026-05-13) — Module API `src/lib/api/training-plans.ts` : 14 fonctions CRUD + helper derivation.*
 
 *Précédente : §275.0/.1/.3 livré (2026-05-13) — Revert §274.1/§274.3 auto-fill ghost + nouveau modèle DB pour plans d'entraînement génériques.*
 
