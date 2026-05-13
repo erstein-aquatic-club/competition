@@ -4,6 +4,69 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.5 — Dialog "Appliquer ce plan à..." + liste applications (2026-05-13)
+
+**Branche** : `main`
+**Suite de** : §275.4 (UI list + editor).
+
+### Implémentation
+
+Ajout au composant `TrainingPlansBrowser.tsx` (+~440 LOC, total 1229 LOC) :
+
+1. **Bouton "Appliquer"** dans le header de `TrainingPlanEditor` à côté du menu kebab.
+
+2. **`ApplyPlanDialog`** :
+   - Radio "Un nageur" / "Un groupe" (boutons radio Radix, surlignés au choix).
+   - Si nageur : `Select` listant `getAthletes()` triés alphabétiquement.
+   - Si groupe : `Select` listant `getGroups()` filtré sur `!is_temporary`, avec count membres.
+   - Date picker `<input type="date">` pour `start_date`. Default = lundi prochain (helper `nextMondayIso`).
+   - Validation client : `isMondayIso` (matche `CHECK start_date_is_monday` SQL). Affiche un lien "Lundi suivant ?" pour auto-corriger.
+   - Aperçu de la date de fin : `start_date + num_weeks × 7 - 1 days`.
+   - Submit → `applyTrainingPlan(input, userId)` via `useAuth(s.userId)`.
+   - Reset complet à la fermeture (target, date, kind).
+
+3. **`PlanApplicationsList`** :
+   - Section sous la grille avec header "Applications (N)".
+   - Liste les applications du plan (`getTrainingPlanApplications({ planId })`).
+   - Pour chaque app : icône (Dumbbell user / Users group) + nom (résolu via `getAthletes`/`getGroups`) + dates ("Démarre le ... — termine le ..." ou "durée X sem.").
+   - Bouton trash (visible au hover) → `deleteTrainingPlanApplication(id)`.
+   - Empty state textuel si 0 application.
+
+4. **Helpers locaux** :
+   - `isMondayIso(iso)` — getDay() === 1.
+   - `nextMondayIso(from)` — calcule le prochain lundi (inclus si déjà lundi).
+   - `formatFrenchDate(iso)` — `toLocaleDateString("fr-FR", { weekday, day, month, year })`.
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | +440 LOC (ApplyPlanDialog + PlanApplicationsList + helpers + bouton "Appliquer") → 1229 LOC |
+| `docs/claude/files-map.md` | Mise à jour ligne TrainingPlansBrowser |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `npm run build` : succès (chunks acceptables, sw généré). ✅
+- Tests existants (§275.2 API + §158 merge) : pass. ✅
+
+### Vérification fonctionnelle attendue
+
+Avec le seed §275.3 :
+1. Coach ouvre éditeur de "Prépa sprint 50m".
+2. Tap "Appliquer" → dialog.
+3. Sélectionne "Un nageur" → François WAGNER → start_date = lundi prochain (auto). Submit.
+4. La liste "Applications" affiche 1 entrée : "François WAGNER — Démarre le lundi … — durée 10 sem.".
+5. Le bouton trash retire l'application (toast confirmation).
+6. RLS : si non-coach essaie de DELETE une application qu'il n'a pas créée, l'erreur "Application introuvable ou suppression refusée" s'affiche (pattern §113).
+
+### Limites & suites
+
+- Pas de prévention contre les applications doublons sur la même cible : un nageur peut recevoir 2 fois le même plan avec start_date différentes. Volontaire (utile pour ré-itérer un plan).
+- Pas d'éditeur d'`end_date` après application. Pour terminer un plan plus tôt, supprimer + re-appliquer. À itérer.
+- La liste applications est par plan ; pas de vue inverse "tous les plans appliqués à un nageur" — délivré en §275.7 (Dashboard nageur).
+- La date d'aujourd'hui n'est pas mise en évidence dans la grille de l'éditeur. À itérer si utile.
+
 ## §275.4 — Refonte biblio>plans UI : TrainingPlansBrowser + Editor (2026-05-13)
 
 **Branche** : `main`

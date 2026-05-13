@@ -12,26 +12,35 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  CalendarDays,
   Dumbbell,
   MoreHorizontal,
   Plus,
   Search,
+  Send,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  applyTrainingPlan,
   createTrainingPlan,
   deleteTrainingPlan,
+  deleteTrainingPlanApplication,
   deleteTrainingPlanSession,
+  getAthletes,
+  getGroups,
   getStrengthSessions,
+  getTrainingPlanApplications,
   getTrainingPlanSessions,
   getTrainingPlans,
   updateTrainingPlan,
   upsertTrainingPlanSession,
 } from "@/lib/api";
 import type {
+  AthleteSummary,
   StrengthSessionTemplate,
   TrainingPlan,
   TrainingPlanSession,
@@ -53,6 +62,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -442,6 +459,7 @@ function TrainingPlanEditor({
   }, [plan]);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
 
   if (!plan) {
     return (
@@ -544,22 +562,28 @@ function TrainingPlanEditor({
               {plan.is_draft ? "Brouillon" : "Publié"}
             </Label>
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-muted">
-                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-44 p-1">
-              <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-muted"
-                onClick={() => setDeleteConfirmOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-                Supprimer le plan
-              </button>
-            </PopoverContent>
-          </Popover>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setApplyOpen(true)}>
+              <Send className="h-4 w-4 mr-1.5" />
+              Appliquer
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-muted">
+                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-44 p-1">
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-muted"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer le plan
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
@@ -625,6 +649,17 @@ function TrainingPlanEditor({
           </table>
         </div>
       </div>
+
+      {/* Applications list */}
+      <PlanApplicationsList planId={planId} planNumWeeks={plan.num_weeks} />
+
+      {/* Apply dialog */}
+      <ApplyPlanDialog
+        open={applyOpen}
+        onOpenChange={setApplyOpen}
+        planId={planId}
+        planNumWeeks={plan.num_weeks}
+      />
 
       {/* Picker bottom sheet */}
       <Sheet
@@ -729,6 +764,408 @@ function TrainingPlanEditor({
       </Dialog>
     </div>
   );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Applications list (per-plan)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function PlanApplicationsList({
+  planId,
+  planNumWeeks,
+}: {
+  planId: number;
+  planNumWeeks: number;
+}) {
+  const queryClient = useQueryClient();
+
+  const { data: applications = [], isLoading } = useQuery({
+    queryKey: ["training_plan_applications", "by-plan", planId],
+    queryFn: () => getTrainingPlanApplications({ planId }),
+  });
+
+  const { data: athletes = [] } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => getAthletes(),
+    staleTime: 5 * 60_000,
+  });
+  const { data: groups = [] } = useQuery({
+    queryKey: ["groups"],
+    queryFn: () => getGroups(),
+    staleTime: 5 * 60_000,
+  });
+
+  const athleteName = (id: number | null): string =>
+    athletes.find((a) => a.id === id)?.display_name ?? `Nageur #${id}`;
+  const groupName = (id: number | null): string =>
+    groups.find((g) => g.id === id)?.name ?? `Groupe #${id}`;
+
+  const deleteAppMut = useMutation({
+    mutationFn: (id: number) => deleteTrainingPlanApplication(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["training_plan_applications", "by-plan", planId],
+      });
+      toast("Application retirée");
+    },
+    onError: (err: unknown) => {
+      toast.error("Erreur", {
+        description: err instanceof Error ? err.message : "Suppression échouée",
+      });
+    },
+  });
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="p-3 border-b bg-muted/30 flex items-center gap-2">
+        <Send className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Applications ({applications.length})
+        </p>
+      </div>
+      {isLoading ? (
+        <div className="p-3 space-y-2">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-10 rounded-md bg-muted/40 animate-pulse motion-reduce:animate-none"
+            />
+          ))}
+        </div>
+      ) : applications.length === 0 ? (
+        <p className="text-xs text-muted-foreground p-4 text-center">
+          Aucune application pour l'instant. Tape "Appliquer" pour assigner ce plan à un nageur ou un groupe.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {applications.map((app) => (
+            <li
+              key={app.id}
+              className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/20 group"
+            >
+              <span
+                className={cn(
+                  "inline-flex items-center justify-center h-6 w-6 rounded-full shrink-0",
+                  app.target_user_id != null
+                    ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                    : "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+                )}
+              >
+                {app.target_user_id != null ? (
+                  <Dumbbell className="h-3 w-3" />
+                ) : (
+                  <Users className="h-3 w-3" />
+                )}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {app.target_user_id != null
+                    ? athleteName(app.target_user_id)
+                    : groupName(app.target_group_id)}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Démarre le {formatFrenchDate(app.start_date)}
+                  {app.end_date
+                    ? ` — termine le ${formatFrenchDate(app.end_date)}`
+                    : ` — durée ${planNumWeeks} sem.`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => deleteAppMut.mutate(app.id)}
+                disabled={deleteAppMut.isPending}
+                className="opacity-0 group-hover:opacity-100 inline-flex h-9 w-9 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 shrink-0"
+                aria-label="Retirer cette application"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Apply plan dialog
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ApplyPlanDialog({
+  open,
+  onOpenChange,
+  planId,
+  planNumWeeks,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  planId: number;
+  planNumWeeks: number;
+}) {
+  const userId = useAuth((s) => s.userId);
+  const queryClient = useQueryClient();
+
+  const { data: athletes = [] } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => getAthletes(),
+    staleTime: 5 * 60_000,
+  });
+  const { data: groups = [] } = useQuery({
+    queryKey: ["groups"],
+    queryFn: () => getGroups(),
+    staleTime: 5 * 60_000,
+  });
+
+  const permanentGroups = useMemo(
+    () => groups.filter((g) => !g.is_temporary),
+    [groups],
+  );
+  const sortedAthletes = useMemo(
+    () =>
+      [...athletes]
+        .filter((a): a is AthleteSummary & { id: number } => a.id != null)
+        .sort((a, b) => a.display_name.localeCompare(b.display_name, "fr")),
+    [athletes],
+  );
+
+  const [targetKind, setTargetKind] = useState<"user" | "group">("user");
+  const [targetUserId, setTargetUserId] = useState<number | null>(null);
+  const [targetGroupId, setTargetGroupId] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<string>(() => nextMondayIso(new Date()));
+
+  // Reset on close
+  useEffect(() => {
+    if (!open) {
+      setTargetKind("user");
+      setTargetUserId(null);
+      setTargetGroupId(null);
+      setStartDate(nextMondayIso(new Date()));
+    }
+  }, [open]);
+
+  const startDateError = !isMondayIso(startDate)
+    ? "La date doit être un lundi."
+    : null;
+  const endDateIso = useMemo(() => {
+    if (!isMondayIso(startDate)) return null;
+    const d = new Date(startDate + "T00:00:00");
+    d.setDate(d.getDate() + planNumWeeks * 7 - 1);
+    return d.toISOString().slice(0, 10);
+  }, [startDate, planNumWeeks]);
+
+  const targetReady =
+    targetKind === "user" ? targetUserId != null : targetGroupId != null;
+  const canSubmit =
+    targetReady && startDateError == null && userId != null;
+
+  const applyMut = useMutation({
+    mutationFn: () => {
+      if (userId == null) throw new Error("Non authentifié");
+      return applyTrainingPlan(
+        {
+          plan_id: planId,
+          target_user_id: targetKind === "user" ? targetUserId : null,
+          target_group_id: targetKind === "group" ? targetGroupId : null,
+          start_date: startDate,
+        },
+        userId,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["training_plan_applications", "by-plan", planId],
+      });
+      toast("Plan appliqué");
+      onOpenChange(false);
+    },
+    onError: (err: unknown) => {
+      toast.error("Erreur", {
+        description: err instanceof Error ? err.message : "Application échouée",
+      });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Appliquer ce plan</DialogTitle>
+          <DialogDescription>
+            Choisis un nageur ou un groupe et la semaine de démarrage. La séance
+            du jour pour chaque nageur sera dérivée de la grille du plan.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Target kind */}
+          <div className="space-y-2">
+            <Label className="text-xs">Cible</Label>
+            <RadioGroup
+              value={targetKind}
+              onValueChange={(v) => setTargetKind(v as "user" | "group")}
+              className="grid grid-cols-2 gap-2"
+            >
+              <Label
+                htmlFor="apply-target-user"
+                className={cn(
+                  "flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors",
+                  targetKind === "user"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/40",
+                )}
+              >
+                <RadioGroupItem id="apply-target-user" value="user" />
+                <Dumbbell className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">Un nageur</span>
+              </Label>
+              <Label
+                htmlFor="apply-target-group"
+                className={cn(
+                  "flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors",
+                  targetKind === "group"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/40",
+                )}
+              >
+                <RadioGroupItem id="apply-target-group" value="group" />
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">Un groupe</span>
+              </Label>
+            </RadioGroup>
+          </div>
+
+          {/* Target picker */}
+          {targetKind === "user" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="apply-user-select" className="text-xs">
+                Nageur
+              </Label>
+              <Select
+                value={targetUserId?.toString() ?? ""}
+                onValueChange={(v) => setTargetUserId(Number(v))}
+              >
+                <SelectTrigger id="apply-user-select">
+                  <SelectValue placeholder="Choisir un nageur..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[50dvh]">
+                  {sortedAthletes.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="apply-group-select" className="text-xs">
+                Groupe
+              </Label>
+              <Select
+                value={targetGroupId?.toString() ?? ""}
+                onValueChange={(v) => setTargetGroupId(Number(v))}
+              >
+                <SelectTrigger id="apply-group-select">
+                  <SelectValue placeholder="Choisir un groupe..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {permanentGroups.map((g) => (
+                    <SelectItem key={g.id} value={String(g.id)}>
+                      {g.name}
+                      {g.member_count != null && (
+                        <span className="text-muted-foreground ml-1.5">
+                          ({g.member_count})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Start date */}
+          <div className="space-y-1.5">
+            <Label htmlFor="apply-start-date" className="text-xs">
+              Lundi de la semaine 1
+            </Label>
+            <Input
+              id="apply-start-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+            {startDateError ? (
+              <p className="text-[11px] text-destructive flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" />
+                {startDateError}{" "}
+                <button
+                  type="button"
+                  className="underline hover:text-foreground"
+                  onClick={() => setStartDate(nextMondayIso(new Date(startDate + "T00:00:00")))}
+                >
+                  Lundi suivant ?
+                </button>
+              </p>
+            ) : (
+              endDateIso && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <CalendarDays className="h-3 w-3" />
+                  Fin : {formatFrenchDate(endDateIso)} ({planNumWeeks} sem.)
+                </p>
+              )
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={applyMut.isPending}
+          >
+            Annuler
+          </Button>
+          <Button
+            onClick={() => applyMut.mutate()}
+            disabled={!canSubmit || applyMut.isPending}
+          >
+            {applyMut.isPending ? "Application..." : "Appliquer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Date helpers
+   ═══════════════════════════════════════════════════════════════════ */
+
+function isMondayIso(iso: string): boolean {
+  if (!iso) return false;
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getDay() === 1;
+}
+
+function nextMondayIso(from: Date): string {
+  const d = new Date(from);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const diff = day === 1 ? 0 : day === 0 ? 1 : 8 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatFrenchDate(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════

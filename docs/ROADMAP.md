@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.4 livré (2026-05-13) — Refonte biblio>plans UI : nouveau `TrainingPlansBrowser` (792 LOC) avec liste + dialog création + éditeur grille `num_weeks × 7` + picker bottom-sheet + delete. Intégré dans StrengthCatalog via sous-toggle "Plans" (nouveau) / "Plans nageurs" (legacy AthletePlansTab). tsc clean, tests OK.*
+*Dernière mise à jour : §275.5 livré (2026-05-13) — Application d'un training_plan à un nageur ou un groupe : nouveau `ApplyPlanDialog` (radio target + Select athlete/group + date picker lundi-only avec auto-suggest + preview end_date) et liste `PlanApplicationsList` sous l'éditeur (icône + nom résolu + dates + delete). +440 LOC dans TrainingPlansBrowser (1229 total). Build OK, tsc clean.*
+
+*Précédente : §275.4 livré (2026-05-13) — Refonte biblio>plans UI : TrainingPlansBrowser (liste + dialog création + éditeur grille num_weeks × 7).*
 
 *Précédente : §275.2 livré (2026-05-13) — Module API `src/lib/api/training-plans.ts` : 14 fonctions CRUD + helper derivation.*
 

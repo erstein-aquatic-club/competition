@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.4** — Refonte biblio>plans UI : TrainingPlansBrowser (liste + dialog + éditeur grille num_weeks × 7) + sous-toggle "Plans"/"Plans nageurs" dans StrengthCatalog.
+Dernier § livré : **§275.5** — ApplyPlanDialog (target nageur/groupe + date lundi-only) + PlanApplicationsList dans l'éditeur de plan.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
