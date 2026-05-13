@@ -404,6 +404,28 @@ export {
   upsertStrengthPlanningWeekOverride,
 } from './strength-planning';
 
+// Training plans (§275)
+export {
+  getTrainingPlans,
+  getTrainingPlan,
+  createTrainingPlan,
+  updateTrainingPlan,
+  deleteTrainingPlan,
+  getTrainingPlanSessions,
+  upsertTrainingPlanSession,
+  deleteTrainingPlanSession,
+  getTrainingPlanApplications,
+  getActiveTrainingPlanApplicationsForUser,
+  applyTrainingPlan,
+  updateTrainingPlanApplication,
+  deleteTrainingPlanApplication,
+} from './training-plans';
+export type {
+  GetTrainingPlansOptions,
+  GetTrainingPlanApplicationsOptions,
+  ActiveTrainingPlanApplication,
+} from './training-plans';
+
 // Coach assignments
 export {
   getMySwimmers,

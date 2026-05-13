@@ -4,6 +4,52 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.2 — API training_plans CRUD (2026-05-13)
+
+**Branche** : `main`
+**Suite de** : §275.1 (schéma DB) + §275.3 (seed "Prépa sprint 50m" id=1).
+
+### Contenu
+
+`src/lib/api/training-plans.ts` — module CRUD complet :
+
+- **Plans** : `getTrainingPlans({ ownerId?, discipline?, includeDrafts? })`, `getTrainingPlan(id)`, `createTrainingPlan(input, ownerId)`, `updateTrainingPlan(id, patch)`, `deleteTrainingPlan(id)`.
+- **Sessions** (grille) : `getTrainingPlanSessions(planId)`, `upsertTrainingPlanSession({ plan_id, relative_week, day_of_week, … })` (upsert sur `(plan_id, relative_week, day_of_week)`), `deleteTrainingPlanSession(id)`.
+- **Applications** : `getTrainingPlanApplications({ planId?, targetUserId?, targetGroupId?, appliedBy? })`, `applyTrainingPlan(input, appliedBy)` (validation XOR target + check lundi), `updateTrainingPlanApplication(id, patch)`, `deleteTrainingPlanApplication(id)`.
+- **Derivation helper** : `getActiveTrainingPlanApplicationsForUser({ userId, date, discipline? })` — fetch direct + via groupes, join `training_plans` pour exposer `num_weeks`/`discipline`/`name`, filtre côté JS sur (start_date ≤ date < start_date + num_weeks×7) ou (end_date >= date).
+
+`src/lib/api/types.ts` — nouveaux types : `TrainingPlan`, `TrainingPlanInput`, `TrainingPlanPatch`, `TrainingPlanSession`, `TrainingPlanSessionInput`, `TrainingPlanApplication`, `TrainingPlanApplicationInput`, `TrainingPlanDiscipline`.
+
+`src/lib/api/index.ts` — re-exports + type re-exports (`GetTrainingPlansOptions`, `GetTrainingPlanApplicationsOptions`, `ActiveTrainingPlanApplication`).
+
+### Validations côté client (avant DB)
+
+- `applyTrainingPlan` rejette si `target_user_id` ET `target_group_id` sont tous deux renseignés ou tous deux null (XOR).
+- `isMondayIso` rejette une `start_date` non-lundi (avant que le CHECK SQL ne le fasse).
+- `delete*` utilisent `.select("id")` pour détecter les no-ops RLS (§113 pattern).
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/api/training-plans.ts` | **Nouveau** — 14 fonctions CRUD + helper derivation, ~280 lignes |
+| `src/lib/api/types.ts` | +60 lignes : types Training* |
+| `src/lib/api/index.ts` | +14 lignes : re-exports |
+| `src/lib/api/__tests__/training-plans.test.ts` | **Nouveau** — 4 tests (Monday check, XOR violations, filters) |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `node --test --experimental-test-module-mocks --import tsx src/lib/api/__tests__/training-plans.test.ts` : 4/4 pass. ✅
+- Validation MCP Supabase : `getTrainingPlans({ ownerId: 2 })` retourne le plan id=1 "Prépa sprint 50m" ; `getTrainingPlanSessions(1)` retourne 32 lignes ordonnées par (relative_week, day_of_week). ✅
+
+### Reste à faire
+
+- §275.4 — Refonte biblio>plans UI (liste de plans génériques + éditeur grille num_weeks × 7).
+- §275.5 — Dialog "Appliquer ce plan à..." (target user/group + start_date lundi picker).
+- §275.6 — Planning timeline derivation depuis applications actives.
+- §275.7 — Athlete-side integration (Dashboard "session du jour").
+
 ## §275.0 — Revert §274.1/§274.3 + scaffold §275 training_plans (2026-05-13)
 
 **Branche** : `main`

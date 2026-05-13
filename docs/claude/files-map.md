@@ -19,6 +19,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/swim-sessions.ts` | CRUD dim_sessions (syncSession 23505 dedup, ensureSwimSession, saveSwimSessionAtomic §262 RPC+fallback, getSessions, updateSession, deleteSession, updateSessionCoachNotes, getCapabilities) — migré depuis ex-api.ts (§219) | 312 lignes |
 | `src/lib/api/coach-kpis.ts` | Wrapper TS du RPC `get_coach_kpis` — 1 round-trip pour fatigue values multi-athlètes (Refacto C §223) | 56 lignes |
 | `src/lib/api/strength-planning.ts` | CRUD strength_planning_* : slots groupe + overrides athlete + week meta (Phase 2 §157) | 170 lignes |
+| `src/lib/api/training-plans.ts` | CRUD training_plans + sessions + applications (§275.2) — 14 fonctions + helper `getActiveTrainingPlanApplicationsForUser` pour timeline derivation | 357 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |
 | `src/lib/api/users.ts` | Profil, athlètes, approbation | ~450 lignes |

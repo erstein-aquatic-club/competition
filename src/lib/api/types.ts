@@ -1141,6 +1141,78 @@ export interface StrengthPlanningWeekOverrideInput {
   notes?: string | null;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Training plans — generic multi-week templates with application model (§275)
+// ═══════════════════════════════════════════════════════════════════
+
+export type TrainingPlanDiscipline = "strength" | "swim";
+
+export interface TrainingPlan {
+  id: number;
+  name: string;
+  description: string | null;
+  discipline: TrainingPlanDiscipline;
+  owner_id: number;
+  num_weeks: number;
+  is_draft: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingPlanInput {
+  name: string;
+  description?: string | null;
+  discipline?: TrainingPlanDiscipline;
+  num_weeks: number;
+  is_draft?: boolean;
+}
+
+export interface TrainingPlanPatch {
+  name?: string;
+  description?: string | null;
+  num_weeks?: number;
+  is_draft?: boolean;
+}
+
+export interface TrainingPlanSession {
+  id: number;
+  plan_id: number;
+  relative_week: number;
+  day_of_week: number; // 0 = Monday … 6 = Sunday
+  session_template_id: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingPlanSessionInput {
+  plan_id: number;
+  relative_week: number;
+  day_of_week: number;
+  session_template_id?: number | null;
+  notes?: string | null;
+}
+
+export interface TrainingPlanApplication {
+  id: number;
+  plan_id: number;
+  target_user_id: number | null;
+  target_group_id: number | null;
+  start_date: string; // ISO YYYY-MM-DD, always a Monday
+  end_date: string | null;
+  applied_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingPlanApplicationInput {
+  plan_id: number;
+  target_user_id?: number | null;
+  target_group_id?: number | null;
+  start_date: string;
+  end_date?: string | null;
+}
+
 // --- Swimmer sessions RPC (§144) ---
 
 export interface SwimmerSession {

@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.0/.1/.3 livré (2026-05-13) — Revert §274.1/§274.3 auto-fill ghost + nouveau modèle DB pour plans d'entraînement génériques. Migration `00162_training_plans.sql` **appliquée** (3 tables + RLS via MCP). Seed initial : training_plan id=1 "Prépa sprint 50m" (draft, 10 semaines, 32 sessions) construit depuis le plan biblio de François WAGNER (S13→S22). Restent §275.2 (API CRUD), §275.4 (refonte biblio>plans UI), §275.5 (dialog "Appliquer"), §275.6 (timeline derivation), §275.7 (athlete-side integration).*
+*Dernière mise à jour : §275.2 livré (2026-05-13) — Module API `src/lib/api/training-plans.ts` : 14 fonctions CRUD (plans, sessions, applications) + helper `getActiveTrainingPlanApplicationsForUser` pour la dérivation timeline. Validations client : XOR target, lundi-only, `.select("id")` sur deletes (§113). 4/4 tests pass, tsc clean.*
+
+*Précédente : §275.0/.1/.3 livré (2026-05-13) — Revert §274.1/§274.3 auto-fill ghost + nouveau modèle DB pour plans d'entraînement génériques.*
 
 *Précédente : §274.3 livré (2026-05-13) — Auto-fill Planif muscu : mapping cycle ↔ semaine via parsing `S<n>` du nom de cycle (revert §275.0).*
 

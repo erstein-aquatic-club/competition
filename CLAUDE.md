@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.0/.1/.3** — Revert auto-fill ghost + scaffold training_plans (DB+RLS appliquées) + seed "Prépa sprint 50m" depuis plan François.
+Dernier § livré : **§275.2** — API training_plans CRUD (14 fonctions + helper derivation) + 4 tests pass.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
