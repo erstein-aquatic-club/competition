@@ -6,6 +6,8 @@ import {
   getStrengthPlanningSlotOverrides,
   getStrengthFolders,
   getStrengthSessions,
+  getTrainingPlanApplicationsForUser,
+  getTrainingPlanSessionsForPlans,
 } from "@/lib/api";
 import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
 import { FolderOpen, Trophy } from "lucide-react";
@@ -22,6 +24,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { mergeStrengthSlots } from "@/lib/strengthPlanningMerge";
+import { derivePlanByWeekDay, type DerivedCell } from "@/lib/strength/derivePlanByWeekDay";
 import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
 
 /** Number of future weeks to display from current week */
@@ -62,6 +65,29 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     staleTime: 5 * 60 * 1000,
   });
   const groupId = profile?.group_id ?? null;
+
+  // ── Phase 3 (§275.7) : training_plan applications targeting the athlete ───
+  // Highest priority source: a coach-applied training plan supplies the
+  // weekly sessions via training_plan_sessions, materialized in this view.
+  const { data: planApplications = [] } = useQuery({
+    queryKey: ["training_plan_applications", "for-user", athleteId],
+    queryFn: () =>
+      getTrainingPlanApplicationsForUser({
+        userId: athleteId,
+        discipline: "strength",
+      }),
+  });
+
+  const applicationPlanIds = useMemo(
+    () => Array.from(new Set(planApplications.map((a) => a.plan_id))),
+    [planApplications],
+  );
+
+  const { data: applicationPlanSessions = [] } = useQuery({
+    queryKey: ["training_plan_sessions", "for-plans", applicationPlanIds],
+    queryFn: () => getTrainingPlanSessionsForPlans(applicationPlanIds),
+    enabled: applicationPlanIds.length > 0,
+  });
 
   // ── Phase 2: Strength planning slots ────────────────────────────────────────
   const { data: groupSlots = [] } = useQuery({
@@ -134,11 +160,81 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     return map;
   }, [allSessions]);
 
+  // ── Phase 3 (§275.7) — derive sessions per visible week from applications ──
+  const phase3Derived = useMemo<Map<string, Map<number, DerivedCell>>>(() => {
+    if (planApplications.length === 0) return new Map();
+    return derivePlanByWeekDay({
+      weekKeys: weekStarts,
+      applications: planApplications,
+      sessions: applicationPlanSessions,
+    });
+  }, [planApplications, applicationPlanSessions, weekStarts]);
+
   // ── Determine which source to use ──────────────────────────────────────────
-  // Use Phase 2 BDD slots if any effective slots exist.
-  // Fall back to Phase 1 cycle parsing only if no BDD slots but cycles exist.
-  const usePhase2 = effectiveSlots.length > 0;
-  const useFallback = !usePhase2 && rootFolders.length > 0;
+  // Priority: Phase 3 (training_plan_applications) > Phase 2 (slots) > Phase 1 (cycles).
+  const usePhase3 = phase3Derived.size > 0;
+  const usePhase2 = !usePhase3 && effectiveSlots.length > 0;
+  const useFallback = !usePhase3 && !usePhase2 && rootFolders.length > 0;
+
+  // ── Phase 3: Build WeekInstances from derived plan cells ──────────────────
+  const phase3WeekInstances = useMemo((): WeekInstance[] => {
+    if (!usePhase3) return [];
+    const instances: WeekInstance[] = [];
+    const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+    for (const weekStart of weekStarts) {
+      const dayMap = phase3Derived.get(weekStart);
+      if (!dayMap || dayMap.size === 0) continue;
+
+      const monday = new Date(weekStart + "T00:00:00");
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const weekNumber = getISOWeekNumber(monday);
+
+      // Pick the plan name from the first cell of the week (all cells share
+      // the same plan in our resolver — newest application wins).
+      const firstCell = dayMap.values().next().value as
+        | { planName: string; relativeWeek: number }
+        | undefined;
+      const planName = firstCell?.planName ?? "";
+      const relativeWeek = firstCell?.relativeWeek ?? null;
+
+      const sessions = Array.from(dayMap.entries())
+        .map(([dayIndex, cell]) => {
+          const tplId = cell.session.session_template_id;
+          if (tplId == null) return null;
+          const session = sessionsById.get(tplId);
+          if (!session) return null;
+          const cleanTitle = (session.title ?? session.name ?? "")
+            .replace(
+              /^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*[—–\-:]\s*/i,
+              "",
+            )
+            .trim();
+          return {
+            dayIndex,
+            dayLabel: DAY_LABELS[dayIndex] ?? null,
+            session,
+            cleanTitle,
+          };
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null)
+        .sort((a, b) => a.dayIndex - b.dayIndex);
+
+      if (sessions.length === 0) continue;
+
+      instances.push({
+        week: { monday, sunday, weekNumber, weekKey: weekStart },
+        cycleId: 0, // no cycle concept in Phase 3
+        cycleName: planName,
+        cycleShortLabel: relativeWeek != null ? `S${weekNumber}` : `S${weekNumber}`,
+        phase: detectPhase(planName),
+        phaseName: planName,
+        dateRangeLabel: null,
+        sessions,
+      });
+    }
+    return instances;
+  }, [usePhase3, phase3Derived, weekStarts, sessionsById]);
 
   // ── Phase 2: Build WeekInstances from effective slots ──────────────────────
   const phase2WeekInstances = useMemo((): WeekInstance[] => {
@@ -209,7 +305,11 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   }, [useFallback, rootFolders, subFoldersMap, sessionsByFolder]);
 
   // ── Final week instances ────────────────────────────────────────────────────
-  const weekInstances = usePhase2 ? phase2WeekInstances : fallbackWeekInstances;
+  const weekInstances = usePhase3
+    ? phase3WeekInstances
+    : usePhase2
+      ? phase2WeekInstances
+      : fallbackWeekInstances;
 
   // Auto-open current week on first render
   useEffect(() => {
@@ -257,8 +357,8 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   }
 
   // ── Empty states ────────────────────────────────────────────────────────────
-  // No Phase 2 slots AND no Phase 1 cycles → show "aucun plan"
-  if (!usePhase2 && rootFolders.length === 0) {
+  // No Phase 3 applications AND no Phase 2 slots AND no Phase 1 cycles → show "aucun plan"
+  if (!usePhase3 && !usePhase2 && rootFolders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <FolderOpen className="h-10 w-10 mb-4 text-muted-foreground/30" />

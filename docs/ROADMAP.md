@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.6 livré (2026-05-13) — Timeline Planif muscu dérivée des `training_plan_applications` actives. Pure fn `derivePlanByWeekDay` (8 tests) + 2 helpers API batch (`getTrainingPlanApplicationsForUser`, `getTrainingPlanSessionsForPlans`). Cellule "from-plan" rendue SOLIDE avec badge "P" (vs ghost transparent du §274.1/.3 revert). Tap → picker → crée slot override. Bugfix DST (parsing UTC). Build OK, tsc clean.*
+*Dernière mise à jour : §275.7 livré (2026-05-13) — Athlete-side : nouvelle Phase 3 dans `MyPlanTab` (priorité training_plan_applications > strength_planning_slots > cycles legacy). Le nageur voit son plan dans "Mon plan" dès que le coach applique un training_plan via §275.5. Reach : Strength.tsx + TeamPlansSection + SuiviPlanification (3 lieux pour 1 mod). Build OK, 21/21 tests pass.*
+
+*Précédente : §275.6 livré (2026-05-13) — Timeline Planif muscu coach dérivée des training_plan_applications.*
 
 *Précédente : §275.5 livré (2026-05-13) — Application d'un training_plan à un nageur ou un groupe (ApplyPlanDialog + PlanApplicationsList).*
 

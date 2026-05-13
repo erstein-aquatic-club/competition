@@ -4,6 +4,79 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.7 — Athlete-side : Phase 3 dans MyPlanTab (training_plan_applications) (2026-05-13)
+
+**Branche** : `main`
+**Suite de** : §275.6 (Planif muscu coach derivation).
+
+### Objectif
+
+Boucler le chantier §275 côté nageur : quand un coach applique un `training_plan` via §275.5, le nageur doit voir ses séances dans son onglet "Mon plan" (`MyPlanTab`).
+
+### Implémentation
+
+`MyPlanTab.tsx` héberge déjà un système de priorité Phase 2 (BDD slots) > Phase 1 (cycles parsing). Ajout d'une **Phase 3 (training_plan_applications)** par-dessus :
+
+```
+Phase 3 > Phase 2 > Phase 1
+training_plan_applications > strength_planning_slots > legacy cycles
+```
+
+Une fois qu'un nageur reçoit une application via §275.5, sa vue "Mon plan" passe automatiquement en Phase 3 et affiche les sessions dérivées.
+
+**Détails** :
+
+- Nouvelles queries (gatées par `athleteId`) :
+  - `getTrainingPlanApplicationsForUser({ userId: athleteId, discipline: "strength" })`
+  - `getTrainingPlanSessionsForPlans(planIds)` (batch via dérivée)
+- `phase3Derived: Map<weekKey, Map<dayIndex, DerivedCell>>` calculée via `derivePlanByWeekDay` (helper pur §275.6).
+- `phase3WeekInstances` construit la même structure `WeekInstance` que Phase 2 → réutilise `MyPlanWeekCard` sans modification UI.
+- `cycleName` / `phaseName` du WeekInstance Phase 3 = nom du plan biblio (ex: "Prépa sprint 50m"), évite de fabriquer un faux nom de cycle.
+- `cleanTitle` enlève le préfixe `Lundi —` etc., conforme au pattern Phase 2.
+- Priorité de source : `usePhase3 → phase3WeekInstances`, fallback Phase 2 puis Phase 1.
+- Empty state mis à jour : "aucun plan" affiché seulement si **aucune** des trois sources n'a de contenu.
+
+### Reach
+
+`MyPlanTab` est consommé par :
+
+- `src/pages/Strength.tsx` (nageur, tab "Mon plan")
+- `src/components/strength/TeamPlansSection.tsx` (coach observe la timeline d'un membre)
+- `src/pages/SuiviPlanification.tsx` (coach inspecte le plan d'un nageur)
+
+→ Phase 3 surfacée dans tous ces contextes en une seule modification.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/strength/MyPlanTab.tsx` | +75 LOC : 2 queries Phase 3 + phase3Derived + phase3WeekInstances + priorité Phase 3 > Phase 2 > Phase 1 (457 LOC total, +20%) |
+
+### Tests
+
+- `npx vitest run derivePlanByWeekDay.test.ts strengthPlanningMerge.test.ts` : 21/21 pass ✅
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+
+### Vérification fonctionnelle attendue
+
+Pré-requis : §275.5 application "Prépa sprint 50m" → François WAGNER (id=1) avec start_date sur un lundi de S13.
+
+1. Nageur (François) ouvre `/strength` → tab **Mon plan**.
+2. La timeline affiche les semaines S13 à S22 avec les sessions issues du plan biblio :
+   - S13 : Vendredi "Tests 5RM"
+   - S14 : Lun "Tractions + Squat", Mar "Deadlift + Bench Pull + Dips", Jeu "Tractions + Squat + Front Lever", Ven "Deadlift + Bench Pull + Gainage"
+   - ... (cf §275.3 seed)
+3. Tap sur une session → ouvre le SessionDetailPreview → "Démarrer" → focus mode (workflow inchangé).
+4. Si le nageur a aussi des `strength_planning_slots` (Phase 2) qui contredisent → Phase 3 prévaut (souhaité, car c'est le plan le plus récent voulu par le coach).
+
+### Limites & suites
+
+- **Pas de "session du jour" card distincte** (ex: bandeau "Aujourd'hui : Tests 5RM"). Pour l'instant le nageur voit le timeline complet. Pourra s'ajouter dans une future itération.
+- **Handoff sessionStorage Phase 2** (`eac_pending_strength_focus_slot_id`) reste branché sur les slots. Pour un nageur en Phase 3, le tap depuis le Dashboard drawer ne déclenchera pas le handoff. À itérer si le Dashboard doit supporter Phase 3.
+- **Pas de notification** lors de l'application du plan. Le nageur découvre son plan en ouvrant `/strength`. Push notification pourrait être déclenchée à l'insert de `training_plan_applications` (Edge function future).
+- **Pas de migration des cycles biblio existants** vers `training_plans`. La Phase 1 fallback reste fonctionnelle pour les nageurs qui n'ont pas encore reçu d'application — pas de bris de service.
+
 ## §275.6 — Planif muscu : timeline dérivée des applications actives (2026-05-13)
 
 **Branche** : `main`
