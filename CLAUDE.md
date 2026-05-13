@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§274.1** — Auto-fill timeline Planif muscu : séances biblio en "ghost" sur les cellules vides (mode nageur).
+Dernier § livré : **§274.2** — Fix fiabilité bouton « Mettre à jour l'app » : attente explicite du SW `waiting` + listener `controllerchange` propre + hard-reload `?_t=now` fallback.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

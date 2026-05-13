@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §274.1 livré (2026-05-13) — Auto-fill timeline Planif muscu : en mode nageur, les cellules sans slot explicite affichent en "ghost" la séance du plan biblio matchant le préfixe jour-de-semaine. Mini-dots du header replié distingués plein (slot) vs creux (hérité). Tap → picker pour adoption/override. tsc clean.*
+*Dernière mise à jour : §274.2 livré (2026-05-13) — Fix fiabilité bouton « Mettre à jour l'app » du Profil. Root cause : `reg.update()` racé contre 3 s mais le SW est encore en `installing` quand on appelle `updateSW(true)` → `messageSkipWaiting()` no-op (pas de `waiting`) + listener `controllerchange` jamais armé. Réécriture : on attend explicitement `reg.installing.state === "installed"` (timeout 15 s), on attache notre propre listener `controllerchange`, on `postMessage SKIP_WAITING`, et on hard-reload avec `?_t=now` pour bust le cache navigateur même quand aucune update n'est trouvée. tsc clean.*
+
+*Précédente : §274.1 livré (2026-05-13) — Auto-fill timeline Planif muscu : en mode nageur, les cellules sans slot explicite affichent en "ghost" la séance du plan biblio matchant le préfixe jour-de-semaine. Mini-dots du header replié distingués plein (slot) vs creux (hérité). Tap → picker pour adoption/override. tsc clean.*
 
 *Précédente : §274 livré (2026-05-13) — Planif muscu coach : grille 1 slot/jour (suppression colonnes Matin/Soir, fallback morning→evening sur données legacy, écritures neuves toujours `morning`) + picker bottom-sheet nourri par les cycles du plan biblio du nageur sélectionné, badge "Suggéré" sur les séances matchant le préfixe jour-de-semaine. tsc clean, tests merge/ISO OK.*
 

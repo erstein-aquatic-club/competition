@@ -311,27 +311,122 @@ export default function Profile() {
   const handleCheckUpdate = async () => {
     setIsCheckingUpdate(true);
     localStorage.removeItem("app_build_timestamp");
+
+    // Total budget — beyond this we give up waiting and hard-reload.
+    const INSTALL_TIMEOUT_MS = 15_000;
+    const CONTROLLER_TIMEOUT_MS = 5_000;
+
+    // Resolves once a SW is sitting in `waiting`, or "no-update" if reg.update()
+    // didn't find a new version, or "timeout" if install takes too long.
+    // reg.update() resolves when the new SW is *installing* — not yet `waiting`.
+    // Calling SKIP_WAITING before that state is a no-op and the page never reloads.
+    const waitForWaitingSW = (reg: ServiceWorkerRegistration): Promise<"waiting" | "no-update" | "timeout"> =>
+      new Promise((resolve) => {
+        if (reg.waiting) return resolve("waiting");
+        let installing = reg.installing;
+
+        const timer = window.setTimeout(() => {
+          installing?.removeEventListener("statechange", onState);
+          reg.removeEventListener("updatefound", onUpdateFound);
+          resolve("timeout");
+        }, INSTALL_TIMEOUT_MS);
+
+        const onState = () => {
+          if (!installing) return;
+          if (installing.state === "installed") {
+            window.clearTimeout(timer);
+            installing.removeEventListener("statechange", onState);
+            reg.removeEventListener("updatefound", onUpdateFound);
+            resolve(reg.waiting ? "waiting" : "no-update");
+          } else if (installing.state === "redundant") {
+            window.clearTimeout(timer);
+            installing.removeEventListener("statechange", onState);
+            reg.removeEventListener("updatefound", onUpdateFound);
+            resolve("no-update");
+          }
+        };
+
+        const onUpdateFound = () => {
+          installing = reg.installing;
+          installing?.addEventListener("statechange", onState);
+        };
+
+        if (installing) {
+          installing.addEventListener("statechange", onState);
+        } else {
+          // reg.update() may set `installing` slightly after resolving — wait for updatefound.
+          reg.addEventListener("updatefound", onUpdateFound);
+          // If nothing happens within 1s, assume no update was found.
+          window.setTimeout(() => {
+            if (!reg.installing && !reg.waiting) {
+              window.clearTimeout(timer);
+              reg.removeEventListener("updatefound", onUpdateFound);
+              resolve("no-update");
+            }
+          }, 1000);
+        }
+      });
+
+    const clearAllCaches = async () => {
+      if (!("caches" in window)) return;
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      } catch { /* best-effort */ }
+    };
+
+    const hardReload = () => {
+      // Cache-busting query forces the browser to re-fetch index.html.
+      const url = new URL(window.location.href);
+      url.searchParams.set("_t", String(Date.now()));
+      window.location.replace(url.toString());
+    };
+
     try {
-      // 1. Ask SW to check for a new version (timeout 3s to avoid hanging on slow networks)
       const reg = (window as any).__pwaRegistration as ServiceWorkerRegistration | undefined
         ?? await navigator.serviceWorker?.getRegistration();
-      if (reg) {
+
+      if (!reg) {
+        await clearAllCaches();
+        hardReload();
+        return;
+      }
+
+      try { await reg.update(); } catch { /* network errors are fine */ }
+
+      const status = await waitForWaitingSW(reg);
+
+      if (status === "waiting" && reg.waiting) {
+        // Listen for controllerchange ourselves — vite-plugin-pwa only attaches
+        // its own listener when its `waiting` event fired earlier in this session.
+        const reloadOnControllerChange = new Promise<void>((resolve) => {
+          const onChange = () => {
+            navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+            resolve();
+          };
+          navigator.serviceWorker.addEventListener("controllerchange", onChange);
+        });
+
+        await clearAllCaches();
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+
         await Promise.race([
-          reg.update(),
-          new Promise((r) => setTimeout(r, 3000)),
+          reloadOnControllerChange,
+          new Promise<void>((r) => setTimeout(r, CONTROLLER_TIMEOUT_MS)),
         ]);
+        hardReload();
+        return;
       }
-      // 2. Use __pwaApplyUpdate (skipWaiting + cache clear + reload) so the waiting SW
-      // activates before reload — avoids onNeedRefresh re-firing after the page comes back.
-      const applyUpdate = (window as any).__pwaApplyUpdate;
-      if (typeof applyUpdate === "function") {
-        await applyUpdate();
-      } else {
-        window.location.reload();
-      }
-    } catch { /* best-effort */ }
-    finally {
-      // Reset loading state — reload may not happen if no SW update is waiting
+
+      // No update available (or install timed out) — clear caches and hard-reload
+      // anyway so the user sees a fresh index.html.
+      await clearAllCaches();
+      hardReload();
+    } catch (error) {
+      console.error("[update] check failed", error);
+      hardReload();
+    } finally {
+      // Only reached if hardReload() didn't fire (shouldn't happen, but safe).
       setIsCheckingUpdate(false);
     }
   };

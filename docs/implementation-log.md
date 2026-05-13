@@ -4,6 +4,50 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §274.2 — Fix fiabilité bouton « Mettre à jour l'app » (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale que le bouton « Mettre à jour » du Profil n'est pas répétable — parfois la MAJ fonctionne, souvent elle échoue silencieusement (le badge revient à l'état idle sans recharger).
+
+### Root cause
+
+`handleCheckUpdate` (Profile.tsx) faisait :
+
+1. `reg.update()` racé contre un timeout de **3 s**.
+2. Puis `__pwaApplyUpdate()` → `updateSW(true)` (vite-plugin-pwa).
+
+Or `updateSW(true)` (workbox-window `messageSkipWaiting()`) ne fait rien si `reg.waiting` est `null`. Et `reg.update()` résout dès que le nouveau SW passe en **`installing`**, pas en `waiting`. Sur une connexion normale l'install prend > 3 s → quand `applyUpdate()` court, le SW est encore en cours d'installation :
+
+- `reg.waiting` est `null` → `messageSkipWaiting()` no-op
+- le listener `controllerchange` → reload n'a jamais été attaché (l'évènement workbox `waiting` n'avait pas encore tiré)
+- les caches sont vidés mais aucun reload n'arrive
+- `setIsCheckingUpdate(false)` → bouton snap à idle, utilisateur voit "rien"
+
+Marchait quand un SW était déjà dans l'état `waiting` (ex: check horaire automatique l'avait trouvé), échouait sur un click frais. Identique au comportement de `UpdateNotification` qui n'apparaît qu'**après** `onNeedRefresh` (= SW déjà en `waiting`).
+
+### Implémentation
+
+`src/pages/Profile.tsx` — réécriture de `handleCheckUpdate` :
+
+- `waitForWaitingSW(reg)` : attend que le SW atteigne `waiting` via `statechange` sur `reg.installing` (+ `updatefound` si `installing` n'existe pas encore). Timeout dur 15 s.
+- Si `waiting` : on attache **notre propre** `controllerchange` listener (workbox n'attache le sien qu'après son event `waiting`, qui n'a pas forcément tiré dans cette session), on vide les caches, on `postMessage({type:"SKIP_WAITING"})` au SW en attente, on attend 5 s max le `controllerchange` puis `window.location.replace(url+?_t=now)` pour bust le cache navigateur du `index.html`.
+- Si `no-update` ou `timeout` : on vide les caches et on hard-reload quand même — l'utilisateur a explicitement demandé une mise à jour, lui rendre un `index.html` frais est le minimum.
+- `_t=timestamp` en query param force le navigateur (notamment Safari iOS PWA) à re-fetch `index.html` même si la heuristique de fraîcheur jouait contre nous.
+
+### Fichiers modifiés
+
+- `src/pages/Profile.tsx` (+~90 lignes nettes — la fonction passe de 27 à ~115 lignes)
+
+### Tests
+
+- `npx tsc --noEmit` clean.
+- `src/pages/__tests__/ProfileLogic.test.ts` : 2/2 ✔ (la fonction `handleCheckUpdate` n'est pas testée unitairement — elle interagit avec `navigator.serviceWorker` / `window.location`).
+
+### Limites
+
+- Pas de test automatisé du flux SW : nécessiterait un mock de `ServiceWorkerRegistration` + `workbox-window`. Validation manuelle requise après déploiement (cliquer plusieurs fois sur "Mettre à jour l'app" sur iOS PWA + desktop Chrome).
+- En cas de SW corrompu (état `redundant` sans nouveau), on tombe sur le branch `no-update` + hard-reload — comportement attendu.
+
 ## §274.1 — Auto-fill timeline depuis le plan biblio du nageur (2026-05-13)
 
 **Branche** : `main`
