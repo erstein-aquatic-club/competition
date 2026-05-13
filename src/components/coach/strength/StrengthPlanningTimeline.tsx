@@ -12,7 +12,7 @@
  *
  * Stateless — all state (expanded week, editing meta, callbacks, data) from props.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import type { Competition, StrengthSessionTemplate } from "@/lib/api/types";
 import type { EffectiveStrengthSlot, EffectiveStrengthWeekMeta } from "@/lib/strengthPlanningMerge";
@@ -23,18 +23,17 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Check,
   ChevronDown,
-  Dumbbell,
   Pencil,
   Plus,
   Trophy,
   User,
   X,
 } from "lucide-react";
+import { SessionPreviewPopover } from "./SessionPreviewPopover";
 
 import {
   DAY_ROWS,
@@ -678,7 +677,7 @@ function SlotCell({
     // Read-only mode → wrap in a hover/click preview popover.
     if (readOnly) {
       return (
-        <SessionPreviewPopover template={fromPlanTpl} sessionName={sessionName} style={style}>
+        <SessionPreviewPopover template={fromPlanTpl} sessionName={sessionName}>
           <button
             type="button"
             className={cn(baseClass, "active:scale-[0.97]")}
@@ -823,149 +822,4 @@ function SlotCell({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Session preview popover — read-only quick read for a from-plan cell.
-   Opens on hover (desktop, hover-capable media) and on tap (touch).
-   The popover content surfaces the exercises with sets×reps + %1RM + repos.
-   ═══════════════════════════════════════════════════════════════════ */
-
-function formatRest(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const sec = seconds % 60;
-  return sec === 0 ? `${m}'` : `${m}'${String(sec).padStart(2, "0")}`;
-}
-
-function SessionPreviewPopover({
-  template,
-  sessionName,
-  style,
-  children,
-}: {
-  template: StrengthSessionTemplate;
-  sessionName: string;
-  style: (typeof PHASE_STYLES)[keyof typeof PHASE_STYLES];
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [hoverCapable, setHoverCapable] = useState(true);
-
-  // Detect hover capability once on mount. Touch-only devices skip the
-  // mouse-enter trigger to avoid the iOS phantom-hover that fires on tap.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      setHoverCapable(window.matchMedia("(hover: hover)").matches);
-    } catch {
-      setHoverCapable(true);
-    }
-  }, []);
-
-  const cancelClose = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-  // Short grace period (60ms) — just enough to bridge the 1-2px gap when
-  // the cursor leaves the cell and enters the popover content. Anything
-  // longer feels laggy after a quick hover-out.
-  const CLOSE_DELAY_MS = 60;
-  const scheduleClose = (ms: number = CLOSE_DELAY_MS) => {
-    cancelClose();
-    closeTimer.current = setTimeout(() => setOpen(false), ms);
-  };
-
-  useEffect(() => () => cancelClose(), []);
-
-  const items = template.items ?? [];
-  const visibleItems = items.slice(0, 6);
-  const overflowCount = Math.max(0, items.length - visibleItems.length);
-  const description = template.description;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span
-          onMouseEnter={hoverCapable ? () => { cancelClose(); setOpen(true); } : undefined}
-          onMouseLeave={hoverCapable ? () => scheduleClose() : undefined}
-          onClick={() => setOpen((o) => !o)}
-          className="inline-block w-full"
-        >
-          {children}
-        </span>
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="center"
-        sideOffset={4}
-        // duration-100 raccourcit l'animation d'apparition/fermeture (vs 150ms
-        // par défaut de tailwindcss-animate), pour que le visuel matche la
-        // courte grâce JS de 60ms et ne donne pas l'impression d'un lag.
-        className={cn(
-          "w-[300px] p-3 space-y-2.5 duration-100",
-        )}
-        onMouseEnter={hoverCapable ? cancelClose : undefined}
-        onMouseLeave={hoverCapable ? () => scheduleClose() : undefined}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        {/* Header — phase dot + session name */}
-        <div className="flex items-center gap-2">
-          <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", style.dot)} />
-          <span className="text-sm font-bold leading-tight truncate">{sessionName}</span>
-        </div>
-
-        {description && (
-          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-            {description}
-          </p>
-        )}
-
-        {items.length === 0 ? (
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <Dumbbell className="h-3.5 w-3.5 text-muted-foreground/40" />
-            Aucun exercice.
-          </div>
-        ) : (
-          <ul className="space-y-1">
-            {visibleItems
-              .slice()
-              .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-              .map((item, idx) => {
-                const hasPercent = item.percent_1rm != null && item.percent_1rm > 0;
-                const hasRest = item.rest_seconds != null && item.rest_seconds > 0;
-                return (
-                  <li key={idx} className="flex items-baseline gap-2 text-[12px] leading-snug">
-                    <span className="text-[10px] text-muted-foreground/60 tabular-nums shrink-0 w-3">
-                      {idx + 1}.
-                    </span>
-                    <span className="font-medium flex-1 truncate">
-                      {item.exercise_name ?? `Exercice #${item.exercise_id}`}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                      <span className="font-semibold text-foreground/90">
-                        {item.sets}×{item.reps}
-                      </span>
-                      {hasPercent && (
-                        <span className="ml-1.5">{item.percent_1rm}%</span>
-                      )}
-                      {hasRest && (
-                        <span className="ml-1.5">{formatRest(item.rest_seconds)}</span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            {overflowCount > 0 && (
-              <li className="text-[10px] text-muted-foreground/70 italic pt-0.5">
-                + {overflowCount} autre{overflowCount > 1 ? "s" : ""} exercice{overflowCount > 1 ? "s" : ""}
-              </li>
-            )}
-          </ul>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
 

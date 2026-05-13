@@ -50,6 +50,7 @@ import type {
 import { useAuth } from "@/lib/auth";
 import { detectPhase, PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { cn } from "@/lib/utils";
+import { SessionPreviewPopover } from "./SessionPreviewPopover";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -425,8 +426,8 @@ function TrainingPlanEditor({
   });
 
   const { data: sessionFolders = [] } = useQuery({
-    queryKey: ["strength_folders", "session", null],
-    queryFn: () => getStrengthFolders("session", { athleteId: null }),
+    queryKey: ["strength_folders", "session", "all"],
+    queryFn: () => getStrengthFolders("session"),
     staleTime: 5 * 60_000,
   });
 
@@ -453,8 +454,6 @@ function TrainingPlanEditor({
   const [pickerSearch, setPickerSearch] = useState("");
   const debouncedSearch = useDebouncedValue(pickerSearch, 200);
 
-  // Detail drawer for a populated cell (shows exercises/sets/reps/%1RM/rest)
-  const [cellDetail, setCellDetail] = useState<TrainingPlanSession | null>(null);
   const [removeLastWeekConfirmOpen, setRemoveLastWeekConfirmOpen] = useState(false);
 
   // Mutations
@@ -574,14 +573,16 @@ function TrainingPlanEditor({
   }, [templates, debouncedSearch]);
 
   const { pickerFolders, pickerUnfiled } = useMemo(() => {
+    const knownFolderIds = new Set(sessionFolders.map((f) => f.id));
     const byFolder = new Map<number, StrengthSessionTemplate[]>();
     const unfiled: StrengthSessionTemplate[] = [];
     for (const t of filteredTemplates) {
-      if (t.folder_id != null) {
+      if (t.folder_id != null && knownFolderIds.has(t.folder_id)) {
         const arr = byFolder.get(t.folder_id) ?? [];
         arr.push(t);
         byFolder.set(t.folder_id, arr);
       } else {
+        // folder_id inconnu (dossier non chargé) → afficher quand même
         unfiled.push(t);
       }
     }
@@ -747,24 +748,29 @@ function TrainingPlanEditor({
                         <PlanCell
                           template={tpl}
                           loading={sessionsLoading}
-                          onTap={() => {
-                            // Tap on filled cell → open detail drawer ; on empty
-                            // cell → open picker to create a new entry.
-                            if (cell) {
-                              setCellDetail(cell);
-                            } else {
-                              setPicker({
-                                relativeWeek: wk,
-                                dayOfWeek: dow,
-                                existingId: null,
-                              });
-                            }
-                          }}
-                          onClear={
+                          onAddEmpty={() =>
+                            setPicker({
+                              relativeWeek: wk,
+                              dayOfWeek: dow,
+                              existingId: null,
+                            })
+                          }
+                          onChangeSession={
+                            cell
+                              ? () =>
+                                  setPicker({
+                                    relativeWeek: wk,
+                                    dayOfWeek: dow,
+                                    existingId: cell.session_template_id ?? null,
+                                  })
+                              : undefined
+                          }
+                          onRemove={
                             cell
                               ? () => deleteSessionMut.mutate(cell.id)
                               : undefined
                           }
+                          removePending={deleteSessionMut.isPending}
                         />
                       </td>
                     );
@@ -809,39 +815,6 @@ function TrainingPlanEditor({
         onOpenChange={setApplyOpen}
         planId={planId}
         planNumWeeks={plan.num_weeks}
-      />
-
-      {/* Cell detail drawer (exercises / sets / reps / %1RM / rest) */}
-      <CellDetailDrawer
-        cell={cellDetail}
-        template={
-          cellDetail?.session_template_id != null
-            ? templatesById.get(cellDetail.session_template_id) ?? null
-            : null
-        }
-        onClose={() => setCellDetail(null)}
-        onChangeSession={() => {
-          if (!cellDetail) return;
-          // Switch to picker for the same cell.
-          setPicker({
-            relativeWeek: cellDetail.relative_week,
-            dayOfWeek: cellDetail.day_of_week,
-            existingId: cellDetail.session_template_id ?? null,
-          });
-          setCellDetail(null);
-        }}
-        onRemove={() => {
-          if (!cellDetail) return;
-          deleteSessionMut.mutate(cellDetail.id, {
-            onSuccess: () => setCellDetail(null),
-            onError: (err: unknown) => {
-              toast.error("Erreur", {
-                description: err instanceof Error ? err.message : "Suppression échouée",
-              });
-            },
-          });
-        }}
-        removePending={deleteSessionMut.isPending}
       />
 
       {/* Remove last week confirmation */}
@@ -1385,183 +1358,27 @@ function formatFrenchDate(iso: string): string {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Cell detail drawer — shows the session's exercises with sets/reps/%1RM/rest
-   Designed for "5-second read" : large names, compact metric chips, clear
-   visual rhythm between exercises.
-   ═══════════════════════════════════════════════════════════════════ */
-
-const CYCLE_LABEL: Record<string, string> = {
-  endurance: "Endurance",
-  hypertrophie: "Hypertrophie",
-  force: "Force",
-};
-
-/** Convert a rest duration in seconds to a runner-style "M'SS" string.
- *  60 → "1'", 90 → "1'30", 180 → "3'", 45 → "45s". */
-function formatRest(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const sec = seconds % 60;
-  return sec === 0 ? `${m}'` : `${m}'${String(sec).padStart(2, "0")}`;
-}
-
-function CellDetailDrawer({
-  cell,
-  template,
-  onClose,
-  onChangeSession,
-  onRemove,
-  removePending,
-}: {
-  cell: TrainingPlanSession | null;
-  template: StrengthSessionTemplate | null;
-  onClose: () => void;
-  onChangeSession: () => void;
-  onRemove: () => void;
-  removePending: boolean;
-}) {
-  const open = cell != null;
-  const sessionName = template?.title ?? template?.name ?? "Séance";
-  const phase = sessionName ? detectPhase(sessionName) : "force";
-  const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-  const items = template?.items ?? [];
-  const cycleLabel = template?.cycle ? CYCLE_LABEL[template.cycle] ?? template.cycle : null;
-
-  return (
-    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
-        {/* Header — large title for instant scan */}
-        <SheetHeader className="pb-3 shrink-0">
-          <SheetTitle className="text-lg font-bold flex items-center gap-2.5 leading-tight">
-            <span className={cn("h-3 w-3 rounded-full shrink-0", style.dot)} />
-            <span className="truncate">{sessionName}</span>
-          </SheetTitle>
-          {cell && (
-            <SheetDescription className="text-sm text-muted-foreground font-medium pl-[22px] flex items-center gap-2 flex-wrap">
-              <span>S{cell.relative_week} · {DAY_LABELS[cell.day_of_week]}</span>
-              {cycleLabel && (
-                <Badge
-                  variant="outline"
-                  className={cn("text-[10px] uppercase tracking-wide font-bold border-0", style.bg, style.text)}
-                >
-                  {cycleLabel}
-                </Badge>
-              )}
-            </SheetDescription>
-          )}
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-4">
-          {template?.description && (
-            <div className="rounded-xl bg-muted/40 px-3.5 py-2.5">
-              <p className="text-sm text-foreground/85 leading-relaxed">
-                {template.description}
-              </p>
-            </div>
-          )}
-
-          {items.length === 0 ? (
-            <div className="text-center py-10">
-              <Dumbbell className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2.5" />
-              <p className="text-sm text-muted-foreground">
-                Aucun exercice dans cette séance.
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {items
-                .slice()
-                .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                .map((item, idx) => {
-                  const hasPercent = item.percent_1rm != null && item.percent_1rm > 0;
-                  const hasRest = item.rest_seconds != null && item.rest_seconds > 0;
-                  return (
-                    <li
-                      key={idx}
-                      className="rounded-xl border border-border bg-card px-3.5 py-3"
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Index chip — large enough to ground the eye */}
-                        <span className="inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-full bg-muted text-foreground text-sm font-bold tabular-nums">
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          {/* Exercise name — biggest text in the card */}
-                          <p className="text-[15px] font-semibold leading-snug">
-                            {item.exercise_name ?? `Exercice #${item.exercise_id}`}
-                          </p>
-                          {/* Primary metrics — bold "N × M" + %1RM chip */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-base font-bold tabular-nums leading-none">
-                              {item.sets} <span className="text-muted-foreground/60 font-medium mx-0.5">×</span> {item.reps}
-                              <span className="ml-1.5 text-xs font-medium text-muted-foreground">reps</span>
-                            </span>
-                            {hasPercent && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold tabular-nums">
-                                {item.percent_1rm}% 1RM
-                              </span>
-                            )}
-                          </div>
-                          {/* Secondary line — rest time only */}
-                          {hasRest && (
-                            <p className="text-xs text-muted-foreground">
-                              Repos <span className="font-semibold text-foreground/80 tabular-nums">{formatRest(item.rest_seconds)}</span>
-                            </p>
-                          )}
-                          {item.notes && (
-                            <p className="text-xs text-muted-foreground italic leading-snug">
-                              {item.notes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
-
-          {/* Actions */}
-          <div className="pt-3 space-y-1">
-            <div className="h-px bg-border" />
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3.5 text-left transition-all min-h-[52px] text-primary hover:bg-primary/10 active:scale-[0.98]"
-              onClick={onChangeSession}
-            >
-              <Dumbbell className="h-4 w-4 shrink-0" />
-              <span className="text-sm font-semibold">Changer de séance</span>
-            </button>
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3.5 text-left transition-all min-h-[52px] text-destructive hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-50"
-              onClick={onRemove}
-              disabled={removePending}
-            >
-              <Trash2 className="h-4 w-4 shrink-0" />
-              <span className="text-sm font-semibold">Retirer de la grille</span>
-            </button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   Plan cell (single grid cell)
+   Plan cell (single grid cell) — uses SessionPreviewPopover (§279) for
+   the filled state with Changer / Retirer actions.
    ═══════════════════════════════════════════════════════════════════ */
 
 function PlanCell({
   template,
   loading,
-  onTap,
-  onClear,
+  onAddEmpty,
+  onChangeSession,
+  onRemove,
+  removePending,
 }: {
   template: StrengthSessionTemplate | null;
   loading: boolean;
-  onTap: () => void;
-  onClear?: () => void;
+  /** Tap on an empty cell : opens the session picker. */
+  onAddEmpty: () => void;
+  /** Popover action : opens the picker with current session pre-selected. */
+  onChangeSession?: () => void;
+  /** Popover action : deletes the training_plan_session row. */
+  onRemove?: () => void;
+  removePending?: boolean;
 }) {
   if (loading) {
     return <div aria-hidden className="h-9 rounded-md bg-muted/40 animate-pulse motion-reduce:animate-none" />;
@@ -1570,7 +1387,7 @@ function PlanCell({
     return (
       <button
         type="button"
-        onClick={onTap}
+        onClick={onAddEmpty}
         className="h-9 w-full rounded-md border border-dashed border-muted-foreground/20 flex items-center justify-center hover:border-muted-foreground/40 hover:bg-muted/30 transition-colors active:scale-95"
         aria-label="Ajouter une séance"
       >
@@ -1583,27 +1400,22 @@ function PlanCell({
   const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
   const displayName = sessionName.replace(/^[A-Za-z]{3,4}\s*[—–-]\s*/u, "").slice(0, 18);
   return (
-    <div className={cn("relative h-9 w-full rounded-md flex items-center gap-1 px-1 group", style.bg)}>
-      <button
-        type="button"
-        onClick={onTap}
-        className="flex-1 min-w-0 flex items-center gap-1 text-left active:scale-[0.97]"
+    <SessionPreviewPopover
+      template={template}
+      sessionName={sessionName}
+      actions={{ onChangeSession, onRemove, removePending }}
+    >
+      <div
+        className={cn(
+          "relative h-9 w-full rounded-md flex items-center gap-1 px-1.5 cursor-pointer transition-colors hover:ring-1 hover:ring-primary/30 active:scale-[0.98]",
+          style.bg,
+        )}
       >
         <span className={cn("h-2 w-2 rounded-full shrink-0", style.dot)} />
-        <span className={cn("text-[10px] font-semibold truncate", style.text)}>
+        <span className={cn("text-[10px] font-semibold truncate flex-1 text-left", style.text)}>
           {displayName}
         </span>
-      </button>
-      {onClear && (
-        <button
-          type="button"
-          onClick={onClear}
-          className="opacity-0 group-hover:opacity-100 inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-background/50 shrink-0"
-          aria-label="Retirer la séance"
-        >
-          <X className="h-3 w-3 text-muted-foreground" />
-        </button>
-      )}
-    </div>
+      </div>
+    </SessionPreviewPopover>
   );
 }
