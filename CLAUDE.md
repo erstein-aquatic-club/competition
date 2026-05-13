@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§278** — Aperçu hover/tap (Popover) des cellules de plan dans Planif muscu (read-only) — drawer supprimé.
+Dernier § livré : **§278-fix** — Hover preview lag fix : 60ms grace + sideOffset 4 + animation duration-100 = ~160ms ressenti (au lieu de ~300).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

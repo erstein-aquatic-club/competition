@@ -868,7 +868,11 @@ function SessionPreviewPopover({
       closeTimer.current = null;
     }
   };
-  const scheduleClose = (ms: number = 150) => {
+  // Short grace period (60ms) — just enough to bridge the 1-2px gap when
+  // the cursor leaves the cell and enters the popover content. Anything
+  // longer feels laggy after a quick hover-out.
+  const CLOSE_DELAY_MS = 60;
+  const scheduleClose = (ms: number = CLOSE_DELAY_MS) => {
     cancelClose();
     closeTimer.current = setTimeout(() => setOpen(false), ms);
   };
@@ -885,7 +889,7 @@ function SessionPreviewPopover({
       <PopoverTrigger asChild>
         <span
           onMouseEnter={hoverCapable ? () => { cancelClose(); setOpen(true); } : undefined}
-          onMouseLeave={hoverCapable ? () => scheduleClose(150) : undefined}
+          onMouseLeave={hoverCapable ? () => scheduleClose() : undefined}
           onClick={() => setOpen((o) => !o)}
           className="inline-block w-full"
         >
@@ -895,10 +899,15 @@ function SessionPreviewPopover({
       <PopoverContent
         side="top"
         align="center"
-        sideOffset={8}
-        className={cn("w-[300px] p-3 space-y-2.5")}
+        sideOffset={4}
+        // duration-100 raccourcit l'animation d'apparition/fermeture (vs 150ms
+        // par défaut de tailwindcss-animate), pour que le visuel matche la
+        // courte grâce JS de 60ms et ne donne pas l'impression d'un lag.
+        className={cn(
+          "w-[300px] p-3 space-y-2.5 duration-100",
+        )}
         onMouseEnter={hoverCapable ? cancelClose : undefined}
-        onMouseLeave={hoverCapable ? () => scheduleClose(150) : undefined}
+        onMouseLeave={hoverCapable ? () => scheduleClose() : undefined}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Header — phase dot + session name */}

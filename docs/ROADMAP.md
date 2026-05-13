@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §278 livré (2026-05-13) — Aperçu hover/tap des cellules dans Planif muscu : nouveau `SessionPreviewPopover` (Radix Popover) avec détection `matchMedia("(hover: hover)")` pour distinguer desktop (mouseenter/leave + 150ms grace) vs touch (click toggle). Popover compact 300px avec dot + nom + description (line-clamp-2) + liste exercices `sets×reps  %1RM  repos`. Drawer `CellDetailDrawer` supprimé (StrengthPlanningScreen passe 829→674 LOC, -19%). Tests OK, build OK.*
+*Dernière mise à jour : §278-fix livré (2026-05-13) — Hover preview lag fix : delay 150→60ms, sideOffset 8→4, animation Radix duration-100 (au lieu de ~150ms par défaut). Total perçu ~160ms au lieu de ~300ms.*
+
+*Précédente : §278 livré (2026-05-13) — Aperçu hover/tap des cellules dans Planif muscu (SessionPreviewPopover).*
 
 *Précédente : §276 livré (2026-05-13) — Simplification UX muscu (Planning read-only).*
 

@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §278-fix — Hover preview popover : tighter close timing (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale « il y a un lag quand le survol quitte la zone, la carte de hover reste presente quelques secondes ».
+
+### Cause perçue
+
+Le delay de grâce JS (150ms) cumulait avec l'animation d'exit Radix (~150ms via `data-[state=closed]:animate-out` de tailwindcss-animate, durée par défaut ~150ms) = **~300ms perçus**. Sur un hover rapide, ce cumul donne l'impression que le popover « lingers » après que le curseur a quitté.
+
+### Fix
+
+`StrengthPlanningTimeline.tsx` — `SessionPreviewPopover` :
+
+- **Constante `CLOSE_DELAY_MS = 60`** (au lieu de 150 inline). Juste assez pour bridger le saut curseur → popover (sideOffset 4px), pas plus.
+- **`sideOffset` 8 → 4** : le popover est plus près de la cellule, le « dead-zone » de transit diminue, le risque que le timer 60ms expire pendant le transit aussi.
+- **`className duration-100`** sur PopoverContent : raccourcit explicitement l'animation tailwindcss-animate (100ms au lieu de 150ms par défaut).
+
+Total perçu après fix : ~60ms grace + ~100ms animation = **~160ms** (au lieu de ~300ms). Sensation d'instantanéité.
+
+### Fichier modifié
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Constante CLOSE_DELAY_MS=60, sideOffset 8→4, className duration-100 sur PopoverContent |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+
 ## §278 — Aperçu hover/tap des cellules de plan dans Planif muscu (2026-05-13)
 
 **Branche** : `main`
