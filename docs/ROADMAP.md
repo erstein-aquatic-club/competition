@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.8-fix livré (2026-05-13) — Refonte lisibilité 5s du drawer détail session : header titre `text-lg font-bold`, cycle en badge coloré, description en box muted, chaque exercice en carte avec chip index `h-7 w-7`, nom `text-[15px] font-semibold`, métriques `N × M reps` en `text-base font-bold` + chip primary `%1RM`, repos formaté `M'SS` (180s → 3'). Build OK.*
+*Dernière mise à jour : §276 livré (2026-05-13) — Simplification UX muscu en 3 phases : §276.1 retrait sous-toggle "Plans nageurs" dans biblio (StrengthCatalog), §276.2 migration des 36 `strength_planning_slot_overrides` de François WAGNER en training_plan_applications (plan id=2, 10 semaines, 32 sessions), §276.3 réécriture complète de StrengthPlanningScreen en aperçu read-only (1199→829 LOC, -31%) avec query `getTrainingPlanApplicationsForGroup` pour mode groupe, drawer détail session lecture seule, plus aucune édition de slot (édition dans biblio>Plans). Build OK, 21/21 tests.*
+
+*Précédente : §275.8-fix livré (2026-05-13) — Refonte lisibilité 5s du drawer détail session.*
 
 *Précédente : §275.8 livré (2026-05-13) — Plan editor : add/remove week + drawer détail session.*
 

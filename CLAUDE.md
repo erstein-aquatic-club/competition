@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.8-fix** — Refonte lisibilité 5s du drawer détail session (carte par exercice, fontes augmentées, repos `M'SS`).
+Dernier § livré : **§276** — Simplification UX muscu : 1 seul éditeur (TrainingPlansBrowser) + Planning muscu réécrit en aperçu read-only dérivé des training_plan_applications + migration des slots legacy.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

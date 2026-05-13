@@ -417,6 +417,7 @@ export {
   deleteTrainingPlanSession,
   getTrainingPlanApplications,
   getTrainingPlanApplicationsForUser,
+  getTrainingPlanApplicationsForGroup,
   getActiveTrainingPlanApplicationsForUser,
   applyTrainingPlan,
   updateTrainingPlanApplication,

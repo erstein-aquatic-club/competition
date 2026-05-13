@@ -230,7 +230,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/dashboard/SwimExerciseLogsHistory.tsx` | Historique logs exercices nage | ~505 lignes |
 | `src/components/coach/strength/AthletePlansTab.tsx` | Onglet plans athlète (coach muscu) — legacy, conservé en sous-tab "Plans nageurs" (§275.4) | ~964 lignes |
 | `src/components/coach/strength/TrainingPlansBrowser.tsx` | UI training_plans (§275.4-7) : liste plans + create dialog + éditeur grille num_weeks × 7 (avec add/remove week §275.8) + picker session + drawer détail session (sets/reps/%1RM/repos §275.8) + ApplyPlanDialog + PlanApplicationsList | 1513 lignes |
-| `src/pages/coach/StrengthPlanningScreen.tsx` | Écran coach planification muscu (timeline groupe/nageur, picker séances, sheets détail/compétitions) (§160) | 1074 lignes |
+| `src/pages/coach/StrengthPlanningScreen.tsx` | Aperçu read-only du plan muscu (§276.3) — timeline dérivée des `training_plan_applications` (mode nageur OU groupe), drawer détail session lecture seule, plus aucune écriture (édition dans biblio>Plans). | 829 lignes |
 | `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Timeline présentationnelle planif muscu (7j × semaines, chips séance + dot phase) (§160 + §275.6 athletePlanByWeekDay) | 815 lignes |
 | `src/lib/strength/derivePlanByWeekDay.ts` | Pure function (§275.6) : applications + sessions → Map<weekKey, Map<dayIndex, DerivedCell>>. Conflict resolution = newest start_date wins. Consommé par StrengthPlanningScreen (§275.6) + MyPlanTab Phase 3 (§275.7). | 121 lignes |
 | `src/components/strength/MyPlanTab.tsx` | Vue "Mon plan" nageur (§275.7 ajoute Phase 3 priorité training_plan_applications > strength_planning_slots > cycles legacy). | 457 lignes |

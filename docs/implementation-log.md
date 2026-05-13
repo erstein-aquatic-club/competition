@@ -4,6 +4,89 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §276 — Simplification UX muscu : Planning = preview read-only (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur veut simplifier le parcours muscu en évitant le mélange entre "Plans" génériques (TrainingPlansBrowser §275.4) et "Plans nageurs" legacy (AthletePlansTab). La vue "Planification muscu" devient un aperçu read-only de ce que le nageur verra côté `/strength`.
+
+### Architecture cible (post-§276)
+
+```
+Séances     (biblio > Musculation > Séances)     → catalogue de templates
+                                                   StrengthCatalog (inchangé)
+                                                   ↓ utilisé par
+Plans       (biblio > Musculation > Plans)       → création/édition/application
+                                                   TrainingPlansBrowser
+                                                   ↓ alimenté par applications
+Planif muscu (hub coach > Planif. Muscu)         → aperçu read-only nageur/groupe
+                                                   StrengthPlanningScreen (refait)
+```
+
+### §276.1 — Suppression sous-toggle "Plans nageurs"
+
+`src/pages/coach/StrengthCatalog.tsx` : retrait du sous-toggle `templates`/`athletes`, suppression de l'import lazy de `AthletePlansTab`, suppression des states `plansSubTab` et `switchPlansSubTab` + clé localStorage `eac-coach-plans-subtab`. Le tab "Plans" héberge maintenant directement `<TrainingPlansBrowser />` (1 seul éditeur).
+
+Le composant `AthletePlansTab.tsx` reste sur disque (référencé en commentaire / test, et continue d'être lisible depuis MyPlanTab Phase 1 fallback indirectement via `getStrengthFolders`).
+
+### §276.2 — Migration data legacy → training_plan_applications
+
+Script SQL one-shot (via MCP Supabase, pas de fichier de migration car les IDs générés ne sont pas reproductibles). Pour chaque `athlete_id` distinct dans `strength_planning_slot_overrides` :
+
+1. Snap des `week_start` à leur lundi ISO (corrige les rangs avec `week_start = dimanche` créés par un ancien bug).
+2. Calcul `start_date = min(monday)` et `num_weeks = (max - min) / 7 + 1`.
+3. Création d'un `training_plans` "Plan migré (legacy slots) — {display_name}", owner_id=2 (admin), is_draft=false.
+4. Insert des sessions via `DISTINCT ON (rel_week, day_of_week) ... ORDER BY rel_week, day_of_week, CASE time_slot WHEN morning THEN 0 ELSE 1 END` (préfère morning sur conflit).
+5. Création d'un `training_plan_applications` target_user_id=athlete, start_date=min_monday.
+
+Résultat : François WAGNER (user_id=1) → plan id=2 "Plan migré (legacy slots) — François WAGNER", 10 semaines, 32 sessions. 4 sessions originelles dédupliquées (rang week_start=2026-05-10 dimanche qui mappait au lundi 2026-05-04 déjà couvert).
+
+Les tables `strength_planning_slots` et `strength_planning_slot_overrides` ne sont **pas supprimées** — conservées pour rollback si besoin, mais plus exploitées par l'UI.
+
+### §276.3 — Réécriture StrengthPlanningScreen en read-only preview
+
+Réécriture complète (1199 → 829 LOC, -31%) :
+
+- Suppression de `useStrengthPlanningAthleteMode` (mutations, week meta), des queries `getStrengthPlanningSlots` / overrides, des sheets picker/detail/changeSession.
+- Conservation : group selection, athlete selection (avec URL hash sync), self-coach injection, competition derivation.
+- Nouveau : query `getTrainingPlanApplicationsForGroup({ groupId, discipline })` (helper ajouté dans `src/lib/api/training-plans.ts`), branchement conditionnel athlète vs groupe via `selectedAthleteId != null`.
+- `athletePlanByWeekDay` dérivé du combo applications + sessions via la pure fn `derivePlanByWeekDay` (§275.6, déjà testée).
+- Timeline passé en `readOnly` + `effectiveSlotsByWeek={new Map()}` (vide, plus de slot overlay).
+- Drawer read-only `CellDetailDrawer` (même langage visuel que §275.8-fix dans TrainingPlansBrowser) : ouvert au tap sur cellule pleine, affiche exercices/sets/reps/%1RM/repos, sans actions d'édition.
+- Header restylé : titre "Aperçu plan muscu" + sub-line "Lecture seule — pour éditer un plan, va dans Biblio > Plans". Badge "N plans" si applications actives.
+- Empty state si aucune application : message + indication "Va dans Biblio > Plans pour créer un plan puis utilise Appliquer".
+
+### Helper API ajouté
+
+`getTrainingPlanApplicationsForGroup({ groupId, discipline? })` dans `training-plans.ts` (~+35 LOC) : symétrique de `getTrainingPlanApplicationsForUser` mais filtre `target_group_id = groupId`. Export ajouté à `src/lib/api/index.ts`.
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/StrengthPlanningScreen.tsx` | **Réécriture complète** : 1199 → 829 LOC, read-only preview |
+| `src/pages/coach/StrengthCatalog.tsx` | Retrait sous-toggle "Plans nageurs" + import AthletePlansTab |
+| `src/lib/api/training-plans.ts` | +35 LOC : `getTrainingPlanApplicationsForGroup` |
+| `src/lib/api/index.ts` | +1 export |
+| `docs/claude/files-map.md` | Mise à jour ligne StrengthPlanningScreen |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+- `npx vitest run derivePlanByWeekDay + strengthPlanningMerge` : 21/21 pass ✅
+
+### Vérification fonctionnelle attendue
+
+1. **Biblio > Musculation > Plans** : plus de sous-onglet "Plans nageurs". Liste affiche les plans génériques (id=1 "Prépa sprint 50m" + id=2 "Plan migré — François WAGNER").
+2. **Hub > Planif. Muscu** : header "Aperçu plan muscu — Lecture seule". Sélectionne François WAGNER → toutes les cellules S13 à S22 affichent les séances du Plan migré (badge "P"). Tap sur une cellule → drawer en lecture seule avec exercices/sets/reps/%1RM/repos.
+3. **Mode groupe** : sélectionne "Elite" + "Aperçu groupe" → si une application est sur le groupe, elle s'affiche ; sinon empty state CTA "Va dans Biblio > Plans".
+
+### Limites & suites
+
+- Les tables `strength_planning_slots*` ne sont pas droppées. À supprimer dans un futur §276.4 si plus aucun rollback envisagé.
+- `useStrengthPlanningAthleteMode.ts` n'est plus consommé. À supprimer si plus jamais référencé (vérifier au build : pour l'instant `mergeStrengthSlots` est encore exporté et testé, donc le fichier reste utile).
+- Le hook `useStrengthPlanByISO.ts` peut aussi devenir orphan ; à vérifier.
+
 ## §275.8-fix — Drawer détail session : refonte lisibilité 5s (2026-05-13)
 
 **Branche** : `main`

@@ -32,6 +32,7 @@ import {
   deleteTrainingPlanSession,
   getAthletes,
   getGroups,
+  getStrengthFolders,
   getStrengthSessions,
   getTrainingPlanApplications,
   getTrainingPlanSessions,
@@ -41,6 +42,7 @@ import {
 } from "@/lib/api";
 import type {
   AthleteSummary,
+  StrengthFolder,
   StrengthSessionTemplate,
   TrainingPlan,
   TrainingPlanSession,
@@ -81,8 +83,53 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { FolderCard } from "@/components/shared/FolderCard";
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+function PickerSessionRow({
+  session,
+  isSelected,
+  isPending,
+  onPick,
+}: {
+  session: StrengthSessionTemplate;
+  isSelected: boolean;
+  isPending: boolean;
+  onPick: (id: number) => void;
+}) {
+  const phase = detectPhase(session.title ?? session.name ?? "");
+  const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+  const itemCount = session.items?.length ?? 0;
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(session.id)}
+      disabled={isPending}
+      className={cn(
+        "w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] active:scale-[0.98]",
+        isSelected ? cn(style.bg, "ring-2 ring-primary/30") : "hover:bg-muted/50",
+      )}
+    >
+      <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", style.dot)} />
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium block truncate">
+          {session.title ?? session.name}
+        </span>
+        {session.description && (
+          <span className="text-[11px] text-muted-foreground line-clamp-1">
+            {session.description}
+          </span>
+        )}
+      </div>
+      {itemCount > 0 && (
+        <Badge variant="secondary" className="text-[10px] shrink-0">
+          {itemCount} ex.
+        </Badge>
+      )}
+    </button>
+  );
+}
 
 export default function TrainingPlansBrowser() {
   const userId = useAuth((s) => s.userId);
@@ -377,6 +424,12 @@ function TrainingPlanEditor({
     staleTime: 5 * 60_000,
   });
 
+  const { data: sessionFolders = [] } = useQuery({
+    queryKey: ["strength_folders", "session", null],
+    queryFn: () => getStrengthFolders("session", { athleteId: null }),
+    staleTime: 5 * 60_000,
+  });
+
   const templatesById = useMemo(() => {
     const map = new Map<number, StrengthSessionTemplate>();
     for (const t of templates) map.set(t.id, t);
@@ -519,6 +572,24 @@ function TrainingPlanEditor({
         (t.name ?? "").toLowerCase().includes(q),
     );
   }, [templates, debouncedSearch]);
+
+  const { pickerFolders, pickerUnfiled } = useMemo(() => {
+    const byFolder = new Map<number, StrengthSessionTemplate[]>();
+    const unfiled: StrengthSessionTemplate[] = [];
+    for (const t of filteredTemplates) {
+      if (t.folder_id != null) {
+        const arr = byFolder.get(t.folder_id) ?? [];
+        arr.push(t);
+        byFolder.set(t.folder_id, arr);
+      } else {
+        unfiled.push(t);
+      }
+    }
+    const folders = sessionFolders
+      .map((f) => ({ folder: f, sessions: byFolder.get(f.id) ?? [] }))
+      .filter(({ sessions }) => sessions.length > 0);
+    return { pickerFolders: folders, pickerUnfiled: unfiled };
+  }, [filteredTemplates, sessionFolders]);
 
   if (!plan) {
     return (
@@ -826,50 +897,55 @@ function TrainingPlanEditor({
               onChange={(e) => setPickerSearch(e.target.value)}
             />
           </div>
-          <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-1">
+          <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-2">
             {filteredTemplates.length === 0 ? (
               <div className="text-center py-8">
                 <Dumbbell className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Aucune séance trouvée</p>
               </div>
             ) : (
-              filteredTemplates.map((s) => {
-                const phase = detectPhase(s.title ?? s.name ?? "");
-                const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-                const itemCount = s.items?.length ?? 0;
-                const isSelected = picker?.existingId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => handlePick(s.id)}
-                    disabled={upsertSession.isPending}
-                    className={cn(
-                      "w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] active:scale-[0.98]",
-                      isSelected
-                        ? cn(style.bg, "ring-2 ring-primary/30")
-                        : "hover:bg-muted/50",
-                    )}
+              <>
+                {pickerFolders.map(({ folder, sessions }) => (
+                  <FolderCard
+                    key={folder.id}
+                    name={folder.name}
+                    count={sessions.length}
+                    defaultOpen={false}
                   >
-                    <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", style.dot)} />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium block truncate">
-                        {s.title ?? s.name}
-                      </span>
-                      {s.description && (
-                        <span className="text-[11px] text-muted-foreground line-clamp-1">
-                          {s.description}
-                        </span>
-                      )}
+                    <div className="space-y-1 pt-1">
+                      {sessions.map((s) => (
+                        <PickerSessionRow
+                          key={s.id}
+                          session={s}
+                          isSelected={picker?.existingId === s.id}
+                          isPending={upsertSession.isPending}
+                          onPick={handlePick}
+                        />
+                      ))}
                     </div>
-                    {itemCount > 0 && (
-                      <Badge variant="secondary" className="text-[10px] shrink-0">
-                        {itemCount} ex.
-                      </Badge>
+                  </FolderCard>
+                ))}
+                {pickerUnfiled.length > 0 && (
+                  <>
+                    {pickerFolders.length > 0 && (
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pt-1">
+                        Non classées
+                      </p>
                     )}
-                  </button>
-                );
-              })
+                    <div className="space-y-1">
+                      {pickerUnfiled.map((s) => (
+                        <PickerSessionRow
+                          key={s.id}
+                          session={s}
+                          isSelected={picker?.existingId === s.id}
+                          isPending={upsertSession.isPending}
+                          onPick={handlePick}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </div>
         </SheetContent>

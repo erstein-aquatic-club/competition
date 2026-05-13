@@ -1,56 +1,51 @@
 /**
- * StrengthPlanningScreen.tsx — Strength training planner for coaches
- * Vertical timeline of weeks with expandable micro-grids for session assignment.
- * Route: /#/coach/strength-planning
+ * StrengthPlanningScreen.tsx — Read-only preview of an athlete's (or group's)
+ * weekly strength plan, derived from `training_plan_applications` (§276.3).
  *
- * Mirror of SwimPlanningDemo.tsx (Phase 3 §158).
- * Main differences:
- * - No filière concept — session template is the primary content.
- * - Picker: lists strength_session_templates (from getStrengthSessions).
- * - Sheet détail: show session items + notes + actions.
- * - No FilièresEditor overlay.
- * - 7 day rows (uses shared DAY_ROWS from swimPlanningShared which already has 7).
+ * §276 simplification : ce composant n'édite plus de slots. Il sert
+ * uniquement à montrer au coach comment le plan d'entraînement appliqué
+ * s'affichera côté nageur. L'édition d'un plan se fait dans biblio > Plans
+ * (TrainingPlansBrowser), et l'application via le dialog "Appliquer".
+ *
+ * Mode groupe (pas de nageur sélectionné) : affiche le plan appliqué au
+ * groupe via `training_plan_applications.target_group_id`.
+ * Mode nageur : applications direct + via groupes (helper
+ * `getTrainingPlanApplicationsForUser`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery } from "@tanstack/react-query";
 import {
   getGroups,
-  getStrengthFolders,
-  getStrengthPlanningSlots,
   getStrengthSessions,
   getCompetitions,
   getMyCompetitionIds,
+  getAthletes,
   getTrainingPlanApplicationsForUser,
+  getTrainingPlanApplicationsForGroup,
   getTrainingPlanSessionsForPlans,
 } from "@/lib/api";
 import type {
-  StrengthFolder,
   StrengthSessionTemplate,
   Competition,
   AthleteSummary,
   GroupSummary,
 } from "@/lib/api/types";
 import type { EffectiveStrengthSlot } from "@/lib/strengthPlanningMerge";
-import type { StrengthPlanningSlot } from "@/lib/api/types";
-import { derivePlanByWeekDay, type DerivedCell } from "@/lib/strength/derivePlanByWeekDay";
+import {
+  derivePlanByWeekDay,
+  type DerivedCell,
+} from "@/lib/strength/derivePlanByWeekDay";
 import { detectPhase, PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
-import { useStrengthPlanningAthleteMode } from "@/hooks/coach/useStrengthPlanningAthleteMode";
 import StrengthPlanningTimeline from "@/components/coach/strength/StrengthPlanningTimeline";
 import {
   generateWeeks,
   getMonday,
-  DAY_ROWS,
-  type WeekInfo,
 } from "@/components/coach/swim/swimPlanningShared";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -61,51 +56,126 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet";
 import {
   ArrowLeft,
   Dumbbell,
-  Search,
-  Trash2,
+  Eye,
   Trophy,
   Users,
 } from "lucide-react";
 
-/* ═══════════════════════════════════════════════════════════════════
-   Constants
-   ═══════════════════════════════════════════════════════════════════ */
-
-const INITIAL_WEEK_COUNT = 13; // current + 12 ahead
+const INITIAL_WEEK_COUNT = 13;
 const LOAD_MORE_COUNT = 4;
 
-/* ═══════════════════════════════════════════════════════════════════
-   Main Component
-   ═══════════════════════════════════════════════════════════════════ */
+const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+const CYCLE_LABEL: Record<string, string> = {
+  endurance: "Endurance",
+  hypertrophie: "Hypertrophie",
+  force: "Force",
+};
+
+function formatRest(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return sec === 0 ? `${m}'` : `${m}'${String(sec).padStart(2, "0")}`;
+}
 
 export default function StrengthPlanningScreen() {
-  // ── Group selection ──
+  // ── Groups & selection ──
   const { data: groups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ["groups"],
     queryFn: () => getGroups(),
   });
-
-  // Filter to permanent groups only
   const permanentGroups = useMemo(
     () => groups.filter((g) => !g.is_temporary),
     [groups],
   );
 
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-
-  // Auto-select first group
   useEffect(() => {
     if (permanentGroups.length > 0 && selectedGroupId === null) {
       setSelectedGroupId(permanentGroups[0].id);
     }
   }, [permanentGroups, selectedGroupId]);
+
+  // ── Athlete selection (URL hash sync) ──
+  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(
+    () => {
+      const params = new URLSearchParams(
+        window.location.hash.split("?")[1] ?? "",
+      );
+      const raw = params.get("athlete");
+      const n = raw ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : null;
+    },
+  );
+
+  useEffect(() => {
+    const [path, qs] = window.location.hash.split("?");
+    const params = new URLSearchParams(qs ?? "");
+    if (selectedAthleteId) {
+      params.set("athlete", String(selectedAthleteId));
+    } else {
+      params.delete("athlete");
+    }
+    const next = params.toString();
+    const nextHash = next ? `${path}?${next}` : path;
+    if (nextHash !== window.location.hash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  }, [selectedAthleteId]);
+
+  // ── Athletes (filtered to selected group + coach self-injection) ──
+  const { data: allAthletes = [] } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => getAthletes(),
+    staleTime: 5 * 60_000,
+  });
+  const coachUserId = useAuth((s) => s.userId);
+  const coachUserName = useAuth((s) => s.user);
+  const coachRole = useAuth((s) => s.role);
+  const coachSelfAthlete = useMemo<AthleteSummary | null>(() => {
+    if (coachRole !== "coach" && coachRole !== "admin") return null;
+    if (coachUserId == null || !coachUserName) return null;
+    return {
+      id: coachUserId,
+      display_name: `${coachUserName} (moi)`,
+      email: null,
+      group_id: null,
+      group_label: null,
+      ffn_iuf: null,
+      avatar_url: null,
+    };
+  }, [coachRole, coachUserId, coachUserName]);
+
+  const groupAthletes = useMemo(() => {
+    const filtered = allAthletes.filter(
+      (a) => a.id != null && a.group_id === selectedGroupId,
+    );
+    if (!coachSelfAthlete) return filtered;
+    if (filtered.some((a) => a.id === coachSelfAthlete.id)) return filtered;
+    return [coachSelfAthlete, ...filtered];
+  }, [allAthletes, selectedGroupId, coachSelfAthlete]);
+
+  const selectedAthlete = useMemo(
+    () => groupAthletes.find((a) => a.id === selectedAthleteId) ?? null,
+    [groupAthletes, selectedAthleteId],
+  );
+
+  useEffect(() => {
+    if (selectedAthleteId == null) return;
+    if (allAthletes.length === 0) return;
+    const stillInGroup = groupAthletes.some(
+      (a) => a.id === selectedAthleteId,
+    );
+    if (!stillInGroup) setSelectedAthleteId(null);
+  }, [allAthletes, groupAthletes, selectedAthleteId, selectedGroupId]);
 
   // ── Week generation (infinite scroll) ──
   const startMonday = useMemo(() => getMonday(new Date()), []);
@@ -116,10 +186,8 @@ export default function StrengthPlanningScreen() {
   );
   const visibleWeekKeys = useMemo(() => weeks.map((w) => w.weekKey), [weeks]);
 
-  // Sentinel ref for infinite scroll
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
-
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -139,76 +207,19 @@ export default function StrengthPlanningScreen() {
     return () => observer.disconnect();
   }, []);
 
-  // ── Strength planning slots ──
-  const {
-    data: slots = [],
-    isLoading: slotsLoading,
-  } = useQuery({
-    queryKey: ["strength-planning-slots", selectedGroupId, visibleWeekKeys],
-    queryFn: () =>
-      getStrengthPlanningSlots({
-        groupId: selectedGroupId!,
-        weekStarts: visibleWeekKeys,
-      }),
-    enabled: !!selectedGroupId && visibleWeekKeys.length > 0,
-  });
-
-  // Index slots by weekKey for fast lookup
-  const slotsByWeek = useMemo(() => {
-    const map = new Map<string, StrengthPlanningSlot[]>();
-    for (const s of slots) {
-      const arr = map.get(s.week_start) ?? [];
-      arr.push(s);
-      map.set(s.week_start, arr);
-    }
-    return map;
-  }, [slots]);
-
-  // ── Athlete mode: selection + merged slots + week meta + routed writes ──
-  const {
-    selectedAthleteId,
-    setSelectedAthleteId,
-    selectedAthlete,
-    groupAthletes,
-    effectiveSlotsByWeek,
-    getEffectiveWeekMeta,
-    existingWeekTypes,
-    writeSlot,
-    deleteSlot,
-    writeWeekMeta,
-    isPending,
-  } = useStrengthPlanningAthleteMode({
-    selectedGroupId,
-    visibleWeekKeys,
-    groupSlotsByWeek: slotsByWeek,
-  });
-
   // ── Session templates catalog ──
   const { data: sessionTemplates = [] } = useQuery({
     queryKey: ["strength-sessions"],
     queryFn: () => getStrengthSessions(),
     staleTime: 5 * 60_000,
   });
-
-  // Map id → template for fast lookup in timeline
   const sessionTemplatesById = useMemo(() => {
     const map = new Map<number, StrengthSessionTemplate>();
-    for (const t of sessionTemplates) {
-      map.set(t.id, t);
-    }
+    for (const t of sessionTemplates) map.set(t.id, t);
     return map;
   }, [sessionTemplates]);
 
-  // ── Athlete biblio plan folders (cycles) — feeds the picker in athlete mode ──
-  const { data: athletePlanFolders = [] } = useQuery({
-    queryKey: ["strength_folders", "session", selectedAthleteId],
-    queryFn: () =>
-      getStrengthFolders("session", { athleteId: selectedAthleteId! }),
-    enabled: selectedAthleteId != null,
-  });
-
-  // §275.6 — training_plan applications targeting the selected athlete.
-  // Used to derive the timeline (auto-fill cells from the active plan).
+  // ── Training plan applications : athlete mode OR group mode ──
   const { data: athleteApplications = [] } = useQuery({
     queryKey: ["training_plan_applications", "for-user", selectedAthleteId],
     queryFn: () =>
@@ -219,37 +230,43 @@ export default function StrengthPlanningScreen() {
     enabled: selectedAthleteId != null,
   });
 
-  const applicationPlanIds = useMemo(
-    () => Array.from(new Set(athleteApplications.map((a) => a.plan_id))),
-    [athleteApplications],
-  );
+  const { data: groupApplications = [] } = useQuery({
+    queryKey: ["training_plan_applications", "for-group", selectedGroupId],
+    queryFn: () =>
+      getTrainingPlanApplicationsForGroup({
+        groupId: selectedGroupId!,
+        discipline: "strength",
+      }),
+    enabled: selectedGroupId != null && selectedAthleteId == null,
+  });
 
-  const { data: applicationPlanSessions = [] } = useQuery({
+  const activeApplications = selectedAthleteId != null
+    ? athleteApplications
+    : groupApplications;
+
+  const applicationPlanIds = useMemo(
+    () => Array.from(new Set(activeApplications.map((a) => a.plan_id))),
+    [activeApplications],
+  );
+  const { data: applicationPlanSessions = [], isLoading: planSessionsLoading } = useQuery({
     queryKey: ["training_plan_sessions", "for-plans", applicationPlanIds],
     queryFn: () => getTrainingPlanSessionsForPlans(applicationPlanIds),
     enabled: applicationPlanIds.length > 0,
   });
 
-  // Derived: per-weekKey, per-dayIndex inherited session from the athlete's
-  // active training plans. Will be passed to the Timeline and rendered as
-  // "from-plan" cells (solid, with a small plan badge), distinct from
-  // explicit strength_planning_slots overrides.
+  // ── Derive per-week/day map of inherited sessions ──
   const derivedPlanCells: Map<string, Map<number, DerivedCell>> = useMemo(
     () =>
       derivePlanByWeekDay({
         weekKeys: visibleWeekKeys,
-        applications: athleteApplications,
+        applications: activeApplications,
         sessions: applicationPlanSessions,
       }),
-    [visibleWeekKeys, athleteApplications, applicationPlanSessions],
+    [visibleWeekKeys, activeApplications, applicationPlanSessions],
   );
 
-  // Convert derived cells → StrengthSessionTemplate map per (weekKey, dayIndex)
-  // for the timeline. Cells whose template was removed from the catalog
-  // (deleted, hidden) are dropped — the cell appears empty.
   const athletePlanByWeekDay = useMemo(() => {
     const map = new Map<string, Map<number, StrengthSessionTemplate>>();
-    if (derivedPlanCells.size === 0) return map;
     for (const [weekKey, dayMap] of derivedPlanCells) {
       const dayResult = new Map<number, StrengthSessionTemplate>();
       for (const [dayIndex, cell] of dayMap) {
@@ -263,25 +280,23 @@ export default function StrengthPlanningScreen() {
     return map;
   }, [derivedPlanCells, sessionTemplatesById]);
 
-  // ── Competitions (context for planning) ──
+  // ── Competitions (context) ──
   const { data: allCompetitions = [] } = useQuery({
     queryKey: ["competitions"],
     queryFn: () => getCompetitions(),
   });
-
-  // In athlete mode, filter to only that athlete's assigned competitions.
   const { data: athleteCompetitionIds = [] } = useQuery({
     queryKey: ["my-competition-ids", selectedAthleteId],
     queryFn: () => getMyCompetitionIds(selectedAthleteId),
     enabled: selectedAthleteId != null,
   });
-
   const visibleCompetitions = useMemo(() => {
     if (selectedAthleteId == null) return allCompetitions;
-    return allCompetitions.filter((c) => athleteCompetitionIds.includes(c.id));
+    return allCompetitions.filter((c) =>
+      athleteCompetitionIds.includes(c.id),
+    );
   }, [allCompetitions, athleteCompetitionIds, selectedAthleteId]);
 
-  // Group competitions by week key
   const competitionsByWeek = useMemo(() => {
     const map = new Map<string, Competition[]>();
     for (const c of visibleCompetitions) {
@@ -322,264 +337,25 @@ export default function StrengthPlanningScreen() {
   );
 
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
-
-  // ── Expanded week ──
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
 
-  // ── Editing week meta ──
-  const [editingWeekKey, setEditingWeekKey] = useState<string | null>(null);
-  const [editWeekType, setEditWeekType] = useState("");
-  const [editWeekNotes, setEditWeekNotes] = useState("");
-
-  const handleStartEditMeta = (weekKey: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!selectedGroupId) return;
-    const meta = getEffectiveWeekMeta(weekKey);
-    setEditWeekType(meta.week_type ?? "");
-    setEditWeekNotes(meta.notes ?? "");
-    setEditingWeekKey(weekKey);
-  };
-
-  const handleSaveMeta = () => {
-    if (!editingWeekKey) return;
-    const weekType = editWeekType.trim() || null;
-    const notes = editWeekNotes.trim() || null;
-    writeWeekMeta(editingWeekKey, weekType, notes, {
-      onSuccess: () => setEditingWeekKey(null),
-      onError: (err: Error) => {
-        toast.error("Erreur", { description: err.message });
-      },
-    });
-  };
-
-  const handleCancelEditMeta = () => {
-    setEditingWeekKey(null);
-  };
-
-  // ── Slot picker state (one slot per day — always writes "morning") ──
-  const [picker, setPicker] = useState<{
+  // ── Read-only cell detail drawer ──
+  const [detailCell, setDetailCell] = useState<{
     weekKey: string;
     dayIndex: number;
-    existing: EffectiveStrengthSlot | null;
+    template: StrengthSessionTemplate;
   } | null>(null);
-  const [pickerSearch, setPickerSearch] = useState("");
-  const debouncedPickerSearch = useDebouncedValue(pickerSearch, 200);
 
-  // ── Detail sheet state (tap case pleine) ──
-  const [detailSlot, setDetailSlot] = useState<EffectiveStrengthSlot | null>(null);
-  const [detailWeekKey, setDetailWeekKey] = useState<string | null>(null);
-  const [detailDayIndex, setDetailDayIndex] = useState<number | null>(null);
-  const [detailNotes, setDetailNotes] = useState("");
-
-  // Open detail sheet or picker depending on whether cell is filled
   const handleSlotTap = useCallback(
-    (
-      weekKey: string,
-      dayIndex: number,
-      slot: EffectiveStrengthSlot | null,
-    ) => {
-      if (!selectedGroupId) return;
-      if (slot) {
-        setDetailSlot(slot);
-        setDetailWeekKey(weekKey);
-        setDetailDayIndex(dayIndex);
-        setDetailNotes(slot.notes ?? "");
-      } else {
-        setPicker({ weekKey, dayIndex, existing: null });
-        setPickerSearch("");
-      }
+    (weekKey: string, dayIndex: number, slot: EffectiveStrengthSlot | null) => {
+      void slot; // ignore (no overrides in read-only mode)
+      const tpl = athletePlanByWeekDay.get(weekKey)?.get(dayIndex);
+      if (tpl) setDetailCell({ weekKey, dayIndex, template: tpl });
     },
-    [selectedGroupId],
+    [athletePlanByWeekDay],
   );
 
-  const onWriteError = useCallback(
-    (err: Error) => {
-      toast.error("Erreur", { description: err.message });
-    },
-    [toast],
-  );
-
-  // ── Session search & grouping ──
-  // In athlete mode, sessions from the athlete's biblio plan are surfaced
-  // first (grouped by cycle), with the rest of the catalog below as
-  // "Catalogue général". In group mode, fall back to a single flat list.
-  const catalogGrouped = useMemo(() => {
-    const inPlanIds = new Set<number>();
-    const groups: { label: string; sessions: StrengthSessionTemplate[] }[] = [];
-
-    if (selectedAthleteId != null && athletePlanFolders.length > 0) {
-      const rootFolders = athletePlanFolders.filter((f) => !f.parent_id);
-      const subFoldersByRoot = new Map<number, StrengthFolder[]>();
-      for (const f of athletePlanFolders) {
-        if (f.parent_id != null) {
-          const arr = subFoldersByRoot.get(f.parent_id) ?? [];
-          arr.push(f);
-          subFoldersByRoot.set(f.parent_id, arr);
-        }
-      }
-      const folderSessions = new Map<number, StrengthSessionTemplate[]>();
-      for (const t of sessionTemplates) {
-        if (!t.items || t.items.length === 0) continue;
-        if (t.folder_id == null) continue;
-        const arr = folderSessions.get(t.folder_id) ?? [];
-        arr.push(t);
-        folderSessions.set(t.folder_id, arr);
-      }
-      for (const root of rootFolders) {
-        const cycles = subFoldersByRoot.get(root.id) ?? [];
-        for (const cycle of cycles) {
-          const sessions = folderSessions.get(cycle.id) ?? [];
-          if (sessions.length === 0) continue;
-          groups.push({ label: cycle.name, sessions });
-          for (const s of sessions) inPlanIds.add(s.id);
-        }
-        const rootSessions = folderSessions.get(root.id) ?? [];
-        if (rootSessions.length > 0) {
-          groups.push({ label: `${root.name} — non classé`, sessions: rootSessions });
-          for (const s of rootSessions) inPlanIds.add(s.id);
-        }
-      }
-    }
-
-    // Everything else → general catalog
-    const generalSessions: StrengthSessionTemplate[] = [];
-    for (const t of sessionTemplates) {
-      if (!t.items || t.items.length === 0) continue;
-      if (inPlanIds.has(t.id)) continue;
-      generalSessions.push(t);
-    }
-    if (generalSessions.length > 0) {
-      groups.push({
-        label: groups.length > 0 ? "Catalogue général" : "Séances",
-        sessions: generalSessions,
-      });
-    }
-    return groups;
-  }, [sessionTemplates, selectedAthleteId, athletePlanFolders]);
-
-  const filteredCatalog = useMemo(() => {
-    if (!debouncedPickerSearch.trim()) return catalogGrouped;
-    const q = debouncedPickerSearch.toLowerCase();
-    return catalogGrouped
-      .map((g) => ({
-        ...g,
-        sessions: g.sessions.filter(
-          (s) =>
-            (s.title ?? "").toLowerCase().includes(q) ||
-            (s.name ?? "").toLowerCase().includes(q),
-        ),
-      }))
-      .filter((g) => g.sessions.length > 0);
-  }, [catalogGrouped, debouncedPickerSearch]);
-
-  // Day-of-week prefix matching ("Lun", "Mardi", etc. in the session title)
-  // → highlight suggested sessions for the currently-targeted day. Works
-  // both for the create flow (picker) and the change-session flow (detail).
-  const dayPickerPrefixes = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
-  const targetDayIndex = picker?.dayIndex ?? detailDayIndex ?? null;
-  const isDaySuggested = useCallback(
-    (s: StrengthSessionTemplate): boolean => {
-      if (targetDayIndex == null) return false;
-      const prefix = dayPickerPrefixes[targetDayIndex];
-      if (!prefix) return false;
-      const title = (s.title ?? s.name ?? "").trim().toLowerCase();
-      return title.startsWith(prefix);
-    },
-    // dayPickerPrefixes is a stable inline const — no need to add as dep
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [targetDayIndex],
-  );
-
-  const handlePickSession = (templateId: number) => {
-    if (!picker) return;
-    writeSlot(
-      {
-        weekKey: picker.weekKey,
-        dayIndex: picker.dayIndex,
-        timeSlot: "morning",
-        session_template_id: templateId,
-        notes: null,
-      },
-      {
-        onSuccess: () => setPicker(null),
-        onError: onWriteError,
-      },
-    );
-  };
-
-  // Editing an existing slot: preserve its original time_slot (could be a
-  // legacy "evening" row) so the update targets the right DB record.
-  const handleChangeSession = (templateId: number) => {
-    if (!detailSlot || !detailWeekKey || detailDayIndex == null) return;
-    writeSlot(
-      {
-        weekKey: detailWeekKey,
-        dayIndex: detailDayIndex,
-        timeSlot: detailSlot.time_slot,
-        session_template_id: templateId,
-        notes: detailSlot.notes,
-        existingSlot: detailSlot,
-      },
-      {
-        onSuccess: () => {
-          setPicker(null);
-          setDetailSlot(null);
-        },
-        onError: onWriteError,
-      },
-    );
-  };
-
-  const handleSaveNotes = () => {
-    if (!detailSlot || !detailWeekKey || detailDayIndex == null) return;
-    const tplId = detailSlot.session_template_id;
-    writeSlot(
-      {
-        weekKey: detailWeekKey,
-        dayIndex: detailDayIndex,
-        timeSlot: detailSlot.time_slot,
-        session_template_id: tplId,
-        notes: detailNotes.trim() || null,
-        existingSlot: detailSlot,
-      },
-      {
-        onSuccess: () => setDetailSlot(null),
-        onError: onWriteError,
-      },
-    );
-  };
-
-  const handleDetachSession = () => {
-    if (!detailSlot || !detailWeekKey || detailDayIndex == null) return;
-    writeSlot(
-      {
-        weekKey: detailWeekKey,
-        dayIndex: detailDayIndex,
-        timeSlot: detailSlot.time_slot,
-        session_template_id: null,
-        notes: null,
-        existingSlot: detailSlot,
-      },
-      {
-        onSuccess: () => setDetailSlot(null),
-        onError: onWriteError,
-      },
-    );
-  };
-
-  const handleDeleteSlot = () => {
-    if (!detailSlot) return;
-    deleteSlot(detailSlot, {
-      onSuccess: () => setDetailSlot(null),
-      onError: onWriteError,
-    });
-  };
-
-  // ── State to re-open picker from detail sheet ──
-  const [changeSessionMode, setChangeSessionMode] = useState(false);
-
-  // ── Loading / empty states ──
-
+  // ── Loading & empty states ──
   if (groupsLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -609,6 +385,7 @@ export default function StrengthPlanningScreen() {
           groups={[]}
           selectedGroupId={null}
           onSelectGroup={() => {}}
+          activeApplicationCount={0}
         />
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
@@ -618,22 +395,18 @@ export default function StrengthPlanningScreen() {
             Aucun groupe disponible
           </p>
           <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[260px]">
-            Crée un groupe dans l'administration pour commencer la
-            planification muscu.
+            Crée un groupe dans l'administration pour visualiser un plan
+            d'entraînement muscu.
           </p>
         </div>
       </div>
     );
   }
 
-  // Template used in detail sheet
-  const detailTemplate = detailSlot?.session_template_id
-    ? sessionTemplatesById.get(detailSlot.session_template_id)
-    : null;
+  const isEmpty = athletePlanByWeekDay.size === 0;
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* ── Header ── */}
       <Header
         groups={permanentGroups}
         selectedGroupId={selectedGroupId}
@@ -642,13 +415,28 @@ export default function StrengthPlanningScreen() {
         selectedAthleteId={selectedAthleteId}
         selectedAthlete={selectedAthlete}
         onSelectAthlete={setSelectedAthleteId}
+        activeApplicationCount={activeApplications.length}
       />
 
-      {/* ── Timeline ── */}
+      {isEmpty && !planSessionsLoading && (
+        <div className="px-4 pt-4">
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-center">
+            <Eye className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-foreground">
+              Aucun plan appliqué pour {selectedAthlete?.display_name ?? (selectedAthleteId == null ? "ce groupe" : "ce nageur")}.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px] mx-auto">
+              Va dans Biblio &gt; Plans pour créer un plan, puis utilise le bouton
+              « Appliquer » pour l'assigner à {selectedAthleteId == null ? "un groupe" : "ce nageur"}.
+            </p>
+          </div>
+        </div>
+      )}
+
       <StrengthPlanningTimeline
         weeks={weeks}
-        effectiveSlotsByWeek={effectiveSlotsByWeek}
-        getEffectiveWeekMeta={getEffectiveWeekMeta}
+        effectiveSlotsByWeek={new Map()}
+        getEffectiveWeekMeta={() => ({ week_type: null, notes: null, source: "none" })}
         sessionTemplatesById={sessionTemplatesById}
         competitionsByWeek={competitionsByWeek}
         getDayCompetitions={getDayCompetitions}
@@ -657,307 +445,31 @@ export default function StrengthPlanningScreen() {
           setExpandedWeekKey((current) => (current === weekKey ? null : weekKey))
         }
         onSlotTap={handleSlotTap}
-        onWeekMetaTap={handleStartEditMeta}
+        onWeekMetaTap={() => {}}
         onCompetitionTap={setSelectedCompetition}
-        editingWeekKey={editingWeekKey}
-        editWeekType={editWeekType}
-        editWeekNotes={editWeekNotes}
-        existingWeekTypes={existingWeekTypes}
-        onSaveMeta={handleSaveMeta}
-        onCancelEditMeta={handleCancelEditMeta}
-        onEditTypeChange={setEditWeekType}
-        onEditNotesChange={setEditWeekNotes}
-        showOverrideBadge={selectedAthleteId != null}
+        editingWeekKey={null}
+        editWeekType=""
+        editWeekNotes=""
+        existingWeekTypes={[]}
+        onSaveMeta={() => {}}
+        onCancelEditMeta={() => {}}
+        onEditTypeChange={() => {}}
+        onEditNotesChange={() => {}}
+        showOverrideBadge={false}
         athletePlanByWeekDay={athletePlanByWeekDay}
         sentinelRef={sentinelRef}
-        isLoading={slotsLoading}
-        isEmpty={slots.length === 0}
+        isLoading={planSessionsLoading}
+        isEmpty={isEmpty}
+        readOnly
       />
 
-      {/* ── Picker session template bottom sheet ── */}
-      <Sheet
-        open={!!picker || changeSessionMode}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPicker(null);
-            setChangeSessionMode(false);
-          }
-        }}
-      >
-        <SheetContent
-          side="bottom"
-          className="rounded-t-2xl max-h-[85dvh] flex flex-col"
-        >
-          <SheetHeader className="pb-2 shrink-0">
-            <SheetTitle className="text-base">Choisir une séance</SheetTitle>
-            <SheetDescription className="text-xs text-muted-foreground">
-              {picker
-                ? (DAY_ROWS[picker.dayIndex]?.label ?? "")
-                : "Changer la séance assignée"}
-            </SheetDescription>
-          </SheetHeader>
+      {/* Cell detail drawer (read-only) */}
+      <CellDetailDrawer
+        cell={detailCell}
+        onClose={() => setDetailCell(null)}
+      />
 
-          {/* Search bar */}
-          <div className="relative shrink-0 mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-            <Input
-              className="pl-9 h-9 text-sm"
-              placeholder="Rechercher une séance..."
-              value={pickerSearch}
-              onChange={(e) => setPickerSearch(e.target.value)}
-            />
-          </div>
-
-          {/* Session list */}
-          <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-4">
-            {filteredCatalog.length === 0 ? (
-              <div className="text-center py-8">
-                <Dumbbell className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Aucune séance trouvée
-                </p>
-              </div>
-            ) : (
-              filteredCatalog.map((group, gi) => (
-                <div key={gi}>
-                  {filteredCatalog.length > 1 && (
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
-                      {group.label}
-                    </p>
-                  )}
-                  <div className="space-y-1">
-                    {group.sessions.map((s) => {
-                      const phase = detectPhase(s.title ?? s.name ?? "");
-                      const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-                      const itemCount = s.items?.length ?? 0;
-                      const currentId = changeSessionMode
-                        ? detailSlot?.session_template_id
-                        : picker?.existing?.session_template_id;
-                      const isSelected = currentId === s.id;
-                      const suggested = isDaySuggested(s);
-
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          className={cn(
-                            "w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] active:scale-[0.98]",
-                            isSelected
-                              ? cn(style.bg, "ring-2 ring-primary/30")
-                              : suggested
-                                ? cn(style.bg, "ring-1 ring-primary/20")
-                                : "hover:bg-muted/50",
-                          )}
-                          onClick={() => {
-                            if (changeSessionMode) {
-                              handleChangeSession(s.id);
-                            } else {
-                              handlePickSession(s.id);
-                            }
-                          }}
-                          disabled={isPending}
-                        >
-                          <span
-                            className={cn("h-2.5 w-2.5 rounded-full shrink-0", style.dot)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm font-medium block truncate">
-                              {s.title ?? s.name}
-                            </span>
-                            {s.description && (
-                              <span className="text-[11px] text-muted-foreground line-clamp-1">
-                                {s.description}
-                              </span>
-                            )}
-                          </div>
-                          {suggested && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] shrink-0 border-primary/40 text-primary"
-                            >
-                              Suggéré
-                            </Badge>
-                          )}
-                          {itemCount > 0 && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] shrink-0"
-                            >
-                              {itemCount} ex.
-                            </Badge>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── Detail session sheet ── */}
-      <Sheet
-        open={!!detailSlot && !changeSessionMode}
-        onOpenChange={(open) => !open && setDetailSlot(null)}
-      >
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
-          <SheetHeader className="pb-2 shrink-0">
-            <SheetTitle className="text-base">
-              {detailTemplate?.title ?? detailTemplate?.name ?? "Séance"}
-            </SheetTitle>
-            <SheetDescription className="text-xs text-muted-foreground">
-              {detailWeekKey && detailDayIndex != null
-                ? `S${weeks.find((w) => w.weekKey === detailWeekKey)?.weekNumber ?? ""} — ${DAY_ROWS[detailDayIndex]?.label ?? ""}`
-                : ""}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="flex-1 overflow-y-auto pb-4 space-y-4">
-            {/* Phase badge + exercise count */}
-            {detailTemplate && (
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const phase = detectPhase(
-                    detailTemplate.title ?? detailTemplate.name ?? "",
-                  );
-                  const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-                  return (
-                    <>
-                      <Badge
-                        className={cn(
-                          "text-[11px] px-2 py-0.5 border-0",
-                          style.bg,
-                          style.text,
-                        )}
-                      >
-                        {phase}
-                      </Badge>
-                      {(detailTemplate.items?.length ?? 0) > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {detailTemplate.items!.length} exercices
-                        </span>
-                      )}
-                    </>
-                  );
-                })()}
-                {detailSlot?.overridden && (
-                  <Badge
-                    variant="outline"
-                    className="text-[11px] px-2 py-0.5 border-primary/50 text-primary"
-                  >
-                    Perso
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            {/* Exercise list (max 10 visible) */}
-            {detailTemplate?.items && detailTemplate.items.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                  Exercices
-                </p>
-                {detailTemplate.items.slice(0, 10).map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 py-1.5 border-b border-border/40 last:border-0"
-                  >
-                    <span className="text-[11px] text-muted-foreground tabular-nums w-5 shrink-0">
-                      {i + 1}.
-                    </span>
-                    <span className="text-[13px] text-foreground flex-1 truncate">
-                      {item.exercise_name ?? `Exercice ${i + 1}`}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground shrink-0">
-                      {item.sets}×{item.reps}
-                    </span>
-                  </div>
-                ))}
-                {detailTemplate.items.length > 10 && (
-                  <p className="text-[11px] text-muted-foreground text-center pt-1">
-                    +{detailTemplate.items.length - 10} autres exercices
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Notes */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                Notes (optionnel)
-              </label>
-              <Textarea
-                className="text-sm min-h-[64px] resize-none"
-                placeholder="Notes pour cette séance..."
-                value={detailNotes}
-                onChange={(e) => setDetailNotes(e.target.value)}
-              />
-              {detailNotes !== (detailSlot?.notes ?? "") && (
-                <Button
-                  size="sm"
-                  className="w-full h-9 text-xs"
-                  onClick={handleSaveNotes}
-                  disabled={isPending}
-                >
-                  Enregistrer les notes
-                </Button>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="space-y-1.5 pt-1">
-              <div className="h-px bg-border" />
-              <button
-                type="button"
-                className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-primary hover:bg-primary/10 active:scale-[0.98]"
-                onClick={() => {
-                  setChangeSessionMode(true);
-                  setPickerSearch("");
-                }}
-              >
-                <Dumbbell className="h-4 w-4 shrink-0" />
-                <span className="text-sm font-medium">Changer de séance</span>
-              </button>
-
-              {/* Détacher : only in group mode, OR if override */}
-              {(selectedAthleteId == null ||
-                detailSlot?.overridden === true) && (
-                <>
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-muted-foreground hover:bg-muted/50 active:scale-[0.98]"
-                    onClick={handleDetachSession}
-                    disabled={isPending}
-                  >
-                    <Trash2 className="h-4 w-4 shrink-0" />
-                    <span className="text-sm font-medium">
-                      Détacher la séance
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98]"
-                    onClick={handleDeleteSlot}
-                    disabled={isPending}
-                  >
-                    <Trash2 className="h-4 w-4 shrink-0" />
-                    <span className="text-sm font-medium">
-                      {selectedAthleteId != null
-                        ? "Supprimer la séance individuelle"
-                        : "Supprimer le slot"}
-                    </span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── Competition Detail Sheet ── */}
+      {/* Competition Detail Sheet */}
       <Sheet
         open={!!selectedCompetition}
         onOpenChange={(o) => !o && setSelectedCompetition(null)}
@@ -994,13 +506,11 @@ export default function StrengthPlanningScreen() {
                     year: "numeric",
                   })}
                   {selectedCompetition.end_date &&
-                    selectedCompetition.end_date !==
-                      selectedCompetition.date && (
+                    selectedCompetition.end_date !== selectedCompetition.date && (
                       <>
                         {" → "}
                         {new Date(
-                          selectedCompetition.end_date.slice(0, 10) +
-                            "T00:00:00",
+                          selectedCompetition.end_date.slice(0, 10) + "T00:00:00",
                         ).toLocaleDateString("fr-FR", {
                           weekday: "long",
                           day: "2-digit",
@@ -1036,7 +546,7 @@ export default function StrengthPlanningScreen() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Header
+   Header — group + athlete selection + preview badge
    ═══════════════════════════════════════════════════════════════════ */
 
 function Header({
@@ -1047,6 +557,7 @@ function Header({
   selectedAthleteId = null,
   selectedAthlete = null,
   onSelectAthlete,
+  activeApplicationCount,
 }: {
   groups: GroupSummary[];
   selectedGroupId: number | null;
@@ -1055,18 +566,26 @@ function Header({
   selectedAthleteId?: number | null;
   selectedAthlete?: AthleteSummary | null;
   onSelectAthlete?: (id: number | null) => void;
+  activeApplicationCount: number;
 }) {
   return (
     <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b">
       <div className="px-4 pt-3 pb-3">
-        <div className="flex items-center gap-2.5">
-          <Dumbbell className="h-4 w-4 text-primary shrink-0" />
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Eye className="h-4 w-4 text-primary shrink-0" />
           <h1 className="text-lg font-bold tracking-tight text-foreground">
-            Planification Musculation
+            Aperçu plan muscu
           </h1>
+          {activeApplicationCount > 0 && (
+            <Badge variant="secondary" className="text-[10px]">
+              {activeApplicationCount} plan{activeApplicationCount > 1 ? "s" : ""}
+            </Badge>
+          )}
         </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Lecture seule — pour éditer un plan, va dans Biblio &gt; Plans.
+        </p>
 
-        {/* ── Athlete-mode banner ── */}
         {selectedAthlete && onSelectAthlete && (
           <div
             className="mt-2 flex items-center gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 dark:bg-amber-950/25 dark:border-amber-800/50 pl-2 pr-1.5 py-1.5 relative overflow-hidden"
@@ -1094,24 +613,22 @@ function Header({
                   .toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
-
             <div className="flex-1 min-w-0 leading-tight">
               <span className="block text-[13px] font-semibold text-amber-900 dark:text-amber-100 truncate">
                 {selectedAthlete.display_name}
               </span>
               <span className="block text-[10px] font-medium uppercase tracking-wider text-amber-700/80 dark:text-amber-300/80">
-                Plan individuel
+                Aperçu individuel
               </span>
             </div>
-
             <button
               type="button"
               onClick={() => onSelectAthlete(null)}
               className="shrink-0 inline-flex items-center gap-1.5 h-9 min-h-9 px-3 rounded-full text-xs font-semibold text-amber-800 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100 bg-white/80 hover:bg-white dark:bg-amber-900/40 dark:hover:bg-amber-900/60 border border-amber-300/80 dark:border-amber-800/60 shadow-sm transition-colors active:scale-[0.97]"
-              aria-label="Retour au plan du groupe"
+              aria-label="Retour à l'aperçu groupe"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Retour au plan groupe
+              Aperçu groupe
             </button>
           </div>
         )}
@@ -1141,16 +658,9 @@ function Header({
 
             {onSelectAthlete && (
               <>
-                <span
-                  aria-hidden
-                  className="hidden sm:block h-4 w-px bg-border/70"
-                />
+                <span aria-hidden className="hidden sm:block h-4 w-px bg-border/70" />
                 <Select
-                  value={
-                    selectedAthleteId
-                      ? String(selectedAthleteId)
-                      : "__group__"
-                  }
+                  value={selectedAthleteId ? String(selectedAthleteId) : "__group__"}
                   onValueChange={(v) =>
                     onSelectAthlete(v === "__group__" ? null : Number(v))
                   }
@@ -1164,13 +674,13 @@ function Header({
                         : "bg-muted/40 text-foreground",
                     )}
                   >
-                    <SelectValue placeholder="Plan du groupe" />
+                    <SelectValue placeholder="Aperçu groupe" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[60dvh]">
                     <SelectItem value="__group__">
                       <span className="flex items-center gap-2">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-medium">Plan du groupe</span>
+                        <span className="font-medium">Aperçu groupe</span>
                       </span>
                     </SelectItem>
                     {groupAthletes.length > 0 && (
@@ -1196,4 +706,124 @@ function Header({
   );
 }
 
-export type { WeekInfo };
+/* ═══════════════════════════════════════════════════════════════════
+   Cell detail drawer (read-only) — same visual language as the editor's
+   drawer in TrainingPlansBrowser (§275.8-fix), no edit actions.
+   ═══════════════════════════════════════════════════════════════════ */
+
+function CellDetailDrawer({
+  cell,
+  onClose,
+}: {
+  cell: { weekKey: string; dayIndex: number; template: StrengthSessionTemplate } | null;
+  onClose: () => void;
+}) {
+  const open = cell != null;
+  const template = cell?.template ?? null;
+  const sessionName = template?.title ?? template?.name ?? "Séance";
+  const phase = sessionName ? detectPhase(sessionName) : "force";
+  const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+  const items = template?.items ?? [];
+  const cycleLabel = template?.cycle
+    ? CYCLE_LABEL[template.cycle] ?? template.cycle
+    : null;
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
+        <SheetHeader className="pb-3 shrink-0">
+          <SheetTitle className="text-lg font-bold flex items-center gap-2.5 leading-tight">
+            <span className={cn("h-3 w-3 rounded-full shrink-0", style.dot)} />
+            <span className="truncate">{sessionName}</span>
+          </SheetTitle>
+          {cell && (
+            <SheetDescription className="text-sm text-muted-foreground font-medium pl-[22px] flex items-center gap-2 flex-wrap">
+              <span>{DAY_LABELS[cell.dayIndex]}</span>
+              {cycleLabel && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px] uppercase tracking-wide font-bold border-0",
+                    style.bg,
+                    style.text,
+                  )}
+                >
+                  {cycleLabel}
+                </Badge>
+              )}
+            </SheetDescription>
+          )}
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-4">
+          {template?.description && (
+            <div className="rounded-xl bg-muted/40 px-3.5 py-2.5">
+              <p className="text-sm text-foreground/85 leading-relaxed">
+                {template.description}
+              </p>
+            </div>
+          )}
+
+          {items.length === 0 ? (
+            <div className="text-center py-10">
+              <Dumbbell className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2.5" />
+              <p className="text-sm text-muted-foreground">
+                Aucun exercice dans cette séance.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {items
+                .slice()
+                .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                .map((item, idx) => {
+                  const hasPercent = item.percent_1rm != null && item.percent_1rm > 0;
+                  const hasRest = item.rest_seconds != null && item.rest_seconds > 0;
+                  return (
+                    <li
+                      key={idx}
+                      className="rounded-xl border border-border bg-card px-3.5 py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-full bg-muted text-foreground text-sm font-bold tabular-nums">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <p className="text-[15px] font-semibold leading-snug">
+                            {item.exercise_name ?? `Exercice #${item.exercise_id}`}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-base font-bold tabular-nums leading-none">
+                              {item.sets}
+                              <span className="text-muted-foreground/60 font-medium mx-0.5">×</span>
+                              {item.reps}
+                              <span className="ml-1.5 text-xs font-medium text-muted-foreground">reps</span>
+                            </span>
+                            {hasPercent && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold tabular-nums">
+                                {item.percent_1rm}% 1RM
+                              </span>
+                            )}
+                          </div>
+                          {hasRest && (
+                            <p className="text-xs text-muted-foreground">
+                              Repos <span className="font-semibold text-foreground/80 tabular-nums">{formatRest(item.rest_seconds)}</span>
+                            </p>
+                          )}
+                          {item.notes && (
+                            <p className="text-xs text-muted-foreground italic leading-snug">
+                              {item.notes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
