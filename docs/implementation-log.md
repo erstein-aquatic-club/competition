@@ -4,6 +4,93 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §272 — Dock mobile coach/admin : Chrono → Profil
+
+**Date :** 2026-05-13
+**Contexte :** La vue Chrono est trop dense pour une utilisation mobile. Sur le dock mobile (≤ md) coach/admin, l'item Chrono est remplacé par un raccourci Profil. La nav desktop conserve Chrono.
+
+**Changements :**
+- `src/components/layout/navItems.ts` — `getMobileNavItemsForRole()` exportée (swap chrono → profil pour coach/admin, délègue à `getNavItemsForRole` pour les autres rôles) + fix `normalizedRole`
+- `src/components/layout/AppLayout.tsx` — dock mobile utilise `getMobileNavItemsForRole(role)`, header desktop conserve `getNavItemsForRole(role)`
+- `src/components/layout/__tests__/AppLayoutLogic.test.ts` — 6 tests (4 nouveaux : coach mobile, admin mobile, athlete mobile, régression desktop Chrono)
+
+**Tests :** 701/701 pass
+**Décisions :** Deux fonctions distinctes (pas de flag `hideOnMobile`) — configs explicites et lisibles. Icône `UserCircle` conservée pour cohérence avec le bouton profil du header coach.
+**Limites :** Aucune — périmètre étroit.
+
+## §271 — Module muscu perso pour les coachs (2026-05-13)
+
+**Branche** : `main`
+**Chantier ROADMAP** : feature à la demande — "les coachs peuvent eux aussi suivre leurs séances perso, plan + charges + focus mode comme un nageur"
+
+### Contexte
+
+Demande utilisateur : un coach doit pouvoir utiliser `/strength` comme un nageur (catalogue + plan + 1RM + historique + focus mode), avec accès à ses propres données — pas celles d'un nageur sélectionné. Les couches data (RLS, API, runner) étaient déjà compatibles : seules manquaient l'exposition côté navigation, l'auto-sélection de soi, et la possibilité de se cibler dans l'écran de planification muscu.
+
+### Changements
+
+1. **Navigation desktop coach/admin (`src/components/layout/navItems.ts`)** :
+   - `getNavItemsForRole("coach")` et `("admin")` passent de 5 → 6 items, avec ajout de `{ href: "/strength", icon: Dumbbell, label: "Ma muscu" }`.
+   - Nouvelle fonction `getMobileNavItemsForRole()` exportée : pour coach/admin, retourne 6 items spécifiques au dock mobile (`Home, Semaine, Nageurs, Biblio, Ma muscu, Profil`) — Chrono retiré (accessible via la tuile hub) pour libérer un slot, Profil ajouté car le header sticky desktop n'existe pas sur mobile.
+
+2. **AppLayout (`src/components/layout/AppLayout.tsx`)** :
+   - Le bottom-nav mobile utilise désormais `mobileNavItems = getMobileNavItemsForRole(role)` au lieu de `navItems`.
+   - Le header desktop garde `navItems` (les 6 items complets, Chrono inclus).
+
+3. **Hub Coach (`src/pages/Coach.tsx`)** :
+   - Nouvelle prop `onOpenMyStrength: () => void` dans `CoachHomeProps`, branchée sur `navigate("/strength")`.
+   - Nouvelle section "Mon entraînement" entre les "Alertes" et "Nageurs récents" : tuile bouton avec icône Dumbbell violette + sous-titre "Plan, charges, 1RM, focus — comme un nageur".
+
+4. **Page Strength (`src/pages/Strength.tsx`)** :
+   - Suppression de la logique `hasCoachSelection`/`selectedAthleteId`/`selectedAthleteName` : `/strength` est désormais **toujours** la vue personnelle de l'utilisateur connecté (nageur ou coach). Un coach qui aurait sélectionné un nageur ailleurs (store coach) ne voit JAMAIS ses données sur `/strength`, mais bien les siennes.
+   - `historyAthleteName = user`, `historyAthleteId = userId` directement.
+
+5. **Hook planification muscu coach (`src/hooks/coach/useStrengthPlanningAthleteMode.ts`)** :
+   - Import `useAuth` ajouté.
+   - Construction d'un `coachSelfAthlete: AthleteSummary | null` (id = coach.userId, display_name = `"<Nom du coach> (moi)"`) injecté en tête de `groupAthletes`, quel que soit le groupe sélectionné, dédupliqué si le coach est déjà athlète membre.
+   - Le coach peut donc se sélectionner dans le picker "athlète" de l'écran `/coach/strength-planning` et créer son propre plan (slot overrides + week overrides).
+
+### Vérification RLS (aucune migration nécessaire)
+
+Audit des migrations existantes :
+- `session_assignments` (00145) : INSERT/UPDATE/DELETE OK pour role `coach`/`admin`, SELECT OK (visibilité large). Un coach peut donc se cibler lui-même via `target_user_id = self.id`.
+- `strength_session_runs`, `strength_set_logs`, `one_rm_records` (00001 lignes 656-694) : policies `athlete_id = app_user_id() OR app_user_role() IN ('admin','coach')` — un coach insère/lit ses propres lignes sans problème.
+- `strength_planning_*` (00136) : `coach`/`admin` écrivent librement, SELECT public authentifié.
+
+Aucune nouvelle migration n'a été appliquée.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/layout/navItems.ts` | +6 items coach/admin (desktop), nouvelle fonction `getMobileNavItemsForRole` (dock mobile) |
+| `src/components/layout/AppLayout.tsx` | Bottom-nav mobile bascule sur `getMobileNavItemsForRole` |
+| `src/components/layout/__tests__/AppLayoutLogic.test.ts` | Tests étendus : 6 items desktop, comportement mobile vs desktop, vérif Profil/Chrono |
+| `src/pages/Coach.tsx` | Prop `onOpenMyStrength`, section "Mon entraînement" dans hub |
+| `src/pages/Strength.tsx` | Neutralisation de `selectedAthleteId` — vue toujours personnelle |
+| `src/hooks/coach/useStrengthPlanningAthleteMode.ts` | Injection coach-self dans `groupAthletes` |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `npm run build` : 17 s, succès, PWA précache 243 entries. ✅
+- `npm test` : 700/701 tests passent. Échec restant `transformers.test.ts: buildRunUpdatePayload keeps completed run ressentis` — **pré-existant**, vérifié par `git stash` (le test échoue avant et après le patch). ✅
+- Tests RLS : non lancés — patch ne touche aucune policy RLS (vérification de l'existant seulement).
+
+### Décisions prises
+
+- **6 items desktop + dock mobile différencié** : §181 avait plafonné le coach nav à 5 items pour ergonomie mobile. Avec l'ajout de "Ma muscu", on garde 6 items partout sauf sur le dock mobile qui swap Chrono ↔ Profil. Conserve l'ergonomie ET donne accès à Ma muscu où qu'on soit. Tests étendus dans `AppLayoutLogic.test.ts` pour ancrer le contrat des deux navs.
+- **Self-view forcée sur `/strength`** : choisi de neutraliser totalement `selectedAthleteId`/`selectedAthleteName` plutôt que de gérer un mode "Strength en tant que coach" vs "Strength en tant qu'athlète sélectionné". Le coach qui veut consulter la muscu d'un nageur passe par `/coach/swimmer/:id` (fiche nageur), pas par `/strength`. Simplifie la sémantique : `/strength` = "ma muscu", toujours.
+- **Coach injecté dans `groupAthletes`** plutôt que d'élargir `getAthletes()` ou de créer un mode "self-planning" séparé : injection locale au hook, scope minimal, aucune contamination des autres écrans (Allures équipe, Fiche nageur, Records). L'entrée affiche `"<Nom> (moi)"` pour distinguer du picker classique.
+- **Pas de migration RLS** : tout est déjà ouvert pour `app_user_role() IN ('admin','coach')`. Le risque "le coach ne peut pas s'auto-cibler" était hypothétique — l'audit a confirmé que ce n'est pas un blocage.
+
+### Limites / dette
+
+- **Le plan muscu coach ne consomme pas de slots de groupe** : un coach n'étant pas membre d'un groupe nageur, `MyPlanTab` (composant `/strength → Mon plan`) verra `groupSlots = []` et n'affichera que les overrides personnels. Le merge fonctionne mais le coach n'a pas de "plan de base" sous-jacent — il doit créer ses overrides ex nihilo. Acceptable v1 : la majorité des coachs utiliseront le mode ad-hoc (lancer depuis la biblio).
+- **L'écran `/coach/strength-planning` mixte coach + nageurs** : quand le coach se sélectionne lui-même, il voit en arrière-plan les slots du groupe choisi (UI inchangée). Un peu visuellement bruyant mais permet au coach de "voir" la charge des nageurs en planifiant la sienne. Si gêne future → ajouter un toggle "Cacher le plan de groupe quand je me planifie".
+- **Pas de test E2E** : la chaîne nav → tuile hub → Strength → focus mode → 1RM → run history n'a pas été testée bout en bout côté coach. Reposer sur la couverture unitaire (tests `Strength.tsx`, `MyPlanTab`, RLS migrations existantes).
+- **Le test `transformers.test.ts: buildRunUpdatePayload keeps completed run ressentis` échoue toujours** : pré-existant, non lié à §271, à traiter dans un patch dédié.
+
 ## §270 — Chantier R5 : polish vers 9.5/10 (2026-05-11)
 
 **Branche** : `main`

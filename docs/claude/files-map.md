@@ -58,7 +58,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | |
 | `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |
 | `src/pages/Dashboard.tsx` | Orchestrateur natation nageur (route /natation) — queries, useDashboardState, navigation, banners, settings dialog inline (§216 split) | ~784 lignes |
-| `src/pages/Strength.tsx` | Module musculation nageur | ~921 lignes |
+| `src/pages/Strength.tsx` | Module musculation perso (nageur ET coach depuis §271 — vue toujours personnelle, ignore `selectedAthleteId` du store coach) | ~1114 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
 | `src/pages/Records.tsx` | Records personnels + FFN sync + virtualisation @tanstack/react-virtual grille natation (§270 R5 sub-§C) | 1517 lignes |
@@ -230,7 +230,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/strength/AthletePlansTab.tsx` | Onglet plans athlète (coach muscu) | ~934 lignes |
 | `src/pages/coach/StrengthPlanningScreen.tsx` | Écran coach planification muscu (timeline groupe/nageur, picker séances, sheets détail/compétitions) (§160) | 1074 lignes |
 | `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Timeline présentationnelle planif muscu (7j × semaines, chips séance + dot phase) (§160) | 749 lignes |
-| `src/hooks/coach/useStrengthPlanningAthleteMode.ts` | Hook sélection athlète + merge slots/weekMeta + mutations routées groupe/overrides (§160) | 460 lignes |
+| `src/hooks/coach/useStrengthPlanningAthleteMode.ts` | Hook sélection athlète + merge slots/weekMeta + mutations routées groupe/overrides (§160). §271 : injecte le coach comme cible synthétique du picker pour plan perso. | 493 lignes |
 | `src/components/coach/strength/StrengthSessionBuilder.tsx` | Builder séance muscu | ~282 lignes |
 | `src/components/coach/strength/StrengthExerciseCard.tsx` | Carte exercice muscu | ~223 lignes |
 | `src/components/coach/swim/SwimSessionBuilder.tsx` | Builder séance natation | ~532 lignes |
@@ -257,7 +257,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/wellness/BodySvg.tsx` | SVG corps interactif (douleurs) | ~247 lignes |
 | `src/components/timesheet/TimesheetShiftForm.tsx` | Formulaire shift pointage | ~296 lignes |
 | `src/components/timesheet/TimesheetTimeWheel.tsx` | Roue sélection heure | ~252 lignes |
-| `src/components/layout/AppLayout.tsx` | Layout racine app | ~217 lignes |
+| `src/components/layout/AppLayout.tsx` | Layout racine app — header desktop (`getNavItemsForRole`) + bottom-nav mobile (`getMobileNavItemsForRole`, §271) | ~234 lignes |
+| `src/components/layout/navItems.ts` | Définition des items de nav par rôle : `getNavItemsForRole` (desktop) + `getMobileNavItemsForRole` (dock mobile coach/admin, §271) | 68 lignes |
 | `src/hooks/useDashboardState.ts` | Façade dashboard nageur (compose 4 sous-hooks) (§112) | ~260 lignes |
 | `src/hooks/dashboard/internal.ts` | Types + helpers purs partagés dashboard (§112) | ~245 lignes |
 | `src/hooks/dashboard/useDashboardSessions.ts` | Queries sessions/slots/assignments (§112) | ~282 lignes |
