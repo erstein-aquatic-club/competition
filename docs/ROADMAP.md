@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §278-fix livré (2026-05-13) — Hover preview lag fix : delay 150→60ms, sideOffset 8→4, animation Radix duration-100 (au lieu de ~150ms par défaut). Total perçu ~160ms au lieu de ~300ms.*
+*Dernière mise à jour : §279 livré (2026-05-13) — `SessionPreviewPopover` extrait en composant partagé (212 LOC), réutilisé dans le plan builder avec actions optionnelles "Changer" / "Retirer". Suppression du `CellDetailDrawer` plein écran de TrainingPlansBrowser (1513→1421 LOC). Suppression du duplicate dans StrengthPlanningTimeline (962→825 LOC). UX cohérente entre Planif muscu (read-only preview) et plan builder (preview + actions).*
+
+*Précédente : §278-fix livré (2026-05-13) — Hover preview lag fix (delays cumulés).*
 
 *Précédente : §278 livré (2026-05-13) — Aperçu hover/tap des cellules dans Planif muscu (SessionPreviewPopover).*
 

@@ -4,6 +4,77 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §279 — SessionPreviewPopover partagé + utilisé dans le plan builder (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur veut le même popover hover/tap dans l'éditeur de plan que dans Planif muscu.
+
+### Extraction du composant
+
+Le code du popover était dupliqué dans `StrengthPlanningTimeline.tsx`. Extrait dans un module partagé `src/components/coach/strength/SessionPreviewPopover.tsx` (212 LOC), exportant :
+
+- `SessionPreviewPopover` : composant prenant `template`, `children` (trigger), `actions?` (objet optionnel `{ onChangeSession, onRemove, removePending }`).
+- `SessionPreviewPopoverActions` / `SessionPreviewPopoverProps` : types publics.
+- Helper `formatRest` local au module.
+
+Logique conservée (cf §278/§278-fix) :
+- Hover-capable detection via `window.matchMedia("(hover: hover)")`.
+- 60ms grace JS + sideOffset 4 + `duration-100` Radix.
+- Touch device → click toggle uniquement.
+
+**Actions** (nouveauté §279) :
+- Ajout d'un footer dans `PopoverContent` quand `actions` est fourni.
+- 2 boutons côte à côte (`flex-1`) : "Changer" (`Pencil`, primary) et "Retirer" (`Trash2`, destructive).
+- Click sur action → ferme le popover puis appelle le callback.
+
+### Intégration dans le plan builder
+
+`TrainingPlansBrowser.tsx` :
+
+- Suppression du `CellDetailDrawer` plein écran (~140 LOC retirées) et du state `cellDetail`.
+- `PlanCell` refactoré : ses props passent de `{ onTap, onClear }` à `{ onAddEmpty, onChangeSession?, onRemove?, removePending? }`.
+- Cellule vide : inchangée (bouton `+` → `onAddEmpty` → ouvre picker).
+- Cellule pleine : wrap dans `<SessionPreviewPopover actions={{ onChangeSession, onRemove, removePending }}>` — plus de bouton X en hover.
+- Le tap sur la cellule pleine n'a plus de `onClick` direct : c'est le popover qui gère via son trigger.
+- Cleanup imports : retrait `Sheet/SheetContent/SheetDescription/SheetHeader/SheetTitle`, `Trash2` (utilisé que pour CellDetailDrawer), `formatRest`, `CYCLE_LABEL`. (En réalité `Sheet*` reste pour le picker bottom-sheet ; seul `CellDetailDrawer` et `formatRest`/`CYCLE_LABEL` sont retirés.)
+
+`StrengthPlanningTimeline.tsx` :
+
+- Suppression du `SessionPreviewPopover` inline (160 LOC) et de son helper `formatRest`.
+- Import du module partagé : `import { SessionPreviewPopover } from "./SessionPreviewPopover";`.
+- Retrait des imports devenus inutiles : `Popover/PopoverContent/PopoverTrigger`, `Dumbbell`, `useEffect/useRef/useState`.
+- Branche read-only from-plan inchangée : `<SessionPreviewPopover template sessionName>` sans actions (preview pur).
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/SessionPreviewPopover.tsx` | **Nouveau** — 212 LOC, composant partagé |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Extraction (962 → 825 LOC, -14%) |
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | Suppression CellDetailDrawer + PlanCell refactor (1513 → 1421 LOC, -6%) |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+- `npx vitest run derivePlanByWeekDay.test.ts` : 8/8 ✅
+
+### Vérification fonctionnelle attendue
+
+1. **Plan builder** (Biblio > Plans > "Prépa sprint 50m" → éditeur) :
+   - Cellule vide → tap → picker (inchangé).
+   - Cellule pleine :
+     - Desktop : survol → popover apparaît avec liste compacte d'exercices + footer 2 boutons "Changer" / "Retirer".
+     - Mobile : tap → popover idem.
+   - Click "Changer" → ferme popover + ouvre picker avec session pré-sélectionnée.
+   - Click "Retirer" → ferme popover + supprime la session de la grille.
+2. **Planif muscu** : comportement inchangé (popover sans actions, lecture seule).
+
+### Limites
+
+- L'action "Retirer" supprime sans confirmation. Pour des séances importantes, l'utilisateur peut accidentellement supprimer. À évaluer si une confirmation rapide est utile.
+- Le popover ne montre que 6 exercices visible ; pour plus de détail il faudrait élargir ou ajouter "Voir tout". Cohérent avec §278.
+
 ## §278-fix — Hover preview popover : tighter close timing (2026-05-13)
 
 **Branche** : `main`
