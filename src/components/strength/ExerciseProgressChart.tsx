@@ -13,7 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { TrendingUp, TrendingDown, Dumbbell } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { slideUp } from "@/lib/animations";
 import {
   Sheet,
@@ -99,6 +99,8 @@ export function ExerciseProgressChart({
   open,
   onOpenChange,
 }: ExerciseProgressChartProps) {
+  const reduce = useReducedMotion();
+  const heroVariants = reduce ? {} : slideUp;
   const [months, setMonths] = useState<number>(3);
   const { sessions, current1rm, delta1rm, deltaPercent, isLoading } = useExerciseHistory({
     exerciseId,
@@ -129,7 +131,7 @@ export function ExerciseProgressChart({
         {/* ── Hero KPI ── */}
         <motion.div
           className="flex flex-col items-center gap-1 py-4"
-          variants={slideUp}
+          variants={heroVariants}
           initial="hidden"
           animate="visible"
         >

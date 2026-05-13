@@ -2,7 +2,7 @@ import { StrengthSessionTemplate, Assignment } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren } from "@/lib/animations";
 import { SessionRow } from "@/components/shared/SessionRow";
 
@@ -29,12 +29,15 @@ const cardVariant = {
 };
 
 export function UnfiledSessionList({ sessions, onStartAssignment, onStartCatalog }: UnfiledSessionListProps) {
+  const reduce = useReducedMotion();
+  const listVariants = reduce ? {} : staggerChildren;
+  const itemVariants = reduce ? {} : cardVariant;
   if (sessions.length === 0) return null;
 
   return (
     <motion.div
       className="space-y-1.5 motion-reduce:animate-none"
-      variants={staggerChildren}
+      variants={listVariants}
       initial="hidden"
       animate="visible"
     >
@@ -49,7 +52,7 @@ export function UnfiledSessionList({ sessions, onStartAssignment, onStartCatalog
         ].filter(Boolean).join(" · ");
 
         return (
-          <motion.div key={session.key} variants={cardVariant}>
+          <motion.div key={session.key} variants={itemVariants}>
             <SessionRow
               title={session.title}
               subtitle={subtitle}

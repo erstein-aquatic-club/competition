@@ -15,7 +15,7 @@
  * SwimmerPlanningPanel (mode="athlete", showOverrideBadge=true).
  */
 import { useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import type { Competition } from "@/lib/api/types";
 import type { EffectiveSlot } from "@/lib/swimPlanningMerge";
 import { FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
@@ -292,6 +292,7 @@ function WeekCard({
   sessionNameMap,
   readOnly,
 }: WeekCardProps) {
+  const reduce = useReducedMotion();
   const hasCompetition = weekCompetitions.length > 0;
   const datalistId = `wt-${week.weekKey}`;
 
@@ -471,7 +472,7 @@ function WeekCard({
               {/* Chevron */}
               <motion.span
                 animate={{ rotate: isExpanded ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
+                transition={reduce ? { duration: 0 } : { duration: 0.2 }}
                 className="shrink-0"
               >
                 <ChevronDown className="h-4 w-4 text-muted-foreground/40" />
@@ -482,10 +483,10 @@ function WeekCard({
             <AnimatePresence>
               {isExpanded && (
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
+                  initial={reduce ? false : { height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.25, ease: "easeInOut" }}
                   className="overflow-hidden"
                 >
                   <MicroGrid

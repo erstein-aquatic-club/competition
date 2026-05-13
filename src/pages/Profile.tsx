@@ -32,7 +32,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { fadeIn } from "@/lib/animations";
 import BadgesGrid from "@/components/profile/BadgesGrid";
 import { useAchievementChecker } from "@/hooks/useAchievementChecker";
@@ -222,6 +222,8 @@ export default function Profile() {
   const role = useAuth((s) => s.role);
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const reduce = useReducedMotion();
+  const fadeVariants = reduce ? {} : fadeIn;
 
   const showRecords = shouldShowRecords(role);
   const canUpdatePassword = role === "athlete" || role === "coach" || role === "admin";
@@ -569,7 +571,7 @@ export default function Profile() {
     return (
       <motion.div
         className="space-y-4 overflow-x-hidden"
-        variants={fadeIn}
+        variants={fadeVariants}
         initial="hidden"
         animate="visible"
       >
@@ -734,7 +736,7 @@ export default function Profile() {
     return (
       <motion.div
         className="space-y-4 overflow-x-hidden"
-        variants={fadeIn}
+        variants={fadeVariants}
         initial="hidden"
         animate="visible"
       >
@@ -800,7 +802,7 @@ export default function Profile() {
   return (
     <motion.div
       className="space-y-6"
-      variants={fadeIn}
+      variants={fadeVariants}
       initial="hidden"
       animate="visible"
     >

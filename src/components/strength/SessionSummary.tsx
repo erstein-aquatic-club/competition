@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Dumbbell, TrendingUp, Timer } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { SetLogEntry } from "@/lib/types";
 
 interface SessionSummaryProps {
@@ -19,6 +19,7 @@ function isBodyweight(w: number | string | null | undefined): boolean {
 }
 
 export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNames, onClose }: SessionSummaryProps) {
+  const reduce = useReducedMotion();
   const stats = useMemo(() => {
     let totalTonnage = 0;
     let totalSets = 0;
@@ -47,7 +48,7 @@ export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNa
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={reduce ? false : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="mx-auto max-w-md space-y-6 px-4 py-8"
     >

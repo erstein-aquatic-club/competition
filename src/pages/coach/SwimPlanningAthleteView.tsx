@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   getSwimPlanningSlots,
   getSwimPlanningSlotOverrides,
@@ -159,6 +159,7 @@ function FiliereGauge({
   fillClass: string;
   trackClass: string;
 }) {
+  const reduce = useReducedMotion();
   if (value == null) {
     return (
       <div className="flex items-center gap-1" aria-label="variable">
@@ -176,9 +177,9 @@ function FiliereGauge({
         return (
           <motion.span
             key={i}
-            initial={{ scaleX: 0, opacity: 0 }}
+            initial={reduce ? false : { scaleX: 0, opacity: 0 }}
             animate={{ scaleX: 1, opacity: 1 }}
-            transition={{ delay: 0.05 * i, duration: 0.25, ease: "easeOut" }}
+            transition={reduce ? { duration: 0 } : { delay: 0.05 * i, duration: 0.25, ease: "easeOut" }}
             style={{ transformOrigin: "left center" }}
             className={cn(
               "h-1.5 flex-1 rounded-full",
@@ -211,6 +212,7 @@ export default function SwimPlanningAthleteView({
   const isVisible = embedded || open;
   const userId = useAuth((s) => s.userId);
   const me = userId;
+  const reduce = useReducedMotion();
 
   // ── Week generation (infinite scroll, same as coach) ──
   const startMonday = useMemo(() => getMonday(new Date()), []);
@@ -588,7 +590,7 @@ export default function SwimPlanningAthleteView({
                         {/* Chevron */}
                         <motion.span
                           animate={{ rotate: expanded ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
+                          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
                           className="shrink-0"
                         >
                           <ChevronDown className="h-4 w-4 text-muted-foreground/40" />
@@ -599,10 +601,10 @@ export default function SwimPlanningAthleteView({
                       <AnimatePresence>
                         {expanded && (
                           <motion.div
-                            initial={{ height: 0, opacity: 0 }}
+                            initial={reduce ? false : { height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                            transition={reduce ? { duration: 0 } : { duration: 0.25, ease: "easeInOut" }}
                             className="overflow-hidden"
                           >
                             <div className="border-t bg-muted/20">
@@ -799,7 +801,7 @@ export default function SwimPlanningAthleteView({
                   className="flex items-center justify-between w-full py-1 min-h-[44px] active:opacity-70 transition-opacity"
                 >
                   <span className="text-[13px] font-medium text-foreground">Détails techniques</span>
-                  <motion.span animate={{ rotate: techOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <motion.span animate={{ rotate: techOpen ? 180 : 0 }} transition={reduce ? { duration: 0 } : { duration: 0.2 }}>
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   </motion.span>
                 </button>
@@ -807,10 +809,10 @@ export default function SwimPlanningAthleteView({
                 <AnimatePresence initial={false}>
                   {techOpen && (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
+                      initial={reduce ? false : { height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                      transition={reduce ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
                       <div className="grid grid-cols-2 gap-2 pt-2 pb-1">
@@ -940,10 +942,10 @@ export default function SwimPlanningAthleteView({
       {open && (
         <motion.div
           className="fixed inset-0 z-50 bg-background overflow-hidden"
-          initial={{ y: "100%" }}
+          initial={reduce ? false : { y: "100%" }}
           animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          transition={{ type: "spring", damping: 28, stiffness: 300 }}
+          exit={reduce ? { opacity: 0 } : { y: "100%" }}
+          transition={reduce ? { duration: 0 } : { type: "spring", damping: 28, stiffness: 300 }}
         >
           {planningContent}
         </motion.div>

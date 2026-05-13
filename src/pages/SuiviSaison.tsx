@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   getSwimPlanningSlots,
   getCompetitions,
@@ -313,6 +313,7 @@ function WeekFiliereGrid({ monday, groupId }: { monday: string; groupId: number 
 export default function SuiviSaison() {
   const [, navigate] = useLocation();
   const userId = useAuth((s) => s.userId);
+  const reduce = useReducedMotion();
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
 
@@ -707,7 +708,7 @@ export default function SuiviSaison() {
                         {/* Chevron with rotation animation */}
                         <motion.span
                           animate={{ rotate: isExpanded ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
+                          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
                           className="shrink-0"
                         >
                           <ChevronDown className="h-4 w-4 text-muted-foreground/40" />
@@ -718,10 +719,10 @@ export default function SuiviSaison() {
                       <AnimatePresence>
                         {isExpanded && (
                           <motion.div
-                            initial={{ height: 0, opacity: 0 }}
+                            initial={reduce ? false : { height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                            transition={reduce ? { duration: 0 } : { duration: 0.25, ease: "easeInOut" }}
                             className="overflow-hidden"
                           >
                             <div className="border-t px-3 py-2.5 space-y-2.5">

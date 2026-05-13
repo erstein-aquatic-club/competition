@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Sheet,
   SheetContent,
@@ -96,6 +96,9 @@ interface RunSummaryRpc {
 }
 
 export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDetailSheetProps) {
+  const reduce = useReducedMotion();
+  const listVariants = reduce ? {} : staggerChildren;
+  const itemVariants = reduce ? {} : listItem;
   const logs = run.logs ?? run.strength_set_logs ?? [];
   const status = run.status ?? "completed";
   const style = statusStyle[status] ?? statusStyle.completed;
@@ -175,9 +178,9 @@ export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDe
         {exerciseGroups.length > 0 && (
           <div className="mt-4 space-y-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Exercices</h3>
-            <motion.div className="space-y-2" variants={staggerChildren} initial="hidden" animate="visible">
+            <motion.div className="space-y-2" variants={listVariants} initial="hidden" animate="visible">
               {exerciseGroups.map((group) => (
-                <motion.div key={group.exerciseId} variants={listItem} className="rounded-xl border bg-card p-2.5 space-y-1.5">
+                <motion.div key={group.exerciseId} variants={itemVariants} className="rounded-xl border bg-card p-2.5 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <p className="text-[12px] font-semibold">{group.exerciseName}</p>
                     <p className="text-[10px] text-muted-foreground tabular-nums">

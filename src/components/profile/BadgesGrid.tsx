@@ -6,7 +6,7 @@ import type { Achievement } from "@/lib/api/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, Trophy, Flame, Heart, Dumbbell, Medal, type LucideIcon } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 interface BadgesGridProps {
   userId: number;
@@ -50,6 +50,7 @@ function CategoryTrack({
   badges: BadgeDefinition[];
   unlockedMap: Map<string, Achievement>;
 }) {
+  const reduce = useReducedMotion();
   const meta = TYPE_META[type];
   const unlockedInCategory = badges.filter((b) => unlockedMap.has(b.key)).length;
   const total = badges.length;
@@ -76,9 +77,9 @@ function CategoryTrack({
         {/* Filled track */}
         <motion.div
           className={`absolute inset-y-1/2 -translate-y-1/2 left-0 h-[3px] rounded-full ${meta.bg}`}
-          initial={{ width: 0 }}
+          initial={reduce ? false : { width: 0 }}
           animate={{ width: `${progressRatio * 100}%` }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.8, ease: "easeOut", delay: 0.2 }}
         />
 
         {/* Milestone dots */}
@@ -101,7 +102,7 @@ function CategoryTrack({
               >
                 {/* Dot */}
                 <div className="relative">
-                  {unlocked && (
+                  {unlocked && !reduce && (
                     <motion.div
                       className={`absolute -inset-1 rounded-full ${meta.bg} opacity-20`}
                       initial={{ scale: 0 }}
@@ -116,9 +117,9 @@ function CategoryTrack({
                         ? `${meta.bg} border-transparent text-white shadow-sm`
                         : "bg-muted/60 border-border/50 text-muted-foreground/40",
                     ].join(" ")}
-                    initial={{ scale: 0.5, opacity: 0 }}
+                    initial={reduce ? false : { scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.1 * idx + 0.3, duration: 0.4 }}
+                    transition={reduce ? { duration: 0 } : { delay: 0.1 * idx + 0.3, duration: 0.4 }}
                   >
                     <span className="text-[10px] font-bold leading-none">
                       {badge.palier}
@@ -143,6 +144,7 @@ function CategoryTrack({
 // ── Main component ────────────────────────────────────────────
 
 export default function BadgesGrid({ userId }: BadgesGridProps) {
+  const reduce = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
 
   const { data: achievements, isLoading } = useQuery({
@@ -191,7 +193,7 @@ export default function BadgesGrid({ userId }: BadgesGridProps) {
           </span>
           <motion.div
             animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={{ duration: 0.25 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.25 }}
           >
             <ChevronDown className="h-4 w-4 text-muted-foreground/50" />
           </motion.div>
@@ -202,10 +204,10 @@ export default function BadgesGrid({ userId }: BadgesGridProps) {
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
+            initial={reduce ? false : { height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
+            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
             <CardContent className="pt-0 pb-4 space-y-4">

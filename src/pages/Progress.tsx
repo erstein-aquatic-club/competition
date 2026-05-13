@@ -41,7 +41,7 @@ import { isBodyweight } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { getContrastTextColor } from "@/lib/design-tokens";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { slideUp } from "@/lib/animations";
 import { ChevronDown, TrendingUp, TrendingDown, BarChart3, Trophy, Waves, Dumbbell, HeartPulse } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
@@ -57,6 +57,7 @@ type ProgressBarProps = {
 };
 
 export function ProgressBar({ label, value, max, invert = false }: ProgressBarProps) {
+  const reduce = useReducedMotion();
   const pct = value !== null ? Math.min(100, (value / max) * 100) : 0;
   const color = scoreToColor(value ?? null, { invert }) ?? "hsl(var(--muted-foreground))";
 
@@ -67,9 +68,9 @@ export function ProgressBar({ label, value, max, invert = false }: ProgressBarPr
         <motion.div
           className="absolute inset-y-0 left-0 rounded-full"
           style={{ backgroundColor: color }}
-          initial={{ width: 0 }}
+          initial={reduce ? false : { width: 0 }}
           animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={reduce ? { duration: 0 } : { duration: 0.6, ease: "easeOut" }}
         />
       </div>
       <span className="w-10 text-right text-sm font-mono font-semibold tabular-nums">
@@ -88,10 +89,12 @@ type HeroKpiProps = {
 };
 
 function HeroKpi({ value, unit, label, trend, trendLabel }: HeroKpiProps) {
+  const reduce = useReducedMotion();
+  const heroVariants = reduce ? {} : slideUp;
   return (
     <motion.div
       className="flex flex-col items-center gap-0.5 py-2"
-      variants={slideUp}
+      variants={heroVariants}
       initial="hidden"
       animate="visible"
     >
@@ -182,6 +185,8 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const role = useAuth((s) => s.role);
   const selectedAthleteId = useAuth((s) => s.selectedAthleteId);
   const selectedAthleteName = useAuth((s) => s.selectedAthleteName);
+  const reduce = useReducedMotion();
+  const slideVariants = reduce ? {} : slideUp;
   const hasCoachSelection =
     (role === "coach" || role === "admin") &&
     (selectedAthleteId !== null || !!selectedAthleteName);
@@ -700,7 +705,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           {/* Volume curve with gradient */}
-          <motion.div variants={slideUp} initial="hidden" animate="visible">
+          <motion.div variants={slideVariants} initial="hidden" animate="visible">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0 h-[140px] w-full">
                 {isSwimLoading ? (
@@ -740,7 +745,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
           </motion.div>
 
           {/* Ressentis — horizontal progress bars */}
-          <motion.div className="space-y-3" variants={slideUp} initial="hidden" animate="visible">
+          <motion.div className="space-y-3" variants={slideVariants} initial="hidden" animate="visible">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ressentis moyens</h3>
             <ProgressBar label="Difficulté" value={swimSessionsAvgRpe} max={5} invert />
             <ProgressBar label="Performance" value={swimSessionsAvgPerformance} max={5} />
@@ -835,7 +840,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           {/* Tonnage & Volume chart */}
-          <motion.div variants={slideUp} initial="hidden" animate="visible">
+          <motion.div variants={slideVariants} initial="hidden" animate="visible">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0 h-[140px] w-full">
                 {isStrengthLoading ? (
@@ -859,7 +864,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
           </motion.div>
 
           {/* Feeling chart */}
-          <motion.div variants={slideUp} initial="hidden" animate="visible">
+          <motion.div variants={slideVariants} initial="hidden" animate="visible">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Ressenti par séance</h3>
             <div className="h-[130px] w-full">
               {isStrengthLoading ? (
@@ -1036,7 +1041,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           {/* Courbe readiness */}
-          <motion.div variants={slideUp} initial="hidden" animate="visible">
+          <motion.div variants={slideVariants} initial="hidden" animate="visible">
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0 h-[160px] w-full">
                 {isHealthLoading ? (
@@ -1077,7 +1082,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
           </motion.div>
 
           {/* Moyennes par métrique */}
-          <motion.div className="space-y-3" variants={slideUp} initial="hidden" animate="visible">
+          <motion.div className="space-y-3" variants={slideVariants} initial="hidden" animate="visible">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Moyennes sur la période
             </h3>

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Redirect, type RouteComponentProps } from "wouter";
 import { endOfMonth, format, startOfMonth, subDays, subMonths } from "date-fns";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import {
@@ -126,6 +126,9 @@ const cardReveal = {
 
 export default function Administratif({ initialTab = "POINTAGE" }: AdministratifProps) {
   const { useMemo, useState } = React;
+  const reduce = useReducedMotion();
+  const staggerVariants = reduce ? {} : stagger;
+  const cardVariants = reduce ? {} : cardReveal;
   const queryClient = useQueryClient();
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((s) => s.role);
   const userId = typeof window === "undefined" ? useAuth.getState().userId : useAuth((s) => s.userId);
@@ -611,11 +614,11 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             aria-labelledby="tab-pointage"
             initial="hidden"
             animate="visible"
-            variants={stagger}
+            variants={staggerVariants}
             className="flex flex-col gap-4"
           >
             {/* Today's Hours Hero */}
-            <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+            <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
                 <span>Heures aujourd'hui</span>
@@ -632,7 +635,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             </motion.div>
 
             {/* Week / Month Summary */}
-            <motion.div variants={cardReveal} className="grid grid-cols-2 gap-3">
+            <motion.div variants={cardVariants} className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border bg-muted/30 p-3">
                 <span className="text-[11px] text-muted-foreground">Semaine</span>
                 <div className="text-lg font-bold tabular-nums">
@@ -654,7 +657,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             </motion.div>
 
             {/* Locations Panel */}
-            <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+            <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-sm font-bold text-foreground">
                   <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
@@ -717,7 +720,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             </motion.div>
 
             {/* Shift List */}
-            <motion.div variants={cardReveal}>
+            <motion.div variants={cardVariants}>
               <TimesheetShiftList
                 groups={grouped}
                 onEdit={openEditShift}
@@ -753,11 +756,11 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             aria-labelledby="tab-dashboard"
             initial="hidden"
             animate="visible"
-            variants={stagger}
+            variants={staggerVariants}
             className="flex flex-col gap-4"
           >
             {/* Period Selector */}
-            <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+            <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
               <h2 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                 Période
               </h2>
@@ -812,7 +815,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             </motion.div>
 
             {/* Hero KPI */}
-            <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+            <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <span className="text-[11px] text-muted-foreground">Total période</span>
@@ -844,7 +847,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             </motion.div>
 
             {/* Work / Travel Cards */}
-            <motion.div variants={cardReveal} className="grid grid-cols-2 gap-3">
+            <motion.div variants={cardVariants} className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border p-3">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Briefcase className="h-3.5 w-3.5 text-primary" />
@@ -873,7 +876,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
 
             {/* Donut Chart — Work vs Travel */}
             {pieData.length > 0 ? (
-              <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+              <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
                 <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                   Répartition
                 </h3>
@@ -915,7 +918,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
             ) : null}
 
             {/* Stacked Bar Chart — Hours per Day */}
-            <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+            <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
               <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                 Heures par jour
               </h3>
@@ -950,7 +953,7 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
 
             {/* Top Locations */}
             {topLocations.length > 0 ? (
-              <motion.div variants={cardReveal} className="rounded-xl border bg-card p-4">
+              <motion.div variants={cardVariants} className="rounded-xl border bg-card p-4">
                 <h3 className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground mb-3">
                   Top lieux
                 </h3>

@@ -1,7 +1,7 @@
 import React from "react";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { successBounce } from "@/lib/animations";
 import { durationsSeconds } from "@/lib/design-tokens";
 
@@ -37,6 +37,7 @@ export function BottomActionBar({
   saveMessage,
   position = "fixed",
 }: BottomActionBarProps) {
+  const reduce = useReducedMotion();
   return (
     <div
       role="region"
@@ -55,10 +56,10 @@ export function BottomActionBar({
         {saveState !== "idle" && (
           <motion.div
             key={saveState}
-            variants={saveState === "saved" ? successBounce : undefined}
-            initial="hidden"
-            animate="visible"
-            exit={{ opacity: 0, scale: 0.8 }}
+            variants={reduce ? undefined : (saveState === "saved" ? successBounce : undefined)}
+            initial={reduce ? false : "hidden"}
+            animate={reduce ? { opacity: 1 } : "visible"}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
             className={cn(
               "mx-auto mb-2 flex max-w-md items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium shadow-lg motion-reduce:animate-none",
               saveState === "saving" && "bg-muted text-muted-foreground",
@@ -77,9 +78,9 @@ export function BottomActionBar({
             {saveState === "saved" && (
               <>
                 <motion.div
-                  initial={{ scale: 0 }}
+                  initial={reduce ? false : { scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ delay: durationsSeconds.fast, type: "spring", stiffness: 300 }}
+                  transition={reduce ? { duration: 0 } : { delay: durationsSeconds.fast, type: "spring", stiffness: 300 }}
                 >
                   <CheckCircle2 className="h-4 w-4" />
                 </motion.div>

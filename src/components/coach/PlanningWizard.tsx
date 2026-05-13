@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CalendarRange, Target, CalendarClock, Check, ChevronRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { FFN_EVENTS, eventLabel, parseTime } from "@/lib/objectiveHelpers";
 import { useAuth } from "@/lib/auth";
 
@@ -62,6 +62,10 @@ export default function PlanningWizard({
 }: Props) {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
+  const reduce = useReducedMotion();
+  const stepInitial = reduce ? false : { opacity: 0, x: 20 };
+  const stepAnimate = reduce ? { opacity: 1, x: 0 } : { opacity: 1, x: 0 };
+  const stepExit = reduce ? { opacity: 0 } : { opacity: 0, x: -20 };
   const [step, setStep] = useState<WizardStep>(1);
 
   // Step 1 state
@@ -210,9 +214,9 @@ export default function PlanningWizard({
         {step === 1 && (
           <motion.div
             key="step1"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={stepInitial}
+            animate={stepAnimate}
+            exit={stepExit}
             className="rounded-2xl border bg-card p-4 space-y-4"
           >
             <div>
@@ -277,9 +281,9 @@ export default function PlanningWizard({
         {step === 2 && (
           <motion.div
             key="step2"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={stepInitial}
+            animate={stepAnimate}
+            exit={stepExit}
             className="rounded-2xl border bg-card p-4 space-y-4"
           >
             <div>
@@ -409,9 +413,9 @@ export default function PlanningWizard({
         {step === 3 && (
           <motion.div
             key="step3"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={stepInitial}
+            animate={stepAnimate}
+            exit={stepExit}
             className="rounded-2xl border bg-card p-4 space-y-4"
           >
             <div>

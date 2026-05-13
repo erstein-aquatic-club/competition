@@ -15,7 +15,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { ChevronLeft, ChevronDown, Play, RefreshCw, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { fadeIn, staggerChildren, listItem } from "@/lib/animations";
 import { BottomActionBar, SaveState } from "@/components/shared/BottomActionBar";
 import { ExercisePicker } from "@/components/strength/ExercisePicker";
@@ -73,6 +73,10 @@ export function SessionDetailPreview({
   originalItemCount,
   onAddExercise,
 }: SessionDetailPreviewProps) {
+  const reduce = useReducedMotion();
+  const containerVariants = reduce ? {} : fadeIn;
+  const listVariants = reduce ? {} : staggerChildren;
+  const itemVariants = reduce ? {} : listItem;
   const exerciseLookup = useMemo(() => {
     return new Map(exercises.map((exercise) => [exercise.id, exercise]));
   }, [exercises]);
@@ -112,7 +116,7 @@ export function SessionDetailPreview({
   return (
     <motion.div
       className="space-y-3 pb-48"
-      variants={fadeIn}
+      variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
@@ -156,7 +160,7 @@ export function SessionDetailPreview({
       )}
 
       {/* ── Exercise list — inline GIF + expandable details ── */}
-      <motion.div className="space-y-1.5" variants={staggerChildren} initial="hidden" animate="visible">
+      <motion.div className="space-y-1.5" variants={listVariants} initial="hidden" animate="visible">
         {items.map((item, index) => {
           const exercise = exerciseLookup.get(item.exercise_id);
           const percentValue = Number(item.percent_1rm);
@@ -178,7 +182,7 @@ export function SessionDetailPreview({
           const hasGif = !!exercise?.illustration_gif;
 
           return (
-            <motion.div key={`${item.exercise_id}-${index}`} variants={listItem}>
+            <motion.div key={`${item.exercise_id}-${index}`} variants={itemVariants}>
               <Collapsible
                 open={isExpanded}
                 onOpenChange={(open) => setExpandedIndex(open ? index : null)}
@@ -248,7 +252,7 @@ export function SessionDetailPreview({
                 {/* ── Expanded details (in-place) ── */}
                 <CollapsibleContent>
                   <motion.div
-                    initial={{ opacity: 0 }}
+                    initial={reduce ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="mt-1 ml-2 mr-1 rounded-xl border border-border/60 bg-muted/20 overflow-hidden"
                   >
