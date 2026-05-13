@@ -362,7 +362,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
         lastSessionDate,
         sessionsCount30d: sessions.length,
         assiduity: null,
-        objectivesTotal: objectiveCounts?.get(athlete.id) ?? 0,
+        objectivesTotal: objectiveCounts?.[athlete.id] ?? 0,
         objectivesAchieved: 0,
       });
     }
@@ -569,7 +569,7 @@ export default function CoachSwimmersOverview({ athletes: propAthletes, athletes
               const isLowForme = formScore !== null && formScore < 2.5;
               const readiness = athlete.id != null ? wellnessByUser.get(athlete.id) ?? null : null;
               const isDeclining = athlete.id != null && decliningUsers.has(athlete.id);
-              const feedbackRate = athlete.id != null ? feedbackRates?.get(athlete.id) : null;
+              const feedbackRate = athlete.id != null ? feedbackRates?.[athlete.id] : null;
 
               return (
                 <button

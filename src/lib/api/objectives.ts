@@ -141,14 +141,14 @@ export async function deleteObjective(id: string): Promise<void> {
 }
 
 /** Returns objectives count keyed by numeric user_id. */
-export async function getObjectivesCountsByUser(): Promise<Map<number, number>> {
-  if (!canUseSupabase()) return new Map();
+export async function getObjectivesCountsByUser(): Promise<Record<number, number>> {
+  if (!canUseSupabase()) return {};
   const data = assertSupabase(await supabase.rpc("get_objectives_counts_by_user"));
-  const map = new Map<number, number>();
+  const record: Record<number, number> = {};
   for (const row of data ?? []) {
-    map.set(row.user_id, Number(row.objectives_count));
+    record[row.user_id] = Number(row.objectives_count);
   }
-  return map;
+  return record;
 }
 
 export async function getObjectivesByCompetition(competitionId: string): Promise<Objective[]> {
