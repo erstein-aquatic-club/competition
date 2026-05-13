@@ -30,12 +30,10 @@ import type {
   AthleteSummary,
   GroupSummary,
 } from "@/lib/api/types";
-import type { EffectiveStrengthSlot } from "@/lib/strengthPlanningMerge";
 import {
   derivePlanByWeekDay,
   type DerivedCell,
 } from "@/lib/strength/derivePlanByWeekDay";
-import { detectPhase, PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import StrengthPlanningTimeline from "@/components/coach/strength/StrengthPlanningTimeline";
 import {
   generateWeeks,
@@ -70,21 +68,6 @@ import {
 
 const INITIAL_WEEK_COUNT = 13;
 const LOAD_MORE_COUNT = 4;
-
-const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-
-const CYCLE_LABEL: Record<string, string> = {
-  endurance: "Endurance",
-  hypertrophie: "Hypertrophie",
-  force: "Force",
-};
-
-function formatRest(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const sec = seconds % 60;
-  return sec === 0 ? `${m}'` : `${m}'${String(sec).padStart(2, "0")}`;
-}
 
 export default function StrengthPlanningScreen() {
   // ── Groups & selection ──
@@ -339,21 +322,10 @@ export default function StrengthPlanningScreen() {
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
 
-  // ── Read-only cell detail drawer ──
-  const [detailCell, setDetailCell] = useState<{
-    weekKey: string;
-    dayIndex: number;
-    template: StrengthSessionTemplate;
-  } | null>(null);
-
-  const handleSlotTap = useCallback(
-    (weekKey: string, dayIndex: number, slot: EffectiveStrengthSlot | null) => {
-      void slot; // ignore (no overrides in read-only mode)
-      const tpl = athletePlanByWeekDay.get(weekKey)?.get(dayIndex);
-      if (tpl) setDetailCell({ weekKey, dayIndex, template: tpl });
-    },
-    [athletePlanByWeekDay],
-  );
+  // No-op tap handler — cells with a from-plan session now show a hover/click
+  // preview popover inline (SessionPreviewPopover in StrengthPlanningTimeline).
+  // Cells without a session don't react (read-only mode).
+  const handleSlotTap = useCallback(() => {}, []);
 
   // ── Loading & empty states ──
   if (groupsLoading) {
@@ -461,12 +433,6 @@ export default function StrengthPlanningScreen() {
         isLoading={planSessionsLoading}
         isEmpty={isEmpty}
         readOnly
-      />
-
-      {/* Cell detail drawer (read-only) */}
-      <CellDetailDrawer
-        cell={detailCell}
-        onClose={() => setDetailCell(null)}
       />
 
       {/* Competition Detail Sheet */}
@@ -706,124 +672,3 @@ function Header({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Cell detail drawer (read-only) — same visual language as the editor's
-   drawer in TrainingPlansBrowser (§275.8-fix), no edit actions.
-   ═══════════════════════════════════════════════════════════════════ */
-
-function CellDetailDrawer({
-  cell,
-  onClose,
-}: {
-  cell: { weekKey: string; dayIndex: number; template: StrengthSessionTemplate } | null;
-  onClose: () => void;
-}) {
-  const open = cell != null;
-  const template = cell?.template ?? null;
-  const sessionName = template?.title ?? template?.name ?? "Séance";
-  const phase = sessionName ? detectPhase(sessionName) : "force";
-  const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
-  const items = template?.items ?? [];
-  const cycleLabel = template?.cycle
-    ? CYCLE_LABEL[template.cycle] ?? template.cycle
-    : null;
-
-  return (
-    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
-        <SheetHeader className="pb-3 shrink-0">
-          <SheetTitle className="text-lg font-bold flex items-center gap-2.5 leading-tight">
-            <span className={cn("h-3 w-3 rounded-full shrink-0", style.dot)} />
-            <span className="truncate">{sessionName}</span>
-          </SheetTitle>
-          {cell && (
-            <SheetDescription className="text-sm text-muted-foreground font-medium pl-[22px] flex items-center gap-2 flex-wrap">
-              <span>{DAY_LABELS[cell.dayIndex]}</span>
-              {cycleLabel && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] uppercase tracking-wide font-bold border-0",
-                    style.bg,
-                    style.text,
-                  )}
-                >
-                  {cycleLabel}
-                </Badge>
-              )}
-            </SheetDescription>
-          )}
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-4">
-          {template?.description && (
-            <div className="rounded-xl bg-muted/40 px-3.5 py-2.5">
-              <p className="text-sm text-foreground/85 leading-relaxed">
-                {template.description}
-              </p>
-            </div>
-          )}
-
-          {items.length === 0 ? (
-            <div className="text-center py-10">
-              <Dumbbell className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2.5" />
-              <p className="text-sm text-muted-foreground">
-                Aucun exercice dans cette séance.
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {items
-                .slice()
-                .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                .map((item, idx) => {
-                  const hasPercent = item.percent_1rm != null && item.percent_1rm > 0;
-                  const hasRest = item.rest_seconds != null && item.rest_seconds > 0;
-                  return (
-                    <li
-                      key={idx}
-                      className="rounded-xl border border-border bg-card px-3.5 py-3"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-full bg-muted text-foreground text-sm font-bold tabular-nums">
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <p className="text-[15px] font-semibold leading-snug">
-                            {item.exercise_name ?? `Exercice #${item.exercise_id}`}
-                          </p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-base font-bold tabular-nums leading-none">
-                              {item.sets}
-                              <span className="text-muted-foreground/60 font-medium mx-0.5">×</span>
-                              {item.reps}
-                              <span className="ml-1.5 text-xs font-medium text-muted-foreground">reps</span>
-                            </span>
-                            {hasPercent && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold tabular-nums">
-                                {item.percent_1rm}% 1RM
-                              </span>
-                            )}
-                          </div>
-                          {hasRest && (
-                            <p className="text-xs text-muted-foreground">
-                              Repos <span className="font-semibold text-foreground/80 tabular-nums">{formatRest(item.rest_seconds)}</span>
-                            </p>
-                          )}
-                          {item.notes && (
-                            <p className="text-xs text-muted-foreground italic leading-snug">
-                              {item.notes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}

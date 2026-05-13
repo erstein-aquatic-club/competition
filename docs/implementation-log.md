@@ -4,6 +4,95 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §278 — Aperçu hover/tap des cellules de plan dans Planif muscu (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur veut un aperçu rapide des séances dans Planif muscu (read-only) au survol sur desktop, au clic sur mobile/tablette — sans devoir ouvrir un drawer plein écran.
+
+### Implémentation
+
+`StrengthPlanningTimeline.tsx` : nouveau composant `SessionPreviewPopover` qui wrap les cellules `from-plan` en mode `readOnly`.
+
+**Détails** :
+
+- Utilise le Radix Popover déjà installé (`@radix-ui/react-popover` via `@/components/ui/popover`).
+- **Détection de capacité hover** : `window.matchMedia("(hover: hover)")` à l'init pour distinguer desktop (hover) de touch (tap-only). Évite le "phantom hover" iOS.
+- **Triggers** :
+  - Desktop : `onMouseEnter` ouvre, `onMouseLeave` ferme avec 150ms de delay (laisse le temps de glisser sur le popover).
+  - Mobile/tablet : `onClick` toggle ; `onOpenChange` Radix ferme sur tap-extérieur.
+  - Popover content garde les mêmes handlers hover pour rester ouvert quand on survole le contenu.
+- **Cleanup** : `useEffect` purge le `setTimeout` au démontage.
+- `onOpenAutoFocus` preventDefault pour ne pas voler le focus.
+
+**Contenu du popover** (~300px de large) :
+
+- Header : phase dot + nom de séance (`text-sm font-bold`).
+- Description (si présente) : 2 lignes max `line-clamp-2`.
+- Liste compacte des exercices (jusqu'à 6 visibles) :
+  - `{idx}. {nom}` à gauche, métriques `sets×reps  %1RM  repos` à droite.
+  - Style minimaliste, monospace pour les chiffres (`tabular-nums`).
+  - Repos formaté `M'SS` via helper `formatRest`.
+- `+N autres exercices` si overflow.
+
+### Suppression du drawer
+
+Le drawer `CellDetailDrawer` dans `StrengthPlanningScreen.tsx` est devenu inutile (le popover preview le remplace) : retrait du composant (~115 LOC), retrait des states `detailCell`, retrait des helpers `formatRest`/`CYCLE_LABEL` doublonnés, retrait des imports devenus inutiles.
+
+`handleSlotTap` devient un no-op : les cellules with-session ouvrent leur popover via leur propre wrapper.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | +~140 LOC : composant `SessionPreviewPopover` + wrap du from-plan branch en readOnly (962 LOC total) |
+| `src/pages/coach/StrengthPlanningScreen.tsx` | -~155 LOC : suppression CellDetailDrawer + helpers + state detailCell (674 LOC, -19%) |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+- `npx vitest run derivePlanByWeekDay + strengthPlanningMerge` : 21/21 pass ✅
+
+### Vérification fonctionnelle attendue
+
+1. Hub > Planif. Muscu → sélectionner François WAGNER.
+2. **Desktop** : survol d'une cellule avec session → popover apparaît au-dessus avec la liste compacte des exercices. Le popover reste ouvert quand on glisse sur lui. Quitter la cellule + popover → fermeture après 150ms.
+3. **Mobile / tablette** : tap d'une cellule → popover apparaît, tap-extérieur ferme.
+4. Cellules vides : aucun popover (comportement inchangé, juste un placeholder pointillé).
+
+### Limites
+
+- Le popover ne montre que jusqu'à **6 exercices** (suffisant pour la majorité). "+N autres" indique l'overflow ; pour le détail complet, biblio>Plans.
+- Pas de détection "long-press" sur mobile (tap classique uniquement).
+- Pas de keyboard navigation explicite (Tab+Enter ouvre Popover via Radix par défaut).
+
+## §277 — Picker plan muscu : groupement par dossier (2026-05-13)
+
+### Contexte
+
+Dans l'éditeur de plan (`TrainingPlansBrowser`), le picker "Choisir une séance" affichait toutes les séances à plat. L'utilisateur a des séances regroupées dans un dossier (ex. "Prépa sprint") → liste illisible et incohérente avec la biblio.
+
+### Changements
+
+- **`src/components/coach/strength/TrainingPlansBrowser.tsx`** :
+  - Ajout import `getStrengthFolders`, `StrengthFolder`, `FolderCard`
+  - Nouveau `useQuery` pour les dossiers globaux de séances (`athleteId: null`)
+  - Nouveau `useMemo` `{ pickerFolders, pickerUnfiled }` : groupe `filteredTemplates` par `folder_id`, filtre les dossiers vides (compatibles avec la recherche)
+  - Picker bottom sheet : remplace la liste plate par `FolderCard` (fermés par défaut) + section "Non classées" en bas
+  - Nouveau composant `PickerSessionRow` (extrait du rendu inline) pour éviter la duplication
+
+### Décisions
+
+- `defaultOpen={false}` : cohérent avec la biblio, demandé par l'utilisateur
+- Les dossiers vides (aucune séance correspondant à la recherche) sont masqués automatiquement
+- `FolderCard` réutilisé tel quel depuis `@/components/shared/FolderCard`
+- Pas de sous-dossiers dans ce patch (les dossiers globaux n'ont pas de `parent_id` non null)
+
+### Limites
+
+- Les dossiers athlete-specific ne sont pas exposés dans le picker (les templates du plan sont des séances globales)
+- Pas de sous-dossiers (extension possible si besoin)
+
 ## §276 — Simplification UX muscu : Planning = preview read-only (2026-05-13)
 
 **Branche** : `main`

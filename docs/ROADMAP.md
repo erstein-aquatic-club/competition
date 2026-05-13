@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §276 livré (2026-05-13) — Simplification UX muscu en 3 phases : §276.1 retrait sous-toggle "Plans nageurs" dans biblio (StrengthCatalog), §276.2 migration des 36 `strength_planning_slot_overrides` de François WAGNER en training_plan_applications (plan id=2, 10 semaines, 32 sessions), §276.3 réécriture complète de StrengthPlanningScreen en aperçu read-only (1199→829 LOC, -31%) avec query `getTrainingPlanApplicationsForGroup` pour mode groupe, drawer détail session lecture seule, plus aucune édition de slot (édition dans biblio>Plans). Build OK, 21/21 tests.*
+*Dernière mise à jour : §278 livré (2026-05-13) — Aperçu hover/tap des cellules dans Planif muscu : nouveau `SessionPreviewPopover` (Radix Popover) avec détection `matchMedia("(hover: hover)")` pour distinguer desktop (mouseenter/leave + 150ms grace) vs touch (click toggle). Popover compact 300px avec dot + nom + description (line-clamp-2) + liste exercices `sets×reps  %1RM  repos`. Drawer `CellDetailDrawer` supprimé (StrengthPlanningScreen passe 829→674 LOC, -19%). Tests OK, build OK.*
+
+*Précédente : §276 livré (2026-05-13) — Simplification UX muscu (Planning read-only).*
 
 *Précédente : §275.8-fix livré (2026-05-13) — Refonte lisibilité 5s du drawer détail session.*
 
