@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 const eacLogo = `${import.meta.env.BASE_URL}logo-eac.webp`;
-import { getNavItemsForRole } from "@/components/layout/navItems";
+import { getNavItemsForRole, getMobileNavItemsForRole } from "@/components/layout/navItems";
 import { OfflineDetector } from "@/components/shared/OfflineDetector";
 import { OfflineSyncBanner } from "@/components/shared/OfflineSyncBanner";
 import { InstallPrompt } from "@/components/shared/InstallPrompt";
@@ -64,6 +64,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const navItems = getNavItemsForRole(role);
+  const mobileNavItems = getMobileNavItemsForRole(role);
   const unread = useUnreadCount();
 
   const scrollToTop = useCallback(() => {
@@ -195,7 +196,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex items-stretch justify-evenly h-16 overflow-x-auto scrollbar-hide">
-          {navItems.map((item) => {
+          {mobileNavItems.map((item) => {
             const active = isNavActive(hash, item.href);
             return (
               <button

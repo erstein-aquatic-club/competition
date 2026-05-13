@@ -28,6 +28,7 @@ import {
   upsertStrengthPlanningWeekMeta,
   upsertStrengthPlanningWeekOverride,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type {
   StrengthPlanningSlot,
   AthleteSummary,
@@ -109,13 +110,34 @@ export function useStrengthPlanningAthleteMode({
     queryFn: () => getAthletes(),
   });
 
-  const groupAthletes = useMemo(
-    () =>
-      allAthletes.filter(
-        (a) => a.id != null && a.group_id === selectedGroupId,
-      ),
-    [allAthletes, selectedGroupId],
-  );
+  // §271 — Injecte le coach connecté comme cible synthétique pour qu'il puisse
+  // se planifier son propre plan muscu. Apparaît en tête du picker, quel que
+  // soit le groupe sélectionné.
+  const coachUserId = useAuth((s) => s.userId);
+  const coachUserName = useAuth((s) => s.user);
+  const coachRole = useAuth((s) => s.role);
+  const coachSelfAthlete = useMemo<AthleteSummary | null>(() => {
+    if (coachRole !== "coach" && coachRole !== "admin") return null;
+    if (coachUserId == null || !coachUserName) return null;
+    return {
+      id: coachUserId,
+      display_name: `${coachUserName} (moi)`,
+      email: null,
+      group_id: null,
+      group_label: null,
+      ffn_iuf: null,
+      avatar_url: null,
+    };
+  }, [coachRole, coachUserId, coachUserName]);
+
+  const groupAthletes = useMemo(() => {
+    const filtered = allAthletes.filter(
+      (a) => a.id != null && a.group_id === selectedGroupId,
+    );
+    if (!coachSelfAthlete) return filtered;
+    if (filtered.some((a) => a.id === coachSelfAthlete.id)) return filtered;
+    return [coachSelfAthlete, ...filtered];
+  }, [allAthletes, selectedGroupId, coachSelfAthlete]);
 
   // ── Athlete selection (optionally synced to URL hash ?athlete=<id>) ──
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(

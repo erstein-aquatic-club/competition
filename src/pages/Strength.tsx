@@ -170,15 +170,13 @@ export const buildInProgressRunCache = (run: ReturnType<typeof createInProgressR
 export default function Strength() {
   const user = useAuth((s) => s.user);
   const userId = useAuth((s) => s.userId);
-  const role = useAuth((s) => s.role);
-  const selectedAthleteId = useAuth((s) => s.selectedAthleteId);
-  const selectedAthleteName = useAuth((s) => s.selectedAthleteName);
   const queryClient = useQueryClient();
-  const hasCoachSelection =
-    (role === "coach" || role === "admin") &&
-    (selectedAthleteId !== null || !!selectedAthleteName);
-  const historyAthleteName = hasCoachSelection ? selectedAthleteName : user;
-  const historyAthleteId = hasCoachSelection ? selectedAthleteId : userId;
+  // §271 — /strength est la vue PERSONNELLE de l'utilisateur connecté
+  // (nageur OU coach). On ignore intentionnellement selectedAthleteId du
+  // store coach pour qu'un coach voie toujours SON plan/historique/1RM,
+  // jamais celui d'un nageur sélectionné ailleurs.
+  const historyAthleteName = user;
+  const historyAthleteId = userId;
   const historyAthleteKey = historyAthleteId ?? historyAthleteName;
 
   const {

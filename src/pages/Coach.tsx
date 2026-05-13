@@ -95,6 +95,7 @@ type CoachHomeProps = {
   onOpenRecordsAdmin: () => void;
   onOpenSwimPlanning: () => void;
   onOpenStrengthPlanning: () => void;
+  onOpenMyStrength: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   onOpenWeekAt: (weekDate: string) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
@@ -216,6 +217,7 @@ const CoachHome = ({
   onOpenRecordsAdmin,
   onOpenSwimPlanning,
   onOpenStrengthPlanning,
+  onOpenMyStrength,
   onOpenAthlete,
   onOpenWeekAt,
   athletes,
@@ -818,6 +820,27 @@ const CoachHome = ({
         </div>
       </section>
 
+      {/* ── Section E-bis: Mon entraînement (§271) ── */}
+      <section className="space-y-2.5">
+        <SectionLabel>Mon entraînement</SectionLabel>
+        <button
+          type="button"
+          onClick={onOpenMyStrength}
+          className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left transition-colors active:bg-muted"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
+            <Dumbbell className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Ma muscu perso</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              Plan, charges, 1RM, focus — comme un nageur
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </section>
+
       {/* ── Section F: Nageurs récents ── */}
       <section className="space-y-2.5">
         <SectionLabel>Nageurs récents</SectionLabel>
@@ -1143,6 +1166,7 @@ export default function Coach() {
           onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
           onOpenStrengthPlanning={() => navigate("/coach/strength-planning")}
+          onOpenMyStrength={() => navigate("/strength")}
           onOpenAthlete={handleOpenAthlete}
           onOpenWeekAt={(weekDate) => setRouteState({ section: "week", weekDate })}
           athletes={myAthletes}
