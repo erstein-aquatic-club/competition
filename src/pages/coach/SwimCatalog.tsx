@@ -244,15 +244,12 @@ export default function SwimCatalog({
     createEmptySession(entryContext?.mode === "create" ? entryContext : null),
   );
 
-  const SWIM_PAGE_SIZE = 20;
+  const SWIM_PAGE_SIZE = 9999;
   const {
     data: sessionPages,
     isLoading: sessionsLoading,
     error: sessionsError,
     refetch: refetchSessions,
-    fetchNextPage: fetchNextSwimPage,
-    hasNextPage: hasNextSwimPage,
-    isFetchingNextPage: isFetchingNextSwimPage,
   } = useInfiniteQuery({
     queryKey: ["swim_catalog_paginated", debouncedSearchQuery, currentFolder],
     queryFn: ({ pageParam = 0 }) =>
@@ -843,16 +840,6 @@ export default function SwimCatalog({
             }
             archiveMode={showArchive ? "restore" : "archive"}
           />
-          )}
-          {hasNextSwimPage && (
-            <Button
-              variant="outline"
-              className="w-full mt-4"
-              onClick={() => fetchNextSwimPage()}
-              disabled={isFetchingNextSwimPage}
-            >
-              {isFetchingNextSwimPage ? "Chargement..." : "Charger plus"}
-            </Button>
           )}
         </div>
 
