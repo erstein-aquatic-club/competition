@@ -4,6 +4,53 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §280 — Bouton "Enregistrer" dans le plan builder (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale « Il manque un bouton 'enregistrer' sur la vue plan builder ».
+
+### Contexte
+
+Le plan builder utilise un modèle auto-save :
+- name / description : blur-save sur les inputs
+- num_weeks : auto-save via boutons Add/Remove week
+- Sessions cellules : auto-save via picker / popover Retirer
+- is_draft : auto-save via switch
+
+L'absence d'un bouton "Enregistrer" visible donne l'impression que les changements ne sont pas persistés. Problème de **confiance UX** plus que fonctionnel.
+
+### Fix
+
+Ajout d'un bouton primary "Enregistrer" dans la ligne de breadcrumb (haut de l'éditeur, à droite).
+
+`handleSaveAndClose` :
+1. Flush des drafts name/description si dirty (au cas où l'utilisateur clique sans avoir blur).
+2. Appelle `onBack` → retour à la liste des plans.
+
+`disabled` quand `updatePlan.isPending` pour éviter les double-clicks.
+
+### Fichier modifié
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | Breadcrumb refait en `flex` avec bouton "Enregistrer" à droite + helper `handleSaveAndClose` |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+
+### Vérification
+
+1. Biblio > Plans > "Prépa sprint 50m" → éditeur.
+2. En haut à droite, bouton **Enregistrer** (icône Check).
+3. Modifier le nom sans blur → cliquer Enregistrer → le nouveau nom est sauvegardé + retour à la liste.
+4. Tout autre changement (séances, semaines, applications) est déjà auto-saved en cours d'édition.
+
+### Note
+
+Aucune sémantique "annuler" n'est ajoutée (pas de undo). Le bouton sert juste de point de sortie clair et flush les éventuels drafts.
+
 ## §279 — SessionPreviewPopover partagé + utilisé dans le plan builder (2026-05-13)
 
 **Branche** : `main`

@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
+  Check,
   Dumbbell,
   MoreHorizontal,
   Plus,
@@ -625,18 +626,44 @@ function TrainingPlanEditor({
     );
   };
 
+  // §280 — bouton "Enregistrer" : flushes les drafts name/description en
+  // attente (si l'utilisateur clique sans avoir blur) puis revient à la liste.
+  // Les mutations cellules/semaines/applications sont déjà auto-sauvées.
+  const handleSaveAndClose = () => {
+    const trimmedName = nameDraft.trim();
+    if (trimmedName && trimmedName !== plan.name) {
+      updatePlan.mutate({ name: trimmedName });
+    }
+    const trimmedDesc = descDraft.trim() || null;
+    if (trimmedDesc !== (plan.description ?? null)) {
+      updatePlan.mutate({ description: trimmedDesc });
+    }
+    onBack();
+  };
+
   return (
     <div className="space-y-4">
-      {/* Breadcrumb */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span>Plans</span>
-        <span className="text-muted-foreground/60">/</span>
-        <span className="font-medium text-foreground truncate">{plan.name}</span>
-      </button>
+      {/* Breadcrumb + save action */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onBack}
+          className="flex-1 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-w-0"
+        >
+          <ArrowLeft className="h-4 w-4 shrink-0" />
+          <span>Plans</span>
+          <span className="text-muted-foreground/60">/</span>
+          <span className="font-medium text-foreground truncate">{plan.name}</span>
+        </button>
+        <Button
+          size="sm"
+          onClick={handleSaveAndClose}
+          disabled={updatePlan.isPending}
+          className="shrink-0"
+        >
+          <Check className="h-4 w-4 mr-1.5" />
+          Enregistrer
+        </Button>
+      </div>
 
       {/* Header: name + description + actions */}
       <div className="rounded-xl border border-border bg-card p-3 space-y-3">

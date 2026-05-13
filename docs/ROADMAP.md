@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §279 livré (2026-05-13) — `SessionPreviewPopover` extrait en composant partagé (212 LOC), réutilisé dans le plan builder avec actions optionnelles "Changer" / "Retirer". Suppression du `CellDetailDrawer` plein écran de TrainingPlansBrowser (1513→1421 LOC). Suppression du duplicate dans StrengthPlanningTimeline (962→825 LOC). UX cohérente entre Planif muscu (read-only preview) et plan builder (preview + actions).*
+*Dernière mise à jour : §280 livré (2026-05-13) — Bouton "Enregistrer" dans le plan builder : breadcrumb refait en flex avec bouton primary à droite. `handleSaveAndClose` flush les drafts name/description avant retour à la liste. Améliore la confiance UX vs le modèle auto-save invisible.*
+
+*Précédente : §279 livré (2026-05-13) — SessionPreviewPopover partagé + actions Changer/Retirer.*
 
 *Précédente : §278-fix livré (2026-05-13) — Hover preview lag fix (delays cumulés).*
 

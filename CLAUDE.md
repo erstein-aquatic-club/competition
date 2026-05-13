@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§279** — SessionPreviewPopover extrait en module partagé + utilisé dans le plan builder avec actions Changer/Retirer.
+Dernier § livré : **§280** — Bouton "Enregistrer" dans le plan builder (flush drafts name/description + retour liste).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
