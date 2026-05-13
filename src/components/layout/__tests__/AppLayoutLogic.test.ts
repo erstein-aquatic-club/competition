@@ -34,7 +34,7 @@ test("getMobileNavItemsForRole — coach : Profil présent, Chrono absent", () =
   assert.equal(items.length, 6);
   assert.ok(labels.includes("Profil"), "Profil doit être dans le dock mobile");
   assert.ok(!labels.includes("Chrono"), "Chrono ne doit PAS être dans le dock mobile");
-  assert.ok(labels.includes("Ma muscu"));
+  assert.ok(labels.includes("Ma muscu"), "Ma muscu doit être dans le dock mobile");
 });
 
 test("getMobileNavItemsForRole — admin : même comportement que coach", () => {
