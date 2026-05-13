@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.7** — Athlete-side : Phase 3 dans MyPlanTab (training_plan_applications > slots > cycles legacy). Surfacé dans Strength, TeamPlansSection, SuiviPlanification.
+Dernier § livré : **§275.7-fix** — Hotfix React #310 dans TrainingPlanEditor (useMemo après early return). Débloque le workflow §275.5 "Appliquer le plan".
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

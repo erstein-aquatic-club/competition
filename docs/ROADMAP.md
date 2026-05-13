@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.7 livré (2026-05-13) — Athlete-side : nouvelle Phase 3 dans `MyPlanTab` (priorité training_plan_applications > strength_planning_slots > cycles legacy). Le nageur voit son plan dans "Mon plan" dès que le coach applique un training_plan via §275.5. Reach : Strength.tsx + TeamPlansSection + SuiviPlanification (3 lieux pour 1 mod). Build OK, 21/21 tests pass.*
+*Dernière mise à jour : §275.7-fix livré (2026-05-13) — Hotfix React error #310 dans `TrainingPlanEditor` : un `useMemo` était déclaré après `if (!plan) return ...`, violant les Rules of Hooks. Le bug crashait l'éditeur de plan et empêchait l'accès au bouton "Appliquer" → 0 application en DB. Remontée du hook au-dessus de l'early return. Build OK, tsc clean.*
+
+*Précédente : §275.7 livré (2026-05-13) — Athlete-side : Phase 3 dans MyPlanTab.*
 
 *Précédente : §275.6 livré (2026-05-13) — Timeline Planif muscu coach dérivée des training_plan_applications.*
 

@@ -461,6 +461,20 @@ function TrainingPlanEditor({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
 
+  // IMPORTANT: keep all hook calls above any early return. Moving this
+  // useMemo below `if (!plan) return` violates the Rules of Hooks (the hook
+  // count differs between the loading render and the loaded render) and
+  // surfaces as React error #310 in production builds.
+  const filteredTemplates = useMemo(() => {
+    if (!debouncedSearch.trim()) return templates;
+    const q = debouncedSearch.toLowerCase();
+    return templates.filter(
+      (t) =>
+        (t.title ?? "").toLowerCase().includes(q) ||
+        (t.name ?? "").toLowerCase().includes(q),
+    );
+  }, [templates, debouncedSearch]);
+
   if (!plan) {
     return (
       <div className="space-y-3">
@@ -493,16 +507,6 @@ function TrainingPlanEditor({
       },
     );
   };
-
-  const filteredTemplates = useMemo(() => {
-    if (!debouncedSearch.trim()) return templates;
-    const q = debouncedSearch.toLowerCase();
-    return templates.filter(
-      (t) =>
-        (t.title ?? "").toLowerCase().includes(q) ||
-        (t.name ?? "").toLowerCase().includes(q),
-    );
-  }, [templates, debouncedSearch]);
 
   return (
     <div className="space-y-4">

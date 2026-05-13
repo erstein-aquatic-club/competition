@@ -4,6 +4,51 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.7-fix — Hotfix React #310 dans TrainingPlanEditor (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale une `Minified React error #310` (visit https://react.dev/errors/310) au chargement de l'éditeur d'un training_plan dans `biblio > Plans`. Stack pointe sur `TrainingPlansBrowser-DJ2rNy31.js:1:8290`.
+
+### Cause racine
+
+React error #310 = "Rendered more hooks than during the previous render." Dans `TrainingPlanEditor` (§275.4), un `useMemo` (`filteredTemplates`) était déclaré **après** l'early return `if (!plan) return ...`. Conséquence :
+
+- 1er render (plan en chargement, `plan = null`) : hooks 1-N exécutés, early return → useMemo skipped.
+- 2e render (plan chargé) : hooks 1-N exécutés, early return passé → useMemo exécuté → React détecte que le compteur de hooks a augmenté → crash.
+
+C'est une violation classique des Rules of Hooks (https://react.dev/reference/rules/rules-of-hooks).
+
+### Fix
+
+Remontée du `const filteredTemplates = useMemo(...)` **au-dessus** du `if (!plan)`, juste après les autres hooks (lignes 461-462 → après 462). Commentaire d'explication ajouté pour prévenir une régression future.
+
+### Conséquence side-effect
+
+Le bug crashait l'éditeur dès qu'on ouvrait un plan, ce qui empêchait **aussi** d'appuyer sur le bouton "Appliquer" (§275.5). C'est pourquoi la DB n'avait aucune ligne dans `training_plan_applications` malgré nos tests de workflow — le user n'a jamais pu accéder au dialog. Le hotfix débloque le workflow complet §275.4 → §275.5 → §275.6 → §275.7.
+
+### Investigation second point ("S21/S22 non remplies")
+
+DB-vérif via MCP : pour François WAGNER (id=1), les overrides `strength_planning_slot_overrides` couvrent bien S13-S22 (36 lignes, dont S21 day=0/1 et S22 day=0, time_slot="evening"). Le helper `findSlot` du Timeline (§274 + §275.0) a un fallback `morning → evening`, donc ces overrides devraient s'afficher.
+
+Hypothèses pour expliquer la perception "non remplies" :
+
+1. **Bug React #310 cascadait** : si l'app était dans un état d'erreur globale après l'ouverture de TrainingPlanEditor, certaines vues pouvaient être dégradées. Le fix précédent débloque ça.
+2. **Cache UI stale** : React Query peut avoir une snapshot pré-§275 sans S21/S22 fetched (cas peu probable mais possible avec le PWA cache).
+3. **Plan biblio édité ≠ overrides DB** : si l'utilisateur a modifié le plan biblio (Prépa sprint 50m) via §275.4 mais n'a pas appliqué de nouvelle application, le Planif muscu continue d'afficher les anciens overrides au lieu du contenu du plan édité. C'est cohérent avec l'architecture §275.6 (slots = override layer, plan content = derivation source) mais peut surprendre l'utilisateur.
+
+Recommandation utilisateur post-déploiement : (a) hard-refresh navigateur pour vider le cache PWA, (b) ouvrir l'éditeur (qui ne crash plus), (c) tester le workflow complet "Appliquer le plan à François" pour activer la dérivation §275.6.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | Remontée du `useMemo filteredTemplates` au-dessus du `if (!plan) return` + commentaire d'avertissement |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+
 ## §275.7 — Athlete-side : Phase 3 dans MyPlanTab (training_plan_applications) (2026-05-13)
 
 **Branche** : `main`
