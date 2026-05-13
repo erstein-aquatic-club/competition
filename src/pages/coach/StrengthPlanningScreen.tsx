@@ -78,6 +78,17 @@ import {
 const INITIAL_WEEK_COUNT = 13; // current + 12 ahead
 const LOAD_MORE_COUNT = 4;
 
+// Biblio plan cycle names encode their target week number, e.g. "S15",
+// "S 15", "Semaine 15", "Sem 15". The number is matched against the
+// timeline's ISO week number to feed `athletePlanByWeekDay`. Names that
+// don't follow this pattern are skipped (treated as draft/unscheduled).
+function parseWeekNumberFromCycleName(name: string): number | null {
+  const m = name.trim().match(/^(?:s|sem|semaine)\s*(\d+)/i);
+  if (!m) return null;
+  const n = parseInt(m[1] ?? "", 10);
+  return Number.isFinite(n) && n > 0 && n <= 53 ? n : null;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════════════════════════ */
@@ -204,23 +215,38 @@ export default function StrengthPlanningScreen() {
     enabled: selectedAthleteId != null,
   });
 
-  // Map dayIndex → session inferred from the athlete's biblio plan based on
-  // the session title prefix (Lundi/Mardi/...). Used to auto-fill timeline
-  // cells in athlete mode as a "ghost" overlay below explicit slots. When
-  // multiple cycles supply a session for the same day, the last one wins
-  // (most recently created tends to be the active cycle).
-  const athletePlanByDay = useMemo(() => {
-    const map = new Map<number, StrengthSessionTemplate>();
+  // Map (weekNumber → (dayIndex → session)) inferred from the athlete's biblio
+  // plan. Cycles are named with their target week number ("S15", "Semaine 15",
+  // ...), and each session inside is day-prefixed (Lundi/Mardi/...). Used to
+  // auto-fill timeline cells in athlete mode as a "ghost" overlay below
+  // explicit slots. Cycles whose name doesn't encode a week number are ignored
+  // (matches the user model where unscheduled drafts live in "Non classé").
+  const athletePlanByWeekDay = useMemo(() => {
+    const map = new Map<number, Map<number, StrengthSessionTemplate>>();
     if (selectedAthleteId == null) return map;
-    const folderIds = new Set(athletePlanFolders.map((f) => f.id));
-    if (folderIds.size === 0) return map;
+    const cyclesByFolderId = new Map<number, { folder: StrengthFolder; weekNumber: number }>();
+    for (const f of athletePlanFolders) {
+      if (f.parent_id == null) continue; // skip root folders
+      const wn = parseWeekNumberFromCycleName(f.name);
+      if (wn != null) {
+        cyclesByFolderId.set(f.id, { folder: f, weekNumber: wn });
+      }
+    }
+    if (cyclesByFolderId.size === 0) return map;
     const dayPrefixes = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
     for (const s of sessionTemplates) {
-      if (s.folder_id == null || !folderIds.has(s.folder_id)) continue;
+      if (s.folder_id == null) continue;
+      const entry = cyclesByFolderId.get(s.folder_id);
+      if (!entry) continue;
       const title = (s.title ?? s.name ?? "").trim().toLowerCase();
       for (let i = 0; i < 7; i += 1) {
         if (title.startsWith(dayPrefixes[i])) {
-          map.set(i, s);
+          let weekMap = map.get(entry.weekNumber);
+          if (!weekMap) {
+            weekMap = new Map();
+            map.set(entry.weekNumber, weekMap);
+          }
+          weekMap.set(i, s);
           break;
         }
       }
@@ -633,7 +659,7 @@ export default function StrengthPlanningScreen() {
         onEditTypeChange={setEditWeekType}
         onEditNotesChange={setEditWeekNotes}
         showOverrideBadge={selectedAthleteId != null}
-        athletePlanByDay={athletePlanByDay}
+        athletePlanByWeekDay={athletePlanByWeekDay}
         sentinelRef={sentinelRef}
         isLoading={slotsLoading}
         isEmpty={slots.length === 0}

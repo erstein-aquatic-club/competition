@@ -4,6 +4,49 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §274.3 — Auto-fill timeline : match cycle ↔ semaine via numéro `S<n>` (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale que le plan affiché dans Planification muscu ne correspond pas à son plan biblio — exemple : une séance Mercredi apparaît alors qu'il n'en a pas dans son cycle actif.
+
+### Cause racine
+
+§274.1 agrégeait **toutes les cycles** du nageur dans un `Map<dayIndex, session>` unique. Si le nageur avait plusieurs cycles (ex: ancien cycle hypertrophie avec un Mercredi + cycle actif force sans Mercredi), les sessions des deux se confondaient et le Mercredi de l'ancien cycle "fuyait" dans toutes les semaines du timeline.
+
+Le modèle mental de l'utilisateur : chaque cycle dans biblio est nommé `S<n>` (ex: `S15`, `Semaine 15`) et correspond à **une semaine spécifique du calendrier**, pas à une phase d'entraînement. Le mapping doit donc être par couple (numéro de semaine ISO, jour).
+
+### Implémentation
+
+`StrengthPlanningScreen.tsx` :
+
+- Nouveau helper `parseWeekNumberFromCycleName(name)` : regex `/^(?:s|sem|semaine)\s*(\d+)/i` → numéro de semaine ou `null`. Cycles non parsables (ex: "Cycle Force") sont ignorés.
+- `athletePlanByDay` (map 1D) remplacée par `athletePlanByWeekDay` : `Map<weekNumber, Map<dayIndex, session>>`. Construite en filtrant sub-folders (cycles), parsant leur nom, puis indexant les sessions par préfixe de jour.
+
+`StrengthPlanningTimeline.tsx` :
+
+- Prop `athletePlanByDay` (1D) remplacée par `athletePlanByWeekDay` (2D).
+- À l'itération des semaines, on récupère `athletePlanByWeekDay.get(week.weekNumber)` et on le passe à `WeekCard` comme `athletePlanByDay` (interne reste 1D dans WeekCard / MicroGrid / SlotCell — inchangé).
+
+Résultat : un cycle `S15` du plan biblio alimente **uniquement** la semaine 15 du timeline. Pas de "fuite" entre cycles.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/StrengthPlanningScreen.tsx` | Helper `parseWeekNumberFromCycleName` + refactor `athletePlanByWeekDay` (2D) |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Prop renommée `athletePlanByDay` → `athletePlanByWeekDay` (2D), lookup par `week.weekNumber` |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- `npx vitest run src/lib/__tests__/strengthPlanningMerge.test.ts` : 13/13 pass. ✅
+- Vérification manuelle : un nageur dont le plan biblio contient uniquement des cycles `S15` (avec Lun/Jeu/Ven) et `S16` (avec Lun/Mer/Ven) doit voir EXACTEMENT ces séances dans les semaines correspondantes du timeline, et rien dans les autres semaines.
+
+### Limites
+
+- Cycles non nommés au format `S<n>` (ex: "Cycle Force", "Pré-compétition") sont ignorés. Pour les inclure, l'utilisateur doit les renommer ou un futur § ajoutera un fallback.
+- Les cycles `S15` couvrent week 15 quel que soit l'année — pas de gestion multi-année. À itérer si les plans recouvrent plusieurs années civiles.
+
 ## §274.2 — Fix fiabilité bouton « Mettre à jour l'app » (2026-05-13)
 
 **Branche** : `main`

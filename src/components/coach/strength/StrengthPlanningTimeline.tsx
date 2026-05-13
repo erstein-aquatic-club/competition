@@ -78,11 +78,12 @@ export interface StrengthPlanningTimelineProps {
   onEditNotesChange: (v: string) => void;
   showOverrideBadge?: boolean;
   /**
-   * In athlete mode: per-dayIndex (0=Mon … 6=Sun) sessions inferred from the
-   * athlete's biblio plan (cycle sessions prefixed with Lun/Mar/...). Cells
-   * with no explicit slot fall back to a "ghost" rendering of this session.
+   * In athlete mode: per (weekNumber → (dayIndex 0=Mon…6=Sun) → session)
+   * inferred from the athlete's biblio plan. Cycles are named "S<n>" /
+   * "Semaine <n>" and feed only the matching ISO-week of the timeline.
+   * Cells with no explicit slot fall back to a "ghost" rendering.
    */
-  athletePlanByDay?: Map<number, StrengthSessionTemplate>;
+  athletePlanByWeekDay?: Map<number, Map<number, StrengthSessionTemplate>>;
   readOnly?: boolean;
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
   isLoading?: boolean;
@@ -116,7 +117,7 @@ export default function StrengthPlanningTimeline(
     onCancelEditMeta,
     onEditTypeChange,
     onEditNotesChange,
-    athletePlanByDay,
+    athletePlanByWeekDay,
     sentinelRef,
     isLoading = false,
     isEmpty = false,
@@ -174,6 +175,7 @@ export default function StrengthPlanningTimeline(
             const s = findSlot(week.weekKey, d);
             if (s) slotsPerDay.push(s);
           }
+          const weekPlan = athletePlanByWeekDay?.get(week.weekNumber);
           return (
             <WeekCard
               key={week.weekKey}
@@ -202,7 +204,7 @@ export default function StrengthPlanningTimeline(
                 onSlotTap(week.weekKey, dayIndex, existing ?? null);
               }}
               showOverrideBadge={showOverrideBadge}
-              athletePlanByDay={athletePlanByDay}
+              athletePlanByDay={weekPlan}
               sessionTemplatesById={sessionTemplatesById}
               readOnly={readOnly}
             />
