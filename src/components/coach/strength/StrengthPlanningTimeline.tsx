@@ -77,6 +77,14 @@ export interface StrengthPlanningTimelineProps {
   onEditTypeChange: (v: string) => void;
   onEditNotesChange: (v: string) => void;
   showOverrideBadge?: boolean;
+  /**
+   * §275.6 — Per (weekKey → (dayIndex → session)) inherited from the
+   * athlete's active training_plan_applications. Cells with no explicit
+   * slot fall back to this. Rendered solid (not ghost) with a "Plan" badge
+   * indicator. Tap behaves like an empty cell: opens the picker so the
+   * coach can create an explicit override.
+   */
+  athletePlanByWeekDay?: Map<string, Map<number, StrengthSessionTemplate>>;
   readOnly?: boolean;
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
   isLoading?: boolean;
@@ -110,6 +118,7 @@ export default function StrengthPlanningTimeline(
     onCancelEditMeta,
     onEditTypeChange,
     onEditNotesChange,
+    athletePlanByWeekDay,
     sentinelRef,
     isLoading = false,
     isEmpty = false,
@@ -167,6 +176,7 @@ export default function StrengthPlanningTimeline(
             const s = findSlot(week.weekKey, d);
             if (s) slotsPerDay.push(s);
           }
+          const weekPlan = athletePlanByWeekDay?.get(week.weekKey);
           return (
             <WeekCard
               key={week.weekKey}
@@ -195,6 +205,7 @@ export default function StrengthPlanningTimeline(
                 onSlotTap(week.weekKey, dayIndex, existing ?? null);
               }}
               showOverrideBadge={showOverrideBadge}
+              athletePlanByDay={weekPlan}
               sessionTemplatesById={sessionTemplatesById}
               readOnly={readOnly}
             />
@@ -238,6 +249,7 @@ interface WeekCardProps {
   ) => EffectiveStrengthSlot | undefined;
   onCellTap: (dayIndex: number) => void;
   showOverrideBadge: boolean;
+  athletePlanByDay?: Map<number, StrengthSessionTemplate>;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
 }
@@ -265,6 +277,7 @@ function WeekCard({
   findSlot,
   onCellTap,
   showOverrideBadge,
+  athletePlanByDay,
   sessionTemplatesById,
   readOnly,
 }: WeekCardProps) {
@@ -477,6 +490,7 @@ function WeekCard({
                     getDayCompetitions={getDayCompetitions}
                     onSelectCompetition={onSelectCompetition}
                     showOverrideBadge={showOverrideBadge}
+                    athletePlanByDay={athletePlanByDay}
                     sessionTemplatesById={sessionTemplatesById}
                     readOnly={readOnly}
                   />
@@ -502,6 +516,7 @@ function MicroGrid({
   getDayCompetitions,
   onSelectCompetition,
   showOverrideBadge,
+  athletePlanByDay,
   sessionTemplatesById,
   readOnly,
 }: {
@@ -515,6 +530,7 @@ function MicroGrid({
   getDayCompetitions: (weekMonday: Date, dayIndex: number) => Competition[];
   onSelectCompetition: (c: Competition) => void;
   showOverrideBadge: boolean;
+  athletePlanByDay?: Map<number, StrengthSessionTemplate>;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
 }) {
@@ -524,9 +540,10 @@ function MicroGrid({
       <div className="px-3 pt-2 pb-3 space-y-1">
         {DAY_ROWS.map((day) => {
           const slot = findSlot(weekKey, day.index);
+          const fromPlan = !slot ? athletePlanByDay?.get(day.index) ?? null : null;
           const dayComps = getDayCompetitions(weekMonday, day.index);
           const hasComp = dayComps.length > 0;
-          const emptyDay = !slot;
+          const emptyDay = !slot && !fromPlan;
           const primaryComp = dayComps[0];
 
           return (
@@ -581,6 +598,7 @@ function MicroGrid({
               ) : (
                 <SlotCell
                   slot={slot}
+                  fromPlanTpl={fromPlan}
                   onTap={() => onCellTap(day.index)}
                   showOverrideBadge={showOverrideBadge}
                   sessionTemplatesById={sessionTemplatesById}
@@ -601,17 +619,79 @@ function MicroGrid({
 
 function SlotCell({
   slot,
+  fromPlanTpl,
   onTap,
   showOverrideBadge,
   sessionTemplatesById,
   readOnly,
 }: {
   slot: EffectiveStrengthSlot | undefined;
+  /**
+   * §275.6 — When no explicit slot exists, optional session inherited from
+   * the athlete's active training_plan_applications. Rendered SOLID (same
+   * look as an explicit slot) plus a small "P" badge to surface its
+   * provenance. Tap = picker (treats as empty) so coach can override.
+   */
+  fromPlanTpl?: StrengthSessionTemplate | null;
   onTap: () => void;
   showOverrideBadge: boolean;
   sessionTemplatesById: Map<number, StrengthSessionTemplate>;
   readOnly: boolean;
 }) {
+  if (!slot && fromPlanTpl) {
+    const sessionName = fromPlanTpl.title ?? fromPlanTpl.name ?? "Séance";
+    const phase = detectPhase(sessionName);
+    const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+    const itemCount = fromPlanTpl.items?.length ?? 0;
+    const displayName = sessionName.replace(/^[A-Za-z]{3,4}\s*[—–-]\s*/u, "").slice(0, 16);
+    const body = (
+      <>
+        <span className={cn("h-2 w-2 rounded-full shrink-0", style.dot)} />
+        <span
+          className={cn(
+            "text-[10px] font-semibold truncate leading-tight flex-1 text-left",
+            style.text,
+          )}
+        >
+          {displayName}
+        </span>
+        {itemCount > 0 && (
+          <span className={cn("text-[9px] font-semibold shrink-0 opacity-70", style.text)}>
+            {itemCount}ex
+          </span>
+        )}
+        <span
+          aria-label="Séance issue du plan d'entraînement"
+          title="Issu du plan"
+          className="absolute top-0.5 right-0.5 inline-flex items-center justify-center h-3 min-w-3 rounded-sm px-[2px] text-[8px] font-bold leading-none text-primary bg-background ring-1 ring-primary/50"
+        >
+          P
+        </span>
+      </>
+    );
+    const baseClass = cn(
+      "relative h-9 w-full rounded-lg flex items-center gap-1.5 px-1.5 transition-all overflow-hidden",
+      style.bg,
+    );
+    if (readOnly) {
+      return (
+        <div className={baseClass} aria-label={`${sessionName} (issu du plan)`}>
+          {body}
+        </div>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className={cn(baseClass, "active:scale-[0.97]")}
+        onClick={onTap}
+        aria-label={`Modifier : ${sessionName} (issu du plan)`}
+      >
+        {body}
+      </button>
+    );
+  }
+
   if (!slot) {
     if (readOnly) {
       return (

@@ -213,6 +213,85 @@ export interface ActiveTrainingPlanApplication extends TrainingPlanApplication {
   plan_name: string;
 }
 
+/**
+ * All applications targeting a given user (direct OR via group memberships),
+ * enriched with parent-plan metadata. NO date filter — caller can compute
+ * `relative_week` per visible date and decide which application applies.
+ *
+ * Use this for the planning-timeline derivation (§275.6) where we render
+ * a sliding window of multiple weeks and need to map each one to a
+ * potentially different application/relative_week.
+ */
+export async function getTrainingPlanApplicationsForUser(opts: {
+  userId: number;
+  discipline?: TrainingPlanDiscipline;
+}): Promise<ActiveTrainingPlanApplication[]> {
+  if (!canUseSupabase()) return [];
+
+  const memberRes = await supabase
+    .from("group_members")
+    .select("group_id")
+    .eq("user_id", opts.userId);
+  if (memberRes.error) throw new Error(memberRes.error.message);
+  const groupIds = (memberRes.data ?? []).map((m) => m.group_id as number);
+
+  const userClause = `target_user_id.eq.${opts.userId}`;
+  const groupClause =
+    groupIds.length > 0 ? `,target_group_id.in.(${groupIds.join(",")})` : "";
+  const orFilter = `${userClause}${groupClause}`;
+
+  let query = supabase
+    .from("training_plan_applications")
+    .select("*, training_plans!inner(id, num_weeks, discipline, name)")
+    .or(orFilter)
+    .order("start_date", { ascending: false });
+
+  if (opts.discipline) {
+    query = query.eq("training_plans.discipline", opts.discipline);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Array<TrainingPlanApplication & {
+    training_plans: { id: number; num_weeks: number; discipline: TrainingPlanDiscipline; name: string };
+  }>).map((r) => ({
+    id: r.id,
+    plan_id: r.plan_id,
+    target_user_id: r.target_user_id,
+    target_group_id: r.target_group_id,
+    start_date: r.start_date,
+    end_date: r.end_date,
+    applied_by: r.applied_by,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    plan_num_weeks: r.training_plans.num_weeks,
+    plan_discipline: r.training_plans.discipline,
+    plan_name: r.training_plans.name,
+  }));
+}
+
+/**
+ * Fetch all training_plan_sessions for a set of plan ids in one round-trip.
+ * Used by the timeline derivation to look up sessions across multiple
+ * applications without N queries.
+ */
+export async function getTrainingPlanSessionsForPlans(
+  planIds: number[],
+): Promise<TrainingPlanSession[]> {
+  if (!canUseSupabase() || planIds.length === 0) return [];
+  const data = assertSupabase(
+    await supabase
+      .from("training_plan_sessions")
+      .select("*")
+      .in("plan_id", planIds)
+      .order("plan_id")
+      .order("relative_week")
+      .order("day_of_week"),
+  );
+  return (data ?? []) as TrainingPlanSession[];
+}
+
 export async function getActiveTrainingPlanApplicationsForUser(opts: {
   userId: number;
   date: string; // ISO YYYY-MM-DD

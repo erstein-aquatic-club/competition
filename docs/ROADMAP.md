@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.5 livré (2026-05-13) — Application d'un training_plan à un nageur ou un groupe : nouveau `ApplyPlanDialog` (radio target + Select athlete/group + date picker lundi-only avec auto-suggest + preview end_date) et liste `PlanApplicationsList` sous l'éditeur (icône + nom résolu + dates + delete). +440 LOC dans TrainingPlansBrowser (1229 total). Build OK, tsc clean.*
+*Dernière mise à jour : §275.6 livré (2026-05-13) — Timeline Planif muscu dérivée des `training_plan_applications` actives. Pure fn `derivePlanByWeekDay` (8 tests) + 2 helpers API batch (`getTrainingPlanApplicationsForUser`, `getTrainingPlanSessionsForPlans`). Cellule "from-plan" rendue SOLIDE avec badge "P" (vs ghost transparent du §274.1/.3 revert). Tap → picker → crée slot override. Bugfix DST (parsing UTC). Build OK, tsc clean.*
+
+*Précédente : §275.5 livré (2026-05-13) — Application d'un training_plan à un nageur ou un groupe (ApplyPlanDialog + PlanApplicationsList).*
 
 *Précédente : §275.4 livré (2026-05-13) — Refonte biblio>plans UI : TrainingPlansBrowser (liste + dialog création + éditeur grille num_weeks × 7).*
 

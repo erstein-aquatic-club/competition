@@ -4,6 +4,105 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.6 — Planif muscu : timeline dérivée des applications actives (2026-05-13)
+
+**Branche** : `main`
+**Suite de** : §275.5 (UI application).
+
+### Objectif
+
+Boucler la demande initiale "le plan de François doit alimenter la timeline" en partant cette fois du bon modèle de données : pas un parsing du nom de cycle (§274.3) mais les `training_plan_applications` créées via §275.5.
+
+### Implémentation
+
+**API helpers ajoutés** (`src/lib/api/training-plans.ts`) :
+
+- `getTrainingPlanApplicationsForUser({ userId, discipline? })` : applications direct + via groupes, sans filtre date. Renvoie `ActiveTrainingPlanApplication[]` enrichies (plan_num_weeks, plan_discipline, plan_name).
+- `getTrainingPlanSessionsForPlans(planIds)` : batch fetch des sessions pour plusieurs plans en une seule requête (IN clause). Évite N round-trips.
+
+**Helper pur** (`src/lib/strength/derivePlanByWeekDay.ts`, 121 LOC) :
+
+Fonction pure framework-agnostique :
+```
+input  : weekKeys[], applications[] (sorted by start_date desc), sessions[]
+output : Map<weekKey, Map<dayIndex, DerivedCell { planId, planName, session, relativeWeek }>>
+```
+
+Pour chaque `weekKey`, itère les applications (newest first). La première dont start_date ≤ weekKey ET (end_date ≥ weekKey OU weekKey < start + num_weeks×7) ET (1 ≤ relative_week ≤ num_weeks) "gagne". Les autres applications sont ignorées pour cette semaine (overlap resolution).
+
+**Bugfix DST** : parsing avec `T00:00:00Z` (UTC) au lieu de `T00:00:00` (local) — sans cela, le passage à l'heure d'été (dernier dimanche de mars en France) faisait que la diff `weekMonday - start_date` était de 6j 23h au lieu de 7j, donc `floor(... / 7days)` retournait 0 au lieu de 1. Cassait la dérivation S2 dès qu'on traversait la DST.
+
+**Tests unitaires** (`src/lib/strength/__tests__/derivePlanByWeekDay.test.ts`, 8/8 pass) :
+- empty map quand pas d'applications
+- relative_week 1 = start_date Monday
+- relative_week subséquents (avec DST traversal: 2026-03-23 → 2026-03-30 = relative_week 2)
+- exclusion des semaines past num_weeks
+- exclusion des semaines avant start_date
+- respect de end_date override
+- conflict resolution (newest start_date wins)
+- multi-day in same week
+
+**Intégration screen** (`src/pages/coach/StrengthPlanningScreen.tsx`) :
+
+```ts
+const { data: athleteApplications } = useQuery(...);  // getTrainingPlanApplicationsForUser
+const applicationPlanIds = useMemo(() => Array.from(new Set(...)), [athleteApplications]);
+const { data: applicationPlanSessions } = useQuery(...);  // batch fetch
+const derivedPlanCells = useMemo(() => derivePlanByWeekDay({...}), [...]);
+const athletePlanByWeekDay = useMemo(() => {
+  // DerivedCell → StrengthSessionTemplate via sessionTemplatesById
+}, [...]);
+```
+
+Passé en prop au `<StrengthPlanningTimeline athletePlanByWeekDay={...} />`.
+
+**Rendu** (`StrengthPlanningTimeline.tsx` + `SlotCell`) :
+
+- Nouveau prop `athletePlanByWeekDay?: Map<weekKey, Map<dayIndex, StrengthSessionTemplate>>` propagé Timeline → WeekCard → MicroGrid → SlotCell (en single dayIndex map via `weekPlan` par semaine).
+- `SlotCell` : si `!slot && fromPlanTpl` → rendu SOLIDE (même bg/text/dot que slot explicite) + badge "P" top-right (primary ring, fond background) indiquant la provenance plan.
+- Tap sur cellule "from-plan" → handler tap normal → `slot` est `null` côté parent → ouvre picker → pick → crée slot override.
+
+Différence-clé vs §274.1/.3 reverté :
+- Source: `training_plan_applications + training_plan_sessions` (DB-backed, intentional) vs parsing de nom de cycle (incorrect).
+- Rendu: solide vs ghost transparent.
+- Edit: tap → override explicite via picker (UX cohérente avec slot vide).
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/strength/derivePlanByWeekDay.ts` | **Nouveau** — 121 LOC, pure fn |
+| `src/lib/strength/__tests__/derivePlanByWeekDay.test.ts` | **Nouveau** — 8 tests |
+| `src/lib/api/training-plans.ts` | +75 LOC : `getTrainingPlanApplicationsForUser`, `getTrainingPlanSessionsForPlans` |
+| `src/lib/api/index.ts` | +2 re-exports |
+| `src/pages/coach/StrengthPlanningScreen.tsx` | +50 LOC : 2 queries, derivedPlanCells, athletePlanByWeekDay (1199 LOC) |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | +66 LOC : prop, propagation, rendu solide from-plan + badge "P" (815 LOC) |
+
+### Tests
+
+- `npx vitest run src/lib/strength/__tests__/derivePlanByWeekDay.test.ts` : 8/8 pass ✅
+- `npx vitest run src/lib/__tests__/strengthPlanningMerge.test.ts` : 13/13 pass ✅
+- `npx tsc --noEmit` : exit 0 ✅
+- `npm run build` : succès ✅
+
+### Vérification fonctionnelle attendue
+
+Pré-requis : §275.5 appliquer "Prépa sprint 50m" à un nageur (start_date = lundi de la semaine S13 de l'année cible).
+
+1. Coach va dans Hub → Planif. Muscu.
+2. Sélectionne le nageur ciblé dans le dropdown.
+3. Étend la semaine S13 → cellule Ven affiche "Tests 5RM" solide avec badge "P".
+4. Étend S14 → cellules Lun/Mar/Jeu/Ven affichent "Tractions+Squat", "Deadlift+Bench Pull+Dips", "Tractions+Squat+Front Lever", "Deadlift+Bench Pull+Gainage" avec badge "P".
+5. Tap sur "Tests 5RM" → picker → pick une autre séance → la cellule devient un slot explicite (override, plus de badge "P", ou badge "Perso" en mode athlète).
+6. Suppression du slot via detail sheet → la cellule retombe sur la cellule "from-plan" du dessous.
+
+### Limites & suites
+
+- Mini-dots du header replié : count uniquement les slots explicites, pas les from-plan. Pourrait être enrichi mais aurait risque de bruit visuel.
+- Pas de "détacher le plan pour cette semaine" sans le retirer entièrement. Pour annuler une semaine, le coach doit créer un slot override avec `session_template_id = null` (pas supporté pour l'instant côté UI car nullable mais pas exposé).
+- Le badge "P" ne montre pas le nom du plan — info disponible dans le tooltip (title attribute). À évoluer en HoverCard si nécessaire.
+- Conflict resolution : newest start_date wins (deterministic). Si un coach a 2 plans appliqués qui se chevauchent, c'est le plus récent qui pilote. Un toggle UI "Activer plan X" reste à imaginer si plusieurs plans concurrents devient un cas réel.
+
 ## §275.5 — Dialog "Appliquer ce plan à..." + liste applications (2026-05-13)
 
 **Branche** : `main`

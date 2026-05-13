@@ -21,6 +21,8 @@ import {
   getStrengthSessions,
   getCompetitions,
   getMyCompetitionIds,
+  getTrainingPlanApplicationsForUser,
+  getTrainingPlanSessionsForPlans,
 } from "@/lib/api";
 import type {
   StrengthFolder,
@@ -31,6 +33,7 @@ import type {
 } from "@/lib/api/types";
 import type { EffectiveStrengthSlot } from "@/lib/strengthPlanningMerge";
 import type { StrengthPlanningSlot } from "@/lib/api/types";
+import { derivePlanByWeekDay, type DerivedCell } from "@/lib/strength/derivePlanByWeekDay";
 import { detectPhase, PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { useStrengthPlanningAthleteMode } from "@/hooks/coach/useStrengthPlanningAthleteMode";
 import StrengthPlanningTimeline from "@/components/coach/strength/StrengthPlanningTimeline";
@@ -203,6 +206,62 @@ export default function StrengthPlanningScreen() {
       getStrengthFolders("session", { athleteId: selectedAthleteId! }),
     enabled: selectedAthleteId != null,
   });
+
+  // §275.6 — training_plan applications targeting the selected athlete.
+  // Used to derive the timeline (auto-fill cells from the active plan).
+  const { data: athleteApplications = [] } = useQuery({
+    queryKey: ["training_plan_applications", "for-user", selectedAthleteId],
+    queryFn: () =>
+      getTrainingPlanApplicationsForUser({
+        userId: selectedAthleteId!,
+        discipline: "strength",
+      }),
+    enabled: selectedAthleteId != null,
+  });
+
+  const applicationPlanIds = useMemo(
+    () => Array.from(new Set(athleteApplications.map((a) => a.plan_id))),
+    [athleteApplications],
+  );
+
+  const { data: applicationPlanSessions = [] } = useQuery({
+    queryKey: ["training_plan_sessions", "for-plans", applicationPlanIds],
+    queryFn: () => getTrainingPlanSessionsForPlans(applicationPlanIds),
+    enabled: applicationPlanIds.length > 0,
+  });
+
+  // Derived: per-weekKey, per-dayIndex inherited session from the athlete's
+  // active training plans. Will be passed to the Timeline and rendered as
+  // "from-plan" cells (solid, with a small plan badge), distinct from
+  // explicit strength_planning_slots overrides.
+  const derivedPlanCells: Map<string, Map<number, DerivedCell>> = useMemo(
+    () =>
+      derivePlanByWeekDay({
+        weekKeys: visibleWeekKeys,
+        applications: athleteApplications,
+        sessions: applicationPlanSessions,
+      }),
+    [visibleWeekKeys, athleteApplications, applicationPlanSessions],
+  );
+
+  // Convert derived cells → StrengthSessionTemplate map per (weekKey, dayIndex)
+  // for the timeline. Cells whose template was removed from the catalog
+  // (deleted, hidden) are dropped — the cell appears empty.
+  const athletePlanByWeekDay = useMemo(() => {
+    const map = new Map<string, Map<number, StrengthSessionTemplate>>();
+    if (derivedPlanCells.size === 0) return map;
+    for (const [weekKey, dayMap] of derivedPlanCells) {
+      const dayResult = new Map<number, StrengthSessionTemplate>();
+      for (const [dayIndex, cell] of dayMap) {
+        const tplId = cell.session.session_template_id;
+        if (tplId == null) continue;
+        const tpl = sessionTemplatesById.get(tplId);
+        if (tpl) dayResult.set(dayIndex, tpl);
+      }
+      if (dayResult.size > 0) map.set(weekKey, dayResult);
+    }
+    return map;
+  }, [derivedPlanCells, sessionTemplatesById]);
 
   // ── Competitions (context for planning) ──
   const { data: allCompetitions = [] } = useQuery({
@@ -609,6 +668,7 @@ export default function StrengthPlanningScreen() {
         onEditTypeChange={setEditWeekType}
         onEditNotesChange={setEditWeekNotes}
         showOverrideBadge={selectedAthleteId != null}
+        athletePlanByWeekDay={athletePlanByWeekDay}
         sentinelRef={sentinelRef}
         isLoading={slotsLoading}
         isEmpty={slots.length === 0}

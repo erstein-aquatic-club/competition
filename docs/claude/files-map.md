@@ -231,7 +231,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/strength/AthletePlansTab.tsx` | Onglet plans athlète (coach muscu) — legacy, conservé en sous-tab "Plans nageurs" (§275.4) | ~964 lignes |
 | `src/components/coach/strength/TrainingPlansBrowser.tsx` | UI training_plans (§275.4 + §275.5) : liste de plans génériques + dialog création + éditeur grille num_weeks × 7 jours avec picker session + dialog "Appliquer ce plan à..." (nageur/groupe + start_date lundi) + liste applications | 1229 lignes |
 | `src/pages/coach/StrengthPlanningScreen.tsx` | Écran coach planification muscu (timeline groupe/nageur, picker séances, sheets détail/compétitions) (§160) | 1074 lignes |
-| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Timeline présentationnelle planif muscu (7j × semaines, chips séance + dot phase) (§160) | 749 lignes |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Timeline présentationnelle planif muscu (7j × semaines, chips séance + dot phase) (§160 + §275.6 athletePlanByWeekDay) | 815 lignes |
+| `src/lib/strength/derivePlanByWeekDay.ts` | Pure function (§275.6) : applications + sessions → Map<weekKey, Map<dayIndex, DerivedCell>>. Conflict resolution = newest start_date wins. | 121 lignes |
 | `src/hooks/coach/useStrengthPlanningAthleteMode.ts` | Hook sélection athlète + merge slots/weekMeta + mutations routées groupe/overrides (§160). §271 : injecte le coach comme cible synthétique du picker pour plan perso. | 493 lignes |
 | `src/components/coach/strength/StrengthSessionBuilder.tsx` | Builder séance muscu | ~282 lignes |
 | `src/components/coach/strength/StrengthExerciseCard.tsx` | Carte exercice muscu | ~223 lignes |

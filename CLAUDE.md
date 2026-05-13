@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.5** — ApplyPlanDialog (target nageur/groupe + date lundi-only) + PlanApplicationsList dans l'éditeur de plan.
+Dernier § livré : **§275.6** — Timeline Planif muscu dérivée des `training_plan_applications` (solide + badge "P", tap=override). Bugfix DST.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
