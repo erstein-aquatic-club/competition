@@ -72,7 +72,11 @@ function readProfileSectionFromHash(): ProfileSection {
   }
 }
 
-export const shouldShowRecords = (role: string | null) => role !== "coach" && role !== "admin" && role !== "comite";
+// §273 — coach/admin ont accès à /records (notamment au tab muscu pour
+// éditer leurs 1RM en parité avec les nageurs). Le tab natation reste
+// visible mais affiche un état vide (queries gated par !!userIuf, qu'un
+// coach n'a pas). Seul `comite` reste exclu (pas de muscu non plus).
+export const shouldShowRecords = (role: string | null) => role !== "comite";
 
 export const getRoleLabel = (role: string | null) => {
   switch (role) {

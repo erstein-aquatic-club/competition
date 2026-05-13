@@ -10,9 +10,11 @@ test("getRoleLabel returns readable labels per role", () => {
   assert.equal(getRoleLabel(null), "Nageur");
 });
 
-test("shouldShowRecords hides records for coach/admin/comite", () => {
-  assert.equal(shouldShowRecords("coach"), false);
-  assert.equal(shouldShowRecords("admin"), false);
+test("shouldShowRecords hides records for comite, ouvre coach/admin (§273)", () => {
+  // §273 — coach/admin accèdent à /records pour le tab muscu (1RM).
+  // Le tab natation reste vide (pas de FFN IUF) mais ne bloque pas.
+  assert.equal(shouldShowRecords("coach"), true);
+  assert.equal(shouldShowRecords("admin"), true);
   assert.equal(shouldShowRecords("comite"), false);
   assert.equal(shouldShowRecords("athlete"), true);
   assert.equal(shouldShowRecords(null), true);

@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §273-fix — Hotfix accès `/records` coach (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale "Cette page est réservée aux nageurs" en ouvrant `/records?tab=1rm` depuis le hub coach (§273).
+
+### Cause racine
+
+`Records.tsx:702-712` rend un bloc "Cette page est réservée aux nageurs" si `shouldShowRecords(role)` retourne `false`. Le helper (`Profile.tsx:75`) excluait historiquement coach/admin/comite — incompatible avec la parité voulue par §271/§273.
+
+### Fix
+
+- `Profile.tsx:75` — `shouldShowRecords` ouvert à `coach` et `admin`, seul `comite` reste exclu (pas de muscu pour eux). Comment ajouté pour expliciter le §273.
+- `src/pages/__tests__/ProfileLogic.test.ts` — assertions inversées pour coach/admin, comite et athlete inchangés.
+
+Les queries swim de `Records.tsx` sont gardées par `!!userIuf && showRecords` — un coach n'a pas d'IUF FFN, donc le tab natation rend gracieusement un état vide. Le tab muscu (1RM) fonctionne car gated uniquement par `!!userId && showRecords`.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/Profile.tsx` | Helper `shouldShowRecords` : exclusion réduite à `comite` |
+| `src/pages/__tests__/ProfileLogic.test.ts` | Assertions §273 (coach/admin ouverts) |
+
+### Tests
+
+- `npm test` : **701/701 pass**. ✅
+- `npx tsc --noEmit` : exit 0. ✅
+- `npm run build` : succès. ✅
+- Vérification manuelle attendue : un coach connecté qui clique "Mes records muscu" sur le hub arrive sur `/records` avec le tab Musculation pré-sélectionné, tab Natation vide mais navigable.
+
 ## §273 — Parité finale muscu coach : carte "séance du jour" + accès 1RM (2026-05-13)
 
 **Branche** : `main`
