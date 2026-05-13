@@ -12,6 +12,7 @@ import {
   getStrengthSessions,
   getAthletes,
   getAllAssignments,
+  getAssignments,
   getGroups,
   getCoachKpis,
   withTimeout,
@@ -96,6 +97,7 @@ type CoachHomeProps = {
   onOpenSwimPlanning: () => void;
   onOpenStrengthPlanning: () => void;
   onOpenMyStrength: () => void;
+  onOpenMyRecords: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   onOpenWeekAt: (weekDate: string) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
@@ -218,6 +220,7 @@ const CoachHome = ({
   onOpenSwimPlanning,
   onOpenStrengthPlanning,
   onOpenMyStrength,
+  onOpenMyRecords,
   onOpenAthlete,
   onOpenWeekAt,
   athletes,
@@ -229,6 +232,25 @@ const CoachHome = ({
   const userName = useAuth((s) => s.user);
   const coachUserId = useAuth((s) => s.userId);
   const firstName = userName?.split(" ")[0] ?? "Coach";
+
+  // §272 — Détection de la séance muscu perso du coach pour aujourd'hui.
+  // Miroir du SwimmerHome : assignments strength scopées sur le coachUserId.
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { data: myStrengthAssignments = [] } = useQuery({
+    queryKey: ["coach-my-strength-assignments", coachUserId],
+    queryFn: () =>
+      getAssignments(userName ?? "", coachUserId, { assignmentType: "strength" }),
+    enabled: !!coachUserId,
+    staleTime: 60_000,
+  });
+  const todayStrengthAssignment = useMemo(() => {
+    return (
+      (myStrengthAssignments ?? []).find((a) => {
+        const iso = String(a?.assigned_date ?? "").slice(0, 10);
+        return iso === todayIso;
+      }) ?? null
+    );
+  }, [myStrengthAssignments, todayIso]);
 
   const now = useMemo(() => new Date(), []);
   const monday = useMemo(() => getMondayOfWeek(now), [now]);
@@ -820,9 +842,11 @@ const CoachHome = ({
         </div>
       </section>
 
-      {/* ── Section E-bis: Mon entraînement (§271) ── */}
+      {/* ── Section E-bis: Mon entraînement (§271, étendu §272) ── */}
       <section className="space-y-2.5">
         <SectionLabel>Mon entraînement</SectionLabel>
+
+        {/* Carte principale : séance du jour ou accès muscu libre */}
         <button
           type="button"
           onClick={onOpenMyStrength}
@@ -832,9 +856,40 @@ const CoachHome = ({
             <Dumbbell className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Ma muscu perso</p>
+            {todayStrengthAssignment ? (
+              <>
+                <p className="truncate text-sm font-semibold">
+                  {String(todayStrengthAssignment.title ?? "Séance musculation")}
+                </p>
+                <p className="truncate text-[11px] font-medium text-violet-700 dark:text-violet-300">
+                  Aujourd'hui — Démarrer ma séance
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold">Ma muscu perso</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  Lancer une séance libre depuis la biblio
+                </p>
+              </>
+            )}
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+
+        {/* Lien secondaire : édition 1RM via /records?tab=1rm */}
+        <button
+          type="button"
+          onClick={onOpenMyRecords}
+          className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-2.5 text-left transition-colors active:bg-muted"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
+            <Trophy className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold">Mes records muscu</p>
             <p className="truncate text-[11px] text-muted-foreground">
-              Plan, charges, 1RM, focus — comme un nageur
+              Régler / mettre à jour mes 1RM
             </p>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1167,6 +1222,7 @@ export default function Coach() {
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
           onOpenStrengthPlanning={() => navigate("/coach/strength-planning")}
           onOpenMyStrength={() => navigate("/strength")}
+          onOpenMyRecords={() => navigate("/records?tab=1rm")}
           onOpenAthlete={handleOpenAthlete}
           onOpenWeekAt={(weekDate) => setRouteState({ section: "week", weekDate })}
           athletes={myAthletes}

@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §272 livré (2026-05-13) — Dock mobile coach/admin : item Chrono remplacé par Profil sur ≤ md (navItems + AppLayout + 6 tests). 701/701 pass, tsc clean.*
+*Dernière mise à jour : §273 livré (2026-05-13) — Parité finale muscu coach : carte "Mon entraînement" du hub coach affiche la séance muscu du jour (détection via `getAssignments` scopé coach.userId) avec CTA Démarrer, + carte secondaire "Mes records muscu" → `/records?tab=1rm` (édition 1RM). Ferme les 2 deltas UX restants vs nageur. 701/701 pass, tsc clean, build OK.*
+
+*Précédente : §272 livré (2026-05-13) — Dock mobile coach/admin : item Chrono remplacé par Profil sur ≤ md (navItems + AppLayout + 6 tests). 701/701 pass, tsc clean.*
 
 *Précédente : §271 livré (2026-05-13) — Module muscu perso coach : `/strength` ouvert à coach/admin via nav desktop 6 items + dock mobile 6 items spécifique (Profil ajouté / Chrono retiré) + tuile "Mon entraînement" dans hub Coach, vue toujours personnelle (neutralisation `selectedAthleteId`), picker `strength-planning` injecte le coach comme cible synthétique pour plan perso, aucune migration RLS nécessaire. 700/701 tests pass (1 fail pré-existant transformers), tsc clean, build OK.*
 

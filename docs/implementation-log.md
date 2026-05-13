@@ -4,6 +4,58 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §273 — Parité finale muscu coach : carte "séance du jour" + accès 1RM (2026-05-13)
+
+**Branche** : `main`
+**Chantier ROADMAP** : prolongation §271 — fermer le delta UX restant entre l'expérience muscu nageur et coach. Demande explicite utilisateur : « je veux juste qu'il ait une expérience aussi complète que le nageur, pas plus ».
+
+### Contexte
+
+Après §271, le coach avait accès à `/strength` (nav + tuile hub), à la planification self-target et au focus mode. Deux deltas UX subsistaient vs. nageur :
+
+1. **Pas de détection de la séance du jour** : le coach devait deviner s'il avait quelque chose de prévu et naviguer dans `/strength` pour la trouver.
+2. **Pas d'accès à `/records` tab muscu** : la vue dédiée d'édition inline des 1RM (présente dans `Records.tsx:680-697` + `Records.tsx:744-765`) n'avait aucun point d'entrée côté coach. Le bouton "Records" du hub coach va vers `/records-club` (records club), pas vers `/records` perso.
+
+Cette §273 ferme exactement ces deux deltas — rien de plus.
+
+### Changements
+
+**`src/pages/Coach.tsx`** :
+
+1. **Import** `getAssignments` ajouté.
+2. **Prop `onOpenMyRecords: () => void`** ajoutée à `CoachHomeProps`, branchée au call-site sur `navigate("/records?tab=1rm")` (Records.tsx lit `?tab=1rm` depuis le hash dès le mount, ligne 236-243 — deep-link déjà supporté).
+3. **Query `coach-my-strength-assignments`** dans `CoachHome` : `getAssignments(userName, coachUserId, { assignmentType: "strength" })`, staleTime 60 s. Scope = visibilité naturelle des assignments pour `coachUserId` (RLS via `target_user_id = self` ou groupes — un coach sans groupe ne récupère donc que ses assignments personnels).
+4. **Derivation `todayStrengthAssignment`** : filtre par `assigned_date.slice(0, 10) === todayIso`. Premier match (un coach n'aura jamais 2 séances muscu/jour en pratique).
+5. **Section "Mon entraînement" enrichie** :
+   - **Carte principale** : si `todayStrengthAssignment` existe → affiche `title` + sous-titre violet "Aujourd'hui — Démarrer ma séance". Sinon → "Ma muscu perso / Lancer une séance libre depuis la biblio". CTA dans les deux cas = `navigate("/strength")`.
+   - **Carte secondaire** : nouveau bouton "Mes records muscu / Régler / mettre à jour mes 1RM" → `/records?tab=1rm`. Icône Trophy ambre, plus discrète (h-8 / py-2.5) pour rester subordonnée à la carte principale.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/Coach.tsx` | +1 prop, +1 query, +1 derivation, section "Mon entraînement" restructurée en carte + lien secondaire |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 après correction `scheduled_date → assigned_date` (Assignment interface utilise `assigned_date`, pas `scheduled_date`). ✅
+- `npm run build` : 12.35 s, succès, PWA 243 entries. ✅
+- `npm test` : **701/701 tests pass**. Le test `transformers.test.ts: buildRunUpdatePayload keeps completed run ressentis` qui échouait à §271 a été aligné en parallèle (commit `495abf672`) — plus de régression résiduelle. ✅
+- Tests RLS : non lancés — patch UI pur, aucune policy touchée.
+
+### Décisions prises
+
+- **`getAssignments` plutôt que `getAllAssignments`** : `getAssignments(name, id, opts)` filtre serveur via `target_user_id`/groupes — économie réseau, et automatiquement scopé au coach connecté (RLS + filtre serveur). `getAllAssignments` ramènerait tout puis filtrerait côté client = inutile.
+- **Pas de handoff auto-launch** : le clic envoie sur `/strength` qui affiche le `MyPlanTab` + `SessionBrowser`. Le coach voit immédiatement sa séance dans `MyPlanTab` (alimenté par les mêmes assignments + slot overrides) et la lance d'un tap. Pas besoin de sessionStorage `eac_pending_strength_focus_slot_id` (utilisé pour le Dashboard nageur drawer → /strength, contexte différent).
+- **Deux cartes séparées plutôt que double action sur une seule** : la séparation visuelle (carte principale violette pour le runner, carte secondaire ambre plus petite pour les records) hiérarchise clairement les deux intentions. Évite le bouton à double action ambigu.
+- **`assigned_date` pas `scheduled_date`** : le type `Assignment` utilise `assigned_date`. Le nom hérite probablement d'un legacy schema — pas dans le scope de §273 d'unifier la nomenclature.
+
+### Limites / dette
+
+- **Pas d'indicateur de complétion** : la carte affiche "Démarrer ma séance" même si le coach a déjà fait sa séance aujourd'hui (logged). Pour aligner avec le `isSessionLogged()` de `SwimmerHome.tsx:419`, il faudrait croiser avec les `strength_session_runs` du jour. Non critique : le coach voit l'état dès qu'il arrive sur `/strength` (le `InProgressCard` ou la liste historique).
+- **Pas de notification rappel** : non vérifié si les crons `slot-session-reminder` poussent une notif au coach pour sa séance muscu auto-ciblée. À auditer dans un patch séparé si gêne observée.
+- **`assignments` cache** : la query `["coach-my-strength-assignments", coachUserId]` est isolée de la query `["assignments", userId ?? user]` que d'autres écrans utilisent (Dashboard nageur). Pas de invalidation croisée explicite — si un coach planifie une séance pour lui via `/coach/strength-planning`, il devra rafraîchir le hub pour la voir. Stale-time 60 s atténue. Acceptable v1.
+
 ## §272 — Dock mobile coach/admin : Chrono → Profil
 
 **Date :** 2026-05-13
