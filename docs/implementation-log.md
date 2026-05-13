@@ -4,6 +4,66 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.0 — Revert §274.1/§274.3 + scaffold §275 training_plans (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur confirme que l'auto-fill ghost (§274.1 / §274.3) s'appuie sur le mauvais modèle DB. Il vise un vrai modèle de plans génériques (brouillon, num_weeks, application à un nageur/groupe avec date de début), pas un parsing du nom de cycle. → revert puis kick-off du chantier §275.
+
+### Revert (commit 1)
+
+Suppression de :
+- `parseWeekNumberFromCycleName` helper (`StrengthPlanningScreen.tsx`).
+- `athletePlanByDay` / `athletePlanByWeekDay` computation et prop (`StrengthPlanningScreen.tsx`, `StrengthPlanningTimeline.tsx`).
+- Prop `athletePlanByDay` dans `WeekCard` / `MicroGrid`.
+- Prop `inheritedTpl` et rendu "ghost" dans `SlotCell`.
+- Mini-dots double-style (plein vs ring) → restauration mini-dots pleins uniquement.
+
+**Conservé** (§274) : grille 1 slot/jour, picker bottom-sheet priorise cycles biblio du nageur (groupés par cycle + badge "Suggéré").
+
+### Scaffold §275.1 (migration prête, non appliquée)
+
+`supabase/migrations/00162_training_plans.sql` créée mais en attente d'authentification MCP Supabase. Contenu :
+
+- `training_plans` (id, name, description, discipline, owner_id, num_weeks, is_draft, timestamps)
+- `training_plan_sessions` (id, plan_id, relative_week, day_of_week, session_template_id, notes, UNIQUE(plan_id, relative_week, day_of_week))
+- `training_plan_applications` (id, plan_id, target_user_id XOR target_group_id, start_date lundi-only, end_date, applied_by)
+- RLS complète : owner édite, coach voit publié, athlète voit applications le ciblant directement ou via groupe.
+- Trigger `set_updated_at_timestamp` (créé idempotent si absent).
+
+### Roadmap §275 (multi-phases)
+
+1. **§275.1** — Migration DB (cette migration) + tests RLS minimal.
+2. **§275.2** — API CRUD `src/lib/api/training-plans.ts` + types TS.
+3. **§275.3** — Seed : convertir le plan biblio actuel de François en draft "Prépa sprint 50m" via SQL one-shot.
+4. **§275.4** — Refonte biblio>plans : liste de plans génériques (mes plans / publiés). Éditeur grille num_weeks×7.
+5. **§275.5** — Dialog "Appliquer ce plan à..." (nageur OU groupe + start_date lundi).
+6. **§275.6** — Planif muscu derivation : timeline dérivée des applications actives. Slots = override.
+7. **§275.7** — Athlete-side integration : Dashboard "séance du jour" lit aussi les applications actives.
+8. **§275.8** — Migration data : convertir les anciens `strength_folders` athlete-specific en `training_plans` si désiré (optionnel).
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/coach/StrengthPlanningScreen.tsx` | Revert auto-fill + helper |
+| `src/components/coach/strength/StrengthPlanningTimeline.tsx` | Revert prop + rendu ghost |
+| `supabase/migrations/00162_training_plans.sql` | **Nouveau** : 3 tables + RLS pour §275 |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0. ✅
+- Migration **appliquée** via MCP Supabase (`apply_migration`, name=`training_plans`). 3 tables + 11 indexes + 3 triggers + 12 policies RLS. Aucune erreur.
+- **Seed §275.3 effectué** : training_plan id=1 "Prépa sprint 50m" (draft, owner_id=2, num_weeks=10) + 32 training_plan_sessions construites depuis le plan biblio de François WAGNER (user_id=1) :
+  - rel_week 1 = S13 (Ven uniquement, reprise)
+  - rel_week 2 = S14 (Lun-Mar-Jeu-Ven, Force Max Bloc Gym)
+  - rel_week 3 = S15 (Lun-Mar-Jeu-Ven, Force Max)
+  - rel_week 4 = S16 (Lun-Mar-Mer-Jeu, Déplacement PDC)
+  - rel_week 5/6/7 = S17-S19 dupliqué (Lun-Mar-Jeu-Ven, Puissance) — cycle source couvrait 3 semaines, dupliqué tel quel
+  - rel_week 8 = S20 (Lun-Mar-Jeu-Ven, Taper)
+  - rel_week 9 = S21 (Lun-Mar, Taper)
+  - rel_week 10 = S22 (Lun, Compétition)
+  - Total: 32 séances sur 10 semaines, weeks_filled=[1..10] ✅
+
 ## §274.3 — Auto-fill timeline : match cycle ↔ semaine via numéro `S<n>` (2026-05-13)
 
 **Branche** : `main`

@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §274.3 livré (2026-05-13) — Auto-fill Planif muscu : mapping cycle ↔ semaine via parsing `S<n>` du nom de cycle. Plus de fuite entre cycles (ex: Mercredi d'un ancien cycle qui apparaissait toutes les semaines). `athletePlanByDay` (1D) → `athletePlanByWeekDay` (2D, `weekNumber → dayIndex → session`). tsc clean, tests merge OK.*
+*Dernière mise à jour : §275.0/.1/.3 livré (2026-05-13) — Revert §274.1/§274.3 auto-fill ghost + nouveau modèle DB pour plans d'entraînement génériques. Migration `00162_training_plans.sql` **appliquée** (3 tables + RLS via MCP). Seed initial : training_plan id=1 "Prépa sprint 50m" (draft, 10 semaines, 32 sessions) construit depuis le plan biblio de François WAGNER (S13→S22). Restent §275.2 (API CRUD), §275.4 (refonte biblio>plans UI), §275.5 (dialog "Appliquer"), §275.6 (timeline derivation), §275.7 (athlete-side integration).*
+
+*Précédente : §274.3 livré (2026-05-13) — Auto-fill Planif muscu : mapping cycle ↔ semaine via parsing `S<n>` du nom de cycle (revert §275.0).*
 
 *Précédente : §274.2 livré (2026-05-13) — Fix fiabilité bouton « Mettre à jour l'app » du Profil. Root cause : `reg.update()` racé contre 3 s mais le SW est encore en `installing` quand on appelle `updateSW(true)` → `messageSkipWaiting()` no-op (pas de `waiting`) + listener `controllerchange` jamais armé. Réécriture : on attend explicitement `reg.installing.state === "installed"` (timeout 15 s), on attache notre propre listener `controllerchange`, on `postMessage SKIP_WAITING`, et on hard-reload avec `?_t=now` pour bust le cache navigateur même quand aucune update n'est trouvée. tsc clean.*
 
