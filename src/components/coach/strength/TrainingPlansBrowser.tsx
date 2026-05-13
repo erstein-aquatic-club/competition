@@ -400,6 +400,10 @@ function TrainingPlanEditor({
   const [pickerSearch, setPickerSearch] = useState("");
   const debouncedSearch = useDebouncedValue(pickerSearch, 200);
 
+  // Detail drawer for a populated cell (shows exercises/sets/reps/%1RM/rest)
+  const [cellDetail, setCellDetail] = useState<TrainingPlanSession | null>(null);
+  const [removeLastWeekConfirmOpen, setRemoveLastWeekConfirmOpen] = useState(false);
+
   // Mutations
   const upsertSession = useMutation({
     mutationFn: (input: {
@@ -426,10 +430,51 @@ function TrainingPlanEditor({
   });
 
   const updatePlan = useMutation({
-    mutationFn: (patch: { name?: string; description?: string | null; is_draft?: boolean }) =>
+    mutationFn: (patch: { name?: string; description?: string | null; is_draft?: boolean; num_weeks?: number }) =>
       updateTrainingPlan(planId, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["training_plans"] });
+    },
+  });
+
+  // Append one empty week at the end : increment num_weeks. Sessions remain
+  // unchanged ; the new row appears in the grid with empty cells.
+  const addWeekMut = useMutation({
+    mutationFn: (currentNumWeeks: number) =>
+      updateTrainingPlan(planId, { num_weeks: currentNumWeeks + 1 }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["training_plans"] });
+      toast("Semaine ajoutée");
+    },
+    onError: (err: unknown) => {
+      toast.error("Erreur", {
+        description: err instanceof Error ? err.message : "Ajout échoué",
+      });
+    },
+  });
+
+  // Remove the LAST week : delete all training_plan_sessions for that week
+  // then decrement num_weeks. Sessions in middle weeks are never touched —
+  // re-numbering them implicitly would surprise the coach.
+  const removeLastWeekMut = useMutation({
+    mutationFn: async (currentNumWeeks: number) => {
+      if (currentNumWeeks <= 1) throw new Error("Un plan doit avoir au moins une semaine");
+      const lastWeek = currentNumWeeks;
+      const sessionsOfLastWeek = sessions.filter((s) => s.relative_week === lastWeek);
+      await Promise.all(
+        sessionsOfLastWeek.map((s) => deleteTrainingPlanSession(s.id)),
+      );
+      return updateTrainingPlan(planId, { num_weeks: currentNumWeeks - 1 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["training_plans"] });
+      queryClient.invalidateQueries({ queryKey: ["training_plan_sessions", planId] });
+      toast("Dernière semaine supprimée");
+    },
+    onError: (err: unknown) => {
+      toast.error("Erreur", {
+        description: err instanceof Error ? err.message : "Suppression échouée",
+      });
     },
   });
 
@@ -631,13 +676,19 @@ function TrainingPlanEditor({
                         <PlanCell
                           template={tpl}
                           loading={sessionsLoading}
-                          onTap={() =>
-                            setPicker({
-                              relativeWeek: wk,
-                              dayOfWeek: dow,
-                              existingId: cell?.session_template_id ?? null,
-                            })
-                          }
+                          onTap={() => {
+                            // Tap on filled cell → open detail drawer ; on empty
+                            // cell → open picker to create a new entry.
+                            if (cell) {
+                              setCellDetail(cell);
+                            } else {
+                              setPicker({
+                                relativeWeek: wk,
+                                dayOfWeek: dow,
+                                existingId: null,
+                              });
+                            }
+                          }}
                           onClear={
                             cell
                               ? () => deleteSessionMut.mutate(cell.id)
@@ -652,6 +703,30 @@ function TrainingPlanEditor({
             </tbody>
           </table>
         </div>
+
+        {/* Week actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t bg-muted/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => addWeekMut.mutate(plan.num_weeks)}
+            disabled={addWeekMut.isPending || plan.num_weeks >= 104}
+            className="text-xs"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Ajouter une semaine
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setRemoveLastWeekConfirmOpen(true)}
+            disabled={removeLastWeekMut.isPending || plan.num_weeks <= 1}
+            className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Supprimer la dernière semaine
+          </Button>
+        </div>
       </div>
 
       {/* Applications list */}
@@ -664,6 +739,67 @@ function TrainingPlanEditor({
         planId={planId}
         planNumWeeks={plan.num_weeks}
       />
+
+      {/* Cell detail drawer (exercises / sets / reps / %1RM / rest) */}
+      <CellDetailDrawer
+        cell={cellDetail}
+        template={
+          cellDetail?.session_template_id != null
+            ? templatesById.get(cellDetail.session_template_id) ?? null
+            : null
+        }
+        onClose={() => setCellDetail(null)}
+        onChangeSession={() => {
+          if (!cellDetail) return;
+          // Switch to picker for the same cell.
+          setPicker({
+            relativeWeek: cellDetail.relative_week,
+            dayOfWeek: cellDetail.day_of_week,
+            existingId: cellDetail.session_template_id ?? null,
+          });
+          setCellDetail(null);
+        }}
+        onRemove={() => {
+          if (!cellDetail) return;
+          deleteSessionMut.mutate(cellDetail.id, {
+            onSuccess: () => setCellDetail(null),
+            onError: (err: unknown) => {
+              toast.error("Erreur", {
+                description: err instanceof Error ? err.message : "Suppression échouée",
+              });
+            },
+          });
+        }}
+        removePending={deleteSessionMut.isPending}
+      />
+
+      {/* Remove last week confirmation */}
+      <Dialog open={removeLastWeekConfirmOpen} onOpenChange={setRemoveLastWeekConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer la dernière semaine ?</DialogTitle>
+            <DialogDescription>
+              La semaine S{plan.num_weeks} et ses {sessions.filter((s) => s.relative_week === plan.num_weeks).length} séance(s)
+              seront supprimées. Cette action ne peut pas être annulée.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveLastWeekConfirmOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setRemoveLastWeekConfirmOpen(false);
+                removeLastWeekMut.mutate(plan.num_weeks);
+              }}
+              disabled={removeLastWeekMut.isPending}
+            >
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Picker bottom sheet */}
       <Sheet
@@ -1170,6 +1306,150 @@ function formatFrenchDate(iso: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Cell detail drawer — shows the session's exercises with sets/reps/%1RM/rest
+   ═══════════════════════════════════════════════════════════════════ */
+
+const CYCLE_LABEL: Record<string, string> = {
+  endurance: "Endurance",
+  hypertrophie: "Hypertrophie",
+  force: "Force",
+};
+
+function CellDetailDrawer({
+  cell,
+  template,
+  onClose,
+  onChangeSession,
+  onRemove,
+  removePending,
+}: {
+  cell: TrainingPlanSession | null;
+  template: StrengthSessionTemplate | null;
+  onClose: () => void;
+  onChangeSession: () => void;
+  onRemove: () => void;
+  removePending: boolean;
+}) {
+  const open = cell != null;
+  const sessionName = template?.title ?? template?.name ?? "Séance";
+  const phase = sessionName ? detectPhase(sessionName) : "force";
+  const style = PHASE_STYLES[phase] ?? PHASE_STYLES.force;
+  const items = template?.items ?? [];
+  const cycleLabel = template?.cycle ? CYCLE_LABEL[template.cycle] ?? template.cycle : null;
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] flex flex-col">
+        <SheetHeader className="pb-2 shrink-0">
+          <SheetTitle className="text-base flex items-center gap-2">
+            <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", style.dot)} />
+            <span className="truncate">{sessionName}</span>
+          </SheetTitle>
+          {cell && (
+            <SheetDescription className="text-xs text-muted-foreground">
+              S{cell.relative_week} — {DAY_LABELS[cell.day_of_week]}
+              {cycleLabel && (
+                <span className="ml-2 inline-flex items-center gap-1">
+                  <span aria-hidden className="text-muted-foreground/40">·</span>
+                  Cycle : {cycleLabel}
+                </span>
+              )}
+            </SheetDescription>
+          )}
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-4 space-y-3">
+          {template?.description && (
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
+              {template.description}
+            </p>
+          )}
+
+          {items.length === 0 ? (
+            <div className="text-center py-8">
+              <Dumbbell className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Aucun exercice dans cette séance.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5 px-1">
+                Exercices ({items.length})
+              </p>
+              <ul className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+                {items
+                  .slice()
+                  .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                  .map((item, idx) => (
+                    <li key={idx} className="px-3 py-2.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium truncate">
+                          {idx + 1}. {item.exercise_name ?? `Exercice #${item.exercise_id}`}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground tabular-nums">
+                        <span>
+                          <span className="font-semibold text-foreground">{item.sets}</span> séries
+                        </span>
+                        <span aria-hidden className="text-muted-foreground/40">·</span>
+                        <span>
+                          <span className="font-semibold text-foreground">{item.reps}</span> reps
+                        </span>
+                        {item.percent_1rm != null && item.percent_1rm > 0 && (
+                          <>
+                            <span aria-hidden className="text-muted-foreground/40">·</span>
+                            <span>
+                              <span className="font-semibold text-foreground">{item.percent_1rm}</span>% 1RM
+                            </span>
+                          </>
+                        )}
+                        {item.rest_seconds != null && item.rest_seconds > 0 && (
+                          <>
+                            <span aria-hidden className="text-muted-foreground/40">·</span>
+                            <span>
+                              Repos <span className="font-semibold text-foreground">{item.rest_seconds}</span>s
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {item.notes && (
+                        <p className="mt-1 text-[11px] text-muted-foreground italic">{item.notes}</p>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="pt-2 space-y-1">
+            <div className="h-px bg-border" />
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-primary hover:bg-primary/10 active:scale-[0.98]"
+              onClick={onChangeSession}
+            >
+              <Dumbbell className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-medium">Changer de séance</span>
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all min-h-[48px] text-destructive hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-50"
+              onClick={onRemove}
+              disabled={removePending}
+            >
+              <Trash2 className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-medium">Retirer de la grille</span>
+            </button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════════════

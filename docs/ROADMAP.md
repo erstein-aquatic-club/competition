@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §275.7-fix livré (2026-05-13) — Hotfix React error #310 dans `TrainingPlanEditor` : un `useMemo` était déclaré après `if (!plan) return ...`, violant les Rules of Hooks. Le bug crashait l'éditeur de plan et empêchait l'accès au bouton "Appliquer" → 0 application en DB. Remontée du hook au-dessus de l'early return. Build OK, tsc clean.*
+*Dernière mise à jour : §275.8 livré (2026-05-13) — Plan editor enrichi : boutons add/remove week (cascade delete sur les sessions de la dernière semaine) + drawer détail session sur tap d'une cellule pleine (liste exercices avec sets/reps/%1RM/repos/notes). Tap cellule vide → picker (inchangé) ; tap pleine → drawer (nouveau). +284 LOC dans TrainingPlansBrowser (1513 total). Build OK.*
+
+*Précédente : §275.7-fix livré (2026-05-13) — Hotfix React error #310 dans TrainingPlanEditor.*
 
 *Précédente : §275.7 livré (2026-05-13) — Athlete-side : Phase 3 dans MyPlanTab.*
 

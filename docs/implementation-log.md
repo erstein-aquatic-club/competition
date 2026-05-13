@@ -4,6 +4,74 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §275.8 — Plan editor : add/remove week + drawer détail session (2026-05-13)
+
+**Branche** : `main`
+**Trigger** : utilisateur signale 2 manques dans l'éditeur de plan : "je dois pouvoir ajouter/supprimer des semaines" et "lors du clic sur une séance, je dois voir un drawer avec nombre de séries/reps/%1RM".
+
+### Implémentation
+
+**1. Add/remove week** (`TrainingPlanEditor` dans `TrainingPlansBrowser.tsx`) :
+
+- Boutons sous la grille : "Ajouter une semaine" + "Supprimer la dernière semaine" (rouge, avec confirm dialog).
+- `addWeekMut` : incrémente `num_weeks` via `updateTrainingPlan({ num_weeks: currentNumWeeks + 1 })`. Cap à 104 semaines (matche le CHECK SQL).
+- `removeLastWeekMut` :
+  1. Fetch `sessions.filter(s => s.relative_week === lastWeek)` (déjà en mémoire via query).
+  2. `Promise.all(...deleteTrainingPlanSession)` pour purger les sessions de la dernière semaine.
+  3. `updateTrainingPlan({ num_weeks: currentNumWeeks - 1 })`.
+  4. Invalidate `training_plans` et `training_plan_sessions` queries.
+- Garde-fous : disabled si `num_weeks >= 104` (add) ou `num_weeks <= 1` (remove). Dialog confirmation décrit le nombre de séances impactées.
+- Pas de renumérotation des semaines : un coach qui veut "supprimer la semaine 5" doit clear les cellules de S5 puis decrement num_weeks depuis le bouton (= supprimer S<num_weeks>). Trade-off : modèle prévisible, pas de réordonnancement implicite.
+
+**2. Drawer détail session** :
+
+Comportement du tap sur une cellule de la grille :
+- Cellule vide → ouvre picker (créer une séance, comportement antérieur).
+- Cellule pleine → ouvre `CellDetailDrawer` (nouveau).
+
+Nouveau composant `CellDetailDrawer` (~135 LOC) :
+- Header : nom de séance + dot couleur de phase, sub-line "S{week} — {day}" + cycle (Force/Hypertrophie/Endurance).
+- Description du template si renseignée.
+- Liste des exercices (ordonnés par `order_index`) :
+  - `{idx}. {exercise_name}` (résolu via le join `dim_exercices` côté `getStrengthSessions`).
+  - Métriques : `N séries · M reps · P% 1RM · Repos Xs` (chaque champ omis si null/0).
+  - Notes affichées en italique si présentes.
+- Actions :
+  - **Changer de séance** → ferme le drawer et ouvre le picker pour la même cellule (avec `existingId` pré-rempli).
+  - **Retirer de la grille** → `deleteTrainingPlanSession(cell.id)` (mutation existante).
+- Empty state si template sans `items`.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/strength/TrainingPlansBrowser.tsx` | +284 LOC : 2 mutations (addWeek, removeLastWeek), 2 boutons sous grille, dialog confirm remove, drawer `CellDetailDrawer`, branchement tap cellule pleine → drawer (1513 LOC total) |
+| `docs/claude/files-map.md` | Mise à jour ligne TrainingPlansBrowser |
+
+### Tests
+
+- `npx tsc --noEmit` : exit 0 ✅
+- Tests vitest (derivePlanByWeekDay + strengthPlanningMerge) : 21/21 pass ✅
+- `npm run build` : succès ✅
+
+### Vérification fonctionnelle attendue
+
+1. Ouvrir Biblio > Plans > "Prépa sprint 50m" → éditeur.
+2. Tap sur cellule **vide** (ex: S3 Mercredi) → picker s'ouvre, comportement inchangé.
+3. Tap sur cellule **pleine** (ex: S2 Lundi "Tractions + Squat") → drawer s'ouvre avec :
+   - "S2 — Lun · Cycle : Force"
+   - Liste exercices : "1. Tractions — 4 séries · 6 reps · 85% 1RM · Repos 180s", etc.
+4. Tap "Changer de séance" → drawer ferme, picker s'ouvre pour la même cellule.
+5. Tap "Retirer de la grille" → cellule devient vide, drawer ferme.
+6. Tap "Ajouter une semaine" en bas → S11 apparaît (vide). num_weeks = 11.
+7. Tap "Supprimer la dernière semaine" → confirm dialog "Supprimer la S11 et ses N séances ?" → confirm → S11 disparaît, num_weeks = 10.
+
+### Limites & suites
+
+- Le drawer affiche les exercices en lecture seule ; pour modifier un exercice (sets/reps/etc.), il faut éditer le template via le builder de séance (§265). Le `training_plan_sessions` ne contient qu'une référence au template, pas un override.
+- Pas d'éditeur inline pour `relative_week` (renumérotation). À itérer si un coach veut insérer une semaine au milieu sans glisser tout.
+- Remove last week n'a pas d'undo. Le dialog confirm met en garde mais la suppression est immédiate.
+
 ## §275.7-fix — Hotfix React #310 dans TrainingPlanEditor (2026-05-13)
 
 **Branche** : `main`

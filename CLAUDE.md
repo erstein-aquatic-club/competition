@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§275.7-fix** — Hotfix React #310 dans TrainingPlanEditor (useMemo après early return). Débloque le workflow §275.5 "Appliquer le plan".
+Dernier § livré : **§275.8** — Plan editor : add/remove week (cascade delete) + drawer détail session (sets/reps/%1RM/repos) sur tap cellule pleine.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
