@@ -64,5 +64,5 @@ export const getMobileNavItemsForRole = (role: string | null): NavItem[] => {
       { href: "/profile", icon: UserCircle, label: "Profil" },
     ];
   }
-  return getNavItemsForRole(role);
+  return getNavItemsForRole(normalizedRole);
 };
