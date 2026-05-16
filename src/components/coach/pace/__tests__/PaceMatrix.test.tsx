@@ -156,14 +156,14 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
       targetDistanceM: 50,
       stroke: "crawl",
     });
-    // 1ère longueur (MAX) : 15 m → 5.7 s, 25 m → 10.7 s — identiques dans les deux bassins
+    // 1ère longueur (MAX) : 15 m → 5.69 s, 25 m → 10.65 s — identiques dans les deux bassins
     for (const html of [longCourse, shortCourse]) {
-      assert.ok(html.includes(">5.7<"), "split 15 m MAX = 5.7 attendu");
-      assert.ok(html.includes(">10.7<"), "split 25 m MAX = 10.7 attendu");
+      assert.ok(html.includes(">5.69<"), "split 15 m MAX = 5.69 attendu");
+      assert.ok(html.includes(">10.65<"), "split 25 m MAX = 10.65 attendu");
     }
-    // La ligne cible diffère : 23.6 s en grand bassin, 22.9 s en petit bassin
-    assert.ok(longCourse.includes(">23.6<"), "cible 50 m = 23.6 attendue");
-    assert.ok(shortCourse.includes(">22.9<"), "cible 25 m = 22.9 attendue");
+    // La ligne cible diffère : 23.62 s en grand bassin, 22.92 s en petit bassin
+    assert.ok(longCourse.includes(">23.62<"), "cible 50 m = 23.62 attendue");
+    assert.ok(shortCourse.includes(">22.92<"), "cible 25 m = 22.92 attendue");
   });
 
   it("verrouille la 1ère longueur d'un 100 m : 15 m/25 m identiques entre bassins", () => {
@@ -181,9 +181,9 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
     // 1ère longueur (lignes 15 m et 25 m) : MAX identique dans les deux bassins
     assert.equal(scMax[0], lcMax[0], "15 m MAX doit être identique entre bassins");
     assert.equal(scMax[1], lcMax[1], "25 m MAX doit être identique entre bassins");
-    // Ligne cible : 1:00.0 en grand bassin, 58.5 en petit bassin
-    assert.equal(lcMax[lcMax.length - 1], "1:00.0", "cible 100 m grand bassin");
-    assert.equal(scMax[scMax.length - 1], "58.5", "cible 100 m petit bassin");
+    // Ligne cible : 1:00.00 en grand bassin, 58.50 en petit bassin
+    assert.equal(lcMax[lcMax.length - 1], "1:00.00", "cible 100 m grand bassin");
+    assert.equal(scMax[scMax.length - 1], "58.50", "cible 100 m petit bassin");
   });
 
   it("distance cible (d=D) présente comme ligne dans le tableau", () => {
@@ -195,5 +195,20 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
     });
     // 50m row should be in the table body
     assert.ok(html.includes(">50<") || html.includes(">50 <"), "ligne d=50 présente");
+  });
+
+  it("colonne MAX à 2 décimales, autres zones à 1 décimale", () => {
+    const html = render({
+      ...BASE_PROPS,
+      targetTimeMs: 23_620,
+      targetDistanceM: 50,
+      stroke: "crawl",
+    });
+    // Colonne MAX : 2 décimales
+    for (const v of maxColumn(html)) {
+      assert.match(v, /^\d+\.\d{2}$/, `cellule MAX "${v}" doit avoir 2 décimales`);
+    }
+    // Zones non-MAX : 1 décimale — la cellule (25 m, V0) reste "15.2"
+    assert.ok(html.includes(">15.2<"), "V0 (25 m) doit rester à 1 décimale");
   });
 });

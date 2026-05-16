@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §282 livré (2026-05-16) — Crédit-virage généralisé aux épreuves multi-virages : `turnCreditForShortCourse` devient multi-mur (D/50 virages aux positions 50k+25, crédit = majoration FFN / N), gate `isTurnModelEvent`. Couvre 100/200 m (4 nages) + 400/800/1500 m (crawl).*
+*Dernière mise à jour : §283 livré (2026-05-16) — Colonne MAX du calculateur d'allures à 2 décimales : `fmtTime` reçoit un paramètre `decimals`, les cellules MAX passent à 2 (PaceMatrix, matrice 4 nages, export PDF). Zones V0–V4 inchangées.*
+
+*Précédente : §282 livré (2026-05-16) — Crédit-virage généralisé aux épreuves multi-virages : `turnCreditForShortCourse` multi-mur, gate `isTurnModelEvent`.*
 
 *Précédente : §281 livré (2026-05-16) — Modèle crédit-virage pour la courbe d'allures 25 m du sprint.*
 

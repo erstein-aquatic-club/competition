@@ -63,11 +63,11 @@ const SEGMENT_LABELS: Record<SingleStroke, string> = {
 };
 
 /** Format seconds → mm:ss.x or ss.x. */
-function fmtTime(s: number): string {
+function fmtTime(s: number, decimals = 1): string {
   if (s <= 0) return "—";
-  if (s < 60) return s.toFixed(1);
+  if (s < 60) return s.toFixed(decimals);
   const m = Math.floor(s / 60);
-  const rem = (s - m * 60).toFixed(1).padStart(4, "0");
+  const rem = (s - m * 60).toFixed(decimals).padStart(3 + decimals, "0");
   return `${m}:${rem}`;
 }
 
@@ -287,7 +287,7 @@ function drawSingleSection({
       });
       const isMax = zone === "MAX";
       cells.push({
-        content: fmtTime(t_s),
+        content: fmtTime(t_s, isMax ? 2 : 1),
         styles: {
           fontStyle: isMax ? "bold" : "normal",
           fillColor: isTargetRow ? strokeTint : undefined,
@@ -542,7 +542,7 @@ function draw4NSection({
         });
         const isMax = zone === "MAX";
         cells.push({
-          content: fmtTime(t_s),
+          content: fmtTime(t_s, isMax ? 2 : 1),
           styles: {
             fontStyle: isMax ? "bold" : "normal",
             fillColor: isTarget ? segTint : undefined,

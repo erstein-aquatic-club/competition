@@ -67,10 +67,10 @@ function buildCols(family: EventFamily, v4Enabled: boolean): ZoneCol[] {
   return cols;
 }
 
-function fmtTime(s: number): string {
-  if (s < 60) return s.toFixed(1);
+function fmtTime(s: number, decimals = 1): string {
+  if (s < 60) return s.toFixed(decimals);
   const m = Math.floor(s / 60);
-  const rem = (s - m * 60).toFixed(1).padStart(4, "0");
+  const rem = (s - m * 60).toFixed(decimals).padStart(3 + decimals, "0");
   return `${m}:${rem}`;
 }
 
@@ -197,7 +197,7 @@ export function PaceMatrix({
         sex: swimmerSex,
         context: raceContext,
       });
-      return fmtTime(adjusted);
+      return fmtTime(adjusted, zone === "MAX" ? 2 : 1);
     } catch {
       return "—";
     }

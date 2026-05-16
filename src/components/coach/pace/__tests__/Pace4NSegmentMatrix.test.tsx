@@ -95,6 +95,16 @@ describe("Pace4NSegmentMatrix — 200 4N", () => {
     });
     assert.ok(html.includes("§187"), "footer disclaimer §187 absent");
   });
+
+  it("colonne MAX à 2 décimales", () => {
+    const html = render({
+      ...BASE_PROPS,
+      targetTimeMs: 158_000,
+      targetDistanceM: 200,
+    });
+    // pap 25m, MAX : tMax ≈ 15.534 → "15.53" (2 décimales)
+    assert.ok(html.includes(">15.53<"), "MAX pap 25m doit être à 2 décimales (15.53)");
+  });
 });
 
 describe("Pace4NSegmentMatrix — 400 4N", () => {

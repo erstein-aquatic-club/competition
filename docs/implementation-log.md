@@ -4,6 +4,42 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §283 — Colonne MAX du calculateur d'allures à 2 décimales (2026-05-16)
+
+**Branche** : `main`
+**Trigger** : l'utilisateur demande 2 décimales sur les allures de la colonne MAX (référence course — la précision au centième y est utile).
+
+### Fix
+
+`fmtTime` (3 copies : `PaceMatrix.tsx`, `Pace4NSegmentMatrix.tsx`, `export-pace-pdf.ts`) reçoit un paramètre `decimals` (défaut 1, rétro-compatible). Les cellules de la **colonne MAX** passent `2` ; les zones V0–V4 gardent 1 décimale. Le format `m:ss` s'adapte (`m:ss.cc` pour la colonne MAX des épreuves ≥ 60 s, via `padStart(3 + decimals)`). Les lignes cumulées 4 nages et les en-têtes de segment restent à 1 décimale — ce ne sont pas « la colonne MAX ».
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/components/coach/pace/PaceMatrix.tsx` | `fmtTime(_, decimals)` + cellule MAX à 2 décimales |
+| `src/components/coach/pace/Pace4NSegmentMatrix.tsx` | idem (sous-matrices 4 nages) |
+| `src/lib/export-pace-pdf.ts` | idem (export PDF, sections simple-nage et 4 nages) |
+| `src/components/coach/pace/__tests__/PaceMatrix.test.tsx` | Test colonne MAX 2 décimales ; valeurs MAX des tests §281/§282 mises à jour |
+| `src/components/coach/pace/__tests__/Pace4NSegmentMatrix.test.tsx` | Test colonne MAX 2 décimales |
+
+### Tests
+
+- TDD : tests écrits et vus échouer avant implémentation. Les tests §281/§282 pinaient des valeurs MAX à 1 décimale — mis à jour (changement voulu, pas une régression).
+- `npm test` : **719/719** ✅
+- `npx tsc --noEmit` : aucune erreur hors `*.stories.tsx` pré-existants ✅
+- Tests RLS : non lancés — patch purement UI (formatage d'affichage).
+
+### Décisions prises
+
+- **`decimals` paramétrable, défaut 1** : rétro-compatible, aucun appelant existant impacté.
+- **Cumul 4 nages et en-têtes de segment laissés à 1 décimale** : périmètre limité à « la colonne MAX » demandée.
+- **3 copies de `fmtTime` non fusionnées** : extraire un module partagé serait un refactor hors périmètre ; chaque copie reçoit le même paramètre.
+
+### Limites / dette
+
+- Les 3 `fmtTime` restent dupliqués — candidat à une factorisation ultérieure dans un module commun.
+
 ## §282 — Crédit-virage généralisé aux épreuves multi-virages (2026-05-16)
 
 **Branche** : `main`
