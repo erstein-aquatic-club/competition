@@ -214,21 +214,22 @@ export function computeRaceContextAdjustedTime(args: {
   return adjusted;
 }
 
-// ─── Turn-credit model: short-course (25 m pool) sprint ──────────────────
+// ─── Turn-credit model: short-course (25 m pool) ─────────────────────────
 
 /** Metres over which a wall push-off + underwater is "banked" into the split. */
 export const TURN_RAMP_M = 13;
 
 /**
- * Short-course turn credit for the 50 m sprint.
+ * Short-course turn credit (25 m pool).
  *
- * In a 25 m pool a 50 m race carries one extra turn (at the 25 m wall) vs the
- * same race in a 50 m pool. The whole pool-length gain (FFN majoration) is
- * banked *after* that wall, ramping in linearly over the breakout zone — so the
- * first length stays identical to the 50 m-pool race.
+ * A 25 m pool adds one wall every 50 m of the race vs a 50 m pool — at 25,
+ * 75, 125 m … (D/50 extra turns). The pool-length gain (FFN majoration) is
+ * shared equally between those turns; each turn's share is banked after its
+ * wall, ramping in linearly over the breakout zone. The race up to the first
+ * extra wall (25 m) stays identical to the 50 m-pool race.
  *
- * Returns the seconds to SUBTRACT from the long-course split. Returns 0 for the
- * 50 m pool, for non-50 m events, and at/before the wall.
+ * Returns the seconds to SUBTRACT from the long-course split. Returns 0 for
+ * the 50 m pool and when no majoration is available.
  */
 export function turnCreditForShortCourse(args: {
   d: number;
@@ -237,11 +238,18 @@ export function turnCreditForShortCourse(args: {
   majoration_s: number;
 }): number {
   const { d, D, poolLengthM, majoration_s } = args;
-  if (D !== 50 || poolLengthM !== 25 || majoration_s <= 0) return 0;
-  const wall = poolLengthM; // single turn, at 25 m
-  if (d <= wall) return 0;
-  const ramp = Math.min(1, (d - wall) / TURN_RAMP_M);
-  return majoration_s * ramp;
+  if (poolLengthM !== 25 || majoration_s <= 0) return 0;
+  const extraTurns = Math.round(D / 50);
+  if (extraTurns < 1) return 0;
+  const creditPerTurn = majoration_s / extraTurns;
+  let credit = 0;
+  for (let k = 0; k < extraTurns; k++) {
+    const wall = 50 * k + 25; // walls a 25 m pool adds: 25, 75, 125 …
+    if (d > wall) {
+      credit += creditPerTurn * Math.min(1, (d - wall) / TURN_RAMP_M);
+    }
+  }
+  return credit;
 }
 
 // ─── Task 10: compute4NSegment + compute4NCumulative ──────────────────────

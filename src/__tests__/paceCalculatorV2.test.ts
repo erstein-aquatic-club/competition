@@ -322,8 +322,37 @@ describe("turnCreditForShortCourse", () => {
     }
   });
 
-  it("returns 0 for non-50 m events (model scoped to the sprint)", () => {
-    assert.equal(turnCreditForShortCourse({ d: 50, D: 100, poolLengthM: 25, majoration_s: 1.50 }), 0);
+  it("D=100 — deux murs supplémentaires (25 m, 75 m), majoration partagée", () => {
+    // majoration 1.50 → 0.75 par mur
+    // d=50 : mur 25 franchi (rampe plafonnée), mur 75 pas atteint → 0.75
+    assert.ok(
+      Math.abs(turnCreditForShortCourse({ d: 50, D: 100, poolLengthM: 25, majoration_s: 1.50 }) - 0.75) < 1e-9,
+    );
+    // d=100 : les deux murs franchis → majoration pleine
+    assert.equal(turnCreditForShortCourse({ d: 100, D: 100, poolLengthM: 25, majoration_s: 1.50 }), 1.50);
+    // d=15 : avant le premier mur → 0
+    assert.equal(turnCreditForShortCourse({ d: 15, D: 100, poolLengthM: 25, majoration_s: 1.50 }), 0);
+    // d=88 = 75 + 13 : les deux rampes plafonnées → majoration pleine
+    assert.equal(turnCreditForShortCourse({ d: 88, D: 100, poolLengthM: 25, majoration_s: 1.50 }), 1.50);
+  });
+
+  it("D=200 — quatre murs supplémentaires, majoration pleine à l'arrivée", () => {
+    assert.equal(turnCreditForShortCourse({ d: 200, D: 200, poolLengthM: 25, majoration_s: 3.60 }), 3.60);
+    // d=25 : au premier mur → 0
+    assert.equal(turnCreditForShortCourse({ d: 25, D: 200, poolLengthM: 25, majoration_s: 3.60 }), 0);
+    // d=38 = 25 + 13 : 1ʳᵉ rampe plafonnée, autres murs pas atteints → 3.60/4 = 0.90
+    assert.ok(
+      Math.abs(turnCreditForShortCourse({ d: 38, D: 200, poolLengthM: 25, majoration_s: 3.60 }) - 0.90) < 1e-9,
+    );
+  });
+
+  it("D=200 — crédit non décroissant sur les lignes de la matrice", () => {
+    let prev = -1;
+    for (const d of [25, 50, 75, 100, 150, 200]) {
+      const c = turnCreditForShortCourse({ d, D: 200, poolLengthM: 25, majoration_s: 3.60 });
+      assert.ok(c >= prev, `crédit en baisse à d=${d}`);
+      prev = c;
+    }
   });
 
   it("returns 0 when no majoration is available", () => {
