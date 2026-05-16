@@ -4,6 +4,40 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §284 — Factorisation de `fmtTime` dans un module commun (2026-05-16)
+
+**Branche** : `main`
+**Trigger** : dette notée en §283 — 3 copies identiques de `fmtTime` (PaceMatrix, matrice 4 nages, export PDF).
+
+### Fix
+
+`fmtTime` est extrait dans `src/lib/formatTime.ts` (fonction pure exportée). `PaceMatrix.tsx`, `Pace4NSegmentMatrix.tsx` et `export-pace-pdf.ts` importent désormais cette version unique au lieu de chacune leur copie. La version partagée conserve le garde `s <= 0 → "—"` (présent dans la copie PDF ; défensif et sans effet observable pour les deux autres, qui ne reçoivent jamais de durée ≤ 0). `fmtTimeCs` (export PDF, temps cibles au centième) devient un mince wrapper `fmtTime(s, 2)`.
+
+Refactor sans changement de comportement : les 719 tests pré-existants restent verts.
+
+### Fichiers
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/formatTime.ts` (nouveau, 17 lignes) | `fmtTime(s, decimals)` — formateur de durée partagé |
+| `src/__tests__/formatTime.test.ts` (nouveau) | 5 tests unitaires `fmtTime` |
+| `src/components/coach/pace/PaceMatrix.tsx` | `fmtTime` local supprimé → import |
+| `src/components/coach/pace/Pace4NSegmentMatrix.tsx` | idem |
+| `src/lib/export-pace-pdf.ts` | `fmtTime` local supprimé → import ; `fmtTimeCs` → wrapper `fmtTime(s, 2)` |
+
+### Tests
+
+- TDD : `formatTime.test.ts` écrit et vu échouer (module absent) avant création du module.
+- `npm test` : **724/724** ✅ (719 pré-existants + 5 nouveaux — les 719 garantissent l'absence de régression du refactor).
+- `npx tsc --noEmit` : aucune erreur hors `*.stories.tsx` pré-existants ✅
+- Tests RLS : non lancés — refactor purement UI/util.
+
+### Décisions prises
+
+- **Garde `s <= 0` dans la version partagée** : comportement de la copie PDF ; inoffensif pour PaceMatrix/4N (durées toujours > 0, et "—" est un affichage correct pour une durée non positive).
+- **`fmtTimeCs` conservé comme nom** (wrapper d'une ligne) : garde la sémantique « centièmes » à ses 4 appels sans churn.
+- **`formatTime.ts` hors `files-map.md`** : fichier feuille de 17 lignes, ni volumineux ni architectural (règle CLAUDE.md).
+
 ## §283 — Colonne MAX du calculateur d'allures à 2 décimales (2026-05-16)
 
 **Branche** : `main`

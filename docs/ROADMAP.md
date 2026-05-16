@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §283 livré (2026-05-16) — Colonne MAX du calculateur d'allures à 2 décimales : `fmtTime` reçoit un paramètre `decimals`, les cellules MAX passent à 2 (PaceMatrix, matrice 4 nages, export PDF). Zones V0–V4 inchangées.*
+*Dernière mise à jour : §284 livré (2026-05-16) — Factorisation de `fmtTime` dans `src/lib/formatTime.ts` : les 3 copies identiques (PaceMatrix, matrice 4 nages, export PDF) remplacées par un import unique ; `fmtTimeCs` devient un wrapper. Refactor sans changement de comportement.*
+
+*Précédente : §283 livré (2026-05-16) — Colonne MAX du calculateur d'allures à 2 décimales.*
 
 *Précédente : §282 livré (2026-05-16) — Crédit-virage généralisé aux épreuves multi-virages : `turnCreditForShortCourse` multi-mur, gate `isTurnModelEvent`.*
 

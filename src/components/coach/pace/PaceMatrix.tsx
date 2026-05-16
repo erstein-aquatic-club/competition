@@ -18,6 +18,7 @@ import {
   type ZoneCoefficientsOverride,
   type RaceContextOptions,
 } from "@/lib/paceCalculatorV2";
+import { fmtTime } from "@/lib/formatTime";
 import type { EventFamily, Zone } from "@/lib/paceData";
 import { convertTargetTime, getPoolMajorationMs } from "@/lib/poolConversion";
 import type { PoolSize, Sex } from "@/lib/poolConversion";
@@ -65,13 +66,6 @@ function buildCols(family: EventFamily, v4Enabled: boolean): ZoneCol[] {
   }
   cols.push({ zone: "MAX", label: "MAX", headerCls: "text-red-500", cellBold: true });
   return cols;
-}
-
-function fmtTime(s: number, decimals = 1): string {
-  if (s < 60) return s.toFixed(decimals);
-  const m = Math.floor(s / 60);
-  const rem = (s - m * 60).toFixed(decimals).padStart(3 + decimals, "0");
-  return `${m}:${rem}`;
 }
 
 export function PaceMatrix({

@@ -10,6 +10,7 @@ import {
   type ZoneCoefficientsOverride,
   type RaceContextOptions,
 } from "@/lib/paceCalculatorV2";
+import { fmtTime } from "@/lib/formatTime";
 import { SEGMENTS_4N, type EventFamily, type Zone } from "@/lib/paceData";
 
 type SingleStroke = "crawl" | "dos" | "brasse" | "papillon";
@@ -63,13 +64,6 @@ const ZONE_COLS: { zone: Zone; label: string; hCls: string; bold: boolean }[] = 
   { zone: "V4",  label: "V4",  hCls: "text-intensity-4",    bold: false },
   { zone: "MAX", label: "MAX", hCls: "text-intensity-5",    bold: true  },
 ];
-
-function fmtTime(s: number, decimals = 1): string {
-  if (s < 60) return s.toFixed(decimals);
-  const m = Math.floor(s / 60);
-  const rem = (s - m * 60).toFixed(decimals).padStart(3 + decimals, "0");
-  return `${m}:${rem}`;
-}
 
 export function Pace4NSegmentMatrix({
   targetTimeMs,

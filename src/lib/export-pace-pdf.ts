@@ -22,6 +22,7 @@ import {
   compute4NCumulative,
   turnCreditForShortCourse,
 } from "@/lib/paceCalculatorV2";
+import { fmtTime } from "@/lib/formatTime";
 import { convertTargetTime, getPoolMajorationMs } from "@/lib/poolConversion";
 import type { Stroke } from "@/lib/paceCalculator";
 import {
@@ -62,22 +63,9 @@ const SEGMENT_LABELS: Record<SingleStroke, string> = {
   crawl:    "NL",
 };
 
-/** Format seconds → mm:ss.x or ss.x. */
-function fmtTime(s: number, decimals = 1): string {
-  if (s <= 0) return "—";
-  if (s < 60) return s.toFixed(decimals);
-  const m = Math.floor(s / 60);
-  const rem = (s - m * 60).toFixed(decimals).padStart(3 + decimals, "0");
-  return `${m}:${rem}`;
-}
-
 /** Format seconds → mm:ss.cc or ss.cc (centièmes — pour les temps cibles). */
 function fmtTimeCs(s: number): string {
-  if (s <= 0) return "—";
-  if (s < 60) return s.toFixed(2);
-  const m = Math.floor(s / 60);
-  const rem = (s - m * 60).toFixed(2).padStart(5, "0");
-  return `${m}:${rem}`;
+  return fmtTime(s, 2);
 }
 
 /** Collect zones ordered for a family, optionally skip V4 if not in data. */
