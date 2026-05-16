@@ -124,11 +124,17 @@ export function PaceMatrix({
     }
   }
 
-  // Turn-credit model — the 50 m sprint pace curve is anchored in long course;
-  // the 25 m-pool curve locks the first length and banks the pool gain after
-  // the wall. See turnCreditForShortCourse / docs/pace-calculator-scenarios.md.
-  const isSprintTurnModel = targetDistanceM === 50;
-  const lcTargetMs = isSprintTurnModel
+  // Turn-credit model — the pace curve is anchored in long course; the 25 m-pool
+  // curve locks the first length and banks the pool gain after each extra wall.
+  // Active for every event with an FFN majoration. See turnCreditForShortCourse
+  // / docs/pace-calculator-scenarios.md.
+  const turnMajorationMs = getPoolMajorationMs(
+    poolStroke,
+    targetDistanceM,
+    swimmerSex ?? null,
+  );
+  const isTurnModelEvent = turnMajorationMs !== null;
+  const lcTargetMs = isTurnModelEvent
     ? convertTargetTime({
         targetTimeMs,
         fromPool: targetPool,
@@ -138,9 +144,6 @@ export function PaceMatrix({
         sex: swimmerSex,
       }) ?? targetTimeMs
     : targetTimeMs;
-  const sprintMajorationMs = isSprintTurnModel
-    ? getPoolMajorationMs(poolStroke, targetDistanceM, swimmerSex ?? null) ?? 0
-    : 0;
 
   // Reason why the other-pool toggle button should be disabled
   const toggleDisabledReason = (): string => {
@@ -158,7 +161,7 @@ export function PaceMatrix({
 
   function cellTimeStr(d: number, zone: Zone): string {
     try {
-      const tMax = isSprintTurnModel
+      const tMax = isTurnModelEvent
         ? computeTMax({
             Tobj_s: lcTargetMs / 1000,
             D: targetDistanceM,
@@ -170,7 +173,7 @@ export function PaceMatrix({
             d,
             D: targetDistanceM,
             poolLengthM: viewPool === "25m" ? 25 : 50,
-            majoration_s: sprintMajorationMs / 1000,
+            majoration_s: (turnMajorationMs ?? 0) / 1000,
           })
         : computeTMax({
             Tobj_s: effectiveMs / 1000,

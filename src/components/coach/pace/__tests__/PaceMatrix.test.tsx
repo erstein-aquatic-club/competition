@@ -27,6 +27,18 @@ function render(props: Parameters<typeof PaceMatrix>[0]): string {
   return renderToStaticMarkup(createElement(PaceMatrix, props));
 }
 
+// Extracts the MAX column (last <td> of each body row) from rendered HTML.
+function maxColumn(html: string): string[] {
+  const rows = html.match(/<tr[^>]*>.*?<\/tr>/gs) ?? [];
+  return rows
+    .map((row) => {
+      const cells = row.match(/<td[^>]*>[^<]*<\/td>/g) ?? [];
+      const last = cells[cells.length - 1] ?? "";
+      return last.replace(/<[^>]*>/g, "");
+    })
+    .filter((v) => v !== "");
+}
+
 describe("PaceMatrix v2 — calcul non-linéaire", () => {
   it("50m crawl Tobj=23.62s → cell (25m, V0) = 15.2s", () => {
     // tMax(25) = 23.62 * 0.451 * 1.0 = 10.653 → V0 = 10.653/0.70 = 15.218 → "15.2"
@@ -152,6 +164,26 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
     // La ligne cible diffère : 23.6 s en grand bassin, 22.9 s en petit bassin
     assert.ok(longCourse.includes(">23.6<"), "cible 50 m = 23.6 attendue");
     assert.ok(shortCourse.includes(">22.9<"), "cible 25 m = 22.9 attendue");
+  });
+
+  it("verrouille la 1ère longueur d'un 100 m : 15 m/25 m identiques entre bassins", () => {
+    // 100 m en 1'00 grand bassin ; équivalent FFN 25 m = 60.00 − 1.50 = 58.50 s
+    const longCourse = render({
+      ...BASE_PROPS, targetPool: "50m", targetTimeMs: 60_000,
+      targetDistanceM: 100, stroke: "crawl",
+    });
+    const shortCourse = render({
+      ...BASE_PROPS, targetPool: "25m", targetTimeMs: 58_500,
+      targetDistanceM: 100, stroke: "crawl",
+    });
+    const lcMax = maxColumn(longCourse);
+    const scMax = maxColumn(shortCourse);
+    // 1ère longueur (lignes 15 m et 25 m) : MAX identique dans les deux bassins
+    assert.equal(scMax[0], lcMax[0], "15 m MAX doit être identique entre bassins");
+    assert.equal(scMax[1], lcMax[1], "25 m MAX doit être identique entre bassins");
+    // Ligne cible : 1:00.0 en grand bassin, 58.5 en petit bassin
+    assert.equal(lcMax[lcMax.length - 1], "1:00.0", "cible 100 m grand bassin");
+    assert.equal(scMax[scMax.length - 1], "58.5", "cible 100 m petit bassin");
   });
 
   it("distance cible (d=D) présente comme ligne dans le tableau", () => {
