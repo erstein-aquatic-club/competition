@@ -12,6 +12,7 @@ import {
   compute4NCumulative,
   getDistanceRowsV2,
   validateMatrix,
+  turnCreditForShortCourse,
 } from "../lib/paceCalculatorV2";
 
 // ─── Task 5: eventFamily + normalizeStroke ────────────────────────────────
@@ -279,6 +280,54 @@ describe("computeRaceContextAdjustedTime", () => {
     });
     assert.ok(female > unknown, `female=${female}, unknown=${unknown}`);
     assert.ok(unknown > male, `unknown=${unknown}, male=${male}`);
+  });
+});
+
+// ─── Turn-credit model (short course) ────────────────────────────────────
+
+describe("turnCreditForShortCourse", () => {
+  it("returns 0 in a 50 m pool (no extra turn)", () => {
+    assert.equal(
+      turnCreditForShortCourse({ d: 50, D: 50, poolLengthM: 50, majoration_s: 0.70 }),
+      0,
+    );
+  });
+
+  it("returns 0 at or before the wall (first length is pool-invariant)", () => {
+    assert.equal(turnCreditForShortCourse({ d: 15, D: 50, poolLengthM: 25, majoration_s: 0.70 }), 0);
+    assert.equal(turnCreditForShortCourse({ d: 25, D: 50, poolLengthM: 25, majoration_s: 0.70 }), 0);
+  });
+
+  it("banks the full majoration once the breakout zone is cleared", () => {
+    // (40 - 25) / 13 = 1.15 → clamped to 1 → full credit
+    assert.equal(turnCreditForShortCourse({ d: 40, D: 50, poolLengthM: 25, majoration_s: 0.70 }), 0.70);
+    assert.equal(turnCreditForShortCourse({ d: 50, D: 50, poolLengthM: 25, majoration_s: 0.70 }), 0.70);
+  });
+
+  it("ramps the credit linearly across the breakout zone", () => {
+    // 35 m → 10 m past the wall → 0.70 × 10/13
+    const c35 = turnCreditForShortCourse({ d: 35, D: 50, poolLengthM: 25, majoration_s: 0.70 });
+    assert.ok(Math.abs(c35 - (0.70 * 10) / 13) < 1e-9, `got ${c35}`);
+    // 30 m → 5 m past the wall → 0.70 × 5/13
+    const c30 = turnCreditForShortCourse({ d: 30, D: 50, poolLengthM: 25, majoration_s: 0.70 });
+    assert.ok(Math.abs(c30 - (0.70 * 5) / 13) < 1e-9, `got ${c30}`);
+  });
+
+  it("is non-decreasing in d (keeps the matrix monotone)", () => {
+    let prev = -1;
+    for (const d of [15, 20, 25, 30, 35, 40, 45, 50]) {
+      const c = turnCreditForShortCourse({ d, D: 50, poolLengthM: 25, majoration_s: 0.70 });
+      assert.ok(c >= prev, `credit dropped at d=${d}: ${c} < ${prev}`);
+      prev = c;
+    }
+  });
+
+  it("returns 0 for non-50 m events (model scoped to the sprint)", () => {
+    assert.equal(turnCreditForShortCourse({ d: 50, D: 100, poolLengthM: 25, majoration_s: 1.50 }), 0);
+  });
+
+  it("returns 0 when no majoration is available", () => {
+    assert.equal(turnCreditForShortCourse({ d: 50, D: 50, poolLengthM: 25, majoration_s: 0 }), 0);
   });
 });
 

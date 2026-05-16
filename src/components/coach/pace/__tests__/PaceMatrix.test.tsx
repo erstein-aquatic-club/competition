@@ -128,6 +128,32 @@ describe("PaceMatrix v2 — calcul non-linéaire", () => {
     assert.ok(!html.includes("disabled=\"\""), "bouton 25m ne doit pas être désactivé sans sexe");
   });
 
+  it("verrouille la 1ère longueur : 15 m/25 m identiques entre bassins (cible 50 m vs équivalent FFN 25 m)", () => {
+    // Cible 50 m = 23.62 s ; équivalent FFN 25 m = 23.62 − 0.70 = 22.92 s
+    const longCourse = render({
+      ...BASE_PROPS,
+      targetPool: "50m",
+      targetTimeMs: 23_620,
+      targetDistanceM: 50,
+      stroke: "crawl",
+    });
+    const shortCourse = render({
+      ...BASE_PROPS,
+      targetPool: "25m",
+      targetTimeMs: 22_920,
+      targetDistanceM: 50,
+      stroke: "crawl",
+    });
+    // 1ère longueur (MAX) : 15 m → 5.7 s, 25 m → 10.7 s — identiques dans les deux bassins
+    for (const html of [longCourse, shortCourse]) {
+      assert.ok(html.includes(">5.7<"), "split 15 m MAX = 5.7 attendu");
+      assert.ok(html.includes(">10.7<"), "split 25 m MAX = 10.7 attendu");
+    }
+    // La ligne cible diffère : 23.6 s en grand bassin, 22.9 s en petit bassin
+    assert.ok(longCourse.includes(">23.6<"), "cible 50 m = 23.6 attendue");
+    assert.ok(shortCourse.includes(">22.9<"), "cible 25 m = 22.9 attendue");
+  });
+
   it("distance cible (d=D) présente comme ligne dans le tableau", () => {
     const html = render({
       ...BASE_PROPS,

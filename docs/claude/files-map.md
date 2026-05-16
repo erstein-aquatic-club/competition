@@ -295,7 +295,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/schema.ts` | Schéma Drizzle (tables) | ~670 lignes |
 | `src/lib/poolConversion.ts` | Table FFN de conversion bassin 50m↔25m (17 entrées, sex-dépendant) + `convertTargetTime` + `getPoolMajorationMs` (§185) | 78 lignes |
 | `src/__tests__/poolConversion.test.ts` | 17 tests `node:test` — majorations FFN, no-op, round-trips, nulls, sex fallback (§185) | 165 lignes |
-| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–MAX) — modèle non-linéaire pace-v2 + V4 conditionnel + toggle bassin 50m/25m + prop `compact` (masque toolbar, §188) | 270 lignes |
+| `src/components/coach/pace/PaceMatrix.tsx` | Matrice allures × zones (V0–MAX) — modèle non-linéaire pace-v2 + V4 conditionnel + toggle bassin 50m/25m + modèle crédit-virage sprint (§281) + prop `compact` (masque toolbar, §188) | 347 lignes |
 | `src/components/coach/pace/PaceMatrixInline.tsx` | Wrapper compact de `PaceMatrix` (lecture seule, sans toggle bassin) — utilisé sous `ObjectiveCard` nageur (§188) | 46 lignes |
 | `src/components/coach/pace/PaceTargetForm.tsx` | Formulaire cible d'allure (nage + distance + temps + bassin toggle) embarqué dans SwimmerPaceCard (§184-§185) | 182 lignes |
 | `src/components/coach/pace/Pace4NSegmentMatrix.tsx` | Matrice 4N segmentée par nage (NL/Dos/Brasse/Pap) avec poids selon doc §9 (§186) | 269 lignes |
@@ -304,10 +304,10 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/pace/SwimmerPaceCard.tsx` | Accordéon nageur — propage zones_v2 + strokeAdjustments + v4ByFamily ; sous-accordions repliables par cible (§186) | 244 lignes |
 | `src/components/coach/pace/PdfExportDialog.tsx` | Dialog pré-export PDF avec toggle 25m/50m (§186) | 116 lignes |
 | `src/components/coach/AddSwimmerToTeamDialog.tsx` | Vue unique team-creation unifiée — refonte 'Mon équipe' (§186) | 233 lignes |
-| `src/lib/paceCalculatorV2.ts` | Moteur pur non-linéaire pace-v2 — `t_allure(d) = (Tobj × R_base × A_nage + Δ_mesure) / k_allure` (§186) | 238 lignes |
+| `src/lib/paceCalculatorV2.ts` | Moteur pur non-linéaire pace-v2 — `t_allure(d) = (Tobj × R_base × A_nage + Δ_mesure) / k_allure` (§186) + `turnCreditForShortCourse` crédit-virage bassin 25 m (§281) | 356 lignes |
 | `src/lib/paceData.ts` | Tables data pures — `R_base(D, d)`, `A_nage(D, d, S)`, `k_allure(family, zone)` selon doc métier (§186) | 96 lignes |
 | `src/lib/pdfPalette.ts` | Palette colorée pour export PDF (zones V0–MAX cohérentes avec écran) (§186) | 57 lignes |
-| `src/lib/export-pace-pdf.ts` | Export PDF allures — refonte palette colorée + branding EAC (rouge + logo + club) + bassin d'origine + flèche conversion + footer épuré (§186) | 906 lignes |
+| `src/lib/export-pace-pdf.ts` | Export PDF allures — refonte palette colorée + branding EAC (rouge + logo + club) + bassin d'origine + flèche conversion + footer épuré (§186) + modèle crédit-virage sprint (§281) | 947 lignes |
 | `src/lib/objective-pace-link.ts` | Parse `event_code` compact FFN (`"100NL"` etc.) → `{ stroke, distance, pool_size }` — utilisé par bouton coach + matrice nageur (§188) | 40 lignes |
 | `src/lib/pace-prefill-handoff.ts` | Handoff sessionStorage coach→calculateur : `setPacePrefill` / `consumePacePrefill` (consume-once, §188) | 50 lignes |
 | `src/lib/api/pace-targets.ts` | CRUD cibles d'allures via RPC `upsert_pace_target` (§184) — inclut `target_pool_size` (§185) | 62 lignes |

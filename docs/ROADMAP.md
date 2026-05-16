@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §280 livré (2026-05-13) — Bouton "Enregistrer" dans le plan builder : breadcrumb refait en flex avec bouton primary à droite. `handleSaveAndClose` flush les drafts name/description avant retour à la liste. Améliore la confiance UX vs le modèle auto-save invisible.*
+*Dernière mise à jour : §281 livré (2026-05-16) — Modèle crédit-virage pour la courbe d'allures 25 m du sprint : la 1ère longueur est verrouillée sur les passages grand bassin, le gain de bassin (majoration FFN) est concentré après le mur via `turnCreditForShortCourse`. Corrige l'invariance 15 m/25 m entre bassins et inverse le sens de l'effet virage.*
+
+*Précédente : §280 livré (2026-05-13) — Bouton "Enregistrer" dans le plan builder.*
 
 *Précédente : §279 livré (2026-05-13) — SessionPreviewPopover partagé + actions Changer/Retirer.*
 

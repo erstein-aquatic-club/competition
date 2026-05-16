@@ -80,6 +80,7 @@ Tous les feature flags sont activés.
 | Commentaires nageurs → push coach | ✅ | `coach-comments.ts`, `CoachCommentsScreen.tsx`, `Coach.tsx` | Push immédiat au coach, badge home 48h, inbox dédié, lu/non-lu (§99) |
 | Historique chronos + éditeur splits | ✅ | `chrono-records.ts`, `CoachChronoHistoryScreen.tsx`, `ChronoSplitEditor.tsx` | Sauvegarde DB, brouillons, édition distances, envoi depuis historique, export xlsx, édition titre inline (§98, §126) |
 | Nageurs manuels chrono | ✅ | `coach-manual-swimmers.ts`, `ChronoSetup.tsx` | Carnet mémorisé par coach, ajout à la volée, badge M dans résultats, exclus de l'envoi profil (§126) |
+| Calculateur d'allures (matrice zones) | ✅ | `CoachPaceCalculatorScreen.tsx`, `PaceMatrix.tsx`, `paceCalculatorV2.ts`, `poolConversion.ts` | Cible course → matrice passages × zones V0–MAX, modèle non-linéaire pace-v2, modulations bassin/départ/combinaison. §281 — modèle crédit-virage : la courbe 25 m du sprint verrouille la 1ère longueur, gain de bassin concentré après le mur |
 | Coach QuickView (mode dépannage) | ✅ | `CoachSwimmerDetail.tsx` (dispatcher), `CoachSwimmerQuickView.tsx`, `QuickViewAttendanceDialog.tsx`, `QuickViewCommentDialog.tsx`, `QuickViewAssignDrawer.tsx`, `coach-quickview.ts`, migrations 00133–00135 | Accès lecture-seule aux fiches non-attribuées ; enregistrement présence/commentaire/session avec `recorded_by` ; RPC SECURITY DEFINER ; attribution badges (TODO §futur) (§152) |
 
 ### Musculation — Nageur

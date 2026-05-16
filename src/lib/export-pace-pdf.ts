@@ -20,8 +20,9 @@ import {
   getDistanceRowsV2,
   compute4NSegment,
   compute4NCumulative,
+  turnCreditForShortCourse,
 } from "@/lib/paceCalculatorV2";
-import { convertTargetTime } from "@/lib/poolConversion";
+import { convertTargetTime, getPoolMajorationMs } from "@/lib/poolConversion";
 import type { Stroke } from "@/lib/paceCalculator";
 import {
   STROKE_COLORS_RGB,
@@ -117,6 +118,7 @@ interface SingleSectionArgs {
   target: PaceTarget;
   effectiveTimeMs: number;          // possibly converted
   effectivePool: "25m" | "50m";
+  sex: "M" | "F" | null;
   notConvertibleNote: string | null;
   zones: Record<EventFamily, Partial<Record<Zone, number>>>;
   strokeAdjustments: Record<SingleStroke, Record<EventFamily, number>>;
@@ -130,6 +132,7 @@ function drawSingleSection({
   target,
   effectiveTimeMs,
   effectivePool,
+  sex,
   notConvertibleNote,
   zones,
   strokeAdjustments,
@@ -148,6 +151,23 @@ function drawSingleSection({
   const Tobj_s = effectiveTimeMs / 1000;
   const distRows = getDistanceRowsV2(target_distance_m, singleStroke);
   const zoneCols = getZoneCols(family, zones);
+
+  // Turn-credit model — mirror PaceMatrix: lock the first length, bank the
+  // pool gain after the wall (50 m sprint only). See turnCreditForShortCourse.
+  const isSprintTurnModel = target_distance_m === 50;
+  const lcTimeMs = isSprintTurnModel
+    ? convertTargetTime({
+        targetTimeMs: target.target_time_ms,
+        fromPool: target.target_pool_size ?? "50m",
+        toPool: "50m",
+        stroke: stroke as Stroke,
+        distanceM: target_distance_m,
+        sex,
+      }) ?? effectiveTimeMs
+    : effectiveTimeMs;
+  const sprintMajorationMs = isSprintTurnModel
+    ? getPoolMajorationMs(stroke as Stroke, target_distance_m, sex) ?? 0
+    : 0;
 
   // Estimate section height: header band (18) + divider (1) + header row (9) + rows * 8
   const sectionHeight = 18 + 1 + 9 + distRows.length * 8 + 6;
@@ -224,13 +244,27 @@ function drawSingleSection({
 
   // Compute tMax for each distance row
   const tableBody: (string | object)[][] = distRows.map((d) => {
-    const tMax_s = computeTMax({
-      Tobj_s,
-      D: target_distance_m,
-      d,
-      stroke: singleStroke,
-      adjustmentOverrides: strokeAdjustments as Record<SingleStroke, Partial<Record<EventFamily, number>>>,
-    });
+    const tMax_s = isSprintTurnModel
+      ? computeTMax({
+          Tobj_s: lcTimeMs / 1000,
+          D: target_distance_m,
+          d,
+          stroke: singleStroke,
+          adjustmentOverrides: strokeAdjustments as Record<SingleStroke, Partial<Record<EventFamily, number>>>,
+        }) -
+        turnCreditForShortCourse({
+          d,
+          D: target_distance_m,
+          poolLengthM: effectivePool === "25m" ? 25 : 50,
+          majoration_s: sprintMajorationMs / 1000,
+        })
+      : computeTMax({
+          Tobj_s,
+          D: target_distance_m,
+          d,
+          stroke: singleStroke,
+          adjustmentOverrides: strokeAdjustments as Record<SingleStroke, Partial<Record<EventFamily, number>>>,
+        });
 
     const isTargetRow = d === target_distance_m;
     const dLabel = d >= 1000 ? `${d / 1000} km` : `${d} m`;
@@ -843,6 +877,9 @@ export async function exportPacePdf(args: {
     return a.target_distance_m - b.target_distance_m;
   });
 
+  const swimmerSex =
+    (swimmer as TeamMember & { sex?: "M" | "F" | null }).sex ?? null;
+
   for (const target of sortedTargets) {
     const { stroke, target_distance_m, target_time_ms, target_pool_size } = target;
 
@@ -858,7 +895,7 @@ export async function exportPacePdf(args: {
         toPool: outputPool,
         stroke: stroke as Stroke,
         distanceM: target_distance_m,
-        sex: (swimmer as TeamMember & { sex?: "M" | "F" | null }).sex ?? null,
+        sex: swimmerSex,
       });
       if (converted !== null) {
         effectiveTimeMs = converted;
@@ -896,6 +933,7 @@ export async function exportPacePdf(args: {
         target,
         effectiveTimeMs,
         effectivePool,
+        sex: swimmerSex,
         notConvertibleNote,
         zones,
         strokeAdjustments,

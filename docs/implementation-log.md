@@ -4,6 +4,63 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §281 — Modèle crédit-virage : courbe d'allures 25 m du sprint (2026-05-16)
+
+**Branche** : `main`
+**Trigger** : François Wagner (nageur) — remontées de splits course (50 m crawl, bassin 25 m, combi + départ plot). La grille d'allures 25 m ré-étirait toute la courbe au prorata du chrono converti FFN.
+
+### Contexte
+
+`PaceMatrix` et `export-pace-pdf` construisaient la matrice 25 m en convertissant d'abord le chrono cible via `convertTargetTime` (majoration FFN), puis en appliquant `RATIOS_BASE` au chrono converti. Deux défauts :
+
+- **15 m / 25 m non invariants** : la première longueur — départ + nage strictement identiques en 25 m et 50 m, aucun virage encore — voyait ses passages ré-étirés (ex. 15 m MAX : 5,69 s en 50 m vs 5,52 s en 25 m).
+- **Aucun modèle de virage** : tout le gain de bassin était lissé sur l'ensemble de la course ; le segment post-virage 25→35 m était modélisé *plus lent* que le segment de nage pure 15→25 m, alors qu'il est plus rapide.
+
+Diagnostic complet et données d'appui (50 m complet 5,69/11,35/23,50 ; 25 m all-out 5,7/10,7) dans `docs/pace-calculator-scenarios.md` §6.
+
+### Fix — modèle « crédit-virage »
+
+Nouvelle fonction pure `turnCreditForShortCourse` dans `paceCalculatorV2.ts` :
+
+- `RATIOS_BASE` est traité comme le profil **grand bassin** (0 virage pour un 50 m).
+- 50 m en bassin de 25 m : première longueur (d ≤ 25 m) verrouillée sur les passages grand bassin — la cible est convertie en grand bassin via `convertTargetTime(... toPool: "50m")`.
+- Après le mur, un **crédit de virage** est soustrait : il vaut la majoration FFN complète, rampé linéairement sur `TURN_RAMP_M = 13 m` (coulée + reprise). À l'arrivée `t_SC(50) = t_LC(50) − majoration` → la cible 25 m est conservée.
+- Hors 50 m, hors bassin 25 m, ou majoration absente → crédit nul (modèle volontairement limité au sprint).
+
+Câblage dans `PaceMatrix.tsx` et `export-pace-pdf.ts` : pour `D = 50`, `tMax = computeTMax(cible_grand_bassin) − turnCreditForShortCourse(...)`. Les vues 50 m et les épreuves ≠ 50 m gardent le comportement existant à l'identique.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/paceCalculatorV2.ts` (326 → 356 lignes) | `turnCreditForShortCourse` + constante `TURN_RAMP_M` |
+| `src/components/coach/pace/PaceMatrix.tsx` (314 → 347 lignes) | Câblage crédit-virage (cible grand bassin + crédit par cellule) |
+| `src/lib/export-pace-pdf.ts` (906 → 947 lignes) | Même câblage côté export PDF + `sex` passé à `drawSingleSection` |
+| `src/__tests__/paceCalculatorV2.test.ts` | 7 tests `turnCreditForShortCourse` |
+| `src/components/coach/pace/__tests__/PaceMatrix.test.tsx` | Test invariance 1ère longueur 25 m/50 m |
+| `docs/pace-calculator-scenarios.md` | §6 réécrit (modèle crédit-virage) |
+
+### Tests
+
+- TDD : tests `turnCreditForShortCourse` et invariance `PaceMatrix` écrits et vus échouer avant implémentation.
+- `node --test` suite complète : **714/714** ✅
+- `npx tsc --noEmit` : aucune erreur hors `*.stories.tsx` pré-existants ✅
+- Tests RLS : non lancés — patch purement UI/calcul, aucune policy ni helper auth touché (hors critères CLAUDE.md § Tests RLS).
+
+### Décisions prises
+
+- **Magnitude du crédit = majoration FFN (défaut)** : le 50 m complet de l'utilisateur (L2 = 12,15 s ≈ cible modèle 12,27 s) confirme que la majoration FFN (0,70 s pour 50 NL homme) est juste pour lui. Un override « qualité de virage » par nageur reste possible mais non nécessaire ici.
+- **Scope limité au 50 m** : généraliser (100 m+ multi-virages, virages en grand bassin) demande de revisiter les hypothèses de virage des courbes `RATIOS_BASE` 100/200/400 — risque de régression sur les cas pinés §12.2/§12.3. Reporté.
+- **Rampe linéaire sur 13 m** : isolée en constante `TURN_RAMP_M` pour calibration ultérieure.
+- **Export PDF câblé dans le même patch** : sinon le PDF 25 m d'un 50 m afficherait l'ancienne courbe ré-étirée, incohérent avec l'écran.
+
+### Limites / dette
+
+- **Ancres `RATIOS_BASE` inchangées** : le 25 m all-out de l'utilisateur (5,7 / 10,7) valide les ancres 15 m/25 m — pas de retouche. Le « réajustement de la courbe sprint » demandé se réduit à la réparation du mécanisme de conversion bassin.
+- **100 m+ en bassin 25 m** : conservent la conversion FFN ré-étirée. À traiter dans un patch de généralisation multi-virages.
+- **Rampe linéaire** : une rampe front-loaded (crédit accumulé plus vite sur les 5-7 premiers mètres) serait plus fidèle à la pointe de vitesse sous l'eau. Polissage possible.
+- **Calibration ouverte** : un 50 m en bassin 25 m avec split au 30/35 m et 1ère longueur plus engagée reste à recueillir pour affiner la rampe.
+
 ## §280 — Bouton "Enregistrer" dans le plan builder (2026-05-13)
 
 **Branche** : `main`

@@ -12,13 +12,14 @@ import {
   computeZoneTime,
   computeRaceContextAdjustedTime,
   getDistanceRowsV2,
+  turnCreditForShortCourse,
   type StrokeV2,
   type StrokeAdjustmentOverrides,
   type ZoneCoefficientsOverride,
   type RaceContextOptions,
 } from "@/lib/paceCalculatorV2";
 import type { EventFamily, Zone } from "@/lib/paceData";
-import { convertTargetTime } from "@/lib/poolConversion";
+import { convertTargetTime, getPoolMajorationMs } from "@/lib/poolConversion";
 import type { PoolSize, Sex } from "@/lib/poolConversion";
 import type { Stroke } from "@/lib/paceCalculator";
 
@@ -123,6 +124,24 @@ export function PaceMatrix({
     }
   }
 
+  // Turn-credit model — the 50 m sprint pace curve is anchored in long course;
+  // the 25 m-pool curve locks the first length and banks the pool gain after
+  // the wall. See turnCreditForShortCourse / docs/pace-calculator-scenarios.md.
+  const isSprintTurnModel = targetDistanceM === 50;
+  const lcTargetMs = isSprintTurnModel
+    ? convertTargetTime({
+        targetTimeMs,
+        fromPool: targetPool,
+        toPool: "50m",
+        stroke: poolStroke,
+        distanceM: targetDistanceM,
+        sex: swimmerSex,
+      }) ?? targetTimeMs
+    : targetTimeMs;
+  const sprintMajorationMs = isSprintTurnModel
+    ? getPoolMajorationMs(poolStroke, targetDistanceM, swimmerSex ?? null) ?? 0
+    : 0;
+
   // Reason why the other-pool toggle button should be disabled
   const toggleDisabledReason = (): string => {
     const probe = convertTargetTime({
@@ -139,13 +158,27 @@ export function PaceMatrix({
 
   function cellTimeStr(d: number, zone: Zone): string {
     try {
-      const tMax = computeTMax({
-        Tobj_s: effectiveMs / 1000,
-        D: targetDistanceM,
-        d,
-        stroke: stroke as SingleStroke,
-        adjustmentOverrides: strokeAdjustments as StrokeAdjustmentOverrides,
-      });
+      const tMax = isSprintTurnModel
+        ? computeTMax({
+            Tobj_s: lcTargetMs / 1000,
+            D: targetDistanceM,
+            d,
+            stroke: stroke as SingleStroke,
+            adjustmentOverrides: strokeAdjustments as StrokeAdjustmentOverrides,
+          }) -
+          turnCreditForShortCourse({
+            d,
+            D: targetDistanceM,
+            poolLengthM: viewPool === "25m" ? 25 : 50,
+            majoration_s: sprintMajorationMs / 1000,
+          })
+        : computeTMax({
+            Tobj_s: effectiveMs / 1000,
+            D: targetDistanceM,
+            d,
+            stroke: stroke as SingleStroke,
+            adjustmentOverrides: strokeAdjustments as StrokeAdjustmentOverrides,
+          });
       const tZone = computeZoneTime({
         tMax_s: tMax,
         zone,
