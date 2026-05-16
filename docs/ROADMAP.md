@@ -1,6 +1,8 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : §281 livré (2026-05-16) — Modèle crédit-virage pour la courbe d'allures 25 m du sprint : la 1ère longueur est verrouillée sur les passages grand bassin, le gain de bassin (majoration FFN) est concentré après le mur via `turnCreditForShortCourse`. Corrige l'invariance 15 m/25 m entre bassins et inverse le sens de l'effet virage.*
+*Dernière mise à jour : §282 livré (2026-05-16) — Crédit-virage généralisé aux épreuves multi-virages : `turnCreditForShortCourse` devient multi-mur (D/50 virages aux positions 50k+25, crédit = majoration FFN / N), gate `isTurnModelEvent`. Couvre 100/200 m (4 nages) + 400/800/1500 m (crawl).*
+
+*Précédente : §281 livré (2026-05-16) — Modèle crédit-virage pour la courbe d'allures 25 m du sprint.*
 
 *Précédente : §280 livré (2026-05-13) — Bouton "Enregistrer" dans le plan builder.*
 

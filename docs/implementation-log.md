@@ -4,6 +4,57 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §282 — Crédit-virage généralisé aux épreuves multi-virages (2026-05-16)
+
+**Branche** : `main`
+**Trigger** : suite directe de §281 — l'utilisateur demande de généraliser le modèle crédit-virage au-delà du 50 m.
+
+### Contexte
+
+§281 a livré le modèle crédit-virage pour le 50 m uniquement : `turnCreditForShortCourse` portait un gate `D !== 50`, et le câblage `PaceMatrix` / `export-pace-pdf` un gate `targetDistanceM === 50`. Les épreuves 100 m et plus en bassin de 25 m utilisaient encore la conversion FFN ré-étirée au prorata — dette explicitement notée en §281.
+
+Design validé : `docs/plans/2026-05-16-generalisation-credit-virage-design.md` (approche A — courbe canonique grand bassin inchangée, crédit multi-mur soustrait pour les vues 25 m).
+
+### Fix
+
+`turnCreditForShortCourse` devient multi-mur : un bassin de 25 m ajoute un virage tous les 50 m de course par rapport à un bassin de 50 m (`D/50` murs supplémentaires, aux positions 25, 75, 125 m…). La majoration FFN est partagée à parts égales entre ces virages ; chaque part est rampée linéairement sur `TURN_RAMP_M = 13 m` après son mur. À l'arrivée, Σ des crédits = majoration → la cible 25 m est conservée. `D = 50` reste un cas particulier identique à §281 (1 virage).
+
+Câblage : le gate `PaceMatrix` / `export-pace-pdf` passe de « épreuve = 50 m » à « majoration FFN définie » (`isTurnModelEvent = getPoolMajorationMs(...) !== null`). Couvre 100/200 m (4 nages) + 400/800/1500 m (crawl). Les épreuves sans majoration FFN gardent le comportement legacy (toggle bassin désactivé).
+
+`computeTMax` et `RATIOS_BASE` ne sont pas touchés → vues 50 m et tests pinés §12.2/§12.3 intacts.
+
+### Fichiers modifiés
+
+| Fichier | Nature |
+|---------|--------|
+| `src/lib/paceCalculatorV2.ts` (356 → 364 lignes) | `turnCreditForShortCourse` multi-mur |
+| `src/components/coach/pace/PaceMatrix.tsx` (347 → 350 lignes) | Gate `isTurnModelEvent` |
+| `src/lib/export-pace-pdf.ts` (947 → 945 lignes) | Gate `isTurnModelEvent` |
+| `src/__tests__/paceCalculatorV2.test.ts` | Tests multi-mur D=100/D=200 (test §281 « non-50 m » réécrit) |
+| `src/components/coach/pace/__tests__/PaceMatrix.test.tsx` | Test intégration 100 m + helper `maxColumn` |
+| `docs/pace-calculator-scenarios.md` | §6 généralisé multi-mur |
+
+### Tests
+
+- TDD : tests écrits et vus échouer avant implémentation. Le test §281 `"returns 0 for non-50 m events"` est réécrit (le modèle n'est plus scopé au 50 m — changement voulu, pas une régression).
+- Le 1ᵉʳ jet du test d'intégration 100 m utilisait une comparaison de sous-chaîne non discriminante (collision avec la colonne V4) ; corrigé par un extracteur de colonne MAX (`maxColumn`), échec RED confirmé avant la correction du gate.
+- `npm test` suite complète : **717/717** ✅
+- `npx tsc --noEmit` : aucune erreur hors `*.stories.tsx` pré-existants ✅
+- Tests RLS : non lancés — patch purement UI/calcul, aucune policy ni helper auth touché.
+
+### Décisions prises
+
+- **Approche A** (courbe canonique = profil grand bassin, crédit multi-mur soustrait pour les vues 25 m) retenue vs B (recalibration complète des 6 courbes) et C (tables 25 m dédiées) — voir le design.
+- **Crédit par virage = majoration FFN / (D/50)**, répartition égale. La majoration FFN étant le gain total mesuré du bassin 25 m, la somme des crédits la reconstitue exactement à l'arrivée.
+- **Rampe `TURN_RAMP_M` uniforme (13 m)** : pas de rampe par famille (le virage de fond a une reprise plus courte) — calibration future.
+- **4N hors scope** : matrice segmentée séparée, sans conversion bassin.
+
+### Limites / dette
+
+- **Rampe uniforme** : 13 m pour toutes les familles ; une rampe plus courte pour le demi-fond/fond serait plus fidèle.
+- **Provenance des courbes `RATIOS_BASE`** : supposées profils grand bassin. Biais léger possible si elles étaient un mélange moyenné 25/50 m — pré-existant, non aggravé par ce patch.
+- **Smoke tests PDF** : `src/lib/__tests__/export-pace-pdf.test.ts` ne s'exécute pas sous `node:test` (souci ESM jspdf-autotable, §186 Phase 7, pré-existant) ; `src/__tests__/export-pace-pdf.test.ts` couvre le chemin 25 m/50 m.
+
 ## §281 — Modèle crédit-virage : courbe d'allures 25 m du sprint (2026-05-16)
 
 **Branche** : `main`

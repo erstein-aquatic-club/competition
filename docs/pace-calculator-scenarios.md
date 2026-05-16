@@ -113,17 +113,17 @@ Ensuite, chaque segment est traite comme une petite epreuve de sa nage, puis les
 
 ## 6. Modulation bassin 25 m / 50 m — modele credit-virage
 
-La courbe de passages est definie en grand bassin (50 m). Pour un 50 m c'est une course sans virage.
+La courbe de passages est definie en grand bassin (50 m).
 
-Le meme 50 m en bassin de 25 m ajoute un virage, au mur des 25 m. Le calculateur ne convertit plus la cible au prorata sur toute la course : il applique un modele credit-virage.
+Un bassin de 25 m ajoute un virage tous les 50 m de course par rapport a un bassin de 50 m : aux 25, 75, 125 m… Le calculateur ne convertit plus la cible au prorata sur toute la course : il applique un modele credit-virage.
 
-1. La premiere longueur (jusqu'au mur) est identique en 25 m et en 50 m : meme depart, meme nage, aucun virage encore. Les passages 15 m et 25 m ne changent donc pas d'un bassin a l'autre.
-2. Apres le mur, un credit de virage est retire du temps. Il vaut la majoration FFN de l'epreuve, et il se construit progressivement sur environ 13 m (coulee + reprise) avant de plafonner.
+1. La course est identique en 25 m et en 50 m jusqu'au premier mur supplementaire (25 m) : meme depart, meme nage. Les passages avant ce mur ne changent pas d'un bassin a l'autre.
+2. Apres chaque mur supplementaire, un credit de virage est retire du temps. Le gain total d'un bassin de 25 m — la majoration FFN de l'epreuve — est partage a parts egales entre ces virages, et chaque part se construit progressivement sur environ 13 m (coulee + reprise) avant de plafonner.
 3. A l'arrivee, le temps final vaut le temps grand bassin moins la majoration : la cible 25 m est conservee.
 
-Lecture sportive : le gain d'un bassin de 25 m ne se repartit pas sur toute la course. Il vient en bloc de la poussee au mur et de la coulee, donc apres le virage. Le segment qui suit le mur est plus rapide que le segment de nage pure equivalent — l'inverse de ce que donnait l'ancienne conversion au prorata.
+Lecture sportive : le gain d'un bassin de 25 m ne se repartit pas uniformement sur la course. Il vient en bloc de la poussee au mur et de la coulee, donc apres chaque virage. Le segment qui suit un mur est plus rapide que le segment de nage pure equivalent — l'inverse de ce que donnait l'ancienne conversion au prorata.
 
-Ce modele est aujourd'hui limite au 50 m. Les epreuves plus longues (100 m et plus) utilisent encore la conversion FFN au prorata ; la generalisation multi-virages est un chantier separe.
+Le modele couvre toutes les epreuves disposant d'une majoration FFN. Le 4 nages, avec sa matrice segmentee propre, reste hors de ce modele.
 
 ## 7. Modulation depart plot
 

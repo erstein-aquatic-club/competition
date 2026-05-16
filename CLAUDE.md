@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§281** — Modèle crédit-virage : courbe d'allures 25 m du sprint (1ère longueur verrouillée + gain bassin concentré après le mur).
+Dernier § livré : **§282** — Crédit-virage généralisé aux épreuves multi-virages (100/200/400/800/1500 m, gate `isTurnModelEvent`).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
