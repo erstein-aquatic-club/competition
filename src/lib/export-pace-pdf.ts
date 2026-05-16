@@ -152,10 +152,11 @@ function drawSingleSection({
   const distRows = getDistanceRowsV2(target_distance_m, singleStroke);
   const zoneCols = getZoneCols(family, zones);
 
-  // Turn-credit model — mirror PaceMatrix: lock the first length, bank the
-  // pool gain after the wall (50 m sprint only). See turnCreditForShortCourse.
-  const isSprintTurnModel = target_distance_m === 50;
-  const lcTimeMs = isSprintTurnModel
+  // Turn-credit model — mirror PaceMatrix: lock the first length, bank the pool
+  // gain after each extra wall. Active for every event with an FFN majoration.
+  const turnMajorationMs = getPoolMajorationMs(stroke as Stroke, target_distance_m, sex);
+  const isTurnModelEvent = turnMajorationMs !== null;
+  const lcTimeMs = isTurnModelEvent
     ? convertTargetTime({
         targetTimeMs: target.target_time_ms,
         fromPool: target.target_pool_size ?? "50m",
@@ -165,9 +166,6 @@ function drawSingleSection({
         sex,
       }) ?? effectiveTimeMs
     : effectiveTimeMs;
-  const sprintMajorationMs = isSprintTurnModel
-    ? getPoolMajorationMs(stroke as Stroke, target_distance_m, sex) ?? 0
-    : 0;
 
   // Estimate section height: header band (18) + divider (1) + header row (9) + rows * 8
   const sectionHeight = 18 + 1 + 9 + distRows.length * 8 + 6;
@@ -244,7 +242,7 @@ function drawSingleSection({
 
   // Compute tMax for each distance row
   const tableBody: (string | object)[][] = distRows.map((d) => {
-    const tMax_s = isSprintTurnModel
+    const tMax_s = isTurnModelEvent
       ? computeTMax({
           Tobj_s: lcTimeMs / 1000,
           D: target_distance_m,
@@ -256,7 +254,7 @@ function drawSingleSection({
           d,
           D: target_distance_m,
           poolLengthM: effectivePool === "25m" ? 25 : 50,
-          majoration_s: sprintMajorationMs / 1000,
+          majoration_s: (turnMajorationMs ?? 0) / 1000,
         })
       : computeTMax({
           Tobj_s,
