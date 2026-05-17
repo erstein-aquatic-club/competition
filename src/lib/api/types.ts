@@ -875,6 +875,87 @@ export interface PainReport {
   created_at: string;
 }
 
+// ── Bilan Muscu — Évaluation (Chantier B) ──
+
+export type StrengthAssessmentStatus =
+  | 'questionnaire_pending'
+  | 'bilan_pending'
+  | 'completed';
+
+export type StrengthDataConfidence = 'full' | 'partial' | 'low';
+
+/** Une zone de douleur déclarée dans le questionnaire nageur. */
+export interface QuestionnairePainEntry {
+  body_zone: string;
+  intensity: number; // 1-3, cohérent avec pain_reports
+}
+
+/** Contenu JSONB de strength_assessments.questionnaire. */
+export interface StrengthQuestionnaire {
+  pain: QuestionnairePainEntry[];
+  injury_history: string;        // texte libre
+  mobility_feel: number;         // ressenti 1-5
+  psychology: {
+    confidence: number;          // 1-5
+    motivation: number;          // 1-5
+    stress: number;              // 1-5
+  };
+  filled_at: string;             // ISO timestamp
+}
+
+/** Contenu JSONB de strength_assessments.physical_tests (saisi par le coach). */
+export interface StrengthPhysicalTests {
+  mobility: {
+    shoulder_flexion: number;    // score 0-3
+    t_spine: number;             // score 0-3
+    hip: number;                 // score 0-3
+  };
+  movement: {
+    scapula_control: number;     // score 0-3
+    trunk_neck_alignment: number;// score 0-3
+    hip_hinge: number;           // score 0-3
+  };
+  filled_at: string;
+}
+
+export interface StrengthAssessment {
+  id: string;
+  athlete_id: number;
+  coach_id: number | null;
+  status: StrengthAssessmentStatus;
+  questionnaire: StrengthQuestionnaire | null;
+  physical_tests: StrengthPhysicalTests | null;
+  bucket_scores: Record<string, number> | null;
+  data_confidence: StrengthDataConfidence;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StrengthKpiKey =
+  | 'vertical_jump'
+  | 'broad_jump'
+  | 'imtp'
+  | 'weighted_pullup'
+  | 'medball_vertical_throw';
+
+export type StrengthKpiSource = 'wizard_athlete' | 'wizard_coach';
+
+export interface StrengthKpiMeasurement {
+  id: string;
+  athlete_id: number;
+  kpi_key: StrengthKpiKey;
+  value: number;
+  unit: string;
+  attempts: number[] | null;
+  measured_at: string;
+  measured_by: number | null;
+  assisted_by: number | null;
+  source: StrengthKpiSource;
+  coach_reviewed: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
 // ── Resolved Slot Assignment (swimmer daily view) ──
 
 export interface ResolvedSlotAssignment {
