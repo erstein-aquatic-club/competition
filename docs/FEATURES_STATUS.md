@@ -96,6 +96,7 @@ Tous les feature flags sont activés.
 | Noms exercices français | ✅ | `dim_exercices` (DB) | 59 exercices traduits en français (§64) |
 | Historique | ✅ | `Strength.tsx` | Tab "Historique", 1RM, graphiques |
 | Fiche exercice avec GIF | 🔧 | `Strength.tsx` | Dépend des URLs dans `dim_exercices` |
+| Wizard de saisie des KPIs de force | ✅ | `KpiWizard.tsx`, `src/components/strength/kpi/*`, `App.tsx` | §285 (Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 6). Route `/strength/kpi-wizard` accessible nageur ET coach. Assistant guidé : sélection nageur (coach), 5 étapes (1 KPI/étape, protocole binôme complet — déroulé, rôle binôme, mesure, GIF placeholder), N champs d'essais avec `bestAttempt` live, skip autorisé (bilan partiel), champ binôme `assisted_by`, recap avec diff vs précédente mesure, mode focus dock masqué. Source `wizard_coach | wizard_athlete`. |
 
 ### Musculation — Coach
 

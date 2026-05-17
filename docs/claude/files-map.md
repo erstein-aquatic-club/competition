@@ -60,6 +60,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/SwimmerHome.tsx` | Home nageur (wellness, séances jour, compétition, accès rapides) | ~710 lignes |
 | `src/pages/Dashboard.tsx` | Orchestrateur natation nageur (route /natation) — queries, useDashboardState, navigation, banners, settings dialog inline (§216 split) | ~784 lignes |
 | `src/pages/Strength.tsx` | Module musculation perso (nageur ET coach depuis §271 — vue toujours personnelle, ignore `selectedAthleteId` du store coach) | ~1114 lignes |
+| `src/pages/KpiWizard.tsx` | Assistant guidé de saisie des 5 KPIs de force (§285, route `/strength/kpi-wizard`) — 3 phases (sélection nageur coach, 5 étapes 1 KPI/étape, recap diff) ; mode focus dock masqué | 553 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
 | `src/pages/Records.tsx` | Records personnels + FFN sync + virtualisation @tanstack/react-virtual grille natation (§270 R5 sub-§C) | 1517 lignes |
@@ -224,6 +225,10 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach (formulaire épuré sans Cards, §196) | 244 lignes |
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | 1484 lignes |
 | `src/components/strength/SetRow.tsx` | Ligne exercice memoïsée pour l'aperçu séance dans WorkoutRunner (§267 R2 sub-§A) | 66 lignes |
+| `src/components/strength/kpi/KpiStepCard.tsx` | Étape KPI du wizard (§285) — protocole (steps, rôle binôme, mesure, GIF), N champs d'essais, valeur retenue live via `bestAttempt` | 190 lignes |
+| `src/components/strength/kpi/KpiRecap.tsx` | Recap post-submit du wizard KPIs (§285) — diff de chaque mesure vs précédente, note review coach si source athlete | 139 lignes |
+| `src/components/strength/kpi/KpiSwimmerPicker.tsx` | Drawer de sélection nageur du wizard KPIs (§285) — cible mesurée + binôme `assisted_by`, recherche | 141 lignes |
+| `src/components/strength/kpi/KpiGifPanel.tsx` | Slot démo d'un protocole KPI (§285) — placeholder neutre tant que `gifUrl` est null | 35 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
 | `src/components/dashboard/DashboardCalendar.tsx` | Wrapper React.memo de CalendarHeader + CalendarGrid — isole le calendrier des re-renders d'écriture (§216) | 69 lignes |
 | `src/components/dashboard/DashboardFeedbackContainer.tsx` | Conteneur React.memo du FeedbackDrawer — possède saveState/draftState/alternativeOverride + 5 mutations + handlers markAbsent/markPresent/clearOverride/saveFeedback (§216) | 440 lignes |

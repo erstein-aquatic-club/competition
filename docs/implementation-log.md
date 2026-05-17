@@ -4,6 +4,55 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §285 — KpiWizard : assistant guidé de saisie des 5 KPIs de force (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 6 (Task 6.1). Phases 1-5 (API, protocoles, mesure) déjà livrées.
+
+### Contexte
+
+Le bilan de force du club se mesure sur 5 KPIs (saut vertical, saut en longueur, tirage isométrique mi-cuisse, traction lestée, lancer vertical médecine-ball). Chaque mesure est un protocole à deux : un nageur réalise le test, un binôme mesure. Il manquait un écran de saisie autonome et répétable qui guide ce protocole.
+
+### Changements
+
+Nouvel écran `KpiWizard` (route `/strength/kpi-wizard`, accessible nageur ET coach).
+
+- **3 phases** : (1) sélection du nageur — coach/admin uniquement, le nageur est lui-même la cible ; (2) 5 étapes, 1 KPI par étape dans l'ordre `KPI_PROTOCOLS` ; (3) recap.
+- **Étape KPI** (`KpiStepCard`) : affiche le bucket, le label, le déroulé ordonné (`steps[]`), le **rôle du binôme mis en avant** (bandeau ambre — c'est un protocole à deux), la méthode de mesure, le GIF (placeholder neutre `KpiGifPanel` tant que `gifUrl` est null). N champs d'essais (`protocol.attempts`, 2 ou 3) ; la valeur retenue est calculée en direct via `bestAttempt()` et l'essai gagnant est surligné.
+- **Skip** : un KPI peut être laissé vide — bilan partiel accepté. Seuls les KPIs ayant ≥ 1 essai valide sont soumis.
+- **Binôme** : champ optionnel "accompagné par" (`KpiSwimmerPicker`) → `assisted_by`.
+- **Soumission** : `recordKpiMeasurement` par KPI rempli. `source = wizard_coach` si coach/admin, sinon `wizard_athlete` ; `measured_by` = user courant ; `value` = `bestAttempt(attempts)` ; `unit` = unité du protocole.
+- **Recap** (`KpiRecap`) : chaque mesure enregistrée comparée à la précédente (`getLatestKpiMeasurements(athleteId)` capturé AVANT submit). Note "le coach examinera" si `source === wizard_athlete`.
+- **Mode focus** : `document.body.dataset.focusMode = "strength"` au montage → dock masqué (observé par `AppLayout`). Confirmation de sortie si saisie en cours.
+
+Route ajoutée dans `App.tsx` (lazy import + `<Suspense fallback={<ListSkeleton />}>`), placée avant `/strength`.
+
+### Fichiers
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/KpiWizard.tsx` (nouveau, 553 lignes) | Orchestrateur du wizard — 3 phases, état, React Query, soumission |
+| `src/components/strength/kpi/KpiStepCard.tsx` (nouveau, 190 lignes) | Étape KPI : protocole + N champs d'essais + valeur retenue live |
+| `src/components/strength/kpi/KpiRecap.tsx` (nouveau, 139 lignes) | Recap post-submit avec diff vs précédente mesure |
+| `src/components/strength/kpi/KpiSwimmerPicker.tsx` (nouveau, 141 lignes) | Drawer de sélection nageur (cible + binôme), recherche |
+| `src/components/strength/kpi/KpiGifPanel.tsx` (nouveau, 35 lignes) | Slot démo protocole — placeholder neutre si `gifUrl` null |
+| `src/App.tsx` | Lazy import `KpiWizard` + route `/strength/kpi-wizard` |
+
+### Tests
+
+- `npx tsc --noEmit` : aucune erreur hors `*.stories.tsx` pré-existants ✅
+- `npm run build` : succès, chunk `KpiWizard-*.js` code-split émis ✅
+- Smoke-test dev : la route charge sans erreur console. Walk-through live des 5 étapes impossible dans cet environnement — le build local n'a pas les credentials Supabase (cf. CLAUDE.md § Déploiement), l'`AppRouter` gate sur `useAuth.user` donc l'app ne rend que l'écran de login sans session. Câblage data (signatures API, types) vérifié par inspection.
+- Tests RLS : non lancés — tâche purement UI, aucune policy/migration touchée.
+
+### Décisions prises
+
+- **Mode focus réutilisé tel quel** : `data-focusMode = "strength"` est la même clé que `WorkoutRunner` ; `AppLayout` masque le dock sur cette valeur. Pas de nouvelle clé pour éviter de toucher `AppLayout`.
+- **Soumission séquentielle** (`for … await`) plutôt que `Promise.all` : 5 inserts max, ordre déterministe, et un échec partiel laisse un état lisible.
+- **`getLatestKpiMeasurements` capturé avant submit** : l'insert décalerait le "latest" ; on garde la photo pré-bilan pour le diff du recap.
+- **Sortie de wizard → `/strength`** : pas de page KPI dédiée existante ; `/strength` est le hub muscu le plus proche.
+- **Pas de persistance brouillon localStorage** : à la différence de `WorkoutRunner`, un bilan KPI est court (5 étapes) et se fait en présence du coach/binôme — le risque de kill PWA mid-saisie est faible. À ajouter si le besoin émerge.
+
 ## §284 — Factorisation de `fmtTime` dans un module commun (2026-05-16)
 
 **Branche** : `main`
