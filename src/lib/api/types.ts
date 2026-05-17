@@ -956,6 +956,37 @@ export interface StrengthKpiMeasurement {
   created_at: string;
 }
 
+/** Les 5 seaux d'exercices entraînables (cf. dim_exercices.bucket). */
+export type StrengthBucket =
+  | 'lower_strength'
+  | 'lower_power'
+  | 'upper_strength'
+  | 'upper_power'
+  | 'mobility';
+
+/** Cycle d'une semaine de périodisation (paramètres séries/reps/%1RM
+ *  portés par dim_exercices) ; `deload` = semaine allégée. */
+export type PeriodizationCycle = 'endurance' | 'hypertrophie' | 'force' | 'deload';
+
+/** Contenu JSONB de strength_periodization_templates.structure. */
+export interface PeriodizationStructure {
+  /** Une entrée par semaine, dans l'ordre — length === week_count. */
+  weeks: { cycle: PeriodizationCycle }[];
+  /** Emphase de l'épreuve par seau, poids 0-1 (le moteur la combine avec
+   *  la priorité « seau le plus faible » de l'évaluation — Chantier C). */
+  bucket_emphasis: Partial<Record<StrengthBucket, number>>;
+}
+
+export interface StrengthPeriodizationTemplate {
+  id: string;
+  event_group: string;
+  name: string;
+  week_count: number;
+  structure: PeriodizationStructure;
+  created_at: string;
+  updated_at: string;
+}
+
 // ── Resolved Slot Assignment (swimmer daily view) ──
 
 export interface ResolvedSlotAssignment {
