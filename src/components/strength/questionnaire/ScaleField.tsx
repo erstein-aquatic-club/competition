@@ -1,12 +1,20 @@
 /**
- * ScaleField — 1-N pill scale for the Strength Questionnaire (§286).
+ * ScaleField — pill scale for the Strength bilan (§286, generalised §287).
  *
- * Used for the mobility-feel (1-5) and the three psychology scales
- * (1-5). Mirrors the visual language of WellnessForm's rated items:
- * row of equal-width pills, low/high labels underneath.
+ * Originally a 1-5 scale for the swimmer Questionnaire (mobility-feel +
+ * the three psychology scales). §287 generalised it with an optional
+ * `min` so the coach Assessment can reuse it for 0-3 movement scores.
+ * Existing callers omit `min` → it defaults to `1`, behaviour unchanged.
+ * Mirrors the visual language of WellnessForm's rated items: row of
+ * equal-width pills, low/high labels underneath.
  *
  * Unlike WellnessForm this is a neutral scale (no green/red intensity
- * tokens) — the questionnaire is self-report, not a readiness score.
+ * tokens) — both the questionnaire and the bilan score are declarative
+ * inputs, not a readiness score.
+ *
+ * "Not yet answered" is encoded as `value` outside `[min, min+steps-1]`
+ * (callers conventionally use a value strictly below `min` — e.g. `0`
+ * for a 1-5 scale, `-1` for a 0-3 scale).
  *
  * A11y: the pills are honest toggle `<button>`s with `aria-pressed`.
  * No `role="radiogroup"`/`role="radio"` — that ARIA contract requires
@@ -21,9 +29,11 @@ export interface ScaleFieldProps {
   label: string;
   /** Optional leading icon. */
   icon?: LucideIcon;
-  /** Current value (0 = not yet answered). */
+  /** Current value (a value below `min` means "not yet answered"). */
   value: number;
   onChange: (value: number) => void;
+  /** Lowest selectable value — default 1. */
+  min?: number;
   /** Number of steps — default 5. */
   steps?: number;
   /** Caption under the low end. */
@@ -37,6 +47,7 @@ export function ScaleField({
   icon: Icon,
   value,
   onChange,
+  min = 1,
   steps = 5,
   labelLow,
   labelHigh,
@@ -50,7 +61,7 @@ export function ScaleField({
         <span className="text-sm font-semibold text-foreground">{label}</span>
       </div>
       <div className="flex gap-1.5" role="group" aria-label={label}>
-        {Array.from({ length: steps }, (_, i) => i + 1).map((n) => {
+        {Array.from({ length: steps }, (_, i) => i + min).map((n) => {
           const active = value === n;
           return (
             <button
