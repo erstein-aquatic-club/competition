@@ -97,6 +97,7 @@ Tous les feature flags sont activés.
 | Historique | ✅ | `Strength.tsx` | Tab "Historique", 1RM, graphiques |
 | Fiche exercice avec GIF | 🔧 | `Strength.tsx` | Dépend des URLs dans `dim_exercices` |
 | Wizard de saisie des KPIs de force | ✅ | `KpiWizard.tsx`, `src/components/strength/kpi/*`, `App.tsx` | §285 (Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 6). Route `/strength/kpi-wizard` accessible nageur ET coach. Assistant guidé : sélection nageur (coach), 5 étapes (1 KPI/étape, protocole binôme complet — déroulé, rôle binôme, mesure, GIF placeholder), N champs d'essais avec `bestAttempt` live, skip autorisé (bilan partiel), champ binôme `assisted_by`, recap avec diff vs précédente mesure, mode focus dock masqué. Source `wizard_coach | wizard_athlete`. |
+| Questionnaire bilan muscu (auto-évaluation nageur) | ⚠️ | `StrengthQuestionnaire.tsx`, `src/components/strength/questionnaire/ScaleField.tsx`, `App.tsx` | §286 (Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 7). Route `/strength/questionnaire` (nageur). `getLatestAssessment` → 3 cas : formulaire éditable (`questionnaire_pending`), lecture seule "déjà rempli" (`bilan_pending`/`completed`), état vide (aucun bilan). 4 sections : douleurs (`BodyHeatMap`), historique blessures, mobilité 1-5, psychologie 3×1-5. Submit : `updateAssessmentQuestionnaire` + `upsertPainReports`. ⚠️ pas encore de point d'entrée navigation (phase ultérieure) ; écran coach d'initiation du bilan non encore livré. |
 
 ### Musculation — Coach
 

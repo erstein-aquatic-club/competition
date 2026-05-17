@@ -4,6 +4,56 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §286 — Questionnaire bilan muscu : auto-évaluation nageur (Phase 7) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 7, Task 7.1 — l'écran d'auto-déclaration que le nageur remplit AVANT l'évaluation physique du coach.
+
+### Contexte
+
+Le bilan muscu se déroule en deux temps : le nageur remplit un questionnaire de ressenti (douleurs, historique blessures, mobilité, psychologie), puis le coach réalise les tests physiques. Phase 7 livre le premier volet — l'écran nageur. L'entrée déclenchée par notification est une phase ultérieure ; pour l'instant la route fonctionne en autonomie (logique de chargement à 3 cas).
+
+### Changements
+
+- **`src/pages/StrengthQuestionnaire.tsx`** (neuf) — écran nageur, route `/strength/questionnaire`. Sur montage, `getLatestAssessment(userId)` via React Query. 3 cas :
+  - `status === 'questionnaire_pending'` → formulaire éditable (4 sections, 1 `Card` chacune).
+  - `status === 'bilan_pending' | 'completed'` → état "déjà rempli" en lecture seule (pas de ré-édition).
+  - aucun bilan → état vide ("Aucun bilan en attente — ton coach doit en initier un").
+  - Cas additionnels : loading (skeletons), erreur réseau (retry), statut inconnu (message calme).
+- **Sections du formulaire** (mappées au type `StrengthQuestionnaire`) :
+  1. Douleurs — réutilise `BodyHeatMap` (composant zones-corps de `WellnessForm`, intensité 1-3) → `questionnaire.pain`.
+  2. Historique de blessures — `Textarea` libre → `questionnaire.injury_history`.
+  3. Ressenti de mobilité — échelle 1-5 → `questionnaire.mobility_feel`.
+  4. Psychologie — 3 échelles 1-5 (confiance, motivation, stress) → `questionnaire.psychology`.
+- **Submit** — `useMutation` : `updateAssessmentQuestionnaire(id, q)` (bascule le statut à `bilan_pending`) PUIS `upsertPainReports(userId, todayISODate, pain)` (mirroir des douleurs dans `pain_reports` du jour). `filled_at` = `new Date().toISOString()`. Toasts `sonner` succès/erreur ; succès → transition vers l'état "déjà rempli".
+- **`src/components/strength/questionnaire/ScaleField.tsx`** (neuf) — échelle 1-N en pilules, réutilisée pour mobilité + 3 échelles psycho. Échelle neutre (pas de tokens intensité vert/rouge — c'est de l'auto-déclaration, pas un score readiness).
+- **`src/App.tsx`** — import `lazyWithRetry` + route `/strength/questionnaire` sous `<Suspense>` (même pattern que `/strength/kpi-wizard`).
+
+### Fichiers modifiés / créés
+
+- `src/pages/StrengthQuestionnaire.tsx` (neuf)
+- `src/components/strength/questionnaire/ScaleField.tsx` (neuf)
+- `src/App.tsx` (route + import)
+
+### Tests / vérifications
+
+- `npx tsc --noEmit` — aucune nouvelle erreur.
+- `npm run build` — succès, chunk `StrengthQuestionnaire-*.js` émis.
+- Pas de test RLS : patch purement UI, aucune policy/migration touchée.
+- Pas de walkthrough live possible localement (app gatée sur login, build local sans credentials Supabase).
+
+### Décisions
+
+- **Numéro de section §286** : la spec mentionnait `feat(§285)`, mais §285 est déjà pris par KpiWizard (Phase 6). §286 est le prochain numéro libre, cohérent avec la règle "1 § par patch".
+- **Mode focus** : `document.body.dataset.focusMode = "strength"` pour masquer le dock — même convention que KpiWizard.
+- **Réutilisation `BodyHeatMap`** : le set canonique de zones-corps + l'échelle 1-3 sont déjà encodés dans le composant wellness — aucune zone inventée.
+- **Champs obligatoires** : mobilité + 3 échelles psycho requises pour activer le submit. Douleurs et historique optionnels (un nageur sans douleur envoie un tableau vide).
+
+### Limites / dette
+
+- Pas de point d'entrée navigation vers l'écran (lien depuis `Strength.tsx` ou notification) — c'est une phase ultérieure, hors scope 7.1.
+- L'écran coach (initiation du bilan, tests physiques) est une phase ultérieure — d'où le cas "aucun bilan" attendu dans le build actuel.
+
 ## §285-fix — KpiWizard : picker binôme fonctionnel côté nageur (2026-05-17)
 
 **Branche** : `main`

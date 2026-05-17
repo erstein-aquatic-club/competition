@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§285** — KpiWizard, assistant guidé de saisie des 5 KPIs de force (route `/strength/kpi-wizard`).
+Dernier § livré : **§286** — Questionnaire bilan muscu, auto-évaluation nageur (route `/strength/questionnaire`).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
