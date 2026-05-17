@@ -4,6 +4,31 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §285-fix — KpiWizard : picker binôme fonctionnel côté nageur (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : revue de spec Phase 6 — le champ "Accompagné par" ne fonctionnait jamais pour un nageur.
+
+### Contexte
+
+La query `athletes` du wizard était gatée `enabled: isCoach` ; `partnerCandidates` était donc toujours vide pour un nageur. Or la feature prévoit explicitement le scénario « un nageur prête son téléphone à un coéquipier pour l'assister » — `assisted_by` côté nageur est un cas d'usage primaire.
+
+### Fix
+
+`getAthletes()` est fetché pour les deux rôles. RLS vérifiée en base via MCP : les policies SELECT de `group_members`, `users`, `user_profiles` sont toutes `qual = true` (authentifié = lecture) — c'est le chemin que la feature nageur `useStrengthLeaderboard` utilise déjà. `partnerCandidates` dépend désormais du rôle : coach/admin → roster complet (inchangé) ; nageur → coéquipiers de son/ses groupe(s) d'entraînement (le nageur lui-même exclu), le `group_id` étant lu depuis sa propre entrée dans le résultat `getAthletes()`. Champ toujours optionnel, `assisted_by` toujours nullable.
+
+### Fichiers
+
+| Fichier | Nature |
+|---------|--------|
+| `src/pages/KpiWizard.tsx` | Query `athletes` dégatée ; `partnerCandidates` filtré par groupe pour le nageur |
+
+### Tests
+
+- `npx tsc --noEmit` : aucune erreur hors `*.stories.tsx` ✅
+- `npm run build` : succès ✅
+- Tests RLS : non lancés — aucune policy/migration touchée ; la vérification RLS s'est faite en lecture seule via MCP (`pg_policies`).
+
 ## §285 — KpiWizard : assistant guidé de saisie des 5 KPIs de force (2026-05-17)
 
 **Branche** : `main`
