@@ -23,6 +23,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/strength-assessments.ts` | CRUD `strength_assessments` — bilans muscu (`createAssessment`, `getLatestAssessment`, `getAssessment`, `listAssessments`, `updateAssessmentQuestionnaire`, `updateAssessmentPhysicalTests`) — Bilan Muscu §285 | 107 lignes |
 | `src/lib/strength/kpiProtocols.ts` | Config des 5 fiches-protocole KPI (`KPI_PROTOCOLS`) — Bilan Muscu §285 | 92 lignes |
 | `src/lib/strength/kpiMeasurement.ts` | Helpers KPI : `bestAttempt`, `parseAttempts` — Bilan Muscu §285 | ~25 lignes |
+| `src/lib/strength/kpiBaremes.ts` | Barèmes KPI : fonction de scoring `kpiScore` (interpolation) + `KPI_BAREMES` (5 KPIs × 2 sexes × 3 bandes d'âge, flag de confiance) + `ageBandFor`/`getBareme` — Bilan Muscu Chantier A §290 | 257 lignes |
 | `src/lib/api/training-plans.ts` | CRUD training_plans + sessions + applications (§275.2) — 14 fonctions + helper `getActiveTrainingPlanApplicationsForUser` pour timeline derivation | 357 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |

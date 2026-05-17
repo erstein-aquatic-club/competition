@@ -4,6 +4,84 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §292 — Bilan Muscu Chantier A : table des templates de périodisation (A3 — EN COURS) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Chantier A, brique A3 (templates de périodisation). Design : `docs/plans/2026-05-17-bilan-muscu-chantier-A-design.md` ; plan : `docs/plans/2026-05-17-bilan-muscu-chantier-A.md`.
+
+> ⚠️ **§292 est partiel** — la table + les tests RLS sont livrés ; les 7 templates ne sont **pas encore seedés**. Reste à faire détaillé ci-dessous.
+
+### Livré
+
+- **Migration `00166_strength_periodization_templates.sql`** — table `strength_periodization_templates` (`id`, `event_group`, `name`, `week_count`, `structure` jsonb, timestamps) + RLS (`spt_select` : lecture tout authentifié ; `spt_write` : écriture coach/admin) + trigger `updated_at`.
+- **Types** (`src/lib/api/types.ts`) — `StrengthBucket`, `PeriodizationCycle`, `PeriodizationStructure`, `StrengthPeriodizationTemplate`.
+- **Tests RLS** — `supabase/tests/rls/strength-periodization-templates.test.ts` (10 tests) + extension de `supabase/tests/schema.sql` / `seed.sql`. Verts.
+
+### Décision majeure validée coach — vocabulaire de cycles
+
+L'ancien vocabulaire `endurance / hypertrophie / force / deload` est abandonné. La littérature S&C (l'hypertrophie non spécifique augmente la traînée) **et** le plan réel de F. Wagner (`training_plans` id 2, « Prépa sprint 50m », 10 sem. : test → force max → puissance → affûtage → pic, sans hypertrophie) confirment. **Nouveau vocabulaire à 6 cycles** : `prepa_generale / force_max / puissance / maintien / affutage / pic`. **Chargement hybride** : `force_max` → params `*_force` de `dim_exercices`, `prepa_generale` → `*_endurance`, le reste (`puissance`, `maintien`, `affutage`, `pic`) → chargement générique au niveau cycle. `dim_exercices` et le module muscu coach existant **non touchés**. Synthèse : `docs/plans/bilan-muscu-cycles-vocabulaire.md`.
+
+### Reste à faire (A3.3-bis + A3.4)
+
+1. Mettre à jour le type `PeriodizationCycle` (créé à 4 valeurs → les 6 valeurs validées).
+2. Ré-aligner les 7 templates de `docs/plans/bilan-muscu-templates-sources.md` (rédigés avec l'ancien vocabulaire) sur les 6 cycles.
+3. Définir le config de chargement par cycle (`puissance`/`maintien`/`affutage`/`pic` génériques + mapping `force_max`→force / `prepa_generale`→endurance).
+4. Validation coach des 7 templates ré-alignés.
+5. Migration de seed des 7 templates.
+
+### Commits
+
+`5d9c34b2c` (table + types), `f0d2ff9b7` (tests RLS).
+
+## §291 — Bilan Muscu Chantier A : tagging du catalogue d'exercices (A2) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Chantier A, brique A2 (tagging). Le moteur de génération (Chantier C) a besoin du catalogue `dim_exercices` taggé par seau.
+
+### Changements
+
+- **Migration `00164_dim_exercices_tagging.sql`** — colonnes `bucket` (5 valeurs CHECK : `lower_strength`/`lower_power`/`upper_strength`/`upper_power`/`mobility`), `contraindication_zones` (`text[]`), `level` (`beginner`/`intermediate`/`advanced`) sur `dim_exercices`.
+- **Migration `00165_dim_exercices_tagging_seed.sql`** — colonne `is_core` (bool) + seed des **94 exercices** (bucket, contraindication_zones, level, is_core).
+- Mapping proposé par Claude (d'après noms + `exercise_subtype`), **validé coach « seede tel quel »**. Document : `docs/plans/bilan-muscu-exercices-tagging.md`.
+
+### Décisions validées coach
+
+- Tag du catalogue existant (94 exercices), pas de nouvelle bibliothèque.
+- Core/tronc → drapeau secondaire `is_core` (pas de 6e bucket — 10 exercices flaggés).
+- Vocabulaire de contre-indications = les 16 zones de `BodySvg`/`BodyHeatMap`.
+
+### Tests
+
+- Répartition vérifiée en base : `lower_strength` 19, `lower_power` 17, `upper_strength` 36, `upper_power` 7, `mobility` 15 ; `is_core` 10 ; aucun `bucket`/`level` NULL.
+
+### Commits
+
+`5d994d74a` (colonnes), `0918847de` (is_core + seed).
+
+## §290 — Bilan Muscu Chantier A : barèmes KPI (A1) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Chantier A, brique A1 (barèmes). Le moteur convertira une mesure KPI brute en score 0-100 de seau.
+
+### Changements
+
+- **`src/lib/strength/kpiBaremes.ts`** (257 lignes) — fonction de scoring `kpiScore` (interpolation linéaire par morceaux entre ancres `[valeur, score]`, bornée 0-100) ; `KPI_BAREMES` (5 KPIs × 2 sexes × 3 bandes d'âge = 30 barèmes), chaque barème portant un flag de confiance `solid`/`transposed`/`placeholder` ; helpers `ageBandFor`, `getBareme`.
+- Note de recherche : `docs/plans/bilan-muscu-baremes-sources.md`.
+
+### Décisions validées coach
+
+- Source : **normes publiées** (population scolaire générale). Couverture inégale assumée — seul `broad_jump` a des normes solides ; `vertical_jump`/`weighted_pullup`/`imtp`/`medball_vertical_throw` sont **transposés/placeholder** (flag de confiance).
+- Bandes d'âge : **13-14 / 15-16 / 17-18** — pas de Bilan Muscu avant 13 ans.
+- Barèmes filles : valeurs réelles par bande.
+
+### Tests
+
+- 36 tests (`kpiScore` + validation structurelle de `KPI_BAREMES`). `tsc` clean.
+
+### Commits
+
+`4baf14e6b` (fonction), `b9c04f745` (barèmes encodés).
+
 ## §289 — Bilan Muscu : protocoles KPI ajustés au matériel du club (2026-05-17)
 
 **Branche** : `main`

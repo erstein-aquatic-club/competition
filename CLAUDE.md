@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§289** — Protocoles KPI ajustés au matériel du club (tirage mi-cuisse à la barre, saut vertical en détente sèche).
+Dernier § livré : **§292** (partiel) — Bilan Muscu Chantier A : barèmes (A1) + tagging (A2) livrés ; templates (A3) en cours — table livrée, 7 templates à seeder.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
