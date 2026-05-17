@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§288** — Points d'entrée navigation Bilan Muscu (Phase 9) sur `/strength` et le hub coach.
+Dernier § livré : **§289** — Protocoles KPI ajustés au matériel du club (tirage mi-cuisse à la barre, saut vertical en détente sèche).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

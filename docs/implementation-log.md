@@ -4,6 +4,27 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §289 — Bilan Muscu : protocoles KPI ajustés au matériel du club (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : retour terrain de l'utilisateur — le club n'a pas de plateau de force pour le tirage isométrique mi-cuisse ; et préférence pour un saut vertical en détente sèche.
+
+### Changements (`src/lib/strength/kpiProtocols.ts` — contenu de config uniquement)
+
+- **`imtp`** : le tirage *isométrique* mi-cuisse (mesure d'une force, nécessite un plateau de force / dynamomètre absent du club) devient un **tirage mi-cuisse à la barre, charge maximale** — barre posée sur les pins d'un rack réglés à hauteur mi-cuisse, charge montée progressivement jusqu'au max sur 1 répétition, relevé en kg. Label `Tirage mi-cuisse à la barre`. Alimente toujours le seau « force bas du corps ». La clé `kpi_key` reste `'imtp'` (commentée dans le fichier).
+- **`vertical_jump`** : passe en **détente sèche** (sans élan ni pas de course, départ bras le long du corps). Mesure sans équipement : le nageur tient 3 morceaux de scotch et en colle un au mur au sommet de chaque saut (au point le plus haut atteint du bout des doigts) ; le binôme mesure la distance sol → **haut** du scotch le plus haut (le haut du scotch = position réelle du bout des doigts). Label `Saut vertical (détente sèche)`.
+
+### Tests
+
+- `npx tsc --noEmit` clean ; `npm run build` OK.
+- Aucun changement de schéma, d'API ni de type — seules les fiches-protocole (texte) changent. Pas de tests RLS (rien de RLS touché).
+
+### Décisions prises
+
+- **`imtp` non renommé** : `kpi_key` est un identifiant interne ; le renommer impliquerait une migration (contrainte CHECK) sans bénéfice — c'est le `label` utilisateur qui reflète le vrai test. Commentaire ajouté dans `kpiProtocols.ts`.
+- **Mesure au haut du scotch** (et non au bas) — plus représentatif de la position du bout des doigts au sommet du saut.
+- Les `gifUrl` restent `null` — illustrations à produire au Chantier A.
+
 ## §288 — Points d'entrée navigation : Bilan Muscu (Phase 9) (2026-05-17)
 
 **Branche** : `main`

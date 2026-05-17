@@ -18,17 +18,17 @@ export interface KpiProtocol {
 export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
   vertical_jump: {
     key: 'vertical_jump',
-    label: 'Saut vertical',
+    label: 'Saut vertical (détente sèche)',
     bucket: 'Puissance bas du corps',
     unit: 'cm',
     attempts: 3,
     steps: [
-      'Debout, pieds écartés largeur de hanches.',
-      'Fléchir puis sauter le plus haut possible, bras tendus vers le haut.',
-      'Toucher le mur / la mire le plus haut possible.',
+      'Le nageur tient 3 morceaux de scotch. Debout face au mur, bras le long du corps.',
+      'Sauter le plus haut possible en détente sèche (sans élan ni pas de course) et coller un scotch au mur, au point le plus haut atteint du bout des doigts.',
+      'Un scotch par essai — 3 sauts.',
     ],
-    partnerRole: 'Repère la hauteur atteinte (doigts) et la mesure au mètre.',
-    measurement: 'Hauteur atteinte − hauteur bras tendu debout, en cm. Meilleur de 3.',
+    partnerRole: 'Mesure au mètre la distance sol → haut du scotch le plus haut.',
+    measurement: 'Distance sol → haut du scotch, en cm. Meilleur des 3 essais.',
     gifUrl: null,
   },
   broad_jump: {
@@ -45,18 +45,22 @@ export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
     measurement: 'Distance en cm, réception stabilisée. Meilleur de 3.',
     gifUrl: null,
   },
+  // `key` reste 'imtp' (compat DB / `StrengthKpiKey`) — le test n'est plus
+  // isométrique : faute de plateau de force, c'est un tirage mi-cuisse à
+  // charge maximale (kg). Alimente toujours le seau « force bas du corps ».
   imtp: {
     key: 'imtp',
-    label: 'Tirage isométrique mi-cuisse',
+    label: 'Tirage mi-cuisse à la barre',
     bucket: 'Force bas du corps',
     unit: 'kg',
     attempts: 2,
     steps: [
-      'Barre fixée à mi-cuisse, dos droit, prise pronation.',
-      'Tirer au maximum vers le haut pendant 3-5 s sans bouger la barre.',
+      'Barre posée sur les pins du rack, réglés à hauteur mi-cuisse.',
+      'Prise pronation, dos droit : tirer la barre vers le haut (extension de hanches) sur 1 répétition complète.',
+      'Monter la charge progressivement jusqu\'à la charge max réussie sur 1 répétition.',
     ],
-    partnerRole: 'Lance le chrono et lit la valeur sur le dynamomètre / la jauge.',
-    measurement: 'Force maximale développée, en kg. Meilleur de 2.',
+    partnerRole: 'Compte les disques, valide l\'amplitude complète, note la charge max réussie.',
+    measurement: 'Charge max soulevée sur 1 tirage mi-cuisse complet, en kg. Meilleur des 2 essais retenus.',
     gifUrl: null,
   },
   weighted_pullup: {
