@@ -195,3 +195,20 @@ SELECT setval('public.planned_absences_id_seq', 100, false);
 
 -- Extra: Bob has no group_members row for subgroups; no custom slots.
 -- Bob inherits ts5 via group_members (group 2 = Juniors) and sa18 is his group session.
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- §285 — strength_assessments + strength_kpi_measurements
+-- See strength-assessments.test.ts. Deterministic UUIDs: last segment encodes
+-- the owning athlete id (…1 = Alice, …2 = Bob).
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- sa-a1: Alice's assessment   | sa-b1: Bob's assessment
+INSERT INTO public.strength_assessments (id, athlete_id, status) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 1, 'questionnaire_pending'),
+  ('a0000000-0000-0000-0000-000000000002', 2, 'questionnaire_pending');
+
+-- km-a1: Alice's KPI measurement | km-b1: Bob's KPI measurement
+INSERT INTO public.strength_kpi_measurements
+  (id, athlete_id, kpi_key, value, unit, source, coach_reviewed) VALUES
+  ('b0000000-0000-0000-0000-000000000001', 1, 'vertical_jump', 42.0, 'cm', 'wizard_athlete', false),
+  ('b0000000-0000-0000-0000-000000000002', 2, 'vertical_jump', 38.0, 'cm', 'wizard_athlete', false);

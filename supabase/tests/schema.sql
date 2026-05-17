@@ -1206,3 +1206,82 @@ AS $$
   group by a.id;
 $$;
 GRANT EXECUTE ON FUNCTION get_pace_share_payload(uuid) TO anon, authenticated;
+
+-- =============================================================================
+-- strength_assessments + strength_kpi_measurements (§285) — Chantier B
+-- "Bilan Muscu → Mésocycle". Keep in sync with migration 00163_strength_assessments.sql.
+--
+-- RLS : le nageur possède ses lignes (`_own` keyed on athlete_id = app_user_id()).
+-- L'accès coach/admin est élargi à FOR ALL (`_coach`) — le coach renseigne
+-- physical_tests et valide les mesures KPI (coach_reviewed). Accès club entier.
+--
+-- NOTE: la migration prod crée aussi un trigger `strength_assessments_set_updated_at`
+-- via la fonction `set_updated_at_timestamp()` (créée en 00162). Cette fonction
+-- n'existe PAS dans ce schéma de test minimal — le trigger est OMIS volontairement,
+-- il est sans rapport avec les policies RLS testées ici.
+-- =============================================================================
+
+CREATE TABLE public.strength_assessments (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id       INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  coach_id         INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  status           TEXT NOT NULL DEFAULT 'questionnaire_pending'
+                     CHECK (status IN ('questionnaire_pending','bilan_pending','completed')),
+  questionnaire    JSONB,
+  physical_tests   JSONB,
+  bucket_scores    JSONB,
+  data_confidence  TEXT NOT NULL DEFAULT 'full'
+                     CHECK (data_confidence IN ('full','partial','low')),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX strength_assessments_athlete_idx
+  ON public.strength_assessments (athlete_id, created_at DESC);
+
+CREATE TABLE public.strength_kpi_measurements (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id      INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  kpi_key         TEXT NOT NULL CHECK (kpi_key IN (
+                    'vertical_jump','broad_jump','imtp',
+                    'weighted_pullup','medball_vertical_throw')),
+  value           NUMERIC NOT NULL CHECK (value >= 0),
+  unit            TEXT NOT NULL,
+  attempts        JSONB,
+  measured_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  measured_by     INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  assisted_by     INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  source          TEXT NOT NULL CHECK (source IN ('wizard_athlete','wizard_coach')),
+  coach_reviewed  BOOLEAN NOT NULL DEFAULT false,
+  notes           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX strength_kpi_measurements_athlete_idx
+  ON public.strength_kpi_measurements (athlete_id, kpi_key, measured_at DESC);
+
+-- RLS — strength_assessments
+ALTER TABLE public.strength_assessments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY strength_assessments_own ON public.strength_assessments
+  FOR ALL TO authenticated
+  USING (athlete_id = app_user_id())
+  WITH CHECK (athlete_id = app_user_id());
+
+CREATE POLICY strength_assessments_coach ON public.strength_assessments
+  FOR ALL TO authenticated
+  USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
+
+-- RLS — strength_kpi_measurements
+ALTER TABLE public.strength_kpi_measurements ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY strength_kpi_measurements_own ON public.strength_kpi_measurements
+  FOR ALL TO authenticated
+  USING (athlete_id = app_user_id())
+  WITH CHECK (athlete_id = app_user_id());
+
+CREATE POLICY strength_kpi_measurements_coach ON public.strength_kpi_measurements
+  FOR ALL TO authenticated
+  USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
