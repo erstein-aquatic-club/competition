@@ -1,5 +1,5 @@
 /**
- * ScaleField — 1-N pill scale for the Strength Questionnaire (§285).
+ * ScaleField — 1-N pill scale for the Strength Questionnaire (§286).
  *
  * Used for the mobility-feel (1-5) and the three psychology scales
  * (1-5). Mirrors the visual language of WellnessForm's rated items:
@@ -7,6 +7,11 @@
  *
  * Unlike WellnessForm this is a neutral scale (no green/red intensity
  * tokens) — the questionnaire is self-report, not a readiness score.
+ *
+ * A11y: the pills are honest toggle `<button>`s with `aria-pressed`.
+ * No `role="radiogroup"`/`role="radio"` — that ARIA contract requires
+ * roving-tabindex + arrow-key navigation, which this control does not
+ * implement, so claiming it would mislead assistive tech.
  */
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -44,15 +49,14 @@ export function ScaleField({
         )}
         <span className="text-sm font-semibold text-foreground">{label}</span>
       </div>
-      <div className="flex gap-1.5" role="radiogroup" aria-label={label}>
+      <div className="flex gap-1.5" role="group" aria-label={label}>
         {Array.from({ length: steps }, (_, i) => i + 1).map((n) => {
           const active = value === n;
           return (
             <button
               key={n}
               type="button"
-              role="radio"
-              aria-checked={active}
+              aria-pressed={active}
               aria-label={`${label} : ${n}`}
               onClick={() => onChange(n)}
               className={cn(

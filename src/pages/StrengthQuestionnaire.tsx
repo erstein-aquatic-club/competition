@@ -1,7 +1,7 @@
 /**
  * StrengthQuestionnaire — swimmer self-report filled BEFORE the coach's
  * physical assessment. Part of the "Bilan Muscu → Mésocycle" feature
- * (Chantier B, Phase 7, §285).
+ * (Chantier B, Phase 7, §286).
  *
  * Flow
  * ────
@@ -21,10 +21,15 @@
  *   3. Mobilité        — 1-5 self-rated feel.
  *   4. Psychologie     — three 1-5 scales (confiance, motivation, stress).
  *
- *  Submit persists in two writes via a single React Query mutation:
- *   - updateAssessmentQuestionnaire(id, q)  → flips status to bilan_pending.
- *   - upsertPainReports(athleteId, today, pain) → mirrors the declared
- *     pain into pain_reports for today.
+ *  Submit performs two sequenced writes via a single React Query mutation.
+ *  They are NOT atomic — the order is deliberate:
+ *   1. upsertPainReports(athleteId, today, pain) → mirrors the declared
+ *      pain into pain_reports for today. May throw (network) — if it does,
+ *      the assessment is still `questionnaire_pending`, so a retry works.
+ *   2. updateAssessmentQuestionnaire(id, q) → the commit-like final step:
+ *      it flips status to `bilan_pending`. Done last on purpose, so a
+ *      mid-submit failure never strands the screen in a non-retryable
+ *      done-state with the pain mirror silently lost.
  *  On success the screen transitions to the read-only done-state.
  *
  * Focus mode : sets `document.body.dataset.focusMode = "strength"` so the
@@ -146,11 +151,16 @@ export default function StrengthQuestionnaire() {
         psychology: { confidence, motivation, stress },
         filled_at: new Date().toISOString(),
       };
-      // 1. Persist the questionnaire — also flips status to bilan_pending.
-      await updateAssessmentQuestionnaire(assessment.id, questionnaire);
-      // 2. Mirror the declared pain into pain_reports for today so the
-      //    coach's wellness/pain views stay consistent.
+      // 1. Mirror the declared pain into pain_reports for today so the
+      //    coach's wellness/pain views stay consistent. Done FIRST: if it
+      //    throws, the assessment is still `questionnaire_pending`, so a
+      //    retry genuinely works (the screen stays editable).
       await upsertPainReports(userId, todayISODate(), painEntries);
+      // 2. Persist the questionnaire — the commit-like final step: it flips
+      //    status to `bilan_pending`. Done LAST on purpose, so a failed
+      //    pain write above never strands the screen in a non-retryable
+      //    done-state with the pain mirror lost.
+      await updateAssessmentQuestionnaire(assessment.id, questionnaire);
     },
     onSuccess: async () => {
       setSubmittedLocally(true);
@@ -213,6 +223,37 @@ export default function StrengthQuestionnaire() {
   }
 
   /* ════════════════════════════════════════════════════════════
+     Done — questionnaire already submitted (read-only)
+     ──────────────────────────────────────────────────────────
+     Checked BEFORE the error branch on purpose: after a successful
+     submit, `submittedLocally` is true ; if the follow-up refetch then
+     fails (network blip), the user must still see the done-state, not
+     the "impossible de charger" error screen for work that succeeded.
+     ════════════════════════════════════════════════════════════ */
+  if (isDone) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col bg-background">
+        {TopBar}
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+            <Check className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">
+            Questionnaire déjà rempli
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Ton auto-évaluation a bien été enregistrée. Ton coach réalisera
+            le bilan physique lors de la prochaine séance.
+          </p>
+          <Button className="mt-5 rounded-xl" onClick={closeScreen}>
+            Retour à la muscu
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════
      Error
      ════════════════════════════════════════════════════════════ */
   if (isError) {
@@ -268,32 +309,6 @@ export default function StrengthQuestionnaire() {
             className="mt-5 rounded-xl"
             onClick={closeScreen}
           >
-            Retour à la muscu
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  /* ════════════════════════════════════════════════════════════
-     Done — questionnaire already submitted (read-only)
-     ════════════════════════════════════════════════════════════ */
-  if (isDone) {
-    return (
-      <div className="flex min-h-[100dvh] flex-col bg-background">
-        {TopBar}
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-            <Check className="h-7 w-7 text-primary" />
-          </div>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">
-            Questionnaire déjà rempli
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Ton auto-évaluation a bien été enregistrée. Ton coach réalisera
-            le bilan physique lors de la prochaine séance.
-          </p>
-          <Button className="mt-5 rounded-xl" onClick={closeScreen}>
             Retour à la muscu
           </Button>
         </div>
