@@ -19,7 +19,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAthletes,
   recordKpiMeasurement,
@@ -51,18 +51,10 @@ import { cn } from "@/lib/utils";
 import { KpiStepCard, type KpiAttemptsState, parseAttempts } from "@/components/strength/kpi/KpiStepCard";
 import { KpiRecap, type KpiRecapEntry } from "@/components/strength/kpi/KpiRecap";
 import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
+import { initials } from "@/components/strength/kpi/kpiHelpers";
 
 const PROTOCOLS = Object.values(KPI_PROTOCOLS);
 const KPI_KEYS = PROTOCOLS.map((p) => p.key);
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
 
 /** Per-KPI attempt state, keyed by KPI key. */
 type AttemptsByKpi = Record<StrengthKpiKey, KpiAttemptsState>;
@@ -76,6 +68,7 @@ type Phase = "select-athlete" | "steps" | "recap";
 
 export default function KpiWizard() {
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const userId = useAuth((s) => s.userId);
   const userName = useAuth((s) => s.user);
   const role = useAuth((s) => s.role);
@@ -116,6 +109,18 @@ export default function KpiWizard() {
   const [partnerPickerOpen, setPartnerPickerOpen] = useState(false);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [recapEntries, setRecapEntries] = useState<KpiRecapEntry[]>([]);
+  // KPIs that failed to persist on the last submit. While non-empty, a
+  // retry re-submits ONLY these keys — never the rows already saved (the
+  // `strength_kpi_measurements` table is append-only, re-inserting would
+  // duplicate). A fully successful submit clears this.
+  const [failedKeys, setFailedKeys] = useState<StrengthKpiKey[]>([]);
+  // Measurements actually persisted during THIS wizard session, keyed by
+  // KPI. Merged on top of the server `latestMeasurements` so that a
+  // same-athlete "Nouveau bilan" diffs against the values we just wrote,
+  // not the pre-first-run baseline.
+  const [sessionWrites, setSessionWrites] = useState<
+    Partial<Record<StrengthKpiKey, StrengthKpiMeasurement>>
+  >({});
 
   // The athlete being measured.
   const athleteId = isCoach ? selectedAthleteId : userId;
@@ -131,11 +136,29 @@ export default function KpiWizard() {
   const athleteName = selectedAthlete?.display_name ?? "ce nageur";
 
   // ── Previous measurements — fetched up-front so the recap can diff ──
-  const { data: latestMeasurements } = useQuery({
+  const {
+    data: latestMeasurements,
+    isError: latestIsError,
+    isSuccess: latestIsLoaded,
+  } = useQuery({
     queryKey: ["kpi-latest", athleteId],
     queryFn: () => getLatestKpiMeasurements(athleteId!),
     enabled: athleteId != null,
   });
+
+  // Effective diff baseline = server "latest" with this session's own writes
+  // layered on top (so a same-athlete second run compares correctly).
+  const diffBaseline = useMemo<
+    Partial<Record<StrengthKpiKey, StrengthKpiMeasurement | null>>
+  >(
+    () => ({ ...(latestMeasurements ?? {}), ...sessionWrites }),
+    [latestMeasurements, sessionWrites],
+  );
+  // True once we can trust the baseline for "1ère mesure" badges: either the
+  // server query loaded OK, or this session already wrote rows for the
+  // athlete (sessionWrites alone is a reliable, if partial, baseline).
+  const baselineReliable =
+    latestIsLoaded || Object.keys(sessionWrites).length > 0;
 
   // Swimmers available as a measurement partner ("accompagné par").
   //  - Coach / admin : the full athlete roster.
@@ -186,6 +209,15 @@ export default function KpiWizard() {
   const currentFilled = currentKey ? filledKeys.includes(currentKey) : false;
 
   // ── Submission ──
+  // A retry re-submits ONLY the keys that failed last time (`failedKeys`);
+  // a fresh submit covers every filled KPI. This is what keeps an
+  // append-only insert from duplicating rows after a partial failure.
+  const isRetry = failedKeys.length > 0;
+  const keysToSubmit = useMemo<StrengthKpiKey[]>(
+    () => (isRetry ? failedKeys.filter((k) => filledKeys.includes(k)) : filledKeys),
+    [isRetry, failedKeys, filledKeys],
+  );
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (athleteId == null || userId == null) {
@@ -194,50 +226,115 @@ export default function KpiWizard() {
       const source: RecordKpiInput["source"] = isCoach
         ? "wizard_coach"
         : "wizard_athlete";
+      // Collect per-KPI outcomes — never fail-fast. A throw mid-loop would
+      // strand already-persisted rows AND make a retry re-insert them.
       const results: StrengthKpiMeasurement[] = [];
-      for (const key of filledKeys) {
+      const failures: { key: StrengthKpiKey; error: Error }[] = [];
+      for (const key of keysToSubmit) {
         const protocol = KPI_PROTOCOLS[key];
         const parsed = parseAttempts(attempts[key].raw);
-        const recorded = await recordKpiMeasurement({
-          athlete_id: athleteId,
-          kpi_key: key,
-          value: bestAttempt(parsed),
-          unit: protocol.unit,
-          attempts: parsed,
-          measured_by: userId,
-          assisted_by: assistedBy,
-          source,
-        });
-        results.push(recorded);
+        try {
+          const recorded = await recordKpiMeasurement({
+            athlete_id: athleteId,
+            kpi_key: key,
+            value: bestAttempt(parsed),
+            unit: protocol.unit,
+            attempts: parsed,
+            measured_by: userId,
+            assisted_by: assistedBy,
+            source,
+          });
+          results.push(recorded);
+        } catch (err) {
+          failures.push({
+            key,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
+        }
       }
-      return results;
+      return { results, failures };
     },
-    onSuccess: (results) => {
+    onSuccess: async ({ results, failures }) => {
+      // Layer the just-written rows into the session baseline so a
+      // same-athlete restart diffs against fresh values (I2).
+      const writes: Partial<Record<StrengthKpiKey, StrengthKpiMeasurement>> = {};
+      for (const r of results) writes[r.kpi_key] = r;
+      const mergedBaseline = { ...diffBaseline, ...writes };
+      setSessionWrites((prev) => ({ ...prev, ...writes }));
+
+      // Recap is built for the KPIs that DID persist this run.
       const entries: KpiRecapEntry[] = results.map((r) => ({
         kpi_key: r.kpi_key,
         value: r.value,
         unit: r.unit,
-        previous: latestMeasurements?.[r.kpi_key] ?? null,
+        // `undefined` → baseline unknown (query errored, no session data);
+        // `null` → known-absent (genuine 1ère mesure). KpiRecap distinguishes.
+        previous: baselineReliable ? mergedBaseline[r.kpi_key] ?? null : undefined,
       }));
-      setRecapEntries(entries);
+      // Merge into any existing recap: a retry's `results` carry only the
+      // retried KPIs — keep the originally-succeeded entries visible too.
+      setRecapEntries((prev) => {
+        const byKey = new Map(prev.map((e) => [e.kpi_key, e]));
+        for (const e of entries) byKey.set(e.kpi_key, e);
+        return KPI_KEYS.filter((k) => byKey.has(k)).map((k) => byKey.get(k)!);
+      });
+
+      // Remember which keys still need a retry; clear on full success.
+      setFailedKeys(failures.map((f) => f.key));
+
+      // Refresh server cache so the rest of the app (and a later wizard run
+      // that re-mounts the query) sees the new measurements (I1).
+      if (athleteId != null && results.length > 0) {
+        await queryClient.invalidateQueries({
+          queryKey: ["kpi-latest", athleteId],
+        });
+      }
+
       setPhase("recap");
-      toast.success(
-        `${results.length} mesure${results.length > 1 ? "s" : ""} enregistrée${
-          results.length > 1 ? "s" : ""
-        }`,
-      );
+
+      if (failures.length === 0) {
+        toast.success(
+          `${results.length} KPI enregistré${results.length > 1 ? "s" : ""}`,
+        );
+      } else if (results.length === 0) {
+        toast.error(
+          `Échec — aucun KPI enregistré (${failures.length}). Réessaie.`,
+        );
+      } else {
+        toast.warning(
+          `${results.length} KPI enregistré${results.length > 1 ? "s" : ""}, ` +
+            `${failures.length} échec${failures.length > 1 ? "s" : ""} — ` +
+            `réessaie le${failures.length > 1 ? "s" : ""} KPI manquant${
+              failures.length > 1 ? "s" : ""
+            }.`,
+        );
+      }
     },
     onError: (err: Error) => {
+      // Reaches here only for a pre-loop throw (e.g. identity unresolved) —
+      // nothing was inserted, so no retry-scoping needed.
       toast.error("Échec de l'enregistrement", {
         description: err.message || "Réessaie dans un instant.",
       });
     },
   });
 
-  const restart = () => {
+  const restart = async () => {
+    // A same-athlete restart must diff against the values we just wrote, not
+    // the pre-first-run baseline. The submit already invalidated
+    // `["kpi-latest", athleteId]`; force the refetch to settle here so the
+    // next run's recap baseline is genuinely fresh (I2). `sessionWrites` is
+    // then cleared — the refetched server data already includes them.
+    if (athleteId != null) {
+      await queryClient.refetchQueries({
+        queryKey: ["kpi-latest", athleteId],
+      });
+    }
     setAttempts(emptyAttempts());
     setAssistedBy(null);
     setRecapEntries([]);
+    setFailedKeys([]);
+    setSessionWrites({});
     setStepIndex(0);
     setPhase(isCoach ? "select-athlete" : "steps");
   };
@@ -391,6 +488,10 @@ export default function KpiWizard() {
             entries={recapEntries}
             athleteName={athleteName}
             isAthleteSource={!isCoach}
+            failedCount={failedKeys.length}
+            baselineUnavailable={recapEntries.some((e) => e.previous === undefined)}
+            isRetrying={submitMutation.isPending}
+            onRetry={() => submitMutation.mutate()}
             onRestart={restart}
             onClose={closeWizard}
           />

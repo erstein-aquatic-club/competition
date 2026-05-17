@@ -3,11 +3,22 @@
  *
  * Lists every KPI that was recorded, each diffed against the previous
  * measurement (captured BEFORE submit). For athlete-sourced runs, shows a
- * note that the coach will review the measurements.
+ * note that the coach will review the measurements. When part of the submit
+ * failed, surfaces a retry affordance scoped to the failed KPIs only.
  */
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, TrendingUp, TrendingDown, Minus, Info, Sparkles } from "lucide-react";
+import {
+  CheckCircle2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Info,
+  Sparkles,
+  AlertTriangle,
+  HelpCircle,
+  RotateCcw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KPI_PROTOCOLS } from "@/lib/strength/kpiProtocols";
 import type { StrengthKpiKey, StrengthKpiMeasurement } from "@/lib/api/types";
@@ -16,37 +27,92 @@ export interface KpiRecapEntry {
   kpi_key: StrengthKpiKey;
   value: number;
   unit: string;
-  /** Previous measurement for this KPI, or null if this is the first record. */
-  previous: StrengthKpiMeasurement | null;
+  /**
+   * Previous measurement for diffing:
+   *  - a measurement → diff against it,
+   *  - `null`        → known-absent, genuine first measurement,
+   *  - `undefined`   → baseline unknown (history query failed) — no badge.
+   */
+  previous: StrengthKpiMeasurement | null | undefined;
 }
 
 export function KpiRecap({
   entries,
   athleteName,
   isAthleteSource,
+  failedCount = 0,
+  baselineUnavailable = false,
+  isRetrying = false,
+  onRetry,
   onRestart,
   onClose,
 }: {
   entries: KpiRecapEntry[];
   athleteName: string;
   isAthleteSource: boolean;
+  /** Number of KPIs that failed to persist on the last submit. */
+  failedCount?: number;
+  /** True when the previous-measurement history could not be loaded. */
+  baselineUnavailable?: boolean;
+  /** True while a retry of the failed KPIs is in flight. */
+  isRetrying?: boolean;
+  /** Re-submit the failed KPIs only. Required when `failedCount > 0`. */
+  onRetry?: () => void;
   onRestart: () => void;
   onClose: () => void;
 }) {
+  const hasFailures = failedCount > 0;
+
   return (
     <div className="space-y-5">
-      {/* Success header */}
+      {/* Header — reflects whether the run fully succeeded */}
       <div className="flex flex-col items-center pt-2 text-center">
-        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <CheckCircle2 className="h-9 w-9 text-primary" />
+        <div
+          className={cn(
+            "mb-3 flex h-16 w-16 items-center justify-center rounded-full",
+            hasFailures ? "bg-amber-100 dark:bg-amber-950/40" : "bg-primary/10",
+          )}
+        >
+          {hasFailures ? (
+            <AlertTriangle className="h-9 w-9 text-amber-600 dark:text-amber-400" />
+          ) : (
+            <CheckCircle2 className="h-9 w-9 text-primary" />
+          )}
         </div>
         <h2 className="text-xl font-bold tracking-tight text-foreground">
-          Bilan enregistré
+          {hasFailures ? "Bilan partiellement enregistré" : "Bilan enregistré"}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {entries.length} mesure{entries.length > 1 ? "s" : ""} pour {athleteName}
         </p>
       </div>
+
+      {/* Partial-failure banner with a retry scoped to the failed KPIs */}
+      {hasFailures && (
+        <div className="flex flex-col gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 px-3.5 py-3 dark:border-amber-800/50 dark:bg-amber-950/25">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm leading-snug text-amber-900 dark:text-amber-100">
+              {failedCount === 1
+                ? "Un KPI n'a pas pu être enregistré. Réessaie pour l'envoyer à nouveau."
+                : `${failedCount} KPIs n'ont pas pu être enregistrés. Réessaie pour les envoyer à nouveau.`}
+            </p>
+          </div>
+          {onRetry && (
+            <Button
+              variant="outline"
+              className="h-10 w-full rounded-xl border-amber-300 font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
+              onClick={onRetry}
+              disabled={isRetrying}
+            >
+              <RotateCcw
+                className={cn("mr-1.5 h-4 w-4", isRetrying && "animate-spin")}
+              />
+              {isRetrying ? "Envoi en cours…" : "Réessayer"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Athlete-source review note */}
       {isAthleteSource && (
@@ -58,11 +124,26 @@ export function KpiRecap({
         </div>
       )}
 
+      {/* Baseline-unavailable note — the previous-measurement history failed
+          to load, so no progression diff can be shown for this run. */}
+      {baselineUnavailable && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-3.5 py-3">
+          <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <p className="text-sm leading-snug text-muted-foreground">
+            Historique indisponible — impossible de comparer aux mesures
+            précédentes pour le moment.
+          </p>
+        </div>
+      )}
+
       {/* Recorded values */}
       <div className="space-y-2.5">
         {entries.map((entry) => {
           const protocol = KPI_PROTOCOLS[entry.kpi_key];
-          const prev = entry.previous?.value ?? null;
+          // `undefined` previous → baseline unknown → show no badge at all.
+          // `null` → known first measurement. A measurement → real diff.
+          const baselineKnown = entry.previous !== undefined;
+          const prev = entry.previous ? entry.previous.value : null;
           const delta = prev != null ? entry.value - prev : null;
           const improved = delta != null && delta > 0;
           const declined = delta != null && delta < 0;
@@ -90,7 +171,7 @@ export function KpiRecap({
                     {entry.unit}
                   </span>
                 </div>
-                {delta != null ? (
+                {!baselineKnown ? null : delta != null ? (
                   <div
                     className={cn(
                       "mt-0.5 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums",

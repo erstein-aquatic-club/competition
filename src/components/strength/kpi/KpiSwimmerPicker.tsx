@@ -14,16 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Check, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { initials } from "./kpiHelpers";
 import type { AthleteSummary } from "@/lib/api/types";
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
 
 export function KpiSwimmerPicker({
   open,
@@ -71,8 +63,8 @@ export function KpiSwimmerPicker({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher un nageur…"
+              aria-label="Rechercher un nageur"
               className="h-11 pl-9"
-              autoFocus={false}
             />
           </div>
 
@@ -80,6 +72,7 @@ export function KpiSwimmerPicker({
             {allowNone && (
               <button
                 type="button"
+                aria-pressed={selectedId == null}
                 onClick={() => {
                   onSelect(null);
                   onOpenChange(false);
@@ -111,6 +104,7 @@ export function KpiSwimmerPicker({
                 <button
                   key={s.id}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => {
                     onSelect(s.id);
                     onOpenChange(false);

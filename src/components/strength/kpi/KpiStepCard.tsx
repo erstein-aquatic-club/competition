@@ -10,23 +10,20 @@
  *  - exactly `protocol.attempts` numeric inputs; the best is retained live.
  */
 import { KpiGifPanel } from "./KpiGifPanel";
-import { bestAttempt } from "@/lib/strength/kpiMeasurement";
+import { bestAttempt, parseAttempts } from "@/lib/strength/kpiMeasurement";
 import type { KpiProtocol } from "@/lib/strength/kpiProtocols";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Users, Ruler, Trophy } from "lucide-react";
 
+// `parseAttempts` lives in the testable `kpiMeasurement` module; re-exported
+// here so existing wizard imports keep their path.
+export { parseAttempts };
+
 export interface KpiAttemptsState {
   /** Raw text per attempt slot — keeps the field controlled without NaN flicker. */
   raw: string[];
-}
-
-/** Parse the raw attempt strings into the finite, positive numbers actually entered. */
-export function parseAttempts(raw: string[]): number[] {
-  return raw
-    .map((v) => Number(String(v).replace(",", ".")))
-    .filter((n) => Number.isFinite(n) && n > 0);
 }
 
 export function KpiStepCard({
