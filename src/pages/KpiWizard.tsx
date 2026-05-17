@@ -91,11 +91,16 @@ export default function KpiWizard() {
     };
   }, []);
 
-  // ── Athletes (coach-only — for the selection step) ──
+  // ── Athletes roster ──
+  // Used by the coach for the athlete-selection step AND by both roles to
+  // populate the "accompagné par" partner picker. `getAthletes()` reads
+  // `group_members` / `users` / `user_profiles`, all of which have RLS
+  // SELECT policies open to any authenticated user (same path the
+  // swimmer-facing strength leaderboard already relies on) — so it is safe
+  // to fetch for a swimmer too.
   const { data: athletes = [], isLoading: athletesLoading } = useQuery({
     queryKey: ["athletes"],
     queryFn: () => getAthletes(),
-    enabled: isCoach,
     staleTime: 5 * 60_000,
   });
 
@@ -132,11 +137,27 @@ export default function KpiWizard() {
     enabled: athleteId != null,
   });
 
-  // Swimmers available as a measurement partner (everyone with an id).
-  const partnerCandidates = useMemo(
-    () => athletes.filter((a) => a.id != null),
-    [athletes],
-  );
+  // Swimmers available as a measurement partner ("accompagné par").
+  //  - Coach / admin : the full athlete roster.
+  //  - Swimmer       : teammates from their own training group(s) — a
+  //    swimmer realistically lends their phone to a groupmate. The current
+  //    user is excluded (you don't assist your own measurement).
+  // `getAthletes()` keys each athlete to one `group_id`; the current
+  // swimmer's group is read from their own entry in that same list.
+  const partnerCandidates = useMemo<AthleteSummary[]>(() => {
+    const withId = athletes.filter((a) => a.id != null);
+    if (isCoach) return withId;
+    if (userId == null) return [];
+    const ownGroupIds = new Set(
+      withId
+        .filter((a) => a.id === userId && a.group_id != null)
+        .map((a) => a.group_id as number),
+    );
+    if (ownGroupIds.size === 0) return [];
+    return withId.filter(
+      (a) => a.id !== userId && a.group_id != null && ownGroupIds.has(a.group_id),
+    );
+  }, [athletes, isCoach, userId]);
   const partner = useMemo(
     () => partnerCandidates.find((a) => a.id === assistedBy) ?? null,
     [partnerCandidates, assistedBy],
