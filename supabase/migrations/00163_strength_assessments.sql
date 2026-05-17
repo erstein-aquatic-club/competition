@@ -2,13 +2,17 @@
 -- §285 — Chantier B "Bilan Muscu → Mésocycle" : tables d'évaluation.
 -- Design : docs/plans/2026-05-17-bilan-muscu-mesocycle-design.md
 --
--- strength_assessments      : un bilan par nageur (questionnaire nageur +
---                             bilan mobilité/mouvement coach + scoring seaux).
+-- strength_assessments      : les bilans d'un nageur (série dans le temps —
+--                             questionnaire nageur + bilan mobilité/mouvement
+--                             coach + scoring seaux). Pas d'unicité par nageur :
+--                             réévaluations successives, le plus récent fait foi.
 -- strength_kpi_measurements : série temporelle des 5 KPIs du wizard.
 --
--- RLS : calquée sur pain_reports (00068) — le nageur possède ses lignes,
--- coach/admin lisent ET écrivent (le coach renseigne physical_tests / valide
--- les mesures KPI).
+-- RLS : le nageur possède ses lignes (pattern pain_reports 00068). L'accès
+-- coach/admin est volontairement élargi à FOR ALL — plus large que pain_reports
+-- (coach en lecture seule) : ici le coach renseigne physical_tests et valide les
+-- mesures KPI. Accès club entier assumé (modèle coach existant de l'app), pas de
+-- scoping par nageur assigné — décision produit confirmée.
 
 BEGIN;
 
