@@ -4,6 +4,60 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §287 — Bilan physique coach : scores mobilité & mouvement (Phase 8) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 8, Task 8.1 — l'écran coach où l'on note la mobilité et la qualité de mouvement qui complètent le "Bilan Muscu" d'un nageur.
+
+### Contexte
+
+Le bilan muscu se déroule en deux temps : le nageur remplit son questionnaire (Phase 7, §286), puis le coach réalise l'évaluation physique. Phase 8 livre le second volet — l'écran coach. La sélection du nageur réutilise exactement le pattern de `KpiWizard` (`getAthletes()` + `KpiSwimmerPicker`). L'entrée déclenchée par notification est une phase ultérieure ; pour l'instant la route fonctionne en autonomie.
+
+### Changements
+
+- **`src/pages/coach/StrengthAssessmentScreen.tsx`** (neuf) — écran coach, route `/coach/strength-assessment`. Accès coach/admin uniquement (garde via `useAuth`). Sélection du nageur (étape 1), puis `getLatestAssessment(athleteId)` via React Query et branchement sur 4 cas de statut :
+  - aucun bilan **ou** `completed` → CTA "Démarrer un bilan" → `createAssessment({athlete_id, coach_id})` (crée une ligne en `questionnaire_pending`).
+  - `questionnaire_pending` → état d'attente "En attente du questionnaire nageur" — le coach ne peut pas encore noter.
+  - `bilan_pending` → formulaire de notation + contexte read-only.
+  - Cas additionnels : loading (skeletons), erreur réseau (retry), done-state post-submit, statut inconnu (message calme).
+- **Formulaire de notation** (mappé au type `StrengthPhysicalTests`) — 6 scores entiers 0-3, 2 groupes :
+  - Mobilité (`physical_tests.mobility`) : `shoulder_flexion`, `t_spine`, `hip`.
+  - Mouvement (`physical_tests.movement`) : `scapula_control`, `trunk_neck_alignment`, `hip_hinge`.
+  - Légende 0-3 (0 = dysfonctionnel … 3 = optimal) affichée une fois en tête de section.
+- **Contexte read-only** (visible à côté du formulaire) — `AssessmentContext` : questionnaire soumis du nageur (douleurs via `BodyHeatMap` mode `view` + badges, historique, ressenti mobilité, psychologie) et `getLatestKpiMeasurements(athleteId)` (valeurs KPI, libellés via `KPI_PROTOCOLS`).
+- **Submit** — `useMutation` : construit l'objet `StrengthPhysicalTests` (`filled_at` = `new Date().toISOString()`), appelle `updateAssessmentPhysicalTests(id, …)` (bascule le statut à `completed`). Toasts `sonner` succès/erreur ; succès → done-state.
+- **`src/components/strength/assessment/assessmentScores.ts`** (neuf) — définition statique des 6 scores (libellé, hint, captions bas/haut) + légende + sentinelle `SCORE_UNSET`.
+- **`src/components/strength/questionnaire/ScaleField.tsx`** — généralisé : prop optionnelle `min` (défaut `1`, donc les appelants questionnaire 1-5 existants restent inchangés). Le bilan coach passe `min={0} steps={4}` pour une échelle 0-3.
+- **`src/App.tsx`** — import `lazyWithRetry` + route `/coach/strength-assessment` sous `<Suspense>` (même pattern que `/coach/strength-planning`).
+
+### Fichiers modifiés / créés
+
+- `src/pages/coach/StrengthAssessmentScreen.tsx` (neuf, 706 lignes)
+- `src/components/strength/assessment/AssessmentContext.tsx` (neuf, 229 lignes)
+- `src/components/strength/assessment/assessmentScores.ts` (neuf, 98 lignes)
+- `src/components/strength/questionnaire/ScaleField.tsx` (généralisé, prop `min`)
+- `src/App.tsx` (route + import)
+
+### Tests / vérifications
+
+- `npx tsc --noEmit` — aucune erreur.
+- `npm run build` — succès, chunk `StrengthAssessmentScreen-*.js` émis (18,7 ko).
+- Pas de test RLS : patch purement UI, aucune policy/migration touchée.
+- Pas de walkthrough live possible localement (app gatée sur login, build local sans credentials Supabase).
+
+### Décisions
+
+- **`ScaleField` généralisé plutôt que nouveau `ScoreField`** : la spec laissait le choix. Ajouter une prop `min` (défaut `1`) est plus propre que dupliquer le composant — les appelants 1-5 du questionnaire ne sont pas touchés, le bilan passe `min={0} steps={4}`. "Non répondu" = valeur `< min` (sentinelle `SCORE_UNSET = -1`).
+- **Réutilisation du pattern de sélection nageur de `KpiWizard`** : `getAthletes()` + `KpiSwimmerPicker` directement (pas un hook — `KpiWizard` n'en a pas). Aucune nouvelle UI inventée.
+- **Mode focus** : `document.body.dataset.focusMode = "strength"` pour masquer le dock — même convention que KpiWizard/StrengthQuestionnaire.
+- **Champs obligatoires** : les 6 scores doivent être notés pour activer le submit (un score 0 est valide ; c'est la valeur "non notée" qui bloque).
+- **`completed` traité comme "démarrer un nouveau bilan"** : conforme à la spec — un bilan terminé relance le cycle.
+
+### Limites / dette
+
+- Pas de point d'entrée navigation vers l'écran (lien depuis le hub coach ou notification) — c'est une phase ultérieure, hors scope 8.1.
+- L'entrée déclenchée par notification (le coach est notifié quand le nageur a rempli son questionnaire) est une phase ultérieure.
+
 ## §286 — Questionnaire bilan muscu : auto-évaluation nageur (Phase 7) (2026-05-17)
 
 **Branche** : `main`

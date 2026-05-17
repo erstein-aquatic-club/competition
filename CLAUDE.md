@@ -71,7 +71,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§286** — Questionnaire bilan muscu, auto-évaluation nageur (route `/strength/questionnaire`).
+Dernier § livré : **§287** — Bilan physique coach, scores mobilité & mouvement (route `/coach/strength-assessment`).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

@@ -62,6 +62,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/Strength.tsx` | Module musculation perso (nageur ET coach depuis §271 — vue toujours personnelle, ignore `selectedAthleteId` du store coach) | ~1114 lignes |
 | `src/pages/KpiWizard.tsx` | Assistant guidé de saisie des 5 KPIs de force (§285, route `/strength/kpi-wizard`) — 3 phases (sélection nageur coach, 5 étapes 1 KPI/étape, recap diff) ; mode focus dock masqué | 553 lignes |
 | `src/pages/StrengthQuestionnaire.tsx` | Questionnaire bilan muscu, auto-évaluation nageur (§286, route `/strength/questionnaire`) — `getLatestAssessment` → 3 cas (formulaire éditable, état "déjà rempli", état vide) ; 4 sections (douleurs, historique, mobilité, psychologie) ; submit `updateAssessmentQuestionnaire` + `upsertPainReports` | 473 lignes |
+| `src/pages/coach/StrengthAssessmentScreen.tsx` | Bilan physique coach (§287, route `/coach/strength-assessment`, coach/admin) — sélection nageur (pattern `KpiWizard`), `getLatestAssessment` → 4 cas (CTA démarrer bilan, attente questionnaire, formulaire de notation, done-state) ; 6 scores 0-3 mappés à `StrengthPhysicalTests` + contexte read-only ; submit `updateAssessmentPhysicalTests` | 706 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
 | `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
 | `src/pages/Records.tsx` | Records personnels + FFN sync + virtualisation @tanstack/react-virtual grille natation (§270 R5 sub-§C) | 1517 lignes |
@@ -230,7 +231,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/strength/kpi/KpiRecap.tsx` | Recap post-submit du wizard KPIs (§285) — diff de chaque mesure vs précédente, note review coach si source athlete | 139 lignes |
 | `src/components/strength/kpi/KpiSwimmerPicker.tsx` | Drawer de sélection nageur du wizard KPIs (§285) — cible mesurée + binôme `assisted_by`, recherche | 141 lignes |
 | `src/components/strength/kpi/KpiGifPanel.tsx` | Slot démo d'un protocole KPI (§285) — placeholder neutre tant que `gifUrl` est null | 35 lignes |
-| `src/components/strength/questionnaire/ScaleField.tsx` | Échelle 1-N en pilules pour le questionnaire bilan (§286) — réutilisée mobilité + 3 échelles psychologie ; échelle neutre sans tokens intensité | 76 lignes |
+| `src/components/strength/questionnaire/ScaleField.tsx` | Échelle en pilules pour le bilan muscu (§286, généralisée §287 prop `min`) — questionnaire nageur (1-5) + bilan coach (0-3) ; échelle neutre sans tokens intensité | 89 lignes |
+| `src/components/strength/assessment/AssessmentContext.tsx` | Contexte read-only du bilan physique coach (§287) — questionnaire nageur (douleurs `BodyHeatMap` view, historique, mobilité, psycho) + KPIs latest, en lecture seule | 229 lignes |
+| `src/components/strength/assessment/assessmentScores.ts` | Définition statique des 6 scores 0-3 du bilan physique (§287) — libellés, hints, captions + légende + sentinelle `SCORE_UNSET` | 98 lignes |
 | `src/components/dashboard/FeedbackDrawer.tsx` | Drawer feedback séance natation | ~1265 lignes |
 | `src/components/dashboard/DashboardCalendar.tsx` | Wrapper React.memo de CalendarHeader + CalendarGrid — isole le calendrier des re-renders d'écriture (§216) | 69 lignes |
 | `src/components/dashboard/DashboardFeedbackContainer.tsx` | Conteneur React.memo du FeedbackDrawer — possède saveState/draftState/alternativeOverride + 5 mutations + handlers markAbsent/markPresent/clearOverride/saveFeedback (§216) | 440 lignes |
