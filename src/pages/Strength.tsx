@@ -37,6 +37,7 @@ import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/type
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { OneRmGate } from "@/components/strength/OneRmGate";
+import { QuestionnairePrompt, KpiWizardEntry } from "@/components/strength/StrengthBilanEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
 
@@ -1000,6 +1001,15 @@ export default function Strength() {
             </TabsList>
 
             <TabsContent value="start" className="space-y-5 pt-4">
+              {screenMode === "list" && (
+                <div className="space-y-2.5">
+                  {/* Bilan Muscu (§288) — questionnaire prioritaire si demandé
+                      par le coach, puis entrée KPI wizard standard. */}
+                  <QuestionnairePrompt userId={userId} />
+                  <KpiWizardEntry />
+                </div>
+              )}
+
               {screenMode === "list" && (
                 <SessionBrowser
                   user={user}

@@ -30,6 +30,7 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  ClipboardCheck,
   Dumbbell,
   Gauge,
   MessageSquareText,
@@ -96,6 +97,7 @@ type CoachHomeProps = {
   onOpenRecordsAdmin: () => void;
   onOpenSwimPlanning: () => void;
   onOpenStrengthPlanning: () => void;
+  onOpenStrengthAssessment: () => void;
   onOpenMyStrength: () => void;
   onOpenMyRecords: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
@@ -219,6 +221,7 @@ const CoachHome = ({
   onOpenRecordsAdmin,
   onOpenSwimPlanning,
   onOpenStrengthPlanning,
+  onOpenStrengthAssessment,
   onOpenMyStrength,
   onOpenMyRecords,
   onOpenAthlete,
@@ -459,6 +462,7 @@ const CoachHome = ({
     () => [
       { label: "Planif. Nage", icon: Waves, action: onOpenSwimPlanning, color: "text-cyan-500", bg: "bg-cyan-100 dark:bg-cyan-900/30" },
       { label: "Planif. Muscu", icon: Dumbbell, action: onOpenStrengthPlanning, color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
+      { label: "Bilan muscu", icon: ClipboardCheck, action: onOpenStrengthAssessment, color: "text-fuchsia-500", bg: "bg-fuchsia-100 dark:bg-fuchsia-900/30" },
       { label: "Echéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
       { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
       { label: "Mes nageurs", icon: UserCheck, action: () => onNavigate("my-swimmers"), color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
@@ -468,7 +472,7 @@ const CoachHome = ({
       { label: "Chronos", icon: Timer, action: () => onNavigate("chrono-history"), color: "text-rose-500", bg: "bg-rose-100 dark:bg-rose-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
-    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -1221,6 +1225,7 @@ export default function Coach() {
           onOpenRecordsAdmin={() => navigate("/records-admin")}
           onOpenSwimPlanning={() => navigate("/coach/swim-planning")}
           onOpenStrengthPlanning={() => navigate("/coach/strength-planning")}
+          onOpenStrengthAssessment={() => navigate("/coach/strength-assessment")}
           onOpenMyStrength={() => navigate("/strength")}
           onOpenMyRecords={() => navigate("/records?tab=1rm")}
           onOpenAthlete={handleOpenAthlete}

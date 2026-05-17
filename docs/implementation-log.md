@@ -4,6 +4,48 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §288 — Points d'entrée navigation : Bilan Muscu (Phase 9) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 9 — les 3 écrans du bilan muscu (§285 `KpiWizard`, §286 `StrengthQuestionnaire`, §287 `StrengthAssessmentScreen`) étaient construits et routés mais inaccessibles depuis l'UI. Phase 9 ajoute les points d'entrée.
+
+### Contexte
+
+Les routes `/strength/kpi-wizard`, `/strength/questionnaire` et `/coach/strength-assessment` existaient dans `src/App.tsx` mais aucun lien/tuile ne les atteignait. Le système de notifications qui routerait normalement le nageur vers son questionnaire est un chantier ultérieur — d'où un point d'entrée conditionnel in-app en attendant.
+
+### Changements
+
+- **`src/components/strength/StrengthBilanEntry.tsx`** (neuf) — deux sous-composants pour `/strength` :
+  - `QuestionnairePrompt` — carte d'action prioritaire **conditionnelle**. `getLatestAssessment(userId)` via React Query ; ne rend rien sauf si `status === 'questionnaire_pending'`. Style violet plein + pastille « ping » + eyebrow « Action demandée » → visuellement plus haut que l'entrée KPI (c'est une action que le coach attend). Navigue vers `/strength/questionnaire`.
+  - `KpiWizardEntry` — tuile standard `rounded-2xl border bg-card` (pattern de `/strength`), icône `ClipboardCheck` en pastille `bg-primary/10`. Toujours visible (nageur ou coach — le wizard gère le rôle). Navigue vers `/strength/kpi-wizard`.
+- **`src/pages/Strength.tsx`** — onglet « S'entraîner », `screenMode === "list"` : rend `<QuestionnairePrompt>` puis `<KpiWizardEntry>` dans un bloc `space-y-2.5` au-dessus du `SessionBrowser`.
+- **`src/pages/Coach.tsx`** — `CoachHome` : nouvelle tuile « Bilan muscu » (`ClipboardCheck`, accent `fuchsia`) dans le tableau `quickAccess` (Section D « Accès rapides »), placée après « Planif. Muscu ». Nouveau prop `onOpenStrengthAssessment` (→ `navigate("/coach/strength-assessment")`).
+
+### Fichiers modifiés / créés
+
+- `src/components/strength/StrengthBilanEntry.tsx` (neuf, 95 lignes)
+- `src/pages/Strength.tsx` (import + bloc d'entrées dans l'onglet « S'entraîner »)
+- `src/pages/Coach.tsx` (prop `onOpenStrengthAssessment` + tuile `quickAccess` + import `ClipboardCheck`)
+
+### Tests / vérifications
+
+- `npx tsc --noEmit` — aucune erreur.
+- `npm run build` — succès.
+- Pas de test RLS : patch purement UI, aucune policy/migration touchée.
+- Pas de walkthrough live possible localement (app gatée sur login, build local sans credentials Supabase). Vérification par build + inspection.
+
+### Décisions
+
+- **Sous-composants extraits** plutôt qu'inline dans `Strength.tsx` (déjà ~1100 lignes) : `StrengthBilanEntry.tsx` isole la query React Query et garde la page lisible.
+- **`QuestionnairePrompt` au-dessus de `KpiWizardEntry`** : la spec demande que la carte questionnaire soit visuellement prioritaire. Couleur pleine + pastille animée vs tuile neutre `bg-card`.
+- **Tuile coach dans `quickAccess`** plutôt que dans la section « Mon entraînement » : « Bilan muscu » est une action du coach **sur ses nageurs** (sélection nageur dans l'écran), pas son entraînement perso. La grille 3-col d'accès rapides est le bon emplacement.
+- **Pas de lien KPI-wizard séparé sur le hub coach** : le wizard est déjà atteignable côté coach via `/strength` (la tuile y est partagée). Inutile de dupliquer.
+
+### Limites / dette
+
+- L'entrée déclenchée par notification (router le nageur vers son questionnaire automatiquement) reste un chantier ultérieur — `QuestionnairePrompt` est le relais in-app en attendant.
+- Les 3 écrans cibles (`KpiWizard`, `StrengthQuestionnaire`, `StrengthAssessmentScreen`) et les routes `App.tsx` n'ont pas été touchés — ils étaient déjà livrés (§285-287).
+
 ## §287 — Bilan physique coach : scores mobilité & mouvement (Phase 8) (2026-05-17)
 
 **Branche** : `main`
