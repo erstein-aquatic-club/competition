@@ -1285,3 +1285,38 @@ CREATE POLICY strength_kpi_measurements_coach ON public.strength_kpi_measurement
   FOR ALL TO authenticated
   USING (app_user_role() IN ('coach','admin'))
   WITH CHECK (app_user_role() IN ('coach','admin'));
+
+-- =============================================================================
+-- strength_periodization_templates (§292) — Chantier A
+-- "Bilan Muscu → Mésocycle". Référentiel des templates de périodisation.
+-- Keep in sync with migration 00166_strength_periodization_templates.sql.
+--
+-- RLS : lecture monde (tout authentifié) via `spt_select` ; écriture
+-- coach/admin uniquement via `spt_write` (FOR ALL, USING + WITH CHECK).
+--
+-- NOTE: la migration prod crée aussi un trigger
+-- `strength_periodization_templates_set_updated_at` via la fonction
+-- `set_updated_at_timestamp()` (créée en 00162). Cette fonction n'existe PAS
+-- dans ce schéma de test minimal — le trigger est OMIS volontairement, il est
+-- sans rapport avec les policies RLS testées ici (cf. §285 plus haut).
+-- =============================================================================
+
+CREATE TABLE public.strength_periodization_templates (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_group  TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  week_count   INTEGER NOT NULL CHECK (week_count > 0 AND week_count <= 24),
+  structure    JSONB NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.strength_periodization_templates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY spt_select ON public.strength_periodization_templates
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY spt_write ON public.strength_periodization_templates
+  FOR ALL TO authenticated
+  USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));

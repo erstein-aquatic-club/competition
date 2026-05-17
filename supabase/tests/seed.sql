@@ -212,3 +212,13 @@ INSERT INTO public.strength_kpi_measurements
   (id, athlete_id, kpi_key, value, unit, source, coach_reviewed) VALUES
   ('b0000000-0000-0000-0000-000000000001', 1, 'vertical_jump', 42.0, 'cm', 'wizard_athlete', false),
   ('b0000000-0000-0000-0000-000000000002', 2, 'vertical_jump', 38.0, 'cm', 'wizard_athlete', false);
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- §292 — strength_periodization_templates
+-- See strength-periodization-templates.test.ts. World-readable referential:
+-- one seeded template lets the swimmer-CAN-SELECT test assert a real row.
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.strength_periodization_templates
+  (id, event_group, name, week_count, structure) VALUES
+  ('c0000000-0000-0000-0000-000000000001', 'sprint', 'Sprint 8 semaines', 8,
+   '{"weeks": []}'::jsonb);
