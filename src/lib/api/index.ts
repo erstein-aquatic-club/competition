@@ -368,6 +368,24 @@ export {
   upsertPainReports,
 } from './painReports';
 
+// Bilan Muscu — Évaluation (Chantier B)
+export {
+  recordKpiMeasurement,
+  getKpiHistory,
+  getLatestKpiMeasurements,
+  markKpiReviewed,
+} from './strength-kpi';
+export type { RecordKpiInput } from './strength-kpi';
+
+export {
+  createAssessment,
+  getLatestAssessment,
+  getAssessment,
+  listAssessments,
+  updateAssessmentQuestionnaire,
+  updateAssessmentPhysicalTests,
+} from './strength-assessments';
+
 // Swim planning
 export {
   getSwimPlanningSlots,
