@@ -1,4 +1,16 @@
 /**
+ * Barèmes KPI du Bilan Muscu — population de référence : SCOLAIRE GÉNÉRALE.
+ *
+ * 1 KPI sur 5 (`broad_jump`) repose sur des normes publiées réelles ; les
+ * 4 autres sont transposés (`vertical_jump`, `weighted_pullup`, `imtp`) ou
+ * de simples placeholders à calibrer (`medball_vertical_throw`).
+ *
+ * Source détaillée et raisonnement : `docs/plans/bilan-muscu-baremes-sources.md`.
+ * Barèmes validés par le coach le 2026-05-17 (3 bandes d'âge — pas de bilan
+ * avant 13 ans ; valeurs filles réelles par bande ; flag de confiance).
+ */
+
+/**
  * Un barème = une liste d'ancres `[valeurBrute, score]` triées par
  * valeurBrute croissante (dérivées des percentiles de normes publiées).
  */
@@ -36,4 +48,210 @@ export function kpiScore(bareme: Bareme, value: number): number {
   }
   // Inatteignable : value est borné par les gardes ci-dessus.
   return clamp(last[1]);
+}
+
+import type { StrengthKpiKey } from '@/lib/api/types';
+
+/** Niveau de confiance d'un barème — voir docs/plans/bilan-muscu-baremes-sources.md. */
+export type BaremeConfidence = 'solid' | 'transposed' | 'placeholder';
+
+/** Bandes d'âge du Bilan Muscu (pas de bilan avant 13 ans). */
+export type AgeBand = '13-14' | '15-16' | '17-18';
+
+export type BaremeSex = 'M' | 'F';
+
+/** Un barème + son niveau de confiance. */
+export interface BaremeEntry {
+  anchors: Bareme;
+  confidence: BaremeConfidence;
+}
+
+/**
+ * Barèmes par KPI × sexe × bande d'âge.
+ *
+ * Transcrit depuis `docs/plans/bilan-muscu-baremes-sources.md` (§ 4-8) :
+ * chaque barème reprend les ancres p10/p30/p50/p70/p90 → scores 10/30/50/70/90
+ * des tranches A2/A3/A4 du document. La tranche A1 (11-12) du document est
+ * volontairement OMISE (décision coach 2026-05-17 : pas de bilan avant 13 ans).
+ */
+export const KPI_BAREMES: Record<
+  StrengthKpiKey,
+  Record<BaremeSex, Record<AgeBand, BaremeEntry>>
+> = {
+  // § 5 — détente verticale (cm) — TRANSPOSÉ.
+  vertical_jump: {
+    M: {
+      '13-14': {
+        anchors: [[28, 10], [35, 30], [41, 50], [47, 70], [54, 90]],
+        confidence: 'transposed',
+      },
+      '15-16': {
+        anchors: [[33, 10], [41, 30], [48, 50], [54, 70], [61, 90]],
+        confidence: 'transposed',
+      },
+      '17-18': {
+        anchors: [[37, 10], [45, 30], [52, 50], [59, 70], [67, 90]],
+        confidence: 'transposed',
+      },
+    },
+    F: {
+      '13-14': {
+        anchors: [[21, 10], [26, 30], [31, 50], [36, 70], [43, 90]],
+        confidence: 'transposed',
+      },
+      '15-16': {
+        anchors: [[23, 10], [29, 30], [34, 50], [39, 70], [46, 90]],
+        confidence: 'transposed',
+      },
+      '17-18': {
+        anchors: [[25, 10], [31, 30], [36, 50], [42, 70], [49, 90]],
+        confidence: 'transposed',
+      },
+    },
+  },
+
+  // § 4 — standing broad jump (cm) — normes publiées (Petrigna et al. 2020).
+  broad_jump: {
+    M: {
+      '13-14': {
+        anchors: [[133, 10], [153, 30], [167, 50], [181, 70], [197, 90]],
+        confidence: 'solid',
+      },
+      '15-16': {
+        anchors: [[134, 10], [159, 30], [175, 50], [191, 70], [211, 90]],
+        confidence: 'solid',
+      },
+      '17-18': {
+        anchors: [[148, 10], [168, 30], [187, 50], [203, 70], [224, 90]],
+        confidence: 'solid',
+      },
+    },
+    F: {
+      '13-14': {
+        anchors: [[116, 10], [128, 30], [140, 50], [153, 70], [173, 90]],
+        confidence: 'solid',
+      },
+      '15-16': {
+        anchors: [[107, 10], [124, 30], [135, 50], [149, 70], [170, 90]],
+        confidence: 'solid',
+      },
+      '17-18': {
+        anchors: [[98, 10], [113, 30], [125, 50], [139, 70], [163, 90]],
+        confidence: 'solid',
+      },
+    },
+  },
+
+  // § 7 — mid-thigh pull charge max (kg) — TRANSPOSÉ.
+  imtp: {
+    M: {
+      '13-14': {
+        anchors: [[40, 10], [55, 30], [70, 50], [90, 70], [110, 90]],
+        confidence: 'transposed',
+      },
+      '15-16': {
+        anchors: [[55, 10], [75, 30], [95, 50], [115, 70], [140, 90]],
+        confidence: 'transposed',
+      },
+      '17-18': {
+        anchors: [[65, 10], [90, 30], [110, 50], [130, 70], [155, 90]],
+        confidence: 'transposed',
+      },
+    },
+    F: {
+      '13-14': {
+        anchors: [[32, 10], [42, 30], [55, 50], [68, 70], [85, 90]],
+        confidence: 'transposed',
+      },
+      '15-16': {
+        anchors: [[40, 10], [52, 30], [65, 50], [80, 70], [100, 90]],
+        confidence: 'transposed',
+      },
+      '17-18': {
+        anchors: [[45, 10], [58, 30], [72, 50], [88, 70], [110, 90]],
+        confidence: 'transposed',
+      },
+    },
+  },
+
+  // § 6 — charge additionnelle traction (kg) — TRANSPOSÉ.
+  weighted_pullup: {
+    M: {
+      '13-14': {
+        anchors: [[-5, 10], [0, 30], [5, 50], [12.5, 70], [22.5, 90]],
+        confidence: 'transposed',
+      },
+      '15-16': {
+        anchors: [[0, 10], [5, 30], [10, 50], [17.5, 70], [30, 90]],
+        confidence: 'transposed',
+      },
+      '17-18': {
+        anchors: [[0, 10], [5, 30], [12.5, 50], [20, 70], [35, 90]],
+        confidence: 'transposed',
+      },
+    },
+    F: {
+      '13-14': {
+        anchors: [[-10, 10], [-2.5, 30], [0, 50], [5, 70], [12.5, 90]],
+        confidence: 'transposed',
+      },
+      '15-16': {
+        anchors: [[-7.5, 10], [0, 30], [2.5, 50], [7.5, 70], [17.5, 90]],
+        confidence: 'transposed',
+      },
+      '17-18': {
+        anchors: [[-5, 10], [0, 30], [5, 50], [10, 70], [20, 90]],
+        confidence: 'transposed',
+      },
+    },
+  },
+
+  // § 8 — lancer vertical médecine-ball 10 kg, hauteur (cm) — PLACEHOLDER.
+  medball_vertical_throw: {
+    M: {
+      '13-14': {
+        anchors: [[45, 10], [65, 30], [85, 50], [105, 70], [130, 90]],
+        confidence: 'placeholder',
+      },
+      '15-16': {
+        anchors: [[65, 10], [90, 30], [115, 50], [140, 70], [170, 90]],
+        confidence: 'placeholder',
+      },
+      '17-18': {
+        anchors: [[80, 10], [110, 30], [135, 50], [160, 70], [195, 90]],
+        confidence: 'placeholder',
+      },
+    },
+    F: {
+      '13-14': {
+        anchors: [[30, 10], [42, 30], [55, 50], [70, 70], [88, 90]],
+        confidence: 'placeholder',
+      },
+      '15-16': {
+        anchors: [[38, 10], [52, 30], [68, 50], [84, 70], [105, 90]],
+        confidence: 'placeholder',
+      },
+      '17-18': {
+        anchors: [[45, 10], [60, 30], [78, 50], [95, 70], [118, 90]],
+        confidence: 'placeholder',
+      },
+    },
+  },
+};
+
+/** Bande d'âge pour un âge donné. `null` si < 13 ans (pas de bilan). */
+export function ageBandFor(age: number): AgeBand | null {
+  if (age < 13) return null;
+  if (age <= 14) return '13-14';
+  if (age <= 16) return '15-16';
+  return '17-18';
+}
+
+/** Récupère le barème d'un KPI pour un sexe et une bande d'âge. */
+export function getBareme(
+  kpiKey: StrengthKpiKey,
+  sex: BaremeSex,
+  ageBand: AgeBand,
+): BaremeEntry {
+  return KPI_BAREMES[kpiKey][sex][ageBand];
 }
