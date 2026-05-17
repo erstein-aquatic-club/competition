@@ -114,6 +114,7 @@ const Administratif = lazyWithRetry(() => import("@/pages/Administratif"));
 const Comite = lazyWithRetry(() => import("@/pages/Comite"));
 const Strength = lazyWithRetry(() => import("@/pages/Strength"));
 const KpiWizard = lazyWithRetry(() => import("@/pages/KpiWizard"));
+const StrengthQuestionnaire = lazyWithRetry(() => import("@/pages/StrengthQuestionnaire"));
 const Suivi = lazyWithRetry(() => import("@/pages/Suivi"));
 const SuiviSemaine = lazyWithRetry(() => import("@/pages/SuiviSemaine"));
 const SuiviPlanification = lazyWithRetry(() => import("@/pages/SuiviPlanification"));
@@ -351,6 +352,11 @@ function AppRouter() {
             <Route path="/strength/kpi-wizard">
               <Suspense fallback={<ListSkeleton />}>
                 <KpiWizard />
+              </Suspense>
+            </Route>
+            <Route path="/strength/questionnaire">
+              <Suspense fallback={<ListSkeleton />}>
+                <StrengthQuestionnaire />
               </Suspense>
             </Route>
             <Route path="/strength">
