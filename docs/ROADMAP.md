@@ -8,6 +8,8 @@
 
 *Précédente : §285 livré (2026-05-17) — KpiWizard, assistant guidé de saisie des 5 KPIs de force (Feature "Bilan Muscu → Mésocycle", Chantier B, Phase 6). Écran autonome `/strength/kpi-wizard` accessible nageur ET coach : 3 phases (sélection nageur coach, 5 étapes 1 KPI/étape avec protocole binôme complet, recap diff vs précédente mesure). Skip de KPI autorisé (bilan partiel), champ binôme `assisted_by`, source `wizard_coach | wizard_athlete`, mode focus dock masqué. 5 fichiers neufs (page + 4 sous-composants `src/components/strength/kpi/`).*
 
+*Précédente : §285 livré (2026-05-17) — Bilan Muscu, fondation Chantier B (Phases 1-5) (Feature "Bilan Muscu → Mésocycle"). Migration `00163` (tables `strength_assessments` + `strength_kpi_measurements` sous RLS), types, API (`strength-kpi.ts`, `strength-assessments.ts` + re-exports `index.ts`), tests RLS d'intégration (20), helpers (`bestAttempt`, `kpiProtocols`). Socle données/API du Bilan Muscu — sans UI ni moteur. ~34 tests unitaires verts. Design : `docs/plans/2026-05-17-bilan-muscu-mesocycle-design.md`.*
+
 *Précédente : §284 livré (2026-05-16) — Factorisation de `fmtTime` dans `src/lib/formatTime.ts` : les 3 copies identiques (PaceMatrix, matrice 4 nages, export PDF) remplacées par un import unique ; `fmtTimeCs` devient un wrapper. Refactor sans changement de comportement.*
 
 *Précédente : §283 livré (2026-05-16) — Colonne MAX du calculateur d'allures à 2 décimales.*

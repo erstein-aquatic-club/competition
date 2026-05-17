@@ -224,6 +224,53 @@ Route ajoutée dans `App.tsx` (lazy import + `<Suspense fallback={<ListSkeleton 
 - **Sortie de wizard → `/strength`** : pas de page KPI dédiée existante ; `/strength` est le hub muscu le plus proche.
 - **Pas de persistance brouillon localStorage** : à la différence de `WorkoutRunner`, un bilan KPI est court (5 étapes) et se fait en présence du coach/binôme — le risque de kill PWA mid-saisie est faible. À ajouter si le besoin émerge.
 
+## §285 — Bilan Muscu : fondation Chantier B — DB, API, tests RLS, helpers (Phases 1-5) (2026-05-17)
+
+**Branche** : `main`
+**Trigger** : Feature "Bilan Muscu → Mésocycle", Chantier B, Phases 1-5. Socle posé avant les 3 écrans (§285 `KpiWizard`, §286 `StrengthQuestionnaire`, §287 `StrengthAssessmentScreen`). Design validé : `docs/plans/2026-05-17-bilan-muscu-mesocycle-design.md` ; plan d'implémentation : `docs/plans/2026-05-17-bilan-muscu-chantier-B.md`.
+
+> Le numéro §285 couvre toute la livraison initiale du Chantier B (fondation + `KpiWizard`) — voir aussi l'entrée §285 `KpiWizard` ci-dessus.
+
+### Contexte
+
+Le moteur de génération de mésocycle (Chantier C, futur) consommera une évaluation structurée du nageur : questionnaire (douleurs, blessures, psycho), bilan coach (mobilité/mouvement) et 5 KPIs chiffrés. Phases 1-5 posent le socle données + API + tests, sans UI ni moteur.
+
+### Changements
+
+- **Migration `00163_strength_assessments.sql`** — 2 tables :
+  - `strength_assessments` (les bilans d'un nageur, série temporelle) : `questionnaire`/`physical_tests`/`bucket_scores` JSONB, workflow `status` (`questionnaire_pending` → `bilan_pending` → `completed`), `data_confidence`.
+  - `strength_kpi_measurements` (série temporelle des 5 KPIs) : `kpi_key`, `value`, `attempts` JSONB, `measured_by`/`assisted_by`, `source`, `coach_reviewed`.
+  - RLS : le nageur possède ses lignes (`athlete_id = app_user_id()`) ; coach/admin `FOR ALL` (le coach renseigne `physical_tests` / valide les KPIs). Accès club entier — décision produit confirmée en revue.
+- **Types** (`src/lib/api/types.ts`) — `StrengthAssessment`, `StrengthKpiMeasurement`, `StrengthQuestionnaire`, `StrengthPhysicalTests`, `QuestionnairePainEntry` + unions `StrengthKpiKey`/`StrengthAssessmentStatus`/`StrengthKpiSource`/`StrengthDataConfidence`.
+- **API** — `strength-kpi.ts` (`recordKpiMeasurement`, `getKpiHistory`, `getLatestKpiMeasurements`, `markKpiReviewed`) + `strength-assessments.ts` (`createAssessment`, `getLatestAssessment`, `getAssessment`, `listAssessments`, `updateAssessmentQuestionnaire`, `updateAssessmentPhysicalTests`). Garde anti no-op silencieux §113 sur les `update`. Re-exports dans `index.ts`.
+- **Helpers/config** — `kpiMeasurement.ts` (`bestAttempt`, plus `parseAttempts` ajouté en §285-fix) ; `kpiProtocols.ts` (`KPI_PROTOCOLS` — fiches-protocole des 5 KPIs, `gifUrl` null en attente du contenu Chantier A).
+
+### Fichiers
+
+| Fichier | Nature |
+|---------|--------|
+| `supabase/migrations/00163_strength_assessments.sql` (nouveau, 97 lignes) | 2 tables + RLS + index + trigger |
+| `src/lib/api/types.ts` | + 9 déclarations Bilan Muscu |
+| `src/lib/api/strength-kpi.ts` (nouveau, 94 lignes) | CRUD `strength_kpi_measurements` |
+| `src/lib/api/strength-assessments.ts` (nouveau, 107 lignes) | CRUD `strength_assessments` |
+| `src/lib/api/index.ts` | + re-exports Bilan Muscu |
+| `src/lib/strength/kpiMeasurement.ts` (nouveau) | helper `bestAttempt` |
+| `src/lib/strength/kpiProtocols.ts` (nouveau, 92 lignes) | config des 5 protocoles KPI |
+| `supabase/tests/schema.sql` · `seed.sql` · `rls/strength-assessments.test.ts` (nouveau) | harness RLS étendu |
+
+### Tests
+
+- ~34 tests unitaires (`node:test`) : 12 `strength-kpi`, 19 `strength-assessments`, 3 `bestAttempt` — verts.
+- 20 tests RLS d'intégration (`strength-assessments.test.ts`) : isolation nageur, accès coach/admin, modes d'échec `WITH CHECK` (INSERT) vs filtrage 0-ligne (UPDATE/SELECT) — verts.
+- `npx tsc --noEmit` clean ; `npm run build` OK.
+
+### Décisions prises
+
+- **Moteur déterministe** (pas de LLM) retenu en design — auditable, RGPD-safe pour des mineurs, le coach garde la main. Cf. design doc.
+- **RLS coach `FOR ALL`** (plus large que `pain_reports`, SELECT-only) — le coach écrit `physical_tests` et valide les mesures KPI ; accès club entier confirmé.
+- **PK `uuid`** pour les 2 tables (cohérent avec `pain_reports`).
+- **KPIs en série temporelle**, pas d'unicité par nageur — réévaluations successives, le plus récent fait foi.
+
 ## §284 — Factorisation de `fmtTime` dans un module commun (2026-05-16)
 
 **Branche** : `main`
