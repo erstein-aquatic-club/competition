@@ -76,15 +76,62 @@ import {
   SCORE_LEGEND,
   SCORE_UNSET,
   type AssessmentScoreItem,
+  type MobilityScoreKey,
+  type MovementScoreKey,
 } from "@/components/strength/assessment/assessmentScores";
 
 const ALL_SCORES: AssessmentScoreItem[] = [...MOBILITY_SCORES, ...MOVEMENT_SCORES];
 
+/** Every score key, mobility + movement. */
+type ScoreKey = MobilityScoreKey | MovementScoreKey;
+
 /** Per-score-key state. Sentinel SCORE_UNSET = not yet picked. */
-type ScoreState = Record<string, number>;
+type ScoreState = Record<ScoreKey, number>;
 
 const emptyScores = (): ScoreState =>
-  Object.fromEntries(ALL_SCORES.map((s) => [s.key, SCORE_UNSET]));
+  Object.fromEntries(
+    ALL_SCORES.map((s) => [s.key, SCORE_UNSET]),
+  ) as ScoreState;
+
+/**
+ * Centered single-message state (loading-free), reused by several screen
+ * branches. Module-scope on purpose: declaring it inside the screen
+ * component would make React see a fresh component *type* each render and
+ * remount the whole subtree.
+ */
+function CenteredState({
+  icon,
+  tone = "muted",
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  tone?: "muted" | "primary" | "destructive";
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 text-center">
+      <div
+        className={cn(
+          "mb-4 flex h-14 w-14 items-center justify-center rounded-2xl",
+          tone === "primary" && "bg-primary/10 text-primary",
+          tone === "destructive" && "bg-destructive/10 text-destructive",
+          tone === "muted" && "bg-muted text-muted-foreground",
+        )}
+      >
+        {icon}
+      </div>
+      <h1 className="text-lg font-bold tracking-tight text-foreground">
+        {title}
+      </h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+      {children}
+    </div>
+  );
+}
 
 export default function StrengthAssessmentScreen() {
   const [, navigate] = useLocation();
@@ -142,11 +189,16 @@ export default function StrengthAssessmentScreen() {
   const canStartNew = assessment == null || status === "completed";
   const isScoring = status === "bilan_pending" && !submittedLocally;
 
-  // ── Latest KPIs — read-only context, only meaningful while scoring ──
+  // ── Latest KPIs — read-only context shown in the scoring branch ──
+  // Gated purely on the athlete being selected, NOT on `isScoring`: gating
+  // on derived status would silently empty the KPI block under the coach
+  // if the assessment refetch settles to a non-`bilan_pending` status
+  // mid-scoring. One extra small fetch on the start/waiting branches is an
+  // acceptable trade for that robustness (matches KpiWizard).
   const { data: kpis } = useQuery({
     queryKey: ["kpi-latest", selectedAthleteId],
     queryFn: () => getLatestKpiMeasurements(selectedAthleteId!),
-    enabled: selectedAthleteId != null && isScoring,
+    enabled: selectedAthleteId != null,
   });
 
   // Reset the form whenever the athlete or the assessment identity changes —
@@ -173,7 +225,14 @@ export default function StrengthAssessmentScreen() {
       toast.success("Bilan démarré", {
         description: "Le nageur peut maintenant remplir son questionnaire.",
       });
-      await queryClient.invalidateQueries({
+      // refetch (not invalidate) so the NEXT render already sees the new
+      // assessment and leaves the start-CTA branch. `createAssessment`
+      // inserts unconditionally; with a mere invalidate the enabled
+      // "Démarrer" button stays rendered until the refetch settles, so a
+      // fast double-tap would insert two `questionnaire_pending` rows for
+      // the same athlete. Awaiting the refetch closes that race (same
+      // pattern as KpiWizard.restart(), see its "I2" comment).
+      await queryClient.refetchQueries({
         queryKey: ["strength-assessment", selectedAthleteId],
       });
     },
@@ -241,39 +300,6 @@ export default function StrengthAssessmentScreen() {
         </span>
       </div>
       <span className="w-[58px]" aria-hidden />
-    </div>
-  );
-
-  /** Centered single-message state (loading-free), reused by several branches. */
-  const CenteredState = ({
-    icon,
-    tone = "muted",
-    title,
-    description,
-    children,
-  }: {
-    icon: React.ReactNode;
-    tone?: "muted" | "primary" | "destructive";
-    title: string;
-    description: string;
-    children?: React.ReactNode;
-  }) => (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 text-center">
-      <div
-        className={cn(
-          "mb-4 flex h-14 w-14 items-center justify-center rounded-2xl",
-          tone === "primary" && "bg-primary/10 text-primary",
-          tone === "destructive" && "bg-destructive/10 text-destructive",
-          tone === "muted" && "bg-muted text-muted-foreground",
-        )}
-      >
-        {icon}
-      </div>
-      <h1 className="text-lg font-bold tracking-tight text-foreground">
-        {title}
-      </h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
-      {children}
     </div>
   );
 
@@ -687,6 +713,7 @@ export default function StrengthAssessmentScreen() {
           <Button
             className="h-14 w-full rounded-2xl text-base font-bold"
             disabled={!allScored || submitMutation.isPending}
+            aria-describedby={!allScored ? "assessment-submit-hint" : undefined}
             onClick={() => submitMutation.mutate()}
           >
             <Send className="mr-1.5 h-5 w-5" />
@@ -695,7 +722,11 @@ export default function StrengthAssessmentScreen() {
               : "Enregistrer le bilan"}
           </Button>
           {!allScored && (
-            <p className="text-center text-[11px] text-muted-foreground">
+            <p
+              id="assessment-submit-hint"
+              aria-live="polite"
+              className="text-center text-[11px] text-muted-foreground"
+            >
               Note les 6 critères ({scoredCount}/6) pour enregistrer.
             </p>
           )}
