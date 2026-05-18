@@ -1,6 +1,6 @@
 # État des fonctionnalités
 
-*Dernière mise à jour : 2026-05-10 (§265 — clôture chantier perf post-pass-2 : 5 livraisons §254 audit + §256 withTimeout + §262 RPC atomique + §263 uploadAvatar offline + §265 useDelayedLoading. Composite estimé 6.1 → ~8.4/10.)*
+*Dernière mise à jour : 2026-05-18 (§292 — clôture du Chantier A « Contenu du Bilan Muscu » : A1 barèmes KPI + A2 tagging du catalogue + A3 templates de périodisation à durée variable, 14 templates seedés. Couche données complète ; moteur de génération Chantier C non livré.)*
 
 ## Légende
 
@@ -115,6 +115,7 @@ Tous les feature flags sont activés.
 | Module muscu perso coach | ✅ | `navItems.ts`, `AppLayout.tsx`, `Coach.tsx`, `Strength.tsx`, `useStrengthPlanningAthleteMode.ts` | §271 — Coach accède à `/strength` comme un nageur : nav desktop 6 items + dock mobile 6 items (Profil/Chrono swappés) + tuile "Mon entraînement" dans hub Coach. Vue toujours perso (neutralisation `selectedAthleteId`). 1RM, focus mode, historique, plan via overrides — RLS déjà permissive. §273 — Parité finale : la carte "Mon entraînement" du hub affiche la séance muscu du jour avec CTA Démarrer + carte secondaire "Mes records muscu" → `/records?tab=1rm` pour édition inline des 1RM. |
 | Dashboard coach | ✅ | `Coach.tsx` | Mobile first, KPI unifié, grille 2x2 avec compteurs, cards nageurs (§35) |
 | Calendrier coach | ✅ | `CoachCalendar.tsx`, `useCoachCalendarState.ts` | Vue mensuelle assignations, filtre groupe/nageur, 3 slots éditables inline (Nage Matin, Nage Soir, Muscu), indicateur musculation DayCell (§53, §54) |
+| Bilan Muscu — Chantier A (contenu/données) | 🔧 | `src/lib/strength/kpiBaremes.ts`, `dim_exercices` (tagging), `strength_periodization_templates` (DB), `src/lib/strength/periodizationCycles.ts` | **Chantier A « Contenu du Bilan Muscu » clos** — couche données complète. A1 barèmes KPI (§290 : 5 KPIs × 2 sexes × 3 bandes d'âge, flag de confiance). A2 tagging du catalogue (§291 : 94 exercices taggés bucket/contraindication/level/is_core, migrations `00164`-`00165`). A3 templates de périodisation (§292 : table à **durée variable** modèle de phases `[min, nominal, max]`, **14 templates seedés** — 7 saison + 7 mini-prépa, migrations `00166`-`00169` ; `sessions_per_week` ajouté à `strength_assessments`). 🔧 car le **moteur de génération** qui consomme ces données (Chantier C) n'est **pas livré**. A4 (5 GIFs protocoles KPI) = tâche utilisateur (assets). |
 
 ### Records & FFN
 

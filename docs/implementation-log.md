@@ -4,34 +4,63 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
-## §292 — Bilan Muscu Chantier A : table des templates de périodisation (A3 — EN COURS) (2026-05-17)
+## §292 — Bilan Muscu Chantier A : templates de périodisation à durée variable (A3 — clôture du Chantier A) (2026-05-17 → 2026-05-18)
 
 **Branche** : `main`
-**Trigger** : Chantier A, brique A3 (templates de périodisation). Design : `docs/plans/2026-05-17-bilan-muscu-chantier-A-design.md` ; plan : `docs/plans/2026-05-17-bilan-muscu-chantier-A.md`.
+**Trigger** : Chantier A, brique A3 (templates de périodisation). Design initial : `docs/plans/2026-05-17-bilan-muscu-chantier-A-design.md` ; plan : `docs/plans/2026-05-17-bilan-muscu-chantier-A.md`. Évolution de design validée au point de validation des templates : `docs/plans/2026-05-18-bilan-muscu-templates-duree-variable-design.md` + plan `docs/plans/2026-05-18-bilan-muscu-templates-duree-variable.md`.
 
-> ⚠️ **§292 est partiel** — la table + les tests RLS sont livrés ; les 7 templates ne sont **pas encore seedés**. Reste à faire détaillé ci-dessous.
+> **Évolution de design.** Le point de validation coach des 7 templates a fait émerger trois besoins que le modèle figé du Chantier A initial ne couvrait pas : durée de mésocycle pilotable par le coach, famille de mini-prépas inter-compétitions, capacité hebdomadaire de l'athlète. La sous-tâche A3.4 d'origine (« seed de 7 templates figés à `week_count` fixe ») est donc **remplacée** par ce design à durée variable : modèle de phases à bornes `[min, nominal, max]` et **14 templates** (7 saison + 7 mini-prépa). §292 livre la brique A3 complète selon ce design.
 
-### Livré
+### Changements
 
-- **Migration `00166_strength_periodization_templates.sql`** — table `strength_periodization_templates` (`id`, `event_group`, `name`, `week_count`, `structure` jsonb, timestamps) + RLS (`spt_select` : lecture tout authentifié ; `spt_write` : écriture coach/admin) + trigger `updated_at`.
-- **Types** (`src/lib/api/types.ts`) — `StrengthBucket`, `PeriodizationCycle`, `PeriodizationStructure`, `StrengthPeriodizationTemplate`.
-- **Tests RLS** — `supabase/tests/rls/strength-periodization-templates.test.ts` (10 tests) + extension de `supabase/tests/schema.sql` / `seed.sql`. Verts.
+- **Table à durée variable** (`strength_periodization_templates`) — la table de la migration `00166` étant restée vide, on la fait évoluer sans migration de données : abandon du `week_count` fixe au profit d'un modèle de durée variable. Chaque template porte `kind`, `min_week_count`, `max_week_count` ; la durée réelle d'un mésocycle est saisie à la génération et répartie par le moteur (Chantier C) sur les phases.
+- **Modèle de phases** — `structure.weeks[]` (modèle figé semaine-par-semaine) est remplacé par `structure.phases[]`. Chaque `PeriodizationPhase` porte `{ cycle, min_weeks, nominal_weeks, max_weeks }` : le moteur garde la séquence de cycles et étire/comprime chaque phase dans sa plage selon la durée cible.
+- **Famille « mini-prépa »** — nouveau `kind = inter_competition` : format court (~5 sem. nominales) pour relancer fraîcheur et puissance entre deux compétitions rapprochées, en partant d'une base déjà solide. Modèle de données uniforme avec les templates de saison (`kind = season`).
+- **Capacité hebdomadaire de l'athlète** — colonne `sessions_per_week` ajoutée à `strength_assessments` (nombre de séances de muscu réalisables/semaine), saisie par le nageur à l'auto-évaluation, ajustable par le coach. Sans cette donnée le plan généré peut être irréaliste.
+- **Types** (`src/lib/api/types.ts`) — nouveau `PeriodizationPhase` ; `PeriodizationStructure` révisé (`weeks[]` → `phases[]`) ; nouveau `PeriodizationTemplateKind` (`season` | `inter_competition`) ; `StrengthPeriodizationTemplate` révisé (ajout `kind`, `week_count` → `min_week_count` + `max_week_count`).
+- **Seed des 14 templates** — `strength_periodization_templates` peuplé : 7 templates « saison » + 7 templates « mini-prépa », un par `event_group` (`sprint_50`, `breaststroke`, `backstroke`, `200m`, `400m`, `distance`, `medley`).
+- **Schéma de test RLS aligné** — `supabase/tests/schema.sql`, `supabase/tests/seed.sql`, `supabase/tests/rls/strength-periodization-templates.test.ts` mis à jour pour le nouveau schéma de table.
+- **Doc de contenu** — `docs/plans/bilan-muscu-templates-sources.md` réécrit : les 14 templates en modèle de phases (plage `[min, nominal, max]` par phase).
+
+### Migrations
+
+- **`00166_strength_periodization_templates.sql`** (livré antérieurement dans §292) — création de la table `strength_periodization_templates` + RLS (`spt_select` lecture tout authentifié, `spt_write` écriture coach/admin) + trigger `updated_at`.
+- **`00167`** — `ALTER TABLE strength_periodization_templates` : `week_count` retiré, ajout `kind` (CHECK `'season'`/`'inter_competition'`), `min_week_count`, `max_week_count` (CHECK `> 0 AND <= 24`) + contrainte CHECK `min_week_count <= max_week_count`.
+- **`00168`** — `ALTER TABLE strength_assessments` : ajout `sessions_per_week INTEGER NOT NULL DEFAULT 3 CHECK (BETWEEN 1 AND 7)`.
+- **`00169`** — seed des 14 templates dans `strength_periodization_templates` (7 saison + 7 mini-prépa), avec garde-fou `DO $$` (idempotence).
 
 ### Décision majeure validée coach — vocabulaire de cycles
 
 L'ancien vocabulaire `endurance / hypertrophie / force / deload` est abandonné. La littérature S&C (l'hypertrophie non spécifique augmente la traînée) **et** le plan réel de F. Wagner (`training_plans` id 2, « Prépa sprint 50m », 10 sem. : test → force max → puissance → affûtage → pic, sans hypertrophie) confirment. **Nouveau vocabulaire à 6 cycles** : `prepa_generale / force_max / puissance / maintien / affutage / pic`. **Chargement hybride** : `force_max` → params `*_force` de `dim_exercices`, `prepa_generale` → `*_endurance`, le reste (`puissance`, `maintien`, `affutage`, `pic`) → chargement générique au niveau cycle. `dim_exercices` et le module muscu coach existant **non touchés**. Synthèse : `docs/plans/bilan-muscu-cycles-vocabulaire.md`.
 
-### Reste à faire (A3.3-bis + A3.4)
+### Décisions validées coach (design à durée variable)
 
-1. Mettre à jour le type `PeriodizationCycle` (créé à 4 valeurs → les 6 valeurs validées).
-2. Ré-aligner les 7 templates de `docs/plans/bilan-muscu-templates-sources.md` (rédigés avec l'ancien vocabulaire) sur les 6 cycles.
-3. Définir le config de chargement par cycle (`puissance`/`maintien`/`affutage`/`pic` génériques + mapping `force_max`→force / `prepa_generale`→endurance).
-4. Validation coach des 7 templates ré-alignés.
-5. Migration de seed des 7 templates.
+- **Durée cible saisie à la génération** — le coach pilote la durée réelle du mésocycle (nombre de semaines ou dates) ; le moteur garde les phases et répartit la durée.
+- **Chaque phase porte une plage `[min, nominal, max]`** — la séquence de cycles sert de structure ; le moteur étire/comprime dans les bornes.
+- **Mini-prépa étirable, plafonnée à 8 sem.** — même mécanique que les templates de saison, mais au-delà de 8 sem. on repasse sur un template de saison (correction coach lors de la validation : plafond resserré de 11 à 8 sem.).
+- **`sessions_per_week` dans `strength_assessments`** — capacité hebdo de l'athlète saisie au Bilan Muscu, ajustable coach.
+- **14 templates validés par le coach** (2026-05-18) avec la seule correction du plafond mini-prépa.
+
+### Tests
+
+- `npm test` — suite verte (808/808 au moment de la clôture).
+- `npx tsc --noEmit` — exit 0.
+- `npm run build` — succès.
+- Tests RLS d'intégration — `supabase/tests/rls/strength-periodization-templates.test.ts` aligné sur le nouveau schéma ; `npm run test:rls` vert (hors 2 échecs pré-existants connus `coach_pace_zones` / `pace_share_links`).
 
 ### Commits
 
-`5d9c34b2c` (table + types), `f0d2ff9b7` (tests RLS).
+`5d9c34b2c` (table + types), `f0d2ff9b7` (tests RLS de la table) ; commits `feat(§292)` / `docs(§292)` du design à durée variable (types, migrations `00167`-`00169`, seed, schéma de test, doc de contenu), puis `docs(§292)` de clôture du Chantier A.
+
+### Limites / hors scope
+
+- **Moteur de génération** — la consommation de ces templates (répartition de la durée cible sur les phases, sélection d'exercices) est le **Chantier C**, non livré.
+- **Chargement par cycle** — `src/lib/strength/periodizationCycles.ts` (config de chargement par cycle) a été livré antérieurement dans §292 et n'est **pas modifié** par le design à durée variable.
+- **Amélioration différée** — une contrainte `UNIQUE (event_group, kind)` sur `strength_periodization_templates` durcirait l'invariant « un template par (épreuve, famille) » — non faite, à envisager ultérieurement.
+
+### Clôture du Chantier A
+
+§292 **achève le Chantier A « Contenu du Bilan Muscu »** : A1 barèmes KPI (§290), A2 tagging du catalogue d'exercices (§291), A3 templates de périodisation (§292). La brique A4 (5 GIFs de démo des protocoles KPI) reste une tâche utilisateur (production d'assets), hors plan de code.
 
 ## §291 — Bilan Muscu Chantier A : tagging du catalogue d'exercices (A2) (2026-05-17)
 
