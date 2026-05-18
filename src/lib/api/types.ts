@@ -979,7 +979,8 @@ export type PeriodizationCycle =
 
 /** Une phase de périodisation : un cycle tenu sur une plage de semaines.
  *  Le moteur (Chantier C) part de nominal_weeks et étire/comprime la phase
- *  dans [min_weeks, max_weeks] pour atteindre la durée cible. */
+ *  dans [min_weeks, max_weeks] pour atteindre la durée cible.
+ *  Invariant : min_weeks ≤ nominal_weeks ≤ max_weeks. */
 export interface PeriodizationPhase {
   cycle: PeriodizationCycle;
   /** Durée plancher (incompressible) de la phase, en semaines. */
@@ -1007,7 +1008,11 @@ export interface StrengthPeriodizationTemplate {
   event_group: string;
   kind: PeriodizationTemplateKind;
   name: string;
+  /** Durée plancher du template. Égale Σ structure.phases[].min_weeks
+   *  (cohérence vérifiée au seed). */
   min_week_count: number;
+  /** Durée plafond du template. Égale Σ structure.phases[].max_weeks
+   *  (cohérence vérifiée au seed). */
   max_week_count: number;
   structure: PeriodizationStructure;
   created_at: string;
