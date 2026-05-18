@@ -219,6 +219,6 @@ INSERT INTO public.strength_kpi_measurements
 -- one seeded template lets the swimmer-CAN-SELECT test assert a real row.
 -- ═════════════════════════════════════════════════════════════════════════════
 INSERT INTO public.strength_periodization_templates
-  (id, event_group, name, week_count, structure) VALUES
-  ('c0000000-0000-0000-0000-000000000001', 'sprint', 'Sprint 8 semaines', 8,
-   '{"weeks": []}'::jsonb);
+  (id, event_group, name, structure, kind, min_week_count, max_week_count) VALUES
+  ('c0000000-0000-0000-0000-000000000001', 'sprint', 'Sprint 8 semaines',
+   '{"weeks": []}'::jsonb, 'season', 8, 12);

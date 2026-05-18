@@ -1289,7 +1289,9 @@ CREATE POLICY strength_kpi_measurements_coach ON public.strength_kpi_measurement
 -- =============================================================================
 -- strength_periodization_templates (§292) — Chantier A
 -- "Bilan Muscu → Mésocycle". Référentiel des templates de périodisation.
--- Keep in sync with migration 00166_strength_periodization_templates.sql.
+-- Keep in sync with migration 00166_strength_periodization_templates.sql
+-- and 00167 (variable-duration: kind + min_week_count + max_week_count,
+-- week_count removed).
 --
 -- RLS : lecture monde (tout authentifié) via `spt_select` ; écriture
 -- coach/admin uniquement via `spt_write` (FOR ALL, USING + WITH CHECK).
@@ -1302,13 +1304,16 @@ CREATE POLICY strength_kpi_measurements_coach ON public.strength_kpi_measurement
 -- =============================================================================
 
 CREATE TABLE public.strength_periodization_templates (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_group  TEXT NOT NULL,
-  name         TEXT NOT NULL,
-  week_count   INTEGER NOT NULL CHECK (week_count > 0 AND week_count <= 24),
-  structure    JSONB NOT NULL,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_group     TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  structure       JSONB NOT NULL,
+  kind            TEXT NOT NULL CHECK (kind IN ('season','inter_competition')),
+  min_week_count  INTEGER NOT NULL CHECK (min_week_count > 0 AND min_week_count <= 24),
+  max_week_count  INTEGER NOT NULL CHECK (max_week_count > 0 AND max_week_count <= 24),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (min_week_count <= max_week_count)
 );
 
 ALTER TABLE public.strength_periodization_templates ENABLE ROW LEVEL SECURITY;

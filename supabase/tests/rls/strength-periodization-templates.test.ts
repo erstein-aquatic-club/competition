@@ -57,8 +57,8 @@ describe("strength_periodization_templates RLS", () => {
       asUser(ALICE, async (c) => {
         await c.query(
           `INSERT INTO strength_periodization_templates
-             (event_group, name, week_count, structure)
-           VALUES ('sprint', 'Athlete sneak-in', 6, '{"weeks": []}'::jsonb)`,
+             (event_group, name, structure, kind, min_week_count, max_week_count)
+           VALUES ('sprint', 'Athlete sneak-in', '{"weeks": []}'::jsonb, 'season', 6, 8)`,
         );
       }),
     ).rejects.toThrow(/row-level security/i);
@@ -98,15 +98,15 @@ describe("strength_periodization_templates RLS", () => {
   // ── A coach CAN write ─────────────────────────────────────────────────────
   it("a coach CAN INSERT a template", async () => {
     const inserted = await asUser(CAROL, async (c) => {
-      const r = await c.query<{ name: string; week_count: number }>(
+      const r = await c.query<{ name: string; max_week_count: number }>(
         `INSERT INTO strength_periodization_templates
-           (event_group, name, week_count, structure)
-         VALUES ('endurance', 'Coach template', 12, '{"weeks": []}'::jsonb)
-         RETURNING name, week_count`,
+           (event_group, name, structure, kind, min_week_count, max_week_count)
+         VALUES ('endurance', 'Coach template', '{"weeks": []}'::jsonb, 'season', 8, 12)
+         RETURNING name, max_week_count`,
       );
       return r.rows;
     });
-    expect(inserted).toEqual([{ name: "Coach template", week_count: 12 }]);
+    expect(inserted).toEqual([{ name: "Coach template", max_week_count: 12 }]);
   });
 
   it("a coach CAN UPDATE a template", async () => {
@@ -136,8 +136,8 @@ describe("strength_periodization_templates RLS", () => {
     const inserted = await asUser(DIANA, async (c) => {
       const r = await c.query<{ name: string }>(
         `INSERT INTO strength_periodization_templates
-           (event_group, name, week_count, structure)
-         VALUES ('mixte', 'Admin template', 10, '{"weeks": []}'::jsonb)
+           (event_group, name, structure, kind, min_week_count, max_week_count)
+         VALUES ('mixte', 'Admin template', '{"weeks": []}'::jsonb, 'season', 8, 10)
          RETURNING name`,
       );
       return r.rows;
@@ -147,13 +147,13 @@ describe("strength_periodization_templates RLS", () => {
 
   it("an admin CAN UPDATE a template", async () => {
     const updated = await asUser(DIANA, async (c) => {
-      const r = await c.query<{ id: string; week_count: number }>(
-        "UPDATE strength_periodization_templates SET week_count = 16 WHERE id = $1 RETURNING id, week_count",
+      const r = await c.query<{ id: string; max_week_count: number }>(
+        "UPDATE strength_periodization_templates SET max_week_count = 16 WHERE id = $1 RETURNING id, max_week_count",
         [TPL1],
       );
       return r.rows;
     });
-    expect(updated).toEqual([{ id: TPL1, week_count: 16 }]);
+    expect(updated).toEqual([{ id: TPL1, max_week_count: 16 }]);
   });
 
   it("an admin CAN DELETE a template", async () => {
