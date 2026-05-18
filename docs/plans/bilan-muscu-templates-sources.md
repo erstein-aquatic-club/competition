@@ -39,13 +39,15 @@ articulation entre blocs ou vers la compétition). Détail complet dans
 | `pic` | transition (1 sem.) | Pic | Semaine de compétition : activation du SNC, séance très courte, « se sentir explosif ». | Volume minimal, charges légères déplacées à vitesse maximale. |
 
 > **Note sur le découpage.** Le template ne fixe **que la séquence hebdomadaire
-> de cycles**. Les blocs (`prepa_generale`, `force_max`, `puissance`) portent un
-> jeu de paramètres séries/reps/%1RM ; les transitions (`maintien`, `affutage`,
-> `pic`) sont entièrement dérivées par le moteur à partir du bloc adjacent
-> (cf. `bilan-muscu-cycles-vocabulaire.md` § 3). La littérature S&C natation
-> distingue explicitement la **force maximale** (phase de développement) de la
-> **puissance / vitesse** (phase de construction puis de compétition) — d'où
-> deux blocs distincts `force_max` puis `puissance`, et non un cycle `force`
+> de cycles**. Le chargement de chaque cycle (séries/reps/%1RM/récup) est défini
+> hors template, dans `src/lib/strength/periodizationCycles.ts` : `prepa_generale`
+> et `force_max` réutilisent les paramètres `*_endurance` et `*_force` portés par
+> chaque exercice de `dim_exercices` ; `puissance`, `maintien`, `affutage` et
+> `pic` portent un **schéma de charge générique au niveau cycle**, appliqué
+> uniformément (cf. `bilan-muscu-cycles-vocabulaire.md` § 3). La littérature S&C
+> natation distingue explicitement la **force maximale** (phase de développement)
+> de la **puissance / vitesse** (phase de construction puis de compétition) —
+> d'où deux blocs distincts `force_max` puis `puissance`, et non un cycle `force`
 > agrégé comme dans l'ancien vocabulaire.
 
 > **Note : pas de semaine `test` dans les templates.** L'évaluation 1RM est une
