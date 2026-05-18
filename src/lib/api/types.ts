@@ -977,20 +977,38 @@ export type PeriodizationCycle =
   | 'affutage'        // transition — réduction progressive du volume avant compétition
   | 'pic';            // transition — semaine de compétition (activation SNC, très court)
 
+/** Une phase de périodisation : un cycle tenu sur une plage de semaines.
+ *  Le moteur (Chantier C) part de nominal_weeks et étire/comprime la phase
+ *  dans [min_weeks, max_weeks] pour atteindre la durée cible. */
+export interface PeriodizationPhase {
+  cycle: PeriodizationCycle;
+  /** Durée plancher (incompressible) de la phase, en semaines. */
+  min_weeks: number;
+  /** Durée par défaut validée — point de départ du moteur. */
+  nominal_weeks: number;
+  /** Durée plafond de la phase, en semaines. */
+  max_weeks: number;
+}
+
 /** Contenu JSONB de strength_periodization_templates.structure. */
 export interface PeriodizationStructure {
-  /** Une entrée par semaine, dans l'ordre — length === week_count. */
-  weeks: { cycle: PeriodizationCycle }[];
+  /** Phases ordonnées. Durée du template ∈ [Σ min_weeks, Σ max_weeks]. */
+  phases: PeriodizationPhase[];
   /** Emphase de l'épreuve par seau, poids 0-1 (le moteur la combine avec
    *  la priorité « seau le plus faible » de l'évaluation — Chantier C). */
   bucket_emphasis: Partial<Record<StrengthBucket, number>>;
 }
 
+/** Famille d'un template : prépa de saison ou mini-prépa inter-compétitions. */
+export type PeriodizationTemplateKind = 'season' | 'inter_competition';
+
 export interface StrengthPeriodizationTemplate {
   id: string;
   event_group: string;
+  kind: PeriodizationTemplateKind;
   name: string;
-  week_count: number;
+  min_week_count: number;
+  max_week_count: number;
   structure: PeriodizationStructure;
   created_at: string;
   updated_at: string;
