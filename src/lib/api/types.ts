@@ -964,9 +964,18 @@ export type StrengthBucket =
   | 'upper_power'
   | 'mobility';
 
-/** Cycle d'une semaine de périodisation (paramètres séries/reps/%1RM
- *  portés par dim_exercices) ; `deload` = semaine allégée. */
-export type PeriodizationCycle = 'endurance' | 'hypertrophie' | 'force' | 'deload';
+/** Cycle d'une semaine de périodisation. 3 blocs (multi-semaines, le cœur du
+ *  travail) et 3 transitions (semaine isolée). Vocabulaire validé par le coach
+ *  — voir docs/plans/bilan-muscu-cycles-vocabulaire.md. La stratégie de
+ *  chargement de chaque cycle est déclarée dans
+ *  src/lib/strength/periodizationCycles.ts. */
+export type PeriodizationCycle =
+  | 'prepa_generale'  // bloc — préparation générale (adaptation anatomique, endurance de force, préhab, socle)
+  | 'force_max'       // bloc — force maximale (recrutement, charges lourdes)
+  | 'puissance'       // bloc — puissance/vitesse (conversion force→explosivité)
+  | 'maintien'        // transition — semaine isolée qui préserve les acquis sans construire
+  | 'affutage'        // transition — réduction progressive du volume avant compétition
+  | 'pic';            // transition — semaine de compétition (activation SNC, très court)
 
 /** Contenu JSONB de strength_periodization_templates.structure. */
 export interface PeriodizationStructure {
