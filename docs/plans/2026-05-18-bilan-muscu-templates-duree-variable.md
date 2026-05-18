@@ -262,7 +262,7 @@ BEGIN;
 INSERT INTO strength_periodization_templates
   (event_group, kind, name, min_week_count, max_week_count, structure)
 VALUES
-  ('sprint_50', 'season', 'Sprint 50 m — Force-vitesse', 7, 13,
+  ('sprint_50', 'season', 'Sprint 50 m — Force-vitesse', 7, 15,
    '{"phases":[
        {"cycle":"force_max","min_weeks":2,"nominal_weeks":2,"max_weeks":4},
        {"cycle":"maintien","min_weeks":1,"nominal_weeks":1,"max_weeks":3},
