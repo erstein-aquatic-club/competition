@@ -251,6 +251,14 @@ décision de modèle de données.
     −15 pts). Plus simple à migrer, mais perd la spécificité par exercice. À
     arbitrer avec le coach (cf. § 7).
 
+> **Décision coach (2026-05-18) — RÉSOLU.** Le coach a tranché : `puissance`
+> utilise un **schéma de chargement générique au niveau cycle** (comme
+> `maintien` / `affutage` / `pic`) — **pas** de nouvelles colonnes dans
+> `dim_exercices`. Le triplet `*_hypertrophie` n'est donc **pas** remplacé par
+> `*_puissance` : le moteur dérive la prescription de puissance au niveau du
+> cycle. La recommandation **(N)** ci-dessus est abandonnée au profit de
+> l'option « dérivé par le moteur » (cf. § 7, question 2).
+
 ### 3.4 `maintien` — Maintien *(transition, 1 semaine)*
 
 - **Définition.** Semaine isolée qui **préserve** les acquis sans construire :
@@ -344,8 +352,8 @@ Le vocabulaire est **commun aux 7 templates** ; ce qui change est la *séquence*
 | `sprint_50` | Sprint 50 m | `force_max` court → `puissance` long → `affutage` → `pic` | Bloc `puissance` dominant ; `prepa_generale` minimal voire absent (athlète déjà préparé) |
 | `breaststroke` | Brasse | `prepa_generale` → `force_max` → `puissance` | `prepa_generale` un peu plus long (préhab hanche/adducteurs) |
 | `backstroke` | Dos | `prepa_generale` → `force_max` → `puissance` | `prepa_generale` chargé en préhab d'épaule |
-| `event_200` | 200 m | `prepa_generale` → `force_max` → `puissance` | Équilibré force ↔ puissance |
-| `event_400` | 400 m | `prepa_generale` long → `force_max` → `puissance` court | Bascule vers la force-endurance |
+| `200m` | 200 m | `prepa_generale` → `force_max` → `puissance` | Équilibré force ↔ puissance |
+| `400m` | 400 m | `prepa_generale` long → `force_max` → `puissance` court | Bascule vers la force-endurance |
 | `distance` | 800/1500 m | `prepa_generale` **dominant** → `force_max` modéré → `puissance` court/optionnel | Le plus long ; `prepa_generale` (endurance de force + préhab) porte le template |
 | `medley` | 4 nages | `prepa_generale` → `force_max` → `puissance` | Polyvalent, séquence médiane |
 
@@ -395,15 +403,19 @@ Pour mémoire, une fois le vocabulaire validé :
 
 ## 7. Questions ouvertes pour le coach
 
+> **✅ Questions tranchées par la validation du vocabulaire à 6 cycles (coach,
+> 2026-05-18) — voir `docs/implementation-log.md` §292. Section conservée pour
+> mémoire.**
+
 1. **`test` : cycle ou étape amont ?** Recommandation Option B (l'évaluation
    1RM est déjà une étape du Bilan Muscu). Veux-tu pouvoir planifier une
    semaine de re-test *au milieu* d'un template (→ Option A, 7e valeur) ?
 2. **`puissance` : nouveaux paramètres par exercice, ou dérivés par le
-   moteur ?** Recommandation : remplacer `*_hypertrophie` par `*_puissance` et
-   re-seeder les 94 exercices (spécificité par exercice). L'alternative
-   « dériver depuis `force` avec un offset de %1RM » est plus simple à migrer
-   mais moins fine. Quel niveau de précision veux-tu pour la prescription de
-   puissance ?
+   moteur ? — RÉSOLU (coach, 2026-05-18).** Décision : `puissance` utilise un
+   **schéma de chargement générique au niveau cycle** (comme `maintien` /
+   `affutage` / `pic`), **sans** colonne dédiée dans `dim_exercices`. Le
+   triplet `*_hypertrophie` n'est pas renommé en `*_puissance` ; la
+   prescription de puissance est dérivée par le moteur. Voir note § 3.3.
 3. **`force_max` vs `puissance` : un seul bloc ou deux ?** La littérature et le
    plan réel les séparent (W2-3 puis W5-6). On garde donc deux blocs distincts.
    Confirmes-tu — ou préfères-tu un continuum `force` unique géré en interne ?
