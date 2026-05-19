@@ -143,7 +143,14 @@ export function KpiRecap({
           // `undefined` previous → baseline unknown → show no badge at all.
           // `null` → known first measurement. A measurement → real diff.
           const baselineKnown = entry.previous !== undefined;
-          const prev = entry.previous ? entry.previous.value : null;
+          // A previous measurement is only comparable when it used the same
+          // unit — `vertical_jump` moved from cm to W/kg in §293, so an older
+          // cm row must not be diffed against a new W/kg one.
+          const comparablePrev =
+            entry.previous && entry.previous.unit === entry.unit
+              ? entry.previous
+              : null;
+          const prev = comparablePrev ? comparablePrev.value : null;
           const delta = prev != null ? entry.value - prev : null;
           const improved = delta != null && delta > 0;
           const declined = delta != null && delta < 0;

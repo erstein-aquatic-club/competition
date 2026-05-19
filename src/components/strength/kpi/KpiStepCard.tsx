@@ -7,9 +7,14 @@
  *  - the partner's job (visually emphasized — this is a two-person test),
  *  - the measurement method,
  *  - the demo GIF (placeholder while gifUrl is null),
- *  - exactly `protocol.attempts` numeric inputs; the best is retained live.
+ *  - the measurement inputs.
+ *
+ * Input model depends on the KPI:
+ *  - 4 KPIs ("simple value") → `protocol.attempts` numeric inputs, best kept;
+ *  - `vertical_jump` (power)  → body weight + flight times (VerticalJumpInputs).
  */
 import { KpiGifPanel } from "./KpiGifPanel";
+import { VerticalJumpInputs } from "./VerticalJumpInputs";
 import { bestAttempt, parseAttempts } from "@/lib/strength/kpiMeasurement";
 import type { KpiProtocol } from "@/lib/strength/kpiProtocols";
 import { Input } from "@/components/ui/input";
@@ -24,20 +29,22 @@ export { parseAttempts };
 export interface KpiAttemptsState {
   /** Raw text per attempt slot — keeps the field controlled without NaN flicker. */
   raw: string[];
+  /** Raw body-weight text — only used by the vertical-jump (power) step. */
+  weight?: string;
 }
 
 export function KpiStepCard({
   protocol,
   attempts,
   onChangeAttempt,
+  onChangeWeight,
 }: {
   protocol: KpiProtocol;
   attempts: KpiAttemptsState;
   onChangeAttempt: (index: number, value: string) => void;
+  /** Updates the body-weight field — used by the vertical-jump step only. */
+  onChangeWeight: (value: string) => void;
 }) {
-  const parsed = parseAttempts(attempts.raw);
-  const retained = parsed.length > 0 ? bestAttempt(parsed) : null;
-
   return (
     <div className="space-y-5">
       {/* Bucket + label */}
@@ -101,6 +108,43 @@ export function KpiStepCard({
         </div>
       </div>
 
+      {/* Measurement inputs — power KPI vs simple-value KPIs */}
+      {protocol.key === "vertical_jump" ? (
+        <VerticalJumpInputs
+          flightTimesRaw={attempts.raw}
+          weightRaw={attempts.weight ?? ""}
+          onChangeFlightTime={onChangeAttempt}
+          onChangeWeight={onChangeWeight}
+        />
+      ) : (
+        <GenericKpiInputs
+          protocol={protocol}
+          attempts={attempts}
+          onChangeAttempt={onChangeAttempt}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Measurement inputs for the 4 "simple value" KPIs — `protocol.attempts`
+ * numeric fields, the best (highest) value retained live.
+ */
+function GenericKpiInputs({
+  protocol,
+  attempts,
+  onChangeAttempt,
+}: {
+  protocol: KpiProtocol;
+  attempts: KpiAttemptsState;
+  onChangeAttempt: (index: number, value: string) => void;
+}) {
+  const parsed = parseAttempts(attempts.raw);
+  const retained = parsed.length > 0 ? bestAttempt(parsed) : null;
+
+  return (
+    <>
       {/* Attempt inputs */}
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -182,6 +226,6 @@ export function KpiStepCard({
           )}
         </span>
       </div>
-    </div>
+    </>
   );
 }

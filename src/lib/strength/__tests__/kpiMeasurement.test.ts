@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { bestAttempt, parseAttempts } from '../kpiMeasurement.ts';
+import {
+  bestAttempt,
+  parseAttempts,
+  parsePositiveNumber,
+} from '../kpiMeasurement.ts';
 
 describe('bestAttempt', () => {
   it('returns the max — tous les KPIs sont "plus = mieux"', () => {
@@ -38,5 +42,23 @@ describe('parseAttempts', () => {
   });
   it('returns an empty array for an all-invalid input', () => {
     assert.deepEqual(parseAttempts(['', 'x', '0']), []);
+  });
+});
+
+describe('parsePositiveNumber', () => {
+  it('parses a plain positive number', () => {
+    assert.equal(parsePositiveNumber('70'), 70);
+  });
+  it('normalises a comma decimal separator', () => {
+    assert.equal(parsePositiveNumber('68,5'), 68.5);
+  });
+  it('returns null for empty or whitespace-only input', () => {
+    assert.equal(parsePositiveNumber(''), null);
+    assert.equal(parsePositiveNumber('   '), null);
+  });
+  it('returns null for zero, negative or non-numeric input', () => {
+    assert.equal(parsePositiveNumber('0'), null);
+    assert.equal(parsePositiveNumber('-5'), null);
+    assert.equal(parsePositiveNumber('abc'), null);
   });
 });

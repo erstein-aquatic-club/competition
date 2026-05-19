@@ -4,6 +4,7 @@ import {
   flightTimeToHeight,
   sayersPeakPower,
   relativePower,
+  verticalJumpResult,
 } from '../jumpPower.ts';
 
 /** Égalité à tolérance — les calculs sont en flottants. */
@@ -52,5 +53,34 @@ describe('relativePower', () => {
   it('throw si le poids est nul ou négatif', () => {
     assert.throws(() => relativePower(3544, 0), /poids/);
     assert.throws(() => relativePower(3544, -1), /poids/);
+  });
+});
+
+describe('verticalJumpResult', () => {
+  it('retient le meilleur saut et calcule la puissance relative', () => {
+    // poids 70 kg, temps de vol [0,48 ; 0,52 ; 0,50] → meilleur 0,52 s
+    // h = 9,81·0,52²/8 ·100 = 33,158 cm
+    // P = 60,7·33,158 + 45,3·70 − 2055 = 3128,7 W
+    // P/kg = 3128,7 / 70 = 44,70 W/kg
+    const r = verticalJumpResult(70, [0.48, 0.52, 0.5]);
+    close(r.value, 44.7, 0.05);
+    close(r.heightCm, 33.2, 0.05);
+    assert.equal(r.peakPowerW, 3129);
+    assert.equal(r.weightKg, 70);
+    assert.deepEqual(r.flightTimes, [0.48, 0.52, 0.5]);
+  });
+
+  it('fonctionne avec un seul essai', () => {
+    // h = 30,656 cm ; P = 2523,8 W ; P/kg = 42,06
+    const r = verticalJumpResult(60, [0.5]);
+    close(r.value, 42.1, 0.05);
+  });
+
+  it('throw si le poids est nul ou négatif', () => {
+    assert.throws(() => verticalJumpResult(0, [0.5]), /poids/);
+  });
+
+  it('throw si aucun temps de vol', () => {
+    assert.throws(() => verticalJumpResult(70, []), /temps de vol/);
   });
 });

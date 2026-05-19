@@ -1,6 +1,10 @@
 /** API Strength KPI — mesures du wizard KPIs (Chantier B). */
 import { supabase, canUseSupabase, assertSupabase } from './client';
-import type { StrengthKpiKey, StrengthKpiMeasurement } from './types';
+import type {
+  KpiAttempts,
+  StrengthKpiKey,
+  StrengthKpiMeasurement,
+} from './types';
 
 const ALL_KPI_KEYS: StrengthKpiKey[] = [
   'vertical_jump', 'broad_jump', 'imtp', 'weighted_pullup', 'medball_vertical_throw',
@@ -11,7 +15,7 @@ export interface RecordKpiInput {
   kpi_key: StrengthKpiKey;
   value: number;
   unit: string;
-  attempts?: number[];
+  attempts?: KpiAttempts;
   measured_by: number;
   assisted_by?: number | null;
   source: 'wizard_athlete' | 'wizard_coach';

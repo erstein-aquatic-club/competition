@@ -22,3 +22,16 @@ export function parseAttempts(raw: string[]): number[] {
     .map((v) => Number(String(v).replace(',', '.')))
     .filter((n) => Number.isFinite(n) && n > 0);
 }
+
+/**
+ * Parse a single raw input string into a finite, strictly-positive number,
+ * or `null` when the input is empty / non-numeric / non-positive.
+ *
+ * Same sanitization rules as `parseAttempts` (comma → dot, reject ≤ 0 and
+ * NaN/Infinity) but for a standalone field — used for the body-weight input
+ * of the vertical-jump KPI step.
+ */
+export function parsePositiveNumber(raw: string): number | null {
+  const n = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}

@@ -940,13 +940,35 @@ export type StrengthKpiKey =
 
 export type StrengthKpiSource = 'wizard_athlete' | 'wizard_coach';
 
+/**
+ * Détail d'une mesure `vertical_jump` — stocké dans `attempts` (jsonb).
+ * Ce KPI est une mesure de puissance : poids et temps de vol bruts sont
+ * conservés pour pouvoir recalculer / auditer la valeur (cf. §293).
+ */
+export interface VerticalJumpAttempts {
+  /** Poids du nageur saisi (kg). */
+  weight_kg: number;
+  /** Temps de vol des essais saisis (s). */
+  flight_times: number[];
+  /** Hauteur du meilleur saut (cm). */
+  height_cm: number;
+  /** Puissance de pic du meilleur saut (W). */
+  peak_power_w: number;
+}
+
+/**
+ * Essais bruts d'une mesure KPI : un tableau de valeurs (4 KPIs « valeur
+ * simple ») ou le détail structuré de la détente verticale (puissance).
+ */
+export type KpiAttempts = number[] | VerticalJumpAttempts;
+
 export interface StrengthKpiMeasurement {
   id: string;
   athlete_id: number;
   kpi_key: StrengthKpiKey;
   value: number;
   unit: string;
-  attempts: number[] | null;
+  attempts: KpiAttempts | null;
   measured_at: string;
   measured_by: number | null;
   assisted_by: number | null;

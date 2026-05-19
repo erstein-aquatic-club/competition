@@ -28,8 +28,14 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { KPI_PROTOCOLS } from "@/lib/strength/kpiProtocols";
-import { bestAttempt } from "@/lib/strength/kpiMeasurement";
-import type { StrengthKpiKey, StrengthKpiMeasurement, AthleteSummary } from "@/lib/api/types";
+import { bestAttempt, parsePositiveNumber } from "@/lib/strength/kpiMeasurement";
+import { verticalJumpResult } from "@/lib/strength/jumpPower";
+import type {
+  KpiAttempts,
+  StrengthKpiKey,
+  StrengthKpiMeasurement,
+  AthleteSummary,
+} from "@/lib/api/types";
 
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -61,7 +67,13 @@ type AttemptsByKpi = Record<StrengthKpiKey, KpiAttemptsState>;
 
 const emptyAttempts = (): AttemptsByKpi =>
   Object.fromEntries(
-    PROTOCOLS.map((p) => [p.key, { raw: Array(p.attempts).fill("") }]),
+    PROTOCOLS.map((p) => [
+      p.key,
+      // The vertical-jump (power) step also carries a body-weight field.
+      p.key === "vertical_jump"
+        ? { raw: Array(p.attempts).fill(""), weight: "" }
+        : { raw: Array(p.attempts).fill("") },
+    ]),
   ) as AttemptsByKpi;
 
 type Phase = "select-athlete" | "steps" | "recap";
@@ -197,13 +209,31 @@ export default function KpiWizard() {
     setAttempts((prev) => {
       const next = [...prev[kpi].raw];
       next[idx] = cleaned;
-      return { ...prev, [kpi]: { raw: next } };
+      return { ...prev, [kpi]: { ...prev[kpi], raw: next } };
     });
   };
 
-  // KPIs that have at least one valid attempt → will be submitted.
+  // Body-weight field — only the vertical-jump (power) step uses it.
+  const updateWeight = (kpi: StrengthKpiKey, value: string) => {
+    const cleaned = value.replace(/[^\d.,]/g, "");
+    setAttempts((prev) => ({
+      ...prev,
+      [kpi]: { ...prev[kpi], weight: cleaned },
+    }));
+  };
+
+  // KPIs that have at least one valid attempt → will be submitted. The power
+  // KPI (vertical_jump) also needs a body weight — without it the W/kg value
+  // cannot be computed, so it is not considered "filled".
   const filledKeys = useMemo(
-    () => KPI_KEYS.filter((k) => parseAttempts(attempts[k].raw).length > 0),
+    () =>
+      KPI_KEYS.filter((k) => {
+        if (parseAttempts(attempts[k].raw).length === 0) return false;
+        if (k === "vertical_jump") {
+          return parsePositiveNumber(attempts[k].weight ?? "") != null;
+        }
+        return true;
+      }),
     [attempts],
   );
   const currentFilled = currentKey ? filledKeys.includes(currentKey) : false;
@@ -232,14 +262,35 @@ export default function KpiWizard() {
       const failures: { key: StrengthKpiKey; error: Error }[] = [];
       for (const key of keysToSubmit) {
         const protocol = KPI_PROTOCOLS[key];
-        const parsed = parseAttempts(attempts[key].raw);
         try {
+          let value: number;
+          let recordedAttempts: KpiAttempts;
+          if (key === "vertical_jump") {
+            // Power KPI : weight + flight times → relative power (W/kg).
+            const weight = parsePositiveNumber(attempts[key].weight ?? "");
+            const flightTimes = parseAttempts(attempts[key].raw);
+            if (weight == null || flightTimes.length === 0) {
+              throw new Error("Détente verticale : poids ou temps de vol manquant");
+            }
+            const r = verticalJumpResult(weight, flightTimes);
+            value = r.value;
+            recordedAttempts = {
+              weight_kg: r.weightKg,
+              flight_times: r.flightTimes,
+              height_cm: r.heightCm,
+              peak_power_w: r.peakPowerW,
+            };
+          } else {
+            const parsed = parseAttempts(attempts[key].raw);
+            value = bestAttempt(parsed);
+            recordedAttempts = parsed;
+          }
           const recorded = await recordKpiMeasurement({
             athlete_id: athleteId,
             kpi_key: key,
-            value: bestAttempt(parsed),
+            value,
             unit: protocol.unit,
-            attempts: parsed,
+            attempts: recordedAttempts,
             measured_by: userId,
             assisted_by: assistedBy,
             source,
@@ -345,7 +396,11 @@ export default function KpiWizard() {
 
   const hasAnyInput =
     filledKeys.length > 0 ||
-    KPI_KEYS.some((k) => attempts[k].raw.some((v) => v.trim() !== ""));
+    KPI_KEYS.some(
+      (k) =>
+        attempts[k].raw.some((v) => v.trim() !== "") ||
+        (attempts[k].weight ?? "").trim() !== "",
+    );
 
   const handleExitRequest = () => {
     if (phase === "steps" && hasAnyInput) {
@@ -592,6 +647,9 @@ export default function KpiWizard() {
             attempts={attempts[currentProtocol.key]}
             onChangeAttempt={(idx, value) =>
               updateAttempt(currentProtocol.key, idx, value)
+            }
+            onChangeWeight={(value) =>
+              updateWeight(currentProtocol.key, value)
             }
           />
         )}
