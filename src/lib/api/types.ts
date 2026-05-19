@@ -1041,6 +1041,52 @@ export interface StrengthPeriodizationTemplate {
   updated_at: string;
 }
 
+// ── Mésocycle généré (§293 — Chantier C+D) ──
+
+/** Statut d'un mésocycle. `active` = le plan courant du nageur. */
+export type StrengthMesocycleStatus = 'active' | 'reverted' | 'superseded';
+
+/**
+ * Un mésocycle de musculation généré par le moteur déterministe.
+ * Correspond à la table `strength_mesocycles`.
+ */
+export interface StrengthMesocycle {
+  id: string;
+  athlete_id: number;
+  assessment_id: string;
+  template_id: string;
+  /** Groupe d'épreuve ciblé (ex. 'sprint', 'fond'). */
+  event_group: string;
+  /** Famille du template : prépa de saison ou mini-prépa inter-compétitions. */
+  kind: PeriodizationTemplateKind;
+  target_week_count: number;
+  sessions_per_week: number;
+  status: StrengthMesocycleStatus;
+  /** Snapshot du raisonnement du moteur (6 scores de seau, priorités, data_confidence). */
+  bucket_priorities: Record<string, unknown> | null;
+  engine_version: string;
+  generated_at: string;
+  generated_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Snapshot de sécurité des overrides de planification avant application d'un
+ * mésocycle. Correspond à la table `strength_planning_snapshots`.
+ * Permet le revert : restaurer les overrides d'avant la génération.
+ */
+export interface StrengthPlanningSnapshot {
+  id: string;
+  mesocycle_id: string;
+  athlete_id: number;
+  /** Copie JSONB des `strength_planning_slot_overrides` avant écrasement. */
+  slot_overrides: Record<string, unknown> | null;
+  /** Copie JSONB des `strength_planning_week_overrides` avant écrasement. */
+  week_overrides: Record<string, unknown> | null;
+  created_at: string;
+}
+
 // ── Resolved Slot Assignment (swimmer daily view) ──
 
 export interface ResolvedSlotAssignment {

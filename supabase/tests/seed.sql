@@ -222,3 +222,8 @@ INSERT INTO public.strength_periodization_templates
   (id, event_group, name, structure, kind, min_week_count, max_week_count) VALUES
   ('c0000000-0000-0000-0000-000000000001', 'sprint', 'Sprint 8 semaines',
    '{"weeks": []}'::jsonb, 'season', 8, 12);
+
+-- NOTE: les fixtures strength_mesocycles / strength_planning_snapshots (§293)
+-- ne sont PAS seedées ici : un mésocycle FK-pinne le template (ON DELETE
+-- RESTRICT), ce qui casserait les tests de suppression de template. Elles sont
+-- insérées dans le beforeAll de strength-mesocycles.test.ts (suite isolée).

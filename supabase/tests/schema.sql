@@ -1325,3 +1325,76 @@ CREATE POLICY spt_write ON public.strength_periodization_templates
   FOR ALL TO authenticated
   USING (app_user_role() IN ('coach','admin'))
   WITH CHECK (app_user_role() IN ('coach','admin'));
+
+-- =============================================================================
+-- strength_mesocycles + strength_planning_snapshots (§293) — Chantier C+D
+-- "Moteur de génération du mésocycle". Keep in sync with migrations
+-- 00170_strength_mesocycles.sql and 00171_strength_mesocycles_coach_rls.sql.
+--
+-- RLS : le nageur possède ses lignes (`_own`). L'accès coach/admin est élargi
+-- à FOR ALL (`_coach`), à l'échelle du club — calqué sur strength_assessments
+-- (le coach voit tout mésocycle comme il voit toute évaluation).
+--
+-- NOTE: le trigger updated_at de la migration prod est OMIS volontairement
+-- (cf. §285) — sans rapport avec les policies RLS testées ici.
+-- =============================================================================
+
+CREATE TABLE public.strength_mesocycles (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id        INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  assessment_id     UUID NOT NULL REFERENCES public.strength_assessments(id) ON DELETE RESTRICT,
+  template_id       UUID NOT NULL REFERENCES public.strength_periodization_templates(id) ON DELETE RESTRICT,
+  event_group       TEXT NOT NULL,
+  kind              TEXT NOT NULL CHECK (kind IN ('season','inter_competition')),
+  target_week_count INTEGER NOT NULL CHECK (target_week_count > 0),
+  sessions_per_week INTEGER NOT NULL CHECK (sessions_per_week >= 1 AND sessions_per_week <= 7),
+  status            TEXT NOT NULL DEFAULT 'active'
+                      CHECK (status IN ('active','reverted','superseded')),
+  bucket_priorities JSONB,
+  engine_version    TEXT NOT NULL,
+  generated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  generated_by      INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX strength_mesocycles_athlete_idx
+  ON public.strength_mesocycles (athlete_id, created_at DESC);
+
+CREATE TABLE public.strength_planning_snapshots (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mesocycle_id   UUID NOT NULL REFERENCES public.strength_mesocycles(id) ON DELETE CASCADE,
+  athlete_id     INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  slot_overrides JSONB,
+  week_overrides JSONB,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX strength_planning_snapshots_mesocycle_idx
+  ON public.strength_planning_snapshots (mesocycle_id);
+
+-- RLS — strength_mesocycles
+ALTER TABLE public.strength_mesocycles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY strength_mesocycles_own ON public.strength_mesocycles
+  FOR ALL TO authenticated
+  USING (athlete_id = app_user_id())
+  WITH CHECK (athlete_id = app_user_id());
+
+CREATE POLICY strength_mesocycles_coach ON public.strength_mesocycles
+  FOR ALL TO authenticated
+  USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
+
+-- RLS — strength_planning_snapshots
+ALTER TABLE public.strength_planning_snapshots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY strength_snapshots_own ON public.strength_planning_snapshots
+  FOR ALL TO authenticated
+  USING (athlete_id = app_user_id())
+  WITH CHECK (athlete_id = app_user_id());
+
+CREATE POLICY strength_snapshots_coach ON public.strength_planning_snapshots
+  FOR ALL TO authenticated
+  USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
