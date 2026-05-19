@@ -16,19 +16,25 @@ export interface KpiProtocol {
 }
 
 export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
+  // Mesure de PUISSANCE (et non plus de hauteur) : poids + temps de vol
+  // chronométré → hauteur → puissance de pic (Sayers) → puissance relative
+  // W/kg, grandeur scorée. Cf. docs/plans/bilan-muscu-barème-puissance-detente.md.
   vertical_jump: {
     key: 'vertical_jump',
-    label: 'Saut vertical (détente sèche)',
+    label: 'Détente verticale (puissance)',
     bucket: 'Puissance bas du corps',
-    unit: 'cm',
+    unit: 'W/kg',
     attempts: 3,
     steps: [
-      'Le nageur tient 3 morceaux de scotch. Debout face au mur, bras le long du corps.',
-      'Sauter le plus haut possible en détente sèche (sans élan ni pas de course) et coller un scotch au mur, au point le plus haut atteint du bout des doigts.',
-      'Un scotch par essai — 3 sauts.',
+      'Saisir le poids du nageur (kg) — il entre dans le calcul de la puissance.',
+      'Debout, départ immobile. Descendre en flexion, puis sauter le plus haut possible en détente sèche (sans élan ni pas de course).',
+      'Jambes tendues pendant tout le vol : ne PAS ramener les genoux sous la poitrine. Un « tuck » rallonge artificiellement le temps de vol et fausse la mesure.',
+      'Réception sur l\'avant des pieds, au même endroit que le décollage. 3 sauts.',
     ],
-    partnerRole: 'Mesure au mètre la distance sol → haut du scotch le plus haut.',
-    measurement: 'Distance sol → haut du scotch, en cm. Meilleur des 3 essais.',
+    partnerRole:
+      'Chronomètre le temps de vol de chaque saut — du décollage des pieds à leur retour au sol. Annonce et note les 3 temps.',
+    measurement:
+      'Temps de vol (s) → hauteur (h = g·t²/8) → puissance de pic (équation de Sayers) → puissance relative en W/kg. Meilleur des 3 essais retenu.',
     gifUrl: null,
   },
   broad_jump: {
