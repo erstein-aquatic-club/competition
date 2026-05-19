@@ -8,6 +8,9 @@
  * Source détaillée et raisonnement : `docs/plans/bilan-muscu-baremes-sources.md`.
  * Barèmes validés par le coach le 2026-05-17 (3 bandes d'âge — pas de bilan
  * avant 13 ans ; valeurs filles réelles par bande ; flag de confiance).
+ *
+ * §293 : le barème `vertical_jump` est passé d'une hauteur (cm) à une
+ * puissance relative (W/kg) — voir `bilan-muscu-barème-puissance-detente.md`.
  */
 
 /**
@@ -78,33 +81,38 @@ export const KPI_BAREMES: Record<
   StrengthKpiKey,
   Record<BaremeSex, Record<AgeBand, BaremeEntry>>
 > = {
-  // § 5 — détente verticale (cm) — TRANSPOSÉ.
+  // § 5 — détente verticale : PUISSANCE RELATIVE (W/kg) — TRANSPOSÉ.
+  // Mesurée en puissance depuis le §293 (et non plus en hauteur cm). Ancres =
+  // percentiles de puissance CMJ de Rodrigues et al. 2024 (Frontiers in
+  // Pediatrics, 736 jeunes 13-18 ans), agrégés par bande d'âge. Forme solide,
+  // niveau absolu à calibrer sur le club → confiance `transposed`.
+  // Voir docs/plans/bilan-muscu-barème-puissance-detente.md.
   vertical_jump: {
     M: {
       '13-14': {
-        anchors: [[28, 10], [35, 30], [41, 50], [47, 70], [54, 90]],
+        anchors: [[36.9, 10], [41.3, 30], [44.7, 50], [48.5, 70], [55.3, 90]],
         confidence: 'transposed',
       },
       '15-16': {
-        anchors: [[33, 10], [41, 30], [48, 50], [54, 70], [61, 90]],
+        anchors: [[42.2, 10], [47.3, 30], [51.1, 50], [55.4, 70], [62.5, 90]],
         confidence: 'transposed',
       },
       '17-18': {
-        anchors: [[37, 10], [45, 30], [52, 50], [59, 70], [67, 90]],
+        anchors: [[46.3, 10], [51.7, 30], [55.7, 50], [60.2, 70], [67.8, 90]],
         confidence: 'transposed',
       },
     },
     F: {
       '13-14': {
-        anchors: [[21, 10], [26, 30], [31, 50], [36, 70], [43, 90]],
+        anchors: [[33.6, 10], [36.9, 30], [39.6, 50], [42.5, 70], [47.1, 90]],
         confidence: 'transposed',
       },
       '15-16': {
-        anchors: [[23, 10], [29, 30], [34, 50], [39, 70], [46, 90]],
+        anchors: [[34.1, 10], [37.7, 30], [40.5, 50], [43.6, 70], [48.3, 90]],
         confidence: 'transposed',
       },
       '17-18': {
-        anchors: [[25, 10], [31, 30], [36, 50], [42, 70], [49, 90]],
+        anchors: [[35.1, 10], [39.3, 30], [42.6, 50], [46.1, 70], [51.3, 90]],
         confidence: 'transposed',
       },
     },
