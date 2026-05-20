@@ -10,7 +10,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 
 | Fichier | Rôle | Taille |
 |---------|------|--------|
-| `src/lib/api/types.ts` | Interfaces TypeScript (sessions, strength, users, comps, wellness, cycles, challenges, achievements, pain, strength-planning) | 1179 lignes |
+| `src/lib/api/types.ts` | Interfaces TypeScript (sessions, strength, users, comps, wellness, cycles, challenges, achievements, pain, strength-planning, strength-mesocycles §293, periodization templates) | 1458 lignes |
 | `src/lib/api/client.ts` | Supabase client, utilitaires | ~316 lignes |
 | `src/lib/api/transformers.ts` | Fonctions de transformation strength | ~228 lignes |
 | `src/lib/api/helpers.ts` | Fonctions de mapping | ~161 lignes |
@@ -25,6 +25,25 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/strength/kpiMeasurement.ts` | Helpers KPI : `bestAttempt`, `parseAttempts` — Bilan Muscu §285 | ~25 lignes |
 | `src/lib/strength/kpiBaremes.ts` | Barèmes KPI : fonction de scoring `kpiScore` (interpolation) + `KPI_BAREMES` (5 KPIs × 2 sexes × 3 bandes d'âge, flag de confiance) + `ageBandFor`/`getBareme` — Bilan Muscu Chantier A §290 | 257 lignes |
 | `src/lib/strength/periodizationCycles.ts` | Stratégie de chargement par cycle de périodisation (`PERIODIZATION_CYCLES` : config des 6 cycles, union discriminée `CycleLoading` catalogue/générique) — Bilan Muscu Chantier A §292 | 166 lignes |
+| `src/lib/strength/mesocycleEngine.ts` | **Moteur de génération du mésocycle** Bilan Muscu — 6 fonctions TS pures TDD : `scoreBuckets` (6 seaux 0-100), `prioritizeBuckets` (score combiné + override sécurité), `allocateVolume` (focus/maintien), `selectExercises` (filtre douleur + substitution), `periodize` (distribution phases sur durée cible), `generateMesocycle` orchestrateur → `GeneratedMesocycle`. Chantier C §293 | 836 lignes |
+| `src/lib/strength/mesocycleEngine.types.ts` | Types-pivot du moteur (`GeneratedMesocycle`, `MesocycleInput`, `MesocycleReasoning`, `BucketScores`/`Priority`/`Allocation`, `SelectedExercise`, `PeriodizedWeek`, `CatalogExercise`) — Chantier C §293 | 334 lignes |
+| `src/lib/strength/__tests__/mesocycleEngine.test.ts` | 49 tests TDD du moteur (6 suites, 1 par fonction + orchestrateur) — §293 | 1121 lignes |
+| `src/lib/strength/jumpPower.ts` | Calculs détente verticale (flightTimeToHeight, sayersPeakPower, relativePower, verticalJumpResult) — KPI puissance W/kg (§293 Phase 1) | 104 lignes |
+| `src/lib/api/strength-mesocycles.ts` | Wrappers API mésocycle (`generateMesocyclePreview`, `applyMesocycle` → RPC, `revertMesocycle` → RPC, `getMesocycle`/`getActiveMesocycle`/`listMesocycles`) — Chantier D §293 | 211 lignes |
+| `src/lib/api/__tests__/strength-mesocycles.test.ts` | 12 tests des wrappers (mocks `client.ts` via `node:test mock.module`, sérialisation snake_case, conversion Date) — §293 | 419 lignes |
+| `src/lib/api/strength-periodization-templates.ts` | Wrappers lecture des templates (`listStrengthPeriodizationTemplates`, `getStrengthPeriodizationTemplate`, `listStrengthTemplateEventGroups`) — §293 | 67 lignes |
+| `src/lib/api/strength-catalog.ts` | Projection « taggée » de `dim_exercices` (`bucket`/`level`/`contraindication_zones`/`is_core`) → `CatalogExercise[]` consommable par le moteur — §293 | 87 lignes |
+| `supabase/migrations/00170_strength_mesocycles.sql` | Tables `strength_mesocycles` + `strength_planning_snapshots` + RLS nageur own + coach scope par CSA (corrigé en 00171) — §293 | 170 lignes |
+| `supabase/migrations/00171_strength_mesocycles_coach_rls.sql` | Corrige le scope coach sur les 2 tables mésocycle : club-entier (calqué sur `strength_assessments`) — §293 | 36 lignes |
+| `supabase/migrations/00172_apply_strength_mesocycle.sql` | RPC SECURITY DEFINER transactionnelle — supersede + INSERT mésocycle + snapshot + matérialisation templates/items/overrides + notification coach — §293 | 318 lignes |
+| `supabase/migrations/00173_revert_strength_mesocycle.sql` | RPC SECURITY DEFINER transactionnelle — DELETE overrides + templates (identifiés via `raw_payload->>'mesocycle_id'`) + restore depuis snapshot JSONB + status='reverted' + notif athlète — §293 | 206 lignes |
+| `supabase/tests/rls/strength-mesocycle-rpc.test.ts` | 12 tests RLS d'intégration des RPC apply/revert (auth, supersede, matérialisation, notif, snapshot/restore) — §293 | 408 lignes |
+| `docs/plans/bilan-muscu-mapping-mesocycle-planning.md` | Note technique du mapping mésocycle → `strength_planning_*` (conversion semaines/jours, cycle_type legacy, raw_payload, snapshot/revert) — §293 Phase 4 | 316 lignes |
+| `docs/plans/bilan-muscu-barème-puissance-detente.md` | Sources et raisonnement du barème puissance détente verticale (Sayers + ancres CMJ Rodrigues 2024 par sexe × bande d'âge) — §293 Phase 1 | 303 lignes |
+| `src/pages/MesocycleGeneration.tsx` | **Écran nageur de génération du mésocycle** (`/strength/mesocycle-generate`) — 4 sections : épreuve · famille · durée tape-mesure + timeline compétitions · séances/sem. Hand-off via sessionStorage. Mode focus dock masqué — §293 Phase 5.2 | 831 lignes |
+| `src/pages/MesocyclePreview.tsx` | **Écran nageur d'aperçu du mésocycle** (`/strength/mesocycle-preview`) — exécution locale du moteur + affichage raisonnement (6 score bars, top 3 priorités, dataConfidence) + plan détaillé (semaines collapsibles colorées par cycle, sessions, exercices avec notation `4 × 5 @ 85% · 180s`) + CTA Confirmer → `applyMesocycle` — §293 Phase 5.3 | 1053 lignes |
+| `src/components/strength/MesocycleEntry.tsx` | Tuile d'entrée sur `/strength` (onglet S'entraîner) — variante violette « action attendue » si pas de mésocycle actif, neutre « Régénérer » sinon. Conditionnée par `assessment.status === 'completed'` — §293 | 97 lignes |
+| `src/components/coach/CoachMesocyclePanel.tsx` | **Panneau coach** dans l'onglet Planning de `CoachSwimmerFullView` — visibilité du mésocycle actif + raisonnement parsé du `bucket_priorities` jsonb (6 score bars + top 3 priorités + flags) + bouton Rejeter avec `AlertDialog` → `revertMesocycle` + historique compact — §293 Phase 6 | 538 lignes |
 | `src/lib/api/training-plans.ts` | CRUD training_plans + sessions + applications (§275.2) — 14 fonctions + helper `getActiveTrainingPlanApplicationsForUser` pour timeline derivation | 357 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |

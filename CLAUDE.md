@@ -42,6 +42,10 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 | `src/hooks/useDashboardState.ts` | Façade dashboard nageur |
 | `src/hooks/useCoachCalendarState.ts` | État calendrier coach |
 | `src/hooks/useStrengthState.ts` | État muscu |
+| `src/lib/strength/mesocycleEngine.ts` | Moteur de génération du mésocycle (6 fonctions TS pures) — §293 |
+| `src/lib/api/strength-mesocycles.ts` | Wrappers API mésocycle (preview/apply/revert/get) — §293 |
+| `src/pages/MesocycleGeneration.tsx` | Écran nageur de génération du mésocycle — §293 |
+| `src/pages/MesocyclePreview.tsx` | Écran nageur d'aperçu + confirmation — §293 |
 | `supabase/tests/rls/` | Tests RLS intégration (voir `docs/rls-testing.md`) |
 
 **Pour tout autre fichier**, lire `docs/claude/files-map.md` (annuaire complet).
@@ -71,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§292** — Chantier A clos : templates de périodisation à durée variable, 14 templates seedés.
+Dernier § livré : **§293** — Chantiers C+D clos : moteur de génération du mésocycle muscu livré bout-en-bout (nageur + coach).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

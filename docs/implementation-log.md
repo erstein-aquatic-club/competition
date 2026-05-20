@@ -4,6 +4,63 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §293 — Bilan Muscu Chantiers C + D : moteur de génération + intégration (2026-05-18 → 2026-05-20)
+
+**Branche** : `main`
+**Trigger** : Chantier C (moteur déterministe) + Chantier D (intégration). Design : `docs/plans/2026-05-18-bilan-muscu-moteur-generation-design.md` ; plan : `docs/plans/2026-05-18-bilan-muscu-moteur-generation.md`. Conception data : `docs/plans/bilan-muscu-mapping-mesocycle-planning.md` (Phase 4) + `docs/plans/bilan-muscu-barème-puissance-detente.md` (Phase 1, barème de puissance révisé).
+
+### Changements
+
+- **KPI détente verticale → puissance relative (W/kg)** (Phase 1) — le KPI passe d'une mesure de hauteur (cm) à une **puissance de pic** : poids saisi + 3 temps de vol chronométrés → hauteur (`h = g·t²/8`) → puissance via Sayers (`P = 60,7·h + 45,3·m − 2055`) → puissance relative `P/m` (W/kg). Le barème `vertical_jump` est ré-encodé en W/kg (ancres p10/p30/p50/p70/p90 de Rodrigues et al. 2024, transposé par bande d'âge — flag `transposed`). Wizard KPI mis à jour (champ poids + chronométrage 3 essais, lecture live W/kg). `value` en base = W/kg, `attempts` (jsonb) conserve `{weight_kg, flight_times[], height_cm, peak_power_w}`. Module pur `src/lib/strength/jumpPower.ts` testé.
+- **Moteur `mesocycleEngine.ts`** (Phase 2) — 6 fonctions pures, TDD strict. (1) `scoreBuckets` → 6 scores 0-100 par seau (5 entraînables + psychologie), mapping KPI → seau, `null` si donnée manquante. (2) `prioritizeBuckets` → tri par score combiné `bucket_emphasis × (100 − score)` + override sécurité (douleur intense `intensity ≥ 3` ou dysfonction `physical_tests` sub-score=0 → `mobility` forcé rang 1). (3) `allocateVolume` → top-2 entraînables = focus (~60 %), reste = maintien (~40 %), `mobility` en échauffement systématique (sessionsPerWeek complets). (4) `selectExercises` → filtre seau + niveau + exclusion `contraindication_zones ∩ painZones`, tri core-first niveau-desc, substitution marquée par cycle excluder. (5) `periodize` → distribution des phases du template sur la durée cible (round-robin dans `[min, max]`, throw si hors `[Σmin, Σmax]`). (6) `generateMesocycle` orchestrateur → `GeneratedMesocycle` complet (semaines → séances → exercices chargés via cycle loading `catalogue`/`generique` + raisonnement snapshot). Données partielles tolérées → `dataConfidence` abaissée, jamais bloquant.
+- **Tables `strength_mesocycles` + `strength_planning_snapshots`** (Phase 3) — migrations `00170` + corrective `00171` (RLS coach alignée sur `strength_assessments` = club-entier, pas `coach_swimmer_assignments`). Tests RLS d'intégration `strength-mesocycles.test.ts` (13 verts).
+- **RPC `apply_strength_mesocycle` + `revert_strength_mesocycle`** (Phase 4) — migrations `00172` + `00173`, SECURITY DEFINER. `apply` (transactionnelle) : auth nageur OU coach → supersede des actifs précédents → INSERT mésocycle → snapshot des `strength_planning_slot_overrides` + `_week_overrides` en fenêtre `[start, start + (N-1)·7j]` → matérialisation des semaines (création `strength_sessions` templates nommés `[Méso <short_id>] S<W> J<S> · <cycle> · <bucket>`, INSERT `strength_session_items` avec `raw_payload.mesocycle_id` + `periodization_cycle` + `bucket` + `is_core` + `substituted` + `original_exercise_id` + `week_number` + `session_number`, UPSERT slot_overrides time_slot=`evening` selon pattern `sessionsPerWeek → days`, UPSERT week_overrides week_type=label cycle FR) → INSERT notification `type='message'` + `metadata.kind='strength_mesocycle_generated'` ciblée sur le groupe du nageur. `revert` (transactionnelle) : auth nageur ou coach → identifie les templates créés par ce mésocycle via `raw_payload->>'mesocycle_id'` → DELETE slot_overrides + week_overrides en fenêtre + templates (CASCADE items) → restore depuis snapshot JSONB → UPDATE status='reverted' → notif réciproque côté nageur si revert venant du coach. Tests RLS RPC `strength-mesocycle-rpc.test.ts` (12 verts) — couvre apply (athlète/coach autorisés, autre athlète bloqué), supersede, matérialisation complète, notif, revert + restauration de l'override pré-existant.
+- **Wrappers API JS** (Phase 4.5) — `src/lib/api/strength-mesocycles.ts` : `generateMesocyclePreview` (moteur pur), `applyMesocycle` (sérialisation camelCase→snake_case + conversion `Date→YYYY-MM-DD`), `revertMesocycle`, `getMesocycle`, `getActiveMesocycle`, `listMesocycles`. `strength-periodization-templates.ts` (list/get) + `strength-catalog.ts` (projection taggée `dim_exercices` → `CatalogExercise[]`).
+- **UI nageur** (Phase 5) — tuile d'entrée `MesocycleEntry` (violet « action attendue » si pas de mésocycle actif, neutre « Régénérer » sinon), conditionnée par `assessment.status === 'completed'`. Écran de génération `MesocycleGeneration` (4 sections progressives : épreuve · famille · durée tape-mesure + timeline compétitions · séances/sem.) hand-off via sessionStorage → écran d'aperçu `MesocyclePreview` (raisonnement « instrument readout » : 6 score bars 0-100 codées rouge/amber/vert, top 3 priorités avec rationale FR + badge OVERRIDE, dataConfidence 3-segments, psychFlag, contre-indications ; plan « notebook » : semaines collapsibles colorées par cycle, sessions, exercices avec notation `4 × 5 @ 85% · 180s`) → CTA Confirmer → `applyMesocycle` → toast + retour `/strength`. Le cycle label posé par la RPC (`week_overrides.week_type`) est consommé par `MyPlanTab` (Phase 2) → affichage des phases sur la timeline.
+- **Intégration coach** (Phase 6) — `CoachMesocyclePanel` inséré dans l'onglet « Planning » de `CoachSwimmerFullView` (CollapsibleSection violet, ouvert par défaut) : carte « Mésocycle actif » avec métadonnées + raisonnement parsé depuis `bucket_priorities` jsonb (6 score bars, top 3 priorités, flags), bouton « Rejeter » avec `AlertDialog` de confirmation → `revertMesocycle`, historique compact des mésocycles non-actifs. L'édition séance par séance reste au builder existant (les templates générés sont des `strength_sessions` standards).
+
+### Migrations
+
+- **`00170_strength_mesocycles.sql`** — tables `strength_mesocycles` + `strength_planning_snapshots` + RLS (nageur `_own` + coach/admin).
+- **`00171_strength_mesocycles_coach_rls.sql`** — corrige le scope coach : remplace les 3 policies coach/admin par une unique `_coach` FOR ALL à l'échelle du club (calquée sur `strength_assessments`).
+- **`00172_apply_strength_mesocycle.sql`** — RPC SECURITY DEFINER (`integer, uuid, uuid, text, text, integer, integer, date, jsonb, text, jsonb` → `uuid`). 318 lignes.
+- **`00173_revert_strength_mesocycle.sql`** — RPC SECURITY DEFINER (`uuid` → `void`). 206 lignes.
+
+### Décisions majeures
+
+- **KPI détente = puissance relative (W/kg)** — décision coach actée en Phase 1 : la puissance absolue est confondue par la masse corporelle, la relative est équitable entre corpulences. Le barème est encodé en W/kg, pas en W.
+- **`PainInput` type partagé** — `prioritizeBuckets` accepte `Pick<PainReport, 'body_zone' | 'intensity'>[]` pour absorber indifféremment `PainReport[]` (table) ou `QuestionnairePainEntry[]` (questionnaire). L'orchestrateur passe la pain du questionnaire, pas une table externe.
+- **`null` score = score 0 dans la priorité** (conservateur, monte en priorité) — données partielles tolérées, le mésocycle travaille ce qui n'a pas pu être mesuré.
+- **Pattern jours/semaine hardcodé** dans la RPC (1→L, 2→L,J, 3→L,M,V, 4→L,Ma,J,V, 5→L→V, 6/7→full). `time_slot='evening'` (convention muscu).
+- **`cycle_type` legacy** : `prepa_generale → endurance`, tous les autres → `force`. Le `PeriodizationCycle` fin est préservé dans `strength_session_items.raw_payload.periodization_cycle`.
+- **Identifiant des templates créés par un mésocycle** = `strength_session_items.raw_payload->>'mesocycle_id'`. Clé sémantique, pas de FK sur `strength_sessions`. `revert` s'en sert pour identifier ce qu'il doit supprimer.
+- **`apply` supersede** les mésocycles `active` précédents du même athlète ; `revert` n'accepte que `active`.
+- **Notification coach** : `type='message'` (pas d'extension du CHECK constraint) + `metadata.kind='strength_mesocycle_generated'`, ciblage groupe via `group_members`. Notif réciproque `'strength_mesocycle_reverted'` si revert vient du coach.
+- **`UserProfile.sex` exposé** (mig 00014, jamais réifié côté TS jusqu'ici) — requis par les barèmes KPI. `StrengthAssessment.sessions_per_week` aussi (mig 00168 §289).
+
+### Tests
+
+- `npm test` — **884/884 verts** (+76 tests dédiés : 49 sur le moteur + 12 wrappers API + 13 RLS table + 12 RLS RPC).
+- `npx tsc --noEmit` — exit 0.
+- `npm run build` — succès.
+- `npm run test:rls` — 25 tests §293 verts (13 table + 12 RPC), hors 2 échecs pré-existants connus `coach_pace_zones` / `pace_share_links`.
+- Bug fix attrapé par les tests RLS : la RPC référençait `users.name` (n'existe pas — prod a `users.display_name`). Corrigé dans les SQL et re-deployé via MCP `CREATE OR REPLACE`.
+
+### Commits (15)
+
+`0ab5a3752` (jump power calc), `8e5687050` (protocole détente temps de vol), `515def348` (barème puissance W/kg), `a0c3d0338` (wizard détente), `e69ee8477` (types mésocycle), `9456df87b` (tables + RLS), `b79673c8d` (fix RLS coach club-entier), `0e52fc187` (tests RLS table), `992200943` (scoreBuckets), `59b6b6811` (prioritizeBuckets), `d0b67ee07` (allocateVolume), `21671b24f` (selectExercises), `b28e33936` (periodize), `fbd760313` (generateMesocycle orchestrateur), `a505464a4` (doc mapping), `d08c4f4bd` (RPC apply), `1d2d209ff` (RPC revert), `00e9f1039` (tests RLS RPC + fix display_name), `db38a035a` (wrappers API), `b4de2f181` (écran génération nageur), `159807753` (écran aperçu nageur), `92d3791cc` (parcours nageur → timeline), `c8f0e5556` (visibilité + revert coach), + clôture documentaire.
+
+### Limites / hors scope
+
+- **Boucle de suivi / réévaluation** en fin de mésocycle = Chantier E, non livré.
+- **`athlete.level`** (`beginner`/`intermediate`/`advanced`) n'est pas stocké côté nageur — défaut `'intermediate'` à la génération. Pourrait être déduit de l'expérience d'entraînement ou saisi.
+- **`MesocycleInput.painReports`** n'existe pas — la douleur vient uniquement de `questionnaire.pain`. Si on veut croiser avec la table `pain_reports` ongoing, ajouter un champ optionnel.
+- **Distribution des séances/semaine** par méthode du plus grand reste : pour `sessionsPerWeek=3` avec 4 buckets non-mobility (2 focus + 2 maintien), on obtient `[focus#1, focus#2, maintien#1]` — le 2e maintien saute cette semaine. Acceptable mais simple ; une rotation par semaine serait plus équitable.
+
+### Clôture du Chantier C + D
+
+§293 **achève les Chantiers C « Moteur » et D « Intégration »** — le nageur peut générer son mésocycle en autonomie, le voit en aperçu, le confirme, et le coach le voit + peut le rejeter. Le parcours bout-en-bout est fonctionnel. Reste **Chantier E** (boucle de suivi en fin de mésocycle), hors plan §293.
+
 ## §292 — Bilan Muscu Chantier A : templates de périodisation à durée variable (A3 — clôture du Chantier A) (2026-05-17 → 2026-05-18)
 
 **Branche** : `main`
