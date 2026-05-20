@@ -116,6 +116,7 @@ const Strength = lazyWithRetry(() => import("@/pages/Strength"));
 const KpiWizard = lazyWithRetry(() => import("@/pages/KpiWizard"));
 const StrengthQuestionnaire = lazyWithRetry(() => import("@/pages/StrengthQuestionnaire"));
 const MesocycleGeneration = lazyWithRetry(() => import("@/pages/MesocycleGeneration"));
+const MesocyclePreview = lazyWithRetry(() => import("@/pages/MesocyclePreview"));
 const Suivi = lazyWithRetry(() => import("@/pages/Suivi"));
 const SuiviSemaine = lazyWithRetry(() => import("@/pages/SuiviSemaine"));
 const SuiviPlanification = lazyWithRetry(() => import("@/pages/SuiviPlanification"));
@@ -369,6 +370,11 @@ function AppRouter() {
             <Route path="/strength/mesocycle-generate">
               <Suspense fallback={<ListSkeleton />}>
                 <MesocycleGeneration />
+              </Suspense>
+            </Route>
+            <Route path="/strength/mesocycle-preview">
+              <Suspense fallback={<ListSkeleton />}>
+                <MesocyclePreview />
               </Suspense>
             </Route>
             <Route path="/strength">
