@@ -4,6 +4,7 @@ import {
   getProfile,
   getStrengthPlanningSlots,
   getStrengthPlanningSlotOverrides,
+  getStrengthPlanningWeekOverrides,
   getStrengthFolders,
   getStrengthSessions,
   getTrainingPlanApplicationsForUser,
@@ -104,6 +105,22 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     queryFn: () =>
       getStrengthPlanningSlotOverrides({ athleteId, weekStarts }),
   });
+
+  // §293 — week_type posé par la RPC apply_strength_mesocycle (label du cycle
+  // de périodisation : "Force max", "Pic", …). Sert à colorer la timeline en
+  // Phase 2 par phase d'entraînement.
+  const { data: athleteWeekOverrides = [] } = useQuery({
+    queryKey: ["strength_planning_week_overrides", athleteId, weekStarts],
+    queryFn: () =>
+      getStrengthPlanningWeekOverrides({ athleteId, weekStarts }),
+  });
+  const weekTypeByStart = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const w of athleteWeekOverrides) {
+      if (w.week_type) m.set(w.week_start, w.week_type);
+    }
+    return m;
+  }, [athleteWeekOverrides]);
 
   // Merge: athlete overrides take precedence over group slots
   const effectiveSlots = useMemo(
@@ -280,19 +297,23 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
         .filter((s): s is NonNullable<typeof s> => s !== null)
         .sort((a, b) => a.dayIndex - b.dayIndex);
 
+      // §293 — si un week_override a posé un week_type (label cycle du
+      // mésocycle généré), on le surface comme nom de cycle/phase pour que la
+      // timeline affiche « Force max » / « Pic » plutôt qu'un libellé vide.
+      const weekType = weekTypeByStart.get(weekStart) ?? "";
       instances.push({
         week: { monday, sunday, weekNumber, weekKey: weekStart },
         cycleId: 0, // no cycle for Phase 2
-        cycleName: "",
+        cycleName: weekType,
         cycleShortLabel: `S${weekNumber}`,
-        phase: detectPhase(""),
-        phaseName: "",
+        phase: detectPhase(weekType),
+        phaseName: weekType,
         dateRangeLabel: null,
         sessions,
       });
     }
     return instances;
-  }, [usePhase2, effectiveSlots, weekStarts, sessionsById]);
+  }, [usePhase2, effectiveSlots, weekStarts, sessionsById, weekTypeByStart]);
 
   // ── Phase 1 fallback: build WeekInstances from cycles ─────────────────────
   const fallbackWeekInstances = useMemo((): WeekInstance[] => {

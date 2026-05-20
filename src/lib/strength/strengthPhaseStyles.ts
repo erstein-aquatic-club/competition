@@ -12,10 +12,11 @@ export const PHASE_STYLES: Record<StrengthPhase, {
 
 export function detectPhase(name: string): StrengthPhase {
   const n = name.toLowerCase();
-  if (n.includes("reprise") || n.includes("s0")) return "reprise";
+  if (n.includes("reprise") || n.includes("s0") || n.includes("préparation générale") || n.includes("prepa")) return "reprise";
   if (n.includes("force")) return "force";
-  if (n.includes("puissance")) return "puissance";
-  if (n.includes("taper")) return "taper";
-  if (n.includes("compét") || n.includes("compet")) return "compétition";
+  if (n.includes("puissance") || n.includes("vitesse")) return "puissance";
+  // §293 — vocabulaire mésocycle : maintien et affûtage = phase de taper.
+  if (n.includes("taper") || n.includes("maintien") || n.includes("affûtage") || n.includes("affutage")) return "taper";
+  if (n.includes("compét") || n.includes("compet") || n.includes("pic")) return "compétition";
   return "force";
 }
