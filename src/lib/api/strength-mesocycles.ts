@@ -229,6 +229,7 @@ export interface MesocycleSessionExerciseContent {
   intention: string | null;
   substituted: boolean;
   originalExerciseId: number | null;
+  illustrationGif: string | null;
 }
 
 /** Une séance d'un mésocycle persisté (groupement d'items + métadonnées
@@ -267,7 +268,7 @@ export async function getMesocycleSessionsContent(
       .from('strength_session_items')
       .select(
         'session_id, ordre, exercise_id, sets, reps, pct_1rm, rest_series_s, notes, raw_payload,' +
-          ' dim_exercices ( nom_exercice )',
+          ' dim_exercices ( nom_exercice, illustration_gif )',
       )
       // Filtre via la clé JSON — pose par apply_strength_mesocycle.
       .eq('raw_payload->>mesocycle_id', mesocycleId)
@@ -285,7 +286,10 @@ export async function getMesocycleSessionsContent(
     rest_series_s: number | null;
     notes: string | null;
     raw_payload: Record<string, unknown> | null;
-    dim_exercices: { nom_exercice: string } | { nom_exercice: string }[] | null;
+    dim_exercices:
+      | { nom_exercice: string; illustration_gif: string | null }
+      | { nom_exercice: string; illustration_gif: string | null }[]
+      | null;
   };
 
   const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.raw_payload);
@@ -317,6 +321,7 @@ export async function getMesocycleSessionsContent(
 
     const dimEx = Array.isArray(r.dim_exercices) ? r.dim_exercices[0] : r.dim_exercices;
     const nomExercice = dimEx?.nom_exercice ?? `#${r.exercise_id}`;
+    const illustrationGif = dimEx?.illustration_gif ?? null;
 
     session.exercises.push({
       exerciseId: r.exercise_id,
@@ -331,6 +336,7 @@ export async function getMesocycleSessionsContent(
       substituted: Boolean(p.substituted),
       originalExerciseId:
         p.original_exercise_id != null ? Number(p.original_exercise_id) : null,
+      illustrationGif,
     });
   }
 

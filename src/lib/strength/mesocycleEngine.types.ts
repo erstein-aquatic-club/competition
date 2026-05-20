@@ -125,6 +125,8 @@ export interface MesocycleExercise {
   substituted: boolean;
   /** ID de l'exercice original si `substituted === true`. `null` sinon. */
   originalExerciseId: number | null;
+  /** URL de l'illustration GIF (propagée depuis le catalogue). */
+  illustrationGif: string | null;
 }
 
 // ── Exercice sélectionné (intermédiaire) ──────────────────────────────────────
@@ -286,6 +288,8 @@ export interface CatalogExercise {
   contraindicationZones: string[];
   /** `true` si exercice fondamental du seau (affiché en premier). */
   isCore: boolean;
+  /** URL de l'illustration GIF (ou null si l'exercice n'en a pas). */
+  illustrationGif: string | null;
   // Paramètres de charge catalogue (stratégie `catalogue` des cycles).
   nbSeriesEndurance: number | null;
   nbRepsEndurance: number | null;

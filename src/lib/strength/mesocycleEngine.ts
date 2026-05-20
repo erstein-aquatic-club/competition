@@ -829,6 +829,7 @@ function toMesocycleExercise(
     intention,
     substituted: selectedEx.substituted,
     originalExerciseId: selectedEx.originalExerciseId,
+    illustrationGif: ex.illustrationGif,
   };
 }
 

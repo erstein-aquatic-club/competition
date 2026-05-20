@@ -29,6 +29,7 @@ import type {
 } from "@/lib/api/types";
 import type { MesocycleSessionContent } from "@/lib/api";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
+import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -669,6 +670,12 @@ function SessionContentCard({
             <span className="mt-0.5 w-5 shrink-0 font-mono text-[10px] font-black tabular-nums text-muted-foreground">
               {String(idx + 1).padStart(2, "0")}
             </span>
+            <ExerciseGifLightbox
+              src={ex.illustrationGif}
+              alt={ex.nomExercice}
+              size="xs"
+              className="mt-0.5"
+            />
             <div className="min-w-0 flex-1 leading-tight">
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                 <span className="text-xs font-semibold">{ex.nomExercice}</span>

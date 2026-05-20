@@ -22,6 +22,7 @@ interface DbRow {
   level: string | null;
   contraindication_zones: string[] | null;
   is_core: boolean | null;
+  illustration_gif: string | null;
   nb_series_endurance: number | null;
   nb_reps_endurance: number | null;
   pourcentage_charge_1rm_endurance: number | null;
@@ -54,6 +55,7 @@ function mapRow(row: DbRow): CatalogExercise {
     level: isLevel(row.level) ? row.level : null,
     contraindicationZones: row.contraindication_zones ?? [],
     isCore: row.is_core ?? false,
+    illustrationGif: row.illustration_gif ?? null,
     nbSeriesEndurance: row.nb_series_endurance,
     nbRepsEndurance: row.nb_reps_endurance,
     pourcentageCharge1rmEndurance: row.pourcentage_charge_1rm_endurance,
@@ -78,7 +80,7 @@ export async function listCatalogExercisesTagged(): Promise<CatalogExercise[]> {
     await supabase
       .from('dim_exercices')
       .select(
-        'id, nom_exercice, bucket, level, contraindication_zones, is_core,' +
+        'id, nom_exercice, bucket, level, contraindication_zones, is_core, illustration_gif,' +
           ' nb_series_endurance, nb_reps_endurance, pourcentage_charge_1rm_endurance, recup_series_endurance,' +
           ' nb_series_force, nb_reps_force, pourcentage_charge_1rm_force, recup_series_force',
       )

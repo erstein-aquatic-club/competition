@@ -642,6 +642,7 @@ function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     level: 'intermediate',
     contraindicationZones: [],
     isCore: false,
+    illustrationGif: null,
     nbSeriesEndurance: 3,
     nbRepsEndurance: 12,
     pourcentageCharge1rmEndurance: 60,
