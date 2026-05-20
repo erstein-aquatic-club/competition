@@ -518,9 +518,17 @@ function buildOverrideRationale(painZones: string[], dysfns: string[]): string {
 /** Version sémantique du moteur — incrémentée à chaque modification de logique. */
 export const ENGINE_VERSION = '1.0.0';
 
-/** Nombre d'exercices par bloc d'une séance. */
+/** Nombre d'exercices par bloc d'une séance.
+ *
+ * Stratégie « multi-bucket à la McEvoy » (Vague C, §293) — chaque séance
+ * combine désormais un bucket PRIMAIRE (le focus principal) + un bucket
+ * COMPLEMENT (l'autre focus, ou le top focus si le primaire est en maintien)
+ * + un warmup mobility, à l'image de « Lundi Tractions + Squat + Ab Wheel »
+ * dans la prépa sprint de référence.
+ */
 const MOBILITY_WARMUP_COUNT = 2;
-const MAIN_BLOCK_COUNT = 3;
+const PRIMARY_BLOCK_COUNT = 2;
+const COMPLEMENT_BLOCK_COUNT = 1;
 /** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
  *  mobility), on cible jusqu'à 5 exercices mobility pour rester productive. */
 const MOBILITY_ONLY_COUNT = 5;
@@ -607,10 +615,19 @@ function buildWeek(
   sessionsPerWeek: number,
 ): MesocycleWeek {
   const slots = distributeSessionSlots(allocations, sessionsPerWeek);
-  const sessions: MesocycleSession[] = slots.map((mainBucket, idx) =>
-    buildSession(idx + 1, mainBucket, pw.cycle, selected),
+  const sessions: MesocycleSession[] = slots.map((slot, idx) =>
+    buildSession(idx + 1, slot.primary, slot.complement, pw.cycle, selected),
   );
   return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
+}
+
+/** Une séance = un bucket primaire + (optionnellement) un bucket complément. */
+interface SessionSlot {
+  primary: StrengthBucket;
+  /** Bucket secondaire pour pairer la séance (McEvoy : Lundi Tractions+Squat
+   *  → primary=upper_strength, complement=lower_strength). `null` si moins
+   *  de 2 focus entraînables ou si primary === 'mobility' (override). */
+  complement: StrengthBucket | null;
 }
 
 /**
@@ -618,11 +635,16 @@ function buildWeek(
  * allocations fractionnaires (méthode du plus grand reste). Mobility n'est pas
  * un "bucket principal" : c'est un échauffement systématique greffé sur chaque
  * séance (sauf si elle a été promue par l'override sécurité).
+ *
+ * Pour chaque créneau, choisit aussi un **complement bucket** (Vague C §293) :
+ * si la séance primaire est focus#1, complement = focus#2 (et vice-versa).
+ * Si primaire vient d'un bucket maintien, complement = top focus. Le résultat :
+ * chaque séance combine 2 buckets entraînables comme dans la prépa McEvoy.
  */
 function distributeSessionSlots(
   allocations: BucketAllocation[],
   sessionsPerWeek: number,
-): StrengthBucket[] {
+): SessionSlot[] {
   // Si mobility est en focus (override sécurité), elle compte comme un bucket principal.
   const candidates = allocations.filter((a) => {
     if (a.bucket === 'mobility') return a.role === 'focus';
@@ -631,7 +653,7 @@ function distributeSessionSlots(
 
   if (candidates.length === 0) {
     // Cas dégénéré : aucun bucket entraînable disponible → tout en mobility.
-    return Array(sessionsPerWeek).fill('mobility');
+    return Array(sessionsPerWeek).fill({ primary: 'mobility', complement: null });
   }
 
   const items = candidates.map((a) => ({
@@ -646,50 +668,101 @@ function distributeSessionSlots(
   const sortedByFrac = items.slice().sort((a, b) => b.frac - a.frac);
   const bonuses = new Set(sortedByFrac.slice(0, remaining).map((i) => i.bucket));
 
-  const slots: StrengthBucket[] = [];
+  const primaries: StrengthBucket[] = [];
   for (const item of items) {
     const count = item.floor + (bonuses.has(item.bucket) ? 1 : 0);
-    for (let i = 0; i < count; i++) slots.push(item.bucket);
+    for (let i = 0; i < count; i++) primaries.push(item.bucket);
   }
 
   // Pad si on n'a pas atteint le total (sécurité), tronc si on dépasse.
-  while (slots.length < sessionsPerWeek) {
-    slots.push(items[0].bucket);
+  while (primaries.length < sessionsPerWeek) {
+    primaries.push(items[0].bucket);
   }
-  return slots.slice(0, sessionsPerWeek);
+  const finalPrimaries = primaries.slice(0, sessionsPerWeek);
+
+  // Détermine le complement par primaire (Vague C McEvoy).
+  const focusBuckets = allocations
+    .filter((a) => a.role === 'focus' && a.bucket !== 'mobility')
+    .map((a) => a.bucket);
+
+  return finalPrimaries.map((primary) => ({
+    primary,
+    complement: pickComplement(primary, focusBuckets),
+  }));
 }
 
 /**
- * Construit une séance : warmup mobility + bloc principal du `mainBucket`.
- * Si `mainBucket === 'mobility'` (override), la séance est entièrement mobilité.
+ * Pour une séance dont le bucket primaire est connu, choisit le bucket
+ * complément à pairer (Vague C §293) :
+ * - si primary est focus#1 → complement = focus#2 (et vice-versa).
+ * - si primary est en maintien → complement = top focus.
+ * - moins de 2 focus disponibles, ou primary === complement → null
+ *   (séance mono-bucket, ancien comportement).
+ */
+function pickComplement(
+  primary: StrengthBucket,
+  focusBuckets: StrengthBucket[],
+): StrengthBucket | null {
+  if (focusBuckets.length < 2) return null;
+  if (primary === 'mobility') return null; // override sécurité — mono-bucket
+  if (primary === focusBuckets[0]) return focusBuckets[1];
+  if (primary === focusBuckets[1]) return focusBuckets[0];
+  // primary est un bucket de maintien → on paire avec le top focus.
+  return focusBuckets[0];
+}
+
+/**
+ * Construit une séance multi-bucket : warmup mobility + bloc PRIMAIRE +
+ * (optionnellement) bloc COMPLEMENT. Si `primary === 'mobility'` (override
+ * sécurité), la séance est entièrement mobilité, mono-bucket.
+ *
+ * Ordre des `buckets` : [primary, complement?, 'mobility'?]. `buckets[0]` =
+ * primary est utilisé par la RPC apply pour le nom du template
+ * (`[Méso XX] S03 J2 · force_max · upper_strength`).
  */
 function buildSession(
   sessionNumber: number,
-  mainBucket: StrengthBucket,
+  primary: StrengthBucket,
+  complement: StrengthBucket | null,
   cycle: PeriodizationCycle,
   selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
 ): MesocycleSession {
   const mobilityPool = selected.mobility ?? [];
-  const mainPool = selected[mainBucket] ?? [];
 
   let exercises: MesocycleExercise[];
   const buckets: StrengthBucket[] = [];
 
-  if (mainBucket === 'mobility') {
+  if (primary === 'mobility') {
+    // Cas override sécurité — la séance entière est mobilité.
     exercises = mobilityPool
       .slice(0, MOBILITY_ONLY_COUNT)
       .map((s) => toMesocycleExercise(s, cycle));
     buckets.push('mobility');
   } else {
+    const primaryPool = selected[primary] ?? [];
+    const useComplement = complement != null && complement !== primary;
+    const complementPool = useComplement ? (selected[complement] ?? []) : [];
+
     const warmup = mobilityPool
       .slice(0, MOBILITY_WARMUP_COUNT)
       .map((s) => toMesocycleExercise(s, cycle));
-    const main = mainPool
-      .slice(0, MAIN_BLOCK_COUNT)
+    const primaryBlock = primaryPool
+      .slice(0, PRIMARY_BLOCK_COUNT)
       .map((s) => toMesocycleExercise(s, cycle));
-    exercises = [...warmup, ...main];
+    const complementBlock = complementPool
+      .slice(0, COMPLEMENT_BLOCK_COUNT)
+      .map((s) => toMesocycleExercise(s, cycle));
+
+    // Ordre chronologique : warmup → primary → complement.
+    exercises = [...warmup, ...primaryBlock, ...complementBlock];
+
+    // Ordre des tags buckets : primary en tête (pour le nom de session côté
+    // RPC), puis complement, puis mobility.
+    buckets.push(primary);
+    if (useComplement && complementBlock.length > 0) {
+      buckets.push(complement as StrengthBucket);
+    }
     if (warmup.length > 0) buckets.push('mobility');
-    buckets.push(mainBucket);
   }
 
   return { sessionNumber, buckets, exercises };

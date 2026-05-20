@@ -1077,6 +1077,57 @@ describe('generateMesocycle', () => {
     }
   });
 
+  // ── Vague C §293 — séances multi-bucket à la McEvoy ─────────────────────
+  it('chaque séance combine un primary + un complement bucket (style McEvoy)', () => {
+    const meso = generateMesocycle(fullInput());
+
+    // Sur un input nominal avec 2+ focus, chaque session non-override doit
+    // contenir 2 buckets entraînables (primary + complement) + mobility.
+    for (const week of meso.weeks) {
+      for (const session of week.sessions) {
+        // Buckets entraînables (hors mobility) dans la séance.
+        const trainable = session.buckets.filter((b) => b !== 'mobility');
+        assert.ok(
+          trainable.length >= 1,
+          `S${week.weekNumber}-${session.sessionNumber} : au moins 1 bucket entraînable`,
+        );
+        // Pour un input avec 2+ focus, on attend en moyenne 2 buckets entraînables.
+        // (pas strict — selon les pools dispo, le complement peut être vide.)
+        assert.ok(
+          trainable.length <= 3,
+          `S${week.weekNumber}-${session.sessionNumber} : max 3 buckets (primary + complement + mobility ou édge)`,
+        );
+      }
+    }
+
+    // Au moins une session du mésocycle doit être bi-bucket (primary + complement).
+    const biBucketCount = meso.weeks.flatMap((w) => w.sessions).filter(
+      (s) => s.buckets.filter((b) => b !== 'mobility').length >= 2,
+    ).length;
+    assert.ok(
+      biBucketCount >= 1,
+      `Au moins 1 session bi-bucket attendue, obtenu ${biBucketCount}`,
+    );
+  });
+
+  it("buckets[0] reste le primary (consommé par la RPC pour le nom du template)", () => {
+    const meso = generateMesocycle(fullInput());
+    for (const week of meso.weeks) {
+      for (const session of week.sessions) {
+        // buckets[0] doit être un bucket entraînable (pas 'mobility') — sauf
+        // override où primary = mobility.
+        const first = session.buckets[0];
+        assert.ok(first, `S${week.weekNumber}-${session.sessionNumber} : buckets non vide`);
+        // Les exercises ordonnés en chronologique : si warmup mobility présent,
+        // les premiers exercices sont mobility. Mais buckets[0] = primary.
+        const primaryExercises = session.exercises.filter((e) => e.bucket === first);
+        if (first !== 'mobility') {
+          assert.ok(primaryExercises.length > 0, `S${week.weekNumber}-${session.sessionNumber} : au moins 1 exercice du primary ${first}`);
+        }
+      }
+    }
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {
