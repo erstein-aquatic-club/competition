@@ -698,7 +698,12 @@ function PlanPanel({
   generated: GeneratedMesocycle;
   startMondayIso: string;
 }) {
-  const [expanded, setExpanded] = useState<Set<number>>(new Set([1]));
+  // Par défaut : TOUTES les semaines dépliées → le contenu des séances est
+  // immédiatement auditable (en miroir du panneau de raisonnement, lui aussi
+  // entièrement déplié par défaut).
+  const [expanded, setExpanded] = useState<Set<number>>(
+    () => new Set(generated.weeks.map((w) => w.weekNumber)),
+  );
   const toggleWeek = (n: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -711,10 +716,15 @@ function PlanPanel({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
-        <h2 className="flex items-center gap-2 text-sm font-bold">
-          <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-          Plan détaillé
-        </h2>
+        <div className="min-w-0 leading-tight">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+            Plan auditable
+          </p>
+          <h2 className="flex items-center gap-2 text-sm font-bold">
+            <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+            Plan détaillé
+          </h2>
+        </div>
         <button
           type="button"
           onClick={() => {
@@ -777,6 +787,7 @@ function PlanPanel({
 
               {isOpen && (
                 <div className={cn("border-t px-2 py-2 sm:px-3", c.bg)}>
+                  <CycleLoadingStrip cycle={week.cycle} cycleColor={c} />
                   <div className="space-y-2.5">
                     {week.sessions.map((s) => (
                       <SessionCard
@@ -792,6 +803,81 @@ function PlanPanel({
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/**
+ * Strip d'info sur la stratégie de chargement du cycle, affichée en tête du
+ * bloc déplié d'une semaine. Permet au nageur/coach de comprendre **d'où**
+ * viennent les sets/reps/%1RM/récup des exercices de la semaine :
+ * - `catalogue` → lit les colonnes `*_endurance` ou `*_force` de
+ *   `dim_exercices` (params portés par chaque exercice).
+ * - `generique` → schéma uniforme au niveau cycle (sets/reps/intensité/récup
+ *   en intervalles + intention d'exécution).
+ */
+function CycleLoadingStrip({
+  cycle,
+  cycleColor,
+}: {
+  cycle: PeriodizationCycle;
+  cycleColor: (typeof CYCLE_COLOR)[PeriodizationCycle];
+}) {
+  const config = PERIODIZATION_CYCLES[cycle];
+  if (!config) return null;
+  const loading = config.loading;
+
+  if (loading.kind === "catalogue") {
+    const colLabel = loading.column === "endurance" ? "endurance" : "force";
+    return (
+      <div className="mb-2.5 rounded-lg border bg-background/70 px-2.5 py-1.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+            Stratégie
+          </span>
+          <Badge
+            variant="outline"
+            className={cn(
+              "h-4 px-1 font-mono text-[9px] font-bold uppercase tracking-wider",
+              cycleColor.text,
+            )}
+          >
+            catalogue · {colLabel}
+          </Badge>
+          <span className="text-[10px] leading-tight text-muted-foreground">
+            Paramètres lus dans <code className="font-mono">dim_exercices</code> (colonnes <code className="font-mono">*_{colLabel}</code>) — propres à chaque exercice.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Stratégie générique : schéma porté par le cycle.
+  const s = loading.scheme;
+  const fmt = (r: readonly [number, number]) =>
+    r[0] === r[1] ? `${r[0]}` : `${r[0]}–${r[1]}`;
+  return (
+    <div className="mb-2.5 rounded-lg border bg-background/70 px-2.5 py-1.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+          Stratégie
+        </span>
+        <Badge
+          variant="outline"
+          className={cn(
+            "h-4 px-1 font-mono text-[9px] font-bold uppercase tracking-wider",
+            cycleColor.text,
+          )}
+        >
+          schéma générique
+        </Badge>
+        <span className="font-mono text-[10px] tabular-nums text-foreground/80">
+          {fmt(s.sets)} × {fmt(s.reps)} @ {fmt(s.intensityPct1rm)}% · récup {fmt(s.restSeconds)}s
+        </span>
+      </div>
+      <p className="mt-1 text-[10px] italic leading-relaxed text-muted-foreground">
+        {s.intention}
+      </p>
     </div>
   );
 }
@@ -910,13 +996,19 @@ function CtaBar({
           <span className="tabular-nums font-bold">{totalWeeks}</span> prochaines
           semaines. Ton coach sera notifié et pourra ajuster.
         </p>
-        <div className="flex items-center gap-2">
+        {/*
+         * Stacke vertical sur mobile (flex-col-reverse → CTA primaire au-dessus
+         * du secondaire, plus accessible). Row sur sm+.
+         * Le bouton primaire raccourci ("Confirmer" sans "& appliquer") évite
+         * l'overflow sur les viewports étroits.
+         */}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
           <Button
             type="button"
             variant="ghost"
             disabled={pending}
             onClick={onCancel}
-            className="text-xs"
+            className="w-full text-xs sm:w-auto"
           >
             Modifier les paramètres
           </Button>
@@ -924,7 +1016,7 @@ function CtaBar({
             type="button"
             disabled={pending}
             onClick={onConfirm}
-            className="ml-auto flex h-12 items-center gap-2 bg-violet-600 px-5 text-base font-semibold text-white shadow-lg hover:bg-violet-700 disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400"
+            className="flex h-12 w-full items-center justify-center gap-2 bg-violet-600 px-4 text-base font-semibold text-white shadow-lg hover:bg-violet-700 disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400 sm:ml-auto sm:w-auto sm:px-5"
           >
             {pending ? (
               <>
@@ -934,7 +1026,7 @@ function CtaBar({
             ) : (
               <>
                 <CheckCircle2 className="h-5 w-5" />
-                Confirmer & appliquer
+                Confirmer
               </>
             )}
           </Button>
