@@ -269,7 +269,7 @@ BEGIN
   END LOOP;
 
   -- ── 7. Notification to the coach (via the athlete's group) ───────────
-  SELECT u.name INTO v_athlete_name FROM users u WHERE u.id = p_athlete_id;
+  SELECT u.display_name INTO v_athlete_name FROM users u WHERE u.id = p_athlete_id;
   SELECT gm.group_id INTO v_athlete_group_id
     FROM group_members gm
    WHERE gm.user_id = p_athlete_id

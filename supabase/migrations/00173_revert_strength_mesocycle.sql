@@ -172,7 +172,7 @@ BEGIN
 
   -- ── 10. Notif au nageur si le revert vient du coach ──────────────────
   IF v_caller_id <> v_athlete_id THEN
-    SELECT u.name INTO v_athlete_name FROM users u WHERE u.id = v_athlete_id;
+    SELECT u.display_name INTO v_athlete_name FROM users u WHERE u.id = v_athlete_id;
     INSERT INTO notifications (title, body, type, created_by, metadata)
     VALUES (
       'Mésocycle muscu annulé',
