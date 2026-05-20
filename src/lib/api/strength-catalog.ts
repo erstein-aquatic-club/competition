@@ -6,6 +6,10 @@
  * `contraindication_zones`, `is_core` ajoutés par migration 00164. Ce wrapper
  * lit ces colonnes et renvoie directement le type `CatalogExercise` consommé
  * par `mesocycleEngine.ts`.
+ *
+ * Noms de colonnes DB (vérifiés via `information_schema.columns` sur prod) :
+ *   nb_series_endurance, nb_reps_endurance, pourcentage_charge_1rm_endurance,
+ *   recup_series_endurance — idem _force.
  */
 import { supabase, canUseSupabase, assertSupabase } from './client';
 import type { CatalogExercise } from '@/lib/strength/mesocycleEngine.types';
@@ -18,14 +22,14 @@ interface DbRow {
   level: string | null;
   contraindication_zones: string[] | null;
   is_core: boolean | null;
-  Nb_series_endurance: number | null;
-  Nb_reps_endurance: number | null;
-  pct_1rm_endurance: number | null;
-  recup_endurance: number | null;
-  Nb_series_force: number | null;
-  Nb_reps_force: number | null;
-  pct_1rm_force: number | null;
-  recup_force: number | null;
+  nb_series_endurance: number | null;
+  nb_reps_endurance: number | null;
+  pourcentage_charge_1rm_endurance: number | null;
+  recup_series_endurance: number | null;
+  nb_series_force: number | null;
+  nb_reps_force: number | null;
+  pourcentage_charge_1rm_force: number | null;
+  recup_series_force: number | null;
 }
 
 function isStrengthBucket(value: unknown): value is StrengthBucket {
@@ -50,14 +54,14 @@ function mapRow(row: DbRow): CatalogExercise {
     level: isLevel(row.level) ? row.level : null,
     contraindicationZones: row.contraindication_zones ?? [],
     isCore: row.is_core ?? false,
-    nbSeriesEndurance: row.Nb_series_endurance,
-    nbRepsEndurance: row.Nb_reps_endurance,
-    pourcentageCharge1rmEndurance: row.pct_1rm_endurance,
-    recupSeriesEndurance: row.recup_endurance,
-    nbSeriesForce: row.Nb_series_force,
-    nbRepsForce: row.Nb_reps_force,
-    pourcentageCharge1rmForce: row.pct_1rm_force,
-    recupSeriesForce: row.recup_force,
+    nbSeriesEndurance: row.nb_series_endurance,
+    nbRepsEndurance: row.nb_reps_endurance,
+    pourcentageCharge1rmEndurance: row.pourcentage_charge_1rm_endurance,
+    recupSeriesEndurance: row.recup_series_endurance,
+    nbSeriesForce: row.nb_series_force,
+    nbRepsForce: row.nb_reps_force,
+    pourcentageCharge1rmForce: row.pourcentage_charge_1rm_force,
+    recupSeriesForce: row.recup_series_force,
   };
 }
 
@@ -75,8 +79,8 @@ export async function listCatalogExercisesTagged(): Promise<CatalogExercise[]> {
       .from('dim_exercices')
       .select(
         'id, nom_exercice, bucket, level, contraindication_zones, is_core,' +
-          ' Nb_series_endurance, Nb_reps_endurance, pct_1rm_endurance, recup_endurance,' +
-          ' Nb_series_force, Nb_reps_force, pct_1rm_force, recup_force',
+          ' nb_series_endurance, nb_reps_endurance, pourcentage_charge_1rm_endurance, recup_series_endurance,' +
+          ' nb_series_force, nb_reps_force, pourcentage_charge_1rm_force, recup_series_force',
       )
       .not('bucket', 'is', null),
   );

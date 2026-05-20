@@ -253,7 +253,11 @@ export default function MesocyclePreview() {
     enabled: params != null,
   });
 
-  const { data: catalog = [], isLoading: catLoading } = useQuery({
+  const {
+    data: catalog = [],
+    isLoading: catLoading,
+    error: catError,
+  } = useQuery({
     queryKey: ["strength-catalog-tagged"],
     queryFn: () => listCatalogExercisesTagged(),
     staleTime: 5 * 60 * 1000,
@@ -352,6 +356,23 @@ export default function MesocyclePreview() {
 
   if (engineError) {
     return <EngineErrorScreen message={engineError} />;
+  }
+
+  // Catalogue en erreur ou vide → moteur produit des séances sans exercices.
+  // On expose l'erreur explicitement plutôt que d'afficher un plan creux.
+  if (catError) {
+    return (
+      <EngineErrorScreen
+        message={`Catalogue d'exercices indisponible : ${
+          catError instanceof Error ? catError.message : "erreur réseau"
+        }`}
+      />
+    );
+  }
+  if (!catLoading && catalog.length === 0) {
+    return (
+      <EngineErrorScreen message="Aucun exercice taggé trouvé dans le catalogue. Préviens ton coach pour qu'il vérifie le seedage de dim_exercices." />
+    );
   }
 
   if (!generated || !template) {
