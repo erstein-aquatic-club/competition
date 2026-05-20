@@ -18,6 +18,7 @@ import type {
 import { getBareme, kpiScore } from './kpiBaremes';
 import type {
   AllBucket,
+  BucketAllocation,
   BucketPriority,
   BucketScores,
   MesocycleInput,
@@ -257,6 +258,68 @@ function buildRationale(
     return `${label} faible (${Math.round(rawScore)}/100) — sollicité ×${emphasis.toFixed(2)} par l'épreuve → focus.`;
   }
   return `${label} ${Math.round(rawScore)}/100 — sollicité ×${emphasis.toFixed(2)} → maintien.`;
+}
+
+// ── allocateVolume ───────────────────────────────────────────────────────────
+
+/** Part de volume allouée aux 2 seaux focus (vs maintien). */
+const FOCUS_SHARE = 0.6;
+const MAINTIEN_SHARE = 0.4;
+/** Nombre de seaux en rôle focus (top-2 du classement entraînable). */
+const FOCUS_COUNT = 2;
+
+/**
+ * Répartit le volume hebdo sur les 5 seaux entraînables, à partir du
+ * classement de priorité.
+ *
+ * - Top 2 (parmi les entraînables, psychology exclue) = **focus**, partageant
+ *   ~60 % du volume → chacun `0.3 × sessionsPerWeek`.
+ * - Les autres entraînables (hors `mobility`) = **maintien**, partageant
+ *   ~40 % du volume → chacun `0.4 × sessionsPerWeek / nb_maintien_non_mob`.
+ * - `mobility` en maintien = **échauffement systématique** : présente à chaque
+ *   séance → `sessionsPerWeek = S`. Si l'override sécurité l'a fait passer
+ *   en focus (top 2), elle prend la part focus comme les autres.
+ *
+ * `psychology` n'a pas d'exercices → exclue de la sortie (un flag est produit
+ * en amont par l'orchestrateur en cas de score bas).
+ */
+export function allocateVolume(
+  priorities: BucketPriority[],
+  sessionsPerWeek: number,
+): BucketAllocation[] {
+  // Filtre psychology, conserve l'ordre de priorité.
+  const entrainables = priorities
+    .filter((p): p is BucketPriority & { bucket: StrengthBucket } => p.bucket !== 'psychology')
+    .slice()
+    .sort((a, b) => a.rank - b.rank);
+
+  const focusBuckets = entrainables.slice(0, FOCUS_COUNT).map((p) => p.bucket);
+  const maintienBuckets = entrainables.slice(FOCUS_COUNT).map((p) => p.bucket);
+
+  const out: BucketAllocation[] = [];
+
+  // Focus : part identique pour chaque seau focus.
+  const focusPer = (FOCUS_SHARE * sessionsPerWeek) / focusBuckets.length;
+  for (const bucket of focusBuckets) {
+    out.push({ bucket, sessionsPerWeek: focusPer, role: 'focus' });
+  }
+
+  // Maintien hors mobility : se partage la part maintien.
+  const maintienNonMob = maintienBuckets.filter((b) => b !== 'mobility');
+  const maintienPer =
+    maintienNonMob.length > 0
+      ? (MAINTIEN_SHARE * sessionsPerWeek) / maintienNonMob.length
+      : 0;
+  for (const bucket of maintienNonMob) {
+    out.push({ bucket, sessionsPerWeek: maintienPer, role: 'maintien' });
+  }
+
+  // Mobility en maintien : échauffement systématique (sessionsPerWeek complets).
+  if (maintienBuckets.includes('mobility')) {
+    out.push({ bucket: 'mobility', sessionsPerWeek, role: 'maintien' });
+  }
+
+  return out;
 }
 
 function buildOverrideRationale(painZones: string[], dysfns: string[]): string {

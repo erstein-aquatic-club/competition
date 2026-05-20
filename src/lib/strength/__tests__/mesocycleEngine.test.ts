@@ -493,3 +493,139 @@ describe('prioritizeBuckets', () => {
   });
 });
 
+// ── allocateVolume ───────────────────────────────────────────────────────────
+
+import type { BucketAllocation, BucketPriority } from '../mesocycleEngine.types.ts';
+import { allocateVolume } from '../mesocycleEngine.ts';
+import type { StrengthBucket } from '@/lib/api/types';
+
+/** Construit une liste de priorités à partir d'un ordre de seaux (rang 1 = premier). */
+function makePriorities(order: AllBucketLite[]): BucketPriority[] {
+  return order.map((bucket, i) => ({
+    bucket,
+    score: 100 - i * 10,
+    rank: i + 1,
+    rationale: `${bucket} test`,
+    overrideApplied: false,
+  }));
+}
+type AllBucketLite = BucketPriority['bucket'];
+
+describe('allocateVolume', () => {
+  it('top 2 entraînables = focus, autres = maintien', () => {
+    // Ordre: lower_strength (1), upper_strength (2), lower_power (3), upper_power (4), mobility (5), psychology (6)
+    const priorities = makePriorities([
+      'lower_strength',
+      'upper_strength',
+      'lower_power',
+      'upper_power',
+      'mobility',
+      'psychology',
+    ]);
+
+    const allocations = allocateVolume(priorities, 4);
+
+    // psychology jamais alloué
+    assert.ok(allocations.every((a) => (a.bucket as string) !== 'psychology'));
+    // 5 entraînables couverts
+    assert.equal(allocations.length, 5);
+    // Top 2 = focus
+    const focus = allocations.filter((a) => a.role === 'focus').map((a) => a.bucket);
+    assert.deepEqual(focus.sort(), ['lower_strength', 'upper_strength'].sort());
+    // Autres = maintien
+    const maintien = allocations.filter((a) => a.role === 'maintien').map((a) => a.bucket).sort();
+    assert.deepEqual(maintien, ['lower_power', 'mobility', 'upper_power'].sort());
+  });
+
+  it('focus reçoit ~60 %, maintien (hors mobility) ~40 % du volume', () => {
+    const priorities = makePriorities([
+      'lower_strength',
+      'upper_strength',
+      'lower_power',
+      'upper_power',
+      'mobility',
+      'psychology',
+    ]);
+    const S = 4;
+
+    const allocations = allocateVolume(priorities, S);
+
+    // 2 focus → chacun (60 % × S) / 2 = 0.3 × S = 1.2
+    const focus = allocations.filter((a) => a.role === 'focus');
+    for (const a of focus) {
+      assert.ok(Math.abs(a.sessionsPerWeek - 1.2) < 1e-9, `focus ${a.bucket}: attendu 1.2, obtenu ${a.sessionsPerWeek}`);
+    }
+    // 2 maintien (lower_power, upper_power) → chacun (40 % × S) / 2 = 0.2 × S = 0.8
+    const maintienNonMob = allocations.filter((a) => a.role === 'maintien' && a.bucket !== 'mobility');
+    for (const a of maintienNonMob) {
+      assert.ok(Math.abs(a.sessionsPerWeek - 0.8) < 1e-9, `maintien ${a.bucket}: attendu 0.8, obtenu ${a.sessionsPerWeek}`);
+    }
+  });
+
+  it('mobility en maintien = échauffement systématique → sessionsPerWeek = S', () => {
+    const priorities = makePriorities([
+      'lower_strength',
+      'upper_strength',
+      'lower_power',
+      'upper_power',
+      'mobility',
+      'psychology',
+    ]);
+
+    const allocations = allocateVolume(priorities, 3);
+
+    const mob = allocations.find((a) => a.bucket === 'mobility')!;
+    assert.equal(mob.role, 'maintien');
+    assert.equal(mob.sessionsPerWeek, 3);
+  });
+
+  it('mobility en focus (override sécurité) → reçoit la part focus, pas la part warmup', () => {
+    // mobility forcée rang 1 par l'override
+    const priorities = makePriorities([
+      'mobility',
+      'lower_strength',
+      'upper_strength',
+      'lower_power',
+      'upper_power',
+      'psychology',
+    ]);
+
+    const allocations = allocateVolume(priorities, 4);
+
+    const mob = allocations.find((a) => a.bucket === 'mobility')!;
+    assert.equal(mob.role, 'focus');
+    // Focus share : 0.3 × S = 1.2
+    assert.ok(Math.abs(mob.sessionsPerWeek - 1.2) < 1e-9);
+    // 3 autres en maintien : (40 % × S) / 3 ≈ 0.533
+    const maintien = allocations.filter((a) => a.role === 'maintien');
+    assert.equal(maintien.length, 3);
+    for (const a of maintien) {
+      assert.ok(Math.abs(a.sessionsPerWeek - (0.4 * 4) / 3) < 1e-9);
+    }
+  });
+
+  it('fonctionne pour sessionsPerWeek = 2 à 5', () => {
+    const priorities = makePriorities([
+      'lower_strength',
+      'upper_strength',
+      'lower_power',
+      'upper_power',
+      'mobility',
+      'psychology',
+    ]);
+
+    for (const S of [2, 3, 4, 5]) {
+      const allocations = allocateVolume(priorities, S);
+      assert.equal(allocations.length, 5, `S=${S}: 5 entraînables`);
+      const focus = allocations.filter((a) => a.role === 'focus');
+      assert.equal(focus.length, 2, `S=${S}: 2 focus`);
+      // Somme du focus = 60 % × S
+      const focusSum = focus.reduce((s, a) => s + a.sessionsPerWeek, 0);
+      assert.ok(Math.abs(focusSum - 0.6 * S) < 1e-9, `S=${S}: focus sum attendu ${0.6 * S}, obtenu ${focusSum}`);
+      // mobility toujours présente
+      assert.ok(allocations.some((a) => a.bucket === 'mobility'), `S=${S}: mobility présente`);
+    }
+  });
+});
+
+
