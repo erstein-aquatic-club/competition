@@ -23,6 +23,7 @@ import type {
   BucketScores,
   CatalogExercise,
   MesocycleInput,
+  PeriodizedWeek,
   SelectedExercise,
 } from './mesocycleEngine.types.ts';
 
@@ -409,6 +410,80 @@ export function selectExercises(
   }
 
   return result;
+}
+
+// ── periodize ────────────────────────────────────────────────────────────────
+
+/**
+ * Distribue les phases du template sur `targetWeekCount` semaines.
+ *
+ * Algorithme :
+ * 1. Vérifie `targetWeekCount ∈ [Σ min_weeks, Σ max_weeks]` — sinon throw.
+ * 2. Part du `nominal_weeks` de chaque phase.
+ * 3. Si `target > Σ nominal` : étire en round-robin, +1 semaine à chaque
+ *    phase dont l'allocation courante < max_weeks, jusqu'à atteindre target.
+ * 4. Si `target < Σ nominal` : comprime en round-robin, -1 à chaque phase
+ *    dont l'allocation courante > min_weeks.
+ * 5. Développe chaque phase en `n` semaines de son cycle, dans l'ordre.
+ *
+ * @throws Error si target hors `[Σ min, Σ max]`.
+ */
+export function periodize(
+  template: StrengthPeriodizationTemplate,
+  targetWeekCount: number,
+): PeriodizedWeek[] {
+  const phases = template.structure.phases;
+  const totalMin = phases.reduce((s, p) => s + p.min_weeks, 0);
+  const totalMax = phases.reduce((s, p) => s + p.max_weeks, 0);
+  const totalNominal = phases.reduce((s, p) => s + p.nominal_weeks, 0);
+
+  if (targetWeekCount < totalMin) {
+    throw new Error(
+      `periodize: targetWeekCount ${targetWeekCount} hors plage — Σ min_weeks = ${totalMin}`,
+    );
+  }
+  if (targetWeekCount > totalMax) {
+    throw new Error(
+      `periodize: targetWeekCount ${targetWeekCount} hors plage — Σ max_weeks = ${totalMax}`,
+    );
+  }
+
+  const allocations = phases.map((p) => p.nominal_weeks);
+  let delta = targetWeekCount - totalNominal;
+
+  while (delta > 0) {
+    let changed = false;
+    for (let i = 0; i < phases.length && delta > 0; i++) {
+      if (allocations[i] < phases[i].max_weeks) {
+        allocations[i]++;
+        delta--;
+        changed = true;
+      }
+    }
+    if (!changed) break; // garde-fou, ne devrait pas arriver vu la borne max
+  }
+
+  while (delta < 0) {
+    let changed = false;
+    for (let i = 0; i < phases.length && delta < 0; i++) {
+      if (allocations[i] > phases[i].min_weeks) {
+        allocations[i]--;
+        delta++;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  const weeks: PeriodizedWeek[] = [];
+  let weekNumber = 1;
+  for (let i = 0; i < phases.length; i++) {
+    for (let j = 0; j < allocations[i]; j++) {
+      weeks.push({ weekNumber, cycle: phases[i].cycle });
+      weekNumber++;
+    }
+  }
+  return weeks;
 }
 
 function buildOverrideRationale(painZones: string[], dysfns: string[]): string {

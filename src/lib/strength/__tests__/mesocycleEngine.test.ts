@@ -777,5 +777,121 @@ describe('selectExercises', () => {
 const _selectedExerciseTypeCheck: SelectedExercise | null = null;
 void _selectedExerciseTypeCheck;
 
+// ── periodize ────────────────────────────────────────────────────────────────
+
+import { periodize } from '../mesocycleEngine.ts';
+
+describe('periodize', () => {
+  it('target = Σ nominal → chaque phase à son nominal', () => {
+    // Σ nominal = 3 + 4 + 3 + 1 = 11
+    const template = makeTemplate({});
+    template.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+      { cycle: 'force_max', min_weeks: 3, nominal_weeks: 4, max_weeks: 5 },
+      { cycle: 'puissance', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+      { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+    ];
+
+    const weeks = periodize(template, 11);
+
+    // 11 semaines au total
+    assert.equal(weeks.length, 11);
+    // Cycles dans l'ordre des phases : 3 prepa, 4 force, 3 puissance, 1 pic
+    const cycles = weeks.map((w) => w.cycle);
+    assert.deepEqual(cycles, [
+      'prepa_generale', 'prepa_generale', 'prepa_generale',
+      'force_max', 'force_max', 'force_max', 'force_max',
+      'puissance', 'puissance', 'puissance',
+      'pic',
+    ]);
+    // weekNumber = 1..11, contigu
+    const weekNumbers = weeks.map((w) => w.weekNumber);
+    assert.deepEqual(weekNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  it('target > Σ nominal → étire dans [nominal, max]', () => {
+    // Σ nominal = 6, Σ max = 12. target = 8 → delta = +2.
+    const template = makeTemplate({});
+    template.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 1, nominal_weeks: 2, max_weeks: 4 },
+      { cycle: 'force_max', min_weeks: 1, nominal_weeks: 2, max_weeks: 4 },
+      { cycle: 'puissance', min_weeks: 1, nominal_weeks: 2, max_weeks: 4 },
+    ];
+
+    const weeks = periodize(template, 8);
+
+    assert.equal(weeks.length, 8);
+    // Comptage par cycle (chaque phase entre nominal=2 et max=4)
+    const counts: Record<string, number> = {};
+    for (const w of weeks) counts[w.cycle] = (counts[w.cycle] ?? 0) + 1;
+    for (const c of ['prepa_generale', 'force_max', 'puissance']) {
+      assert.ok(counts[c] >= 2 && counts[c] <= 4, `${c}: attendu ∈ [2,4], obtenu ${counts[c]}`);
+    }
+    // Somme = 8
+    assert.equal(counts.prepa_generale + counts.force_max + counts.puissance, 8);
+  });
+
+  it('target < Σ nominal → comprime dans [min, nominal]', () => {
+    // Σ nominal = 9, Σ min = 3. target = 5 → delta = -4.
+    const template = makeTemplate({});
+    template.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 1, nominal_weeks: 3, max_weeks: 5 },
+      { cycle: 'force_max', min_weeks: 1, nominal_weeks: 3, max_weeks: 5 },
+      { cycle: 'puissance', min_weeks: 1, nominal_weeks: 3, max_weeks: 5 },
+    ];
+
+    const weeks = periodize(template, 5);
+
+    assert.equal(weeks.length, 5);
+    const counts: Record<string, number> = {};
+    for (const w of weeks) counts[w.cycle] = (counts[w.cycle] ?? 0) + 1;
+    for (const c of ['prepa_generale', 'force_max', 'puissance']) {
+      assert.ok(counts[c] >= 1 && counts[c] <= 3, `${c}: attendu ∈ [1,3], obtenu ${counts[c]}`);
+    }
+  });
+
+  it('preserve l’ordre des phases dans la séquence finale', () => {
+    const template = makeTemplate({});
+    template.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      { cycle: 'force_max', min_weeks: 1, nominal_weeks: 2, max_weeks: 3 },
+      { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+    ];
+
+    const weeks = periodize(template, 5);
+    const cycles = weeks.map((w) => w.cycle);
+    // pic ne doit jamais précéder force_max, qui ne doit jamais précéder prepa_generale.
+    const firstForceIdx = cycles.indexOf('force_max');
+    const lastPrepaIdx = cycles.lastIndexOf('prepa_generale');
+    const firstPicIdx = cycles.indexOf('pic');
+    const lastForceIdx = cycles.lastIndexOf('force_max');
+    assert.ok(firstForceIdx > lastPrepaIdx, 'force_max après prepa_generale');
+    assert.ok(firstPicIdx > lastForceIdx, 'pic après force_max');
+  });
+
+  it('throw si target < Σ min_weeks', () => {
+    const template = makeTemplate({});
+    template.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+      { cycle: 'force_max', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+    ];
+
+    // Σ min = 4. target 3 → throw.
+    assert.throws(() => periodize(template, 3), /hors|out|min/i);
+  });
+
+  it('throw si target > Σ max_weeks', () => {
+    const template = makeTemplate({});
+    template.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+      { cycle: 'force_max', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+    ];
+
+    // Σ max = 8. target 9 → throw.
+    assert.throws(() => periodize(template, 9), /hors|out|max/i);
+  });
+});
+
+
 
 

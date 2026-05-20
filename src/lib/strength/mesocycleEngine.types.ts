@@ -168,6 +168,22 @@ export interface MesocycleSession {
   exercises: MesocycleExercise[];
 }
 
+// ── Semaine périodisée (intermédiaire) ────────────────────────────────────────
+
+/**
+ * Une semaine après distribution des phases du template — uniquement le cycle,
+ * sans les séances.
+ *
+ * Sortie de `periodize` : l'orchestrateur `generateMesocycle` y greffera les
+ * séances (`MesocycleSession[]`) pour produire les `MesocycleWeek` finales.
+ */
+export interface PeriodizedWeek {
+  /** Numéro de la semaine dans le mésocycle (1 = première semaine). */
+  weekNumber: number;
+  /** Cycle de périodisation de cette semaine. */
+  cycle: PeriodizationCycle;
+}
+
 // ── Semaine ────────────────────────────────────────────────────────────────────
 
 /**
