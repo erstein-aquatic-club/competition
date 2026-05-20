@@ -209,3 +209,134 @@ export async function listMesocycles(
   );
   return (data ?? []) as StrengthMesocycle[];
 }
+
+// ── Lecture du contenu d'un mésocycle persisté ───────────────────────────────
+
+/**
+ * Détail d'un exercice tel que persisté dans une séance d'un mésocycle.
+ * Reconstitué depuis `strength_session_items` + `raw_payload` posé par la
+ * RPC `apply_strength_mesocycle` (mig 00172).
+ */
+export interface MesocycleSessionExerciseContent {
+  exerciseId: number;
+  nomExercice: string;
+  bucket: string;
+  isCore: boolean;
+  sets: number | null;
+  reps: number | null;
+  intensityPct1rm: number | null;
+  restSeconds: number | null;
+  intention: string | null;
+  substituted: boolean;
+  originalExerciseId: number | null;
+}
+
+/** Une séance d'un mésocycle persisté (groupement d'items + métadonnées
+ *  reconstituées depuis `raw_payload`). */
+export interface MesocycleSessionContent {
+  weekNumber: number;
+  sessionNumber: number;
+  /** PeriodizationCycle string : `'prepa_generale'` | `'force_max'` | … */
+  cycle: string;
+  /** Seaux travaillés (dérivés des items de la séance, dédoublonnés). */
+  buckets: string[];
+  exercises: MesocycleSessionExerciseContent[];
+}
+
+/**
+ * Récupère le contenu détaillé d'un mésocycle persisté — toutes les séances
+ * avec leurs exercices, ordonnées par (semaine, session, ordre).
+ *
+ * Utilisée par le panneau coach pour offrir une vue auditable « en miroir »
+ * de l'aperçu nageur, sans relancer le moteur. Les exercices viennent de
+ * `strength_session_items.raw_payload` (posé par la RPC apply, §293) qui
+ * conserve `mesocycle_id`, `week_number`, `session_number`, `bucket`,
+ * `is_core`, `periodization_cycle`, `intention`, `substituted`,
+ * `original_exercise_id` à côté des paramètres de charge classiques.
+ *
+ * Retourne `[]` si Supabase indispo ou si aucun item n'a été posé pour ce
+ * mésocycle (rare — un mésocycle `reverted` aurait ses items supprimés).
+ */
+export async function getMesocycleSessionsContent(
+  mesocycleId: string,
+): Promise<MesocycleSessionContent[]> {
+  if (!canUseSupabase()) return [];
+
+  const data = assertSupabase(
+    await supabase
+      .from('strength_session_items')
+      .select(
+        'session_id, ordre, exercise_id, sets, reps, pct_1rm, rest_series_s, notes, raw_payload,' +
+          ' dim_exercices ( nom_exercice )',
+      )
+      // Filtre via la clé JSON — pose par apply_strength_mesocycle.
+      .eq('raw_payload->>mesocycle_id', mesocycleId)
+      .order('id'),
+  );
+
+  // Rows arrivent à plat. Regroupe par (week_number, session_number).
+  type Row = {
+    session_id: number;
+    ordre: number;
+    exercise_id: number;
+    sets: number | null;
+    reps: number | null;
+    pct_1rm: number | null;
+    rest_series_s: number | null;
+    notes: string | null;
+    raw_payload: Record<string, unknown> | null;
+    dim_exercices: { nom_exercice: string } | { nom_exercice: string }[] | null;
+  };
+
+  const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.raw_payload);
+  const byKey = new Map<string, MesocycleSessionContent>();
+
+  for (const r of rows) {
+    const p = r.raw_payload!;
+    const weekNumber = Number(p.week_number ?? 0);
+    const sessionNumber = Number(p.session_number ?? 0);
+    if (!weekNumber || !sessionNumber) continue;
+
+    const key = `${weekNumber}-${sessionNumber}`;
+    let session = byKey.get(key);
+    if (!session) {
+      session = {
+        weekNumber,
+        sessionNumber,
+        cycle: String(p.periodization_cycle ?? ''),
+        buckets: [],
+        exercises: [],
+      };
+      byKey.set(key, session);
+    }
+
+    const bucket = String(p.bucket ?? '');
+    if (bucket && !session.buckets.includes(bucket)) {
+      session.buckets.push(bucket);
+    }
+
+    const dimEx = Array.isArray(r.dim_exercices) ? r.dim_exercices[0] : r.dim_exercices;
+    const nomExercice = dimEx?.nom_exercice ?? `#${r.exercise_id}`;
+
+    session.exercises.push({
+      exerciseId: r.exercise_id,
+      nomExercice,
+      bucket,
+      isCore: Boolean(p.is_core),
+      sets: r.sets,
+      reps: r.reps,
+      intensityPct1rm: r.pct_1rm,
+      restSeconds: r.rest_series_s,
+      intention: r.notes,
+      substituted: Boolean(p.substituted),
+      originalExerciseId:
+        p.original_exercise_id != null ? Number(p.original_exercise_id) : null,
+    });
+  }
+
+  // Tri stable : semaine asc, séance asc.
+  return Array.from(byKey.values()).sort((a, b) => {
+    if (a.weekNumber !== b.weekNumber) return a.weekNumber - b.weekNumber;
+    return a.sessionNumber - b.sessionNumber;
+  });
+}

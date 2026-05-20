@@ -13,18 +13,22 @@
  * design (les templates créés par l'apply RPC sont des `strength_sessions`
  * standards, ils s'éditent comme les autres).
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getActiveMesocycle,
+  getMesocycleSessionsContent,
   listMesocycles,
   revertMesocycle,
 } from "@/lib/api";
 import type {
   StrengthBucket,
   StrengthMesocycle,
+  PeriodizationCycle,
 } from "@/lib/api/types";
+import type { MesocycleSessionContent } from "@/lib/api";
+import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
 
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +48,10 @@ import {
   Activity,
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   History,
+  Layers,
   Loader2,
   RefreshCw,
   Undo2,
@@ -71,6 +78,18 @@ const BUCKET_SHORT_FR: Record<AnyBucket, string> = {
   upper_power: "Puissance haut",
   mobility: "Mobilité",
   psychology: "Psycho",
+};
+
+/** Couleurs par cycle (alignées sur MesocyclePreview pour cohérence visuelle). */
+const CYCLE_COLOR: Record<PeriodizationCycle, {
+  dot: string; ring: string; text: string; bg: string;
+}> = {
+  prepa_generale: { dot: "bg-sky-500",   ring: "ring-sky-200 dark:ring-sky-900/50",   text: "text-sky-700 dark:text-sky-300",   bg: "bg-sky-50 dark:bg-sky-950/30" },
+  force_max:      { dot: "bg-rose-500",  ring: "ring-rose-200 dark:ring-rose-900/50", text: "text-rose-700 dark:text-rose-300", bg: "bg-rose-50 dark:bg-rose-950/30" },
+  puissance:      { dot: "bg-amber-500", ring: "ring-amber-200 dark:ring-amber-900/50", text: "text-amber-700 dark:text-amber-300", bg: "bg-amber-50 dark:bg-amber-950/30" },
+  maintien:       { dot: "bg-slate-400", ring: "ring-slate-200 dark:ring-slate-700/50", text: "text-slate-700 dark:text-slate-300", bg: "bg-slate-50 dark:bg-slate-950/30" },
+  affutage:       { dot: "bg-violet-500",ring: "ring-violet-200 dark:ring-violet-900/50", text: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 dark:bg-violet-950/30" },
+  pic:            { dot: "bg-emerald-500",ring: "ring-emerald-200 dark:ring-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
 };
 
 const ZONE_LABEL_FR: Record<string, string> = {
@@ -331,6 +350,9 @@ export default function CoachMesocyclePanel({
         </div>
       </Card>
 
+      {/* ── Plan détaillé du mésocycle (auditable) ──────────────────────── */}
+      <MesocyclePlanContent mesocycleId={active.id} />
+
       {/* ── Historique mésocycles (compact) ─────────────────────────────── */}
       {history.length > 1 && (
         <HistoryStrip history={history} />
@@ -444,6 +466,257 @@ function NoteStrip({
     >
       <div className="mt-0.5 shrink-0">{icon}</div>
       <p className="min-w-0">{body}</p>
+    </div>
+  );
+}
+
+// ── Plan détaillé du mésocycle (auditable) ──────────────────────────────────
+
+/**
+ * Affiche le contenu complet du mésocycle (semaines → séances → exercices)
+ * en miroir de l'aperçu nageur. Le coach peut ainsi auditer le PLAN, pas
+ * seulement le POURQUOI (= raisonnement, déjà rendu plus haut).
+ *
+ * Toutes les semaines sont dépliées par défaut — cohérent avec l'aperçu
+ * nageur depuis le commit §293 UX fix.
+ */
+function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
+  const { data: sessions = [], isLoading } = useQuery({
+    queryKey: ["mesocycle-content", mesocycleId],
+    queryFn: () => getMesocycleSessionsContent(mesocycleId),
+    staleTime: 60_000,
+  });
+
+  // Regroupe par week_number → liste de sessions.
+  const weeks = useMemo(() => {
+    const m = new Map<number, MesocycleSessionContent[]>();
+    for (const s of sessions) {
+      const arr = m.get(s.weekNumber) ?? [];
+      arr.push(s);
+      m.set(s.weekNumber, arr);
+    }
+    return Array.from(m.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([weekNumber, ss]) => ({
+        weekNumber,
+        cycle: ss[0]?.cycle ?? "",
+        sessions: ss.sort((a, b) => a.sessionNumber - b.sessionNumber),
+      }));
+  }, [sessions]);
+
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  // Init : toutes les semaines dépliées dès qu'on a le data.
+  useEffect(() => {
+    if (weeks.length > 0 && expanded.size === 0) {
+      setExpanded(new Set(weeks.map((w) => w.weekNumber)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weeks.length]);
+
+  if (isLoading) {
+    return (
+      <Card className="rounded-2xl border bg-card p-4">
+        <div className="h-24 animate-pulse rounded bg-muted" />
+      </Card>
+    );
+  }
+
+  if (weeks.length === 0) {
+    return (
+      <Card className="rounded-2xl border-dashed bg-muted/20 p-4 text-center">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Aucune séance trouvée pour ce mésocycle dans la base.
+        </p>
+      </Card>
+    );
+  }
+
+  const allExpanded = expanded.size === weeks.length;
+  const toggleAll = () => {
+    if (allExpanded) setExpanded(new Set());
+    else setExpanded(new Set(weeks.map((w) => w.weekNumber)));
+  };
+  const toggleWeek = (n: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(n)) next.delete(n);
+      else next.add(n);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <div className="min-w-0 leading-tight">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+            Plan auditable
+          </p>
+          <h3 className="flex items-center gap-2 text-sm font-bold">
+            <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+            Plan détaillé
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={toggleAll}
+          className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
+        >
+          {allExpanded ? "Tout replier" : "Tout déplier"}
+        </button>
+      </div>
+
+      <ol className="space-y-2">
+        {weeks.map((w) => {
+          const cycle = (w.cycle as PeriodizationCycle) || "prepa_generale";
+          const c = CYCLE_COLOR[cycle] ?? CYCLE_COLOR.prepa_generale;
+          const cycleLabel = PERIODIZATION_CYCLES[cycle]?.label ?? w.cycle;
+          const isOpen = expanded.has(w.weekNumber);
+          return (
+            <li
+              key={w.weekNumber}
+              className="overflow-hidden rounded-xl border bg-card"
+            >
+              <button
+                type="button"
+                onClick={() => toggleWeek(w.weekNumber)}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
+                aria-expanded={isOpen}
+              >
+                <span className={cn("block h-2.5 w-2.5 shrink-0 rounded-full ring-4", c.dot, c.ring)} />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-[10px] font-black tabular-nums tracking-wider text-muted-foreground">
+                      S{String(w.weekNumber).padStart(2, "0")}
+                    </span>
+                    <span className="text-xs font-bold">{cycleLabel}</span>
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    <span className="tabular-nums">{w.sessions.length}</span> séances ·{" "}
+                    <span className="tabular-nums">
+                      {w.sessions.reduce((s, sess) => s + sess.exercises.length, 0)}
+                    </span>{" "}
+                    exercices
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  {isOpen ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+              </button>
+
+              {isOpen && (
+                <div className={cn("border-t px-2 py-2", c.bg)}>
+                  <div className="space-y-2">
+                    {w.sessions.map((s) => (
+                      <SessionContentCard
+                        key={s.sessionNumber}
+                        session={s}
+                        cycleColor={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function SessionContentCard({
+  session,
+  cycleColor,
+}: {
+  session: MesocycleSessionContent;
+  cycleColor: (typeof CYCLE_COLOR)[PeriodizationCycle];
+}) {
+  return (
+    <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h4 className="flex items-center gap-2 text-xs font-bold">
+          <span className="font-mono text-[9px] font-black tabular-nums text-muted-foreground">
+            J{session.sessionNumber}
+          </span>
+          <span>Séance {session.sessionNumber}</span>
+        </h4>
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {session.buckets.map((b) => (
+            <Badge
+              key={b}
+              variant="outline"
+              className={cn(
+                "h-4 px-1 text-[9px] font-black uppercase tracking-wider",
+                b === "mobility"
+                  ? "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  : cn(cycleColor.bg, cycleColor.text, "border-current/30"),
+              )}
+            >
+              {BUCKET_SHORT_FR[b as AnyBucket] ?? b}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <ul className="divide-y divide-border/60">
+        {session.exercises.map((ex, idx) => (
+          <li key={idx} className="flex items-start gap-2 py-1.5">
+            <span className="mt-0.5 w-5 shrink-0 font-mono text-[10px] font-black tabular-nums text-muted-foreground">
+              {String(idx + 1).padStart(2, "0")}
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <span className="text-xs font-semibold">{ex.nomExercice}</span>
+                <Badge
+                  variant="outline"
+                  className="h-4 px-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  {BUCKET_SHORT_FR[ex.bucket as AnyBucket] ?? ex.bucket}
+                </Badge>
+                {ex.isCore && (
+                  <Badge
+                    variant="outline"
+                    className="h-4 border-violet-300 bg-violet-50 px-1 text-[9px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300"
+                  >
+                    core
+                  </Badge>
+                )}
+                {ex.substituted && (
+                  <Badge
+                    variant="outline"
+                    className="h-4 border-orange-300 bg-orange-50 px-1 text-[9px] font-bold uppercase tracking-wider text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
+                  >
+                    remplace #{ex.originalExerciseId}
+                  </Badge>
+                )}
+              </div>
+              {ex.intention && (
+                <p className="mt-0.5 text-[10px] italic leading-relaxed text-muted-foreground">
+                  {ex.intention}
+                </p>
+              )}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-mono text-[11px] font-bold tabular-nums">
+                {ex.sets ?? "?"} × {ex.reps ?? "?"}
+                {ex.intensityPct1rm != null && (
+                  <span className="text-muted-foreground"> @ {ex.intensityPct1rm}%</span>
+                )}
+              </p>
+              {ex.restSeconds != null && (
+                <p className="font-mono text-[9px] tabular-nums text-muted-foreground">
+                  {ex.restSeconds}s
+                </p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

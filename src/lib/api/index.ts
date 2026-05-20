@@ -394,6 +394,11 @@ export {
   getMesocycle,
   getActiveMesocycle,
   listMesocycles,
+  getMesocycleSessionsContent,
+} from './strength-mesocycles';
+export type {
+  MesocycleSessionContent,
+  MesocycleSessionExerciseContent,
 } from './strength-mesocycles';
 
 // Bilan Muscu — Périodisation templates (Chantier A, §292) — lecture
