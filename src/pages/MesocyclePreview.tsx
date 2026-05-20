@@ -719,12 +719,10 @@ function PlanPanel({
   generated: GeneratedMesocycle;
   startMondayIso: string;
 }) {
-  // Par défaut : TOUTES les semaines dépliées → le contenu des séances est
-  // immédiatement auditable (en miroir du panneau de raisonnement, lui aussi
-  // entièrement déplié par défaut).
-  const [expanded, setExpanded] = useState<Set<number>>(
-    () => new Set(generated.weeks.map((w) => w.weekNumber)),
-  );
+  // Par défaut : TOUT REPLIÉ. La vue est dense (5-23 semaines × 2-5 séances ×
+  // 3-5 exercices) — le repli laisse la timeline lisible, l'utilisateur ouvre
+  // ce qu'il veut auditer. Bouton "Tout déplier" toujours disponible.
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const toggleWeek = (n: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -808,7 +806,6 @@ function PlanPanel({
 
               {isOpen && (
                 <div className={cn("border-t px-2 py-2 sm:px-3", c.bg)}>
-                  <CycleLoadingStrip cycle={week.cycle} cycleColor={c} />
                   <div className="space-y-2.5">
                     {week.sessions.map((s) => (
                       <SessionCard
@@ -824,81 +821,6 @@ function PlanPanel({
           );
         })}
       </ol>
-    </div>
-  );
-}
-
-/**
- * Strip d'info sur la stratégie de chargement du cycle, affichée en tête du
- * bloc déplié d'une semaine. Permet au nageur/coach de comprendre **d'où**
- * viennent les sets/reps/%1RM/récup des exercices de la semaine :
- * - `catalogue` → lit les colonnes `*_endurance` ou `*_force` de
- *   `dim_exercices` (params portés par chaque exercice).
- * - `generique` → schéma uniforme au niveau cycle (sets/reps/intensité/récup
- *   en intervalles + intention d'exécution).
- */
-function CycleLoadingStrip({
-  cycle,
-  cycleColor,
-}: {
-  cycle: PeriodizationCycle;
-  cycleColor: (typeof CYCLE_COLOR)[PeriodizationCycle];
-}) {
-  const config = PERIODIZATION_CYCLES[cycle];
-  if (!config) return null;
-  const loading = config.loading;
-
-  if (loading.kind === "catalogue") {
-    const colLabel = loading.column === "endurance" ? "endurance" : "force";
-    return (
-      <div className="mb-2.5 rounded-lg border bg-background/70 px-2.5 py-1.5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-            Stratégie
-          </span>
-          <Badge
-            variant="outline"
-            className={cn(
-              "h-4 px-1 font-mono text-[9px] font-bold uppercase tracking-wider",
-              cycleColor.text,
-            )}
-          >
-            catalogue · {colLabel}
-          </Badge>
-          <span className="text-[10px] leading-tight text-muted-foreground">
-            Paramètres lus dans <code className="font-mono">dim_exercices</code> (colonnes <code className="font-mono">*_{colLabel}</code>) — propres à chaque exercice.
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // Stratégie générique : schéma porté par le cycle.
-  const s = loading.scheme;
-  const fmt = (r: readonly [number, number]) =>
-    r[0] === r[1] ? `${r[0]}` : `${r[0]}–${r[1]}`;
-  return (
-    <div className="mb-2.5 rounded-lg border bg-background/70 px-2.5 py-1.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-          Stratégie
-        </span>
-        <Badge
-          variant="outline"
-          className={cn(
-            "h-4 px-1 font-mono text-[9px] font-bold uppercase tracking-wider",
-            cycleColor.text,
-          )}
-        >
-          schéma générique
-        </Badge>
-        <span className="font-mono text-[10px] tabular-nums text-foreground/80">
-          {fmt(s.sets)} × {fmt(s.reps)} @ {fmt(s.intensityPct1rm)}% · récup {fmt(s.restSeconds)}s
-        </span>
-      </div>
-      <p className="mt-1 text-[10px] italic leading-relaxed text-muted-foreground">
-        {s.intention}
-      </p>
     </div>
   );
 }
