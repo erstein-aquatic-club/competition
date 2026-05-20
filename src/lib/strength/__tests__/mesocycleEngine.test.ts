@@ -2,12 +2,17 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import type {
+  PainReport,
   StrengthKpiMeasurement,
+  StrengthPeriodizationTemplate,
   StrengthPhysicalTests,
   StrengthQuestionnaire,
 } from '@/lib/api/types';
-import type { MesocycleInput } from '../mesocycleEngine.types.ts';
-import { scoreBuckets } from '../mesocycleEngine.ts';
+import type {
+  BucketScores,
+  MesocycleInput,
+} from '../mesocycleEngine.types.ts';
+import { prioritizeBuckets, scoreBuckets } from '../mesocycleEngine.ts';
 
 // ── Helpers de fabrication des entrées ───────────────────────────────────────
 
@@ -235,3 +240,256 @@ describe('scoreBuckets', () => {
     );
   });
 });
+
+// ── prioritizeBuckets ────────────────────────────────────────────────────────
+
+function makeTemplate(
+  bucketEmphasis: StrengthPeriodizationTemplate['structure']['bucket_emphasis'],
+): StrengthPeriodizationTemplate {
+  return {
+    id: 'tpl-1',
+    event_group: 'sprint',
+    kind: 'season',
+    name: 'Sprint test',
+    min_week_count: 8,
+    max_week_count: 12,
+    structure: {
+      phases: [
+        { cycle: 'prepa_generale', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+        { cycle: 'force_max', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+        { cycle: 'puissance', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+        { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      ],
+      bucket_emphasis: bucketEmphasis,
+    },
+    created_at: '2026-05-01T00:00:00Z',
+    updated_at: '2026-05-01T00:00:00Z',
+  };
+}
+
+function emptyScores(): BucketScores {
+  return {
+    lower_strength: 50,
+    lower_power: 50,
+    upper_strength: 50,
+    upper_power: 50,
+    mobility: 50,
+    psychology: 50,
+  };
+}
+
+const noPain: PainReport[] = [];
+const cleanPhysical: StrengthPhysicalTests = {
+  mobility: { shoulder_flexion: 3, t_spine: 3, hip: 3 },
+  movement: { scapula_control: 3, trunk_neck_alignment: 3, hip_hinge: 3 },
+  filled_at: '2026-05-01T00:00:00Z',
+};
+
+describe('prioritizeBuckets', () => {
+  it('classe par score combiné = emphasis × (100 − score) décroissant', () => {
+    // upper_power : score 30, emphasis 1.0 → combiné 70
+    // lower_strength : score 30, emphasis 0.5 → combiné 35
+    // lower_power : score 80, emphasis 1.0 → combiné 20
+    const scores: BucketScores = {
+      lower_strength: 30,
+      lower_power: 80,
+      upper_strength: 70,
+      upper_power: 30,
+      mobility: 70,
+      psychology: 80,
+    };
+    const template = makeTemplate({
+      lower_strength: 0.5,
+      lower_power: 1.0,
+      upper_strength: 0.5,
+      upper_power: 1.0,
+      mobility: 0.5,
+    });
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+
+    // Tous les 6 seaux présents
+    assert.equal(out.length, 6);
+    // Tous différents
+    const ids = new Set(out.map((b) => b.bucket));
+    assert.equal(ids.size, 6);
+    // Rang 1 = upper_power (combiné 70)
+    assert.equal(out[0].bucket, 'upper_power');
+    assert.equal(out[0].rank, 1);
+    // Rang 2 = lower_strength (combiné 35)
+    assert.equal(out[1].bucket, 'lower_strength');
+    assert.equal(out[1].rank, 2);
+    // Pas d'override → overrideApplied === false partout
+    assert.ok(out.every((b) => b.overrideApplied === false));
+    // Tous ont une rationale non vide
+    assert.ok(out.every((b) => typeof b.rationale === 'string' && b.rationale.length > 0));
+  });
+
+  it('un seau faible+sollicité passe devant un seau faible+non sollicité', () => {
+    const scores: BucketScores = {
+      lower_strength: 30, // faible
+      lower_power: 30,    // faible aussi
+      upper_strength: 70,
+      upper_power: 70,
+      mobility: 70,
+      psychology: 70,
+    };
+    const template = makeTemplate({
+      lower_strength: 0.2, // peu sollicité
+      lower_power: 1.0,    // très sollicité
+      upper_strength: 0.5,
+      upper_power: 0.5,
+      mobility: 0.5,
+    });
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+
+    const lpRank = out.find((b) => b.bucket === 'lower_power')!.rank;
+    const lsRank = out.find((b) => b.bucket === 'lower_strength')!.rank;
+    assert.ok(lpRank < lsRank, `lower_power (${lpRank}) doit passer devant lower_strength (${lsRank})`);
+  });
+
+  it('un seau fort descend dans le classement', () => {
+    const scores: BucketScores = {
+      lower_strength: 90, // fort
+      lower_power: 30,    // faible
+      upper_strength: 30, // faible
+      upper_power: 30,    // faible
+      mobility: 30,       // faible
+      psychology: 50,
+    };
+    // Emphasis identique pour neutraliser l'effet "sollicité"
+    const template = makeTemplate({
+      lower_strength: 1.0,
+      lower_power: 1.0,
+      upper_strength: 1.0,
+      upper_power: 1.0,
+      mobility: 1.0,
+    });
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+
+    // lower_strength doit être dernier des entraînables (avant psychology qui n'a pas d'emphasis)
+    const lsRank = out.find((b) => b.bucket === 'lower_strength')!.rank;
+    const others = out.filter((b) => b.bucket !== 'lower_strength' && b.bucket !== 'psychology');
+    assert.ok(others.every((b) => b.rank < lsRank), `lower_strength (rang ${lsRank}) doit être derrière tous les autres entraînables`);
+  });
+
+  it('override sécurité : douleur intense (intensity ≥ 3) → mobility forcé rang 1', () => {
+    const scores: BucketScores = {
+      lower_strength: 30, // serait rang 1 sans override
+      lower_power: 30,
+      upper_strength: 30,
+      upper_power: 30,
+      mobility: 80,       // serait bas sinon
+      psychology: 50,
+    };
+    const template = makeTemplate({
+      lower_strength: 1.0,
+      lower_power: 1.0,
+      upper_strength: 1.0,
+      upper_power: 1.0,
+      mobility: 0.5,
+    });
+    const painReports: PainReport[] = [
+      {
+        id: 'p1',
+        user_id: 42,
+        date: '2026-05-10',
+        body_zone: 'shoulder',
+        intensity: 3,
+        created_at: '2026-05-10T00:00:00Z',
+      },
+    ];
+
+    const out = prioritizeBuckets(scores, template, painReports, cleanPhysical);
+
+    const mobility = out.find((b) => b.bucket === 'mobility')!;
+    assert.equal(mobility.rank, 1);
+    assert.equal(mobility.overrideApplied, true);
+    // Rationale doit mentionner la zone et la douleur
+    assert.ok(/shoulder/i.test(mobility.rationale) && /douleur/i.test(mobility.rationale), `rationale doit mentionner la douleur shoulder, obtenu: ${mobility.rationale}`);
+    // Les autres ne sont pas marqués override
+    const others = out.filter((b) => b.bucket !== 'mobility');
+    assert.ok(others.every((b) => b.overrideApplied === false));
+    // Rangs uniques et contigus 1..6
+    const ranks = out.map((b) => b.rank).sort();
+    assert.deepEqual(ranks, [1, 2, 3, 4, 5, 6]);
+  });
+
+  it('override sécurité : dysfonction (physical_tests sub-score = 0) → mobility forcé rang 1', () => {
+    const scores: BucketScores = {
+      lower_strength: 30,
+      lower_power: 30,
+      upper_strength: 30,
+      upper_power: 30,
+      mobility: 80,
+      psychology: 50,
+    };
+    const template = makeTemplate({
+      lower_strength: 1.0,
+      lower_power: 1.0,
+      upper_strength: 1.0,
+      upper_power: 1.0,
+      mobility: 0.5,
+    });
+    const dysfunction: StrengthPhysicalTests = {
+      mobility: { shoulder_flexion: 0, t_spine: 3, hip: 3 },
+      movement: { scapula_control: 3, trunk_neck_alignment: 3, hip_hinge: 3 },
+      filled_at: '2026-05-01T00:00:00Z',
+    };
+
+    const out = prioritizeBuckets(scores, template, noPain, dysfunction);
+
+    const mobility = out.find((b) => b.bucket === 'mobility')!;
+    assert.equal(mobility.rank, 1);
+    assert.equal(mobility.overrideApplied, true);
+    assert.ok(/dysfonction/i.test(mobility.rationale), `rationale doit mentionner la dysfonction, obtenu: ${mobility.rationale}`);
+  });
+
+  it('null score traité comme 0 (priorité maximale, conservateur)', () => {
+    const scores: BucketScores = {
+      lower_strength: null, // donnée manquante → conservateur
+      lower_power: 80,
+      upper_strength: 80,
+      upper_power: 80,
+      mobility: 80,
+      psychology: 80,
+    };
+    const template = makeTemplate({
+      lower_strength: 0.5,
+      lower_power: 0.5,
+      upper_strength: 0.5,
+      upper_power: 0.5,
+      mobility: 0.5,
+    });
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+
+    assert.equal(out[0].bucket, 'lower_strength');
+    assert.equal(out[0].rank, 1);
+  });
+
+  it('psychology a une emphasis 0 par défaut → toujours dernier sans override', () => {
+    const scores: BucketScores = {
+      lower_strength: 90,
+      lower_power: 90,
+      upper_strength: 90,
+      upper_power: 90,
+      mobility: 90,
+      psychology: 10, // très bas
+    };
+    const template = makeTemplate({
+      lower_strength: 0.1,
+      lower_power: 0.1,
+      upper_strength: 0.1,
+      upper_power: 0.1,
+      mobility: 0.1,
+    });
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+
+    assert.equal(out[out.length - 1].bucket, 'psychology');
+  });
+});
+
