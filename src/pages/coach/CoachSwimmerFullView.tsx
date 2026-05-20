@@ -13,7 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Activity, ArrowLeft, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, Dumbbell, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CoachBreadcrumb from "@/components/shared/CoachBreadcrumb";
@@ -29,6 +29,7 @@ import SwimVolumeCharts from "@/components/coach/SwimVolumeCharts";
 import { useSwimAnalytics } from "@/hooks/useSwimAnalytics";
 import AttendancePerformanceChart from "@/components/coach/AttendancePerformanceChart";
 import PainHistoryMap from "@/components/coach/PainHistoryMap";
+import CoachMesocyclePanel from "@/components/coach/CoachMesocyclePanel";
 /* ── Helpers ─────────────────────────────────────────────── */
 
 function formatRelative(dateStr: string): string {
@@ -475,6 +476,25 @@ export default function CoachSwimmerFullView({
                   <SwimmerPlanningPanel athleteId={athleteId} />
                 </CollapsibleContent>
               </Collapsible>
+
+              {/* §293 — Mésocycle muscu : visibilité coach + action revert */}
+              {athleteId != null && (
+                <Collapsible defaultOpen>
+                  <CollapsibleTrigger asChild>
+                    <button type="button" className="w-full flex items-center gap-2 group">
+                      <Dumbbell className="h-4 w-4 text-violet-500" />
+                      <h2 className="text-sm font-semibold">Mésocycle muscu</h2>
+                      <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <CoachMesocyclePanel
+                      athleteId={athleteId}
+                      athleteName={displayName}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </>
           )}
         </TabsContent>
