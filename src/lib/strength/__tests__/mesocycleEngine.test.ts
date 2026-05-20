@@ -892,6 +892,230 @@ describe('periodize', () => {
   });
 });
 
+// ── generateMesocycle ────────────────────────────────────────────────────────
+
+import { generateMesocycle } from '../mesocycleEngine.ts';
+import type { GeneratedMesocycle } from '../mesocycleEngine.types.ts';
+
+function richCatalog(): CatalogExercise[] {
+  const out: CatalogExercise[] = [];
+  const buckets: StrengthBucket[] = [
+    'lower_strength',
+    'lower_power',
+    'upper_strength',
+    'upper_power',
+    'mobility',
+  ];
+  let id = 1;
+  for (const bucket of buckets) {
+    out.push(makeExercise({
+      id: id++,
+      nomExercice: `${bucket}_core_1`,
+      bucket,
+      level: 'beginner',
+      isCore: true,
+    }));
+    out.push(makeExercise({
+      id: id++,
+      nomExercice: `${bucket}_core_2`,
+      bucket,
+      level: 'intermediate',
+      isCore: true,
+    }));
+    out.push(makeExercise({
+      id: id++,
+      nomExercice: `${bucket}_acc_1`,
+      bucket,
+      level: 'beginner',
+      isCore: false,
+    }));
+    out.push(makeExercise({
+      id: id++,
+      nomExercice: `${bucket}_acc_2`,
+      bucket,
+      level: 'intermediate',
+      isCore: false,
+    }));
+  }
+  return out;
+}
+
+function fullInput(): MesocycleInput {
+  return {
+    assessment: {
+      id: 'assess-1',
+      athlete_id: 42,
+      questionnaire: greatQuestionnaire,
+      physical_tests: fullPhysicalTests,
+    },
+    kpiMeasurements: [
+      makeMeasurement('vertical_jump', 51.1, '2026-05-01T00:00:00Z', 'W/kg'),
+      makeMeasurement('broad_jump', 175, '2026-05-01T00:00:00Z', 'cm'),
+      makeMeasurement('imtp', 95, '2026-05-01T00:00:00Z', 'kg'),
+      makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
+      makeMeasurement('medball_vertical_throw', 115, '2026-05-01T00:00:00Z', 'cm'),
+    ],
+    athlete: { sex: 'M', ageBand: '15-16', level: 'intermediate' },
+    template: makeTemplate({
+      lower_strength: 0.5,
+      lower_power: 1.0,
+      upper_strength: 0.5,
+      upper_power: 1.0,
+      mobility: 0.5,
+    }),
+    targetWeekCount: 10, // = Σ nominal du template par défaut
+    sessionsPerWeek: 3,
+    exerciseCatalog: richCatalog(),
+  };
+}
+
+describe('generateMesocycle', () => {
+  it('cas nominal : produit un mésocycle complet et cohérent', () => {
+    const meso = generateMesocycle(fullInput());
+
+    // Structure de haut niveau
+    assert.equal(meso.totalWeeks, 10);
+    assert.equal(meso.weeks.length, 10);
+    assert.equal(meso.sessionsPerWeek, 3);
+    assert.ok(typeof meso.templateId === 'string' && meso.templateId.length > 0);
+    assert.ok(typeof meso.engineVersion === 'string' && /\d+\.\d+\.\d+/.test(meso.engineVersion));
+
+    // Semaines bien numérotées 1..N
+    const weekNumbers = meso.weeks.map((w) => w.weekNumber);
+    assert.deepEqual(weekNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+    // Chaque semaine a sessionsPerWeek sessions, et chaque session ≥ 1 exercice.
+    for (const week of meso.weeks) {
+      assert.equal(week.sessions.length, 3, `semaine ${week.weekNumber}: 3 sessions`);
+      for (const session of week.sessions) {
+        assert.ok(session.exercises.length > 0, `S${week.weekNumber}-${session.sessionNumber}: ≥1 ex`);
+        assert.ok(session.buckets.length > 0, `S${week.weekNumber}-${session.sessionNumber}: ≥1 bucket`);
+      }
+    }
+
+    // Reasoning rempli
+    assert.ok(meso.reasoning.bucketScores);
+    assert.ok(meso.reasoning.bucketPriorities.length === 6);
+    assert.ok(meso.reasoning.bucketAllocations.length === 5);
+    assert.ok(['full', 'partial', 'low'].includes(meso.reasoning.dataConfidence));
+    assert.ok(typeof meso.reasoning.psychFlag === 'boolean');
+    assert.ok(Array.isArray(meso.reasoning.activeContraindications));
+  });
+
+  it('data_confidence = full quand toutes les données sont présentes', () => {
+    const meso = generateMesocycle(fullInput());
+    assert.equal(meso.reasoning.dataConfidence, 'full');
+  });
+
+  it('cas données partielles : aucune mesure KPI → génère quand même', () => {
+    const input = fullInput();
+    input.kpiMeasurements = [];
+
+    const meso = generateMesocycle(input);
+
+    // N'a pas thrown
+    assert.equal(meso.weeks.length, 10);
+    // Confidence abaissée
+    assert.ok(['partial', 'low'].includes(meso.reasoning.dataConfidence), `dataConfidence = ${meso.reasoning.dataConfidence}`);
+  });
+
+  it('cas mixte : quelques KPI manquants → data_confidence partial', () => {
+    const input = fullInput();
+    // Garde 3 KPI sur 5
+    input.kpiMeasurements = input.kpiMeasurements.slice(0, 3);
+
+    const meso = generateMesocycle(input);
+
+    assert.equal(meso.reasoning.dataConfidence, 'partial');
+  });
+
+  it('psychFlag = true quand le score psychologie < 40', () => {
+    const input = fullInput();
+    input.assessment.questionnaire = meanQuestionnaire; // score = 0
+
+    const meso = generateMesocycle(input);
+
+    assert.equal(meso.reasoning.psychFlag, true);
+  });
+
+  it('psychFlag = false quand le score psychologie ≥ 40', () => {
+    const meso = generateMesocycle(fullInput()); // greatQuestionnaire → score 100
+    assert.equal(meso.reasoning.psychFlag, false);
+  });
+
+  it('cycles des semaines respectent la périodisation du template', () => {
+    const meso = generateMesocycle(fullInput());
+
+    const cycles = meso.weeks.map((w) => w.cycle);
+    // Doit contenir au moins une fois chaque phase du template
+    assert.ok(cycles.includes('prepa_generale'));
+    assert.ok(cycles.includes('force_max'));
+    assert.ok(cycles.includes('puissance'));
+    assert.ok(cycles.includes('pic'));
+  });
+
+  it('exercices chargés avec sets/reps/rest (jamais 0 sans raison)', () => {
+    const meso = generateMesocycle(fullInput());
+
+    const allExercises = meso.weeks.flatMap((w) => w.sessions.flatMap((s) => s.exercises));
+    assert.ok(allExercises.length > 0);
+    for (const ex of allExercises) {
+      assert.ok(ex.sets >= 1, `${ex.nomExercice} sets=${ex.sets}`);
+      assert.ok(ex.reps >= 1, `${ex.nomExercice} reps=${ex.reps}`);
+      assert.ok(ex.restSeconds >= 30, `${ex.nomExercice} rest=${ex.restSeconds}`);
+    }
+  });
+
+  it('mobility présente dans chaque session (échauffement systématique)', () => {
+    const meso = generateMesocycle(fullInput());
+
+    for (const week of meso.weeks) {
+      for (const session of week.sessions) {
+        const hasMobility = session.exercises.some((e) => e.bucket === 'mobility');
+        assert.ok(hasMobility, `S${week.weekNumber}-${session.sessionNumber} sans mobility`);
+      }
+    }
+  });
+
+  it('contraindication active reportée dans reasoning.activeContraindications', () => {
+    const input = fullInput();
+    input.assessment.questionnaire = {
+      ...greatQuestionnaire,
+      pain: [{ body_zone: 'shoulder', intensity: 3 }],
+    };
+    // Ajoute un exercice contre-indiqué dans le catalogue
+    input.exerciseCatalog.push(
+      makeExercise({ id: 999, bucket: 'upper_strength', isCore: true, contraindicationZones: ['shoulder'] }),
+    );
+
+    const meso = generateMesocycle(input);
+
+    assert.ok(meso.reasoning.activeContraindications.includes('shoulder'));
+  });
+
+  it('lowestBaremeConfidence reflète la confiance minimale parmi les barèmes utilisés', () => {
+    const meso = generateMesocycle(fullInput());
+
+    // medball_vertical_throw est 'placeholder', donc lowest doit être 'placeholder'
+    assert.equal(meso.reasoning.lowestBaremeConfidence, 'placeholder');
+  });
+
+  it('aucune mesure KPI → lowestBaremeConfidence = placeholder par défaut', () => {
+    const input = fullInput();
+    input.kpiMeasurements = [];
+
+    const meso = generateMesocycle(input);
+
+    // Aucun barème consulté → on conserve la confiance la plus prudente
+    assert.equal(meso.reasoning.lowestBaremeConfidence, 'placeholder');
+  });
+});
+
+// Marqueur de type
+const _generatedMesocycleTypeCheck: GeneratedMesocycle | null = null;
+void _generatedMesocycleTypeCheck;
+
+
 
 
 

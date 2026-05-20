@@ -9,20 +9,29 @@
 
 import type {
   PainReport,
+  PeriodizationCycle,
   StrengthBucket,
   StrengthKpiKey,
   StrengthKpiMeasurement,
   StrengthPeriodizationTemplate,
   StrengthPhysicalTests,
 } from '@/lib/api/types';
+import type { BaremeConfidence } from './kpiBaremes';
 import { getBareme, kpiScore } from './kpiBaremes';
+import { PERIODIZATION_CYCLES } from './periodizationCycles';
 import type {
   AllBucket,
   BucketAllocation,
   BucketPriority,
   BucketScores,
   CatalogExercise,
+  DataConfidence,
+  GeneratedMesocycle,
+  MesocycleExercise,
   MesocycleInput,
+  MesocycleReasoning,
+  MesocycleSession,
+  MesocycleWeek,
   PeriodizedWeek,
   SelectedExercise,
 } from './mesocycleEngine.types.ts';
@@ -151,8 +160,15 @@ const BUCKET_LABEL_FR: Record<AllBucket, string> = {
   psychology: 'Psychologie',
 };
 
+/**
+ * Forme minimale d'une déclaration de douleur acceptée par le moteur — accepte
+ * indifféremment un `PainReport` (table) ou un `QuestionnairePainEntry`
+ * (saisi dans le questionnaire de l'évaluation).
+ */
+export type PainInput = Pick<PainReport, 'body_zone' | 'intensity'>;
+
 /** Détecte les zones de douleur intense (intensity ≥ 3). */
-function intensePainZones(painReports: PainReport[]): string[] {
+function intensePainZones(painReports: ReadonlyArray<PainInput>): string[] {
   return painReports
     .filter((p) => p.intensity >= 3)
     .map((p) => p.body_zone);
@@ -191,7 +207,7 @@ function dysfunctionFlags(physicalTests: StrengthPhysicalTests | null): string[]
 export function prioritizeBuckets(
   bucketScores: BucketScores,
   template: StrengthPeriodizationTemplate,
-  painReports: PainReport[],
+  painReports: ReadonlyArray<PainInput>,
   physicalTests: StrengthPhysicalTests | null,
 ): BucketPriority[] {
   const emphasisFor = (b: AllBucket): number => {
@@ -495,4 +511,326 @@ function buildOverrideRationale(painZones: string[], dysfns: string[]): string {
     parts.push(`dysfonction (${dysfns.join(', ')})`);
   }
   return `Mobilité — ${parts.join(' + ')} → correctif prioritaire.`;
+}
+
+// ── generateMesocycle ────────────────────────────────────────────────────────
+
+/** Version sémantique du moteur — incrémentée à chaque modification de logique. */
+export const ENGINE_VERSION = '1.0.0';
+
+/** Nombre d'exercices par bloc d'une séance. */
+const MOBILITY_WARMUP_COUNT = 2;
+const MAIN_BLOCK_COUNT = 3;
+/** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
+ *  mobility), on cible jusqu'à 5 exercices mobility pour rester productive. */
+const MOBILITY_ONLY_COUNT = 5;
+
+/** Confidence ordering (placeholder < transposed < solid). */
+const CONFIDENCE_ORDER: Record<BaremeConfidence, number> = {
+  placeholder: 0,
+  transposed: 1,
+  solid: 2,
+};
+
+/**
+ * Orchestrateur du moteur : enchaîne les 5 fonctions précédentes pour produire
+ * le mésocycle complet à partir d'un `MesocycleInput`.
+ *
+ * Pipeline :
+ *   1. `scoreBuckets`        → 6 scores 0-100
+ *   2. `prioritizeBuckets`   → 6 priorités (+ overrides sécurité)
+ *   3. `allocateVolume`      → volume par seau entraînable
+ *   4. `selectExercises`     → pool d'exercices par seau
+ *   5. `periodize`           → semaine → cycle de périodisation
+ *   6. (interne) construction des séances par semaine + chargement par cycle
+ *   7. (interne) snapshot du raisonnement → `MesocycleReasoning`
+ *
+ * Données partielles tolérées — `dataConfidence` abaissée mais aucun throw.
+ */
+export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
+  const bucketScores = scoreBuckets(
+    input.assessment,
+    input.kpiMeasurements,
+    input.athlete,
+  );
+
+  const painEntries: PainInput[] = input.assessment.questionnaire?.pain ?? [];
+  const painZones = painEntries.map((p) => p.body_zone);
+
+  const bucketPriorities = prioritizeBuckets(
+    bucketScores,
+    input.template,
+    painEntries,
+    input.assessment.physical_tests,
+  );
+
+  const bucketAllocations = allocateVolume(bucketPriorities, input.sessionsPerWeek);
+
+  const selected = selectExercises(
+    bucketAllocations,
+    input.exerciseCatalog,
+    input.athlete.level,
+    painZones,
+  );
+
+  const periodizedWeeks = periodize(input.template, input.targetWeekCount);
+
+  const weeks: MesocycleWeek[] = periodizedWeeks.map((pw) =>
+    buildWeek(pw, bucketAllocations, selected, input.sessionsPerWeek),
+  );
+
+  const reasoning = buildReasoning({
+    bucketScores,
+    bucketPriorities,
+    bucketAllocations,
+    input,
+    painZones,
+  });
+
+  return {
+    weeks,
+    totalWeeks: weeks.length,
+    sessionsPerWeek: input.sessionsPerWeek,
+    templateId: input.template.id,
+    reasoning,
+    engineVersion: ENGINE_VERSION,
+  };
+}
+
+// ── helpers internes : sessions + chargement ─────────────────────────────────
+
+/** Pour une semaine, construit `sessionsPerWeek` séances chargées. */
+function buildWeek(
+  pw: PeriodizedWeek,
+  allocations: BucketAllocation[],
+  selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
+  sessionsPerWeek: number,
+): MesocycleWeek {
+  const slots = distributeSessionSlots(allocations, sessionsPerWeek);
+  const sessions: MesocycleSession[] = slots.map((mainBucket, idx) =>
+    buildSession(idx + 1, mainBucket, pw.cycle, selected),
+  );
+  return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
+}
+
+/**
+ * Répartit `sessionsPerWeek` créneaux entre les seaux non-mobility selon leurs
+ * allocations fractionnaires (méthode du plus grand reste). Mobility n'est pas
+ * un "bucket principal" : c'est un échauffement systématique greffé sur chaque
+ * séance (sauf si elle a été promue par l'override sécurité).
+ */
+function distributeSessionSlots(
+  allocations: BucketAllocation[],
+  sessionsPerWeek: number,
+): StrengthBucket[] {
+  // Si mobility est en focus (override sécurité), elle compte comme un bucket principal.
+  const candidates = allocations.filter((a) => {
+    if (a.bucket === 'mobility') return a.role === 'focus';
+    return true;
+  });
+
+  if (candidates.length === 0) {
+    // Cas dégénéré : aucun bucket entraînable disponible → tout en mobility.
+    return Array(sessionsPerWeek).fill('mobility');
+  }
+
+  const items = candidates.map((a) => ({
+    bucket: a.bucket,
+    floor: Math.floor(a.sessionsPerWeek),
+    frac: a.sessionsPerWeek - Math.floor(a.sessionsPerWeek),
+  }));
+
+  const baseSum = items.reduce((s, i) => s + i.floor, 0);
+  const remaining = Math.max(0, sessionsPerWeek - baseSum);
+  // Plus grand reste : on attribue +1 aux `remaining` buckets dont le reste est le plus élevé.
+  const sortedByFrac = items.slice().sort((a, b) => b.frac - a.frac);
+  const bonuses = new Set(sortedByFrac.slice(0, remaining).map((i) => i.bucket));
+
+  const slots: StrengthBucket[] = [];
+  for (const item of items) {
+    const count = item.floor + (bonuses.has(item.bucket) ? 1 : 0);
+    for (let i = 0; i < count; i++) slots.push(item.bucket);
+  }
+
+  // Pad si on n'a pas atteint le total (sécurité), tronc si on dépasse.
+  while (slots.length < sessionsPerWeek) {
+    slots.push(items[0].bucket);
+  }
+  return slots.slice(0, sessionsPerWeek);
+}
+
+/**
+ * Construit une séance : warmup mobility + bloc principal du `mainBucket`.
+ * Si `mainBucket === 'mobility'` (override), la séance est entièrement mobilité.
+ */
+function buildSession(
+  sessionNumber: number,
+  mainBucket: StrengthBucket,
+  cycle: PeriodizationCycle,
+  selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
+): MesocycleSession {
+  const mobilityPool = selected.mobility ?? [];
+  const mainPool = selected[mainBucket] ?? [];
+
+  let exercises: MesocycleExercise[];
+  const buckets: StrengthBucket[] = [];
+
+  if (mainBucket === 'mobility') {
+    exercises = mobilityPool
+      .slice(0, MOBILITY_ONLY_COUNT)
+      .map((s) => toMesocycleExercise(s, cycle));
+    buckets.push('mobility');
+  } else {
+    const warmup = mobilityPool
+      .slice(0, MOBILITY_WARMUP_COUNT)
+      .map((s) => toMesocycleExercise(s, cycle));
+    const main = mainPool
+      .slice(0, MAIN_BLOCK_COUNT)
+      .map((s) => toMesocycleExercise(s, cycle));
+    exercises = [...warmup, ...main];
+    if (warmup.length > 0) buckets.push('mobility');
+    buckets.push(mainBucket);
+  }
+
+  return { sessionNumber, buckets, exercises };
+}
+
+/** Centre d'un intervalle, arrondi à l'entier. */
+function midRange(range: readonly [number, number]): number {
+  return Math.round((range[0] + range[1]) / 2);
+}
+
+/**
+ * Charge un exercice catalogue avec les paramètres dictés par le cycle :
+ * - `catalogue.endurance` → colonnes `*_endurance` de `dim_exercices`,
+ * - `catalogue.force`     → colonnes `*_force`,
+ * - `generique`           → schéma de charge du cycle (midpoint des intervalles).
+ *
+ * Fallbacks défensifs si une colonne attendue est nulle (ex : mobility n'a pas
+ * de %1RM ni de schéma force).
+ */
+function toMesocycleExercise(
+  selectedEx: SelectedExercise,
+  cycle: PeriodizationCycle,
+): MesocycleExercise {
+  const ex = selectedEx.exercise;
+  const cycleConfig = PERIODIZATION_CYCLES[cycle];
+
+  let sets: number;
+  let reps: number;
+  let intensityPct1rm: number | null;
+  let restSeconds: number;
+  let intention: string | null;
+
+  if (cycleConfig.loading.kind === 'catalogue') {
+    if (cycleConfig.loading.column === 'endurance') {
+      sets = ex.nbSeriesEndurance ?? 2;
+      reps = ex.nbRepsEndurance ?? 10;
+      intensityPct1rm = ex.pourcentageCharge1rmEndurance;
+      restSeconds = ex.recupSeriesEndurance ?? 60;
+    } else {
+      sets = ex.nbSeriesForce ?? 4;
+      reps = ex.nbRepsForce ?? 5;
+      intensityPct1rm = ex.pourcentageCharge1rmForce;
+      restSeconds = ex.recupSeriesForce ?? 180;
+    }
+    intention = null;
+  } else {
+    const scheme = cycleConfig.loading.scheme;
+    sets = midRange(scheme.sets);
+    reps = midRange(scheme.reps);
+    intensityPct1rm = midRange(scheme.intensityPct1rm);
+    restSeconds = midRange(scheme.restSeconds);
+    intention = scheme.intention;
+  }
+
+  return {
+    exerciseId: ex.id,
+    nomExercice: ex.nomExercice,
+    bucket: (ex.bucket ?? 'mobility') as StrengthBucket,
+    isCore: ex.isCore,
+    sets,
+    reps,
+    intensityPct1rm,
+    restSeconds,
+    intention,
+    substituted: selectedEx.substituted,
+    originalExerciseId: selectedEx.originalExerciseId,
+  };
+}
+
+// ── reasoning : data_confidence, psych flag, contre-indications ──────────────
+
+interface BuildReasoningInput {
+  bucketScores: BucketScores;
+  bucketPriorities: BucketPriority[];
+  bucketAllocations: BucketAllocation[];
+  input: MesocycleInput;
+  painZones: string[];
+}
+
+function buildReasoning(args: BuildReasoningInput): MesocycleReasoning {
+  const { bucketScores, bucketPriorities, bucketAllocations, input, painZones } = args;
+
+  const dataConfidence = computeDataConfidence(input);
+  const lowestBaremeConfidence = computeLowestBaremeConfidence(input);
+  const psychScore = bucketScores.psychology;
+  const psychFlag = psychScore !== null && psychScore < 40;
+  const activeContraindications = computeActiveContraindications(painZones, input.exerciseCatalog);
+
+  return {
+    bucketScores,
+    bucketPriorities,
+    bucketAllocations,
+    dataConfidence,
+    psychFlag,
+    lowestBaremeConfidence,
+    activeContraindications,
+  };
+}
+
+/** 7 sources (5 KPI + physical_tests + questionnaire). Seuil partial = ≥ 4. */
+function computeDataConfidence(input: MesocycleInput): DataConfidence {
+  const kpiKeys: StrengthKpiKey[] = [
+    'vertical_jump',
+    'broad_jump',
+    'imtp',
+    'weighted_pullup',
+    'medball_vertical_throw',
+  ];
+  const presentKpis = new Set(input.kpiMeasurements.map((m) => m.kpi_key));
+  let present = kpiKeys.filter((k) => presentKpis.has(k)).length;
+  if (input.assessment.physical_tests) present++;
+  if (input.assessment.questionnaire) present++;
+
+  if (present >= 7) return 'full';
+  if (present >= 4) return 'partial';
+  return 'low';
+}
+
+/** Confiance minimale parmi les barèmes effectivement consultés. */
+function computeLowestBaremeConfidence(input: MesocycleInput): BaremeConfidence {
+  const presentKpis = new Set(input.kpiMeasurements.map((m) => m.kpi_key));
+  if (presentKpis.size === 0) return 'placeholder';
+
+  let lowestRank = Infinity;
+  let lowest: BaremeConfidence = 'placeholder';
+  for (const k of presentKpis) {
+    const entry = getBareme(k, input.athlete.sex, input.athlete.ageBand);
+    const rank = CONFIDENCE_ORDER[entry.confidence];
+    if (rank < lowestRank) {
+      lowestRank = rank;
+      lowest = entry.confidence;
+    }
+  }
+  return lowest;
+}
+
+/** Zones de douleur qui croisent au moins une contre-indication du catalogue. */
+function computeActiveContraindications(
+  painZones: string[],
+  catalog: CatalogExercise[],
+): string[] {
+  const catalogZones = new Set(catalog.flatMap((e) => e.contraindicationZones));
+  return painZones.filter((z) => catalogZones.has(z));
 }
