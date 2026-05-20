@@ -386,6 +386,16 @@ export {
   updateAssessmentPhysicalTests,
 } from './strength-assessments';
 
+// Bilan Muscu — Mésocycle (Chantier C+D, §293)
+export {
+  generateMesocyclePreview,
+  applyMesocycle,
+  revertMesocycle,
+  getMesocycle,
+  getActiveMesocycle,
+  listMesocycles,
+} from './strength-mesocycles';
+
 // Swim planning
 export {
   getSwimPlanningSlots,
