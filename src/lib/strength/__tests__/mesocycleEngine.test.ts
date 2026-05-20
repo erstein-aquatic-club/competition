@@ -628,4 +628,154 @@ describe('allocateVolume', () => {
   });
 });
 
+// ── selectExercises ──────────────────────────────────────────────────────────
+
+import type { CatalogExercise, SelectedExercise } from '../mesocycleEngine.types.ts';
+import { selectExercises } from '../mesocycleEngine.ts';
+
+let nextExId = 1000;
+function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise {
+  return {
+    id: nextExId++,
+    nomExercice: `ex-${nextExId}`,
+    bucket: 'lower_strength',
+    level: 'intermediate',
+    contraindicationZones: [],
+    isCore: false,
+    nbSeriesEndurance: 3,
+    nbRepsEndurance: 12,
+    pourcentageCharge1rmEndurance: 60,
+    recupSeriesEndurance: 60,
+    nbSeriesForce: 4,
+    nbRepsForce: 5,
+    pourcentageCharge1rmForce: 85,
+    recupSeriesForce: 180,
+    ...overrides,
+  };
+}
+
+function allocFor(buckets: StrengthBucket[]): BucketAllocation[] {
+  return buckets.map((bucket) => ({ bucket, sessionsPerWeek: 1, role: 'maintien' }));
+}
+
+describe('selectExercises', () => {
+  it('filtre par seau : ne retourne que les exercices du seau alloué', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, bucket: 'lower_strength' }),
+      makeExercise({ id: 2, bucket: 'upper_power' }),
+      makeExercise({ id: 3, bucket: 'mobility' }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', []);
+
+    assert.deepEqual(Object.keys(out), ['lower_strength']);
+    assert.equal(out.lower_strength!.length, 1);
+    assert.equal(out.lower_strength![0].exercise.id, 1);
+  });
+
+  it('filtre par niveau : exclut les exercices au-dessus du niveau du nageur', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, level: 'beginner' }),
+      makeExercise({ id: 2, level: 'intermediate' }),
+      makeExercise({ id: 3, level: 'advanced' }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', []);
+
+    const ids = out.lower_strength!.map((s) => s.exercise.id).sort();
+    assert.deepEqual(ids, [1, 2]);
+  });
+
+  it('niveau beginner → seuls les beginner (et level null) passent', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, level: 'beginner' }),
+      makeExercise({ id: 2, level: 'intermediate' }),
+      makeExercise({ id: 3, level: null }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'beginner', []);
+
+    const ids = out.lower_strength!.map((s) => s.exercise.id).sort();
+    assert.deepEqual(ids, [1, 3]);
+  });
+
+  it('exclut les exercices dont contraindication_zones recoupe painZones', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, contraindicationZones: ['shoulder'] }),
+      makeExercise({ id: 2, contraindicationZones: [] }),
+      makeExercise({ id: 3, contraindicationZones: ['knee', 'hip'] }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', ['shoulder']);
+
+    const ids = out.lower_strength!.map((s) => s.exercise.id).sort();
+    assert.deepEqual(ids, [2, 3]);
+  });
+
+  it('trie : exercices core en premier, puis level décroissant', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, isCore: false, level: 'intermediate' }),
+      makeExercise({ id: 2, isCore: true, level: 'beginner' }),
+      makeExercise({ id: 3, isCore: true, level: 'intermediate' }),
+      makeExercise({ id: 4, isCore: false, level: 'beginner' }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', []);
+    const ordered = out.lower_strength!.map((s) => s.exercise.id);
+
+    // Core first : 3 (intermediate), 2 (beginner) — puis non-core : 1, 4.
+    assert.deepEqual(ordered, [3, 2, 1, 4]);
+  });
+
+  it('substitution : un core exclu → un remplaçant marqué substituted', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 10, isCore: true, contraindicationZones: ['shoulder'] }),
+      makeExercise({ id: 11, isCore: false }), // candidat remplaçant
+      makeExercise({ id: 12, isCore: false }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', ['shoulder']);
+
+    const subs = out.lower_strength!.filter((s) => s.substituted);
+    assert.equal(subs.length, 1);
+    assert.equal(subs[0].originalExerciseId, 10);
+    assert.equal(subs[0].exercise.isCore, false);
+  });
+
+  it('aucune substitution si aucun core n’est exclu', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, isCore: true }),
+      makeExercise({ id: 2, isCore: false, contraindicationZones: ['shoulder'] }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', ['shoulder']);
+
+    assert.ok(out.lower_strength!.every((s) => !s.substituted && s.originalExerciseId === null));
+  });
+
+  it('seau alloué mais vide dans le catalogue → entrée vide', () => {
+    const catalog: CatalogExercise[] = [makeExercise({ bucket: 'lower_strength' })];
+
+    const out = selectExercises(allocFor(['lower_strength', 'upper_power']), catalog, 'intermediate', []);
+
+    assert.equal(out.upper_power!.length, 0);
+  });
+
+  it('ignore les seaux non alloués', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ bucket: 'lower_strength' }),
+      makeExercise({ bucket: 'mobility' }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'intermediate', []);
+
+    assert.equal(out.mobility, undefined);
+  });
+});
+
+// Marqueur de type pour s'assurer que SelectedExercise est bien re-exporté.
+const _selectedExerciseTypeCheck: SelectedExercise | null = null;
+void _selectedExerciseTypeCheck;
+
+
 

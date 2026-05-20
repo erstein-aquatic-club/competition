@@ -21,7 +21,9 @@ import type {
   BucketAllocation,
   BucketPriority,
   BucketScores,
+  CatalogExercise,
   MesocycleInput,
+  SelectedExercise,
 } from './mesocycleEngine.types.ts';
 
 /** Sélectionne la mesure la plus récente pour chaque KPI. */
@@ -320,6 +322,93 @@ export function allocateVolume(
   }
 
   return out;
+}
+
+// ── selectExercises ──────────────────────────────────────────────────────────
+
+const LEVEL_ORDER: Record<'beginner' | 'intermediate' | 'advanced', number> = {
+  beginner: 1,
+  intermediate: 2,
+  advanced: 3,
+};
+
+/**
+ * Sélectionne, pour chaque seau alloué, les exercices du catalogue admissibles.
+ *
+ * Filtres successifs :
+ * 1. Seau ciblé (`exercise.bucket === bucket`).
+ * 2. Niveau ≤ niveau du nageur (les exercices au-dessus sont exclus ; les
+ *    exercices `level === null` sont autorisés à tous les niveaux).
+ * 3. Pas de contre-indication : `contraindicationZones ∩ painZones === ∅`.
+ *
+ * Tri : exercices `isCore=true` en premier, puis par niveau décroissant
+ * (intermediate avant beginner) — l'aval (générateur de séances) prend les
+ * premiers exercices pour les blocs principaux.
+ *
+ * **Substitution** : pour chaque exercice `core` exclu pour contre-indication,
+ * un remplaçant non-core est marqué `substituted = true` avec l'id du core
+ * exclu dans `originalExerciseId`.
+ *
+ * Sortie : un dictionnaire `{ bucket → SelectedExercise[] }` qui n'inclut que
+ * les seaux présents dans `allocations`. Une entrée peut être vide si le
+ * catalogue n'a pas d'exercice admissible pour ce seau.
+ */
+export function selectExercises(
+  allocations: BucketAllocation[],
+  exerciseCatalog: CatalogExercise[],
+  athleteLevel: 'beginner' | 'intermediate' | 'advanced',
+  painZones: string[],
+): Partial<Record<StrengthBucket, SelectedExercise[]>> {
+  const athleteLevelNum = LEVEL_ORDER[athleteLevel];
+  const painSet = new Set(painZones);
+
+  const isContraindicated = (ex: CatalogExercise): boolean =>
+    ex.contraindicationZones.some((z) => painSet.has(z));
+
+  const fitsLevel = (ex: CatalogExercise): boolean =>
+    ex.level === null || LEVEL_ORDER[ex.level] <= athleteLevelNum;
+
+  const result: Partial<Record<StrengthBucket, SelectedExercise[]>> = {};
+
+  for (const allocation of allocations) {
+    const bucket = allocation.bucket;
+    if (result[bucket]) continue; // un seul traitement par seau
+
+    const inBucket = exerciseCatalog.filter((e) => e.bucket === bucket);
+    const inLevel = inBucket.filter(fitsLevel);
+    const safe = inLevel.filter((e) => !isContraindicated(e));
+    const excludedCores = inLevel.filter((e) => e.isCore && isContraindicated(e));
+
+    // Tri : core en premier, puis niveau décroissant (intermediate > beginner > null).
+    const ordered = safe.slice().sort((a, b) => {
+      if (a.isCore !== b.isCore) return a.isCore ? -1 : 1;
+      const al = a.level ? LEVEL_ORDER[a.level] : 0;
+      const bl = b.level ? LEVEL_ORDER[b.level] : 0;
+      return bl - al;
+    });
+
+    const selected: SelectedExercise[] = ordered.map((e) => ({
+      exercise: e,
+      substituted: false,
+      originalExerciseId: null,
+    }));
+
+    // Pour chaque core exclu, marquer un remplaçant non-core comme substitué.
+    let cursor = 0;
+    for (const excl of excludedCores) {
+      while (cursor < selected.length && (selected[cursor].substituted || selected[cursor].exercise.isCore)) {
+        cursor++;
+      }
+      if (cursor >= selected.length) break;
+      selected[cursor].substituted = true;
+      selected[cursor].originalExerciseId = excl.id;
+      cursor++;
+    }
+
+    result[bucket] = selected;
+  }
+
+  return result;
 }
 
 function buildOverrideRationale(painZones: string[], dysfns: string[]): string {

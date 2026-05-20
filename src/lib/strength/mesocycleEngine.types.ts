@@ -127,6 +127,28 @@ export interface MesocycleExercise {
   originalExerciseId: number | null;
 }
 
+// ── Exercice sélectionné (intermédiaire) ──────────────────────────────────────
+
+/**
+ * Exercice retenu par `selectExercises` pour un seau, avant chargement par cycle.
+ *
+ * Sortie de `selectExercises` : on a filtré le catalogue (seau + niveau du
+ * nageur + zones de douleur) et trié (core en premier). La charge (sets,
+ * reps, %1RM, récup, intention) n'est pas encore appliquée — elle dépend du
+ * cycle de la semaine et est posée par `generateMesocycle`.
+ */
+export interface SelectedExercise {
+  /** L'exercice du catalogue retenu. */
+  exercise: CatalogExercise;
+  /**
+   * `true` si cet exercice a été choisi en remplacement d'un exercice `core`
+   * exclu pour cause de contre-indication (zone de douleur).
+   */
+  substituted: boolean;
+  /** Id de l'exercice qu'il remplace, ou `null`. */
+  originalExerciseId: number | null;
+}
+
 // ── Séance ─────────────────────────────────────────────────────────────────────
 
 /**
