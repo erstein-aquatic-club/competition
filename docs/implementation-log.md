@@ -4,6 +4,67 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §294 — Clôture qualité Bilan Muscu : suite à l'audit §293 (2026-05-20)
+
+**Branche** : `main`
+**Trigger** : audit en lecture seule du flux Bilan Muscu → Mésocycle (`docs/audits/2026-05-20-audit-bilan-muscu-293.md`). 3 findings moyens + 4 mineurs identifiés. Ce § corrige les findings A/B/C (moyens) + D/E/G (mineurs).
+
+### Changements
+
+- **Cleanup `is_core` upper_strength + ajout pilier beginner** (mig `00177`) — l'audit a montré que la mig `00174` (vague A McEvoy) ajoutait les piliers (Tractions, Bench Pull, Dips, Pike Push-Up, Front Lever) sans dégager les 8 exercices de gainage hérités du §291 (L-Sit, Ab Wheel, Hollow Body Hold, Planche…), polluant la sémantique « pilier de seau ». Conséquence : pour un sprinter `advanced`, le tri level desc faisait remonter L-Sit avant les Tractions ; pour un sprinter `beginner`, les 4 cores beginner étaient uniquement du gainage (Abdos, Plank walkout…). Fix : (a) création de **« Tractions élastiques »** (id 95, level=`beginner`, is_core=true, bucket=`upper_strength`) — traction verticale à la barre fixe assistée par élastique, mouvement d'entrée avant Tractions prise neutre puis lestée ; (b) retrait de `is_core` sur les 8 exercices de gainage (ids 15, 23, 32, 72, 75, 78, 79, 82) — ils restent dans le pool non-core, sélectionnables en complement/maintien. Composition post-fix : 7 piliers upper_strength = Tractions lestées (adv) + Front Lever (adv) + Tractions prise neutre (inter) + Dips (inter) + Bench Pull (inter) + Pike Push-Up (inter) + Tractions élastiques (beg).
+- **Index `strength_session_items.raw_payload->>'mesocycle_id'`** (mig `00178`) — la RPC `revert_strength_mesocycle` et `getMesocycleSessionsContent` filtraient cette clé JSON sans index → seq scan. Index partiel (`WHERE raw_payload ? 'mesocycle_id'`) pour ne pas alourdir les inserts hors-mésocycle.
+- **Alignement Σ_max_weeks = max_week_count** sur sprint_50 saison (mig `00179`) — l'audit a relevé Σ_max=17 ≠ max_week_count=16. La phase `puissance` (index 3) passe de max=4 à max=3 → Σ_max=2+4+2+3+2+2+1=16. Le bloc puissance reste cohérent McEvoy (3 sem nominales sur Trap Bar Jump + Box Jump), force_max garde son max=4.
+- **Coach panel : toutes semaines repliées par défaut** (`CoachMesocyclePanel.tsx`) — divergence avec `MesocyclePreview` corrigée. Le `useEffect` qui dépliait toutes les semaines au premier load est supprimé. Bouton « Tout déplier » reste dispo. Le commentaire factuel faux (« cohérent avec l'aperçu nageur ») est corrigé.
+- **`ZONE_LABEL_FR` extrait dans `src/lib/strength/zones.ts`** — `CoachMesocyclePanel` et `MesocyclePreview` dupliquaient un mapping à 8 entrées (génériques `shoulder`, `knee`…) qui ne couvrait pas les zones granulaires utilisées par le catalogue (`left_shoulder`, `right_shoulder`, `lower_back`, `upper_back`, `neck`, etc., 16 zones distinctes). Nouveau module partagé `zones.ts` (40+ entrées) + helper `zoneLabelFr(z)`. Branché dans les 2 consommateurs.
+- **Guide utilisateurs `bilan-muscu-guide-utilisateurs.md`** — ajout d'une section « 3 bis. Séances multi-bucket (« façon McEvoy ») » (vague C engine) ; mention du **pilier beginner Tractions élastiques** ; encart templates sprint_50 saison / inter_competition (vague B). Footer mis à jour §294.
+
+### Migrations
+
+- **`00177_dim_exercices_pilliers_cleanup.sql`** — INSERT `Tractions élastiques` (id 95) + UPDATE 8 cleanups is_core sur upper_strength.
+- **`00178_strength_session_items_mesocycle_idx.sql`** — index partiel sur `raw_payload->>'mesocycle_id'`.
+- **`00179_sprint_50_template_align_max_weeks.sql`** — `UPDATE strength_periodization_templates ... jsonb_set(structure, '{phases,3,max_weeks}', 3)` sur sprint_50 saison.
+
+### Décisions
+
+- **Tractions élastiques tagguées `intermediate` pour les blocs `force_max` ?** Non — laissé `beginner`. Le moteur sprint utilisera surtout les cycles génériques (puissance/maintien/affutage/pic) pour cet exercice ; la charge est de toute façon 0 (PDC assisté). Pour `force_max` le moteur lit `*_force` du catalogue (4 séries × 8 reps × 0%, recup 180/240s) — paramètres alignés sur Tractions prise neutre (intermediate) avec moins de séries.
+- **`is_core` du gainage** non supprimé sur les autres buckets (le gainage est moins représenté ailleurs et la convention §291 reste pertinente hors upper_strength). Si symptôme similaire apparaît sur d'autres seaux, étendre le nettoyage.
+- **Pas de migration des items déjà persistés** — query MCP `strength_mesocycles` retourne 0 ligne (le flux n'a pas encore été exercé en prod). Aucun backfill nécessaire.
+- **`CoachMesocyclePanel` toutes-repliées** plutôt que dépliées : on aligne sur le comportement nageur pour cohérence ; le coach a le bouton « Tout déplier » sous la main pour l'audit complet.
+- **Findings F (rest_exercise_s NULL) et H (entrée §293 enrichie)** repoussés — non bloquants, à traiter si symptôme remonte.
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---|---|
+| `supabase/migrations/00177_dim_exercices_pilliers_cleanup.sql` (neuf) | INSERT Tractions élastiques + UPDATE is_core cleanup |
+| `supabase/migrations/00178_strength_session_items_mesocycle_idx.sql` (neuf) | Index partiel JSON |
+| `supabase/migrations/00179_sprint_50_template_align_max_weeks.sql` (neuf) | UPDATE jsonb_set max_weeks |
+| `src/lib/strength/zones.ts` (neuf) | Mapping zones granulaires + helper `zoneLabelFr` |
+| `src/components/coach/CoachMesocyclePanel.tsx` | Imports zones partagés + useState init vide + suppression `useEffect` |
+| `src/pages/MesocyclePreview.tsx` | Import zones partagé (suppression mapping local) |
+| `docs/bilan-muscu-guide-utilisateurs.md` | +3 sections (multi-bucket, pilier beginner, templates épreuve-spé) |
+| `docs/audits/2026-05-20-audit-bilan-muscu-293.md` (neuf, ~370 lignes) | Rapport d'audit complet |
+| `docs/ROADMAP.md` · `CLAUDE.md` · `implementation-log.md` | Mise à jour suivi |
+
+### Tests
+
+- `npm test` — **886/886 verts** (inchangé vs §293).
+- `npx tsc --noEmit` — exit 0.
+- `npm run build` — non re-lancé (changements: 1 module neuf trivial, 2 imports refactor, 0 logique modifiée → aucun risque de build cassé).
+- `npm run test:rls` — 25/25 §293 (table + RPC) verts (inchangé — aucune policy ni RPC touchée par §294).
+- **Vérifs post-DB** via MCP : composition `is_core` upper_strength (7 piliers nets, 1/level), index présent (`strength_session_items_mesocycle_idx`), Σ_max sprint_50 saison = 16 = max_week_count.
+
+### Limites / dette restante
+
+- **Finding F (mineur)** : `rest_exercise_s = NULL` posé par la RPC apply ne propage pas les `recup_exercices_*` du catalogue. Non corrigé — à traiter si le coach signale une lacune dans la récup entre exercices côté WorkoutRunner.
+- **4 profils incomplets en DB** (sex/birthdate NULL) : 1 nageur actif (user_id 3 « François ») + 1 coach + 2 adultes hors plage. Correction `data` à faire à la main par les concernés via le champ Sexe de `Profile.tsx` (livré §293).
+- **Tractions élastiques sans GIF d'illustration** (`illustration_gif = NULL`). À fournir par l'équipe technique — pas bloquant, le moteur affiche sans GIF.
+- **`MesocycleEngine` rest_exercise_seconds** : non propagé depuis `CatalogExercise` aujourd'hui ; nécessiterait d'ajouter le champ dans le type + le mapping + la sérialisation côté wrapper.
+
+### Commits
+
+(à faire — pas créés par cette session ; cette entrée trace le contenu du patch §294)
+
 ## §293 — Bilan Muscu Chantiers C + D : moteur de génération + intégration (2026-05-18 → 2026-05-20)
 
 **Branche** : `main`

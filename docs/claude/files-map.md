@@ -29,6 +29,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/strength/mesocycleEngine.types.ts` | Types-pivot du moteur (`GeneratedMesocycle`, `MesocycleInput`, `MesocycleReasoning`, `BucketScores`/`Priority`/`Allocation`, `SelectedExercise`, `PeriodizedWeek`, `CatalogExercise`) — Chantier C §293 | 334 lignes |
 | `src/lib/strength/__tests__/mesocycleEngine.test.ts` | 49 tests TDD du moteur (6 suites, 1 par fonction + orchestrateur) — §293 | 1121 lignes |
 | `src/lib/strength/jumpPower.ts` | Calculs détente verticale (flightTimeToHeight, sayersPeakPower, relativePower, verticalJumpResult) — KPI puissance W/kg (§293 Phase 1) | 104 lignes |
+| `src/lib/strength/zones.ts` | Mapping FR partagé des zones anatomiques granulaires (`left_shoulder`/`right_shoulder`/`lower_back`…) — consommé par `CoachMesocyclePanel` et `MesocyclePreview` — §294 | 50 lignes |
 | `src/lib/api/strength-mesocycles.ts` | Wrappers API mésocycle (`generateMesocyclePreview`, `applyMesocycle` → RPC, `revertMesocycle` → RPC, `getMesocycle`/`getActiveMesocycle`/`listMesocycles`) — Chantier D §293 | 211 lignes |
 | `src/lib/api/__tests__/strength-mesocycles.test.ts` | 12 tests des wrappers (mocks `client.ts` via `node:test mock.module`, sérialisation snake_case, conversion Date) — §293 | 419 lignes |
 | `src/lib/api/strength-periodization-templates.ts` | Wrappers lecture des templates (`listStrengthPeriodizationTemplates`, `getStrengthPeriodizationTemplate`, `listStrengthTemplateEventGroups`) — §293 | 67 lignes |

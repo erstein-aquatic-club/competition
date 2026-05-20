@@ -13,7 +13,7 @@
  * design (les templates créés par l'apply RPC sont des `strength_sessions`
  * standards, ils s'éditent comme les autres).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -29,6 +29,7 @@ import type {
 } from "@/lib/api/types";
 import type { MesocycleSessionContent } from "@/lib/api";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
+import { ZONE_LABEL_FR } from "@/lib/strength/zones";
 import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 
 import { Card } from "@/components/ui/card";
@@ -91,17 +92,6 @@ const CYCLE_COLOR: Record<PeriodizationCycle, {
   maintien:       { dot: "bg-slate-400", ring: "ring-slate-200 dark:ring-slate-700/50", text: "text-slate-700 dark:text-slate-300", bg: "bg-slate-50 dark:bg-slate-950/30" },
   affutage:       { dot: "bg-violet-500",ring: "ring-violet-200 dark:ring-violet-900/50", text: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 dark:bg-violet-950/30" },
   pic:            { dot: "bg-emerald-500",ring: "ring-emerald-200 dark:ring-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
-};
-
-const ZONE_LABEL_FR: Record<string, string> = {
-  shoulder: "épaule",
-  knee: "genou",
-  hip: "hanche",
-  back: "dos",
-  neck: "nuque",
-  ankle: "cheville",
-  wrist: "poignet",
-  elbow: "coude",
 };
 
 // ── Schéma du snapshot du raisonnement (forme du jsonb) ──────────────────────
@@ -478,8 +468,8 @@ function NoteStrip({
  * en miroir de l'aperçu nageur. Le coach peut ainsi auditer le PLAN, pas
  * seulement le POURQUOI (= raisonnement, déjà rendu plus haut).
  *
- * Toutes les semaines sont dépliées par défaut — cohérent avec l'aperçu
- * nageur depuis le commit §293 UX fix.
+ * Toutes les semaines repliées par défaut, comme côté nageur (§294, fix
+ * cohérence Coach ↔ Nageur). Bouton « Tout déplier » disponible.
  */
 function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
   const { data: sessions = [], isLoading } = useQuery({
@@ -505,14 +495,7 @@ function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
       }));
   }, [sessions]);
 
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  // Init : toutes les semaines dépliées dès qu'on a le data.
-  useEffect(() => {
-    if (weeks.length > 0 && expanded.size === 0) {
-      setExpanded(new Set(weeks.map((w) => w.weekNumber)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weeks.length]);
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
 
   if (isLoading) {
     return (

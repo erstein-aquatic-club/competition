@@ -228,6 +228,18 @@ Sur les **5 seaux entraînables** (la psychologie n'a pas d'exercices, juste un 
 - Les **autres entraînables** = **maintien** (~40 % du volume).
 - La **Mobilité** est en **échauffement systématique** dans chaque séance — sauf si elle est en focus (override sécurité), auquel cas elle prend une part dédiée.
 
+### 3 bis. Séances multi-bucket (« façon McEvoy »)
+
+Chaque séance combine désormais **deux seaux travaillables** plutôt qu'un seul, dans l'esprit de la prépa Cameron McEvoy adaptée par F. Wagner. Exemple sprint : « Lundi Tractions (force haut) + Squat (force bas) + Ab Wheel ».
+
+La règle :
+
+- **Bloc primaire** = ton focus #1 ou focus #2 (selon la rotation de la semaine).
+- **Bloc complément** = l'autre focus, ou le top focus si la séance porte sur un seau de maintien.
+- **Warmup mobilité** systématique en début de séance.
+
+Cas particulier : si l'override sécurité a poussé la mobilité en priorité 1 (douleur intense), la séance correspondante reste **mono-bucket mobilité** (correctif).
+
 ### 4. Sélection des exercices
 
 Pour chaque seau alloué, le moteur prend les exercices du catalogue qui :
@@ -236,7 +248,9 @@ Pour chaque seau alloué, le moteur prend les exercices du catalogue qui :
 2. Sont à un **niveau ≤ ton niveau** (intermédiaire par défaut).
 3. **Ne contiennent pas de contre-indication** sur une zone où tu as déclaré une douleur. *(Exemple : tu as mal à l'épaule, le développé couché est exclu.)*
 
-Les exercices marqués `is_core` (les fondamentaux du seau) sont triés en premier. Si un exercice fondamental est exclu pour cause de douleur, un **remplaçant** est sélectionné et marqué `substituted` — tu le verras dans l'aperçu avec un badge « remplace #X ».
+Les exercices marqués `is_core` (les **piliers** du seau — tirages/poussées pour le haut, squat/explosif pour le bas) sont triés en premier. Si un exercice fondamental est exclu pour cause de douleur, un **remplaçant** est sélectionné et marqué `substituted` — tu le verras dans l'aperçu avec un badge « remplace #X ».
+
+**Adapté à ton niveau** : si tu es noté `beginner`, tu auras des piliers accessibles (ex. **Tractions élastiques** assistées au lieu de Tractions lestées). Quand tu progresses, le moteur reprend les piliers de niveau supérieur.
 
 ### 5. Périodisation sur la durée cible
 
@@ -245,6 +259,8 @@ Le template définit une **séquence de phases** (par exemple : prepa_generale �
 Si tu choisis **8 semaines** et que la somme des `nominal` fait 10, le moteur **comprime** : il prend une semaine à chaque phase qui peut être réduite (jusqu'à `min`). Inversement si tu choisis 15, il **étire** dans `[nominal, max]`.
 
 Si tu choisis une durée **hors de la plage du template** (< Σmin ou > Σmax), le système refuse — c'est protégé.
+
+> **Templates épreuve-spécifiques** : pour le sprint 50 m, le template suit la signature de Cameron McEvoy adaptée par F. Wagner — 7 phases distinctes (reprise / force max / charge légère intercalée / puissance / maintien / affûtage / pic) sur 8 à 16 semaines. La mini-prépa inter-compétitions du sprint 50 m garde les piliers Tractions + Bench Pull + Squat en focus (force haut prioritaire), pas uniquement la puissance.
 
 ### Chargement des exercices par cycle
 
@@ -354,4 +370,4 @@ Les **GIFs de démonstration** des 5 protocoles KPI ne sont pas encore en place 
 
 ---
 
-*Document maintenu en cohérence avec l'état du code au §293 (2026-05-20). Si tu vois un écart entre cette doc et l'app, c'est l'app qui a raison — préviens.*
+*Document maintenu en cohérence avec l'état du code au §294 (2026-05-20). Si tu vois un écart entre cette doc et l'app, c'est l'app qui a raison — préviens.*

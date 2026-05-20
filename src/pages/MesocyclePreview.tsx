@@ -39,6 +39,7 @@ import type {
 } from "@/lib/strength/mesocycleEngine.types";
 import { ageBandFor } from "@/lib/strength/kpiBaremes";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
+import { ZONE_LABEL_FR } from "@/lib/strength/zones";
 import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 import type { PeriodizationCycle } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
@@ -135,17 +136,6 @@ const CYCLE_COLOR: Record<PeriodizationCycle, {
     text: "text-emerald-700 dark:text-emerald-300",
     bg: "bg-emerald-50 dark:bg-emerald-950/30",
   },
-};
-
-const ZONE_LABEL_FR: Record<string, string> = {
-  shoulder: "épaule",
-  knee: "genou",
-  hip: "hanche",
-  back: "dos",
-  neck: "nuque",
-  ankle: "cheville",
-  wrist: "poignet",
-  elbow: "coude",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
