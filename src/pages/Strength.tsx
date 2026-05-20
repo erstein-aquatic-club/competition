@@ -38,6 +38,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { OneRmGate } from "@/components/strength/OneRmGate";
 import { QuestionnairePrompt, KpiWizardEntry } from "@/components/strength/StrengthBilanEntry";
+import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
 
@@ -1007,6 +1008,8 @@ export default function Strength() {
                       par le coach, puis entrée KPI wizard standard. */}
                   <QuestionnairePrompt userId={userId} />
                   <KpiWizardEntry />
+                  {/* Mésocycle (§293) — visible une fois le bilan complété. */}
+                  <MesocycleEntry />
                 </div>
               )}
 

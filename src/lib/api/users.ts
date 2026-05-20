@@ -37,6 +37,7 @@ export async function getProfile(options: {
     display_name: data.display_name ?? null,
     email: data.email ?? null,
     birthdate: data.birthdate ?? null,
+    sex: data.sex === 'M' || data.sex === 'F' ? data.sex : null,
     group_id: safeOptionalInt(data.group_id) ?? null,
     group_label: data.group_label ?? null,
     objectives: data.objectives ?? null,

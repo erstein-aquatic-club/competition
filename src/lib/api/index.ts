@@ -396,6 +396,19 @@ export {
   listMesocycles,
 } from './strength-mesocycles';
 
+// Bilan Muscu — Périodisation templates (Chantier A, §292) — lecture
+export {
+  listStrengthPeriodizationTemplates,
+  getStrengthPeriodizationTemplate,
+  listStrengthTemplateEventGroups,
+  type ListTemplatesOptions,
+} from './strength-periodization-templates';
+
+// Bilan Muscu — Catalogue d'exercices taggés (§291)
+export {
+  listCatalogExercisesTagged,
+} from './strength-catalog';
+
 // Swim planning
 export {
   getSwimPlanningSlots,

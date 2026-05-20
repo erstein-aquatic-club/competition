@@ -176,6 +176,8 @@ export interface UserProfile {
   display_name?: string;
   email?: string | null;
   birthdate?: string | null;
+  /** Sexe biologique (mig 00014). Requis par les barèmes KPI muscu (Chantier B). */
+  sex?: 'M' | 'F' | null;
   group_id?: number | null;
   group_label?: string | null;
   objectives?: string | null;
@@ -927,6 +929,13 @@ export interface StrengthAssessment {
   physical_tests: StrengthPhysicalTests | null;
   bucket_scores: Record<string, number> | null;
   data_confidence: StrengthDataConfidence;
+  /**
+   * Nombre de séances muscu/semaine voulues par le nageur (mig 00168, §289).
+   * Saisi à la fin du questionnaire ; consommé par le moteur de génération
+   * du mésocycle (§293) comme valeur par défaut, ajustable à l'écran de
+   * génération.
+   */
+  sessions_per_week: number | null;
   created_at: string;
   updated_at: string;
 }
