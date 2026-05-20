@@ -29,7 +29,7 @@ import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2,
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import { compressImage, isAcceptedImageType } from "@/lib/imageUtils";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, useReducedMotion } from "framer-motion";
@@ -192,6 +192,9 @@ const profileEditSchema = z.object({
     },
     { message: "L'âge doit être entre 6 et 100 ans" }
   ),
+  // §293 — requis pour le Bilan Muscu (barèmes KPI). Optionnel pour les
+  // utilisateurs hors muscu (coach, comité…), mais affiché pour tous.
+  sex: z.union([z.literal("M"), z.literal("F"), z.literal("")]).optional(),
   ffn_iuf: z.string().optional().refine(
     (val) => {
       if (!val) return true;
@@ -438,6 +441,7 @@ export default function Profile() {
       group_id: "",
       bio: "",
       birthdate: "",
+      sex: "",
       ffn_iuf: "",
       phone: "",
     },
@@ -497,6 +501,7 @@ export default function Profile() {
           ? groups.find((g) => g.id === Number(data.group_id))?.name ?? null
           : null,
         birthdate: data.birthdate || null,
+        sex: data.sex === "M" || data.sex === "F" ? data.sex : null,
         bio: data.bio,
         ffn_iuf: (data.ffn_iuf || "").trim() || null,
         phone: data.phone || null,
@@ -605,6 +610,7 @@ export default function Profile() {
       group_id: profile?.group_id ? String(profile.group_id) : "",
       bio: profile?.bio || "",
       birthdate: profile?.birthdate ? String(profile.birthdate).split("T")[0] : "",
+      sex: profile?.sex === "M" || profile?.sex === "F" ? profile.sex : "",
       ffn_iuf: profile?.ffn_iuf ? String(profile.ffn_iuf) : "",
       phone: profile?.phone || "",
     });
@@ -786,6 +792,41 @@ export default function Profile() {
                   {profileForm.formState.errors.birthdate.message}
                 </p>
               )}
+            </div>
+
+            {/* §293 — Sexe : requis pour les barèmes KPI du Bilan Muscu */}
+            <div className="space-y-1.5">
+              <Label>Sexe</Label>
+              <Controller
+                control={profileForm.control}
+                name="sex"
+                render={({ field }) => (
+                  <ToggleGroup
+                    type="single"
+                    value={field.value ?? ""}
+                    onValueChange={(v) => field.onChange(v === "M" || v === "F" ? v : "")}
+                    className="grid grid-cols-2 gap-2 rounded-xl bg-muted p-0.5"
+                  >
+                    <ToggleGroupItem
+                      value="M"
+                      aria-label="Masculin"
+                      className="min-h-11 rounded-lg text-sm font-medium data-[state=on]:bg-background data-[state=on]:shadow-sm"
+                    >
+                      Masculin
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="F"
+                      aria-label="Féminin"
+                      className="min-h-11 rounded-lg text-sm font-medium data-[state=on]:bg-background data-[state=on]:shadow-sm"
+                    >
+                      Féminin
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Utilisé pour calibrer les barèmes KPI du Bilan Muscu.
+              </p>
             </div>
 
             <div className="space-y-1.5">

@@ -56,6 +56,8 @@ export async function updateProfile(payload: {
     group_id?: number | null;
     group_label?: string | null;
     birthdate?: string | null;
+    /** Sexe biologique (mig 00014). Requis par les barèmes KPI muscu (§293). */
+    sex?: 'M' | 'F' | null;
     objectives?: string | null;
     bio?: string | null;
     avatar_url?: string | null;
