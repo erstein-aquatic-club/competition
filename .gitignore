@@ -47,3 +47,6 @@ docs/*.xls
 # Archive bucket (cleanup §196). Holds obsolete/superfluous files
 # moved out of the active tree but not yet relocated off-machine.
 _archive/
+
+# Git worktrees (local isolated branches)
+.worktrees/
