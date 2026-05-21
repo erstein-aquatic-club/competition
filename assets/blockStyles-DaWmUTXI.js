@@ -1,0 +1,1 @@
+const k={warmup:{bg:"bg-sky-50/70 dark:bg-sky-950/30",bgSubtle:"bg-sky-50/40 dark:bg-sky-950/20",border:"border-sky-200 dark:border-sky-800/50",textMuted:"text-sky-700/70 dark:text-sky-300/70",badge:"bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300",divider:"bg-sky-200/60 dark:bg-sky-800/40"}};export{k as B};
