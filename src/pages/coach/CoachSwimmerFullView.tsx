@@ -67,7 +67,29 @@ export default function CoachSwimmerFullView({
   const [, navigate] = useLocation();
   const { selectedAthleteId, selectedAthleteName } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<CoachSwimmerTab>("resume");
+  // §296 — Deeplink depuis le hub coach (section « Mésocycles muscu actifs »)
+  // qui pose un sessionStorage key pour ouvrir directement l'onglet Planning.
+  // Consommé une seule fois au mount puis effacé.
+  const [activeTab, setActiveTab] = useState<CoachSwimmerTab>(() => {
+    if (typeof window === "undefined") return "resume";
+    try {
+      const initial = window.sessionStorage.getItem(
+        "eac_coach_swimmer_initial_tab",
+      );
+      window.sessionStorage.removeItem("eac_coach_swimmer_initial_tab");
+      if (
+        initial === "planning" ||
+        initial === "echanges" ||
+        initial === "comms" ||
+        initial === "resume"
+      ) {
+        return initial;
+      }
+    } catch {
+      // sessionStorage indispo → fallback resume
+    }
+    return "resume";
+  });
   const [swimWeeks, setSwimWeeks] = useState(8);
 
   const athleteId =

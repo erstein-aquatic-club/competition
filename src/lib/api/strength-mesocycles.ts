@@ -210,6 +210,77 @@ export async function listMesocycles(
   return (data ?? []) as StrengthMesocycle[];
 }
 
+/**
+ * Mésocycle actif enrichi avec le nom du nageur — pour les vues coach
+ * « tous les mésocycles actifs du club » (§296).
+ *
+ * Le coach voit tous les mésocycles `active` (RLS club-wide depuis mig
+ * 00171) ; le nageur lui-même ne voit que les siens.
+ */
+export interface ActiveMesocycleWithAthlete {
+  id: string;
+  athlete_id: number;
+  athlete_name: string;
+  event_group: string;
+  kind: string;
+  target_week_count: number;
+  sessions_per_week: number;
+  generated_at: string;
+  engine_version: string;
+}
+
+/**
+ * Liste tous les mésocycles `active` visibles par l'appelant, avec le
+ * nom du nageur jointé. Coach club-wide / admin → tous ; nageur → les
+ * siens uniquement (RLS).
+ *
+ * Trié par date de génération décroissante (plus récents en tête).
+ */
+export async function listActiveMesocyclesWithAthletes(): Promise<
+  ActiveMesocycleWithAthlete[]
+> {
+  if (!canUseSupabase()) return [];
+  const data = assertSupabase(
+    await supabase
+      .from('strength_mesocycles')
+      .select(
+        'id, athlete_id, event_group, kind, target_week_count, sessions_per_week, generated_at, engine_version,' +
+          ' users:athlete_id (display_name)',
+      )
+      .eq('status', 'active')
+      .order('generated_at', { ascending: false }),
+  );
+  type Row = {
+    id: string;
+    athlete_id: number;
+    event_group: string;
+    kind: string;
+    target_week_count: number;
+    sessions_per_week: number;
+    generated_at: string;
+    engine_version: string;
+    users:
+      | { display_name: string | null }
+      | { display_name: string | null }[]
+      | null;
+  };
+  const rows = ((data ?? []) as unknown as Row[]).map((r) => {
+    const u = Array.isArray(r.users) ? r.users[0] : r.users;
+    return {
+      id: r.id,
+      athlete_id: r.athlete_id,
+      athlete_name: u?.display_name ?? `#${r.athlete_id}`,
+      event_group: r.event_group,
+      kind: r.kind,
+      target_week_count: r.target_week_count,
+      sessions_per_week: r.sessions_per_week,
+      generated_at: r.generated_at,
+      engine_version: r.engine_version,
+    } satisfies ActiveMesocycleWithAthlete;
+  });
+  return rows;
+}
+
 // ── Lecture du contenu d'un mésocycle persisté ───────────────────────────────
 
 /**

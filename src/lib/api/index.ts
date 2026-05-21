@@ -394,9 +394,11 @@ export {
   getMesocycle,
   getActiveMesocycle,
   listMesocycles,
+  listActiveMesocyclesWithAthletes,
   getMesocycleSessionsContent,
 } from './strength-mesocycles';
 export type {
+  ActiveMesocycleWithAthlete,
   MesocycleSessionContent,
   MesocycleSessionExerciseContent,
 } from './strength-mesocycles';
