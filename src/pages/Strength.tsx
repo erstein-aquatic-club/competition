@@ -41,6 +41,7 @@ import { QuestionnairePrompt, KpiWizardEntry } from "@/components/strength/Stren
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
+import { computeMissing1RmExercises } from "@/lib/strength/missing1rmFilter";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -545,15 +546,10 @@ export default function Strength() {
   const [showOneRmGate, setShowOneRmGate] = useState(false);
   const [skipPercent1rm, setSkipPercent1rm] = useState(false);
 
-  const missing1RmExercises = useMemo(() => {
-    return activeFilteredItems
-      .filter((item) => (item.percent_1rm ?? 0) > 0)
-      .filter((item) => !oneRMs?.some((rm: OneRmEntry) => rm.exercise_id === item.exercise_id && Number(rm.weight) > 0))
-      .map((item) => ({
-        exerciseId: item.exercise_id,
-        exerciseName: item.exercise_name ?? `Ex #${item.exercise_id}`,
-      }));
-  }, [activeFilteredItems, oneRMs]);
+  const missing1RmExercises = useMemo(
+    () => computeMissing1RmExercises(activeFilteredItems, oneRMs, exerciseLookup),
+    [activeFilteredItems, oneRMs, exerciseLookup],
+  );
 
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
