@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§296** — Fixes test réel Bilan Muscu (Mon plan nageur, library coach, hub mésocycles).
+Dernier § livré : **§297** — Flag `is_bodyweight` + estimation 1RM inline via ramp-up (chauffes → série de référence) + bouton "Recalculer ma 1RM".
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

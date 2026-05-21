@@ -133,7 +133,7 @@ const ExerciseCycleTabs = ({
               <Label>% 1RM</Label>
               <Input
                 type="number"
-                value={exercise[pctField] ?? ""}
+                value={(exercise[pctField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [pctField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -144,7 +144,7 @@ const ExerciseCycleTabs = ({
               <Label>Nb séries</Label>
               <Input
                 type="number"
-                value={exercise[seriesField] ?? ""}
+                value={(exercise[seriesField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [seriesField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -155,7 +155,7 @@ const ExerciseCycleTabs = ({
               <Label>Nb reps</Label>
               <Input
                 type="number"
-                value={exercise[repsField] ?? ""}
+                value={(exercise[repsField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [repsField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -166,7 +166,7 @@ const ExerciseCycleTabs = ({
               <Label>Récup. séries (s)</Label>
               <Input
                 type="number"
-                value={exercise[recupField] ?? ""}
+                value={(exercise[recupField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [recupField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -177,7 +177,7 @@ const ExerciseCycleTabs = ({
               <Label>Récup. exercices (s)</Label>
               <Input
                 type="number"
-                value={exercise[recupExField] ?? ""}
+                value={(exercise[recupExField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [recupExField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -967,6 +967,30 @@ export default function StrengthCatalog() {
               />
               <Label htmlFor="warmup-flag-edit">Exercice d'échauffement (warmup)</Label>
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="bodyweight-flag-edit"
+                checked={editingExercise.is_bodyweight === true}
+                onCheckedChange={(checked) => {
+                  const isBw = checked === true;
+                  setEditingExercise({
+                    ...editingExercise,
+                    is_bodyweight: isBw,
+                    // Reset les % 1RM si l'exo passe en PDC (cohérence)
+                    ...(isBw
+                      ? {
+                          pct_1rm_endurance: null,
+                          pct_1rm_hypertrophie: null,
+                          pct_1rm_force: null,
+                        }
+                      : {}),
+                  });
+                }}
+              />
+              <Label htmlFor="bodyweight-flag-edit">
+                Exercice au poids de corps (pas de 1RM)
+              </Label>
+            </div>
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1084,6 +1108,29 @@ export default function StrengthCatalog() {
               }}
             />
             <Label htmlFor="warmup-flag">Exercice d'échauffement (warmup)</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="bodyweight-flag-create"
+              checked={newExercise.is_bodyweight === true}
+              onCheckedChange={(checked) => {
+                const isBw = checked === true;
+                setNewExercise({
+                  ...newExercise,
+                  is_bodyweight: isBw,
+                  ...(isBw
+                    ? {
+                        pct_1rm_endurance: null,
+                        pct_1rm_hypertrophie: null,
+                        pct_1rm_force: null,
+                      }
+                    : {}),
+                });
+              }}
+            />
+            <Label htmlFor="bodyweight-flag-create">
+              Exercice au poids de corps (pas de 1RM)
+            </Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setExerciseDialogOpen(false)} className="h-10">

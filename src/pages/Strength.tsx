@@ -11,6 +11,7 @@ import {
   getStrengthSessions,
   getExercises,
   get1RM,
+  update1RM,
   startStrengthRun as startStrengthRunApi,
   logStrengthSet as logStrengthSetApi,
   updateStrengthRun,
@@ -41,6 +42,7 @@ import { QuestionnairePrompt, KpiWizardEntry } from "@/components/strength/Stren
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
+import { computeMissing1RmExercises } from "@/lib/strength/missing1rmFilter";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -206,6 +208,8 @@ export default function Strength() {
     setCycleType,
     clearActiveRunState,
     wasRestored,
+    inlineEstimationExercises,
+    setInlineEstimationExercises,
   } = useStrengthState({ athleteKey: historyAthleteKey });
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
@@ -543,17 +547,11 @@ export default function Strength() {
 
   const [isPlanMode, setIsPlanMode] = useState(false);
   const [showOneRmGate, setShowOneRmGate] = useState(false);
-  const [skipPercent1rm, setSkipPercent1rm] = useState(false);
 
-  const missing1RmExercises = useMemo(() => {
-    return activeFilteredItems
-      .filter((item) => (item.percent_1rm ?? 0) > 0)
-      .filter((item) => !oneRMs?.some((rm: OneRmEntry) => rm.exercise_id === item.exercise_id && Number(rm.weight) > 0))
-      .map((item) => ({
-        exerciseId: item.exercise_id,
-        exerciseName: item.exercise_name ?? `Ex #${item.exercise_id}`,
-      }));
-  }, [activeFilteredItems, oneRMs]);
+  const missing1RmExercises = useMemo(
+    () => computeMissing1RmExercises(activeFilteredItems, oneRMs, exerciseLookup),
+    [activeFilteredItems, oneRMs, exerciseLookup],
+  );
 
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
@@ -630,7 +628,38 @@ export default function Strength() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLaunchKey, activeSession, screenMode, activeFilteredItems.length]);
 
-  const handleLaunchFocus = async () => {
+  // §297 — Callbacks pour l'estimation 1RM inline depuis le WorkoutRunner.
+  const handleRequestRecalc = useCallback((exerciseId: number) => {
+    setInlineEstimationExercises((prev) => {
+      const next = new Set(prev);
+      next.add(exerciseId);
+      return next;
+    });
+    toast("Mode estimation activé", {
+      description: "Fais ta chauffe et marque ta série de référence.",
+    });
+  }, []);
+
+  const handleEstimationComplete = useCallback(
+    async (exerciseId: number, estimatedOneRm: number) => {
+      if (!userId) return;
+      await update1RM({
+        athlete_id: userId,
+        exercise_id: exerciseId,
+        one_rm: estimatedOneRm,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["1rm"] });
+      setInlineEstimationExercises((prev) => {
+        const next = new Set(prev);
+        next.delete(exerciseId);
+        return next;
+      });
+      toast(`🎯 1RM estimé : ${estimatedOneRm} kg`);
+    },
+    [userId, queryClient],
+  );
+
+  const handleLaunchFocus = async (options?: { bypassMissing1RmGate?: boolean }) => {
     if (!activeSession) return;
     if (startRun.isPending) return;
     const lockedCycle = activeSession.cycle ?? cycleType;
@@ -639,8 +668,17 @@ export default function Strength() {
       return;
     }
 
-    // Check for missing 1RMs before entering focus mode
-    if (missing1RmExercises.length > 0 && !skipPercent1rm) {
+    // §297 — Check for missing 1RMs before entering focus mode.
+    // bypassMissing1RmGate: passed by `onEstimateInline` callback so the
+    // re-trigger after `setInlineEstimationExercises(...)` doesn't re-open
+    // the gate due to a stale closure reading inlineEstimationExercises.size === 0
+    // (setState is queued; setTimeout(fn, 0) fires with the previous render's
+    // closure values).
+    if (
+      !options?.bypassMissing1RmGate &&
+      missing1RmExercises.length > 0 &&
+      inlineEstimationExercises.size === 0
+    ) {
       setShowOneRmGate(true);
       return;
     }
@@ -688,6 +726,8 @@ export default function Strength() {
                   runLogs: [],
                   runnerStep: 1,
                   cycleType: lockedCycle,
+                  // §297 — Inclure le Set pour cohérence avec le payload du hook
+                  inlineEstimationExercises: Array.from(inlineEstimationExercises),
                 }),
               );
             } catch {
@@ -811,6 +851,9 @@ export default function Strength() {
               initialStep={activeRunnerStep}
               isFinishing={isFinishing}
               runId={activeRunId ?? undefined}
+              inlineEstimationExercises={inlineEstimationExercises}
+              onRequestRecalc={handleRequestRecalc}
+              onEstimationComplete={handleEstimationComplete}
               onStepChange={(step) => setActiveRunnerStep(step)}
               onExitFocus={() => {
                 setScreenMode("list");
@@ -1112,14 +1155,17 @@ export default function Strength() {
         onSaveAndContinue={() => {
           setShowOneRmGate(false);
           queryClient.invalidateQueries({ queryKey: ["1rm"] });
-          // Re-trigger launch after 1RM saved
           handleLaunchFocus();
         }}
-        onSkipToFreeWeight={() => {
+        onEstimateInline={(skippedIds) => {
           setShowOneRmGate(false);
-          setSkipPercent1rm(true);
-          // Re-trigger launch with skip flag
-          setTimeout(() => handleLaunchFocus(), 0);
+          setInlineEstimationExercises(new Set(skippedIds));
+          // §297 — bypassMissing1RmGate explicite : setInlineEstimationExercises
+          // est une mutation async (queued), donc une lecture immédiate dans
+          // handleLaunchFocus via setTimeout(0) verrait encore size === 0 dans
+          // la closure capturée → le gate se rouvrirait. Le flag explicite
+          // contourne ce piège sans dépendre du timing React.
+          setTimeout(() => handleLaunchFocus({ bypassMissing1RmGate: true }), 0);
         }}
       />
     </div>

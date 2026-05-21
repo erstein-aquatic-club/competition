@@ -55,6 +55,8 @@ export interface Exercise {
   recup_force?: number | null;
   recup_exercices_force?: number | null;
   folder_id?: number | null;
+  /** §297 — Si TRUE, exo au poids de corps : OneRmGate l'ignore, runner masque Charge. */
+  is_bodyweight?: boolean;
 }
 
 export type StrengthCycleType = "endurance" | "hypertrophie" | "force";

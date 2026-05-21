@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  RefreshCw,
   RotateCcw,
   StickyNote,
   Trophy,
@@ -143,6 +144,9 @@ export function WorkoutRunner({
   onSubstitute,
   userId,
   runId,
+  inlineEstimationExercises,
+  onRequestRecalc,
+  onEstimationComplete,
 }: {
   session: StrengthSessionTemplate;
   exercises: Exercise[];
@@ -166,6 +170,12 @@ export function WorkoutRunner({
    *  is persisted to localStorage so the swimmer can recover after an iOS
    *  PWA background-kill or accidental tab close. */
   runId?: string | number | null;
+  /** §297 — Set d'exercise_ids dont la série 1 doit ouvrir le mode estimation
+   *  ramp-up (calcul 1RM à partir d'une série de référence). Le runner retire
+   *  l'exo du Set parent via onEstimationComplete. */
+  inlineEstimationExercises?: Set<number>;
+  onRequestRecalc?: (exerciseId: number) => void;
+  onEstimationComplete?: (exerciseId: number, estimatedOneRm: number) => Promise<void>;
 }) {
   const isLoggingRef = useRef(false);
 
@@ -287,6 +297,19 @@ export function WorkoutRunner({
   const currentExerciseDef = currentBlock
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
+  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true;
+  const isEstimationMode =
+    !isBodyweightExercise &&
+    currentSetIndex === 1 &&
+    (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false);
+
+  const [warmupHistory, setWarmupHistory] = useState<
+    Array<{ weight: number; reps: number; difficulty: number | null }>
+  >([]);
+
+  useEffect(() => {
+    setWarmupHistory([]);
+  }, [currentBlock?.exercise_id]);
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
     ? exercises.find((e) => e.id === nextBlock.exercise_id)
@@ -563,6 +586,68 @@ export function WorkoutRunner({
     }
   };
 
+  const handleAddWarmupSet = () => {
+    if (!currentBlock) return;
+    const weight = Number(currentSetInputs[0]?.weight ?? 0);
+    const reps = Number(currentSetInputs[0]?.reps ?? 0);
+    const difficulty = currentSetInputs[0]?.difficulty ?? null;
+    if (weight <= 0 || reps <= 0) return;
+    setWarmupHistory((prev) => [...prev, { weight, reps, difficulty }]);
+    setCurrentSetInputs({});
+  };
+
+  const handleReferenceSet = async () => {
+    if (!currentBlock || !onEstimationComplete) return;
+    const weight = Number(currentSetInputs[0]?.weight ?? 0);
+    const reps = Number(currentSetInputs[0]?.reps ?? 0);
+    const difficulty = currentSetInputs[0]?.difficulty ?? null;
+    if (weight <= 0 || reps <= 0 || difficulty == null) return;
+
+    // Calcul Epley+RIR via la fonction existante de prDetection.ts
+    const estimated = estimateOneRM(weight, reps, difficulty);
+    if (estimated <= 0) {
+      toast.error("Estimation impossible", {
+        description: "Vérifie la charge et le nombre de répétitions.",
+      });
+      return;
+    }
+
+    // Persist le 1RM côté parent (Strength.tsx → update1RM + invalidate query)
+    try {
+      await onEstimationComplete(currentBlock.exercise_id, estimated);
+    } catch {
+      toast.error("Erreur", {
+        description: "1RM non sauvegardé. Réessaye.",
+      });
+      return;
+    }
+
+    // Log la série de référence comme série 1 standard
+    const newLog: SetLogEntry = {
+      exercise_id: currentBlock.exercise_id,
+      set_number: 1,
+      reps,
+      weight,
+      difficulty,
+    };
+    setLogs((prev) => [...prev, newLog]);
+    isLoggingRef.current = true;
+    try {
+      await onLogSets?.([newLog]);
+    } finally {
+      isLoggingRef.current = false;
+    }
+
+    // Reset warmupHistory + avance à série 2
+    setWarmupHistory([]);
+    setCurrentSetInputs({});
+    setCurrentSetIndex(2);
+
+    if (autoRest && currentBlock.rest_seconds > 0) {
+      startRestTimer(currentBlock.rest_seconds, "set");
+    }
+  };
+
   const handleValidateSet = async () => {
     if (!currentBlock) return;
     if (isLoggingRef.current) return;
@@ -586,7 +671,9 @@ export function WorkoutRunner({
       exercise_id: currentBlock.exercise_id,
       set_number: currentSetIndex,
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
-      weight: currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight,
+      weight: isBodyweightExercise
+        ? BODYWEIGHT_SENTINEL
+        : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight),
       difficulty: setDifficultyValue,
     };
     setLogs((prev) => [...prev, newLog]);
@@ -990,6 +1077,27 @@ export function WorkoutRunner({
         )}
       </div>
 
+      {isEstimationMode && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
+            🎯 Estimation 1RM en cours
+          </div>
+          <p className="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">
+            Charge légère, monte progressivement. Marque ta dernière série
+            comme référence pour calculer ton 1RM.
+          </p>
+          {warmupHistory.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-amber-900/90 dark:text-amber-200/90">
+              {warmupHistory.map((w, i) => (
+                <span key={i} className="rounded-full bg-amber-500/20 px-2 py-0.5">
+                  {w.weight}kg × {w.reps}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
@@ -1006,26 +1114,28 @@ export function WorkoutRunner({
         </div>
         {/* §199 Chantier B — cards focus adoucies : gradient + border-2 retirés
             au profit d'un bg-secondary plat (cohérent avec le ton iOS sobre). */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
-            onClick={() => openInputSheet("weight")}
-          >
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Charge</div>
-            <div className="mt-1 flex items-baseline gap-0.5">
-              {isBodyweight(activeWeight) ? (
-                <span className="text-2xl font-bold tracking-tight">PDC</span>
-              ) : (
-                <>
-                  <span className="text-3xl font-bold tabular-nums tracking-tight">
-                    {activeWeight || "—"}
-                  </span>
-                  <span className="text-sm font-medium text-muted-foreground">kg</span>
-                </>
-              )}
-            </div>
-          </button>
+        <div className={cn("grid gap-3", isBodyweightExercise ? "grid-cols-1" : "grid-cols-2")}>
+          {!isBodyweightExercise && (
+            <button
+              type="button"
+              className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
+              onClick={() => openInputSheet("weight")}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Charge</div>
+              <div className="mt-1 flex items-baseline gap-0.5">
+                {isBodyweight(activeWeight) ? (
+                  <span className="text-2xl font-bold tracking-tight">PDC</span>
+                ) : (
+                  <>
+                    <span className="text-3xl font-bold tabular-nums tracking-tight">
+                      {activeWeight || "—"}
+                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">kg</span>
+                  </>
+                )}
+              </div>
+            </button>
+          )}
           <button
             type="button"
             className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
@@ -1093,6 +1203,24 @@ export function WorkoutRunner({
           </p>
         </div>
       )}
+      {/* §297 — Recalculer 1RM : visible uniquement sur série 1 d'exos chargés non en
+          mode estimation, et avant que la série 1 ne soit loggée. */}
+      {!isBodyweightExercise &&
+        !isEstimationMode &&
+        currentSetIndex === 1 &&
+        !currentLoggedSet &&
+        onRequestRecalc &&
+        currentBlock && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs text-muted-foreground"
+            onClick={() => onRequestRecalc(currentBlock.exercise_id)}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Recalculer ma 1RM
+          </Button>
+        )}
       <Button variant="outline" className="w-full rounded-2xl" onClick={() => setSeriesSheetOpen(true)}>
         Voir les séries
       </Button>
@@ -1102,33 +1230,62 @@ export function WorkoutRunner({
           className="bottom-0 z-modal"
           containerClassName="flex-col gap-2 py-4"
         >
-          <Button
-            className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
-            onClick={handleValidateSet}
-          >
-            <Check className="mr-2 h-5 w-5" />
-            {currentLoggedSet ? "Série suivante" : "Valider série"}
-          </Button>
-          <button
-            type="button"
-            className="text-xs text-muted-foreground font-medium py-1 active:text-foreground transition-colors"
-            onClick={() => {
-              // Confirm only when there's already partial work on the current
-              // exercise — otherwise skipping a fresh block is a normal flow
-              // (e.g. swimmer realises an exercise isn't relevant today) and
-              // a confirm dialog adds friction without benefit.
-              const hasLogsForCurrent = currentBlock
-                ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
-                : false;
-              if (hasLogsForCurrent) {
-                setSkipExerciseConfirmOpen(true);
-              } else {
-                advanceExercise();
-              }
-            }}
-          >
-            Passer cet exercice
-          </button>
+          {isEstimationMode ? (
+            <>
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-2xl text-sm font-semibold"
+                onClick={handleAddWarmupSet}
+                disabled={
+                  !currentSetInputs[0]?.weight || !currentSetInputs[0]?.reps
+                }
+              >
+                + Chauffe suivante
+              </Button>
+              <Button
+                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg"
+                onClick={handleReferenceSet}
+                disabled={
+                  !currentSetInputs[0]?.weight ||
+                  !currentSetInputs[0]?.reps ||
+                  currentSetInputs[0]?.difficulty == null
+                }
+              >
+                <Check className="mr-2 h-5 w-5" />
+                C'est ma série de référence → calculer 1RM
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
+                onClick={handleValidateSet}
+              >
+                <Check className="mr-2 h-5 w-5" />
+                {currentLoggedSet ? "Série suivante" : "Valider série"}
+              </Button>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground font-medium py-1 active:text-foreground transition-colors"
+                onClick={() => {
+                  // Confirm only when there's already partial work on the current
+                  // exercise — otherwise skipping a fresh block is a normal flow
+                  // (e.g. swimmer realises an exercise isn't relevant today) and
+                  // a confirm dialog adds friction without benefit.
+                  const hasLogsForCurrent = currentBlock
+                    ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
+                    : false;
+                  if (hasLogsForCurrent) {
+                    setSkipExerciseConfirmOpen(true);
+                  } else {
+                    advanceExercise();
+                  }
+                }}
+              >
+                Passer cet exercice
+              </button>
+            </>
+          )}
         </BottomActionBar>
       ) : null}
 
