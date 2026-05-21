@@ -544,7 +544,7 @@ export default function Strength() {
 
   const [isPlanMode, setIsPlanMode] = useState(false);
   const [showOneRmGate, setShowOneRmGate] = useState(false);
-  const [skipPercent1rm, setSkipPercent1rm] = useState(false);
+  const [inlineEstimationExercises, setInlineEstimationExercises] = useState<Set<number>>(new Set());
 
   const missing1RmExercises = useMemo(
     () => computeMissing1RmExercises(activeFilteredItems, oneRMs, exerciseLookup),
@@ -636,7 +636,7 @@ export default function Strength() {
     }
 
     // Check for missing 1RMs before entering focus mode
-    if (missing1RmExercises.length > 0 && !skipPercent1rm) {
+    if (missing1RmExercises.length > 0 && inlineEstimationExercises.size === 0) {
       setShowOneRmGate(true);
       return;
     }
@@ -1108,13 +1108,14 @@ export default function Strength() {
         onSaveAndContinue={() => {
           setShowOneRmGate(false);
           queryClient.invalidateQueries({ queryKey: ["1rm"] });
-          // Re-trigger launch after 1RM saved
           handleLaunchFocus();
         }}
-        onSkipToFreeWeight={() => {
+        onEstimateInline={(skippedIds) => {
           setShowOneRmGate(false);
-          setSkipPercent1rm(true);
-          // Re-trigger launch with skip flag
+          setInlineEstimationExercises(new Set(skippedIds));
+          // Re-trigger launch — handleLaunchFocus will now bypass the gate because
+          // missing1RmExercises is recomputed against oneRMs (saved values already
+          // persisted) and the remaining items are now in inlineEstimationExercises.
           setTimeout(() => handleLaunchFocus(), 0);
         }}
       />

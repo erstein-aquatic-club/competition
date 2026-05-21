@@ -13,7 +13,9 @@ interface Props {
   missingExercises: Array<{ exerciseId: number; exerciseName: string }>;
   athleteId: number | string | null;
   onSaveAndContinue: () => void;
-  onSkipToFreeWeight: () => void;
+  /** §297 — Lance la séance ; les exos sans 1RM saisi entrent en mode
+   *  estimation inline (ramp-up sur série 1) côté WorkoutRunner. */
+  onEstimateInline: (skippedExerciseIds: number[]) => void;
 }
 
 export function OneRmGate({
@@ -22,12 +24,14 @@ export function OneRmGate({
   missingExercises,
   athleteId,
   onSaveAndContinue,
-  onSkipToFreeWeight,
+  onEstimateInline,
 }: Props) {
   const [values, setValues] = useState<Record<number, string>>({});
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (mode: "saveAndContinue" | "estimateInline") => {
+      const savedIds: number[] = [];
+      const skippedIds: number[] = [];
       for (const ex of missingExercises) {
         const weight = Number(values[ex.exerciseId]);
         if (weight > 0) {
@@ -36,12 +40,20 @@ export function OneRmGate({
             exercise_id: ex.exerciseId,
             one_rm: weight,
           });
+          savedIds.push(ex.exerciseId);
+        } else {
+          skippedIds.push(ex.exerciseId);
         }
       }
+      return { mode, savedIds, skippedIds };
     },
-    onSuccess: () => {
-      toast("1RM sauvegardés");
-      onSaveAndContinue();
+    onSuccess: ({ mode, savedIds, skippedIds }) => {
+      if (savedIds.length > 0) toast("1RM sauvegardés");
+      if (mode === "estimateInline") {
+        onEstimateInline(skippedIds);
+      } else {
+        onSaveAndContinue();
+      }
     },
     onError: () => {
       toast.error("Erreur", { description: "Impossible de sauvegarder les 1RM." });
@@ -59,7 +71,8 @@ export function OneRmGate({
             1RM requis
           </SheetTitle>
           <SheetDescription>
-            Ces exercices utilisent un pourcentage de votre 1RM. Renseignez votre max ou passez en poids libre.
+            Ces exercices utilisent un % de votre 1RM. Renseignez vos max,
+            ou laissez l'app les estimer pendant la séance (séries de chauffe).
           </SheetDescription>
         </SheetHeader>
 
@@ -85,13 +98,18 @@ export function OneRmGate({
         <div className="mt-6 flex gap-2">
           <Button
             className="flex-1"
-            onClick={() => saveMutation.mutate()}
+            onClick={() => saveMutation.mutate("saveAndContinue")}
             disabled={!hasAnyValue || saveMutation.isPending}
           >
             {saveMutation.isPending ? "Sauvegarde..." : "Sauvegarder et continuer"}
           </Button>
-          <Button variant="outline" className="flex-1" onClick={onSkipToFreeWeight}>
-            Poids libre
+          <Button
+            variant="outline"
+            className="flex-1"
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate("estimateInline")}
+          >
+            Estimer pendant la séance
           </Button>
         </div>
       </SheetContent>
