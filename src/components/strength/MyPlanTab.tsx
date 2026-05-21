@@ -15,6 +15,7 @@ import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib
 import { FolderOpen, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isCurrentWeek, fmtDD_MM, getMonday, getISOWeekNumber } from "@/components/coach/swim/swimPlanningShared";
+import { toISODate } from "@/lib/date";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
 import type { WeekInstance } from "@/lib/strength/strengthPlanWeeks";
 import { MyPlanWeekCard } from "./MyPlanWeekCard";
@@ -32,14 +33,21 @@ import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
 /** Number of future weeks to display from current week */
 const PLAN_WEEK_COUNT = 12;
 
-/** Build ISO date strings for the next N weeks from today's Monday */
+/** Build ISO date strings for the next N weeks from today's Monday.
+ *
+ * §296 — utilise `toISODate` (local YYYY-MM-DD) PAS `toISOString().split("T")[0]`
+ * (qui convertit en UTC → en heure d'été Paris, "2026-05-18 00:00 +02" devient
+ * "2026-05-17T22:00:00Z" → split donne "2026-05-17" qui ne match pas la DB).
+ * Ce shift faisait silencieusement échouer la query `.in('week_start', ...)`
+ * → athleteOverrides vide → MyPlanTab affichait Phase 3 (training_plan)
+ * au lieu des slot_overrides du mésocycle. */
 function buildWeekStarts(count: number): string[] {
   const monday = getMonday(new Date());
   const starts: string[] = [];
   for (let i = 0; i < count; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i * 7);
-    starts.push(d.toISOString().split("T")[0]);
+    starts.push(toISODate(d));
   }
   return starts;
 }
@@ -336,7 +344,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     const allCycles = rootFolders.flatMap((root) => subFoldersMap.get(root.id) ?? []);
     if (allCycles.length === 0) return [];
     const all = buildWeekInstances(rootFolders[0], allCycles, sessionsByFolder);
-    const todayMondayKey = getMonday(new Date()).toISOString().split("T")[0];
+    const todayMondayKey = toISODate(getMonday(new Date()));
     return all.filter((inst) => inst.week.weekKey >= todayMondayKey);
   }, [useFallback, rootFolders, subFoldersMap, sessionsByFolder]);
 
