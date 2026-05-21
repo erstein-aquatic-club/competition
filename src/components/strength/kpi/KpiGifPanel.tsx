@@ -1,13 +1,27 @@
 /**
  * KpiGifPanel — visual demo slot for a KPI protocol.
  *
- * `gifUrl` is currently null for all 5 protocols (Chantier A will add them).
- * Until then this renders a tasteful neutral placeholder instead of an empty
- * box — keeps the step visually balanced and signals "demo coming".
+ * Stratégie en cascade (§295) :
+ *   1. Si `gifUrl` est fourni (asset binaire externe) → `<img>` direct.
+ *   2. Sinon → `<KpiAnimatedIllustration>` (SVG inline animé par cycle CSS).
+ *
+ * Plus de placeholder « démonstration à venir » — les 5 protocoles ont
+ * désormais une illustration animée immédiatement. Si un GIF/MP4 binaire
+ * est fourni plus tard (UPDATE `dim_exercices.illustration_gif`), il
+ * remplace automatiquement l'animation SVG (le slot reste prioritaire).
  */
-import { ImageOff } from "lucide-react";
+import type { StrengthKpiKey } from '@/lib/api/types';
+import { KpiAnimatedIllustration } from './KpiAnimatedIllustration';
 
-export function KpiGifPanel({ gifUrl, label }: { gifUrl: string | null; label: string }) {
+export function KpiGifPanel({
+  gifUrl,
+  kpiKey,
+  label,
+}: {
+  gifUrl: string | null;
+  kpiKey: StrengthKpiKey;
+  label: string;
+}) {
   if (gifUrl) {
     return (
       <div className="overflow-hidden rounded-2xl border bg-muted">
@@ -20,16 +34,5 @@ export function KpiGifPanel({ gifUrl, label }: { gifUrl: string | null; label: s
       </div>
     );
   }
-
-  return (
-    <div
-      className="flex aspect-video w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-muted/40"
-      aria-hidden
-    >
-      <ImageOff className="h-7 w-7 text-muted-foreground/40" />
-      <span className="text-[11px] font-medium text-muted-foreground/60">
-        Démonstration à venir
-      </span>
-    </div>
-  );
+  return <KpiAnimatedIllustration kpiKey={kpiKey} label={label} />;
 }

@@ -57,7 +57,11 @@ export function KpiStepCard({
         </h2>
       </div>
 
-      <KpiGifPanel gifUrl={protocol.gifUrl} label={protocol.label} />
+      <KpiGifPanel
+        gifUrl={protocol.gifUrl}
+        kpiKey={protocol.key}
+        label={protocol.label}
+      />
 
       {/* Partner role — emphasized: this is a two-person protocol */}
       <div className="relative overflow-hidden rounded-2xl border border-amber-200/70 bg-amber-50/70 px-3.5 py-3 dark:border-amber-800/50 dark:bg-amber-950/25">
