@@ -4,6 +4,74 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §296 — Fixes test réel Bilan Muscu : Mon plan, library coach, hub mésocycles (2026-05-21)
+
+**Branche** : `main`
+**Trigger** : test réel utilisateur du flux §293/§294/§295 — 3 bugs critiques remontés :
+
+1. **Côté nageur** : mésocycle généré n'apparaît pas dans `/strength` onglet « Mon plan ».
+2. **Côté coach** : les 20 templates `[Méso XX]` polluent la bibliothèque coach (`/coach/library` → Musculation).
+3. **Côté coach** : pas de point d'entrée visible vers le `CoachMesocyclePanel` (le coach ne sait pas qu'un nageur a généré un mésocycle).
+
+Investigation systématique : `docs/audits/2026-05-20-audit-bilan-muscu-293.md` + queries DB (mésocycle persisté, slot_overrides créés, training_plan_applications de l'athlète).
+
+### Root causes identifiées
+
+- **Bug 1** : `MyPlanTab.tsx:192-194` cascade `Phase 3 (training_plan_applications) > Phase 2 (slot_overrides) > Phase 1 (folders)`. L'athlète testeur (user 1 « François WAGNER ») a un `training_plan_applications` actif (plan « Prépa sprint 50m - F.Wagner », end_date NULL depuis 2026-03-23) → Phase 3 prend la priorité → les 20 `strength_planning_slot_overrides` du mésocycle sont **totalement masqués**.
+- **Bug 2** : RPC `get_strength_catalog_paginated` (consommée par `StrengthCatalog`) ne filtre pas les sessions générées par mésocycle. Les 20 templates `[Méso XX]` ont `folder_id=NULL` → tombent en `unfiledSessions` → polluent visuellement.
+- **Bug 3** : pas un bug technique — le `CoachMesocyclePanel` est bien wired dans `CoachSwimmerFullView:491` (onglet Planning, Collapsible defaultOpen). Pure discoverability : aucun point d'entrée sur le hub coach.
+
+### Changements
+
+- **Fix Bug 1 — `MyPlanTab.tsx`** : ajout d'une query `getActiveMesocycle(athleteId)`. Si non-null → bascule en Phase 2 prioritaire (overrides), `Phase 3 > Phase 2` n'est conservé que si pas de mésocycle actif. Sémantique : « override = priorité » et « mésocycle = focus actuel personnalisé ». Les nageurs sans mésocycle ne voient aucun changement de comportement.
+- **Fix Bug 2 — mig `00180`** : `get_strength_catalog_paginated` exclut désormais `name NOT LIKE '[Méso %'`. Les templates restent atteignables via les slot_overrides (côté nageur) et via `CoachMesocyclePanel` / `getMesocycleSessionsContent` (côté coach). Vérifié post-migration : 64 sessions renvoyées (= 84 total - 20 méso).
+- **Fix Bug 3** — point d'entrée hub coach :
+  - API : `listActiveMesocyclesWithAthletes()` (avec join `users.display_name` via PostgREST) + type `ActiveMesocycleWithAthlete` exporté depuis `lib/api/index.ts`.
+  - Composant `CoachActiveMesocyclesSection.tsx` (neuf, 109 l.) — section conditionnelle (s'efface si 0 mésocycle) avec 1 carte cliquable par nageur ayant un mésocycle actif. Métadonnées : nom, event, kind, durée, sessions/sem, date génération. Tap → `/coach/swimmer/:id`.
+  - Deeplink onglet Planning : la section pose `sessionStorage` key `eac_coach_swimmer_initial_tab = 'planning'` avant navigation ; `CoachSwimmerFullView` lit la key au mount via `useState(() => …)` et l'efface (consommée une fois). Fallback `resume` si absente.
+  - Insertion dans `CoachHome` juste avant la grille « Accès rapides » → visibilité maximale, zéro bruit si aucun mésocycle.
+
+### Migrations
+
+- **`00180_catalog_exclude_mesocycle_sessions.sql`** — `CREATE OR REPLACE FUNCTION get_strength_catalog_paginated` avec `AND ss.name NOT LIKE '[Méso %'` ajouté aux 2 WHERE (count + select).
+
+### Décisions
+
+- **`MyPlanTab` priorité par mésocycle actif** (vs override sporadique) — la query `getActiveMesocycle` cible un cas clair (un mésocycle posé est un override structurel sur N semaines). Pour un override sporadique (1-2 séances modifiées), Phase 3 reste prioritaire. Cohérent avec la sémantique du flux §293.
+- **Filtre côté RPC plutôt que côté JS** — économise le payload réseau et le compteur paginé est correct.
+- **Section hub coach plutôt que tuile quickAccess** — donne immédiatement le contenu actionnable (liste des nageurs concernés) sans clic supplémentaire. La grille quickAccess reste pour les accès récurrents (planif, bilan, comms…).
+- **Deeplink onglet via sessionStorage** plutôt qu'un query param URL — pattern déjà utilisé dans `MyPlanTab` (key `eac_pending_strength_focus_slot_id`). Consommé-une-fois auto-cleanup.
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature |
+|---|---|
+| `src/components/strength/MyPlanTab.tsx` | +query `getActiveMesocycle` + nouvelle cascade |
+| `supabase/migrations/00180_catalog_exclude_mesocycle_sessions.sql` (neuf) | RPC `get_strength_catalog_paginated` exclut `[Méso %'` |
+| `src/lib/api/strength-mesocycles.ts` | +`listActiveMesocyclesWithAthletes()` + type `ActiveMesocycleWithAthlete` |
+| `src/lib/api/index.ts` | re-exports |
+| `src/components/coach/CoachActiveMesocyclesSection.tsx` (neuf, 109 l.) | Section conditionnelle hub coach + deeplink Planning |
+| `src/pages/coach/CoachSwimmerFullView.tsx` | Lit `sessionStorage` initial tab + cleanup |
+| `src/pages/Coach.tsx` | Import + insertion dans `CoachHome` |
+
+### Tests
+
+- `npm test` — **892/892 verts** (inchangé vs §295).
+- `npx tsc --noEmit` — exit 0.
+- `npm run build` — succès.
+- `npm run test:rls` — non requis (aucune RLS / RPC touchant la sécurité ; modification de RPC seulement pour filtrage cosmétique).
+- Vérification post-DB : `(get_strength_catalog_paginated(0,100)).total = 64` (vs 84 total, dont 20 [Méso ...]).
+
+### Limites / hors scope
+
+- **Profil incomplet user_id=3 « François »** distinct de user_id=1 « François WAGNER » — l'audit §293 pointait id=3 (sex/birthdate null), mais le testeur réel est id=1 (qui a tout). id=3 est probablement un compte test legacy. Pas critique.
+- **Deeplink Planning** consomme la sessionStorage key au mount (single-use). Si le user navigue ailleurs puis revient, l'onglet n'est plus auto-Planning. Comportement attendu — c'est un deeplink, pas une persistance.
+- **Section hub coach** ne montre que les `active` ; les `superseded`/`reverted` sont visibles dans `CoachMesocyclePanel` (HistoryStrip).
+
+### Commits
+
+`07581f65b` (Bug 1 MyPlanTab), `d3d63c8f3` (Bug 2 mig 00180), `dd448af11` (Bug 3 hub + deeplink) + clôture documentaire.
+
 ## §295 — Chrono temps de vol + illustrations SVG animées KPI (2026-05-21)
 
 **Branche** : `main`
