@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment, StrengthCycleType } from "@/lib/api";
+import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -180,23 +181,56 @@ export function SessionDetailPreview({
           const restVal = formatStrengthSeconds(item.rest_seconds);
           const isExpanded = expandedIndex === index;
           const hasGif = !!exercise?.illustration_gif;
+          // §296 — distinction visuelle warmup vs main + eyebrow headers
+          const isWarmup = item.block === "warmup";
+          const prevBlock = index > 0 ? items[index - 1].block : undefined;
+          const showWarmupHeader = index === 0 && isWarmup;
+          const showMainDivider = prevBlock === "warmup" && !isWarmup;
 
           return (
-            <motion.div key={`${item.exercise_id}-${index}`} variants={itemVariants}>
-              <Collapsible
-                open={isExpanded}
-                onOpenChange={(open) => setExpandedIndex(open ? index : null)}
-              >
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
+            <Fragment key={`${item.exercise_id}-${index}`}>
+              {showWarmupHeader && (
+                <div className="flex items-center gap-2 px-1 pt-1 pb-0.5">
+                  <span
                     className={cn(
-                      "w-full flex items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 text-left transition-all active:scale-[0.98]",
-                      isExpanded
-                        ? "border-primary/40 shadow-sm ring-1 ring-primary/10"
-                        : "hover:border-primary/30",
+                      "text-[10px] font-bold uppercase tracking-[0.18em]",
+                      BLOCK_STYLES.warmup.textMuted,
                     )}
                   >
+                    Échauffement · Mobilité
+                  </span>
+                  <div className={cn("h-px flex-1", BLOCK_STYLES.warmup.divider)} />
+                </div>
+              )}
+              {showMainDivider && (
+                <div className="flex items-center gap-2 px-1 pt-3 pb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                    Bloc principal
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+              )}
+              <motion.div variants={itemVariants}>
+                <Collapsible
+                  open={isExpanded}
+                  onOpenChange={(open) => setExpandedIndex(open ? index : null)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full flex items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 text-left transition-all active:scale-[0.98]",
+                        isWarmup && !isExpanded
+                          ? cn(
+                              BLOCK_STYLES.warmup.bgSubtle,
+                              "border-sky-200/60 dark:border-sky-900/40",
+                            )
+                          : "",
+                        isExpanded
+                          ? "border-primary/40 shadow-sm ring-1 ring-primary/10"
+                          : "hover:border-primary/30",
+                      )}
+                    >
                     {/* GIF thumbnail or number fallback */}
                     {hasGif ? (
                       <div className="relative h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-muted/30 border border-border/50">
@@ -316,6 +350,7 @@ export function SessionDetailPreview({
                 </CollapsibleContent>
               </Collapsible>
             </motion.div>
+            </Fragment>
           );
         })}
         {items.length === 0 && (
