@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  RefreshCw,
   RotateCcw,
   StickyNote,
   Trophy,
@@ -1202,6 +1203,24 @@ export function WorkoutRunner({
           </p>
         </div>
       )}
+      {/* §297 — Recalculer 1RM : visible uniquement sur série 1 d'exos chargés non en
+          mode estimation, et avant que la série 1 ne soit loggée. */}
+      {!isBodyweightExercise &&
+        !isEstimationMode &&
+        currentSetIndex === 1 &&
+        !currentLoggedSet &&
+        onRequestRecalc &&
+        currentBlock && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs text-muted-foreground"
+            onClick={() => onRequestRecalc(currentBlock.exercise_id)}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Recalculer ma 1RM
+          </Button>
+        )}
       <Button variant="outline" className="w-full rounded-2xl" onClick={() => setSeriesSheetOpen(true)}>
         Voir les séries
       </Button>
