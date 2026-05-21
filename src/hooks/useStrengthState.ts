@@ -27,6 +27,10 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
   const [activeRunLogs, setActiveRunLogs] = useState<SetLogEntry[] | null>(null);
   const [activeRunnerStep, setActiveRunnerStep] = useState(0);
+  // §297 — Exos en attente d'estimation 1RM via ramp-up inline (déclenché par
+  // le OneRmGate "Estimer pendant la séance" ou le bouton "Recalculer ma 1RM").
+  // Persisté dans le focus snapshot pour survivre à un reload PWA.
+  const [inlineEstimationExercises, setInlineEstimationExercises] = useState<Set<number>>(new Set());
   const [screenMode, setScreenMode] = useState<"list" | "reader" | "focus" | "settings" | "summary">("list");
   const [isFinishing, setIsFinishing] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -101,6 +105,11 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
       setActiveRunId(typeof parsed.runId === "number" ? parsed.runId : null);
       setActiveRunLogs(Array.isArray(parsed.runLogs) ? parsed.runLogs : null);
       setActiveRunnerStep(Number.isFinite(parsed.runnerStep) ? parsed.runnerStep : 0);
+      // §297 — Restaure le Set des exos en attente d'estimation inline
+      const restoredIds = Array.isArray(parsed.inlineEstimationExercises)
+        ? parsed.inlineEstimationExercises.filter((id: unknown): id is number => typeof id === "number")
+        : [];
+      setInlineEstimationExercises(new Set(restoredIds));
       if (parsed.cycleType) {
         setCycleType(normalizeStrengthCycle(parsed.cycleType));
       }
@@ -132,6 +141,8 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
       runLogs: activeRunLogs,
       runnerStep: activeRunnerStep,
       cycleType,
+      // §297 — Set non-JSON sérialisable → Array
+      inlineEstimationExercises: Array.from(inlineEstimationExercises),
     };
     window.localStorage.setItem(focusStorageKey, JSON.stringify(payload));
   }, [
@@ -143,6 +154,7 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     cycleType,
     focusStorageKey,
     screenMode,
+    inlineEstimationExercises,
   ]);
 
   // Reset view state when dock icon is tapped while already on this page
@@ -168,6 +180,7 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     setActiveRunLogs(null);
     setActiveRunnerStep(0);
     setScreenMode("list");
+    setInlineEstimationExercises(new Set());
   };
 
   return {
@@ -198,5 +211,8 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     // Helpers
     clearActiveRunState,
     wasRestored,
+    // §297 — Estimation 1RM inline (ramp-up)
+    inlineEstimationExercises,
+    setInlineEstimationExercises,
   };
 }

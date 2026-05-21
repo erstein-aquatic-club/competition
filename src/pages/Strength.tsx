@@ -208,6 +208,8 @@ export default function Strength() {
     setCycleType,
     clearActiveRunState,
     wasRestored,
+    inlineEstimationExercises,
+    setInlineEstimationExercises,
   } = useStrengthState({ athleteKey: historyAthleteKey });
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
@@ -545,7 +547,6 @@ export default function Strength() {
 
   const [isPlanMode, setIsPlanMode] = useState(false);
   const [showOneRmGate, setShowOneRmGate] = useState(false);
-  const [inlineEstimationExercises, setInlineEstimationExercises] = useState<Set<number>>(new Set());
 
   const missing1RmExercises = useMemo(
     () => computeMissing1RmExercises(activeFilteredItems, oneRMs, exerciseLookup),
@@ -716,6 +717,8 @@ export default function Strength() {
                   runLogs: [],
                   runnerStep: 1,
                   cycleType: lockedCycle,
+                  // §297 — Inclure le Set pour cohérence avec le payload du hook
+                  inlineEstimationExercises: Array.from(inlineEstimationExercises),
                 }),
               );
             } catch {
