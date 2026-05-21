@@ -11,6 +11,7 @@ import {
   getStrengthSessions,
   getExercises,
   get1RM,
+  update1RM,
   startStrengthRun as startStrengthRunApi,
   logStrengthSet as logStrengthSetApi,
   updateStrengthRun,
@@ -626,6 +627,37 @@ export default function Strength() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLaunchKey, activeSession, screenMode, activeFilteredItems.length]);
 
+  // §297 — Callbacks pour l'estimation 1RM inline depuis le WorkoutRunner.
+  const handleRequestRecalc = useCallback((exerciseId: number) => {
+    setInlineEstimationExercises((prev) => {
+      const next = new Set(prev);
+      next.add(exerciseId);
+      return next;
+    });
+    toast("Mode estimation activé", {
+      description: "Fais ta chauffe et marque ta série de référence.",
+    });
+  }, []);
+
+  const handleEstimationComplete = useCallback(
+    async (exerciseId: number, estimatedOneRm: number) => {
+      if (!userId) return;
+      await update1RM({
+        athlete_id: userId,
+        exercise_id: exerciseId,
+        one_rm: estimatedOneRm,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["1rm"] });
+      setInlineEstimationExercises((prev) => {
+        const next = new Set(prev);
+        next.delete(exerciseId);
+        return next;
+      });
+      toast(`🎯 1RM estimé : ${estimatedOneRm} kg`);
+    },
+    [userId, queryClient],
+  );
+
   const handleLaunchFocus = async () => {
     if (!activeSession) return;
     if (startRun.isPending) return;
@@ -807,6 +839,9 @@ export default function Strength() {
               initialStep={activeRunnerStep}
               isFinishing={isFinishing}
               runId={activeRunId ?? undefined}
+              inlineEstimationExercises={inlineEstimationExercises}
+              onRequestRecalc={handleRequestRecalc}
+              onEstimationComplete={handleEstimationComplete}
               onStepChange={(step) => setActiveRunnerStep(step)}
               onExitFocus={() => {
                 setScreenMode("list");

@@ -143,6 +143,9 @@ export function WorkoutRunner({
   onSubstitute,
   userId,
   runId,
+  inlineEstimationExercises,
+  onRequestRecalc,
+  onEstimationComplete,
 }: {
   session: StrengthSessionTemplate;
   exercises: Exercise[];
@@ -166,6 +169,12 @@ export function WorkoutRunner({
    *  is persisted to localStorage so the swimmer can recover after an iOS
    *  PWA background-kill or accidental tab close. */
   runId?: string | number | null;
+  /** §297 — Set d'exercise_ids dont la série 1 doit ouvrir le mode estimation
+   *  ramp-up (calcul 1RM à partir d'une série de référence). Le runner retire
+   *  l'exo du Set parent via onEstimationComplete. */
+  inlineEstimationExercises?: Set<number>;
+  onRequestRecalc?: (exerciseId: number) => void;
+  onEstimationComplete?: (exerciseId: number, estimatedOneRm: number) => Promise<void>;
 }) {
   const isLoggingRef = useRef(false);
 
