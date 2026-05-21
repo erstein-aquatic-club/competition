@@ -4,6 +4,114 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §297 — Flag `is_bodyweight` + estimation 1RM inline via ramp-up (2026-05-21)
+
+**Branche** : `feat/297-bodyweight-1rm-estimation` (worktree `.worktrees/feat-297-bodyweight-1rm`)
+**Trigger** : retour utilisateur — deux problèmes :
+1. Les exos au poids de corps (pompes, tractions, dips, gainage…) déclenchent inutilement le `OneRmGate` qui demande de saisir un 1RM.
+2. Le nageur qui ne connaît pas son 1RM doit soit le deviner, soit cliquer « Poids libre » et perdre la prescription en % — pas de protocole encadré pour le calculer en début de séance.
+
+### Décisions de design
+
+Tableau récapitulatif (cf. design doc `docs/plans/2026-05-21-bodyweight-flag-and-inline-1rm-estimation-design.md` pour la justification complète) :
+
+| Question | Choix retenu |
+|---|---|
+| Identifier les exos PDC | Flag `is_bodyweight BOOLEAN` sur la table `exercises` (`dim_exercices`) |
+| Déclencher l'estimation 1RM | Inline pendant la séance, via choix « Estimer pendant la séance » dans `OneRmGate` |
+| Protocole de ramp-up | Libre — l'utilisateur ajoute autant de chauffes qu'il veut, marque sa série de référence |
+| Après calcul du 1RM | Les chauffes remplacent la série 1, on enchaine sur série 2 au poids cible recalculé |
+| UI exo PDC pendant séance | Masquer entièrement le champ « Charge », n'afficher que Reps |
+| « Poids libre » du gate actuel | Supprimé, remplacé par « Estimer pendant la séance » |
+| Bouton « Recalculer ma 1RM » | Affiché sur série 1 de tout exo non-PDC (même avec 1RM existant) |
+
+### Changements
+
+**1. Data layer (Tasks 1-2)**
+- Migration `00183_dim_exercices_is_bodyweight.sql` — `ADD COLUMN is_bodyweight BOOLEAN NOT NULL DEFAULT FALSE` (idempotent via `IF NOT EXISTS`). Appliquée via MCP. Aucune policy RLS impactée.
+- Type `Exercise` étendu (`is_bodyweight?: boolean` optionnel pour rétro-compat).
+- 3 mappers wired (`mapDbExerciseToApi`, `mapApiExerciseToDb`, `normalizeExercise`) avec coercion `=== true` (defense in depth contre `null`/`undefined`/`"true"`).
+- 5 tests unitaires `exerciseMappers.test.ts` (round-trip db ↔ api, défauts, localStorage). **Note interne** : tests d'abord écrits en vitest puis convertis en `node:test` car la commande `npm test` du projet utilise `node:test` (et non vitest comme annoncé dans le README). Plusieurs fichiers `vitest` existants ne sont silencieusement pas exécutés — c'est un bug pré-existant hors scope.
+
+**2. UI catalogue coach (Task 3)**
+- `StrengthCatalog.tsx` : checkbox `Exercice au poids de corps (pas de 1RM)` ajoutée dans les 2 dialogs (création + édition). Quand cochée, reset `pct_1rm_endurance/hypertrophie/force` à `null` pour cohérence. `ExerciseCycleTabs` non désactivé (la cohérence est garantie au save via le reset).
+
+**3. Filtre `missing1RmExercises` (Task 4)**
+- Extraction dans `src/lib/strength/missing1rmFilter.ts` (fonction pure `computeMissing1RmExercises`) pour testabilité.
+- 3 filtres : `percent_1rm > 0`, `!ex.is_bodyweight` (defense in depth — coach UI grise déjà les %1RM mais résiduel possible), pas de 1RM existant.
+- Fallback de naming amélioré : `item.exercise_name ?? exerciseLookup.get(id)?.nom_exercice ?? "Ex #id"` (cohérent avec le pattern utilisé ailleurs dans `Strength.tsx`).
+- 4 tests unitaires (`strength_missing1rm_filter.test.ts`).
+
+**4. Refonte `OneRmGate` (Task 5)**
+- Props : `onSkipToFreeWeight: () => void` → `onEstimateInline: (skippedExerciseIds: number[]) => void`.
+- Le saveMutation accepte désormais un mode (`saveAndContinue | estimateInline`) et calcule `savedIds` + `skippedIds`. L'utilisateur peut **mixer** : saisir 2 exos sur 3, cliquer « Estimer » → seul le 3ème entre en mode ramp-up.
+- Bouton « Sauvegarder et continuer » reste gated par `!hasAnyValue` ; bouton « Estimer pendant la séance » est toujours disponible (skip-all autorisé).
+- State `skipPercent1rm` supprimé (2 références nettoyées). Nouveau state `inlineEstimationExercises: Set<number>` dans `Strength.tsx`. Gate s'ouvre si `missing1RmExercises.length > 0 && inlineEstimationExercises.size === 0`.
+
+**5. `WorkoutRunner` — UI bodyweight + mode estimation + bouton recalc (Tasks 6-10)**
+- Props ajoutées : `inlineEstimationExercises?: Set<number>`, `onRequestRecalc?(exerciseId)`, `onEstimationComplete?(exerciseId, oneRm) => Promise<void>` (toutes optionnelles).
+- **Exo bodyweight** : `isBodyweightExercise = currentExerciseDef?.is_bodyweight === true`. Grille passe à `grid-cols-1` reps-only ; `handleValidateSet` force `weight = BODYWEIGHT_SENTINEL` (-1). PR detection déjà gardée par `!isBodyweight(logWeight)` (l. 597), aucune fuite.
+- **Mode estimation** : `isEstimationMode = !bw && setIndex===1 && Set.has(exoId)`. State éphémère `warmupHistory: Array<{weight, reps, difficulty}>` (in-memory React, reset au changement d'exo via useEffect). Bandeau ambré + pills de chauffes loggées. Bottom action bar conditionnel :
+  - Standard : `Valider série` + `Passer cet exercice` (préservés byte-identical dans la branche else)
+  - Estimation : `+ Chauffe suivante` (gated weight+reps) et `C'est ma série de référence → calculer 1RM` (gated weight+reps+difficulty obligatoire pour Epley+RIR).
+- `handleAddWarmupSet` : push triplet dans warmupHistory, reset inputs.
+- `handleReferenceSet` : `estimateOneRM(w, r, d)` via `prDetection.ts` → `onEstimationComplete()` (parent persist via `update1RM` + invalidate React Query + retire l'exo du Set) → log série 1 standard → reset warmupHistory/inputs → `setCurrentSetIndex(2)` → rest timer.
+- **Bouton « Recalculer ma 1RM »** : variant ghost sous la carte de série, 6 conditions de visibilité (not bw, not estimation mode, set===1, !currentLoggedSet, onRequestRecalc défini, currentBlock défini).
+
+**6. Wiring `Strength.tsx` (Task 6)**
+- Callbacks `useCallback` `handleRequestRecalc` (toast info + add to Set) et `handleEstimationComplete` (`update1RM` + invalidate + delete from Set + toast confirm).
+- Props passées au `<WorkoutRunner />` à l'instanciation.
+
+**7. Persistance focus state (Task 11)**
+- `inlineEstimationExercises` lifted dans `useStrengthState` (hook canonical) — source de vérité unique, déduplique le state qui vivait temporairement dans `Strength.tsx`.
+- Sérialisation `Array.from(Set)` dans le write effect du hook + le write « anti-orphan pre-persist » manuel à `Strength.tsx:707` (cohérence des deux payloads).
+- Restauration `new Set(restoredIds)` avec type guard `typeof === "number"` dans le read effect.
+- Reset à `new Set()` dans `clearActiveRunState`.
+- **Trade-off accepté** : `warmupHistory` (les chauffes en cours d'un exo en mode estimation) n'est PAS persisté. Au retour d'un kill PWA, l'exo est toujours en mode estimation mais l'utilisateur recommence sa chauffe. Acceptable car les chauffes ne sont pas du « vrai travail » loggé.
+
+### Fichiers modifiés
+
+| Fichier | Type | Lignes |
+|---|---|---|
+| `supabase/migrations/00183_dim_exercices_is_bodyweight.sql` | Nouveau | 9 |
+| `src/lib/api/types.ts` | Modifié (1 champ) | 1458 (inchangé) |
+| `src/lib/api/client.ts` | Modifié (2 lignes mappers) | ~316 |
+| `src/lib/api/helpers.ts` | Modifié (1 ligne normalize) | ~161 |
+| `src/lib/strength/missing1rmFilter.ts` | Nouveau (extrait) | 41 |
+| `src/components/strength/OneRmGate.tsx` | Refondu | 118 (~+18) |
+| `src/components/strength/WorkoutRunner.tsx` | Modifié (4 sites) | 1692 (~+160) |
+| `src/pages/Strength.tsx` | Modifié (state + callbacks + props) | 1162 (~+35) |
+| `src/pages/coach/StrengthCatalog.tsx` | Modifié (2 dialogs + 5 casts) | 1705 (~+47) |
+| `src/hooks/useStrengthState.ts` | Modifié (state lifted + persistance) | 218 (~+16) |
+| `src/lib/api/__tests__/exerciseMappers.test.ts` | Nouveau (5 tests) | 38 |
+| `src/pages/__tests__/strength_missing1rm_filter.test.ts` | Nouveau (4 tests) | 54 |
+
+### Tests
+
+- `npm test` : 901/901 verts (892 baseline + 9 nouveaux : 5 mappers + 4 filtre).
+- `npx tsc --noEmit` : exit 0.
+- Pas de test rendu React ajouté (le projet utilise `node:test` qui ne supporte pas natievement les tests DOM ; les tests `vitest` existants ne sont pas exécutés par `npm test`). Vérification de la couche UI déférée au smoke test e2e en dev local (cf. Task 13 du plan).
+- Pas de `npm run test:rls` (la migration n'ajoute qu'une colonne, pas de policy).
+
+### Limites V1
+
+- Chauffes ramp-up éphémères (non persistées). Si crash/quit pendant l'estimation, l'utilisateur reprend du début. Acceptable car les chauffes ne sont pas du « vrai travail » loggé.
+- Coach ne voit pas le ramp-up dans l'historique du nageur (seule la série de référence apparaît comme set_index=1). Si besoin → table `strength_warmup_sets` future.
+- L'écriture/lecture des tests `vitest` existants n'est pas corrigée (hors scope). Les nouveaux tests `§297` utilisent `node:test` pour réellement s'exécuter.
+- Pas de backfill automatique : les exos catalogue existants sont tous `is_bodyweight=false` par défaut. Le coach doit cocher manuellement les classiques (pompes, tractions, dips, gainage, etc.).
+
+### Décisions clés
+
+- **`is_bodyweight` comme flag explicite vs déduit de `percent_1rm = 0`** : flag explicite (defense in depth contre les états incohérents, source de vérité partagée par tous les nageurs).
+- **Ramp-up libre vs guidé** : libre (l'utilisateur connaît mieux son corps qu'un protocole arbitraire ; sans 1RM de référence, impossible de proposer des paliers 50/70/85% pertinents).
+- **Chauffes éphémères vs persistées** : éphémères (YAGNI, le 1RM est ce qui compte ; le coach peut toujours auditer la série de référence loggée).
+- **Mode estimation inline vs test 1RM séparé** : inline (zéro friction, l'estimation se fait dans le flux naturel de la séance).
+
+### Suivi
+
+- Tâche pas encore traitée : Task 13 du plan (vérification e2e tsc + build + smoke 3 scénarios).
+- Hors scope mais à considérer pour §298+ : (a) script SQL de backfill `is_bodyweight=true` pour les classiques (`name ILIKE '%pompe%'` etc.) ; (b) corriger les tests `vitest` du projet pour qu'ils s'exécutent vraiment (ou migrer vers un seul runner) ; (c) afficher le ramp-up dans l'historique coach si la pédagogie le requiert.
+
 ## §296 — Fixes test réel Bilan Muscu : Mon plan, library coach, hub mésocycles (2026-05-21)
 
 **Branche** : `main`
