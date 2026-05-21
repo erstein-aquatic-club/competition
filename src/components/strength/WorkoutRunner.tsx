@@ -296,6 +296,7 @@ export function WorkoutRunner({
   const currentExerciseDef = currentBlock
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
+  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true;
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
     ? exercises.find((e) => e.id === nextBlock.exercise_id)
@@ -595,7 +596,9 @@ export function WorkoutRunner({
       exercise_id: currentBlock.exercise_id,
       set_number: currentSetIndex,
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
-      weight: currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight,
+      weight: isBodyweightExercise
+        ? BODYWEIGHT_SENTINEL
+        : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight),
       difficulty: setDifficultyValue,
     };
     setLogs((prev) => [...prev, newLog]);
@@ -1015,26 +1018,28 @@ export function WorkoutRunner({
         </div>
         {/* §199 Chantier B — cards focus adoucies : gradient + border-2 retirés
             au profit d'un bg-secondary plat (cohérent avec le ton iOS sobre). */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
-            onClick={() => openInputSheet("weight")}
-          >
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Charge</div>
-            <div className="mt-1 flex items-baseline gap-0.5">
-              {isBodyweight(activeWeight) ? (
-                <span className="text-2xl font-bold tracking-tight">PDC</span>
-              ) : (
-                <>
-                  <span className="text-3xl font-bold tabular-nums tracking-tight">
-                    {activeWeight || "—"}
-                  </span>
-                  <span className="text-sm font-medium text-muted-foreground">kg</span>
-                </>
-              )}
-            </div>
-          </button>
+        <div className={cn("grid gap-3", isBodyweightExercise ? "grid-cols-1" : "grid-cols-2")}>
+          {!isBodyweightExercise && (
+            <button
+              type="button"
+              className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
+              onClick={() => openInputSheet("weight")}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Charge</div>
+              <div className="mt-1 flex items-baseline gap-0.5">
+                {isBodyweight(activeWeight) ? (
+                  <span className="text-2xl font-bold tracking-tight">PDC</span>
+                ) : (
+                  <>
+                    <span className="text-3xl font-bold tabular-nums tracking-tight">
+                      {activeWeight || "—"}
+                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">kg</span>
+                  </>
+                )}
+              </div>
+            </button>
+          )}
           <button
             type="button"
             className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
