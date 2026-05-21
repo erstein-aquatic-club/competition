@@ -733,25 +733,30 @@ function buildSession(
   const buckets: StrengthBucket[] = [];
 
   if (primary === 'mobility') {
-    // Cas override sécurité — la séance entière est mobilité.
+    // Cas override sécurité — la séance entière est mobilité corrective.
+    // isWarmup=false ici car ce n'est pas un échauffement mais le focus
+    // principal (l'effectiveWarmup côté toMesocycleExercise détectera
+    // bucket=mobility et appliquera quand même le chargement endurance).
     exercises = mobilityPool
       .slice(0, MOBILITY_ONLY_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle));
+      .map((s) => toMesocycleExercise(s, cycle, false));
     buckets.push('mobility');
   } else {
     const primaryPool = selected[primary] ?? [];
     const useComplement = complement != null && complement !== primary;
     const complementPool = useComplement ? (selected[complement] ?? []) : [];
 
+    // §297 — Warmup items reçoivent isWarmup=true → chargement endurance
+    // + intention activation, indépendamment du cycle de la semaine.
     const warmup = mobilityPool
       .slice(0, MOBILITY_WARMUP_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle));
+      .map((s) => toMesocycleExercise(s, cycle, true));
     const primaryBlock = primaryPool
       .slice(0, PRIMARY_BLOCK_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle));
+      .map((s) => toMesocycleExercise(s, cycle, false));
     const complementBlock = complementPool
       .slice(0, COMPLEMENT_BLOCK_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle));
+      .map((s) => toMesocycleExercise(s, cycle, false));
 
     // Ordre chronologique : warmup → primary → complement.
     exercises = [...warmup, ...primaryBlock, ...complementBlock];
@@ -774,20 +779,39 @@ function midRange(range: readonly [number, number]): number {
 }
 
 /**
- * Charge un exercice catalogue avec les paramètres dictés par le cycle :
- * - `catalogue.endurance` → colonnes `*_endurance` de `dim_exercices`,
- * - `catalogue.force`     → colonnes `*_force`,
- * - `generique`           → schéma de charge du cycle (midpoint des intervalles).
+ * Charge un exercice avec les paramètres adaptés au contexte (§297).
  *
- * Fallbacks défensifs si une colonne attendue est nulle (ex : mobility n'a pas
- * de %1RM ni de schéma force).
+ * **Règle 1 — Échauffement (isWarmup ou bucket=mobility)** :
+ *   Quel que soit le cycle, utilise les colonnes `*_endurance` du catalogue
+ *   (charges légères, séries courtes, activation). Repos clampé à 60s max.
+ *   Intention : « Activation et préparation ».
+ *
+ * **Règle 2 — Cycles `catalogue`** (`prepa_generale` / `force_max`) :
+ *   Lit directement les colonnes `*_endurance` ou `*_force` de `dim_exercices`.
+ *
+ * **Règle 3 — Cycles dérivés** (`puissance` / `maintien` / `affutage` / `pic`) :
+ *   Part des colonnes `*_force` du catalogue (sets, reps, %1RM, repos par
+ *   exercice) et applique une modulation propre au cycle :
+ *     - `puissance` : %1RM = max(0, force - 15) — charges modérées déplacées
+ *       vite. Box Jump (force=0%) reste 0%, Tractions lestées (force=85%) → 70%.
+ *     - `maintien`  : sets × 0.5 (volume réduit), %1RM tenu.
+ *     - `affutage`  : sets × 0.4 (volume décroissant), %1RM tenu.
+ *     - `pic`       : 2 séries × 2-4 reps, %1RM × 0.6 (charges légères explosives).
+ *   L'intention vient du `scheme.intention` du cycle.
+ *
+ * Cf. `docs/plans/bilan-muscu-cycles-vocabulaire.md` § 3 pour la doctrine.
  */
 function toMesocycleExercise(
   selectedEx: SelectedExercise,
   cycle: PeriodizationCycle,
+  isWarmup: boolean,
 ): MesocycleExercise {
   const ex = selectedEx.exercise;
   const cycleConfig = PERIODIZATION_CYCLES[cycle];
+  // Mobility-as-focus (override sécurité) → traité comme warmup pour le
+  // chargement (charges légères, repos courts) — l'intention diffère mais
+  // les paramètres restent ceux du catalogue endurance.
+  const effectiveWarmup = isWarmup || ex.bucket === 'mobility';
 
   let sets: number;
   let reps: number;
@@ -795,7 +819,17 @@ function toMesocycleExercise(
   let restSeconds: number;
   let intention: string | null;
 
-  if (cycleConfig.loading.kind === 'catalogue') {
+  if (effectiveWarmup) {
+    // Règle 1 — Échauffement : colonnes endurance du catalogue, repos clampé.
+    sets = ex.nbSeriesEndurance ?? 2;
+    reps = ex.nbRepsEndurance ?? 10;
+    intensityPct1rm = ex.pourcentageCharge1rmEndurance ?? 0;
+    restSeconds = Math.min(60, ex.recupSeriesEndurance ?? 45);
+    intention = isWarmup
+      ? "Activation et préparation — qualité du mouvement, pas l'effort."
+      : 'Mobilité corrective — contrôle, amplitude, gainage actif.';
+  } else if (cycleConfig.loading.kind === 'catalogue') {
+    // Règle 2 — prepa_generale ou force_max : lecture directe du catalogue.
     if (cycleConfig.loading.column === 'endurance') {
       sets = ex.nbSeriesEndurance ?? 2;
       reps = ex.nbRepsEndurance ?? 10;
@@ -809,12 +843,39 @@ function toMesocycleExercise(
     }
     intention = null;
   } else {
-    const scheme = cycleConfig.loading.scheme;
-    sets = midRange(scheme.sets);
-    reps = midRange(scheme.reps);
-    intensityPct1rm = midRange(scheme.intensityPct1rm);
-    restSeconds = midRange(scheme.restSeconds);
-    intention = scheme.intention;
+    // Règle 3 — Cycles dérivés (puissance/maintien/affutage/pic) :
+    // base = colonnes *_force du catalogue, modulation par cycle.
+    const baseSets = ex.nbSeriesForce ?? 4;
+    const baseReps = ex.nbRepsForce ?? 5;
+    const baseIntensity = ex.pourcentageCharge1rmForce;
+    const baseRest = ex.recupSeriesForce ?? 180;
+
+    if (cycle === 'puissance') {
+      sets = baseSets;
+      reps = baseReps;
+      // Charges modérées déplacées vite : -15 pts vs force max. Pliométrie
+      // pure (catalogue=0%) reste 0% — la max() le garantit.
+      intensityPct1rm = baseIntensity != null ? Math.max(0, baseIntensity - 15) : 0;
+      restSeconds = baseRest;
+    } else if (cycle === 'maintien') {
+      sets = Math.max(2, Math.round(baseSets * 0.5));
+      reps = baseReps;
+      intensityPct1rm = baseIntensity; // intensité tenue
+      restSeconds = baseRest;
+    } else if (cycle === 'affutage') {
+      sets = Math.max(1, Math.round(baseSets * 0.4));
+      reps = baseReps;
+      intensityPct1rm = baseIntensity; // intensité tenue, volume décroissant
+      restSeconds = baseRest;
+    } else {
+      // 'pic' — activation SNC, charges légères explosives.
+      sets = 2;
+      reps = Math.max(2, Math.min(4, baseReps));
+      intensityPct1rm =
+        baseIntensity != null ? Math.round(baseIntensity * 0.6) : 0;
+      restSeconds = baseRest;
+    }
+    intention = cycleConfig.loading.scheme.intention;
   }
 
   return {
