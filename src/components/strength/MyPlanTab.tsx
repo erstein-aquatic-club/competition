@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  getActiveMesocycle,
   getProfile,
   getStrengthPlanningSlots,
   getStrengthPlanningSlotOverrides,
@@ -187,11 +188,25 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     });
   }, [planApplications, applicationPlanSessions, weekStarts]);
 
+  // §296 — Si l'athlète a un mésocycle muscu actif, ses slot_overrides (Phase
+  // 2) doivent gagner sur le training_plan_application (Phase 3) — sémantique :
+  // un mésocycle posé = override personnalisé récent qui DOIT s'afficher.
+  // Sans mésocycle actif, on garde la cascade historique (Phase 3 > Phase 2).
+  const { data: activeMesocycle } = useQuery({
+    queryKey: ["strength-mesocycle-active", athleteId],
+    queryFn: () => getActiveMesocycle(athleteId),
+  });
+  const hasActiveMesocycle = activeMesocycle != null;
+
   // ── Determine which source to use ──────────────────────────────────────────
-  // Priority: Phase 3 (training_plan_applications) > Phase 2 (slots) > Phase 1 (cycles).
-  const usePhase3 = phase3Derived.size > 0;
-  const usePhase2 = !usePhase3 && effectiveSlots.length > 0;
-  const useFallback = !usePhase3 && !usePhase2 && rootFolders.length > 0;
+  // Priority (post-§296) :
+  //   • si mésocycle actif → Phase 2 (overrides) > Phase 3 > Phase 1
+  //   • sinon              → Phase 3 (applications) > Phase 2 > Phase 1
+  const usePhase2 =
+    (hasActiveMesocycle && effectiveSlots.length > 0) ||
+    (phase3Derived.size === 0 && effectiveSlots.length > 0);
+  const usePhase3 = !usePhase2 && phase3Derived.size > 0;
+  const useFallback = !usePhase2 && !usePhase3 && rootFolders.length > 0;
 
   // ── Phase 3: Build WeekInstances from derived plan cells ──────────────────
   const phase3WeekInstances = useMemo((): WeekInstance[] => {
