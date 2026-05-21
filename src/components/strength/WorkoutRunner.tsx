@@ -596,9 +596,55 @@ export function WorkoutRunner({
   };
 
   const handleReferenceSet = async () => {
-    // §297 Task 9 — actual logic (compute 1RM, persist, log series 1, advance) lives here.
-    // Stub for now to keep the disabled state of the button logical:
-    console.warn("handleReferenceSet: stub — Task 9 to implement");
+    if (!currentBlock || !onEstimationComplete) return;
+    const weight = Number(currentSetInputs[0]?.weight ?? 0);
+    const reps = Number(currentSetInputs[0]?.reps ?? 0);
+    const difficulty = currentSetInputs[0]?.difficulty ?? null;
+    if (weight <= 0 || reps <= 0 || difficulty == null) return;
+
+    // Calcul Epley+RIR via la fonction existante de prDetection.ts
+    const estimated = estimateOneRM(weight, reps, difficulty);
+    if (estimated <= 0) {
+      toast.error("Estimation impossible", {
+        description: "Vérifie la charge et le nombre de répétitions.",
+      });
+      return;
+    }
+
+    // Persist le 1RM côté parent (Strength.tsx → update1RM + invalidate query)
+    try {
+      await onEstimationComplete(currentBlock.exercise_id, estimated);
+    } catch {
+      toast.error("Erreur", {
+        description: "1RM non sauvegardé. Réessaye.",
+      });
+      return;
+    }
+
+    // Log la série de référence comme série 1 standard
+    const newLog: SetLogEntry = {
+      exercise_id: currentBlock.exercise_id,
+      set_number: 1,
+      reps,
+      weight,
+      difficulty,
+    };
+    setLogs((prev) => [...prev, newLog]);
+    isLoggingRef.current = true;
+    try {
+      await onLogSets?.([newLog]);
+    } finally {
+      isLoggingRef.current = false;
+    }
+
+    // Reset warmupHistory + avance à série 2
+    setWarmupHistory([]);
+    setCurrentSetInputs({});
+    setCurrentSetIndex(2);
+
+    if (autoRest && currentBlock.rest_seconds > 0) {
+      startRestTimer(currentBlock.rest_seconds, "set");
+    }
   };
 
   const handleValidateSet = async () => {
