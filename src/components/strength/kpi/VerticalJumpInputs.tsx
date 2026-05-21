@@ -6,15 +6,26 @@
  * time of each jump. Weight + best flight time → height (g·t²/8) → peak power
  * (Sayers) → relative power (W/kg), which is the value actually scored.
  *
+ * Modes (§295) :
+ *   • CHRONO (défaut) — 3 KpiStopwatch tactiles Start/Stop, mesure directement
+ *     dans l'app (performance.now sub-ms).
+ *   • TEXTE (fallback) — 3 inputs texte saisis manuellement, révélable via
+ *     le lien « Saisir manuellement → » (panne, correction, démo).
+ *
+ * Le poids reste un input texte dans les 2 modes (pas chronométrable).
+ *
  * Cf. §293 — docs/plans/bilan-muscu-barème-puissance-detente.md.
+ * Cf. §295 — docs/plans/2026-05-21-kpi-chrono-illustrations-design.md.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { parseAttempts, parsePositiveNumber } from "@/lib/strength/kpiMeasurement";
 import { verticalJumpResult } from "@/lib/strength/jumpPower";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Scale, Zap } from "lucide-react";
+import { Pencil, Scale, Timer, Zap } from "lucide-react";
+import { KpiStopwatch } from "./KpiStopwatch";
 
 export function VerticalJumpInputs({
   flightTimesRaw,
@@ -29,6 +40,7 @@ export function VerticalJumpInputs({
   onChangeFlightTime: (index: number, value: string) => void;
   onChangeWeight: (value: string) => void;
 }) {
+  const [manualMode, setManualMode] = useState(false);
   const weightKg = parsePositiveNumber(weightRaw);
   const flightTimes = useMemo(
     () => parseAttempts(flightTimesRaw),
@@ -76,7 +88,7 @@ export function VerticalJumpInputs({
         </div>
       </div>
 
-      {/* Flight-time attempts */}
+      {/* Flight-time attempts — CHRONO (par défaut) ou TEXTE (fallback) */}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -86,45 +98,86 @@ export function VerticalJumpInputs({
             Meilleur retenu
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2.5">
-          {flightTimesRaw.map((value, i) => {
-            const numeric = Number(String(value).replace(",", "."));
-            const isBest =
-              bestFlightTime != null &&
-              Number.isFinite(numeric) &&
-              numeric > 0 &&
-              numeric === bestFlightTime;
-            return (
-              <div key={i}>
-                <span className="mb-1 block text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Essai {i + 1}
-                </span>
-                <div className="relative">
-                  <Input
-                    inputMode="decimal"
-                    type="text"
-                    value={value}
-                    onChange={(e) => onChangeFlightTime(i, e.target.value)}
-                    placeholder="—"
-                    aria-label={`Temps de vol — essai ${i + 1} en secondes`}
-                    className={cn(
-                      "h-14 pr-7 text-center text-lg font-bold tabular-nums",
-                      isBest &&
-                        "border-primary/50 bg-primary/5 ring-1 ring-primary/20",
-                    )}
-                  />
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                    s
+
+        {manualMode ? (
+          <div className="grid grid-cols-3 gap-2.5">
+            {flightTimesRaw.map((value, i) => {
+              const numeric = Number(String(value).replace(",", "."));
+              const isBest =
+                bestFlightTime != null &&
+                Number.isFinite(numeric) &&
+                numeric > 0 &&
+                numeric === bestFlightTime;
+              return (
+                <div key={i}>
+                  <span className="mb-1 block text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Essai {i + 1}
                   </span>
+                  <div className="relative">
+                    <Input
+                      inputMode="decimal"
+                      type="text"
+                      value={value}
+                      onChange={(e) => onChangeFlightTime(i, e.target.value)}
+                      placeholder="—"
+                      aria-label={`Temps de vol — essai ${i + 1} en secondes`}
+                      className={cn(
+                        "h-14 pr-7 text-center text-lg font-bold tabular-nums",
+                        isBest &&
+                          "border-primary/50 bg-primary/5 ring-1 ring-primary/20",
+                      )}
+                    />
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                      s
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {flightTimesRaw.map((value, i) => (
+              <KpiStopwatch
+                key={i}
+                index={i}
+                value={value && value.trim() !== "" ? value : null}
+                onStop={(seconds) => onChangeFlightTime(i, seconds)}
+                onReset={() => onChangeFlightTime(i, "")}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {manualMode
+              ? "Saisis 3 temps en secondes (ex. 0,52)."
+              : "Tape ▶ Démarrer au décollage, ⏹ Arrêter au retour au sol."}
+          </p>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            onClick={() => setManualMode((m) => !m)}
+            className="h-auto shrink-0 gap-1 px-0 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            aria-label={
+              manualMode
+                ? "Revenir au mode chronomètre intégré"
+                : "Saisir manuellement les temps de vol"
+            }
+          >
+            {manualMode ? (
+              <>
+                <Timer className="h-3 w-3" /> Revenir au chrono
+              </>
+            ) : (
+              <>
+                <Pencil className="h-3 w-3" /> Saisir manuellement →
+              </>
+            )}
+          </Button>
         </div>
-        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-          Temps de vol chronométré par le binôme — du décollage des pieds à
-          leur retour au sol (ex. 0,52).
-        </p>
       </div>
 
       {/* Computed power readout */}
