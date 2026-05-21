@@ -4,6 +4,62 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §295 — Chrono temps de vol + illustrations SVG animées KPI (2026-05-21)
+
+**Branche** : `main`
+**Trigger** : retour utilisateur post-§294 — la mesure du temps de vol du KPI détente verticale était une saisie texte manuelle (`<Input>` 3 essais), et les 5 protocoles KPI affichaient un placeholder « Démonstration à venir » faute d'assets GIF. Design : `docs/plans/2026-05-21-kpi-chrono-illustrations-design.md` ; plan : `docs/plans/2026-05-21-kpi-chrono-illustrations.md`.
+
+### Changements
+
+- **Composant `KpiStopwatch.tsx`** (neuf, 194 l.) — chrono autonome state machine 3 états `idle | running | stopped` (dérivés de `value` + interne `running`). Mesure via `performance.now()` (précision sub-ms), readout live à ~60 fps via `requestAnimationFrame`. Vibration haptique optionnelle au start (`navigator.vibrate(50)`) / stop (`[0, 50, 50, 50]`). Format de sortie `'0.52'` (string 2 décimales) **identique** à l'ancien input texte → compat directe avec `parseAttempts` → `verticalJumpResult` (aucun changement de la chaîne de scoring). Design « précision instrument » : IDLE bouton dashed primary + pill `Démarrer`, RUNNING bouton plein rose pulsé + readout 6xl monospace hero + pill `Arrêter`, STOPPED card emerald compacte + badge « Essai N+1 » + bouton ↺ Refaire. 6 tests `node:test` verts sur `formatStopwatchSeconds`.
+- **`VerticalJumpInputs.tsx` refactor** (175→228 l.) — 3 `KpiStopwatch` empilés en mode par défaut, lien révélateur « Saisir manuellement → » qui bascule vers les 3 inputs texte de l'ancien composant (panne, correction, démo). Toggle réciproque « ⏱ Revenir au chrono ». Le poids reste un `<Input>` standard dans les 2 modes. Le chrono pousse `'0.52'` via `onStop` → `onChangeFlightTime` ; `onReset` push `''` (slot vidé).
+- **`KpiAnimatedIllustration.tsx`** (neuf, 54 l.) + **5 illustrations SVG inline animées** (`illustrations/{VerticalJump, BroadJump, Imtp, WeightedPullup, MedballThrow}Anim.tsx`, 50-65 l. chacune) — silhouettes monochromes `stroke-current` (adaptatives dark/light mode), ratio 16:9, anims CSS keyframes namespacées par préfixe pour éviter les collisions globales. Cycles 1.8-2.5s. Aucune lib d'animation, aucun asset binaire. Dispatcher `switch (kpiKey)` + container `role="img"` + `aria-label`.
+- **`KpiGifPanel.tsx` refactor** — cascade : `<img>` si `gifUrl` fourni, sinon `<KpiAnimatedIllustration>`. Plus de placeholder « démonstration à venir ». Si demain un GIF/MP4 binaire est fourni (`UPDATE dim_exercices.illustration_gif`), il remplace automatiquement l'animation SVG (le slot reste prioritaire). `KpiStepCard.tsx` passe maintenant `kpiKey={protocol.key}` au panel.
+
+### Décisions
+
+- **Pas de RTL/userEvent dans les tests** — le runner `node --test --import tsx` du projet n'a pas jsdom configuré pour les composants React. Les tests d'interaction (idle→running→stopped) seraient idéaux mais nécessiteraient une config vitest jsdom séparée. On se contente de tester le helper pur `formatStopwatchSeconds` (DOM-agnostique) + validation par revue de code + smoke manuel sur `/strength/kpi-wizard`.
+- **Format de sortie `'0.52'` string, pas `number`** — compat directe avec `parseAttempts` qui s'attend à des strings. Le chrono est un drop-in remplacement de l'input texte du point de vue du parent.
+- **5 illustrations en composants React inline plutôt qu'une feuille SVG sprite ou en JSON** — autonomie de chaque illustration, anim isolée, lazy-loadable plus tard si besoin, pas de coupling.
+- **Pas de `framer-motion` ni `lottie`** — CSS keyframes suffisent largement, économise ~50 KB gzipped.
+- **`requestAnimationFrame`** plutôt que `setInterval(16)` — synchronisé au refresh display, pause auto si l'onglet n'est pas focus.
+- **Pas de migration `gifUrl`** — le slot reste null en DB, l'illustration animée prend le relais. Aucune migration nécessaire.
+
+### Fichiers modifiés / créés
+
+| Fichier | Nature | Taille |
+|---|---|---|
+| `src/components/strength/kpi/KpiStopwatch.tsx` (neuf) | Composant chrono state machine | 194 l. |
+| `src/components/strength/kpi/__tests__/KpiStopwatch.test.tsx` (neuf) | 6 tests `node:test` | 47 l. |
+| `src/components/strength/kpi/KpiAnimatedIllustration.tsx` (neuf) | Dispatcher illustrations | 54 l. |
+| `src/components/strength/kpi/illustrations/VerticalJumpAnim.tsx` (neuf) | SVG anim détente verticale | 52 l. |
+| `src/components/strength/kpi/illustrations/BroadJumpAnim.tsx` (neuf) | SVG anim saut longueur | 60 l. |
+| `src/components/strength/kpi/illustrations/ImtpAnim.tsx` (neuf) | SVG anim tirage mi-cuisse | 60 l. |
+| `src/components/strength/kpi/illustrations/WeightedPullupAnim.tsx` (neuf) | SVG anim traction lestée | 62 l. |
+| `src/components/strength/kpi/illustrations/MedballThrowAnim.tsx` (neuf) | SVG anim lancer ballon | 63 l. |
+| `src/components/strength/kpi/VerticalJumpInputs.tsx` | Refactor chrono + fallback | 228 l. (+30%) |
+| `src/components/strength/kpi/KpiGifPanel.tsx` | Refactor cascade gifUrl/anim | 33 l. |
+| `src/components/strength/kpi/KpiStepCard.tsx` | Passe kpiKey au panel | inchangée |
+| `docs/plans/2026-05-21-kpi-chrono-illustrations-design.md` (neuf) | Design validé | 172 l. |
+| `docs/plans/2026-05-21-kpi-chrono-illustrations.md` (neuf) | Plan d'impl | 579 l. |
+
+### Tests
+
+- `npm test` — **892/892 verts** (+6 tests dédiés sur `formatStopwatchSeconds`).
+- `npx tsc --noEmit` — exit 0.
+- `npm run build` — succès.
+- `npm run test:rls` — non requis (aucune RLS / RPC touchée).
+
+### Commits
+
+`ca74c5e7b` (design), `b9853199f` (plan), `2306fe3de` (KpiStopwatch + tests), `255aaf817` (VerticalJumpInputs refactor), `9ca4a6c4e` (5 illustrations SVG + dispatcher), `ef6623dd2` (KpiGifPanel cascade) + clôture documentaire.
+
+### Limites / hors scope
+
+- **Pas de capteur accéléromètre** — le téléphone est tenu par le binôme, pas porté par le nageur. Détection auto pas pertinente.
+- **Pas de tests d'interaction React** — le runner projet n'a pas jsdom. Une migration vers vitest pourrait débloquer ça plus tard.
+- **Précision réelle** : le binôme humain a un délai de réaction ~150-250 ms ; la précision « utile » est ~50 ms. `performance.now()` apporte la précision théorique sub-ms mais le facteur limitant reste humain.
+
 ## §294 — Clôture qualité Bilan Muscu : suite à l'audit §293 (2026-05-20)
 
 **Branche** : `main`

@@ -256,7 +256,10 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/strength/kpi/KpiStepCard.tsx` | Étape KPI du wizard (§285) — protocole (steps, rôle binôme, mesure, GIF), N champs d'essais, valeur retenue live via `bestAttempt` | 190 lignes |
 | `src/components/strength/kpi/KpiRecap.tsx` | Recap post-submit du wizard KPIs (§285) — diff de chaque mesure vs précédente, note review coach si source athlete | 139 lignes |
 | `src/components/strength/kpi/KpiSwimmerPicker.tsx` | Drawer de sélection nageur du wizard KPIs (§285) — cible mesurée + binôme `assisted_by`, recherche | 141 lignes |
-| `src/components/strength/kpi/KpiGifPanel.tsx` | Slot démo d'un protocole KPI (§285) — placeholder neutre tant que `gifUrl` est null | 35 lignes |
+| `src/components/strength/kpi/KpiGifPanel.tsx` | Slot démo d'un protocole KPI — cascade : `<img>` si `gifUrl` fourni, sinon `<KpiAnimatedIllustration>` (§295) | 33 lignes |
+| `src/components/strength/kpi/KpiStopwatch.tsx` | Chrono temps de vol intégré pour KPI détente (§295) — state machine idle/running/stopped, `performance.now()` sub-ms, vibration haptique, fallback `↺ Refaire` | 194 lignes |
+| `src/components/strength/kpi/KpiAnimatedIllustration.tsx` | Dispatcher des 5 illustrations SVG animées des protocoles KPI (§295) — switch par `kpiKey` | 54 lignes |
+| `src/components/strength/kpi/illustrations/*.tsx` | 5 SVG inline animés (`VerticalJump`, `BroadJump`, `Imtp`, `WeightedPullup`, `MedballThrow`Anim) — silhouettes monochromes `stroke-current`, CSS keyframes namespacées (§295) | ~60 lignes chacun |
 | `src/components/strength/questionnaire/ScaleField.tsx` | Échelle en pilules pour le bilan muscu (§286, généralisée §287 prop `min`) — questionnaire nageur (1-5) + bilan coach (0-3) ; échelle neutre sans tokens intensité | 89 lignes |
 | `src/components/strength/assessment/AssessmentContext.tsx` | Contexte read-only du bilan physique coach (§287) — questionnaire nageur (douleurs `BodyHeatMap` view, historique, mobilité, psycho) + KPIs latest, en lecture seule | 229 lignes |
 | `src/components/strength/assessment/assessmentScores.ts` | Définition statique des 6 scores 0-3 du bilan physique (§287) — libellés, hints, captions + légende + sentinelle `SCORE_UNSET` | 98 lignes |
