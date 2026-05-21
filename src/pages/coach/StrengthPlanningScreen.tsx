@@ -41,6 +41,7 @@ import {
 } from "@/components/coach/swim/swimPlanningShared";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { toISODate } from "@/lib/date";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -291,7 +292,8 @@ export default function StrengthPlanningScreen() {
       const cursor = getMonday(start);
       const endMonday = getMonday(end);
       while (cursor.getTime() <= endMonday.getTime()) {
-        const key = cursor.toISOString().split("T")[0];
+        // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+        const key = toISODate(cursor);
         const arr = map.get(key) ?? [];
         arr.push(c);
         map.set(key, arr);

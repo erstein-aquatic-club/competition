@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getCompetitions, getMyCompetitionIds } from "@/lib/api";
 import { getMonday } from "@/components/coach/swim/swimPlanningShared";
+import { toISODate } from "@/lib/date";
 import type { Competition } from "@/lib/api/types";
 
 export function useCompetitionsByWeek(userId: number | null | undefined) {
@@ -34,7 +35,9 @@ export function useCompetitionsByWeek(userId: number | null | undefined) {
       const cursor = getMonday(start);
       const endMonday = getMonday(end);
       while (cursor.getTime() <= endMonday.getTime()) {
-        const key = cursor.toISOString().split("T")[0];
+        // §296 — toISODate (local) ; getMonday retourne un lundi local 00:00,
+        // toISOString().split shift d'1 jour en heure d'été Paris.
+        const key = toISODate(cursor);
         const arr = map.get(key) ?? [];
         arr.push(c);
         map.set(key, arr);

@@ -965,7 +965,9 @@ const CoachHome = ({
 };
 
 // ── Data helpers ───────────────────────────────────────────────────────────
-const getDateOnly = (value: Date) => value.toISOString().split("T")[0];
+// §296 — toISODate (local) plutôt que toISOString().split (UTC) — éviter le
+// shift d'un jour en heure d'été.
+const getDateOnly = (value: Date) => formatDateIso(value);
 // §222 — getRunTimestamp/getRunFatigueValue retirés : la fenêtre temporelle
 // et la source de fatigue sont gérées côté SQL par get_coach_kpis (RPC).
 const normalizeFatigueValue = (value: unknown): number | null => {

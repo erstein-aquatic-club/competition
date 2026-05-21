@@ -31,7 +31,7 @@ import {
   type FiliereLevels,
 } from "@/lib/swimFilieres";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
-import { getMonday } from "@/lib/date";
+import { getMonday, toISODate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,7 +85,8 @@ function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
     monday.setDate(startMonday.getDate() + i * 7);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    return { monday, sunday, weekNumber: getISOWeekNumber(monday), weekKey: monday.toISOString().split("T")[0] };
+    // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+    return { monday, sunday, weekNumber: getISOWeekNumber(monday), weekKey: toISODate(monday) };
   });
 }
 
@@ -372,7 +373,8 @@ export default function SwimPlanningAthleteView({
       const cursor = getMonday(start);
       const endMonday = getMonday(end);
       while (cursor.getTime() <= endMonday.getTime()) {
-        const key = cursor.toISOString().split("T")[0];
+        // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+        const key = toISODate(cursor);
         const arr = map.get(key) ?? [];
         arr.push(c);
         map.set(key, arr);

@@ -28,6 +28,7 @@ export function getISOWeekNumber(date: Date): number {
 }
 
 // §211 — getMonday déplacé dans src/lib/date.ts. Re-export pour compat.
+import { toISODate } from "@/lib/date";
 export { getMonday } from "@/lib/date";
 
 export function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
@@ -40,7 +41,9 @@ export function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
       monday,
       sunday,
       weekNumber: getISOWeekNumber(monday),
-      weekKey: monday.toISOString().split("T")[0],
+      // §296 — toISODate (local) au lieu de toISOString().split (UTC) — sinon
+      // en heure d'été Paris, le lundi local devient le dimanche en UTC.
+      weekKey: toISODate(monday),
     };
   });
 }

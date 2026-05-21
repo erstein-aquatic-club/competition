@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getCompetitions, getMyCompetitionIds } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
+import { toISODate } from "@/lib/date";
 import { PageHeader } from "@/components/shared/PageHeader";
 import SwimmerObjectivesView from "@/components/profile/SwimmerObjectivesView";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ function daysBetween(a: string, b: string): number {
 export default function SuiviObjectifs() {
   const [, navigate] = useLocation();
   const userId = useAuth((s) => s.userId);
-  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayIso = useMemo(() => toISODate(new Date()), []);
 
   const { data: competitions = [] } = useQuery({
     queryKey: ["competitions"],

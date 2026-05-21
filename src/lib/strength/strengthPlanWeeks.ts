@@ -4,6 +4,7 @@ import {
   getISOWeekNumber,
   getMonday,
 } from "@/components/coach/swim/swimPlanningShared";
+import { toISODate } from "@/lib/date";
 import { type StrengthPhase, detectPhase } from "./strengthPhaseStyles";
 
 export type { WeekInfo };
@@ -99,7 +100,8 @@ export function weekInfoFromSNumber(sNum: number, refDate: Date): WeekInfo {
     monday,
     sunday,
     weekNumber: sNum,
-    weekKey: monday.toISOString().split("T")[0],
+    // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+    weekKey: toISODate(monday),
   };
 }
 

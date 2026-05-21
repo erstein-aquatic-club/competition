@@ -46,6 +46,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { toISODate } from "@/lib/date";
 import {
   Plus,
   Trash2,
@@ -90,7 +91,8 @@ function fmtShort(iso: string): string {
 function getSunday(mondayIso: string): string {
   const d = new Date(mondayIso + "T00:00:00");
   d.setDate(d.getDate() + 6);
-  return d.toISOString().split("T")[0];
+  // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+  return toISODate(d);
 }
 
 function isCurrentWeek(mondayIso: string): boolean {
@@ -111,7 +113,7 @@ function getMondays(startDate: string, endDate: string): string[] {
   const diffToMonday = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
   current.setDate(current.getDate() + diffToMonday);
   while (current <= end) {
-    mondays.push(current.toISOString().split("T")[0]);
+    mondays.push(toISODate(current));
     current.setDate(current.getDate() + 7);
   }
   return mondays;
@@ -388,7 +390,7 @@ const InlinePlanning = ({
   }, [weeksByCycleId]);
 
   const nextCompetition = upcomingCompetitions[0] ?? null;
-  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayIso = useMemo(() => toISODate(new Date()), []);
   const daysToComp = nextCompetition ? daysBetween(todayIso, nextCompetition.date) : null;
 
   const createCycleMutation = useMutation({

@@ -26,6 +26,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { toISODate } from "@/lib/date";
 import { ObjectiveCard } from "@/components/shared/ObjectiveCard";
 import { weekTypeColor, weekTypeTextColor } from "@/lib/weekTypeColor";
 import {
@@ -70,7 +71,8 @@ function fmtShort(iso: string): string {
 function getSunday(mondayIso: string): string {
   const d = new Date(mondayIso + "T00:00:00");
   d.setDate(d.getDate() + 6);
-  return d.toISOString().split("T")[0];
+  // §296 — d est local, toISODate évite le shift UTC.
+  return toISODate(d);
 }
 
 function isCurrentWeek(mondayIso: string): boolean {
@@ -91,7 +93,7 @@ function getMondays(startDate: string, endDate: string): string[] {
   const diffToMonday = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
   current.setDate(current.getDate() + diffToMonday);
   while (current <= end) {
-    mondays.push(current.toISOString().split("T")[0]);
+    mondays.push(toISODate(current));
     current.setDate(current.getDate() + 7);
   }
   return mondays;
@@ -809,7 +811,7 @@ function ReadOnlyPlanning({
     return map;
   }, [plannedCycles, weekQueries]);
 
-  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayIso = useMemo(() => toISODate(new Date()), []);
   const daysToComp = nextCompetition ? daysBetween(todayIso, nextCompetition.date) : null;
 
   if (!nextCompetition) {

@@ -16,6 +16,7 @@ import {
 import type { TrainingWeek, Interview } from "@/lib/api";
 import type { SwimPlanningSlot } from "@/lib/api/types";
 import { getSwimmerSessions } from "@/lib/api/swimmerSessions";
+import { toISODate } from "@/lib/date";
 import { FILIERE_MAP, FILIERE_STYLES } from "@/lib/swimFilieres";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -54,7 +55,8 @@ function fmtShort(iso: string): string {
 function getSunday(mondayIso: string): string {
   const d = new Date(mondayIso + "T00:00:00");
   d.setDate(d.getDate() + 6);
-  return d.toISOString().split("T")[0];
+  // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+  return toISODate(d);
 }
 
 function isCurrentWeek(mondayIso: string): boolean {
@@ -75,7 +77,7 @@ function getMondays(startDate: string, endDate: string): string[] {
   const diffToMonday = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
   current.setDate(current.getDate() + diffToMonday);
   while (current <= end) {
-    mondays.push(current.toISOString().split("T")[0]);
+    mondays.push(toISODate(current));
     current.setDate(current.getDate() + 7);
   }
   return mondays;
@@ -163,7 +165,8 @@ function getWeekDates(mondayIso: string): string[] {
   const dates: string[] = [];
   const d = new Date(mondayIso + "T00:00:00");
   for (let i = 0; i < 7; i++) {
-    dates.push(d.toISOString().split("T")[0]);
+    // §296 — toISODate (local) au lieu de toISOString().split (UTC).
+    dates.push(toISODate(d));
     d.setDate(d.getDate() + 1);
   }
   return dates;
@@ -314,7 +317,7 @@ export default function SuiviSaison() {
   const [, navigate] = useLocation();
   const userId = useAuth((s) => s.userId);
   const reduce = useReducedMotion();
-  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayIso = useMemo(() => toISODate(new Date()), []);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
 
   // ── Data fetching ───────────────────────────────────────
