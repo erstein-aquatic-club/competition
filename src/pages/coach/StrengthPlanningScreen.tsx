@@ -35,6 +35,8 @@ import {
   type DerivedCell,
 } from "@/lib/strength/derivePlanByWeekDay";
 import StrengthPlanningTimeline from "@/components/coach/strength/StrengthPlanningTimeline";
+import { MyPlanTab } from "@/components/strength/MyPlanTab";
+import { MyPlanSessionSheet } from "@/components/strength/MyPlanSessionSheet";
 import {
   generateWeeks,
   getMonday,
@@ -323,6 +325,10 @@ export default function StrengthPlanningScreen() {
 
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
+  // §298 — Preview sheet pour le mode athlete (coach voit la même timeline
+  // que le nageur via MyPlanTab, tap d'une séance ouvre une preview read-only).
+  const [previewSession, setPreviewSession] =
+    useState<StrengthSessionTemplate | null>(null);
 
   // No-op tap handler — cells with a from-plan session now show a hover/click
   // preview popover inline (SessionPreviewPopover in StrengthPlanningTimeline).
@@ -392,48 +398,70 @@ export default function StrengthPlanningScreen() {
         activeApplicationCount={activeApplications.length}
       />
 
-      {isEmpty && !planSessionsLoading && (
+      {/* §298 — Mode athlete : rend exactement la même timeline que côté
+          nageur (MyPlanTab) avec cascade Phase 2 mésocycle prioritaire >
+          Phase 3 training_plan > Phase 1 cycles. Tap → preview read-only. */}
+      {selectedAthleteId != null ? (
         <div className="px-4 pt-4">
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-center">
-            <Eye className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
-            <p className="text-sm font-medium text-foreground">
-              Aucun plan appliqué pour {selectedAthlete?.display_name ?? (selectedAthleteId == null ? "ce groupe" : "ce nageur")}.
-            </p>
-            <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px] mx-auto">
-              Va dans Biblio &gt; Plans pour créer un plan, puis utilise le bouton
-              « Appliquer » pour l'assigner à {selectedAthleteId == null ? "un groupe" : "ce nageur"}.
-            </p>
-          </div>
+          <MyPlanTab
+            athleteId={selectedAthleteId}
+            onSelectSession={setPreviewSession}
+          />
         </div>
+      ) : (
+        <>
+          {isEmpty && !planSessionsLoading && (
+            <div className="px-4 pt-4">
+              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-center">
+                <Eye className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
+                <p className="text-sm font-medium text-foreground">
+                  Aucun plan appliqué pour ce groupe.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px] mx-auto">
+                  Va dans Biblio &gt; Plans pour créer un plan, puis utilise le bouton
+                  « Appliquer » pour l'assigner à un groupe.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <StrengthPlanningTimeline
+            weeks={weeks}
+            effectiveSlotsByWeek={new Map()}
+            getEffectiveWeekMeta={() => ({ week_type: null, notes: null, source: "none" })}
+            sessionTemplatesById={sessionTemplatesById}
+            competitionsByWeek={competitionsByWeek}
+            getDayCompetitions={getDayCompetitions}
+            expandedWeekKey={expandedWeekKey}
+            onToggleExpand={(weekKey) =>
+              setExpandedWeekKey((current) => (current === weekKey ? null : weekKey))
+            }
+            onSlotTap={handleSlotTap}
+            onWeekMetaTap={() => {}}
+            onCompetitionTap={setSelectedCompetition}
+            editingWeekKey={null}
+            editWeekType=""
+            editWeekNotes=""
+            existingWeekTypes={[]}
+            onSaveMeta={() => {}}
+            onCancelEditMeta={() => {}}
+            onEditTypeChange={() => {}}
+            onEditNotesChange={() => {}}
+            showOverrideBadge={false}
+            athletePlanByWeekDay={athletePlanByWeekDay}
+            sentinelRef={sentinelRef}
+            isLoading={planSessionsLoading}
+            isEmpty={isEmpty}
+            readOnly
+          />
+        </>
       )}
 
-      <StrengthPlanningTimeline
-        weeks={weeks}
-        effectiveSlotsByWeek={new Map()}
-        getEffectiveWeekMeta={() => ({ week_type: null, notes: null, source: "none" })}
-        sessionTemplatesById={sessionTemplatesById}
-        competitionsByWeek={competitionsByWeek}
-        getDayCompetitions={getDayCompetitions}
-        expandedWeekKey={expandedWeekKey}
-        onToggleExpand={(weekKey) =>
-          setExpandedWeekKey((current) => (current === weekKey ? null : weekKey))
-        }
-        onSlotTap={handleSlotTap}
-        onWeekMetaTap={() => {}}
-        onCompetitionTap={setSelectedCompetition}
-        editingWeekKey={null}
-        editWeekType=""
-        editWeekNotes=""
-        existingWeekTypes={[]}
-        onSaveMeta={() => {}}
-        onCancelEditMeta={() => {}}
-        onEditTypeChange={() => {}}
-        onEditNotesChange={() => {}}
-        showOverrideBadge={false}
-        athletePlanByWeekDay={athletePlanByWeekDay}
-        sentinelRef={sentinelRef}
-        isLoading={planSessionsLoading}
-        isEmpty={isEmpty}
+      {/* §298 — Preview Sheet read-only (mode athlete uniquement) */}
+      <MyPlanSessionSheet
+        session={previewSession}
+        phase={null}
+        onClose={() => setPreviewSession(null)}
         readOnly
       />
 

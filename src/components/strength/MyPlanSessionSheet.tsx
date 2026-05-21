@@ -17,7 +17,9 @@ interface MyPlanSessionSheetProps {
   session: StrengthSessionTemplate | null;
   phase: StrengthPhase | null;
   onClose: () => void;
-  onLaunch: (session: StrengthSessionTemplate) => void;
+  onLaunch?: (session: StrengthSessionTemplate) => void;
+  /** §298 — mode lecture seule (coach) : masque le bouton « Lancer la séance ». */
+  readOnly?: boolean;
 }
 
 export function MyPlanSessionSheet({
@@ -25,6 +27,7 @@ export function MyPlanSessionSheet({
   phase,
   onClose,
   onLaunch,
+  readOnly = false,
 }: MyPlanSessionSheetProps) {
   const style = phase ? PHASE_STYLES[phase] : null;
   const items = session?.items ?? [];
@@ -65,13 +68,15 @@ export function MyPlanSessionSheet({
               <Button variant="outline" className="flex-1" onClick={onClose}>
                 Fermer
               </Button>
-              <Button
-                size="lg"
-                className="flex-1"
-                onClick={() => onLaunch(session)}
-              >
-                Lancer la séance
-              </Button>
+              {!readOnly && onLaunch && (
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  onClick={() => onLaunch(session)}
+                >
+                  Lancer la séance
+                </Button>
+              )}
             </SheetFooter>
           </>
         )}
