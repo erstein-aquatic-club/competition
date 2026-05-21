@@ -133,7 +133,7 @@ const ExerciseCycleTabs = ({
               <Label>% 1RM</Label>
               <Input
                 type="number"
-                value={exercise[pctField] ?? ""}
+                value={(exercise[pctField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [pctField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -144,7 +144,7 @@ const ExerciseCycleTabs = ({
               <Label>Nb séries</Label>
               <Input
                 type="number"
-                value={exercise[seriesField] ?? ""}
+                value={(exercise[seriesField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [seriesField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -155,7 +155,7 @@ const ExerciseCycleTabs = ({
               <Label>Nb reps</Label>
               <Input
                 type="number"
-                value={exercise[repsField] ?? ""}
+                value={(exercise[repsField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [repsField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -166,7 +166,7 @@ const ExerciseCycleTabs = ({
               <Label>Récup. séries (s)</Label>
               <Input
                 type="number"
-                value={exercise[recupField] ?? ""}
+                value={(exercise[recupField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [recupField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
@@ -177,7 +177,7 @@ const ExerciseCycleTabs = ({
               <Label>Récup. exercices (s)</Label>
               <Input
                 type="number"
-                value={exercise[recupExField] ?? ""}
+                value={(exercise[recupExField] as number | null | undefined) ?? ""}
                 disabled={disabled}
                 onChange={(e) =>
                   onChange({ [recupExField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)

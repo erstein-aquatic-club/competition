@@ -89,6 +89,7 @@ export const normalizeExercise = (exercise: Record<string, unknown>): Exercise =
   pct_1rm_force: safeOptionalNumber(exercise.pct_1rm_force),
   recup_force: safeOptionalInt(exercise.recup_force),
   recup_exercices_force: safeOptionalInt(exercise.recup_exercices_force),
+  is_bodyweight: exercise.is_bodyweight === true,
 });
 
 // --- Session Mapping ---
