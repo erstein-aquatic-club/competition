@@ -967,6 +967,30 @@ export default function StrengthCatalog() {
               />
               <Label htmlFor="warmup-flag-edit">Exercice d'échauffement (warmup)</Label>
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="bodyweight-flag-edit"
+                checked={editingExercise.is_bodyweight === true}
+                onCheckedChange={(checked) => {
+                  const isBw = checked === true;
+                  setEditingExercise({
+                    ...editingExercise,
+                    is_bodyweight: isBw,
+                    // Reset les % 1RM si l'exo passe en PDC (cohérence)
+                    ...(isBw
+                      ? {
+                          pct_1rm_endurance: null,
+                          pct_1rm_hypertrophie: null,
+                          pct_1rm_force: null,
+                        }
+                      : {}),
+                  });
+                }}
+              />
+              <Label htmlFor="bodyweight-flag-edit">
+                Exercice au poids de corps (pas de 1RM)
+              </Label>
+            </div>
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1084,6 +1108,29 @@ export default function StrengthCatalog() {
               }}
             />
             <Label htmlFor="warmup-flag">Exercice d'échauffement (warmup)</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="bodyweight-flag-create"
+              checked={newExercise.is_bodyweight === true}
+              onCheckedChange={(checked) => {
+                const isBw = checked === true;
+                setNewExercise({
+                  ...newExercise,
+                  is_bodyweight: isBw,
+                  ...(isBw
+                    ? {
+                        pct_1rm_endurance: null,
+                        pct_1rm_hypertrophie: null,
+                        pct_1rm_force: null,
+                      }
+                    : {}),
+                });
+              }}
+            />
+            <Label htmlFor="bodyweight-flag-create">
+              Exercice au poids de corps (pas de 1RM)
+            </Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setExerciseDialogOpen(false)} className="h-10">
