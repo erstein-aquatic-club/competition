@@ -3,6 +3,7 @@ import { Check, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StrengthSessionItem } from "@/lib/api/types";
 import type { Exercise } from "@/lib/api/types";
+import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 
 const formatStrengthValue = (value?: number | null) => {
   const numeric = Number(value);
@@ -23,12 +24,19 @@ export interface SetRowProps {
 
 function SetRowImpl({ item, index, exercise, loggedSets, isActive, hasPr }: SetRowProps) {
   const isDone = loggedSets >= (item.sets ?? 0);
+  // §296 — fond sky léger pour les items d'échauffement / mobilité.
+  const isWarmup = item.block === "warmup";
 
   return (
     <div
       className={cn(
         "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
-        isActive && "border-primary bg-primary/5",
+        // Active gagne sur warmup pour conserver l'indicateur "en cours" net.
+        isActive
+          ? "border-primary bg-primary/5"
+          : isWarmup
+            ? cn(BLOCK_STYLES.warmup.bgSubtle, "border-sky-200/60 dark:border-sky-900/40")
+            : "",
         isDone && !isActive && "opacity-50",
       )}
     >
@@ -44,7 +52,12 @@ function SetRowImpl({ item, index, exercise, loggedSets, isActive, hasPr }: SetR
         <p className="text-sm font-semibold truncate">
           {exercise?.nom_exercice ?? item.exercise_name}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p
+          className={cn(
+            "text-xs",
+            isWarmup ? BLOCK_STYLES.warmup.textMuted : "text-muted-foreground",
+          )}
+        >
           {formatStrengthValue(item.sets)}×{formatStrengthValue(item.reps)}
         </p>
       </div>

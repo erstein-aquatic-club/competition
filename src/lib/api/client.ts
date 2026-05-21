@@ -192,6 +192,11 @@ export const normalizeStrengthItem = (
   notes: (item.notes as string) ?? "",
   exercise_name: (item.exercise_name ?? item.nom_exercice) as string | undefined,
   category: (item.category ?? item.exercise_type) as string | undefined,
+  // §296 — propage le block ('warmup' / 'main') du DB pour distinction visuelle
+  block:
+    item.block === "warmup" || item.block === "main"
+      ? (item.block as "warmup" | "main")
+      : null,
 });
 
 export const validateStrengthItems = (items: StrengthSessionItem[]): void => {

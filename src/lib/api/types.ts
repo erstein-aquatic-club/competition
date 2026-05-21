@@ -81,6 +81,11 @@ export interface StrengthSessionItem {
   notes?: string;
   exercise_name?: string;
   category?: string;
+  /** §296 — Bloc d'appartenance ('warmup' / 'main') propagé depuis
+   *  `strength_session_items.block` en DB. Permet de distinguer
+   *  visuellement échauffement vs bloc principal dans le preview
+   *  + le mode focus. `null` pour les items legacy sans block tagué. */
+  block?: 'warmup' | 'main' | null;
 }
 
 export interface StrengthFolder {

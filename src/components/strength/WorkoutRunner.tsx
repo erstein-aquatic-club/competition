@@ -31,6 +31,7 @@ import { ExercisePicker } from "@/components/strength/ExercisePicker";
 import { ExerciseGif } from "@/components/strength/ExerciseGif";
 import { RestScreen } from "./RestScreen";
 import { SetRow } from "./SetRow";
+import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -872,6 +873,23 @@ export function WorkoutRunner({
         </div>
       )}
       <div className="space-y-3">
+        {/* §296 — Badge "Échauffement" si l'exo en cours est un warmup */}
+        {currentBlock?.block === "warmup" && (
+          <div className="mb-2 flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold uppercase tracking-[0.14em]",
+                BLOCK_STYLES.warmup.badge,
+              )}
+            >
+              Échauffement
+            </span>
+            <span className={cn("text-[11px]", BLOCK_STYLES.warmup.textMuted)}>
+              Intensité légère · prépare le bloc principal
+            </span>
+          </div>
+        )}
+
         {/* Ligne 1 : GIF + titre + note + exit */}
         <div className="flex items-center gap-3">
           <button
@@ -881,7 +899,10 @@ export function WorkoutRunner({
               if (!currentExerciseDef?.illustration_gif) return;
               setIsGifOpen(true);
             }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-card shadow-sm"
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-card shadow-sm",
+              currentBlock?.block === "warmup" && BLOCK_STYLES.warmup.border,
+            )}
           >
             <ExerciseGif
               src={currentExerciseDef?.illustration_gif}
@@ -1199,16 +1220,47 @@ export function WorkoutRunner({
               const hasPr = Array.from({ length: item.sets ?? 0 }).some((_, si) =>
                 prSets.has(`${item.exercise_id}-${si + 1}`),
               );
+              // §296 — séparateur visuel entre le dernier warmup et le premier main
+              const prevBlock = index > 0 ? workoutPlan[index - 1]?.block : undefined;
+              const showMainDivider =
+                prevBlock === "warmup" && item.block !== "warmup";
+              // Eyebrow "Échauffement" au-dessus du tout premier item warmup
+              const showWarmupHeader =
+                index === 0 && item.block === "warmup";
               return (
-                <SetRow
-                  key={`${item.exercise_id}-${index}`}
-                  item={item}
-                  index={index}
-                  exercise={exercise}
-                  loggedSets={loggedSets}
-                  isActive={isActive}
-                  hasPr={hasPr}
-                />
+                <React.Fragment key={`${item.exercise_id}-${index}`}>
+                  {showWarmupHeader && (
+                    <div className="flex items-center gap-2 px-1 pt-1 pb-0.5">
+                      <span
+                        className={cn(
+                          "text-[9px] font-bold uppercase tracking-[0.18em]",
+                          BLOCK_STYLES.warmup.textMuted,
+                        )}
+                      >
+                        Échauffement · Mobilité
+                      </span>
+                      <div
+                        className={cn("h-px flex-1", BLOCK_STYLES.warmup.divider)}
+                      />
+                    </div>
+                  )}
+                  {showMainDivider && (
+                    <div className="flex items-center gap-2 px-1 pt-2 pb-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        Bloc principal
+                      </span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  )}
+                  <SetRow
+                    item={item}
+                    index={index}
+                    exercise={exercise}
+                    loggedSets={loggedSets}
+                    isActive={isActive}
+                    hasPr={hasPr}
+                  />
+                </React.Fragment>
               );
             })}
           </div>

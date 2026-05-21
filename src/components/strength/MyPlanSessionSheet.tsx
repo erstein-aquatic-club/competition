@@ -8,9 +8,10 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import type { StrengthSessionTemplate } from "@/lib/api/types";
+import type { StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api/types";
 import type { StrengthPhase } from "@/lib/strength/strengthPhaseStyles";
 import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
+import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 
 interface MyPlanSessionSheetProps {
   session: StrengthSessionTemplate | null;
@@ -57,33 +58,10 @@ export function MyPlanSessionSheet({
             </SheetHeader>
 
             {items.length > 0 && (
-              <div className="space-y-1 pb-4">
-                {items.slice(0, 10).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-muted/30"
-                  >
-                    <span className="text-[11px] text-muted-foreground tabular-nums w-4 shrink-0">
-                      {idx + 1}.
-                    </span>
-                    <span className="text-[12px] font-medium flex-1 truncate">
-                      {item.exercise_name ?? `Exercice ${idx + 1}`}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-                      {item.sets}×{item.reps}
-                      {item.percent_1rm > 0 && ` @ ${item.percent_1rm}%`}
-                    </span>
-                  </div>
-                ))}
-                {items.length > 10 && (
-                  <p className="text-[11px] text-muted-foreground text-center pt-1">
-                    +{items.length - 10} autres exercices
-                  </p>
-                )}
-              </div>
+              <ItemsList items={items} />
             )}
 
-            <SheetFooter className="sticky bottom-0 bg-background pt-2 pb-safe flex gap-2">
+            <SheetFooter className="sticky bottom-0 bg-background pt-2 pb-safe flex gap-2 mt-2">
               <Button variant="outline" className="flex-1" onClick={onClose}>
                 Fermer
               </Button>
@@ -99,5 +77,108 @@ export function MyPlanSessionSheet({
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/**
+ * Liste des items groupés par block (warmup → main).
+ *
+ * Si TOUS les items sont sans `block` (templates legacy) OU s'il n'y a
+ * que du main, on rend sans header (= comportement historique).
+ * §296 — distinction visuelle sky pour le warmup.
+ */
+function ItemsList({ items }: { items: StrengthSessionItem[] }) {
+  const warmupItems = items.filter((i) => i.block === "warmup");
+  const mainItems = items.filter((i) => i.block !== "warmup");
+  const hasGroups = warmupItems.length > 0 && mainItems.length > 0;
+  const renderLimit = 10;
+  // Limite globale = renderLimit items affichés, tous blocs confondus.
+  const warmupShown = warmupItems.slice(0, renderLimit);
+  const mainShown = mainItems.slice(
+    0,
+    Math.max(0, renderLimit - warmupShown.length),
+  );
+
+  const renderItem = (
+    item: StrengthSessionItem,
+    displayIdx: number,
+    isWarmup: boolean,
+  ) => (
+    <div
+      key={`${item.exercise_id}-${displayIdx}`}
+      className={cn(
+        "flex items-center gap-2 py-1.5 px-2 rounded-lg",
+        isWarmup ? BLOCK_STYLES.warmup.bg : "bg-muted/30",
+      )}
+    >
+      <span
+        className={cn(
+          "text-[11px] tabular-nums w-5 shrink-0",
+          isWarmup
+            ? BLOCK_STYLES.warmup.textMuted
+            : "text-muted-foreground",
+        )}
+      >
+        {displayIdx + 1}.
+      </span>
+      <span className="text-[12px] font-medium flex-1 truncate">
+        {item.exercise_name ?? `Exercice ${displayIdx + 1}`}
+      </span>
+      <span
+        className={cn(
+          "text-[11px] tabular-nums shrink-0",
+          isWarmup
+            ? BLOCK_STYLES.warmup.textMuted
+            : "text-muted-foreground",
+        )}
+      >
+        {item.sets}×{item.reps}
+        {item.percent_1rm > 0 && ` @ ${item.percent_1rm}%`}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="pb-4">
+      {warmupShown.length > 0 && (
+        <div className="space-y-1 mb-3">
+          {/* Eyebrow label warmup — pas d'icône, juste typo */}
+          <div className="flex items-center gap-2 px-1 pb-1">
+            <span
+              className={cn(
+                "text-[9px] font-bold uppercase tracking-[0.18em]",
+                BLOCK_STYLES.warmup.textMuted,
+              )}
+            >
+              Échauffement · Mobilité
+            </span>
+            <div className={cn("h-px flex-1", BLOCK_STYLES.warmup.divider)} />
+          </div>
+          {warmupShown.map((item, i) => renderItem(item, i, true))}
+        </div>
+      )}
+
+      {mainShown.length > 0 && (
+        <div className="space-y-1">
+          {hasGroups && (
+            <div className="flex items-center gap-2 px-1 pb-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Bloc principal
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          )}
+          {mainShown.map((item, i) =>
+            renderItem(item, warmupShown.length + i, false),
+          )}
+        </div>
+      )}
+
+      {items.length > renderLimit && (
+        <p className="text-[11px] text-muted-foreground text-center pt-2">
+          +{items.length - renderLimit} autres exercices
+        </p>
+      )}
+    </div>
   );
 }
