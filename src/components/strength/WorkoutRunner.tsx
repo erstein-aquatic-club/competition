@@ -297,6 +297,18 @@ export function WorkoutRunner({
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
   const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true;
+  const isEstimationMode =
+    !isBodyweightExercise &&
+    currentSetIndex === 1 &&
+    (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false);
+
+  const [warmupHistory, setWarmupHistory] = useState<
+    Array<{ weight: number; reps: number; difficulty: number | null }>
+  >([]);
+
+  useEffect(() => {
+    setWarmupHistory([]);
+  }, [currentBlock?.exercise_id]);
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
     ? exercises.find((e) => e.id === nextBlock.exercise_id)
@@ -571,6 +583,22 @@ export function WorkoutRunner({
         action: { label: "Réessayer", onClick: () => void onProgress?.(progressPct) },
       });
     }
+  };
+
+  const handleAddWarmupSet = () => {
+    if (!currentBlock) return;
+    const weight = Number(currentSetInputs[0]?.weight ?? 0);
+    const reps = Number(currentSetInputs[0]?.reps ?? 0);
+    const difficulty = currentSetInputs[0]?.difficulty ?? null;
+    if (weight <= 0 || reps <= 0) return;
+    setWarmupHistory((prev) => [...prev, { weight, reps, difficulty }]);
+    setCurrentSetInputs({});
+  };
+
+  const handleReferenceSet = async () => {
+    // §297 Task 9 — actual logic (compute 1RM, persist, log series 1, advance) lives here.
+    // Stub for now to keep the disabled state of the button logical:
+    console.warn("handleReferenceSet: stub — Task 9 to implement");
   };
 
   const handleValidateSet = async () => {
@@ -1002,6 +1030,27 @@ export function WorkoutRunner({
         )}
       </div>
 
+      {isEstimationMode && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
+            🎯 Estimation 1RM en cours
+          </div>
+          <p className="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">
+            Charge légère, monte progressivement. Marque ta dernière série
+            comme référence pour calculer ton 1RM.
+          </p>
+          {warmupHistory.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-amber-900/90 dark:text-amber-200/90">
+              {warmupHistory.map((w, i) => (
+                <span key={i} className="rounded-full bg-amber-500/20 px-2 py-0.5">
+                  {w.weight}kg × {w.reps}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
@@ -1116,33 +1165,62 @@ export function WorkoutRunner({
           className="bottom-0 z-modal"
           containerClassName="flex-col gap-2 py-4"
         >
-          <Button
-            className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
-            onClick={handleValidateSet}
-          >
-            <Check className="mr-2 h-5 w-5" />
-            {currentLoggedSet ? "Série suivante" : "Valider série"}
-          </Button>
-          <button
-            type="button"
-            className="text-xs text-muted-foreground font-medium py-1 active:text-foreground transition-colors"
-            onClick={() => {
-              // Confirm only when there's already partial work on the current
-              // exercise — otherwise skipping a fresh block is a normal flow
-              // (e.g. swimmer realises an exercise isn't relevant today) and
-              // a confirm dialog adds friction without benefit.
-              const hasLogsForCurrent = currentBlock
-                ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
-                : false;
-              if (hasLogsForCurrent) {
-                setSkipExerciseConfirmOpen(true);
-              } else {
-                advanceExercise();
-              }
-            }}
-          >
-            Passer cet exercice
-          </button>
+          {isEstimationMode ? (
+            <>
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-2xl text-sm font-semibold"
+                onClick={handleAddWarmupSet}
+                disabled={
+                  !currentSetInputs[0]?.weight || !currentSetInputs[0]?.reps
+                }
+              >
+                + Chauffe suivante
+              </Button>
+              <Button
+                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg"
+                onClick={handleReferenceSet}
+                disabled={
+                  !currentSetInputs[0]?.weight ||
+                  !currentSetInputs[0]?.reps ||
+                  currentSetInputs[0]?.difficulty == null
+                }
+              >
+                <Check className="mr-2 h-5 w-5" />
+                C'est ma série de référence → calculer 1RM
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
+                onClick={handleValidateSet}
+              >
+                <Check className="mr-2 h-5 w-5" />
+                {currentLoggedSet ? "Série suivante" : "Valider série"}
+              </Button>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground font-medium py-1 active:text-foreground transition-colors"
+                onClick={() => {
+                  // Confirm only when there's already partial work on the current
+                  // exercise — otherwise skipping a fresh block is a normal flow
+                  // (e.g. swimmer realises an exercise isn't relevant today) and
+                  // a confirm dialog adds friction without benefit.
+                  const hasLogsForCurrent = currentBlock
+                    ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
+                    : false;
+                  if (hasLogsForCurrent) {
+                    setSkipExerciseConfirmOpen(true);
+                  } else {
+                    advanceExercise();
+                  }
+                }}
+              >
+                Passer cet exercice
+              </button>
+            </>
+          )}
         </BottomActionBar>
       ) : null}
 
