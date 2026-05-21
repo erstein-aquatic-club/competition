@@ -659,7 +659,7 @@ export default function Strength() {
     [userId, queryClient],
   );
 
-  const handleLaunchFocus = async () => {
+  const handleLaunchFocus = async (options?: { bypassMissing1RmGate?: boolean }) => {
     if (!activeSession) return;
     if (startRun.isPending) return;
     const lockedCycle = activeSession.cycle ?? cycleType;
@@ -668,8 +668,17 @@ export default function Strength() {
       return;
     }
 
-    // Check for missing 1RMs before entering focus mode
-    if (missing1RmExercises.length > 0 && inlineEstimationExercises.size === 0) {
+    // §297 — Check for missing 1RMs before entering focus mode.
+    // bypassMissing1RmGate: passed by `onEstimateInline` callback so the
+    // re-trigger after `setInlineEstimationExercises(...)` doesn't re-open
+    // the gate due to a stale closure reading inlineEstimationExercises.size === 0
+    // (setState is queued; setTimeout(fn, 0) fires with the previous render's
+    // closure values).
+    if (
+      !options?.bypassMissing1RmGate &&
+      missing1RmExercises.length > 0 &&
+      inlineEstimationExercises.size === 0
+    ) {
       setShowOneRmGate(true);
       return;
     }
@@ -1151,10 +1160,12 @@ export default function Strength() {
         onEstimateInline={(skippedIds) => {
           setShowOneRmGate(false);
           setInlineEstimationExercises(new Set(skippedIds));
-          // Re-trigger launch — handleLaunchFocus will now bypass the gate because
-          // missing1RmExercises is recomputed against oneRMs (saved values already
-          // persisted) and the remaining items are now in inlineEstimationExercises.
-          setTimeout(() => handleLaunchFocus(), 0);
+          // §297 — bypassMissing1RmGate explicite : setInlineEstimationExercises
+          // est une mutation async (queued), donc une lecture immédiate dans
+          // handleLaunchFocus via setTimeout(0) verrait encore size === 0 dans
+          // la closure capturée → le gate se rouvrirait. Le flag explicite
+          // contourne ce piège sans dépendre du timing React.
+          setTimeout(() => handleLaunchFocus({ bypassMissing1RmGate: true }), 0);
         }}
       />
     </div>
