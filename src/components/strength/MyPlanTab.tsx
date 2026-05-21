@@ -347,16 +347,39 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       ? phase2WeekInstances
       : fallbackWeekInstances;
 
-  // Auto-open current week on first render
+  // §296 — Auto-open priorité : si un mésocycle actif existe, ouvrir la
+  // PREMIÈRE semaine du mésocycle (le plan que le nageur vient de générer
+  // mérite la visibilité maximale). Sinon, semaine en cours comme avant.
+  const firstMesoWeekKey = useMemo(() => {
+    if (!hasActiveMesocycle) return null;
+    for (const o of athleteOverrides) {
+      if (typeof o.notes === "string" && o.notes.startsWith("Mésocycle ")) {
+        return o.week_start;
+      }
+    }
+    return null;
+  }, [hasActiveMesocycle, athleteOverrides]);
+
   useEffect(() => {
     if (weekInstances.length > 0 && expandedWeekKey === null) {
+      // 1) Si meso actif → première semaine du méso (si présente dans la timeline)
+      if (firstMesoWeekKey) {
+        const mesoInst = weekInstances.find(
+          (inst) => inst.week.weekKey === firstMesoWeekKey,
+        );
+        if (mesoInst) {
+          setExpandedWeekKey(mesoInst.week.weekKey);
+          return;
+        }
+      }
+      // 2) Sinon, semaine en cours
       const current = weekInstances.find((inst) => isCurrentWeek(inst.week.weekKey));
       setExpandedWeekKey(
         current?.week.weekKey ?? weekInstances[weekInstances.length - 1].week.weekKey,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekInstances.length]);
+  }, [weekInstances.length, firstMesoWeekKey]);
 
   // Handoff from Dashboard day drawer: when the swimmer tapped a muscu card
   // there, the slot id was stashed in sessionStorage. As soon as the slot
