@@ -12,6 +12,8 @@ export interface Missing1RmExercise {
  *  - les items sans %1RM prescrit (percent_1rm <= 0)
  *  - les exos déjà dotés d'un 1RM > 0
  *  - les exos marqués `is_bodyweight = true` (PDC ne demande jamais de 1RM)
+ *  - les exos dont `intensity_metric != weight_kg` (§298 — hauteur/distance/temps,
+ *    pas de 1RM)
  */
 export function computeMissing1RmExercises(
   items: StrengthSessionItem[],
@@ -23,7 +25,10 @@ export function computeMissing1RmExercises(
     .filter((item) => (item.percent_1rm ?? 0) > 0)
     .filter((item) => {
       const ex = exerciseLookup.get(item.exercise_id);
-      return !ex?.is_bodyweight;
+      if (ex?.is_bodyweight) return false;
+      // §298 — seules les métriques weight_kg utilisent un 1RM
+      if (ex?.intensity_metric && ex.intensity_metric !== "weight_kg") return false;
+      return true;
     })
     .filter(
       (item) =>
