@@ -4,6 +4,7 @@
 
 import { supabaseConfig } from "../config";
 import { supabase } from "../supabase";
+import { normalizeIntensityMetric } from "@/lib/strength/intensityMetrics";
 import type {
   Exercise,
   StrengthSessionItem,
@@ -242,6 +243,7 @@ export const mapDbExerciseToApi = (row: Record<string, unknown>): Exercise => ({
   recup_exercices_force: safeOptionalInt(row.recup_exercices_force),
   folder_id: safeOptionalInt(row.folder_id),
   is_bodyweight: row.is_bodyweight === true,
+  intensity_metric: normalizeIntensityMetric(row.intensity_metric),
 });
 
 export const mapApiExerciseToDb = (exercise: Partial<Exercise>) => ({
@@ -267,6 +269,7 @@ export const mapApiExerciseToDb = (exercise: Partial<Exercise>) => ({
   recup_exercices_force: exercise.recup_exercices_force ?? null,
   folder_id: exercise.folder_id ?? null,
   is_bodyweight: exercise.is_bodyweight === true,
+  intensity_metric: normalizeIntensityMetric(exercise.intensity_metric),
 });
 
 // --- Misc utilities ---
