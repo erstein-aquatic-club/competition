@@ -198,6 +198,8 @@ export const normalizeStrengthItem = (
     item.block === "warmup" || item.block === "main"
       ? (item.block as "warmup" | "main")
       : null,
+  // §298 — propage la cible absolue (cm/s) prescrite par le coach
+  target_intensity: item.target_intensity == null ? null : Number(item.target_intensity),
 });
 
 export const validateStrengthItems = (items: StrengthSessionItem[]): void => {

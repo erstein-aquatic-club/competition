@@ -92,6 +92,8 @@ export interface StrengthSessionItem {
    *  visuellement échauffement vs bloc principal dans le preview
    *  + le mode focus. `null` pour les items legacy sans block tagué. */
   block?: 'warmup' | 'main' | null;
+  /** §298 — Cible absolue (cm/s) prescrite par le coach pour metric != weight_kg. NULL = libre. */
+  target_intensity?: number | null;
 }
 
 export interface StrengthFolder {

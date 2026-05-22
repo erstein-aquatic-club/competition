@@ -288,6 +288,7 @@ export async function updateStrengthSession(session: any) {
         rest_series_s: item.rest_series_s ?? null,
         rest_exercise_s: null as number | null,
         notes: item.notes ?? null,
+        target_intensity: item.target_intensity ?? null,
         raw_payload: null as unknown,
       }),
     );
@@ -1448,7 +1449,7 @@ export async function duplicateStrengthSession(
   // Read source items
   const { data: items, error: itemsErr } = await supabase
     .from("strength_session_items")
-    .select("ordre, exercise_id, block, cycle_type, sets, reps, pct_1rm, rest_series_s, rest_exercise_s, notes, raw_payload")
+    .select("ordre, exercise_id, block, cycle_type, sets, reps, pct_1rm, rest_series_s, rest_exercise_s, notes, target_intensity, raw_payload")
     .eq("session_id", sessionId)
     .order("ordre");
   if (itemsErr) throw new Error(itemsErr.message);
@@ -1481,6 +1482,7 @@ export async function duplicateStrengthSession(
       rest_series_s: it.rest_series_s,
       rest_exercise_s: it.rest_exercise_s,
       notes: it.notes,
+      target_intensity: it.target_intensity,
       raw_payload: it.raw_payload,
     }));
     const { error: insErr } = await supabase
