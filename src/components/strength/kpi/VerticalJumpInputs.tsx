@@ -53,7 +53,13 @@ export function VerticalJumpInputs({
     return verticalJumpResult(weightKg, flightTimes);
   }, [weightKg, flightTimes]);
 
-  const bestFlightTime = flightTimes.length > 0 ? Math.max(...flightTimes) : null;
+  // Essais incohérents (chrono manuel) : écart-type relatif > 8 % sur ≥ 2 essais
+  // → on invite à refaire le set plutôt qu'à se fier à une mesure douteuse.
+  const inconsistent =
+    result != null &&
+    flightTimes.length >= 2 &&
+    result.meanFlightTimeSec > 0 &&
+    result.flightTimeStdevSec / result.meanFlightTimeSec > 0.08;
 
   return (
     <div className="space-y-5">
@@ -95,19 +101,13 @@ export function VerticalJumpInputs({
             Temps de vol ({flightTimesRaw.length} essais)
           </Label>
           <span className="text-[11px] text-muted-foreground">
-            Meilleur retenu
+            Moyenne retenue
           </span>
         </div>
 
         {manualMode ? (
           <div className="grid grid-cols-3 gap-2.5">
             {flightTimesRaw.map((value, i) => {
-              const numeric = Number(String(value).replace(",", "."));
-              const isBest =
-                bestFlightTime != null &&
-                Number.isFinite(numeric) &&
-                numeric > 0 &&
-                numeric === bestFlightTime;
               return (
                 <div key={i}>
                   <span className="mb-1 block text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -121,11 +121,7 @@ export function VerticalJumpInputs({
                       onChange={(e) => onChangeFlightTime(i, e.target.value)}
                       placeholder="—"
                       aria-label={`Temps de vol — essai ${i + 1} en secondes`}
-                      className={cn(
-                        "h-14 pr-7 text-center text-lg font-bold tabular-nums",
-                        isBest &&
-                          "border-primary/50 bg-primary/5 ring-1 ring-primary/20",
-                      )}
+                      className="h-14 pr-7 text-center text-lg font-bold tabular-nums"
                     />
                     <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                       s
@@ -215,14 +211,34 @@ export function VerticalJumpInputs({
         <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground tabular-nums">
           {result ? (
             <>
-              Meilleur saut&nbsp;: {bestFlightTime} s → {result.heightCm} cm →{" "}
-              {result.peakPowerW} W
+              Moyenne&nbsp;: {result.meanFlightTimeSec} s
+              {flightTimes.length >= 2 && (
+                <> (±{result.flightTimeStdevSec} s · {flightTimes.length} essais)</>
+              )}{" "}
+              → {result.heightCm} cm → {result.peakPowerW} W
             </>
           ) : (
             "Saisis le poids et au moins un temps de vol pour calculer la puissance."
           )}
         </p>
+        {result && (
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground/80">
+            Estimation : le temps de vol est chronométré à la main — valeur
+            indicative, à comparer à technique de mesure constante.
+          </p>
+        )}
       </div>
+
+      {/* Essais incohérents — invite à refaire le set */}
+      {inconsistent && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 px-3.5 py-2.5 dark:border-amber-800/50 dark:bg-amber-950/25">
+          <Timer className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="text-[11px] leading-snug text-amber-900 dark:text-amber-100">
+            Essais dispersés (±{result?.flightTimeStdevSec} s). Refais le set pour
+            une mesure fiable — les 3 temps de vol devraient être proches.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

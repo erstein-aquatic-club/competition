@@ -70,7 +70,7 @@ Tu passes avec un binôme. L'écran te guide test par test, avec le protocole d�
 | Test | Ce que ça mesure | Comment |
 |---|---|---|
 | **Tirage isométrique mi-cuisse (IMTP)** | Force bas du corps | Barre sur les pins du rack à hauteur mi-cuisse, charge max en kg que tu tiens 5 s |
-| **Détente verticale** | Puissance bas du corps | Tu donnes ton poids, le binôme chronomètre ton temps de vol sur 3 sauts (jambes tendues, pas de tuck). Le système calcule ta puissance en W/kg via l'équation de Sayers |
+| **Détente verticale** | Puissance bas du corps | Tu donnes ton poids, le binôme chronomètre ton temps de vol sur 3 sauts (jambes tendues, pas de tuck). Le système retient la **moyenne** des 3 temps (chrono manuel → plus répétable que le meilleur) et calcule ta puissance en W/kg via l'équation de Sayers. Si les 3 essais sont trop dispersés, un avertissement t'invite à refaire le set |
 | **Saut en longueur (broad jump)** | Puissance bas du corps | Distance max sur 3 essais, en cm |
 | **Traction lestée** | Force haut du corps | Charge additionnelle max sur 1 traction stricte |
 | **Lancer vertical médecine-ball 10 kg** | Puissance haut du corps | Hauteur max atteinte par le ballon, en cm |

@@ -39,7 +39,7 @@ export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
     partnerRole:
       'Chronomètre le temps de vol de chaque saut — du décollage des pieds à leur retour au sol. Annonce et note les 3 temps.',
     measurement:
-      'Temps de vol (s) → hauteur (h = g·t²/8) → puissance de pic (équation de Sayers) → puissance relative en W/kg. Meilleur des 3 essais retenu.',
+      'Temps de vol (s) → hauteur (h = g·t²/8) → puissance de pic (équation de Sayers) → puissance relative en W/kg. Moyenne des 3 essais retenue (chrono manuel → la moyenne est plus répétable que le meilleur).',
     gifUrl: null,
   },
   broad_jump: {

@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§301** — Fiabilité mesure Bilan Muscu, Part 1 (T1+T2+T3) : `weighted_pullup` accepte 0/assisté (mig `00190`), démos KPI câblées sur GIFs catalogue, confiance barème par-KPI au recap. Reste T4 (détente moyenne) + T5 (rubrique mobilité + photos). (Aussi récents : §300 édition coach séance générée, §299 parcours 2 modes.)
+Dernier § livré : **§301** — Fiabilité mesure Bilan Muscu, Part 1 (T1→T4) : `weighted_pullup` accepte 0/assisté (mig `00190`), démos KPI câblées sur GIFs catalogue, confiance barème par-KPI au recap, détente verticale = moyenne des temps de vol + écart-type. Reste T5 (rubrique mobilité + photos). (Aussi récents : §300 édition coach séance générée, §299 parcours 2 modes.)
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

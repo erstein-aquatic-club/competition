@@ -4,10 +4,10 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
-## §301 — Fiabilité de la mesure (Bilan Muscu) : Part 1 — T1+T2+T3 (2026-05-23)
+## §301 — Fiabilité de la mesure (Bilan Muscu) : Part 1 — T1→T4 (2026-05-23)
 
 **Branche** : `feat/301-fiabilite-mesure`
-**Trigger** : audit `docs/audits/2026-05-23-audit-mesure-coach-robustesse.md`. Plan : `docs/plans/2026-05-23-fiabilite-mesure-coach-design.md` (périmètre fiabilité = recos 1,2,5,6,7). Ce lot livre les 3 quick wins à faible risque (T1 BUG `weighted_pullup`, T2 démos KPI câblées, T3 confiance barème par-KPI). T4 (détente moyenne) et T5 (rubrique mobilité + photos) restent à venir.
+**Trigger** : audit `docs/audits/2026-05-23-audit-mesure-coach-robustesse.md`. Plan : `docs/plans/2026-05-23-fiabilite-mesure-coach-design.md` (périmètre fiabilité = recos 1,2,5,6,7). Ce lot livre T1 (BUG `weighted_pullup`), T2 (démos KPI câblées), T3 (confiance barème par-KPI) et T4 (détente verticale : moyenne + écart-type). T5 (rubrique mobilité + photos) reste à venir.
 
 ### T1 — `weighted_pullup` accepte 0 (poids de corps) et charges assistées (négatif)
 - **Constat audit (BUG-1)** : l'input strippait `−` et `parseAttempts` rejetait `≤ 0`, alors que le barème `weighted_pullup` a des ancres ≤ 0 (jusqu'à -10 kg) → médiane filles/débutants non mesurable.
@@ -27,14 +27,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 - **`kpiBaremes.ts`** : **`baremeConfidenceFor(kpiKey)`** (confiance invariante par sexe/âge). **TDD** : 9 tests dans `kpiBaremes.test.ts` (dont garde d'invariance sur les 30 entrées).
 - **`KpiRecap.tsx`** (UI via `/frontend-design`) : pastille par KPI **uniquement si non-`solid`** — « indicatif » (transposed, muted) / « à calibrer » (placeholder, ambre) + note de bas : « la mesure brute reste fiable, c'est le score 0-100 dérivé qui est approximatif ». Cohérent avec le langage visuel des badges existants du recap.
 
+### T4 — Détente verticale : moyenne au lieu de `Math.max` + écart-type
+- **Constat audit** : `verticalJumpResult` retenait `Math.max(flightTimes)` → comme le chrono est manuel (réaction ~150-250 ms), le max sélectionne l'essai au plus grand bruit → **biais systématique vers le haut** de la hauteur/puissance.
+- **`jumpPower.ts`** : `verticalJumpResult` calcule désormais la **moyenne** des temps de vol → hauteur → puissance, et renvoie `meanFlightTimeSec` + `flightTimeStdevSec` (écart-type d'échantillon, 0 si 1 essai). **TDD** (changement de comportement) : 4 assertions mises à jour + 2 ajoutées dans `jumpPower.test.ts` (mean vs max, stdev). Compromis assumé : répétabilité plutôt que pic.
+- **`VerticalJumpInputs.tsx`** (UI) : « Meilleur retenu » → « Moyenne retenue » ; readout « Moyenne : 0,50 s (±0,02 s · 3 essais) → … » ; mention « Estimation : chrono manuel » ; **avertissement ambré si essais incohérents** (écart-type relatif > 8 %, ≥ 2 essais) invitant à refaire le set ; suppression du surlignage « meilleur essai » (plus de notion de meilleur). `KpiWizard` inchangé (recordedAttempts garde la même forme, height/peak désormais dérivés de la moyenne).
+- `kpiProtocols.ts` (measurement) + guide utilisateur §détente mis à jour (moyenne, pas meilleur).
+
 ### Tests / vérifs
-- `npm test` — **952/952 verts** (935 §300 + 17 nouveaux : T1 +13, T2 +3, T3 +6 dont guard). `npx tsc --noEmit` — exit 0. `npm run build` — OK (built 12,3 s, precache 275).
-- **Pas de `test:rls`** : aucune policy RLS touchée (T1 = CHECK constraint ; T2/T3 = lib/UI).
+- `npm test` — **954/954 verts** (935 §300 + 19 nouveaux : T1 +13, T2 +3, T3 +6, T4 +2 net). `npx tsc --noEmit` — exit 0. `npm run build` — OK (precache 275).
+- **Pas de `test:rls`** : aucune policy RLS touchée (T1 = CHECK constraint ; T2/T3/T4 = lib/UI).
 
 ### Décisions / limites
 - T2 ne câble que 2/5 démos (matchs exacts) — `imtp`/`vertical_jump`/`medball` attendent des clips dédiés (le SVG reste pédagogiquement honnête).
 - T3 affiche un avertissement présentationnel ; il n'« améliore » pas la calibration (4/5 barèmes restent non sourcés natation — chantier de re-sourçage hors périmètre).
-- Reste du §301 : **T4** (détente verticale : moyenne au lieu de `Math.max` + écart-type) et **T5** (rubrique mobilité 0-3 + repères chiffrés + note précédente + 24 photos de référence).
+- T4 : moyenne retenue (alternative médiane non retenue) ; la détente reste une **estimation** tant que le chrono est manuel (capture vidéo/tapis = chantier ultérieur, hors périmètre).
+- Reste du §301 : **T5** (rubrique mobilité 0-3 + repères chiffrés + note précédente + 24 photos de référence).
 
 ## §300 — Édition coach d'une séance générée : Part 1 (préservation raw_payload) (2026-05-23)
 

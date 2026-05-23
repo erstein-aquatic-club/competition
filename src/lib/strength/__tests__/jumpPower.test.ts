@@ -57,23 +57,41 @@ describe('relativePower', () => {
 });
 
 describe('verticalJumpResult', () => {
-  it('retient le meilleur saut et calcule la puissance relative', () => {
-    // poids 70 kg, temps de vol [0,48 ; 0,52 ; 0,50] → meilleur 0,52 s
-    // h = 9,81·0,52²/8 ·100 = 33,158 cm
-    // P = 60,7·33,158 + 45,3·70 − 2055 = 3128,7 W
-    // P/kg = 3128,7 / 70 = 44,70 W/kg
+  // §301 T4 — on retient la MOYENNE des temps de vol (et non le max) : le max
+  // sélectionne l'essai au plus grand bruit de chrono → biais vers le haut. La
+  // moyenne est plus répétable. Un écart-type est renvoyé pour signaler un set
+  // d'essais incohérent.
+  it('retient la MOYENNE des temps de vol (pas le max)', () => {
+    // poids 70 kg, [0,48 ; 0,52 ; 0,50] → moyenne 0,50 s (max serait 0,52)
+    // h = 9,81·0,50²/8 ·100 = 30,656 cm
+    // P = 60,7·30,656 + 45,3·70 − 2055 = 2976,8 W ; P/kg = 42,53
     const r = verticalJumpResult(70, [0.48, 0.52, 0.5]);
-    close(r.value, 44.7, 0.05);
-    close(r.heightCm, 33.2, 0.05);
-    assert.equal(r.peakPowerW, 3129);
+    close(r.meanFlightTimeSec, 0.5, 1e-9);
+    close(r.value, 42.5, 0.05);
+    close(r.heightCm, 30.7, 0.05);
+    assert.equal(r.peakPowerW, 2977);
     assert.equal(r.weightKg, 70);
     assert.deepEqual(r.flightTimes, [0.48, 0.52, 0.5]);
   });
 
-  it('fonctionne avec un seul essai', () => {
-    // h = 30,656 cm ; P = 2523,8 W ; P/kg = 42,06
+  it('ne prend PAS le max : [0,4 ; 0,6] → moyenne 0,5', () => {
+    const r = verticalJumpResult(70, [0.4, 0.6]);
+    close(r.meanFlightTimeSec, 0.5, 1e-9);
+  });
+
+  it('renvoie l’écart-type (échantillon) des temps de vol', () => {
+    // [0,48 ; 0,52 ; 0,50] : moyenne 0,50 ; var échantillon = 0,0008/2 = 0,0004
+    // → écart-type = 0,02 s
+    const r = verticalJumpResult(70, [0.48, 0.52, 0.5]);
+    close(r.flightTimeStdevSec, 0.02, 1e-9);
+  });
+
+  it('écart-type nul pour un seul essai', () => {
     const r = verticalJumpResult(60, [0.5]);
+    assert.equal(r.flightTimeStdevSec, 0);
+    // un seul essai : la moyenne EST cette valeur → calcul inchangé
     close(r.value, 42.1, 0.05);
+    close(r.meanFlightTimeSec, 0.5, 1e-9);
   });
 
   it('throw si le poids est nul ou négatif', () => {

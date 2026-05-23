@@ -57,27 +57,38 @@ export function relativePower(peakPowerW: number, weightKg: number): number {
 
 /** Résultat consolidé d'une mesure de détente verticale. */
 export interface VerticalJumpResult {
-  /** Puissance relative du meilleur saut (W/kg) — la valeur effectivement scorée. */
+  /** Puissance relative à partir du temps de vol MOYEN (W/kg) — valeur scorée. */
   value: number;
   /** Poids saisi (kg). */
   weightKg: number;
   /** Temps de vol des essais saisis (s). */
   flightTimes: number[];
-  /** Hauteur du meilleur saut (cm). */
+  /** Temps de vol moyen retenu (s). */
+  meanFlightTimeSec: number;
+  /** Écart-type (échantillon) des temps de vol (s) — 0 si un seul essai. */
+  flightTimeStdevSec: number;
+  /** Hauteur calculée depuis le temps de vol moyen (cm). */
   heightCm: number;
-  /** Puissance de pic du meilleur saut (W). */
+  /** Puissance de pic calculée depuis le temps de vol moyen (W). */
   peakPowerW: number;
 }
 
 /** Arrondi à 1 décimale. */
 const round1 = (n: number): number => Math.round(n * 10) / 10;
+/** Arrondi à 2 décimales (temps de vol / écart-type, format chrono). */
+const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /**
- * Consolide une mesure de détente verticale : poids + temps de vol des
- * essais → puissance relative du meilleur saut.
+ * Consolide une mesure de détente verticale : poids + temps de vol des essais
+ * → puissance relative à partir du temps de vol **moyen**.
  *
- * Le meilleur saut est celui au temps de vol le plus long (hauteur, puis
- * puissance, croissent de façon monotone avec le temps de vol).
+ * §301 T4 — on retient la **moyenne** (et non le maximum) des temps de vol. Le
+ * chrono est manuel : le temps de réaction de l'opérateur (~150-250 ms) domine
+ * la mesure, et `Math.max` sélectionne l'essai au plus grand bruit → biais
+ * systématique vers le haut de la hauteur/puissance. La moyenne est plus
+ * répétable d'un opérateur à l'autre. On renvoie aussi l'écart-type des essais
+ * pour signaler un set incohérent (à refaire). Compromis assumé : répétabilité
+ * plutôt que pic de performance.
  *
  * Lève une `Error` si le poids est ≤ 0 ou si aucun temps de vol n'est fourni.
  */
@@ -91,13 +102,24 @@ export function verticalJumpResult(
   if (flightTimes.length === 0) {
     throw new Error('verticalJumpResult: au moins un temps de vol requis');
   }
-  const bestFlightTime = Math.max(...flightTimes);
-  const heightCm = flightTimeToHeight(bestFlightTime);
+  const n = flightTimes.length;
+  const meanFlightTime = flightTimes.reduce((s, t) => s + t, 0) / n;
+  // Écart-type d'échantillon (n − 1) ; 0 par convention pour un seul essai.
+  const stdev =
+    n < 2
+      ? 0
+      : Math.sqrt(
+          flightTimes.reduce((s, t) => s + (t - meanFlightTime) ** 2, 0) /
+            (n - 1),
+        );
+  const heightCm = flightTimeToHeight(meanFlightTime);
   const peakPowerW = sayersPeakPower(heightCm, weightKg);
   return {
     value: round1(relativePower(peakPowerW, weightKg)),
     weightKg,
     flightTimes,
+    meanFlightTimeSec: round2(meanFlightTime),
+    flightTimeStdevSec: round2(stdev),
     heightCm: round1(heightCm),
     peakPowerW: Math.round(peakPowerW),
   };
