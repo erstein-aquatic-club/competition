@@ -46,6 +46,38 @@ import {
 } from './transformers';
 import { localStorageGet, localStorageSave } from './localStorage';
 
+/** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
+ *  ou métrique d'intensité non-poids (skip flag armé par le caller). */
+export function shouldSkipOneRm(weight: number | null | undefined, skipFlag?: boolean): boolean {
+  return isBodyweight(weight) || skipFlag === true;
+}
+
+/** §298 — Set des exercise_ids dont la métrique n'est PAS weight_kg (hauteur/
+ *  distance/temps), donc non éligibles à l'estimation 1RM. Lit le catalogue
+ *  (cache localStorage/mémoire via getExercises). Utilisé par les chemins de
+ *  récupération (reconcile, fin de séance, replay offline) où le flag
+ *  `skip_one_rm` par-log n'est pas disponible — sinon un Box Jump re-loggé
+ *  créerait un 1RM fantôme. Renvoie un Set vide en cas d'échec (dégradation
+ *  gracieuse : on ne bloque pas la sauvegarde des séries). */
+export async function getNonWeightExerciseIds(): Promise<Set<number>> {
+  try {
+    // §177/§298 — borne le fetch catalogue. Ce helper tourne sur les chemins de
+    // récupération (reconcile fin de séance, replay offline, fallback save) que
+    // §177 a durcis contre les hangs réseau. Sans withTimeout, un getExercises()
+    // qui traîne bloquerait reconcile indéfiniment (régression du durcissement).
+    // Timeout/erreur → catch → Set vide (skip_one_rm = false, comportement
+    // pré-§298 : au pire un 1RM est estimé, jamais un blocage de la sauvegarde).
+    const exercises = await withTimeout(getExercises(), 10_000, "catalog-metric");
+    return new Set(
+      exercises
+        .filter((e) => (e.intensity_metric ?? "weight_kg") !== "weight_kg")
+        .map((e) => e.id),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 // --- Exercises ---
 
 export async function getExercises(): Promise<Exercise[]> {
@@ -288,6 +320,7 @@ export async function updateStrengthSession(session: any) {
         rest_series_s: item.rest_series_s ?? null,
         rest_exercise_s: null as number | null,
         notes: item.notes ?? null,
+        target_intensity: item.target_intensity ?? null,
         raw_payload: null as unknown,
       }),
     );
@@ -414,13 +447,16 @@ export async function logStrengthSet(payload: {
   athleteId?: number | string | null;
   athlete_name?: string | null;
   athleteName?: string | null;
+  /** §298 — armé par le caller quand l'exo a une métrique non-poids (cm/s) :
+   *  la valeur loggée dans `weight` n'est pas une charge → pas d'estimation 1RM. */
+  skip_one_rm?: boolean;
 }) {
   const maybeUpdateOneRm = async (context?: {
     athleteId?: number | string | null;
     athleteName?: string | null;
   }) => {
-    // Skip 1RM estimation for bodyweight sets
-    if (isBodyweight(payload.weight)) return null;
+    // Skip 1RM estimation for bodyweight sets ou métriques non-poids (§298)
+    if (shouldSkipOneRm(payload.weight, payload.skip_one_rm)) return null;
     const estimate = estimateOneRm(Number(payload.weight), Number(payload.reps));
     if (!estimate) return null;
     const athleteId = context?.athleteId ?? null;
@@ -495,9 +531,10 @@ export async function logStrengthSet(payload: {
     }
 
     // Compute the 1RM estimate client-side; the RPC will only persist it if
-    // it beats the existing record. Bodyweight sets skip 1RM estimation.
+    // it beats the existing record. Bodyweight sets ou métriques non-poids
+    // (§298) skip 1RM estimation.
     const oneRmEstimate =
-      isBodyweight(payload.weight)
+      shouldSkipOneRm(payload.weight, payload.skip_one_rm)
         ? null
         : estimateOneRm(Number(payload.weight), Number(payload.reps));
 
@@ -599,6 +636,9 @@ export async function reconcileStrengthRunLogs(params: {
   if (remoteCount >= params.logs.length) return emptyResult;
   const missing = params.logs.slice(remoteCount);
   const errors: ReconcileStrengthSetError[] = [];
+  // §298 — un re-log doit hériter du gating 1RM : pour les exos à métrique
+  // non-poids, armer skip_one_rm (sinon estimateOneRm produit un 1RM fantôme).
+  const nonWeightIds = await getNonWeightExerciseIds();
   // Run all missing-set inserts in parallel and enforce a global 30 s budget.
   // Sequential fire-and-forget could take 200 s+ (20 sets × 10 s each);
   // the allSettled wrapper ensures we wait for all slots but a hung network
@@ -615,6 +655,7 @@ export async function reconcileStrengthRunLogs(params: {
           difficulty: log.difficulty ?? null,
           athlete_id: params.athleteId ?? null,
           athlete_name: params.athleteName ?? null,
+          skip_one_rm: nonWeightIds.has(log.exercise_id),
         }),
       ),
     ),
@@ -737,8 +778,12 @@ export async function saveStrengthRun(run: any) {
       notes: log.notes ?? null,
     }));
 
-    // Collect 1RM estimates client-side to pass to the RPC
-    const estimatedRecords = collectEstimated1RMs(rawLogs);
+    // Collect 1RM estimates client-side to pass to the RPC.
+    // §298 — exclure les exos à métrique non-poids (pas de 1RM sur cm/s).
+    const estimatedRecords = collectEstimated1RMs(
+      rawLogs,
+      await getNonWeightExerciseIds(),
+    );
     const oneRmEstimates = Array.from(estimatedRecords.entries()).map(
       ([exerciseId, weight]) => ({
         exercise_id: exerciseId,
@@ -806,6 +851,7 @@ export async function saveStrengthRun(run: any) {
   }
   const estimatedRecords = collectEstimated1RMs(
     Array.isArray(run.logs) ? run.logs : [],
+    await getNonWeightExerciseIds(),
   );
   if (estimatedRecords.size > 0) {
     const athleteId = run.athlete_id ?? null;
@@ -1448,7 +1494,7 @@ export async function duplicateStrengthSession(
   // Read source items
   const { data: items, error: itemsErr } = await supabase
     .from("strength_session_items")
-    .select("ordre, exercise_id, block, cycle_type, sets, reps, pct_1rm, rest_series_s, rest_exercise_s, notes, raw_payload")
+    .select("ordre, exercise_id, block, cycle_type, sets, reps, pct_1rm, rest_series_s, rest_exercise_s, notes, target_intensity, raw_payload")
     .eq("session_id", sessionId)
     .order("ordre");
   if (itemsErr) throw new Error(itemsErr.message);
@@ -1481,6 +1527,7 @@ export async function duplicateStrengthSession(
       rest_series_s: it.rest_series_s,
       rest_exercise_s: it.rest_exercise_s,
       notes: it.notes,
+      target_intensity: it.target_intensity,
       raw_payload: it.raw_payload,
     }));
     const { error: insErr } = await supabase

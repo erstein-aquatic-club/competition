@@ -34,3 +34,21 @@ describe("exercise mappers — is_bodyweight (§297)", () => {
     assert.equal(result.is_bodyweight, true);
   });
 });
+
+describe("exercise mappers — intensity_metric (§298)", () => {
+  it("mapDbExerciseToApi lit intensity_metric", () => {
+    const r = mapDbExerciseToApi({ id: 1, nom_exercice: "Box Jump", intensity_metric: "height_cm" });
+    assert.equal(r.intensity_metric, "height_cm");
+  });
+  it("mapDbExerciseToApi défaut weight_kg si absent ou invalide", () => {
+    assert.equal(mapDbExerciseToApi({ id: 1, nom_exercice: "Squat" }).intensity_metric, "weight_kg");
+    assert.equal(mapDbExerciseToApi({ id: 1, nom_exercice: "X", intensity_metric: "bogus" }).intensity_metric, "weight_kg");
+  });
+  it("mapApiExerciseToDb écrit intensity_metric (défaut weight_kg)", () => {
+    assert.equal((mapApiExerciseToDb({ id: 1, nom_exercice: "Box Jump", intensity_metric: "height_cm" } as any) as any).intensity_metric, "height_cm");
+    assert.equal((mapApiExerciseToDb({ id: 1, nom_exercice: "Squat" } as any) as any).intensity_metric, "weight_kg");
+  });
+  it("normalizeExercise préserve intensity_metric", () => {
+    assert.equal(normalizeExercise({ id: 1, nom_exercice: "Box Jump", intensity_metric: "height_cm" }).intensity_metric, "height_cm");
+  });
+});

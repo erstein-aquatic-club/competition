@@ -245,6 +245,7 @@ export function RestScreen({
               todayLogs={todayLogs}
               exerciseId={displayExerciseId}
               userId={userId}
+              intensityMetric={displayExercise?.intensity_metric}
             />
           </div>
         </motion.div>

@@ -7,6 +7,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ArrowDown, ArrowUp, ChevronDown, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExercisePickerDrawer } from "./ExercisePickerDrawer";
+import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 import type { Exercise, StrengthSessionItem } from "@/lib/api";
 
 interface StrengthExerciseCardProps {
@@ -44,6 +45,7 @@ export function StrengthExerciseCard({
   const exerciseName = currentExercise?.nom_exercice ?? "Exercice";
   const isWarmup = currentExercise?.exercise_type === "warmup";
   const gifUrl = currentExercise?.illustration_gif;
+  const metric = (currentExercise?.intensity_metric ?? "weight_kg") as IntensityMetric;
 
   return (
     <>
@@ -89,7 +91,13 @@ export function StrengthExerciseCard({
             </div>
             <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
               {exercise.sets}&times;{exercise.reps}
-              {exercise.percent_1rm ? <><span className="text-muted-foreground/40"> · </span>{exercise.percent_1rm}% 1RM</> : ""}
+              {metric === "weight_kg"
+                ? exercise.percent_1rm
+                  ? <><span className="text-muted-foreground/40"> · </span>{exercise.percent_1rm}% 1RM</>
+                  : ""
+                : exercise.target_intensity != null
+                  ? <><span className="text-muted-foreground/40"> · </span>{exercise.target_intensity} {INTENSITY_METRICS[metric].unit}</>
+                  : ""}
               {exercise.rest_seconds ? <><span className="text-muted-foreground/40"> · </span>repos {exercise.rest_seconds}s</> : ""}
             </p>
           </div>
@@ -125,16 +133,32 @@ export function StrengthExerciseCard({
                   className="rounded-xl h-10"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">% 1RM</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  value={exercise.percent_1rm === 0 ? "" : exercise.percent_1rm}
-                  onChange={(e) => onChange("percent_1rm", e.target.value === "" ? 0 : Number(e.target.value))}
-                  className="rounded-xl h-10"
-                />
-              </div>
+              {metric !== "weight_kg" ? (
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Cible {INTENSITY_METRICS[metric].label} ({INTENSITY_METRICS[metric].unit})
+                  </Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={exercise.target_intensity ?? ""}
+                    placeholder={INTENSITY_METRICS[metric].unit}
+                    onChange={(e) => onChange("target_intensity", e.target.value === "" ? null : Number(e.target.value))}
+                    className="rounded-xl h-10"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label className="text-xs">% 1RM</Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={exercise.percent_1rm === 0 ? "" : exercise.percent_1rm}
+                    onChange={(e) => onChange("percent_1rm", e.target.value === "" ? 0 : Number(e.target.value))}
+                    className="rounded-xl h-10"
+                  />
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Repos (s)</Label>
                 <Input

@@ -1,5 +1,7 @@
 // API Types - All TypeScript interfaces for the API layer
 
+import type { IntensityMetric } from "@/lib/strength/intensityMetrics";
+
 export type StrokeDistances = {
   NL?: number;
   DOS?: number;
@@ -57,6 +59,8 @@ export interface Exercise {
   folder_id?: number | null;
   /** §297 — Si TRUE, exo au poids de corps : OneRmGate l'ignore, runner masque Charge. */
   is_bodyweight?: boolean;
+  /** §298 — Métrique d'intensité. Défaut 'weight_kg'. Pilote runner UI + gating 1RM. */
+  intensity_metric?: IntensityMetric;
 }
 
 export type StrengthCycleType = "endurance" | "hypertrophie" | "force";
@@ -88,6 +92,8 @@ export interface StrengthSessionItem {
    *  visuellement échauffement vs bloc principal dans le preview
    *  + le mode focus. `null` pour les items legacy sans block tagué. */
   block?: 'warmup' | 'main' | null;
+  /** §298 — Cible absolue (cm/s) prescrite par le coach pour metric != weight_kg. NULL = libre. */
+  target_intensity?: number | null;
 }
 
 export interface StrengthFolder {
