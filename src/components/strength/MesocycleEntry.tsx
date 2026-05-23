@@ -1,9 +1,11 @@
 /**
  * MesocycleEntry — point d'entrée "Génère ton mésocycle" sur /strength (§293).
  *
- * Conditionnel : visible UNIQUEMENT quand le bilan muscu est complet
- * (`status === 'completed'`). Sinon, retourne `null` — l'écran de bilan
+ * Conditionnel : visible dès que le nageur peut générer (§299 W1) —
+ * `status === 'bilan_pending'` (questionnaire soumis, notation coach optionnelle)
+ * OU `status === 'completed'`. Sinon, retourne `null` — l'écran de bilan
  * (`<QuestionnairePrompt/>` / `<KpiWizardEntry/>`) est la marche d'avant.
+ * À `bilan_pending`, un sous-texte signale la confiance réduite (sans bloquer).
  *
  * Pendant ce premier mésocycle, on est dans l'esprit « action attendue »
  * → carte violette (même palette que `<QuestionnairePrompt/>`). Une fois
@@ -16,6 +18,7 @@ import { useLocation } from "wouter";
 import { getActiveMesocycle, getLatestAssessment } from "@/lib/api";
 import { Dumbbell, ChevronRight, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
 
 /**
  * Tuile d'entrée vers la génération de mésocycle.
@@ -41,9 +44,10 @@ export function MesocycleEntry() {
     staleTime: 60_000,
   });
 
-  if (!assessment || assessment.status !== "completed") return null;
+  if (!assessment || !canGenerateMesocycle(assessment.status)) return null;
 
   const hasActive = activeMesocycle != null;
+  const bilanPending = assessment.status === "bilan_pending";
 
   if (hasActive) {
     // Tuile neutre — il a déjà un plan, l'action de régénération est secondaire.
@@ -90,6 +94,11 @@ export function MesocycleEntry() {
         <p className="mt-0.5 truncate text-[11px] text-violet-700/90 dark:text-violet-300/80">
           Plan personnalisé basé sur ton bilan
         </p>
+        {bilanPending && (
+          <p className="mt-1 text-[11px] leading-snug text-violet-500/70 dark:text-violet-400/60">
+            Bilan physique coach non encore réalisé — confiance réduite
+          </p>
+        )}
       </div>
       <ChevronRight className="h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" />
     </button>
