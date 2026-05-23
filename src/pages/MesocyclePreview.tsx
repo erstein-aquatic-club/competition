@@ -43,6 +43,7 @@ import { ZONE_LABEL_FR } from "@/lib/strength/zones";
 import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 import type { PeriodizationCycle } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
+import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -341,7 +342,7 @@ export default function MesocyclePreview() {
     return <ProfileIncompleteScreen />;
   }
 
-  if (!assessment || assessment.status !== "completed") {
+  if (!assessment || !canGenerateMesocycle(assessment.status)) {
     return <AssessmentRequiredScreen />;
   }
 
@@ -381,7 +382,10 @@ export default function MesocyclePreview() {
       />
 
       <div className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
-        <ReasoningPanel generated={generated} />
+        <ReasoningPanel
+          generated={generated}
+          bilanPending={assessment.status === "bilan_pending"}
+        />
         <PlanPanel generated={generated} startMondayIso={params.startWeekMonday} />
       </div>
 
@@ -454,7 +458,13 @@ function Header({
 
 // ── Reasoning panel ──────────────────────────────────────────────────────────
 
-function ReasoningPanel({ generated }: { generated: GeneratedMesocycle }) {
+function ReasoningPanel({
+  generated,
+  bilanPending,
+}: {
+  generated: GeneratedMesocycle;
+  bilanPending: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const reasoning = generated.reasoning;
   const buckets: AllBucket[] = [
@@ -572,6 +582,14 @@ function ReasoningPanel({ generated }: { generated: GeneratedMesocycle }) {
               icon={<RefreshCw className="h-4 w-4" />}
               title="Substitutions actives"
               body={`Zones évitées : ${reasoning.activeContraindications.map((z) => ZONE_LABEL_FR[z] ?? z).join(", ")}.`}
+            />
+          )}
+          {bilanPending && (
+            <NoteStrip
+              tone="amber"
+              icon={<AlertCircle className="h-4 w-4" />}
+              title="Bilan physique coach non encore réalisé"
+              body="Le score Mobilité est conservateur et la confiance des données est réduite. Ton coach pourra l'enrichir ensuite."
             />
           )}
 

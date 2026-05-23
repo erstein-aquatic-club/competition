@@ -40,6 +40,7 @@ import {
 } from "@/lib/api";
 import type { Competition, StrengthPeriodizationTemplate } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
+import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
 import { useCompetitionsByWeek } from "@/hooks/useCompetitionsByWeek";
 import { getMonday, toISODate, addDays } from "@/lib/date";
 
@@ -280,7 +281,7 @@ export default function MesocycleGeneration() {
     return <PageSkeleton />;
   }
 
-  if (!assessment || assessment.status !== "completed") {
+  if (!assessment || !canGenerateMesocycle(assessment.status)) {
     return <AssessmentRequiredScreen onBack={() => navigate("/strength")} />;
   }
 
