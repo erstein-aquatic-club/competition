@@ -405,4 +405,67 @@ describe("revert_strength_mesocycle RLS", () => {
       expect(after.rows[0].notes).toBe("pre-existing manual");
     });
   });
+
+  it("§300 — édition coach d'une séance générée (raw_payload préservé) : revert nettoie tout, zéro orphelin", async () => {
+      await asUser(ALICE, async (c) => {
+        const apply = await c.query<{ mesocycle_id: string }>(applySql, [
+          1, A_ASSESS, TEMPLATE, START_MONDAY, REASONING, PAYLOAD,
+        ]);
+        const mesoId = apply.rows[0].mesocycle_id;
+
+        const sess = await c.query<{ id: number }>(
+          `SELECT id FROM strength_sessions WHERE name LIKE '[Méso %' AND created_by = 1 ORDER BY id LIMIT 1`,
+        );
+        const sessionId = sess.rows[0].id;
+
+        // Édition coach (RLS WRITE coach/admin) : simule update_strength_session_atomic
+        // + §300 Part 1 — re-insère les items en PRÉSERVANT mesocycle_id, + 1 item
+        // AJOUTÉ qui hérite du tag (reconcileMesocyclePayloads).
+        await c.query(
+          `SET LOCAL "request.jwt.claims" TO '${JSON.stringify({
+            sub: "00000000-0000-0000-0000-000000000003",
+            app_metadata: { app_user_id: 3, app_user_role: "coach" },
+          })}'`,
+        );
+        await c.query(`DELETE FROM strength_session_items WHERE session_id = $1`, [
+          sessionId,
+        ]);
+        await c.query(
+          `INSERT INTO strength_session_items
+             (session_id, ordre, exercise_id, block, cycle_type, sets, reps, pct_1rm, rest_series_s, notes, raw_payload)
+           VALUES
+            ($1, 0, 1002, 'main', 'force', 5, 3, 90, 200, 'édité coach', $2::jsonb),
+            ($1, 1, 1003, 'main', 'force', 3, 8, 70, 120, 'ajouté coach', $3::jsonb)`,
+          [
+            sessionId,
+            JSON.stringify({ mesocycle_id: mesoId, periodization_cycle: "force_max" }),
+            JSON.stringify({ mesocycle_id: mesoId }),
+          ],
+        );
+
+        // L'édité ET l'ajouté portent le mesocycle_id (invariant Part 1).
+        const tagged = await c.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM strength_session_items
+            WHERE raw_payload->>'mesocycle_id' = $1`,
+          [mesoId],
+        );
+        expect(Number(tagged.rows[0].count)).toBeGreaterThanOrEqual(2);
+
+        // Revert : identifie les séances via le tag → CASCADE delete des items.
+        await c.query("SELECT revert_strength_mesocycle($1::uuid)", [mesoId]);
+
+        const residualItems = await c.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM strength_session_items
+            WHERE raw_payload->>'mesocycle_id' = $1`,
+          [mesoId],
+        );
+        expect(residualItems.rows[0].count).toBe("0");
+
+        const residualSessions = await c.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM strength_sessions
+            WHERE name LIKE '[Méso %' AND created_by = 1`,
+        );
+        expect(residualSessions.rows[0].count).toBe("0");
+      });
+    });
 });
