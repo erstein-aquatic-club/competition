@@ -36,9 +36,10 @@
  * bottom navigation dock is hidden — same convention as KpiWizard.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  getAthletes,
   getLatestAssessment,
   updateAssessmentQuestionnaire,
   upsertPainReports,
@@ -63,6 +64,7 @@ import {
   Activity,
   Send,
   Smile,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -81,6 +83,33 @@ export default function StrengthQuestionnaire() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const userId = useAuth((s) => s.userId);
+  const role = useAuth((s) => s.role);
+  const isCoach = role === "coach" || role === "admin";
+
+  // Route /coach/questionnaire/:athleteId → bilan accompagné (le coach saisit
+  // AVEC le nageur) ; route /strength/questionnaire → le nageur lui-même.
+  const routeParams = useParams<{ athleteId?: string }>();
+  const targetAthleteId =
+    routeParams.athleteId != null ? Number(routeParams.athleteId) : null;
+  const effectiveAthleteId =
+    isCoach && targetAthleteId != null ? targetAthleteId : userId;
+  const isCoachMode = effectiveAthleteId !== userId;
+
+  // Garde de rôle : un nageur ne peut pas cibler un autre nageur.
+  useEffect(() => {
+    if (targetAthleteId != null && !isCoach) navigate("/strength");
+  }, [targetAthleteId, isCoach, navigate]);
+
+  // Nom du nageur ciblé (mode coach) — en-tête de cible.
+  const { data: rosterAthletes } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => getAthletes(),
+    enabled: isCoachMode,
+    staleTime: 5 * 60_000,
+  });
+  const targetName =
+    rosterAthletes?.find((a) => a.id === effectiveAthleteId)?.display_name ??
+    null;
 
   // ── Focus mode : hide the bottom dock while the screen is open ──
   useEffect(() => {
@@ -98,9 +127,9 @@ export default function StrengthQuestionnaire() {
     isLoading,
     isError,
   } = useQuery<StrengthAssessment | null>({
-    queryKey: ["strength-assessment", userId],
-    queryFn: () => getLatestAssessment(userId!),
-    enabled: userId != null,
+    queryKey: ["strength-assessment", effectiveAthleteId],
+    queryFn: () => getLatestAssessment(effectiveAthleteId!),
+    enabled: effectiveAthleteId != null,
   });
 
   // ── Form state ──
@@ -121,7 +150,8 @@ export default function StrengthQuestionnaire() {
   const isDone =
     submittedLocally || status === "bilan_pending" || status === "completed";
 
-  const closeScreen = () => navigate("/strength");
+  const closeScreen = () =>
+    navigate(isCoachMode ? `/coach/swimmer/${effectiveAthleteId}` : "/strength");
 
   // ── Submission ──
   // psychology scales are all required (1-5) ; mobility too. Pain and the
@@ -141,7 +171,7 @@ export default function StrengthQuestionnaire() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (assessment == null || userId == null) {
+      if (assessment == null || effectiveAthleteId == null) {
         throw new Error("Bilan ou identité non résolu");
       }
       const questionnaire: StrengthQuestionnaireType = {
@@ -155,7 +185,7 @@ export default function StrengthQuestionnaire() {
       //    coach's wellness/pain views stay consistent. Done FIRST: if it
       //    throws, the assessment is still `questionnaire_pending`, so a
       //    retry genuinely works (the screen stays editable).
-      await upsertPainReports(userId, todayISODate(), painEntries);
+      await upsertPainReports(effectiveAthleteId, todayISODate(), painEntries);
       // 2. Persist the questionnaire — the commit-like final step: it flips
       //    status to `bilan_pending`. Done LAST on purpose, so a failed
       //    pain write above never strands the screen in a non-retryable
@@ -165,11 +195,13 @@ export default function StrengthQuestionnaire() {
     onSuccess: async () => {
       setSubmittedLocally(true);
       toast.success("Questionnaire envoyé", {
-        description: "Ton coach peut maintenant réaliser le bilan physique.",
+        description: isCoachMode
+          ? "Tu peux maintenant noter le bilan physique."
+          : "Ton coach peut maintenant réaliser le bilan physique.",
       });
-      if (userId != null) {
+      if (effectiveAthleteId != null) {
         await queryClient.invalidateQueries({
-          queryKey: ["strength-assessment", userId],
+          queryKey: ["strength-assessment", effectiveAthleteId],
         });
       }
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -348,6 +380,17 @@ export default function StrengthQuestionnaire() {
       {TopBar}
 
       <div className="mx-auto w-full max-w-md flex-1 space-y-4 px-4 py-5 pb-32">
+        {isCoachMode && (
+          <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+            <Users className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-muted-foreground">
+              Bilan rempli avec&nbsp;
+              <span className="font-semibold text-foreground">
+                {targetName ?? "ce nageur"}
+              </span>
+            </span>
+          </div>
+        )}
         {/* Intro */}
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">

@@ -579,15 +579,25 @@ export default function StrengthAssessmentScreen() {
           icon={<Hourglass className="h-7 w-7" />}
           tone="muted"
           title="En attente du questionnaire nageur"
-          description={`${athleteName} n'a pas encore rempli son auto-évaluation. Tu pourras noter le bilan physique dès que le questionnaire sera envoyé.`}
+          description={`${athleteName} n'a pas encore rempli son auto-évaluation. Il peut le faire seul, ou tu peux le remplir avec lui maintenant.`}
         >
-          <Button
-            variant="outline"
-            className="mt-5 rounded-xl"
-            onClick={() => setSelectedAthleteId(null)}
-          >
-            Évaluer un autre nageur
-          </Button>
+          <div className="mt-5 flex flex-col gap-2">
+            <Button
+              className="rounded-xl"
+              onClick={() =>
+                navigate(`/coach/questionnaire/${selectedAthleteId}`)
+              }
+            >
+              Remplir avec le nageur
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setSelectedAthleteId(null)}
+            >
+              Évaluer un autre nageur
+            </Button>
+          </div>
         </CenteredState>
       </div>
     );
