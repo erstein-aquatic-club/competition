@@ -312,6 +312,7 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
           exerciseId={progressExercise.id}
           userId={athleteId}
           exerciseName={progressExercise.name}
+          intensityMetric={exercises?.find((e) => e.id === progressExercise.id)?.intensity_metric}
           open={!!progressExercise}
           onOpenChange={(open) => {
             if (!open) setProgressExercise(null);

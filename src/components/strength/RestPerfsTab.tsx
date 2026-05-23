@@ -6,6 +6,7 @@ import { useExerciseHistory } from "@/hooks/useExerciseHistory";
 import { ExerciseProgressChart } from "./ExerciseProgressChart";
 import type { SetLogEntry } from "@/lib/types";
 import { isBodyweight } from "@/lib/api/client";
+import type { IntensityMetric } from "@/lib/strength/intensityMetrics";
 
 export interface RestPerfsTabProps {
   exerciseName: string;
@@ -15,6 +16,7 @@ export interface RestPerfsTabProps {
   todayLogs: SetLogEntry[];
   exerciseId: number;
   userId: number;
+  intensityMetric?: IntensityMetric;
 }
 
 export function RestPerfsTab({
@@ -25,6 +27,7 @@ export function RestPerfsTab({
   todayLogs,
   exerciseId,
   userId,
+  intensityMetric,
 }: RestPerfsTabProps) {
   const { sessions, delta1rm } = useExerciseHistory({
     exerciseId,
@@ -194,6 +197,7 @@ export function RestPerfsTab({
           exerciseId={exerciseId}
           userId={userId}
           exerciseName={exerciseName}
+          intensityMetric={intensityMetric}
           open={chartOpen}
           onOpenChange={setChartOpen}
         />

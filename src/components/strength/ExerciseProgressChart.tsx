@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useExerciseHistory } from "@/hooks/useExerciseHistory";
 import type { ExerciseSession } from "@/hooks/useExerciseHistory";
+import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 
 // ── Props ───────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ interface ExerciseProgressChartProps {
   exerciseName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  intensityMetric?: IntensityMetric;
 }
 
 // ── Period options ──────────────────────────────────────────
@@ -56,20 +58,28 @@ function difficultyColor(d: number | null): string {
 
 // ── Custom tooltip ──────────────────────────────────────────
 
-function E1rmTooltip({ active, payload }: any) {
-  if (!active || !payload?.[0]) return null;
-  const d = payload[0].payload as ExerciseSession & { label: string };
-  return (
-    <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
-      <p className="font-semibold">{d.label}</p>
-      <p className="text-muted-foreground">
-        1RM est. <span className="font-mono font-bold text-foreground">{d.estimated1rm} kg</span>
-      </p>
-      <p className="text-muted-foreground">
-        Meilleure : {d.bestSet.weight} kg x {d.bestSet.reps}
-      </p>
-    </div>
-  );
+function makeProgressionTooltip(tracksWeight: boolean, unit: string) {
+  return function ProgressionTooltip({ active, payload }: any) {
+    if (!active || !payload?.[0]) return null;
+    const d = payload[0].payload as ExerciseSession & { label: string; progressionValue: number };
+    return (
+      <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
+        <p className="font-semibold">{d.label}</p>
+        {tracksWeight ? (
+          <p className="text-muted-foreground">
+            1RM est. <span className="font-mono font-bold text-foreground">{d.estimated1rm} kg</span>
+          </p>
+        ) : (
+          <p className="text-muted-foreground">
+            Meilleure <span className="font-mono font-bold text-foreground">{d.progressionValue} {unit}</span>
+          </p>
+        )}
+        <p className="text-muted-foreground">
+          Meilleure : {d.bestSet.weight} {unit} x {d.bestSet.reps}
+        </p>
+      </div>
+    );
+  };
 }
 
 function VolumeTooltip({ active, payload }: any) {
@@ -98,6 +108,7 @@ export function ExerciseProgressChart({
   exerciseName,
   open,
   onOpenChange,
+  intensityMetric,
 }: ExerciseProgressChartProps) {
   const reduce = useReducedMotion();
   const heroVariants = reduce ? {} : slideUp;
@@ -108,11 +119,23 @@ export function ExerciseProgressChart({
     months,
   });
 
+  const metric = intensityMetric ?? "weight_kg";
+  const metricCfg = INTENSITY_METRICS[metric];
+  const tracksWeight = metric === "weight_kg";
+
   const chartData = sessions.map((s) => ({
     ...s,
     label: format(new Date(s.date), "dd MMM", { locale: fr }),
     shortDate: format(new Date(s.date), "dd/MM"),
+    progressionValue: tracksWeight ? s.estimated1rm : s.bestSet.weight,
   }));
+
+  // Hero KPI: 1RM for weight, latest best raw value otherwise (sessions are chronological ↑)
+  const heroValue = tracksWeight ? current1rm : (sessions.at(-1)?.bestSet.weight ?? 0);
+  const heroUnit = metricCfg.unit;
+  const heroLabel = tracksWeight ? "1RM estime" : `Meilleure ${metricCfg.label.toLowerCase()}`;
+  const chartTitle = tracksWeight ? "1RM estime" : `Meilleure ${metricCfg.label.toLowerCase()}`;
+  const ProgressionTooltip = makeProgressionTooltip(tracksWeight, metricCfg.unit);
 
   const hasDifficulty = sessions.some((s) => s.avgDifficulty != null);
   const periodLabel = PERIODS.find((p) => p.value === months)?.label ?? `${months} mois`;
@@ -148,11 +171,11 @@ export function ExerciseProgressChart({
           ) : (
             <>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-mono font-bold tracking-tight">{current1rm}</span>
-                <span className="text-lg font-mono text-muted-foreground">kg</span>
+                <span className="text-4xl font-mono font-bold tracking-tight">{heroValue}</span>
+                <span className="text-lg font-mono text-muted-foreground">{heroUnit}</span>
               </div>
-              <span className="text-sm text-muted-foreground">1RM estime</span>
-              {delta1rm !== 0 && (
+              <span className="text-sm text-muted-foreground">{heroLabel}</span>
+              {tracksWeight && delta1rm !== 0 && (
                 <span
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
@@ -200,7 +223,7 @@ export function ExerciseProgressChart({
             {/* ── 1RM Line/Area Chart ── */}
             <div>
               <h3 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                1RM estime
+                {chartTitle}
               </h3>
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
@@ -223,10 +246,10 @@ export function ExerciseProgressChart({
                     domain={["auto", "auto"]}
                     width={40}
                   />
-                  <Tooltip content={<E1rmTooltip />} />
+                  <Tooltip content={<ProgressionTooltip />} />
                   <Area
                     type="monotone"
-                    dataKey="estimated1rm"
+                    dataKey="progressionValue"
                     stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     fill="url(#e1rmGrad)"
@@ -237,7 +260,8 @@ export function ExerciseProgressChart({
               </ResponsiveContainer>
             </div>
 
-            {/* ── Volume Bar Chart ── */}
+            {/* ── Volume Bar Chart (weight only — volume in cm/s is meaningless) ── */}
+            {tracksWeight && (
             <div>
               <h3 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Volume total
@@ -291,6 +315,7 @@ export function ExerciseProgressChart({
                 </div>
               )}
             </div>
+            )}
 
             {/* ── Session details table ── */}
             <div>
@@ -313,13 +338,22 @@ export function ExerciseProgressChart({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] tabular-nums">
-                        <span className="font-semibold">{s.estimated1rm} kg</span>
-                        <span className="text-muted-foreground"> 1RM</span>
+                        {tracksWeight ? (
+                          <>
+                            <span className="font-semibold">{s.estimated1rm} kg</span>
+                            <span className="text-muted-foreground"> 1RM</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-semibold">{s.bestSet.weight} {metricCfg.unit}</span>
+                            <span className="text-muted-foreground"> max</span>
+                          </>
+                        )}
                         <span className="text-muted-foreground/40"> · </span>
                         <span className="text-muted-foreground">{s.sets.length} series</span>
                       </p>
                       <p className="text-[10px] text-muted-foreground tabular-nums">
-                        Meilleure : {s.bestSet.weight} kg x {s.bestSet.reps}
+                        Meilleure : {s.bestSet.weight} {metricCfg.unit} x {s.bestSet.reps}
                         {s.avgDifficulty != null && (
                           <> · Diff. {s.avgDifficulty}/5</>
                         )}
