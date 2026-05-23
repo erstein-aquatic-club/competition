@@ -757,6 +757,7 @@ export default function StrengthCatalog() {
         percent_1rm: item.percent_1rm,
         cycle_type: item.cycle_type,
         notes: item.notes ?? "",
+        target_intensity: item.target_intensity ?? null,
       })) ?? [],
       folder_id: session.folder_id ?? null,
     });
