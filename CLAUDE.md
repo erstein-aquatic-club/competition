@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§300** — Édition coach d'une séance générée (complète) : `updateStrengthSession` préserve `raw_payload` (`reconcileMesocyclePayloads`) + getter `getStrengthSessionForEdit(id)` + bouton « Éditer » sur la planif → deeplink éditeur catalogue ; revert cohérent (T14 RLS). (Aussi récents : §299 parcours mésocycle 2 modes, §298 métrique d'intensité cm/s.)
+Dernier § livré : **§301** — Fiabilité mesure Bilan Muscu, Part 1 (T1+T2+T3) : `weighted_pullup` accepte 0/assisté (mig `00190`), démos KPI câblées sur GIFs catalogue, confiance barème par-KPI au recap. Reste T4 (détente moyenne) + T5 (rubrique mobilité + photos). (Aussi récents : §300 édition coach séance générée, §299 parcours 2 modes.)
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

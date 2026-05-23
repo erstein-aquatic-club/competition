@@ -4,6 +4,7 @@ import {
   bestAttempt,
   parseAttempts,
   parsePositiveNumber,
+  sanitizeNumericInput,
 } from '../kpiMeasurement.ts';
 
 describe('bestAttempt', () => {
@@ -42,6 +43,50 @@ describe('parseAttempts', () => {
   });
   it('returns an empty array for an all-invalid input', () => {
     assert.deepEqual(parseAttempts(['', 'x', '0']), []);
+  });
+
+  // §301 T1 — weighted_pullup : la charge additionnelle peut être nulle
+  // (1 traction au poids de corps) ou négative (assistée élastique). Le barème
+  // a des ancres ≤ 0 ; le parsing doit pouvoir les conserver sur demande.
+  describe('allowNonPositive (weighted_pullup assisté / poids de corps)', () => {
+    it('keeps zero and negative values when allowed', () => {
+      assert.deepEqual(
+        parseAttempts(['-10', '0', '5'], { allowNonPositive: true }),
+        [-10, 0, 5],
+      );
+    });
+    it('still drops empty / whitespace / NaN / Infinity when allowed', () => {
+      assert.deepEqual(
+        parseAttempts(['', '  ', 'abc', 'NaN', 'Infinity', '-2,5'], {
+          allowNonPositive: true,
+        }),
+        [-2.5],
+      );
+    });
+    it('default behaviour is unchanged (rejects ≤ 0)', () => {
+      assert.deepEqual(parseAttempts(['-10', '0', '5']), [5]);
+    });
+  });
+});
+
+describe('sanitizeNumericInput', () => {
+  it('strips non-numeric chars, keeps digits and separators', () => {
+    assert.equal(sanitizeNumericInput('4kg2'), '42');
+    assert.equal(sanitizeNumericInput('1,5'), '1,5');
+    assert.equal(sanitizeNumericInput('0.52s'), '0.52');
+  });
+  it('strips a leading minus by default', () => {
+    assert.equal(sanitizeNumericInput('-5'), '5');
+  });
+  it('keeps a single leading minus when allowNegative', () => {
+    assert.equal(sanitizeNumericInput('-5', true), '-5');
+    assert.equal(sanitizeNumericInput('-', true), '-'); // saisie en cours
+  });
+  it('collapses multiple leading minuses to one when allowNegative', () => {
+    assert.equal(sanitizeNumericInput('--5', true), '-5');
+  });
+  it('drops a non-leading minus even when allowNegative', () => {
+    assert.equal(sanitizeNumericInput('5-3', true), '53');
   });
 });
 

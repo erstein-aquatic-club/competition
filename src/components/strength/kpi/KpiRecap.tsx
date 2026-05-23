@@ -21,7 +21,31 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KPI_PROTOCOLS } from "@/lib/strength/kpiProtocols";
+import { baremeConfidenceFor } from "@/lib/strength/kpiBaremes";
+import type { BaremeConfidence } from "@/lib/strength/kpiBaremes";
 import type { StrengthKpiKey, StrengthKpiMeasurement } from "@/lib/api/types";
+
+/**
+ * Présentation de la fiabilité du barème par KPI (§301 T3). On ne badge QUE les
+ * barèmes non sourcés natation (`transposed` / `placeholder`) — un barème
+ * `solid` n'a pas besoin d'avertissement. Le message clé : la **mesure brute
+ * reste fiable**, c'est le **score 0-100 dérivé** qui est approximatif.
+ */
+const BAREME_BADGE: Record<
+  Exclude<BaremeConfidence, "solid">,
+  { label: string; className: string }
+> = {
+  transposed: {
+    label: "indicatif",
+    className:
+      "bg-muted text-muted-foreground",
+  },
+  placeholder: {
+    label: "à calibrer",
+    className:
+      "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+  },
+};
 
 export interface KpiRecapEntry {
   kpi_key: StrengthKpiKey;
@@ -164,6 +188,23 @@ export function KpiRecap({
                 <p className="truncate text-sm font-semibold text-foreground">
                   {protocol.label}
                 </p>
+                {(() => {
+                  const confidence = baremeConfidenceFor(entry.kpi_key);
+                  if (confidence === "solid") return null;
+                  const badge = BAREME_BADGE[confidence];
+                  return (
+                    <span
+                      className={cn(
+                        "mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                        badge.className,
+                      )}
+                      title="Le score 0-100 dérivé de ce barème est approximatif (référence non-natation) — la mesure brute reste fiable."
+                    >
+                      <Info className="h-3 w-3" />
+                      Barème {badge.label}
+                    </span>
+                  );
+                })()}
                 {prev != null && (
                   <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
                     Précédent : {prev} {entry.unit}
@@ -208,6 +249,19 @@ export function KpiRecap({
           );
         })}
       </div>
+
+      {/* Note barèmes — n'apparaît que si un KPI mesuré n'est pas sur barème solide */}
+      {entries.some((e) => baremeConfidenceFor(e.kpi_key) !== "solid") && (
+        <div className="flex items-start gap-2.5 rounded-xl border bg-muted/40 px-3.5 py-2.5">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            <span className="font-semibold text-foreground">Barème indicatif / à calibrer :</span>{" "}
+            le score 0-100 calculé à partir de ces mesures sera approximatif
+            (référence non-natation). La mesure brute, elle, reste fiable et
+            comparable dans le temps.
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col gap-2 pt-1">

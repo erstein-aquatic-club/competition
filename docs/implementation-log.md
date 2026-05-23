@@ -4,6 +4,38 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §301 — Fiabilité de la mesure (Bilan Muscu) : Part 1 — T1+T2+T3 (2026-05-23)
+
+**Branche** : `feat/301-fiabilite-mesure`
+**Trigger** : audit `docs/audits/2026-05-23-audit-mesure-coach-robustesse.md`. Plan : `docs/plans/2026-05-23-fiabilite-mesure-coach-design.md` (périmètre fiabilité = recos 1,2,5,6,7). Ce lot livre les 3 quick wins à faible risque (T1 BUG `weighted_pullup`, T2 démos KPI câblées, T3 confiance barème par-KPI). T4 (détente moyenne) et T5 (rubrique mobilité + photos) restent à venir.
+
+### T1 — `weighted_pullup` accepte 0 (poids de corps) et charges assistées (négatif)
+- **Constat audit (BUG-1)** : l'input strippait `−` et `parseAttempts` rejetait `≤ 0`, alors que le barème `weighted_pullup` a des ancres ≤ 0 (jusqu'à -10 kg) → médiane filles/débutants non mesurable.
+- **`kpiMeasurement.ts`** : `parseAttempts(raw, { allowNonPositive })` (défaut `false` — comportement des 4 autres KPIs inchangé ; filtre désormais les vides par `trim` avant le test de signe) + nouvelle fonction pure **`sanitizeNumericInput(value, allowNegative)`** (extrait du nettoyage d'input du wizard, garde un `−` en tête seulement). **TDD** : RED→GREEN, 22 tests dans `kpiMeasurement.test.ts`.
+- **`kpiProtocols.ts`** : flag `allowNonPositive?: boolean` sur `KpiProtocol`, posé sur `weighted_pullup` ; steps/partnerRole/measurement précisent « 0 au poids de corps, négatif si assisté ».
+- **Wiring** : `KpiWizard.updateAttempt`/`updateWeight` utilisent `sanitizeNumericInput` ; `filledKeys` + boucle submit + `KpiStepCard.GenericKpiInputs` (surlignage « meilleur ») passent `{ allowNonPositive }` selon le protocole.
+- **Migration `00190_weighted_pullup_allow_negative.sql`** (appliquée via MCP) : l'ancien CHECK `value >= 0` rejetait les négatifs à l'insert → relâché en `CHECK (value >= 0 OR kpi_key = 'weighted_pullup')`. **Aucune RLS touchée** (CHECK simple) → `test:rls` non requis.
+
+### T2 — Démos KPI câblées sur les GIFs catalogue existants
+- **Constat audit** : les 5 protocoles ont `gifUrl: null` → SVG systématique, alors que `dim_exercices.illustration_gif` a déjà des GIFs pour des mouvements KPI ; `KpiGifPanel` lisait le champ statique, pas la DB.
+- **`kpiProtocols.ts`** : map **`KPI_DEMO_EXERCISE_ID`** — seuls les matchs **exacts** mappés (`broad_jump`→21 « Saut en longueur », `weighted_pullup`→13 « Tractions lestées ») ; `imtp`/`vertical_jump`/`medball_vertical_throw` → `null` (SVG conservé — un GIF voisin serait trompeur). **TDD** : 3 tests dans `kpiProtocols.test.ts` (nouveau).
+- **`strength-catalog.ts`** : helper I/O **`getExerciseGifs(ids)`** (`id → illustration_gif`), re-exporté depuis `@/lib/api`.
+- **Wiring** : `KpiWizard` fetch les GIFs mappés (1 requête, `staleTime: Infinity`) et passe `demoGifUrl` à `KpiStepCard` ; `KpiGifPanel` reçoit `demoGifUrl ?? protocol.gifUrl` (SVG en fallback si null/indispo).
+
+### T3 — Confiance du barème par-KPI au moment de la mesure
+- **Constat audit** : le flag `transposed`/`placeholder` n'était visible qu'à l'aperçu mésocycle (agrégé, enum brut), jamais au recap de mesure.
+- **`kpiBaremes.ts`** : **`baremeConfidenceFor(kpiKey)`** (confiance invariante par sexe/âge). **TDD** : 9 tests dans `kpiBaremes.test.ts` (dont garde d'invariance sur les 30 entrées).
+- **`KpiRecap.tsx`** (UI via `/frontend-design`) : pastille par KPI **uniquement si non-`solid`** — « indicatif » (transposed, muted) / « à calibrer » (placeholder, ambre) + note de bas : « la mesure brute reste fiable, c'est le score 0-100 dérivé qui est approximatif ». Cohérent avec le langage visuel des badges existants du recap.
+
+### Tests / vérifs
+- `npm test` — **952/952 verts** (935 §300 + 17 nouveaux : T1 +13, T2 +3, T3 +6 dont guard). `npx tsc --noEmit` — exit 0. `npm run build` — OK (built 12,3 s, precache 275).
+- **Pas de `test:rls`** : aucune policy RLS touchée (T1 = CHECK constraint ; T2/T3 = lib/UI).
+
+### Décisions / limites
+- T2 ne câble que 2/5 démos (matchs exacts) — `imtp`/`vertical_jump`/`medball` attendent des clips dédiés (le SVG reste pédagogiquement honnête).
+- T3 affiche un avertissement présentationnel ; il n'« améliore » pas la calibration (4/5 barèmes restent non sourcés natation — chantier de re-sourçage hors périmètre).
+- Reste du §301 : **T4** (détente verticale : moyenne au lieu de `Math.max` + écart-type) et **T5** (rubrique mobilité 0-3 + repères chiffrés + note précédente + 24 photos de référence).
+
 ## §300 — Édition coach d'une séance générée : Part 1 (préservation raw_payload) (2026-05-23)
 
 **Branche** : `feat/300-coach-edit-mesocycle`

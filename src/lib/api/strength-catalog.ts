@@ -91,3 +91,24 @@ export async function listCatalogExercisesTagged(): Promise<CatalogExercise[]> {
   // is_core). On les SELECT explicitement et on les normalise via mapRow.
   return ((data ?? []) as unknown as DbRow[]).map(mapRow);
 }
+
+/**
+ * Résout le `illustration_gif` d'un ensemble d'exercices par id. §301 T2 — sert
+ * à câbler les démos KPI sur les GIFs déjà présents dans le catalogue
+ * (`KPI_DEMO_EXERCISE_ID`). Renvoie une map `id → url | null` ; entrée absente =
+ * exercice introuvable. Tableau vide ou Supabase indisponible → `{}` (le wizard
+ * retombe alors sur l'illustration SVG).
+ */
+export async function getExerciseGifs(
+  ids: number[],
+): Promise<Record<number, string | null>> {
+  if (!canUseSupabase() || ids.length === 0) return {};
+  const data = assertSupabase(
+    await supabase.from('dim_exercices').select('id, illustration_gif').in('id', ids),
+  );
+  const out: Record<number, string | null> = {};
+  for (const row of (data ?? []) as { id: number; illustration_gif: string | null }[]) {
+    out[row.id] = row.illustration_gif ?? null;
+  }
+  return out;
+}

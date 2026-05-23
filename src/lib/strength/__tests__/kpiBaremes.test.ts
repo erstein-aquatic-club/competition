@@ -3,8 +3,10 @@ import { describe, it } from 'node:test';
 import {
   kpiScore,
   KPI_BAREMES,
+  baremeConfidenceFor,
   type AgeBand,
   type Bareme,
+  type BaremeConfidence,
   type BaremeSex,
 } from '../kpiBaremes.ts';
 import type { StrengthKpiKey } from '@/lib/api/types';
@@ -87,4 +89,39 @@ describe('KPI_BAREMES — structure', () => {
       }
     }
   }
+});
+
+// §301 T3 — confiance du barème exposée par-KPI, pour l'afficher au moment de la
+// mesure (le recap wizard) et pas seulement à l'aperçu mésocycle.
+describe('baremeConfidenceFor', () => {
+  const EXPECTED: Record<StrengthKpiKey, BaremeConfidence> = {
+    broad_jump: 'solid',
+    vertical_jump: 'transposed',
+    imtp: 'transposed',
+    weighted_pullup: 'transposed',
+    medball_vertical_throw: 'placeholder',
+  };
+
+  for (const [kpi, confidence] of Object.entries(EXPECTED)) {
+    it(`${kpi} → ${confidence}`, () => {
+      assert.equal(baremeConfidenceFor(kpi as StrengthKpiKey), confidence);
+    });
+  }
+
+  it('est invariante par sexe × bande (ne ment sur aucune entrée)', () => {
+    const SEXES: BaremeSex[] = ['M', 'F'];
+    const BANDS: AgeBand[] = ['13-14', '15-16', '17-18'];
+    for (const kpi of Object.keys(EXPECTED) as StrengthKpiKey[]) {
+      const expected = baremeConfidenceFor(kpi);
+      for (const sex of SEXES) {
+        for (const band of BANDS) {
+          assert.equal(
+            KPI_BAREMES[kpi][sex][band].confidence,
+            expected,
+            `${kpi}/${sex}/${band} diverge de baremeConfidenceFor`,
+          );
+        }
+      }
+    }
+  });
 });

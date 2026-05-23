@@ -263,3 +263,17 @@ export function getBareme(
 ): BaremeEntry {
   return KPI_BAREMES[kpiKey][sex][ageBand];
 }
+
+/**
+ * Niveau de confiance du barème d'un KPI, **invariant** par sexe et bande d'âge
+ * (une même source alimente toutes les entrées d'un KPI). Permet d'afficher la
+ * fiabilité du barème dès la saisie (recap wizard) et pas seulement à l'aperçu
+ * du mésocycle. §301.
+ *
+ * Rappel : seul `broad_jump` est `solid` (normes publiées) ; `vertical_jump`,
+ * `imtp`, `weighted_pullup` sont `transposed` ; `medball_vertical_throw` est
+ * `placeholder` (à calibrer).
+ */
+export function baremeConfidenceFor(kpiKey: StrengthKpiKey): BaremeConfidence {
+  return KPI_BAREMES[kpiKey].M['15-16'].confidence;
+}

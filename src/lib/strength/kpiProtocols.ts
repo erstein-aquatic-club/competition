@@ -13,6 +13,11 @@ export interface KpiProtocol {
   /** Méthode de mesure chiffrée. */
   measurement: string;
   gifUrl: string | null;  // Chantier A
+  /**
+   * Autorise une mesure ≤ 0 (charge nulle au poids de corps ou négative
+   * assistée). Réservé à `weighted_pullup` — le barème a des ancres ≤ 0. §301.
+   */
+  allowNonPositive?: boolean;
 }
 
 export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
@@ -79,10 +84,13 @@ export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
       'Ceinture de lest, prise pronation largeur d\'épaules.',
       'Réaliser 1 traction complète menton au-dessus de la barre.',
       'Augmenter la charge jusqu\'à la charge max sur 1 répétition.',
+      'Au poids de corps sans lest : note 0. Si la traction nécessite une aide '
+        + '(élastique), note la charge d\'assistance en NÉGATIF (ex. -7,5).',
     ],
-    partnerRole: 'Valide l\'amplitude complète et note la charge réussie.',
-    measurement: 'Charge additionnelle max sur 1 traction stricte, en kg.',
+    partnerRole: 'Valide l\'amplitude complète et note la charge réussie (0 au poids de corps, négatif si assisté).',
+    measurement: 'Charge additionnelle max sur 1 traction stricte, en kg (0 = poids de corps, négatif = assisté).',
     gifUrl: null,
+    allowNonPositive: true,
   },
   medball_vertical_throw: {
     key: 'medball_vertical_throw',
@@ -98,4 +106,24 @@ export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
     measurement: 'Hauteur verticale du lancer, en cm. Médecine-ball 10 kg. Meilleur de 3.',
     gifUrl: null,
   },
+};
+
+/**
+ * Démo KPI → exercice du catalogue dont le `illustration_gif` illustre le geste.
+ * §301 T2 : seuls les mouvements ayant un GIF catalogue **exact** sont mappés ;
+ * `KpiGifPanel` résout l'URL et l'affiche, sinon retombe sur l'illustration SVG.
+ * `null` = pas de match exact (un GIF d'un mouvement voisin serait trompeur)
+ * → SVG conservé en attendant un clip dédié.
+ *
+ *  - `broad_jump`       → 21 « Saut en longueur »
+ *  - `weighted_pullup`  → 13 « Tractions lestées »
+ *  - les 3 autres (détente sèche, tirage mi-cuisse, lancer vertical allongé)
+ *    n'ont pas d'équivalent catalogue exact.
+ */
+export const KPI_DEMO_EXERCISE_ID: Record<StrengthKpiKey, number | null> = {
+  vertical_jump: null,
+  broad_jump: 21,
+  imtp: null,
+  weighted_pullup: 13,
+  medball_vertical_throw: null,
 };

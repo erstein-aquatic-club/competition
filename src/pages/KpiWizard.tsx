@@ -24,11 +24,16 @@ import {
   getAthletes,
   recordKpiMeasurement,
   getLatestKpiMeasurements,
+  getExerciseGifs,
   type RecordKpiInput,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { KPI_PROTOCOLS } from "@/lib/strength/kpiProtocols";
-import { bestAttempt, parsePositiveNumber } from "@/lib/strength/kpiMeasurement";
+import { KPI_PROTOCOLS, KPI_DEMO_EXERCISE_ID } from "@/lib/strength/kpiProtocols";
+import {
+  bestAttempt,
+  parsePositiveNumber,
+  sanitizeNumericInput,
+} from "@/lib/strength/kpiMeasurement";
 import { verticalJumpResult } from "@/lib/strength/jumpPower";
 import type {
   KpiAttempts,
@@ -107,6 +112,23 @@ export default function KpiWizard() {
     queryKey: ["athletes"],
     queryFn: () => getAthletes(),
     staleTime: 5 * 60_000,
+  });
+
+  // ── Démos KPI ── résout les GIFs catalogue mappés (§301 T2). Statique :
+  // un seul fetch, jamais ré-évalué. Si indisponible, KpiGifPanel retombe sur
+  // l'illustration SVG.
+  const demoExerciseIds = useMemo(
+    () =>
+      Object.values(KPI_DEMO_EXERCISE_ID).filter(
+        (id): id is number => id != null,
+      ),
+    [],
+  );
+  const { data: demoGifs } = useQuery({
+    queryKey: ["kpi-demo-gifs", demoExerciseIds],
+    queryFn: () => getExerciseGifs(demoExerciseIds),
+    staleTime: Infinity,
+    enabled: demoExerciseIds.length > 0,
   });
 
   // ── Wizard state ──
@@ -205,7 +227,11 @@ export default function KpiWizard() {
 
   const updateAttempt = (kpi: StrengthKpiKey, idx: number, value: string) => {
     // Accept digits, one decimal separator — keep input forgiving but clean.
-    const cleaned = value.replace(/[^\d.,]/g, "");
+    // `weighted_pullup` also accepts a leading minus (assisted / bodyweight).
+    const cleaned = sanitizeNumericInput(
+      value,
+      KPI_PROTOCOLS[kpi].allowNonPositive ?? false,
+    );
     setAttempts((prev) => {
       const next = [...prev[kpi].raw];
       next[idx] = cleaned;
@@ -213,9 +239,10 @@ export default function KpiWizard() {
     });
   };
 
-  // Body-weight field — only the vertical-jump (power) step uses it.
+  // Body-weight field — only the vertical-jump (power) step uses it. Always
+  // positive (no leading minus).
   const updateWeight = (kpi: StrengthKpiKey, value: string) => {
-    const cleaned = value.replace(/[^\d.,]/g, "");
+    const cleaned = sanitizeNumericInput(value);
     setAttempts((prev) => ({
       ...prev,
       [kpi]: { ...prev[kpi], weight: cleaned },
@@ -228,7 +255,9 @@ export default function KpiWizard() {
   const filledKeys = useMemo(
     () =>
       KPI_KEYS.filter((k) => {
-        if (parseAttempts(attempts[k].raw).length === 0) return false;
+        const allowNonPositive = KPI_PROTOCOLS[k].allowNonPositive ?? false;
+        if (parseAttempts(attempts[k].raw, { allowNonPositive }).length === 0)
+          return false;
         if (k === "vertical_jump") {
           return parsePositiveNumber(attempts[k].weight ?? "") != null;
         }
@@ -281,7 +310,9 @@ export default function KpiWizard() {
               peak_power_w: r.peakPowerW,
             };
           } else {
-            const parsed = parseAttempts(attempts[key].raw);
+            const parsed = parseAttempts(attempts[key].raw, {
+              allowNonPositive: protocol.allowNonPositive ?? false,
+            });
             value = bestAttempt(parsed);
             recordedAttempts = parsed;
           }
@@ -644,6 +675,11 @@ export default function KpiWizard() {
         {currentProtocol && (
           <KpiStepCard
             protocol={currentProtocol}
+            demoGifUrl={
+              ((id) => (id != null ? demoGifs?.[id] ?? null : null))(
+                KPI_DEMO_EXERCISE_ID[currentProtocol.key],
+              )
+            }
             attempts={attempts[currentProtocol.key]}
             onChangeAttempt={(idx, value) =>
               updateAttempt(currentProtocol.key, idx, value)

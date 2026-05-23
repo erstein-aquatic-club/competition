@@ -35,11 +35,17 @@ export interface KpiAttemptsState {
 
 export function KpiStepCard({
   protocol,
+  demoGifUrl = null,
   attempts,
   onChangeAttempt,
   onChangeWeight,
 }: {
   protocol: KpiProtocol;
+  /**
+   * GIF de démo résolu depuis le catalogue (§301 T2). Prioritaire sur
+   * `protocol.gifUrl` ; `null` → illustration SVG (fallback `KpiGifPanel`).
+   */
+  demoGifUrl?: string | null;
   attempts: KpiAttemptsState;
   onChangeAttempt: (index: number, value: string) => void;
   /** Updates the body-weight field — used by the vertical-jump step only. */
@@ -58,7 +64,7 @@ export function KpiStepCard({
       </div>
 
       <KpiGifPanel
-        gifUrl={protocol.gifUrl}
+        gifUrl={demoGifUrl ?? protocol.gifUrl}
         kpiKey={protocol.key}
         label={protocol.label}
       />
@@ -144,7 +150,8 @@ function GenericKpiInputs({
   attempts: KpiAttemptsState;
   onChangeAttempt: (index: number, value: string) => void;
 }) {
-  const parsed = parseAttempts(attempts.raw);
+  const allowNonPositive = protocol.allowNonPositive ?? false;
+  const parsed = parseAttempts(attempts.raw, { allowNonPositive });
   const retained = parsed.length > 0 ? bestAttempt(parsed) : null;
 
   return (
@@ -166,11 +173,11 @@ function GenericKpiInputs({
           {Array.from({ length: protocol.attempts }).map((_, i) => {
             const value = attempts.raw[i] ?? "";
             const numeric = Number(String(value).replace(",", "."));
-            const isBest =
-              retained != null &&
+            const isValid =
+              value.trim() !== "" &&
               Number.isFinite(numeric) &&
-              numeric > 0 &&
-              numeric === retained;
+              (allowNonPositive || numeric > 0);
+            const isBest = retained != null && isValid && numeric === retained;
             return (
               <div key={i} className="relative">
                 <span className="mb-1 block text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">

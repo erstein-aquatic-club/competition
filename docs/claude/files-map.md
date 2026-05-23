@@ -21,8 +21,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/strength-planning.ts` | CRUD strength_planning_* : slots groupe + overrides athlete + week meta (Phase 2 §157) | 170 lignes |
 | `src/lib/api/strength-kpi.ts` | CRUD `strength_kpi_measurements` — mesures du wizard KPIs (`recordKpiMeasurement`, `getKpiHistory`, `getLatestKpiMeasurements`, `markKpiReviewed`) — Bilan Muscu §285 | 94 lignes |
 | `src/lib/api/strength-assessments.ts` | CRUD `strength_assessments` — bilans muscu (`createAssessment`, `getLatestAssessment`, `getAssessment`, `listAssessments`, `updateAssessmentQuestionnaire`, `updateAssessmentPhysicalTests`) — Bilan Muscu §285 | 107 lignes |
-| `src/lib/strength/kpiProtocols.ts` | Config des 5 fiches-protocole KPI (`KPI_PROTOCOLS`) — Bilan Muscu §285 | 92 lignes |
-| `src/lib/strength/kpiMeasurement.ts` | Helpers KPI : `bestAttempt`, `parseAttempts` — Bilan Muscu §285 | ~25 lignes |
+| `src/lib/strength/kpiProtocols.ts` | Config des 5 fiches-protocole KPI (`KPI_PROTOCOLS`, flag `allowNonPositive`) + map démo `KPI_DEMO_EXERCISE_ID` (§301) — Bilan Muscu §285 | 129 lignes |
+| `src/lib/strength/kpiMeasurement.ts` | Helpers KPI : `bestAttempt`, `parseAttempts({allowNonPositive})`, `parsePositiveNumber`, `sanitizeNumericInput` (§301) — Bilan Muscu §285 | 69 lignes |
 | `src/lib/strength/kpiBaremes.ts` | Barèmes KPI : fonction de scoring `kpiScore` (interpolation) + `KPI_BAREMES` (5 KPIs × 2 sexes × 3 bandes d'âge, flag de confiance) + `ageBandFor`/`getBareme` — Bilan Muscu Chantier A §290 | 257 lignes |
 | `src/lib/strength/periodizationCycles.ts` | Stratégie de chargement par cycle de périodisation (`PERIODIZATION_CYCLES` : config des 6 cycles, union discriminée `CycleLoading` catalogue/générique) — Bilan Muscu Chantier A §292 | 166 lignes |
 | `src/lib/strength/mesocycleEngine.ts` | **Moteur de génération du mésocycle** Bilan Muscu — 6 fonctions TS pures TDD : `scoreBuckets` (6 seaux 0-100), `prioritizeBuckets` (score combiné + override sécurité), `allocateVolume` (focus/maintien), `selectExercises` (filtre douleur + substitution), `periodize` (distribution phases sur durée cible), `generateMesocycle` orchestrateur → `GeneratedMesocycle`. Chantier C §293 | 836 lignes |
@@ -36,7 +36,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/api/strength-mesocycles.ts` | Wrappers API mésocycle (`generateMesocyclePreview`, `applyMesocycle` → RPC, `revertMesocycle` → RPC, `getMesocycle`/`getActiveMesocycle`/`listMesocycles`) — Chantier D §293 | 211 lignes |
 | `src/lib/api/__tests__/strength-mesocycles.test.ts` | 12 tests des wrappers (mocks `client.ts` via `node:test mock.module`, sérialisation snake_case, conversion Date) — §293 | 419 lignes |
 | `src/lib/api/strength-periodization-templates.ts` | Wrappers lecture des templates (`listStrengthPeriodizationTemplates`, `getStrengthPeriodizationTemplate`, `listStrengthTemplateEventGroups`) — §293 | 67 lignes |
-| `src/lib/api/strength-catalog.ts` | Projection « taggée » de `dim_exercices` (`bucket`/`level`/`contraindication_zones`/`is_core`) → `CatalogExercise[]` consommable par le moteur — §293 | 87 lignes |
+| `src/lib/api/strength-catalog.ts` | Projection « taggée » de `dim_exercices` (`bucket`/`level`/`contraindication_zones`/`is_core`) → `CatalogExercise[]` consommable par le moteur (§293) + `getExerciseGifs(ids)` (démos KPI §301) | 114 lignes |
 | `supabase/migrations/00170_strength_mesocycles.sql` | Tables `strength_mesocycles` + `strength_planning_snapshots` + RLS nageur own + coach scope par CSA (corrigé en 00171) — §293 | 170 lignes |
 | `supabase/migrations/00171_strength_mesocycles_coach_rls.sql` | Corrige le scope coach sur les 2 tables mésocycle : club-entier (calqué sur `strength_assessments`) — §293 | 36 lignes |
 | `supabase/migrations/00172_apply_strength_mesocycle.sql` | RPC SECURITY DEFINER transactionnelle — supersede + INSERT mésocycle + snapshot + matérialisation templates/items/overrides + notification coach — §293 | 318 lignes |
@@ -257,7 +257,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | 1484 lignes |
 | `src/components/strength/SetRow.tsx` | Ligne exercice memoïsée pour l'aperçu séance dans WorkoutRunner (§267 R2 sub-§A) | 66 lignes |
 | `src/components/strength/kpi/KpiStepCard.tsx` | Étape KPI du wizard (§285) — protocole (steps, rôle binôme, mesure, GIF), N champs d'essais, valeur retenue live via `bestAttempt` | 190 lignes |
-| `src/components/strength/kpi/KpiRecap.tsx` | Recap post-submit du wizard KPIs (§285) — diff de chaque mesure vs précédente, note review coach si source athlete | 139 lignes |
+| `src/components/strength/kpi/KpiRecap.tsx` | Recap post-submit du wizard KPIs (§285) — diff de chaque mesure vs précédente, note review coach si source athlete, pastille de confiance barème par-KPI (§301) | 281 lignes |
 | `src/components/strength/kpi/KpiSwimmerPicker.tsx` | Drawer de sélection nageur du wizard KPIs (§285) — cible mesurée + binôme `assisted_by`, recherche | 141 lignes |
 | `src/components/strength/kpi/KpiGifPanel.tsx` | Slot démo d'un protocole KPI — cascade : `<img>` si `gifUrl` fourni, sinon `<KpiAnimatedIllustration>` (§295) | 33 lignes |
 | `src/components/strength/kpi/KpiStopwatch.tsx` | Chrono temps de vol intégré pour KPI détente (§295) — state machine idle/running/stopped, `performance.now()` sub-ms, vibration haptique, fallback `↺ Refaire` | 194 lignes |

@@ -414,6 +414,7 @@ export {
 // Bilan Muscu — Catalogue d'exercices taggés (§291)
 export {
   listCatalogExercisesTagged,
+  getExerciseGifs,
 } from './strength-catalog';
 
 // Swim planning
