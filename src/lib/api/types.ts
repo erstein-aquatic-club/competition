@@ -88,6 +88,10 @@ export interface StrengthSessionItem {
    *  visuellement échauffement vs bloc principal dans le preview
    *  + le mode focus. `null` pour les items legacy sans block tagué. */
   block?: 'warmup' | 'main' | null;
+  /** §300 — `raw_payload` JSON de l'item (porte `mesocycle_id`, cycle, intention…).
+   *  Conservé lors d'une édition coach d'une séance générée pour ne pas casser
+   *  le revert (cf. `reconcileMesocyclePayloads`). `null`/absent hors mésocycle. */
+  raw_payload?: Record<string, unknown> | null;
 }
 
 export interface StrengthFolder {

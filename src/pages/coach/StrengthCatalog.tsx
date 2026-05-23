@@ -756,6 +756,9 @@ export default function StrengthCatalog() {
         percent_1rm: item.percent_1rm,
         cycle_type: item.cycle_type,
         notes: item.notes ?? "",
+        // §300 — conserve le raw_payload (mesocycle_id…) pour le round-trip à la
+        // sauvegarde ; absent pour les séances hors mésocycle (→ null).
+        raw_payload: item.raw_payload ?? null,
       })) ?? [],
       folder_id: session.folder_id ?? null,
     });

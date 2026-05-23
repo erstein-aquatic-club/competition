@@ -45,6 +45,7 @@ import {
   enrichItemsWithExerciseNames,
 } from './transformers';
 import { localStorageGet, localStorageSave } from './localStorage';
+import { reconcileMesocyclePayloads } from '../strength/mesocycleItemPayload';
 
 // --- Exercises ---
 
@@ -276,21 +277,42 @@ export async function updateStrengthSession(session: any) {
     prepareStrengthItemsPayload(session);
 
   if (canUseSupabase()) {
-    const rpcItems = mapItemsForDbInsert(itemsPayload, session.id, cycle).map(
-      ({ session_id: _sid, ...item }) => ({
-        ordre: item.ordre,
-        exercise_id: item.exercise_id,
-        block: item.block ?? 'main',
-        cycle_type: item.cycle_type ?? 'normal',
-        sets: item.sets ?? null,
-        reps: item.reps ?? null,
-        pct_1rm: item.pct_1rm ?? null,
-        rest_series_s: item.rest_series_s ?? null,
-        rest_exercise_s: null as number | null,
-        notes: item.notes ?? null,
-        raw_payload: null as unknown,
-      }),
+    const mapped = mapItemsForDbInsert(itemsPayload, session.id, cycle);
+    // §300 — Préserve le raw_payload d'origine (mesocycle_id, cycle, intention…)
+    // par corrélation sur `ordre`. Pour une séance de mésocycle, le tag est
+    // imposé à tous les items (y compris ajoutés) → le revert reste cohérent.
+    // Hors mésocycle, raw_payload reste null (comportement inchangé).
+    const sourceItems: Array<Record<string, unknown>> = Array.isArray(
+      session.items,
+    )
+      ? (session.items as Array<Record<string, unknown>>)
+      : [];
+    const sourceByOrdre = new Map<
+      number,
+      Record<string, unknown> | null
+    >(
+      sourceItems.map((it) => [
+        Number(it.order_index ?? it.ordre),
+        (it.raw_payload ?? null) as Record<string, unknown> | null,
+      ]),
     );
+    const reconciledPayloads = reconcileMesocyclePayloads(
+      mapped.map((m) => m.ordre),
+      sourceByOrdre,
+    );
+    const rpcItems = mapped.map(({ session_id: _sid, ...item }, idx) => ({
+      ordre: item.ordre,
+      exercise_id: item.exercise_id,
+      block: item.block ?? 'main',
+      cycle_type: item.cycle_type ?? 'normal',
+      sets: item.sets ?? null,
+      reps: item.reps ?? null,
+      pct_1rm: item.pct_1rm ?? null,
+      rest_series_s: item.rest_series_s ?? null,
+      rest_exercise_s: null as number | null,
+      notes: item.notes ?? null,
+      raw_payload: reconciledPayloads[idx] as unknown,
+    }));
     assertSupabase(await supabase.rpc('update_strength_session_atomic', {
       p_session_id: session.id,
       p_name: session?.title ?? session?.name ?? '',
