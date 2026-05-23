@@ -4,6 +4,25 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §300 — Édition coach d'une séance générée : Part 1 (préservation raw_payload) (2026-05-23)
+
+**Branche** : `feat/300-coach-edit-mesocycle`
+**Trigger** : suite du §299 (T13/T14 différés). L'audit avait montré que `updateStrengthSession` force `raw_payload:null` → éditer une séance `[Méso]` détruirait `mesocycle_id` (orphelins au revert) + la métadonnée de périodisation. Plan complet : `docs/plans/2026-05-23-coach-edit-mesocycle-part2.md`.
+
+> **Fait décisif** : la RPC `update_strength_session_atomic` **écrit déjà** `item->'raw_payload'` (vérifié sur la def live). Le blocage était purement JS. **Aucun changement RPC → aucun conflit avec §298.**
+
+### Part 1 — Foundation data-safety (livrée, isolée)
+- **`reconcileMesocyclePayloads(ordres, sourceByOrdre)`** (ajout à `src/lib/strength/mesocycleItemPayload.ts`) : corrèle les items reconstruits aux items source par `ordre`, préserve le `raw_payload` complet des items édités, et **impose le `mesocycle_id` de la séance aux items ajoutés** (absents de la source) → revert cohérent, zéro orphelin. Hors mésocycle (aucun item taggé) : `raw_payload` rendu tel quel (null) — **comportement inchangé**. 5 tests (10 au total avec `preserveMesocycleTag`).
+- **`updateStrengthSession`** (`src/lib/api/strength.ts`) : ne force plus `raw_payload:null` ; construit `sourceByOrdre` depuis `session.items` (order_index→raw_payload) et applique `reconcileMesocyclePayloads`. **Ne touche pas aux transforms partagés** (`prepareStrengthItemsPayload`/`mapItemsForDbInsert`) — la corrélation se fait dans `updateStrengthSession` (blast radius minimal).
+- **`StrengthSessionItem`** (`types.ts`) : ajout du champ optionnel `raw_payload`. Porté dans le draft `startEditSession` (`StrengthCatalog.tsx`) pour le round-trip une fois Part 2 livrée.
+
+### Part 2 — Atteignabilité éditeur (PLANIFIÉE, non livrée)
+Permettre d'ouvrir une séance `[Méso]` dans l'éditeur depuis la planif (getter par id avec `raw_payload`, deeplink catalogue, bouton « Éditer », test RLS édit→revert). Détail : `docs/plans/2026-05-23-coach-edit-mesocycle-part2.md`. **Sans Part 2, l'édition n'est pas encore atteignable en UI** — Part 1 sécurise le chemin de sauvegarde et débloque Part 2.
+
+### Tests
+- `npm test` — vert (+5 tests `reconcileMesocyclePayloads`). `npx tsc --noEmit` — exit 0. `npm run build` — OK.
+- Pas de `test:rls` : la logique d'autorisation des policies sur `strength_session_items` est **inchangée** (on ne modifie que le **contenu** `raw_payload` écrit, pas le qui-peut-écrire). Le test RLS édit→revert (T14) est planifié en Part 2.
+
 ## §299 — Parcours mésocycle : 2 modes (autonomie nageur + génération coach) (2026-05-23)
 
 **Branche** : `feat/299-parcours-mesocycle-2modes` (worktree `.worktrees/feat-299-parcours-mesocycle`)

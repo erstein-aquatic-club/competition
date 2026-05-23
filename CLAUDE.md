@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§299** — Parcours mésocycle 2 modes : autonomie nageur (verrou abaissé à `bilan_pending` + auto-démarrage) + génération/questionnaire pilotés coach (écrans paramétrés par `athleteId`). Édition fine coach différée.
+Dernier § livré : **§300** — Édition coach séance générée, Part 1 : `updateStrengthSession` préserve `raw_payload` (`reconcileMesocyclePayloads`) → revert cohérent. Part 2 (atteignabilité éditeur) planifiée (`docs/plans/2026-05-23-coach-edit-mesocycle-part2.md`). (§299 : parcours mésocycle 2 modes.)
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
