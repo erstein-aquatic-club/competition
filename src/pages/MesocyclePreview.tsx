@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import {
   applyMesocycle,
+  getAthletes,
   generateMesocyclePreview,
   getLatestAssessment,
   getLatestKpiMeasurements,
@@ -61,6 +62,7 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  Target,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -74,6 +76,8 @@ interface PendingParams {
   targetWeekCount: number;
   sessionsPerWeek: number;
   startWeekMonday: string;
+  /** Nageur ciblé (mode coach). Absent/égal à la session → mode nageur. */
+  athleteId?: number | null;
 }
 
 const BUCKET_LABEL_FR: Record<AllBucket, string> = {
@@ -220,24 +224,43 @@ export default function MesocyclePreview() {
     }
   }, [params, navigate]);
 
+  // ── Cible effective : nageur ciblé par le payload (mode coach) ou soi ─────
+  const role = useAuth((s) => s.role);
+  const isCoach = role === "coach" || role === "admin";
+  const targetAthleteId = params?.athleteId ?? null;
+  const effectiveAthleteId =
+    isCoach && targetAthleteId != null ? targetAthleteId : userId;
+  const isCoachMode = effectiveAthleteId !== userId;
+
   // ── Fetches en parallèle ─────────────────────────────────────────────────
   const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["profile", userId],
-    queryFn: () => getProfile({ userId: userId! }),
-    enabled: userId != null,
+    queryKey: ["profile", effectiveAthleteId],
+    queryFn: () => getProfile({ userId: effectiveAthleteId! }),
+    enabled: effectiveAthleteId != null,
   });
 
   const { data: assessment, isLoading: assessLoading } = useQuery({
-    queryKey: ["strength-assessment-latest", userId],
-    queryFn: () => getLatestAssessment(userId!),
-    enabled: userId != null,
+    queryKey: ["strength-assessment-latest", effectiveAthleteId],
+    queryFn: () => getLatestAssessment(effectiveAthleteId!),
+    enabled: effectiveAthleteId != null,
   });
 
   const { data: kpiLatest, isLoading: kpiLoading } = useQuery({
-    queryKey: ["strength-kpi-latest", userId],
-    queryFn: () => getLatestKpiMeasurements(userId!),
-    enabled: userId != null,
+    queryKey: ["strength-kpi-latest", effectiveAthleteId],
+    queryFn: () => getLatestKpiMeasurements(effectiveAthleteId!),
+    enabled: effectiveAthleteId != null,
   });
+
+  // Nom du nageur ciblé (mode coach) — en-tête de cible non ambigu.
+  const { data: previewAthletes } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => getAthletes(),
+    enabled: isCoachMode,
+    staleTime: 5 * 60_000,
+  });
+  const targetName =
+    previewAthletes?.find((a) => a.id === effectiveAthleteId)?.display_name ??
+    null;
 
   const { data: template, isLoading: tplLoading } = useQuery({
     queryKey: ["strength-periodization-template", params?.templateId],
@@ -316,16 +339,19 @@ export default function MesocyclePreview() {
       } catch {
         // Ignore : sessionStorage peut être bloqué (private mode).
       }
-      queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-active", userId] });
+      queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-active", effectiveAthleteId] });
       queryClient.invalidateQueries({ queryKey: ["strength_planning_slot_overrides"] });
       queryClient.invalidateQueries({ queryKey: ["strength_planning_week_overrides"] });
       queryClient.invalidateQueries({ queryKey: ["strength_planning_slots"] });
       toast.success("Mésocycle appliqué", {
-        description: `${generated?.totalWeeks ?? "?"} semaines posées sur ta planif muscu. Ton coach a été notifié.`,
+        description: isCoachMode
+          ? `${generated?.totalWeeks ?? "?"} semaines posées sur la planif de ${targetName ?? "ce nageur"}. Il a été notifié.`
+          : `${generated?.totalWeeks ?? "?"} semaines posées sur ta planif muscu. Ton coach a été notifié.`,
       });
       // ID renvoyé par la RPC — utile pour debug, pas pour le routing.
       void mesocycleId;
-      navigate("/strength");
+      // Mode coach → retour à la fiche nageur (onglet Planning) ; sinon /strength.
+      navigate(isCoachMode ? `/coach/swimmer/${effectiveAthleteId}` : "/strength");
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
@@ -382,6 +408,17 @@ export default function MesocyclePreview() {
       />
 
       <div className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
+        {isCoachMode && (
+          <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+            <Target className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-muted-foreground">
+              Aperçu pour&nbsp;
+              <span className="font-semibold text-foreground">
+                {targetName ?? "ce nageur"}
+              </span>
+            </span>
+          </div>
+        )}
         <ReasoningPanel
           generated={generated}
           bilanPending={assessment.status === "bilan_pending"}

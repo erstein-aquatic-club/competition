@@ -30,9 +30,10 @@
  *  (cf. AppLayout), comme `KpiWizard` et `StrengthQuestionnaire`.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
+  getAthletes,
   getLatestAssessment,
   getProfile,
   listStrengthPeriodizationTemplates,
@@ -141,7 +142,23 @@ function pickUpcoming(comps: Competition[], todayIso: string, limit = 5): Compet
 export default function MesocycleGeneration() {
   const userId = useAuth((s) => s.userId);
   const userName = useAuth((s) => s.user);
+  const role = useAuth((s) => s.role);
+  const isCoach = role === "coach" || role === "admin";
   const [, navigate] = useLocation();
+
+  // Route /coach/mesocycle-generate/:athleteId → on génère pour le nageur
+  // ciblé (mode coach) ; route /strength/... → pour soi (session courante).
+  const routeParams = useParams<{ athleteId?: string }>();
+  const targetAthleteId =
+    routeParams.athleteId != null ? Number(routeParams.athleteId) : null;
+  const effectiveAthleteId =
+    isCoach && targetAthleteId != null ? targetAthleteId : userId;
+  const isCoachMode = effectiveAthleteId !== userId;
+
+  // Garde de rôle : un nageur ne peut pas cibler un autre nageur.
+  useEffect(() => {
+    if (targetAthleteId != null && !isCoach) navigate("/strength");
+  }, [targetAthleteId, isCoach, navigate]);
 
   // Masquer le dock du bas — convention focus mode (cf. KpiWizard).
   useEffect(() => {
@@ -153,17 +170,27 @@ export default function MesocycleGeneration() {
 
   // ── Pré-requis : bilan complété ──────────────────────────────────────────
   const { data: assessment, isLoading: assessmentLoading } = useQuery({
-    queryKey: ["strength-assessment-latest", userId],
-    queryFn: () => getLatestAssessment(userId!),
-    enabled: userId != null,
+    queryKey: ["strength-assessment-latest", effectiveAthleteId],
+    queryFn: () => getLatestAssessment(effectiveAthleteId!),
+    enabled: effectiveAthleteId != null,
   });
 
   const { data: profile } = useQuery({
-    queryKey: ["profile", userId],
-    queryFn: () => getProfile({ userId: userId! }),
-    enabled: userId != null,
+    queryKey: ["profile", effectiveAthleteId],
+    queryFn: () => getProfile({ userId: effectiveAthleteId! }),
+    enabled: effectiveAthleteId != null,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Nom du nageur ciblé (mode coach uniquement) — en-tête de cible non ambigu.
+  const { data: athletes } = useQuery({
+    queryKey: ["athletes"],
+    queryFn: () => getAthletes(),
+    enabled: isCoachMode,
+    staleTime: 5 * 60_000,
+  });
+  const targetName =
+    athletes?.find((a) => a.id === effectiveAthleteId)?.display_name ?? null;
 
   // ── Données du catalogue ─────────────────────────────────────────────────
   const { data: eventGroups = [] } = useQuery({
@@ -218,7 +245,7 @@ export default function MesocycleGeneration() {
   }, [assessment, sessionsPerWeek]);
 
   // ── Compétitions à venir + ancrage temporel ──────────────────────────────
-  const { visibleCompetitions } = useCompetitionsByWeek(userId);
+  const { visibleCompetitions } = useCompetitionsByWeek(effectiveAthleteId);
 
   const todayMonday = useMemo(() => getMonday(new Date()), []);
   const todayIso = useMemo(() => toISODate(new Date()), []);
@@ -266,6 +293,7 @@ export default function MesocycleGeneration() {
       targetWeekCount: weeks,
       sessionsPerWeek,
       startWeekMonday: startMondayIso,
+      athleteId: effectiveAthleteId,
     };
     try {
       window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
@@ -281,15 +309,30 @@ export default function MesocycleGeneration() {
     return <PageSkeleton />;
   }
 
+  const backTarget = isCoachMode
+    ? `/coach/swimmer/${effectiveAthleteId}`
+    : "/strength";
+
   if (!assessment || !canGenerateMesocycle(assessment.status)) {
-    return <AssessmentRequiredScreen onBack={() => navigate("/strength")} />;
+    return <AssessmentRequiredScreen onBack={() => navigate(backTarget)} />;
   }
 
   return (
     <div className="min-h-dvh bg-muted/30 pb-32">
-      <Header onBack={() => navigate("/strength")} />
+      <Header onBack={() => navigate(backTarget)} />
 
       <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+        {isCoachMode && (
+          <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+            <Target className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-muted-foreground">
+              Génération pour&nbsp;
+              <span className="font-semibold text-foreground">
+                {targetName ?? "ce nageur"}
+              </span>
+            </span>
+          </div>
+        )}
         {/* ── Section 01 — Épreuve ciblée ──────────────────────────────── */}
         <SectionCard
           number="01"

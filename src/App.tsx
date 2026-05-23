@@ -372,6 +372,11 @@ function AppRouter() {
                 <MesocycleGeneration />
               </Suspense>
             </Route>
+            <Route path="/coach/mesocycle-generate/:athleteId">
+              <Suspense fallback={<ListSkeleton />}>
+                <MesocycleGeneration />
+              </Suspense>
+            </Route>
             <Route path="/strength/mesocycle-preview">
               <Suspense fallback={<ListSkeleton />}>
                 <MesocyclePreview />
