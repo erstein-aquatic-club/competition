@@ -21,7 +21,11 @@ import { describe, it, before, beforeEach, mock } from "node:test";
 // Each entry is consumed FIFO by supabase.from().
 type FromScript =
   | { kind: "count"; count: number; error: null | { message: string } }
-  | { kind: "insert"; hang: boolean; error: null | { message: string } };
+  | { kind: "insert"; hang: boolean; error: null | { message: string } }
+  // §298 — reconcile appelle getNonWeightExerciseIds() → getExercises() →
+  // supabase.from("dim_exercices") pour armer skip_one_rm. Ce fetch doit être
+  // borné (withTimeout) côté code, sinon il bloque le chemin durci §177.
+  | { kind: "catalog"; hang: boolean; exercises?: unknown[] };
 
 const scripts: FromScript[] = [];
 const fromCalls: string[] = [];
@@ -94,6 +98,11 @@ before(async () => {
           if (script.kind === "count") {
             return makeChain({ data: null, error: script.error, count: script.count });
           }
+          if (script.kind === "catalog") {
+            // §298 — getExercises() : null/[] data → liste d'exos vide côté helper.
+            if (script.hang) return makeHangingChain();
+            return makeChain({ data: script.exercises ?? [], error: null });
+          }
           // insert
           if (script.hang) return makeHangingChain();
           return makeChain({ data: null, error: script.error });
@@ -123,6 +132,7 @@ describe("reconcileStrengthRunLogs — §177 timeout wrapper", () => {
     // The insert hangs → outer withTimeout (80 ms) fires before allSettled settles.
     scripts.push(
       { kind: "count", count: 0, error: null },
+      { kind: "catalog", hang: false },          // §298 getNonWeightExerciseIds
       { kind: "insert", hang: true, error: null },
     );
 
@@ -152,6 +162,7 @@ describe("reconcileStrengthRunLogs — §177 timeout wrapper", () => {
     // so the outer timeout fires before it can collect all results.
     scripts.push(
       { kind: "count", count: 0, error: null },
+      { kind: "catalog", hang: false },              // §298 getNonWeightExerciseIds
       { kind: "insert", hang: false, error: null },
       { kind: "insert", hang: false, error: null },
       { kind: "insert", hang: true,  error: null }, // 3rd hangs
@@ -182,6 +193,7 @@ describe("reconcileStrengthRunLogs — §177 timeout wrapper", () => {
   it("resolves successfully when all 5 inserts resolve quickly (well under timeout)", async () => {
     scripts.push(
       { kind: "count", count: 0, error: null },
+      { kind: "catalog", hang: false },              // §298 getNonWeightExerciseIds
       { kind: "insert", hang: false, error: null },
       { kind: "insert", hang: false, error: null },
       { kind: "insert", hang: false, error: null },
@@ -203,6 +215,33 @@ describe("reconcileStrengthRunLogs — §177 timeout wrapper", () => {
     assert.ok(elapsed < 200, `Expected fast resolution, took ${elapsed}ms`);
     assert.equal(result.attempted, 5);
     assert.equal(result.succeeded, 5);
+    assert.deepEqual(result.errors, []);
+    // §298 — documente le fetch catalogue ajouté sur le chemin reconcile.
+    assert.ok(fromCalls.includes("dim_exercices"), `Expected catalog fetch, got: ${fromCalls.join(",")}`);
+  });
+
+  it("ne hang pas si le fetch catalogue (getNonWeightExerciseIds) traîne — dégrade (§298)", async () => {
+    // Régression §298 : getNonWeightExerciseIds() → getExercises() a été ajouté
+    // sur le chemin reconcile (durci §177 contre les hangs) SANS borne. Si le
+    // fetch dim_exercices ne répond jamais, reconcile doit dégrader (skip_one_rm
+    // = false, comportement pré-§298) et logger les séries — JAMAIS rester bloqué.
+    scripts.push(
+      { kind: "count", count: 0, error: null },
+      { kind: "catalog", hang: true },                // catalogue ne répond jamais
+      { kind: "insert", hang: false, error: null },
+    );
+
+    const { reconcileStrengthRunLogs } = await import("../strength.ts");
+
+    const result = await reconcileStrengthRunLogs({
+      runId: 42,
+      logs: [makeLog(0)],
+      athleteId: null,
+      athleteName: null,
+    });
+
+    assert.equal(result.attempted, 1);
+    assert.equal(result.succeeded, 1);
     assert.deepEqual(result.errors, []);
   });
 });

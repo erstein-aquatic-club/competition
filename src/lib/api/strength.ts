@@ -61,7 +61,13 @@ export function shouldSkipOneRm(weight: number | null | undefined, skipFlag?: bo
  *  gracieuse : on ne bloque pas la sauvegarde des séries). */
 export async function getNonWeightExerciseIds(): Promise<Set<number>> {
   try {
-    const exercises = await getExercises();
+    // §177/§298 — borne le fetch catalogue. Ce helper tourne sur les chemins de
+    // récupération (reconcile fin de séance, replay offline, fallback save) que
+    // §177 a durcis contre les hangs réseau. Sans withTimeout, un getExercises()
+    // qui traîne bloquerait reconcile indéfiniment (régression du durcissement).
+    // Timeout/erreur → catch → Set vide (skip_one_rm = false, comportement
+    // pré-§298 : au pire un 1RM est estimé, jamais un blocage de la sauvegarde).
+    const exercises = await withTimeout(getExercises(), 10_000, "catalog-metric");
     return new Set(
       exercises
         .filter((e) => (e.intensity_metric ?? "weight_kg") !== "weight_kg")
