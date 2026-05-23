@@ -46,6 +46,12 @@ import {
 } from './transformers';
 import { localStorageGet, localStorageSave } from './localStorage';
 
+/** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
+ *  ou métrique d'intensité non-poids (skip flag armé par le caller). */
+export function shouldSkipOneRm(weight: number | null | undefined, skipFlag?: boolean): boolean {
+  return isBodyweight(weight) || skipFlag === true;
+}
+
 // --- Exercises ---
 
 export async function getExercises(): Promise<Exercise[]> {
@@ -415,13 +421,16 @@ export async function logStrengthSet(payload: {
   athleteId?: number | string | null;
   athlete_name?: string | null;
   athleteName?: string | null;
+  /** §298 — armé par le caller quand l'exo a une métrique non-poids (cm/s) :
+   *  la valeur loggée dans `weight` n'est pas une charge → pas d'estimation 1RM. */
+  skip_one_rm?: boolean;
 }) {
   const maybeUpdateOneRm = async (context?: {
     athleteId?: number | string | null;
     athleteName?: string | null;
   }) => {
-    // Skip 1RM estimation for bodyweight sets
-    if (isBodyweight(payload.weight)) return null;
+    // Skip 1RM estimation for bodyweight sets ou métriques non-poids (§298)
+    if (shouldSkipOneRm(payload.weight, payload.skip_one_rm)) return null;
     const estimate = estimateOneRm(Number(payload.weight), Number(payload.reps));
     if (!estimate) return null;
     const athleteId = context?.athleteId ?? null;
@@ -496,9 +505,10 @@ export async function logStrengthSet(payload: {
     }
 
     // Compute the 1RM estimate client-side; the RPC will only persist it if
-    // it beats the existing record. Bodyweight sets skip 1RM estimation.
+    // it beats the existing record. Bodyweight sets ou métriques non-poids
+    // (§298) skip 1RM estimation.
     const oneRmEstimate =
-      isBodyweight(payload.weight)
+      shouldSkipOneRm(payload.weight, payload.skip_one_rm)
         ? null
         : estimateOneRm(Number(payload.weight), Number(payload.reps));
 
