@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§297** — Flag `is_bodyweight` + estimation 1RM inline via ramp-up (chauffes → série de référence) + bouton "Recalculer ma 1RM".
+Dernier § livré : **§298** — Métrique d'intensité par exercice (hauteur/distance/temps), ex: Box Jump tracké en cm.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
