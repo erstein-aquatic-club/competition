@@ -20,6 +20,9 @@ interface MyPlanSessionSheetProps {
   onLaunch?: (session: StrengthSessionTemplate) => void;
   /** §298 — mode lecture seule (coach) : masque le bouton « Lancer la séance ». */
   readOnly?: boolean;
+  /** §300 Part 2 — si fourni (coach), affiche « Éditer la séance » → ouvre
+   *  l'éditeur catalogue par deeplink (préserve le raw_payload du mésocycle). */
+  onEdit?: (session: StrengthSessionTemplate) => void;
 }
 
 export function MyPlanSessionSheet({
@@ -28,6 +31,7 @@ export function MyPlanSessionSheet({
   onClose,
   onLaunch,
   readOnly = false,
+  onEdit,
 }: MyPlanSessionSheetProps) {
   const style = phase ? PHASE_STYLES[phase] : null;
   const items = session?.items ?? [];
@@ -68,6 +72,16 @@ export function MyPlanSessionSheet({
               <Button variant="outline" className="flex-1" onClick={onClose}>
                 Fermer
               </Button>
+              {onEdit && (
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => onEdit(session)}
+                >
+                  Éditer la séance
+                </Button>
+              )}
               {!readOnly && onLaunch && (
                 <Button
                   size="lg"

@@ -457,12 +457,29 @@ export default function StrengthPlanningScreen() {
         </>
       )}
 
-      {/* §298 — Preview Sheet read-only (mode athlete uniquement) */}
+      {/* §298 — Preview Sheet read-only ; §300 Part 2 — bouton « Éditer » coach */}
       <MyPlanSessionSheet
         session={previewSession}
         phase={null}
         onClose={() => setPreviewSession(null)}
         readOnly
+        onEdit={(session) => {
+          // §300 Part 2 — deeplink vers l'éditeur catalogue : sélectionne l'onglet
+          // muscu de la bibliothèque coach + dépose l'id de séance, puis navigue
+          // vers la section bibliothèque. StrengthCatalog charge la séance par id
+          // (y compris une séance générée [Méso], exclue de la liste).
+          try {
+            localStorage.setItem("eac-coach-library-tab", "strength");
+            sessionStorage.setItem(
+              "eac_coach_edit_strength_session",
+              String(session.id),
+            );
+          } catch {
+            /* stockage indisponible (private mode) — on navigue quand même */
+          }
+          setPreviewSession(null);
+          window.location.hash = "#/coach?section=library";
+        }}
       />
 
       {/* Competition Detail Sheet */}

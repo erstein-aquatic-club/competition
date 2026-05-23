@@ -26,6 +26,7 @@ import {
   duplicateFolder,
   duplicateAthletePlan,
   getStrengthSessionsPaginated,
+  getStrengthSessionForEdit,
 } from "@/lib/api";
 import type { AthleteSummary } from "@/lib/api/types";
 import type { StrengthSessionInput } from "@/lib/types";
@@ -651,6 +652,10 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      // §300 Part 2 — une séance de mésocycle peut avoir été éditée via deeplink
+      // depuis la planif : rafraîchit les vues planif/mésocycle (coach + nageur).
+      queryClient.invalidateQueries({ queryKey: ["strength_planning_slot_overrides"] });
+      queryClient.invalidateQueries({ queryKey: ["mesocycle-sessions-content"] });
       setIsCreating(false);
       setEditingSessionId(null);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
@@ -766,6 +771,34 @@ export default function StrengthCatalog() {
     });
     setIsCreating(true);
   };
+
+  // §300 Part 2 — Deeplink d'édition déposé par la planif coach : ouvre une
+  // séance par id (y compris une séance générée `[Méso …]`, exclue de la liste
+  // mais éditable par id). Chargée avec son `raw_payload` → la sauvegarde le
+  // préserve (cf. reconcileMesocyclePayloads). Consommé une seule fois.
+  useEffect(() => {
+    const KEY = "eac_coach_edit_strength_session";
+    const raw = sessionStorage.getItem(KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(KEY);
+    const id = Number(raw);
+    if (!Number.isFinite(id)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const loaded = await getStrengthSessionForEdit(id);
+        if (cancelled) return;
+        if (loaded) startEditSession(loaded);
+        else toast.error("Séance introuvable pour l'édition.");
+      } catch {
+        if (!cancelled) toast.error("Impossible de charger la séance à éditer.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startEditExercise = (exercise: Exercise) => {
     setEditingExercise(exercise);

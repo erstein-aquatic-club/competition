@@ -218,6 +218,54 @@ export async function getStrengthSessions(): Promise<StrengthSessionTemplate[]> 
   return (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as StrengthSessionTemplate[];
 }
 
+/**
+ * §300 Part 2 — Charge UNE séance en forme éditeur (items + `raw_payload`) par id,
+ * hors logique de liste. Les séances `[Méso …]` sont exclues de la liste
+ * catalogue (mig 00180) mais restent éditables par id ; le `raw_payload`
+ * (mesocycle_id, cycle…) est inclus pour que la sauvegarde le préserve
+ * (`reconcileMesocyclePayloads`). Le coach a `SELECT` sur les deux tables (RLS).
+ */
+export async function getStrengthSessionForEdit(
+  sessionId: number,
+): Promise<StrengthSessionTemplate | null> {
+  if (!canUseSupabase()) {
+    const sessions = (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) ||
+      []) as StrengthSessionTemplate[];
+    return sessions.find((s) => s.id === sessionId) ?? null;
+  }
+  const rows = assertSupabase(
+    await supabase
+      .from("strength_sessions")
+      .select(
+        "*, strength_session_items(*, dim_exercices(nom_exercice, exercise_type))",
+      )
+      .eq("id", sessionId)
+      .limit(1),
+  );
+  const session = (rows ?? [])[0] as any;
+  if (!session) return null;
+  const rawItems = Array.isArray(session.strength_session_items)
+    ? session.strength_session_items
+    : [];
+  const cycle = normalizeCycleType(rawItems[0]?.cycle_type);
+  return {
+    id: safeInt(session.id, sessionId),
+    title: String(session.name || ""),
+    description: session.description ?? "",
+    cycle,
+    folder_id: safeOptionalInt(session.folder_id),
+    items: rawItems
+      .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
+      .map((item: any, index: number) => ({
+        ...normalizeStrengthItem(item, index, cycle),
+        exercise_name: item.dim_exercices?.nom_exercice ?? undefined,
+        category: item.dim_exercices?.exercise_type ?? undefined,
+        // §300 — indispensable au round-trip : préserve mesocycle_id à la save.
+        raw_payload: (item.raw_payload ?? null) as Record<string, unknown> | null,
+      })),
+  };
+}
+
 export async function getStrengthSessionsPaginated(opts: {
   offset?: number;
   limit?: number;

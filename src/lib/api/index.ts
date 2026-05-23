@@ -494,6 +494,7 @@ export {
   updateExercise,
   deleteExercise,
   getStrengthSessions,
+  getStrengthSessionForEdit,
   createStrengthSession,
   updateStrengthSession,
   persistStrengthSessionOrder,
