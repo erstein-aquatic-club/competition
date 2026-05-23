@@ -46,6 +46,10 @@ export default defineConfig(({ mode }) => ({
           '**/exceljs.min-*.js',
           '**/jspdf.plugin.autotable-*.js',
           '**/html2canvas.esm-*.js',
+          // Artefact du bundle-analyzer (rollup-plugin-visualizer) : fichier de
+          // debug jamais servi à l'utilisateur, > 2 MiB → exclu du precache PWA
+          // (sinon workbox lève une erreur et fait échouer `npm run build` en CI).
+          '**/stats.html',
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: false,  // §171 P1: was true — let UpdateNotification gate the activation
