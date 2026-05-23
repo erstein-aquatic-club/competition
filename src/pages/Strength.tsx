@@ -38,7 +38,7 @@ import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/type
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { OneRmGate } from "@/components/strength/OneRmGate";
-import { QuestionnairePrompt, KpiWizardEntry } from "@/components/strength/StrengthBilanEntry";
+import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/components/strength/StrengthBilanEntry";
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
@@ -1047,8 +1047,10 @@ export default function Strength() {
             <TabsContent value="start" className="space-y-5 pt-4">
               {screenMode === "list" && (
                 <div className="space-y-2.5">
-                  {/* Bilan Muscu (§288) — questionnaire prioritaire si demandé
-                      par le coach, puis entrée KPI wizard standard. */}
+                  {/* Bilan Muscu (§288) — amorçage autonome (§299), puis
+                      questionnaire prioritaire si demandé par le coach, puis
+                      entrée KPI wizard standard. */}
+                  <StartBilanEntry userId={userId} />
                   <QuestionnairePrompt userId={userId} />
                   <KpiWizardEntry />
                   {/* Mésocycle (§293) — visible une fois le bilan complété. */}

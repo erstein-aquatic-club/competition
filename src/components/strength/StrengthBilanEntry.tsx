@@ -15,10 +15,17 @@
  * Les deux suivent le pattern de tuiles de /strength :
  * `rounded-2xl border bg-card` + icône en pastille + ChevronRight.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { getLatestAssessment } from "@/lib/api";
-import { ClipboardCheck, ClipboardList, ChevronRight } from "lucide-react";
+import { getLatestAssessment, createAssessment } from "@/lib/api";
+import {
+  ClipboardCheck,
+  ClipboardList,
+  ClipboardPlus,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 /**
  * Carte conditionnelle : le coach a demandé un bilan, le nageur doit remplir
@@ -90,6 +97,88 @@ export function KpiWizardEntry() {
         </p>
       </div>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
+/**
+ * StartBilanEntry — amorçage autonome du bilan muscu (§299).
+ *
+ * Un nageur peut démarrer lui-même son bilan (`createAssessment` avec
+ * `coach_id: null`) sans attendre que le coach l'initie. Visible uniquement
+ * quand aucun bilan n'est en cours (pas d'assessment, ou le dernier est
+ * `completed`) — sinon `QuestionnairePrompt` (questionnaire_pending) ou
+ * `MesocycleEntry` (bilan_pending / completed) prennent le relais.
+ */
+export function StartBilanEntry({ userId }: { userId: number | null }) {
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  const { data: assessment } = useQuery({
+    queryKey: ["strength-assessment-latest", userId],
+    queryFn: () => getLatestAssessment(userId!),
+    enabled: userId != null,
+    staleTime: 60_000,
+  });
+
+  const startMutation = useMutation({
+    mutationFn: async () => {
+      if (userId == null) throw new Error("Identité non résolue");
+      return createAssessment({ athlete_id: userId, coach_id: null });
+    },
+    onSuccess: async () => {
+      toast.success("Bilan démarré", {
+        description: "Réponds au questionnaire pour préparer ton mésocycle.",
+      });
+      // refetch (pas invalidate) → la prochaine frame voit le nouvel
+      // assessment et cette tuile s'efface ; ferme la fenêtre d'un double-tap
+      // (même pattern que StrengthAssessmentScreen.createMutation).
+      await queryClient.refetchQueries({
+        queryKey: ["strength-assessment-latest", userId],
+      });
+      navigate("/strength/questionnaire");
+    },
+    onError: (err: Error) => {
+      toast.error("Impossible de démarrer le bilan", {
+        description: err.message || "Réessaie dans un instant.",
+      });
+    },
+  });
+
+  // Rien à amorcer si un bilan est déjà en cours : seul un état vide ou un
+  // bilan `completed` propose un nouveau départ.
+  if (userId == null) return null;
+  if (assessment && assessment.status !== "completed") return null;
+
+  const pending = startMutation.isPending;
+
+  return (
+    <button
+      type="button"
+      onClick={() => startMutation.mutate()}
+      disabled={pending}
+      aria-busy={pending}
+      className="group flex w-full items-center gap-3.5 rounded-2xl border bg-card px-4 py-3.5 text-left shadow-sm transition-colors hover:border-violet-300 active:bg-violet-50/60 disabled:cursor-wait disabled:opacity-70 dark:hover:border-violet-800/60 dark:active:bg-violet-950/30"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 transition-colors group-hover:bg-violet-200/70 dark:bg-violet-950/50 dark:text-violet-300 dark:group-hover:bg-violet-900/50">
+        {pending ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <ClipboardPlus className="h-5 w-5" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-600/80 dark:text-violet-300/80">
+          Bilan muscu
+        </p>
+        <p className="mt-0.5 text-sm font-semibold text-foreground">
+          {pending ? "Démarrage…" : "Démarrer mon bilan muscu"}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          Réponds au questionnaire — ton coach l'enrichira ensuite
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-violet-500 dark:group-hover:text-violet-400" />
     </button>
   );
 }
