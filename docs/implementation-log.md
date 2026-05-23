@@ -4,6 +4,55 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §299 — Parcours mésocycle : 2 modes (autonomie nageur + génération coach) (2026-05-23)
+
+**Branche** : `feat/299-parcours-mesocycle-2modes` (worktree `.worktrees/feat-299-parcours-mesocycle`)
+**Trigger** : audit `docs/audits/2026-05-23-audit-parcours-creation-mesocycle.md` — le parcours livré (§293→§297) ne réalisait ni le Mode A (autonomie nageur, verrouillée aux deux bouts) ni le Mode B (génération/questionnaire pilotés coach, inexistants). Design : `docs/plans/2026-05-23-bilan-muscu-parcours-fixes-design.md` ; plan : `docs/plans/2026-05-23-bilan-muscu-parcours-fixes.md`.
+
+> **Spine** : *paramétrer, ne pas dupliquer*. Les 3 écrans nageur acceptent un `athleteId` optionnel (route param ou payload), sur le modèle `KpiWizard.tsx:138`. La RPC `apply_strength_mesocycle` autorisait déjà l'appelant coach (§293) — le gap était purement UI.
+
+### W1 — Autonomie nageur réelle (verrou abaissé)
+- **`canGenerateMesocycle(status)`** (`src/lib/strength/mesocycleGating.ts`, neuf, 22 l, 5 tests) : `bilan_pending` OU `completed` → true. Le moteur tolère déjà `physical_tests = null`.
+- Verrou `status === 'completed'` → `canGenerateMesocycle(status)` dans **3 endroits** : `MesocycleEntry.tsx:44`, `MesocycleGeneration.tsx:283`, `MesocyclePreview.tsx:344` (les 2 derniers gataient aussi `completed` → le plan initial ne visait que la tuile ; gap rattrapé). La notation physique coach devient un enrichissement, plus un gate.
+- **`StartBilanEntry`** (tuile `/strength`) : le nageur démarre son bilan seul → `createAssessment({athlete_id, coach_id: null})` → questionnaire. Visible si pas d'assessment ou dernier `completed`.
+- **Bandeau confiance réduite** sur `MesocyclePreview` quand `bilan_pending` (mobilité conservatrice).
+
+### W2 — Génération pilotée coach
+- `MesocycleGeneration` / `MesocyclePreview` paramétrés par `athleteId` : route `/coach/mesocycle-generate/:athleteId` ; l'`athleteId` voyage dans le payload sessionStorage `eac_pending_mesocycle_params` jusqu'à la preview (pas de 2e route param). Garde de rôle (nageur ne cible que lui), en-tête de cible, retour fiche nageur après apply.
+- Points d'entrée coach : bouton **« Générer le mésocycle »** sur le done-state de `StrengthAssessmentScreen` + bouton **« Régénérer »** sur `CoachMesocyclePanel`.
+
+### W3 — Questionnaire accompagné coach
+- `StrengthQuestionnaire` paramétré par `athleteId` (route `/coach/questionnaire/:athleteId`) ; les writes (questionnaire + miroir `pain_reports`) ciblent le nageur. Branche d'attente du bilan coach → bouton **« Remplir avec le nageur »**.
+- **Migration `00188_pain_coach_write`** (appliquée MCP) : policy `FOR ALL coach/admin` sur `pain_reports` — requise par le miroir de douleur écrit par le coach (jusqu'ici `pain_own` self + `pain_coach_read` SELECT uniquement).
+
+### W4 — Édition fine coach : **partiel** (helper + invariant ; UI DIFFÉRÉE)
+- **`preserveMesocycleTag(next, prev)`** (`src/lib/strength/mesocycleItemPayload.ts`, neuf, 23 l, 5 tests) : garde `raw_payload.mesocycle_id` sur les items édités/ajoutés (invariant revert).
+- **L'édition UI (T13) est DIFFÉRÉE** : `updateStrengthSession` (`strength.ts:291`) impose `raw_payload: null` à chaque item via la RPC `update_strength_session_atomic` → éditer une séance `[Méso]` par l'éditeur catalogue actuel **détruirait** `mesocycle_id` (orphelins au revert) + la métadonnée de périodisation. Fix sûr = round-trip de `raw_payload` dans la RPC (que §298 vient de modifier — `00187`) → chantier dédié. `preserveMesocycleTag` est la brique posée.
+
+### W5 — Boucle & traçabilité
+- **Migration `00189_notify_assessment_started`** (appliquée MCP) : trigger `AFTER INSERT` sur `strength_assessments` → notifie le nageur quand un coach démarre un bilan (`coach_id <> athlete_id`) ; silencieux pour l'auto-démarrage (W1, `coach_id NULL`). Ferme le handoff coach→nageur jusqu'ici muet.
+- **§298** (intensity metric) : non restauré dans ce log — c'est une branche parallèle vivante (`feat/298-intensity-metric`, entrée intacte au commit `e5d9a5f59`) qui apportera son entrée à son merge ; la restaurer ici créerait un conflit. L'hypothèse « perdue au merge » de l'audit était inexacte.
+
+### Fichiers
+| Fichier | Nature |
+|---|---|
+| `src/lib/strength/mesocycleGating.ts` (+test) | Neuf — gating génération (22 l) |
+| `src/lib/strength/mesocycleItemPayload.ts` (+test) | Neuf — invariant revert (23 l) |
+| `src/components/strength/MesocycleEntry.tsx` · `StrengthBilanEntry.tsx` · `src/pages/Strength.tsx` | W1 |
+| `src/pages/MesocycleGeneration.tsx` · `MesocyclePreview.tsx` · `StrengthQuestionnaire.tsx` · `src/App.tsx` | W2/W3 (athleteId + routes) |
+| `src/pages/coach/StrengthAssessmentScreen.tsx` · `src/components/coach/CoachMesocyclePanel.tsx` | W2/W3 entrées coach |
+| `supabase/migrations/00188_pain_coach_write.sql` · `00189_notify_assessment_started.sql` | Neuves (appliquées MCP) |
+
+### Tests
+- `npm test` — **911/911 verts** (901 + 5 gating + 5 payload).
+- `npx tsc --noEmit` — exit 0. `npm run build` — OK.
+- `npm run test:rls -- strength-mesocycle-rpc strength-assessments` — **32/32 verts**. Mode B sécurité : coach-apply déjà couvert (`strength-mesocycle-rpc.test.ts:121`), coach-write assessment déjà couvert (`strength-assessments.test.ts:113,124`).
+
+### Limites / dette
+- **T13/T14 (édition fine coach)** différés (cf. W4) — chantier dédié.
+- **`pain_coach_write`** non couvert par test d'intégration (`pain_reports` absent du harness RLS) ; vérifié par `pg_policies` prod + équivalence au pattern testé `strength_assessments_coach`.
+- Numérotation : prod a déjà `00186/00187` (§298) ; ce chantier prend `00188/00189`.
+
 ## §297 — Flag `is_bodyweight` + estimation 1RM inline via ramp-up (2026-05-21)
 
 **Branche** : `feat/297-bodyweight-1rm-estimation` (worktree `.worktrees/feat-297-bodyweight-1rm`)

@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§297** — Flag `is_bodyweight` + estimation 1RM inline via ramp-up (chauffes → série de référence) + bouton "Recalculer ma 1RM".
+Dernier § livré : **§299** — Parcours mésocycle 2 modes : autonomie nageur (verrou abaissé à `bilan_pending` + auto-démarrage) + génération/questionnaire pilotés coach (écrans paramétrés par `athleteId`). Édition fine coach différée.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

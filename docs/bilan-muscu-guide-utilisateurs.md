@@ -370,4 +370,9 @@ Les **GIFs de démonstration** des 5 protocoles KPI ne sont pas encore en place 
 
 ---
 
-*Document maintenu en cohérence avec l'état du code au §294 (2026-05-20). Si tu vois un écart entre cette doc et l'app, c'est l'app qui a raison — préviens.*
+> **Mise à jour §299 (2026-05-23) — deux portes d'entrée.**
+> - **Nageur en autonomie** : tu peux désormais **démarrer ton bilan toi-même** (tuile « Démarrer mon bilan muscu » sur `/strength`) et **générer ton mésocycle dès que ton questionnaire est envoyé** (statut « en attente du coach ») — sans attendre la notation physique du coach. Tant qu'il ne l'a pas faite, un bandeau t'indique que la confiance est réduite (la mobilité est estimée prudemment) ; il pourra l'enrichir ensuite.
+> - **Coach** : tu peux mener le bilan **avec** le nageur de bout en bout sur ton appareil — « Remplir avec le nageur » (questionnaire), saisir les KPIs, noter le physique, puis **« Générer le mésocycle »** directement (et « Régénérer » depuis le panneau).
+> - **À venir** : l'**édition d'une séance générée** depuis l'app n'est **pas encore disponible** (chantier dédié — l'éditeur actuel effacerait les métadonnées du mésocycle). En attendant, le coach ajuste via **régénération** ou **rejet**. La section « Étape 3 — Ajustement fin » décrit la cible, pas l'état actuel.
+
+*Document maintenu en cohérence avec l'état du code au §299 (2026-05-23). Si tu vois un écart entre cette doc et l'app, c'est l'app qui a raison — préviens.*
