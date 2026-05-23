@@ -6,7 +6,7 @@ import { useExerciseHistory } from "@/hooks/useExerciseHistory";
 import { ExerciseProgressChart } from "./ExerciseProgressChart";
 import type { SetLogEntry } from "@/lib/types";
 import { isBodyweight } from "@/lib/api/client";
-import type { IntensityMetric } from "@/lib/strength/intensityMetrics";
+import { formatIntensity, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 
 export interface RestPerfsTabProps {
   exerciseName: string;
@@ -35,6 +35,9 @@ export function RestPerfsTab({
     months: 3,
   });
   const [chartOpen, setChartOpen] = useState(false);
+  // §298 — métrique d'intensité (défaut : charge en kg)
+  const metric: IntensityMetric = intensityMetric ?? "weight_kg";
+  const isWeightMetric = metric === "weight_kg";
   // Filter out bodyweight logs for weight-based computations
   const weightedLogs = todayLogs.filter(
     (l) => !isBodyweight(l.weight) && typeof l.weight === "number" && (l.weight ?? 0) > 0,
@@ -138,15 +141,21 @@ export function RestPerfsTab({
             Meilleure série
           </p>
           <p className="text-2xl font-bold tabular-nums">
-            {bestSet.weight} <span className="text-sm font-normal text-muted-foreground">kg</span>
+            {isWeightMetric ? (
+              <>
+                {bestSet.weight} <span className="text-sm font-normal text-muted-foreground">kg</span>
+              </>
+            ) : (
+              <>{formatIntensity(bestSet.weight, metric)}</>
+            )}
             <span className="text-muted-foreground mx-1.5">×</span>
             {bestSet.reps} <span className="text-sm font-normal text-muted-foreground">reps</span>
           </p>
         </div>
       )}
 
-      {/* 1RM sparkline */}
-      {sessions.length >= 2 && (
+      {/* 1RM sparkline — uniquement pour les métriques de charge (§298) */}
+      {isWeightMetric && sessions.length >= 2 && (
         <button
           type="button"
           className="w-full max-w-xs rounded-2xl border border-border/50 bg-card p-4 shadow-sm active:scale-[0.98] transition-transform"

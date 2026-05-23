@@ -3,6 +3,7 @@ import { Check, Flame, Timer } from "lucide-react";
 import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 import type { SetLogEntry } from "@/lib/types";
 import { isBodyweight } from "@/lib/api/client";
+import { formatIntensity } from "@/lib/strength/intensityMetrics";
 import { cn } from "@/lib/utils";
 
 export interface RestSessionTabProps {
@@ -35,8 +36,10 @@ export function RestSessionTab({
 }: RestSessionTabProps) {
   const exerciseMap = new Map<number, Exercise>(exercises.map((e) => [e.id, e]));
 
+  // §298 — volume en kg : exclure poids du corps ET métriques non-poids (cm/s)
   const totalVolume = logs.reduce((sum, log) => {
-    if (isBodyweight(log.weight)) return sum;
+    const metric = exerciseMap.get(log.exercise_id)?.intensity_metric ?? "weight_kg";
+    if (isBodyweight(log.weight) || metric !== "weight_kg") return sum;
     return sum + (log.weight ?? 0) * (log.reps ?? 0);
   }, 0);
 
@@ -151,6 +154,8 @@ export function RestSessionTab({
               exerciseMap.get(item.exercise_id)?.nom_exercice ??
               item.exercise_name ??
               `Exercice ${item.exercise_id}`;
+            // §298 — métrique d'intensité de l'exercice (chips de série)
+            const itemMetric = exerciseMap.get(item.exercise_id)?.intensity_metric ?? "weight_kg";
 
             // Compute logged sets for this exercise
             const loggedSets = Array.from({ length: item.sets }).filter((_, si) =>
@@ -213,7 +218,9 @@ export function RestSessionTab({
                             {isDone
                               ? isBodyweight(setLog.weight)
                                 ? `${setLog.reps}r`
-                                : `${setLog.weight}×${setLog.reps}`
+                                : itemMetric === "weight_kg"
+                                  ? `${setLog.weight}×${setLog.reps}`
+                                  : `${formatIntensity(setLog.weight, itemMetric)}×${setLog.reps}`
                               : `S${si + 1}`}
                           </div>
                         );
