@@ -475,12 +475,21 @@ export default function StrengthAssessmentScreen() {
           <div className="mt-5 flex flex-col gap-2">
             <Button
               className="rounded-xl"
+              onClick={() =>
+                navigate(`/coach/mesocycle-generate/${selectedAthleteId}`)
+              }
+            >
+              Générer le mésocycle
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-xl"
               onClick={() => setSelectedAthleteId(null)}
             >
               Évaluer un autre nageur
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               className="rounded-xl"
               onClick={closeScreen}
             >

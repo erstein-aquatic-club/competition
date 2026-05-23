@@ -14,6 +14,7 @@
  * standards, ils s'éditent comme les autres).
  */
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -143,6 +144,7 @@ export default function CoachMesocyclePanel({
   athleteName,
 }: CoachMesocyclePanelProps) {
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: active, isLoading: activeLoading } = useQuery({
@@ -322,21 +324,34 @@ export default function CoachMesocyclePanel({
               Pour annuler complètement ce mésocycle et restaurer la planif
               d'avant, rejette-le ci-dessous.
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirmOpen(true)}
-              disabled={revertMutation.isPending}
-              className="shrink-0 border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
-            >
-              {revertMutation.isPending ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Undo2 className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Rejeter
-            </Button>
+            <div className="flex shrink-0 flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  navigate(`/coach/mesocycle-generate/${athleteId}`)
+                }
+              >
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Régénérer
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmOpen(true)}
+                disabled={revertMutation.isPending}
+                className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+              >
+                {revertMutation.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Undo2 className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Rejeter
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
