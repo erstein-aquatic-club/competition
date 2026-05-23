@@ -16,12 +16,16 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 - **`updateStrengthSession`** (`src/lib/api/strength.ts`) : ne force plus `raw_payload:null` ; construit `sourceByOrdre` depuis `session.items` (order_index→raw_payload) et applique `reconcileMesocyclePayloads`. **Ne touche pas aux transforms partagés** (`prepareStrengthItemsPayload`/`mapItemsForDbInsert`) — la corrélation se fait dans `updateStrengthSession` (blast radius minimal).
 - **`StrengthSessionItem`** (`types.ts`) : ajout du champ optionnel `raw_payload`. Porté dans le draft `startEditSession` (`StrengthCatalog.tsx`) pour le round-trip une fois Part 2 livrée.
 
-### Part 2 — Atteignabilité éditeur (PLANIFIÉE, non livrée)
-Permettre d'ouvrir une séance `[Méso]` dans l'éditeur depuis la planif (getter par id avec `raw_payload`, deeplink catalogue, bouton « Éditer », test RLS édit→revert). Détail : `docs/plans/2026-05-23-coach-edit-mesocycle-part2.md`. **Sans Part 2, l'édition n'est pas encore atteignable en UI** — Part 1 sécurise le chemin de sauvegarde et débloque Part 2.
+### Part 2 — Atteignabilité éditeur (LIVRÉE)
+L'édition coach d'une séance générée est désormais atteignable en UI :
+- **`getStrengthSessionForEdit(sessionId)`** (`strength.ts` + export `index.ts`) : charge UNE séance en forme éditeur **avec son `raw_payload`** par id, hors logique de liste (les `[Méso]` sont exclues de la liste mais éditables par id ; coach a `SELECT` RLS).
+- **Bouton « Éditer la séance »** sur la preview planif coach (`MyPlanSessionSheet` reçoit `onEdit`, `StrengthPlanningScreen` le câble). Deeplink : `localStorage` tab=strength + `sessionStorage eac_coach_edit_strength_session=<id>` + `window.location.hash = "#/coach?section=library"`.
+- **`StrengthCatalog`** lit la clé au mount (consommée une fois) → `getStrengthSessionForEdit` → `startEditSession(séance chargée)` → builder ouvert. `startEditSession` porte désormais `raw_payload` (et `target_intensity` §298) dans le draft. Au save, `updateStrengthSession` (Part 1) préserve `raw_payload` → le revert reste cohérent. `updateSession.onSuccess` invalide aussi les vues planif/mésocycle.
+- **Découverte clé** : la RPC `update_strength_session_atomic` écrivait déjà `raw_payload` (pas de changement RPC, pas de conflit §298). Le revert (`00173`) identifie les séances `[Méso]` **via** les items taggés `mesocycle_id` puis DELETE CASCADE → l'invariant Part 1 (items gardent/héritent le tag) est précisément ce qui permet au revert de les retrouver après édition.
 
 ### Tests
-- `npm test` — vert (+5 tests `reconcileMesocyclePayloads`). `npx tsc --noEmit` — exit 0. `npm run build` — OK.
-- Pas de `test:rls` : la logique d'autorisation des policies sur `strength_session_items` est **inchangée** (on ne modifie que le **contenu** `raw_payload` écrit, pas le qui-peut-écrire). Le test RLS édit→revert (T14) est planifié en Part 2.
+- `npm test` — **935/935 verts** (901 §297 + gating/payload §299/§300 + reconcile). `npx tsc --noEmit` — exit 0. `npm run build` — OK.
+- `npm run test:rls -- strength-mesocycle-rpc` — **13/13 verts** (12 + T14 « édit coach → revert nettoie tout, zéro orphelin »). T14 simule l'édition coach (re-insert items en préservant `mesocycle_id` + item ajouté tagué) puis revert → 0 résiduel. `update_strength_session_atomic` n'est pas dans le harness hand-crafted → l'édition est simulée en SQL (DELETE+INSERT) comme le ferait la RPC + Part 1.
 
 ## §299 — Parcours mésocycle : 2 modes (autonomie nageur + génération coach) (2026-05-23)
 

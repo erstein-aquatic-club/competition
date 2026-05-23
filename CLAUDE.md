@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§300** — Édition coach séance générée, Part 1 : `updateStrengthSession` préserve `raw_payload` (`reconcileMesocyclePayloads`) → revert cohérent. Part 2 (atteignabilité éditeur) planifiée (`docs/plans/2026-05-23-coach-edit-mesocycle-part2.md`). (Aussi récents sur main : §299 parcours mésocycle 2 modes, §298 métrique d'intensité par exercice cm/s.)
+Dernier § livré : **§300** — Édition coach d'une séance générée (complète) : `updateStrengthSession` préserve `raw_payload` (`reconcileMesocyclePayloads`) + getter `getStrengthSessionForEdit(id)` + bouton « Éditer » sur la planif → deeplink éditeur catalogue ; revert cohérent (T14 RLS). (Aussi récents : §299 parcours mésocycle 2 modes, §298 métrique d'intensité cm/s.)
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
