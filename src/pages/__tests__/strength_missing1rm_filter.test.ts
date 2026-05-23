@@ -51,4 +51,13 @@ describe("computeMissing1RmExercises (§297)", () => {
     const result = computeMissing1RmExercises(items, oneRMs, exerciseLookup);
     assert.deepEqual(result, []);
   });
+
+  it("exclut les exos dont intensity_metric != weight_kg (§298)", () => {
+    const lookup = new Map([
+      [8, { id: 8, nom_exercice: "Box Jump", exercise_type: "strength", is_bodyweight: false, intensity_metric: "height_cm" } as any],
+    ]);
+    const items = [{ exercise_id: 8, percent_1rm: 75 }] as any;
+    const result = computeMissing1RmExercises(items, [], lookup);
+    assert.deepEqual(result, []);
+  });
 });

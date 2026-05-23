@@ -24,6 +24,8 @@ export interface DbStrengthItemPayload {
   pct_1rm: number;
   rest_series_s: number;
   notes?: string;
+  /** §298 — Cible absolue (cm/s) prescrite par le coach. NULL = libre. */
+  target_intensity?: number | null;
 }
 
 export interface PreparedStrengthItems {
@@ -60,6 +62,7 @@ export const prepareStrengthItemsPayload = (session: {
       pct_1rm: item.percent_1rm,
       rest_series_s: item.rest_seconds,
       notes: item.notes,
+      target_intensity: item.target_intensity ?? null,
     }));
   return { cycle, normalizedItems, itemsPayload };
 };
@@ -84,6 +87,7 @@ export const mapItemsForDbInsert = (
     pct_1rm: item.pct_1rm,
     rest_series_s: item.rest_series_s,
     notes: item.notes,
+    target_intensity: item.target_intensity ?? null,
   }));
 
 // --- Strength Run Transformers ---
@@ -206,13 +210,18 @@ export const enrichItemsWithExerciseNames = (
  */
 export const collectEstimated1RMs = (
   logs: Array<{ exercise_id?: unknown; weight?: unknown; reps?: unknown }>,
+  /** §298 — exercise_ids dont la métrique n'est PAS weight_kg (hauteur/distance/
+   *  temps) : leur valeur loggée n'est pas une charge, on n'estime aucun 1RM.
+   *  Sans ce filtre, un Box Jump à 60 cm créerait un 1RM fantôme de 70 « kg ». */
+  skipExerciseIds?: Set<number>,
 ): Map<number, number> => {
   const estimates = new Map<number, number>();
   for (const log of logs) {
-    const estimate = estimateOneRm(Number(log.weight), Number(log.reps));
-    if (!estimate) continue;
     const exerciseId = Number(log.exercise_id);
     if (!Number.isFinite(exerciseId)) continue;
+    if (skipExerciseIds?.has(exerciseId)) continue;
+    const estimate = estimateOneRm(Number(log.weight), Number(log.reps));
+    if (!estimate) continue;
     const current = estimates.get(exerciseId) ?? 0;
     if (estimate > current) {
       estimates.set(exerciseId, estimate);

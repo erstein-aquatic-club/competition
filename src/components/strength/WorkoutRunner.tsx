@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
 import type { Exercise, StrengthSessionTemplate } from "@/lib/api";
 import { BODYWEIGHT_SENTINEL, isBodyweight } from "@/lib/api/client";
+import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from "@/lib/types";
 import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
@@ -298,6 +299,10 @@ export function WorkoutRunner({
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
   const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true;
+  // §298 — métrique d'intensité de l'exo courant (pilote tile/numpad/gating 1RM)
+  const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
+  const metricCfg = INTENSITY_METRICS[metric];
+  const tracksWeight = metric === "weight_kg";
   const isEstimationMode =
     !isBodyweightExercise &&
     currentSetIndex === 1 &&
@@ -341,6 +346,8 @@ export function WorkoutRunner({
     ? oneRMs.find((r) => r.exercise_id === currentBlock?.exercise_id)?.weight || 0
     : 0;
   const targetWeight = hasPercent ? Math.round(rm * (percentValue / 100)) : 0;
+  // §298 — métriques non-poids : cible depuis l'item (target_intensity), pas le 1RM
+  const targetValue = tracksWeight ? targetWeight : Number(currentBlock?.target_intensity ?? 0);
 
   const [currentSetInputs, setCurrentSetInputs] = useState<Record<number, SetInputValues>>({});
 
@@ -436,7 +443,7 @@ export function WorkoutRunner({
   const currentSetKey = currentBlock ? `${currentBlock.exercise_id}-${currentSetIndex}` : null;
   const currentLoggedSet = currentSetKey ? logLookup.get(currentSetKey) : null;
   const activeWeight =
-    currentLoggedSet?.weight ?? currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight;
+    currentLoggedSet?.weight ?? currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue;
   const activeReps =
     currentLoggedSet?.reps ??
     currentSetInputs[currentSetIndex - 1]?.reps ??
@@ -673,7 +680,7 @@ export function WorkoutRunner({
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
       weight: isBodyweightExercise
         ? BODYWEIGHT_SENTINEL
-        : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight),
+        : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue),
       difficulty: setDifficultyValue,
     };
     setLogs((prev) => [...prev, newLog]);
@@ -681,7 +688,8 @@ export function WorkoutRunner({
     // --- Live PR detection (before async save so toast shows immediately) ---
     const logWeight = Number(newLog.weight);
     const logReps = Number(newLog.reps);
-    if (logWeight > 0 && logReps > 0 && !isBodyweight(logWeight)) {
+    // §298 — pas de détection PR / estimation 1RM hors métrique weight_kg.
+    if (tracksWeight && logWeight > 0 && logReps > 0 && !isBodyweight(logWeight)) {
       const currentBest1rm = oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight || 0;
       const exName = currentExerciseDef?.nom_exercice ?? "Exercice";
       const pr = detectPR({ weight: logWeight, reps: logReps, difficulty: newLog.difficulty }, currentBest1rm, exName);
@@ -730,7 +738,7 @@ export function WorkoutRunner({
     setActiveInput(type);
     const existingValue =
       type === "weight"
-        ? currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight ?? ""
+        ? currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue ?? ""
         : currentSetInputs[currentSetIndex - 1]?.reps ?? currentBlock?.reps ?? "";
     setDraftValue(existingValue ? String(existingValue) : "");
     setShouldReplace(Boolean(existingValue));
@@ -747,10 +755,11 @@ export function WorkoutRunner({
         ? Number(draftValue.replace(",", "."))
         : Number(draftValue);
     if (!Number.isFinite(parsed)) return;
-    // Bounds: weight ∈ [0, 1000] kg (plus BODYWEIGHT_SENTINEL = -1 pour PDC),
+    // Bounds: weight ∈ [0, metricCfg.max] (plus BODYWEIGHT_SENTINEL = -1 pour PDC),
     // reps ∈ [1, 200]. Absurd values are silently rejected — the keypad
     // already prevents most malformed input but this catches overflow typos.
-    if (activeInput === "weight" && !isBodyweightDraft && (parsed < 0 || parsed > 1000)) return;
+    // §298 — borne haute = metricCfg.max (1000 kg / 300 cm / 500 cm / 3600 s).
+    if (activeInput === "weight" && !isBodyweightDraft && (parsed < 0 || parsed > metricCfg.max)) return;
     if (activeInput === "reps" && (parsed < 1 || parsed > 200)) return;
     setCurrentSetInputs((prev: Record<number, SetInputValues>) => ({
       ...prev,
@@ -822,7 +831,7 @@ export function WorkoutRunner({
     // Use updatedInputs (which includes the just-saved value) to load the next field
     const nextValue =
       type === "weight"
-        ? updatedInputs[currentSetIndex - 1]?.weight ?? targetWeight ?? ""
+        ? updatedInputs[currentSetIndex - 1]?.weight ?? targetValue ?? ""
         : updatedInputs[currentSetIndex - 1]?.reps ?? currentBlock?.reps ?? "";
     setDraftValue(nextValue ? String(nextValue) : "");
     setShouldReplace(Boolean(nextValue));
@@ -1121,16 +1130,16 @@ export function WorkoutRunner({
               className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
               onClick={() => openInputSheet("weight")}
             >
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Charge</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{metricCfg.label}</div>
               <div className="mt-1 flex items-baseline gap-0.5">
-                {isBodyweight(activeWeight) ? (
+                {metricCfg.hasBodyweight && isBodyweight(activeWeight) ? (
                   <span className="text-2xl font-bold tracking-tight">PDC</span>
                 ) : (
                   <>
                     <span className="text-3xl font-bold tabular-nums tracking-tight">
                       {activeWeight || "—"}
                     </span>
-                    <span className="text-sm font-medium text-muted-foreground">kg</span>
+                    <span className="text-sm font-medium text-muted-foreground">{metricCfg.unit}</span>
                   </>
                 )}
               </div>
@@ -1430,7 +1439,7 @@ export function WorkoutRunner({
           <div className="mx-auto w-full max-w-md px-4 pb-8">
             <DrawerHeader className="pb-2">
               <DrawerTitle className="text-center flex items-center justify-center gap-2">
-                <span>{activeInput === "weight" ? "Charge" : "Répétitions"}</span>
+                <span>{activeInput === "weight" ? metricCfg.label : "Répétitions"}</span>
                 {/* Tunnel-mode step indicator: weight = step 1/2, reps = step 2/2.
                     Lets the swimmer know they don't need to dismiss after weight. */}
                 <span className="text-xs font-normal text-muted-foreground tabular-nums">
@@ -1455,17 +1464,17 @@ export function WorkoutRunner({
                 )}
                 onClick={() => selectInputType("weight")}
               >
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Charge</div>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">{metricCfg.label}</div>
                 <div className="mt-1 text-2xl font-bold tabular-nums">
                   {(() => {
                     const displayVal = activeInput === "weight"
                       ? draftValue
-                      : String(currentSetInputs[currentSetIndex - 1]?.weight ?? targetWeight ?? "");
-                    if (displayVal === String(BODYWEIGHT_SENTINEL)) return "PDC";
+                      : String(currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue ?? "");
+                    if (metricCfg.hasBodyweight && displayVal === String(BODYWEIGHT_SENTINEL)) return "PDC";
                     return (
                       <>
                         {displayVal || "—"}
-                        <span className="ml-1 text-base font-normal text-muted-foreground">kg</span>
+                        <span className="ml-1 text-base font-normal text-muted-foreground">{metricCfg.unit}</span>
                       </>
                     );
                   })()}
@@ -1496,20 +1505,22 @@ export function WorkoutRunner({
               <div className="mb-4">
                 <div className="text-xs font-semibold text-muted-foreground mb-2">Suggestions</div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={draftValue === String(BODYWEIGHT_SENTINEL) ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-full px-4 h-10 text-sm font-semibold"
-                    onClick={() => setDraftValue(String(BODYWEIGHT_SENTINEL))}
-                  >
-                    PDC
-                  </Button>
-                  {targetWeight > 0 && [
-                    targetWeight - 10,
-                    targetWeight - 5,
-                    targetWeight,
-                    targetWeight + 5,
-                    targetWeight + 10,
+                  {metricCfg.hasBodyweight && (
+                    <Button
+                      variant={draftValue === String(BODYWEIGHT_SENTINEL) ? "default" : "outline"}
+                      size="sm"
+                      className="rounded-full px-4 h-10 text-sm font-semibold"
+                      onClick={() => setDraftValue(String(BODYWEIGHT_SENTINEL))}
+                    >
+                      PDC
+                    </Button>
+                  )}
+                  {targetValue > 0 && [
+                    targetValue - 10,
+                    targetValue - 5,
+                    targetValue,
+                    targetValue + 5,
+                    targetValue + 10,
                   ]
                     .filter((v) => v > 0)
                     .map((v) => (
@@ -1520,7 +1531,7 @@ export function WorkoutRunner({
                         className="rounded-full px-4 h-10 text-sm font-semibold"
                         onClick={() => setDraftValue(String(v))}
                       >
-                        {v} kg
+                        {v} {metricCfg.unit}
                       </Button>
                     ))}
                 </div>

@@ -3,12 +3,15 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Dumbbell, TrendingUp, Timer } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { SetLogEntry } from "@/lib/types";
+import { formatIntensity, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 
 interface SessionSummaryProps {
   sessionTitle: string;
   logs: SetLogEntry[];
   durationMinutes: number | null;
   exerciseNames: Map<number, string>;
+  /** §298 — métrique d'intensité par exercice (id → metric). Absent ⇒ weight_kg. */
+  exerciseMetrics?: Map<number, IntensityMetric>;
   onClose: () => void;
 }
 
@@ -18,7 +21,7 @@ function isBodyweight(w: number | string | null | undefined): boolean {
   return s === "bw" || s === "pdc" || s === "0" || s === "";
 }
 
-export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNames, onClose }: SessionSummaryProps) {
+export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNames, exerciseMetrics, onClose }: SessionSummaryProps) {
   const reduce = useReducedMotion();
   const stats = useMemo(() => {
     let totalTonnage = 0;
@@ -34,7 +37,9 @@ export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNa
       const name = exerciseNames.get(log.exercise_id) ?? `Ex #${log.exercise_id}`;
       exerciseIds.add(log.exercise_id);
 
-      if (!isBodyweight(log.weight)) {
+      // §298 — tonnage en kg : exclure poids du corps ET métriques non-poids (cm/s)
+      const metric = exerciseMetrics?.get(log.exercise_id) ?? "weight_kg";
+      if (!isBodyweight(log.weight) && metric === "weight_kg") {
         const weight = Number(log.weight) || 0;
         totalTonnage += weight * reps;
         if (!bestSet || weight > bestSet.weight) {
@@ -44,7 +49,7 @@ export function SessionSummary({ sessionTitle, logs, durationMinutes, exerciseNa
     }
 
     return { totalTonnage, totalSets, totalReps, exerciseCount: exerciseIds.size, bestSet };
-  }, [logs, exerciseNames]);
+  }, [logs, exerciseNames, exerciseMetrics]);
 
   return (
     <motion.div

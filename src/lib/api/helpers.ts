@@ -4,6 +4,7 @@
 
 import type { Session, Exercise, Notification, SyncSessionInput } from './types';
 import type { LocalStrengthRun } from '../types';
+import { normalizeIntensityMetric } from '@/lib/strength/intensityMetrics';
 import {
   safeInt,
   safeOptionalInt,
@@ -90,6 +91,7 @@ export const normalizeExercise = (exercise: Record<string, unknown>): Exercise =
   recup_force: safeOptionalInt(exercise.recup_force),
   recup_exercices_force: safeOptionalInt(exercise.recup_exercices_force),
   is_bodyweight: exercise.is_bodyweight === true,
+  intensity_metric: normalizeIntensityMetric(exercise.intensity_metric),
 });
 
 // --- Session Mapping ---

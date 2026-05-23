@@ -790,6 +790,18 @@ export default function Strength() {
     [activeSession?.items, exerciseLookup],
   );
 
+  // §298 — métrique d'intensité par exercice (id → metric) pour le résumé de séance
+  const sessionExerciseMetrics = useMemo(
+    () =>
+      new Map(
+        (activeSession?.items ?? []).map((item) => [
+          item.exercise_id,
+          exerciseLookup.get(item.exercise_id)?.intensity_metric ?? "weight_kg",
+        ]),
+      ),
+    [activeSession?.items, exerciseLookup],
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-4 md:space-y-6">
@@ -882,6 +894,10 @@ export default function Strength() {
                         difficulty: log.difficulty ?? null,
                         athlete_id: userId ?? null,
                         athlete_name: user ?? null,
+                        // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
+                        skip_one_rm:
+                          (exerciseLookup.get(log.exercise_id)?.intensity_metric ?? "weight_kg") !==
+                          "weight_kg",
                       } as Record<string, unknown>);
                     } catch {
                       quotaErrored = true;
@@ -906,6 +922,10 @@ export default function Strength() {
                     difficulty: log.difficulty ?? null,
                     athlete_id: userId ?? null,
                     athlete_name: user ?? null,
+                    // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
+                    skip_one_rm:
+                      (exerciseLookup.get(log.exercise_id)?.intensity_metric ?? "weight_kg") !==
+                      "weight_kg",
                   };
                   logStrengthSet.mutate(payload, {
                     onError: () => {
@@ -1021,6 +1041,7 @@ export default function Strength() {
           logs={activeRunLogs ?? []}
           durationMinutes={sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 60000) : null}
           exerciseNames={sessionExerciseNames}
+          exerciseMetrics={sessionExerciseMetrics}
           onClose={() => {
             setScreenMode("list");
             setActiveSession(null);

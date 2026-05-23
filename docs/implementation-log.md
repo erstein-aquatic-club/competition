@@ -72,6 +72,86 @@ Permettre d'ouvrir une séance `[Méso]` dans l'éditeur depuis la planif (gette
 - **`pain_coach_write`** non couvert par test d'intégration (`pain_reports` absent du harness RLS) ; vérifié par `pg_policies` prod + équivalence au pattern testé `strength_assessments_coach`.
 - Numérotation : prod a déjà `00186/00187` (§298) ; ce chantier prend `00188/00189`.
 
+## §298 — Métrique d'intensité par exercice (hauteur/distance/temps) (2026-05-23)
+
+**Branche** : `feat/298-intensity-metric` (worktree `.worktrees/feat-298-intensity-metric`)
+**Trigger** : retour utilisateur — pour un Box Jump, l'intensité et la progression se mesurent par la **hauteur de box (cm)**, pas en kg. Idem saut en longueur (distance cm), gainage (temps s). Le modèle ne supportait que des kg + %1RM.
+
+### Décisions de design
+
+Cf. design doc `docs/plans/2026-05-22-intensity-metric-height-distance-time-design.md`.
+
+| Question | Choix |
+|---|---|
+| Scope | Pattern réutilisable via enum `intensity_metric` au catalogue (pas un hardcode Box Jump) |
+| Métriques V1 | `weight_kg` (défaut), `height_cm`, `distance_cm`, `time_s` |
+| Stockage valeur loggée | Réutiliser `strength_set_logs.weight` (unité portée par l'exo) — zéro migration sur les logs |
+| Cible coach | Optionnelle, absolue, dans `strength_session_items.target_intensity` |
+| 1RM/PR sur non-poids | Désactivés (gating strict client + serveur) |
+
+### Changements par couche
+
+**1. Data (T1-T2, T4)**
+- Migration `00186_intensity_metric.sql` : `dim_exercices.intensity_metric TEXT NOT NULL DEFAULT 'weight_kg' CHECK (...)` + `strength_session_items.target_intensity DOUBLE PRECISION`.
+- Migration `00187_update_session_atomic_target_intensity.sql` : recompile le RPC `update_strength_session_atomic` pour inclure `target_intensity` dans l'INSERT — **catch important** : sans ça, la cible coach était silencieusement perdue à chaque mise à jour de séance (le RPC catalog `get_strength_catalog_paginated` utilise `row_to_json`, donc OK en lecture sans changement).
+- Module `src/lib/strength/intensityMetrics.ts` (29 l.) : `INTENSITY_METRICS` (config par métrique : `label`, `unit`, `tracksOneRm`, `hasBodyweight`, `selectLabel`, `max`), `normalizeIntensityMetric`, `formatIntensity`, `DEFAULT_INTENSITY_METRIC`. Source unique de vérité.
+
+**2. Types & mappers (T3-T4)**
+- `Exercise.intensity_metric?: IntensityMetric` (mappers `mapDbExerciseToApi`/`mapApiExerciseToDb`/`normalizeExercise`, coercion via `normalizeIntensityMetric` → défaut `weight_kg` sur valeur absente/invalide).
+- `StrengthSessionItem.target_intensity?: number | null` threadé sur TOUS les chemins : read (`normalizeStrengthItem`), write (`prepareStrengthItemsPayload` + `mapItemsForDbInsert`), update (`rpcItems`), duplication (`duplicateSession` select + copy), et le whitelist `startEditSession` du builder (**catch** : aurait perdu la cible à l'édition).
+
+**3. OneRmGate (T5)**
+- `computeMissing1RmExercises` exclut désormais les exos `intensity_metric !== 'weight_kg'` (en plus du filtre `is_bodyweight` §297).
+
+**4. Gating 1RM/PR (T6, T9) — point critique**
+- `logStrengthSet` : nouveau flag `skip_one_rm?: boolean` + helper exporté `shouldSkipOneRm(weight, skipFlag)` = `isBodyweight(weight) || skipFlag`. Branché sur les 2 chemins (RPC + estimation).
+- `Strength.tsx` arme `skip_one_rm` aux 2 points d'appel (online + enqueue offline) via `exerciseLookup.get(log.exercise_id)?.intensity_metric !== 'weight_kg'`.
+- `OfflineMutationSync.tsx` : `skip_one_rm` ajouté au type du payload queue pour survivre au replay offline (**catch** : sinon un Box Jump loggé hors-ligne créait un 1RM fantôme au replay).
+- WorkoutRunner : PR detection gardée par `tracksWeight`.
+
+**5. UI coach (T7-T8)**
+- `StrengthCatalog.tsx` : `Select` "Métrique d'intensité" dans les 2 dialogs ; masque la checkbox PDC + grise `ExerciseCycleTabs` (%1RM) quand non-poids ; reset `is_bodyweight`+`pct_1rm_*` au changement.
+- `StrengthExerciseCard.tsx` : champ "Cible {label} ({unit})" conditionnel écrivant `target_intensity` (sinon %1RM inchangé).
+
+**6. UI nageur (T9)**
+- `WorkoutRunner.tsx` : `metric`/`metricCfg`/`tracksWeight` dérivés ; tile label+unité adaptatifs ; `targetValue` = `target_intensity` pour non-poids (sinon `rm × pct`) ; bouton PDC seulement si `hasBodyweight` ; borne numpad = `metricCfg.max`. §297 (bodyweight) préservé.
+
+**7. Progression & résumés (T10-T11)**
+- `ExerciseProgressChart.tsx` : prop `intensityMetric` ; pour non-poids → hero "meilleure {label}" + unité, courbe `progressionValue` (= `bestSet.weight` brut), volume kg masqué, delta 1RM masqué, tooltips/table adaptés. `weight_kg` strictement inchangé. Threadé depuis `RestScreen`→`RestPerfsTab` et `HistoryTable`.
+- `SessionSummary`/`RestSessionTab`/`RestPerfsTab` : volume kg exclut les non-poids (+ bodyweight), affichage via `formatIntensity`. Sparkline 1RM de `RestPerfsTab` gardée `isWeightMetric`.
+
+### Fichiers
+
+| Fichier | Type |
+|---|---|
+| `supabase/migrations/00186_intensity_metric.sql` | Nouveau |
+| `supabase/migrations/00187_update_session_atomic_target_intensity.sql` | Nouveau |
+| `src/lib/strength/intensityMetrics.ts` (29 l.) | Nouveau |
+| `src/lib/api/types.ts`, `client.ts`, `helpers.ts`, `transformers.ts`, `strength.ts` | Modifiés |
+| `src/lib/strength/missing1rmFilter.ts` | Modifié |
+| `src/pages/coach/StrengthCatalog.tsx`, `src/components/coach/strength/StrengthExerciseCard.tsx` | Modifiés |
+| `src/components/strength/WorkoutRunner.tsx`, `src/pages/Strength.tsx` | Modifiés |
+| `src/components/strength/ExerciseProgressChart.tsx`, `RestScreen.tsx`, `HistoryTable.tsx` | Modifiés |
+| `src/components/strength/SessionSummary.tsx`, `RestSessionTab.tsx`, `RestPerfsTab.tsx` | Modifiés |
+| `src/components/shared/OfflineMutationSync.tsx` | Modifié |
+| Tests : `intensityMetrics.test.ts`, `exerciseMappers.test.ts` (étendu), `strengthItemTarget.test.ts`, `strength_missing1rm_filter.test.ts` (étendu), `logStrengthSetGating.test.ts` | Nouveaux/étendus |
+
+### Tests
+
+- `npm test` (node:test) : **917/917 verts** (+13 dédiés sur 5 fichiers de test).
+- `npx tsc --noEmit` : 0.
+- Pas de `npm run test:rls` : les migrations n'ajoutent que des colonnes + recompilent un RPC SECURITY DEFINER sans toucher aux policies.
+
+### Limites V1
+
+- **Pas de PR/record** sur les métriques non-poids (pas de toast "nouveau record de hauteur"). Stockage + progression seulement.
+- `bestSet` (chart non-poids) sélectionné via `estimateOneRm`, donc dans de rares cas (charge haute × peu de reps vs charge basse × bcp de reps) la "meilleure valeur" affichée peut ne pas être le max brut. Raffinement possible dans `useExerciseHistory` (hors scope).
+- Si un coach bascule un exo `weight_kg → height_cm` après des logs en kg, les logs historiques sont ré-interprétés comme cm (rare, documenté).
+- Pas de backfill : les exos catalogue restent `weight_kg` par défaut. Le coach coche manuellement Box Jump → Hauteur, etc.
+
+### Correctif post-merge (hang reconcile)
+- `getNonWeightExerciseIds()` (ajouté au fix code-review §298) appelait `getExercises()` **sans `withTimeout`** sur le chemin `reconcileStrengthRunLogs` (durci §177 contre les hangs). En prod un fetch catalogue qui traîne pouvait figer la fin de séance ; en test, le mock FIFO de `reconcileTimeout.test.ts` ne scriptait pas ce fetch → désalignement → hang infini de la suite (`--test-timeout=0`). **Fix** : `withTimeout(getExercises(), 10_000, "catalog-metric")` dans `getNonWeightExerciseIds` (dégradation gracieuse via le `catch` → Set vide, `skip_one_rm=false`). Couvre reconcile + replay offline + fallback save. Test ajouté : « ne hang pas si le fetch catalogue traîne ». Suite : 920/920.
+
 ## §297 — Flag `is_bodyweight` + estimation 1RM inline via ramp-up (2026-05-21)
 
 **Branche** : `feat/297-bodyweight-1rm-estimation` (worktree `.worktrees/feat-297-bodyweight-1rm`)

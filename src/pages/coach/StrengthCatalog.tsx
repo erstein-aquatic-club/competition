@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -756,6 +757,7 @@ export default function StrengthCatalog() {
         percent_1rm: item.percent_1rm,
         cycle_type: item.cycle_type,
         notes: item.notes ?? "",
+        target_intensity: item.target_intensity ?? null,
         // §300 — conserve le raw_payload (mesocycle_id…) pour le round-trip à la
         // sauvegarde ; absent pour les séances hors mésocycle (→ null).
         raw_payload: item.raw_payload ?? null,
@@ -946,12 +948,63 @@ export default function StrengthCatalog() {
               )}
             </div>
             {editingExercise.exercise_type !== "warmup" ? (
-              <ExerciseCycleTabs
-                exercise={editingExercise}
-                onChange={(updates) =>
-                  setEditingExercise((prev) => (prev ? { ...prev, ...updates } : prev))
+              <div className="space-y-2">
+                <Label>Métrique d'intensité</Label>
+                <Select
+                  value={editingExercise.intensity_metric ?? "weight_kg"}
+                  onValueChange={(v) => {
+                    const metric = v as IntensityMetric;
+                    setEditingExercise((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            intensity_metric: metric,
+                            // §298 — métriques non-poids : pas de %1RM ni PDC
+                            ...(metric !== "weight_kg"
+                              ? {
+                                  is_bodyweight: false,
+                                  pct_1rm_endurance: null,
+                                  pct_1rm_hypertrophie: null,
+                                  pct_1rm_force: null,
+                                }
+                              : {}),
+                          }
+                        : prev
+                    );
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(INTENSITY_METRICS) as IntensityMetric[]).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {INTENSITY_METRICS[m].selectLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {editingExercise.exercise_type !== "warmup" ? (
+              <fieldset
+                disabled={(editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
+                className={
+                  (editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg" ? "opacity-50" : ""
                 }
-              />
+              >
+                <ExerciseCycleTabs
+                  exercise={editingExercise}
+                  onChange={(updates) =>
+                    setEditingExercise((prev) => (prev ? { ...prev, ...updates } : prev))
+                  }
+                />
+                {(editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg" && (
+                  <p className="text-xs text-muted-foreground">
+                    Les % 1RM ne s'appliquent pas à cette métrique.
+                  </p>
+                )}
+              </fieldset>
             ) : null}
             <div className="flex items-center gap-2">
               <Checkbox
@@ -970,30 +1023,32 @@ export default function StrengthCatalog() {
               />
               <Label htmlFor="warmup-flag-edit">Exercice d'échauffement (warmup)</Label>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="bodyweight-flag-edit"
-                checked={editingExercise.is_bodyweight === true}
-                onCheckedChange={(checked) => {
-                  const isBw = checked === true;
-                  setEditingExercise({
-                    ...editingExercise,
-                    is_bodyweight: isBw,
-                    // Reset les % 1RM si l'exo passe en PDC (cohérence)
-                    ...(isBw
-                      ? {
-                          pct_1rm_endurance: null,
-                          pct_1rm_hypertrophie: null,
-                          pct_1rm_force: null,
-                        }
-                      : {}),
-                  });
-                }}
-              />
-              <Label htmlFor="bodyweight-flag-edit">
-                Exercice au poids de corps (pas de 1RM)
-              </Label>
-            </div>
+            {(editingExercise.intensity_metric ?? "weight_kg") === "weight_kg" && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="bodyweight-flag-edit"
+                  checked={editingExercise.is_bodyweight === true}
+                  onCheckedChange={(checked) => {
+                    const isBw = checked === true;
+                    setEditingExercise({
+                      ...editingExercise,
+                      is_bodyweight: isBw,
+                      // Reset les % 1RM si l'exo passe en PDC (cohérence)
+                      ...(isBw
+                        ? {
+                            pct_1rm_endurance: null,
+                            pct_1rm_hypertrophie: null,
+                            pct_1rm_force: null,
+                          }
+                        : {}),
+                    });
+                  }}
+                />
+                <Label htmlFor="bodyweight-flag-edit">
+                  Exercice au poids de corps (pas de 1RM)
+                </Label>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1090,10 +1145,57 @@ export default function StrengthCatalog() {
             )}
           </div>
           {newExercise.exercise_type !== "warmup" ? (
-            <ExerciseCycleTabs
-              exercise={newExercise}
-              onChange={(updates) => setNewExercise((prev) => ({ ...prev, ...updates }))}
-            />
+            <div className="space-y-2">
+              <Label>Métrique d'intensité</Label>
+              <Select
+                value={newExercise.intensity_metric ?? "weight_kg"}
+                onValueChange={(v) => {
+                  const metric = v as IntensityMetric;
+                  setNewExercise((prev) => ({
+                    ...prev,
+                    intensity_metric: metric,
+                    // §298 — métriques non-poids : pas de %1RM ni PDC
+                    ...(metric !== "weight_kg"
+                      ? {
+                          is_bodyweight: false,
+                          pct_1rm_endurance: null,
+                          pct_1rm_hypertrophie: null,
+                          pct_1rm_force: null,
+                        }
+                      : {}),
+                  }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(INTENSITY_METRICS) as IntensityMetric[]).map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {INTENSITY_METRICS[m].selectLabel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+          {newExercise.exercise_type !== "warmup" ? (
+            <fieldset
+              disabled={(newExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
+              className={
+                (newExercise.intensity_metric ?? "weight_kg") !== "weight_kg" ? "opacity-50" : ""
+              }
+            >
+              <ExerciseCycleTabs
+                exercise={newExercise}
+                onChange={(updates) => setNewExercise((prev) => ({ ...prev, ...updates }))}
+              />
+              {(newExercise.intensity_metric ?? "weight_kg") !== "weight_kg" && (
+                <p className="text-xs text-muted-foreground">
+                  Les % 1RM ne s'appliquent pas à cette métrique.
+                </p>
+              )}
+            </fieldset>
           ) : null}
           <div className="flex items-center gap-2">
             <Checkbox
@@ -1112,29 +1214,31 @@ export default function StrengthCatalog() {
             />
             <Label htmlFor="warmup-flag">Exercice d'échauffement (warmup)</Label>
           </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="bodyweight-flag-create"
-              checked={newExercise.is_bodyweight === true}
-              onCheckedChange={(checked) => {
-                const isBw = checked === true;
-                setNewExercise({
-                  ...newExercise,
-                  is_bodyweight: isBw,
-                  ...(isBw
-                    ? {
-                        pct_1rm_endurance: null,
-                        pct_1rm_hypertrophie: null,
-                        pct_1rm_force: null,
-                      }
-                    : {}),
-                });
-              }}
-            />
-            <Label htmlFor="bodyweight-flag-create">
-              Exercice au poids de corps (pas de 1RM)
-            </Label>
-          </div>
+          {(newExercise.intensity_metric ?? "weight_kg") === "weight_kg" && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="bodyweight-flag-create"
+                checked={newExercise.is_bodyweight === true}
+                onCheckedChange={(checked) => {
+                  const isBw = checked === true;
+                  setNewExercise({
+                    ...newExercise,
+                    is_bodyweight: isBw,
+                    ...(isBw
+                      ? {
+                          pct_1rm_endurance: null,
+                          pct_1rm_hypertrophie: null,
+                          pct_1rm_force: null,
+                        }
+                      : {}),
+                  });
+                }}
+              />
+              <Label htmlFor="bodyweight-flag-create">
+                Exercice au poids de corps (pas de 1RM)
+              </Label>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setExerciseDialogOpen(false)} className="h-10">
               Annuler
