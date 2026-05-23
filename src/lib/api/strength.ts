@@ -52,6 +52,26 @@ export function shouldSkipOneRm(weight: number | null | undefined, skipFlag?: bo
   return isBodyweight(weight) || skipFlag === true;
 }
 
+/** §298 — Set des exercise_ids dont la métrique n'est PAS weight_kg (hauteur/
+ *  distance/temps), donc non éligibles à l'estimation 1RM. Lit le catalogue
+ *  (cache localStorage/mémoire via getExercises). Utilisé par les chemins de
+ *  récupération (reconcile, fin de séance, replay offline) où le flag
+ *  `skip_one_rm` par-log n'est pas disponible — sinon un Box Jump re-loggé
+ *  créerait un 1RM fantôme. Renvoie un Set vide en cas d'échec (dégradation
+ *  gracieuse : on ne bloque pas la sauvegarde des séries). */
+export async function getNonWeightExerciseIds(): Promise<Set<number>> {
+  try {
+    const exercises = await getExercises();
+    return new Set(
+      exercises
+        .filter((e) => (e.intensity_metric ?? "weight_kg") !== "weight_kg")
+        .map((e) => e.id),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 // --- Exercises ---
 
 export async function getExercises(): Promise<Exercise[]> {
@@ -610,6 +630,9 @@ export async function reconcileStrengthRunLogs(params: {
   if (remoteCount >= params.logs.length) return emptyResult;
   const missing = params.logs.slice(remoteCount);
   const errors: ReconcileStrengthSetError[] = [];
+  // §298 — un re-log doit hériter du gating 1RM : pour les exos à métrique
+  // non-poids, armer skip_one_rm (sinon estimateOneRm produit un 1RM fantôme).
+  const nonWeightIds = await getNonWeightExerciseIds();
   // Run all missing-set inserts in parallel and enforce a global 30 s budget.
   // Sequential fire-and-forget could take 200 s+ (20 sets × 10 s each);
   // the allSettled wrapper ensures we wait for all slots but a hung network
@@ -626,6 +649,7 @@ export async function reconcileStrengthRunLogs(params: {
           difficulty: log.difficulty ?? null,
           athlete_id: params.athleteId ?? null,
           athlete_name: params.athleteName ?? null,
+          skip_one_rm: nonWeightIds.has(log.exercise_id),
         }),
       ),
     ),
@@ -748,8 +772,12 @@ export async function saveStrengthRun(run: any) {
       notes: log.notes ?? null,
     }));
 
-    // Collect 1RM estimates client-side to pass to the RPC
-    const estimatedRecords = collectEstimated1RMs(rawLogs);
+    // Collect 1RM estimates client-side to pass to the RPC.
+    // §298 — exclure les exos à métrique non-poids (pas de 1RM sur cm/s).
+    const estimatedRecords = collectEstimated1RMs(
+      rawLogs,
+      await getNonWeightExerciseIds(),
+    );
     const oneRmEstimates = Array.from(estimatedRecords.entries()).map(
       ([exerciseId, weight]) => ({
         exercise_id: exerciseId,
@@ -817,6 +845,7 @@ export async function saveStrengthRun(run: any) {
   }
   const estimatedRecords = collectEstimated1RMs(
     Array.isArray(run.logs) ? run.logs : [],
+    await getNonWeightExerciseIds(),
   );
   if (estimatedRecords.size > 0) {
     const athleteId = run.athlete_id ?? null;

@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   logStrengthSet,
+  getNonWeightExerciseIds,
   updateStrengthRun,
   saveStrengthRun,
   updateProfile,
@@ -187,6 +188,9 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
 
   if (remoteLogCount !== null) {
     const missingLogs = logs.slice(remoteLogCount);
+    // §298 — re-log offline : hériter du gating 1RM pour les métriques non-poids
+    // (sinon un Box Jump re-loggé au replay crée un 1RM fantôme).
+    const nonWeightIds = await getNonWeightExerciseIds();
 
     for (const [index, log] of missingLogs.entries()) {
       await logStrengthSet({
@@ -200,6 +204,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
         difficulty: log.difficulty ?? null,
         athlete_id: payload.athlete_id ?? null,
         athlete_name: payload.athlete_name ?? null,
+        skip_one_rm: nonWeightIds.has(log.exercise_id),
       });
     }
 

@@ -210,13 +210,18 @@ export const enrichItemsWithExerciseNames = (
  */
 export const collectEstimated1RMs = (
   logs: Array<{ exercise_id?: unknown; weight?: unknown; reps?: unknown }>,
+  /** §298 — exercise_ids dont la métrique n'est PAS weight_kg (hauteur/distance/
+   *  temps) : leur valeur loggée n'est pas une charge, on n'estime aucun 1RM.
+   *  Sans ce filtre, un Box Jump à 60 cm créerait un 1RM fantôme de 70 « kg ». */
+  skipExerciseIds?: Set<number>,
 ): Map<number, number> => {
   const estimates = new Map<number, number>();
   for (const log of logs) {
-    const estimate = estimateOneRm(Number(log.weight), Number(log.reps));
-    if (!estimate) continue;
     const exerciseId = Number(log.exercise_id);
     if (!Number.isFinite(exerciseId)) continue;
+    if (skipExerciseIds?.has(exerciseId)) continue;
+    const estimate = estimateOneRm(Number(log.weight), Number(log.reps));
+    if (!estimate) continue;
     const current = estimates.get(exerciseId) ?? 0;
     if (estimate > current) {
       estimates.set(exerciseId, estimate);

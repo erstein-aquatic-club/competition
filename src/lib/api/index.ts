@@ -500,6 +500,7 @@ export {
   deleteStrengthSession,
   startStrengthRun,
   logStrengthSet,
+  getNonWeightExerciseIds,
   reconcileStrengthRunLogs,
   updateStrengthRun,
   deleteStrengthRun,
