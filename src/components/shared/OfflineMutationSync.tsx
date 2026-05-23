@@ -42,6 +42,8 @@ type QueuedStrengthSetLogPayload = {
   difficulty?: number | null;
   athlete_id?: number | string | null;
   athlete_name?: string | null;
+  // §298 — métriques non-poids : préserve le gating 1RM lors du replay offline
+  skip_one_rm?: boolean;
 };
 
 function isQueuedStrengthCompletion(

@@ -882,6 +882,10 @@ export default function Strength() {
                         difficulty: log.difficulty ?? null,
                         athlete_id: userId ?? null,
                         athlete_name: user ?? null,
+                        // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
+                        skip_one_rm:
+                          (exerciseLookup.get(log.exercise_id)?.intensity_metric ?? "weight_kg") !==
+                          "weight_kg",
                       } as Record<string, unknown>);
                     } catch {
                       quotaErrored = true;
@@ -906,6 +910,10 @@ export default function Strength() {
                     difficulty: log.difficulty ?? null,
                     athlete_id: userId ?? null,
                     athlete_name: user ?? null,
+                    // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
+                    skip_one_rm:
+                      (exerciseLookup.get(log.exercise_id)?.intensity_metric ?? "weight_kg") !==
+                      "weight_kg",
                   };
                   logStrengthSet.mutate(payload, {
                     onError: () => {
