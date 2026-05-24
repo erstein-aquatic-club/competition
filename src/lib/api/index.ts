@@ -382,6 +382,7 @@ export {
   getLatestAssessment,
   getAssessment,
   listAssessments,
+  getPreviousCompletedPhysicalTests,
   updateAssessmentQuestionnaire,
   updateAssessmentPhysicalTests,
 } from './strength-assessments';

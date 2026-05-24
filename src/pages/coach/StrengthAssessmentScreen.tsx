@@ -38,6 +38,7 @@ import {
   createAssessment,
   updateAssessmentPhysicalTests,
   getLatestKpiMeasurements,
+  getPreviousCompletedPhysicalTests,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type {
@@ -68,8 +69,8 @@ import { cn } from "@/lib/utils";
 
 import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
 import { initials } from "@/components/strength/kpi/kpiHelpers";
-import { ScaleField } from "@/components/strength/questionnaire/ScaleField";
 import { AssessmentContext } from "@/components/strength/assessment/AssessmentContext";
+import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
 import {
   MOBILITY_SCORES,
   MOVEMENT_SCORES,
@@ -200,6 +201,25 @@ export default function StrengthAssessmentScreen() {
     queryFn: () => getLatestKpiMeasurements(selectedAthleteId!),
     enabled: selectedAthleteId != null,
   });
+
+  // ── Notation mobilité/mouvement du dernier bilan COMPLÉTÉ — pour la
+  // comparaison dans le temps (§301 T5). Exclut le bilan en cours.
+  const { data: prevPhysical } = useQuery({
+    queryKey: ["assessment-prev-physical", selectedAthleteId, assessment?.id],
+    queryFn: () =>
+      getPreviousCompletedPhysicalTests(selectedAthleteId!, assessment?.id),
+    enabled: selectedAthleteId != null,
+  });
+
+  /** Note du bilan précédent pour un axe (null si aucun bilan antérieur). */
+  const prevScoreFor = (item: AssessmentScoreItem): number | null => {
+    if (!prevPhysical) return null;
+    const group = prevPhysical[item.group] as
+      | Record<string, number>
+      | undefined;
+    const v = group?.[item.key];
+    return typeof v === "number" ? v : null;
+  };
 
   // Reset the form whenever the athlete or the assessment identity changes —
   // a stale half-filled form must never leak across swimmers.
@@ -645,24 +665,17 @@ export default function StrengthAssessmentScreen() {
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-6">
         {items.map((item) => (
-          <div key={item.key} className="space-y-1.5">
-            <ScaleField
-              label={item.label}
-              value={scores[item.key]}
-              onChange={(v) =>
-                setScores((prev) => ({ ...prev, [item.key]: v }))
-              }
-              min={0}
-              steps={4}
-              labelLow={`0 · ${item.labelLow}`}
-              labelHigh={`3 · ${item.labelHigh}`}
-            />
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              {item.hint}
-            </p>
-          </div>
+          <AssessmentScoreField
+            key={item.key}
+            item={item}
+            value={scores[item.key]}
+            previous={prevScoreFor(item)}
+            onChange={(v) =>
+              setScores((prev) => ({ ...prev, [item.key]: v }))
+            }
+          />
         ))}
       </CardContent>
     </Card>
@@ -682,6 +695,9 @@ export default function StrengthAssessmentScreen() {
           <p className="mt-1 text-sm text-muted-foreground">
             Note la mobilité et la qualité de mouvement de {athleteName}.
             Appuie-toi sur son questionnaire et ses KPIs ci-dessous.
+            {prevPhysical
+              ? " La note du dernier bilan est rappelée à côté de chaque axe."
+              : ""}
           </p>
         </div>
 

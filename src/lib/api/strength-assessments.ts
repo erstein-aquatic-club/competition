@@ -69,6 +69,32 @@ export async function listAssessments(
   return (data ?? []) as StrengthAssessment[];
 }
 
+/**
+ * Renvoie les `physical_tests` du dernier bilan **complété** de l'athlète,
+ * optionnellement en excluant un id (le bilan en cours). Sert à afficher la
+ * note de mobilité/mouvement précédente à côté de la nouvelle (§301 T5 —
+ * comparaison dans le temps). `null` si aucun bilan complété antérieur, ou si
+ * ce bilan n'avait pas de notation physique. Mêmes RLS que les autres lectures
+ * d'assessments (pas de nouvelle policy).
+ */
+export async function getPreviousCompletedPhysicalTests(
+  athleteId: number,
+  excludeId?: string,
+): Promise<StrengthPhysicalTests | null> {
+  if (!canUseSupabase()) return null;
+  let query = supabase
+    .from('strength_assessments')
+    .select('id, physical_tests, created_at')
+    .eq('athlete_id', athleteId)
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (excludeId != null) query = query.neq('id', excludeId);
+  const data = assertSupabase(await query);
+  const rows = (data ?? []) as { physical_tests: StrengthPhysicalTests | null }[];
+  return rows[0]?.physical_tests ?? null;
+}
+
 export async function updateAssessmentQuestionnaire(
   id: string,
   questionnaire: StrengthQuestionnaire,

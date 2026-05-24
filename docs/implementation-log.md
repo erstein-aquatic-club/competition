@@ -4,10 +4,10 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
-## §301 — Fiabilité de la mesure (Bilan Muscu) : Part 1 — T1→T4 (2026-05-23)
+## §301 — Fiabilité de la mesure (Bilan Muscu) : T1→T5 (2026-05-23)
 
 **Branche** : `feat/301-fiabilite-mesure`
-**Trigger** : audit `docs/audits/2026-05-23-audit-mesure-coach-robustesse.md`. Plan : `docs/plans/2026-05-23-fiabilite-mesure-coach-design.md` (périmètre fiabilité = recos 1,2,5,6,7). Ce lot livre T1 (BUG `weighted_pullup`), T2 (démos KPI câblées), T3 (confiance barème par-KPI) et T4 (détente verticale : moyenne + écart-type). T5 (rubrique mobilité + photos) reste à venir.
+**Trigger** : audit `docs/audits/2026-05-23-audit-mesure-coach-robustesse.md`. Plan : `docs/plans/2026-05-23-fiabilite-mesure-coach-design.md` (périmètre fiabilité = recos 1,2,5,6,7 — **toutes livrées**). T1 (BUG `weighted_pullup`), T2 (démos KPI câblées), T3 (confiance barème par-KPI), T4 (détente verticale moyenne + écart-type), T5 (rubrique mobilité/mouvement 0-3 + repères + note précédente). Les recos fluidité coach (3,4) → §302.
 
 ### T1 — `weighted_pullup` accepte 0 (poids de corps) et charges assistées (négatif)
 - **Constat audit (BUG-1)** : l'input strippait `−` et `parseAttempts` rejetait `≤ 0`, alors que le barème `weighted_pullup` a des ancres ≤ 0 (jusqu'à -10 kg) → médiane filles/débutants non mesurable.
@@ -33,15 +33,24 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 - **`VerticalJumpInputs.tsx`** (UI) : « Meilleur retenu » → « Moyenne retenue » ; readout « Moyenne : 0,50 s (±0,02 s · 3 essais) → … » ; mention « Estimation : chrono manuel » ; **avertissement ambré si essais incohérents** (écart-type relatif > 8 %, ≥ 2 essais) invitant à refaire le set ; suppression du surlignage « meilleur essai » (plus de notion de meilleur). `KpiWizard` inchangé (recordedAttempts garde la même forme, height/peak désormais dérivés de la moyenne).
 - `kpiProtocols.ts` (measurement) + guide utilisateur §détente mis à jour (moyenne, pas meilleur).
 
+### T5 — Rubrique mobilité/mouvement 0-3 + repères chiffrés + comparaison
+- **Constat audit (angle mort n°1)** : les 6 axes étaient notés 0-3 avec libellés **aux seuls extrêmes** (1 et 2 indéfinis), sans repère visuel/chiffré, sans comparaison temporelle → dérive inter-coach assurée.
+- **`assessmentScores.ts`** : `AssessmentScoreItem` étendu — `levels: Record<0|1|2|3,string>` (descripteur observable par niveau) + `gauge` (repère chiffré / protocole standardisé). 24 descripteurs (6 axes × 4 niveaux) rédigés (draft S&C à valider coach). **TDD** : guard `assessmentScores.test.ts` (nouveau) — chaque axe a 4 niveaux non vides + un gauge (7 tests).
+- **`AssessmentScoreField.tsx`** (nouveau, UI via `/frontend-design`) : par axe — repère chiffré, **descripteur du niveau choisi surfacé dès la sélection**, dépliant « 4 niveaux » avec **photo de référence par niveau** (convention `public/assessment-refs/<key>-<level>.jpg`, `RefPhoto` se masque seule si l'image n'existe pas → fallback texte), et **rappel de la note du dernier bilan complété** + delta.
+- **`strength-assessments.ts`** : `getPreviousCompletedPhysicalTests(athleteId, excludeId?)` — dernier bilan `completed` antérieur (mêmes RLS, pas de nouvelle policy). Re-exporté.
+- **`StrengthAssessmentScreen.tsx`** : `renderScoreGroup` consomme `AssessmentScoreField` (au lieu du `ScaleField` nu) + query `prevPhysical` + `prevScoreFor(item)` + note « note du dernier bilan rappelée à côté de chaque axe ».
+- **Pas de migration** (`physical_tests` inchangé) ; comparaison = lecture de l'historique déjà stocké.
+
 ### Tests / vérifs
-- `npm test` — **954/954 verts** (935 §300 + 19 nouveaux : T1 +13, T2 +3, T3 +6, T4 +2 net). `npx tsc --noEmit` — exit 0. `npm run build` — OK (precache 275).
-- **Pas de `test:rls`** : aucune policy RLS touchée (T1 = CHECK constraint ; T2/T3/T4 = lib/UI).
+- `npm test` — **961/961 verts** (935 §300 + 26 nouveaux : T1 +13, T2 +3, T3 +6, T4 +2, T5 +7 guard rubrique). `npx tsc --noEmit` — exit 0. `npm run build` — OK (precache 275).
+- **Pas de `test:rls`** : aucune policy RLS touchée (T1 = CHECK constraint ; T2/T3/T4/T5 = lib/UI ; T5 lit un assessment antérieur via les policies existantes).
 
 ### Décisions / limites
 - T2 ne câble que 2/5 démos (matchs exacts) — `imtp`/`vertical_jump`/`medball` attendent des clips dédiés (le SVG reste pédagogiquement honnête).
 - T3 affiche un avertissement présentationnel ; il n'« améliore » pas la calibration (4/5 barèmes restent non sourcés natation — chantier de re-sourçage hors périmètre).
 - T4 : moyenne retenue (alternative médiane non retenue) ; la détente reste une **estimation** tant que le chrono est manuel (capture vidéo/tapis = chantier ultérieur, hors périmètre).
-- Reste du §301 : **T5** (rubrique mobilité 0-3 + repères chiffrés + note précédente + 24 photos de référence).
+- T5 : 24 descripteurs = **draft à valider par le coach** (expertise S&C) ; les 24 photos de référence sont à fournir (le code marche sans — fallback texte). Pas de saisie goniométrique (schéma inchangé).
+- **§301 complet** (recos 1,2,5,6,7). Recos fluidité parcours coach (3,4) → **§302**.
 
 ## §300 — Édition coach d'une séance générée : Part 1 (préservation raw_payload) (2026-05-23)
 
