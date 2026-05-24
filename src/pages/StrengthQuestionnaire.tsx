@@ -150,8 +150,14 @@ export default function StrengthQuestionnaire() {
   const isDone =
     submittedLocally || status === "bilan_pending" || status === "completed";
 
+  // En mode coach (bilan accompagné), on revient au fil conducteur du bilan
+  // (cible conservée) plutôt qu'à la fiche nageur — §302.
   const closeScreen = () =>
-    navigate(isCoachMode ? `/coach/swimmer/${effectiveAthleteId}` : "/strength");
+    navigate(
+      isCoachMode
+        ? `/coach/strength-assessment/${effectiveAthleteId}`
+        : "/strength",
+    );
 
   // ── Submission ──
   // psychology scales are all required (1-5) ; mobility too. Pain and the
@@ -271,15 +277,38 @@ export default function StrengthQuestionnaire() {
             <Check className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-lg font-bold tracking-tight text-foreground">
-            Questionnaire déjà rempli
+            {isCoachMode ? "Questionnaire enregistré" : "Questionnaire déjà rempli"}
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Ton auto-évaluation a bien été enregistrée. Ton coach réalisera
-            le bilan physique lors de la prochaine séance.
+            {isCoachMode
+              ? `Le questionnaire de ${targetName ?? "ce nageur"} est enregistré. Enchaîne sur la notation du bilan physique.`
+              : "Ton auto-évaluation a bien été enregistrée. Ton coach réalisera le bilan physique lors de la prochaine séance."}
           </p>
-          <Button className="mt-5 rounded-xl" onClick={closeScreen}>
-            Retour à la muscu
-          </Button>
+          {isCoachMode ? (
+            <div className="mt-5 flex flex-col gap-2">
+              <Button
+                className="rounded-xl"
+                onClick={() =>
+                  navigate(`/coach/strength-assessment/${effectiveAthleteId}`)
+                }
+              >
+                Noter le bilan physique
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() =>
+                  navigate(`/coach/kpi-wizard/${effectiveAthleteId}`)
+                }
+              >
+                Mesurer les KPIs
+              </Button>
+            </div>
+          ) : (
+            <Button className="mt-5 rounded-xl" onClick={closeScreen}>
+              Retour à la muscu
+            </Button>
+          )}
         </div>
       </div>
     );

@@ -30,7 +30,7 @@
  * bottom navigation dock is hidden — same convention as KpiWizard.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAthletes,
@@ -71,6 +71,8 @@ import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
 import { initials } from "@/components/strength/kpi/kpiHelpers";
 import { AssessmentContext } from "@/components/strength/assessment/AssessmentContext";
 import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
+import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
+import { computeBilanProgress } from "@/lib/strength/bilanProgress";
 import {
   MOBILITY_SCORES,
   MOVEMENT_SCORES,
@@ -158,9 +160,16 @@ export default function StrengthAssessmentScreen() {
     staleTime: 5 * 60_000,
   });
 
+  // Route /coach/strength-assessment/:athleteId → cible pré-sélectionnée (fil
+  // conducteur coach §302) : la cible persiste entre les étapes et au retour
+  // du wizard KPI. /coach/strength-assessment (sans param) → sélection libre.
+  const routeParams = useParams<{ athleteId?: string }>();
+  const paramAthleteId =
+    routeParams.athleteId != null ? Number(routeParams.athleteId) : null;
+
   // ── Screen state ──
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(
-    null,
+    paramAthleteId,
   );
   const [athletePickerOpen, setAthletePickerOpen] = useState(false);
   const [scores, setScores] = useState<ScoreState>(emptyScores);
@@ -423,12 +432,47 @@ export default function StrengthAssessmentScreen() {
         variant="outline"
         size="sm"
         className="shrink-0 rounded-full"
-        onClick={() => setSelectedAthleteId(null)}
+        onClick={() => {
+          setSelectedAthleteId(null);
+          navigate("/coach/strength-assessment");
+        }}
       >
         Changer
       </Button>
     </div>
   );
+
+  /* ── Fil conducteur — 3 étapes du bilan, navigation cible conservée (§302) ── */
+  const hasKpis = !!kpis && Object.keys(kpis).length > 0;
+  const progress = computeBilanProgress(status, hasKpis);
+  const bilanSteps: BilanStep[] = [
+    {
+      key: "questionnaire",
+      label: "Questionnaire",
+      state: progress.questionnaire,
+      // Actionnable seulement tant qu'il n'est pas rempli (remplir avec le nageur).
+      onTap:
+        progress.questionnaire === "current" && selectedAthleteId != null
+          ? () => navigate(`/coach/questionnaire/${selectedAthleteId}`)
+          : undefined,
+    },
+    {
+      key: "kpis",
+      label: "KPIs",
+      state: progress.kpis,
+      // Toujours (re)mesurable.
+      onTap:
+        selectedAthleteId != null
+          ? () => navigate(`/coach/kpi-wizard/${selectedAthleteId}`)
+          : undefined,
+    },
+    {
+      key: "physical",
+      label: "Bilan physique",
+      state: progress.physical,
+    },
+  ];
+  const BilanProgressStrip = <BilanProgress steps={bilanSteps} />;
 
   /* ════════════════════════════════════════════════════════════
      Loading the assessment
@@ -504,7 +548,10 @@ export default function StrengthAssessmentScreen() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => setSelectedAthleteId(null)}
+              onClick={() => {
+              setSelectedAthleteId(null);
+              navigate("/coach/strength-assessment");
+            }}
             >
               Évaluer un autre nageur
             </Button>
@@ -592,14 +639,15 @@ export default function StrengthAssessmentScreen() {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background">
         {TopBar}
-        <div className="mx-auto w-full max-w-md flex-1 px-4 py-6">
+        <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-6">
           {AthleteStrip}
+          {BilanProgressStrip}
         </div>
         <CenteredState
           icon={<Hourglass className="h-7 w-7" />}
           tone="muted"
           title="En attente du questionnaire nageur"
-          description={`${athleteName} n'a pas encore rempli son auto-évaluation. Il peut le faire seul, ou tu peux le remplir avec lui maintenant.`}
+          description={`${athleteName} n'a pas encore rempli son auto-évaluation. Remplis-le avec lui, ou enchaîne sur les KPIs en attendant.`}
         >
           <div className="mt-5 flex flex-col gap-2">
             <Button
@@ -613,7 +661,19 @@ export default function StrengthAssessmentScreen() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => setSelectedAthleteId(null)}
+              onClick={() =>
+                navigate(`/coach/kpi-wizard/${selectedAthleteId}`)
+              }
+            >
+              Mesurer les KPIs
+            </Button>
+            <Button
+              variant="ghost"
+              className="rounded-xl"
+              onClick={() => {
+                setSelectedAthleteId(null);
+                navigate("/coach/strength-assessment");
+              }}
             >
               Évaluer un autre nageur
             </Button>
@@ -639,7 +699,10 @@ export default function StrengthAssessmentScreen() {
           <Button
             variant="outline"
             className="mt-5 rounded-xl"
-            onClick={() => setSelectedAthleteId(null)}
+            onClick={() => {
+              setSelectedAthleteId(null);
+              navigate("/coach/strength-assessment");
+            }}
           >
             Choisir un autre nageur
           </Button>
@@ -687,6 +750,7 @@ export default function StrengthAssessmentScreen() {
 
       <div className="mx-auto w-full max-w-md flex-1 space-y-4 px-4 py-5 pb-32">
         {AthleteStrip}
+        {BilanProgressStrip}
 
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">

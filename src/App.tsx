@@ -344,6 +344,11 @@ function AppRouter() {
                 <StrengthPlanningScreen />
               </Suspense>
             </Route>
+            <Route path="/coach/strength-assessment/:athleteId">
+              <Suspense fallback={<ListSkeleton />}>
+                <StrengthAssessmentScreen />
+              </Suspense>
+            </Route>
             <Route path="/coach/strength-assessment">
               <Suspense fallback={<ListSkeleton />}>
                 <StrengthAssessmentScreen />
@@ -357,6 +362,11 @@ function AppRouter() {
             <Route path="/admin" component={Admin} />
             <Route path="/administratif" component={Administratif} />
             <Route path="/comite" component={Comite} />
+            <Route path="/coach/kpi-wizard/:athleteId">
+              <Suspense fallback={<ListSkeleton />}>
+                <KpiWizard />
+              </Suspense>
+            </Route>
             <Route path="/strength/kpi-wizard">
               <Suspense fallback={<ListSkeleton />}>
                 <KpiWizard />

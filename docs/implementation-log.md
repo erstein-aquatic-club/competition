@@ -4,6 +4,29 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §302 — Fluidité du parcours coach : intégration KPI + fil conducteur (2026-05-24)
+
+**Branche** : `feat/301-fiabilite-mesure`
+**Trigger** : audit `docs/audits/2026-05-23-audit-mesure-coach-robustesse.md` (recos 3+4). L'audit montrait que l'étape KPI était **orpheline** du flux coach (seule entrée KPI = tuile du module nageur `/strength`), que la cible nageur n'était **pas partagée** entre écrans (re-sélection à chaque brique), et que le questionnaire coach finissait en **cul-de-sac** (done-state → fiche nageur, texte nageur, pas de retour vers la notation).
+
+### Reco 3 — Intégrer le KPI + fil conducteur + cible partagée
+- **`bilanProgress.ts`** (nouveau, TS pur) : `computeBilanProgress(status, hasKpis)` → état `done`/`current`/`todo` des 3 étapes (questionnaire / KPIs / bilan physique). Les KPIs sont indépendants du statut (pas de `current`). **TDD** : 5 tests (`bilanProgress.test.ts`).
+- **`BilanProgress.tsx`** (nouveau, UI via `/frontend-design`) : bandeau « Déroulé du bilan » — 3 pastilles tappables avec connecteurs, état visuel done/current/todo.
+- **Routes** (`App.tsx`) : `/coach/kpi-wizard/:athleteId` (KPI ciblé) + `/coach/strength-assessment/:athleteId` (cible persistante), en plus des routes sans param (rétrocompat nageur / sélection libre).
+- **`KpiWizard`** : lit `:athleteId` (`isCoachTargeted`) → **saute l'étape de sélection**, cible imposée ; `closeWizard`/`restart` reviennent à `/coach/strength-assessment/:athleteId` (cible conservée). La route `/strength/kpi-wizard` (nageur, ou coach sélection libre) est inchangée.
+- **`StrengthAssessmentScreen`** : `selectedAthleteId` initialisé depuis le param → la cible persiste au retour du wizard KPI ; `BilanProgress` affiché dans les branches `questionnaire_pending` et `bilan_pending` avec bouton **« Mesurer les KPIs »** → `/coach/kpi-wizard/:id` ; « Changer » / « Évaluer un autre nageur » nettoient le param d'URL.
+
+### Reco 4 — Fin du cul-de-sac questionnaire → notation
+- **`StrengthQuestionnaire`** : en mode coach, `closeScreen` revient au **fil conducteur** (`/coach/strength-assessment/:athleteId`) au lieu de la fiche nageur ; le done-state affiche un texte adapté coach + CTA **« Noter le bilan physique »** et **« Mesurer les KPIs »** (au lieu du seul « Retour à la muscu » nageur).
+
+### Tests / vérifs
+- `npm test` — **966/966 verts** (961 §301 + 5 `bilanProgress`). `npx tsc --noEmit` — exit 0. `npm run build` — OK (precache 275).
+- **Pas de `test:rls`** : aucune policy touchée (routes + UI + 1 fonction pure).
+
+### Décisions / limites
+- Le fil conducteur n'apparaît qu'une fois un bilan démarré (branches `questionnaire_pending`/`bilan_pending`) ; mesurer les KPIs sans bilan reste possible via la tuile du module nageur (`/strength`).
+- Recos 3+4 livrées. L'audit n'avait pas d'autre reco de fluidité majeure ouverte (F5 fil conducteur ✓, F4 cible partagée ✓, F1 KPI intégré ✓, F2/F3 cul-de-sac ✓).
+
 ## §301 — Fiabilité de la mesure (Bilan Muscu) : T1→T5 (2026-05-23)
 
 **Branche** : `feat/301-fiabilite-mesure`

@@ -18,7 +18,7 @@
  * observes `data-focus-mode`).
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAthletes,
@@ -91,6 +91,19 @@ export default function KpiWizard() {
   const role = useAuth((s) => s.role);
   const isCoach = role === "coach" || role === "admin";
 
+  // Route /coach/kpi-wizard/:athleteId → cible pré-sélectionnée (fil conducteur
+  // coach §302) : on saute l'étape de sélection et on revient à l'écran bilan.
+  // Route /strength/kpi-wizard → nageur (soi) ou coach choisissant la cible.
+  const routeParams = useParams<{ athleteId?: string }>();
+  const targetAthleteId =
+    routeParams.athleteId != null ? Number(routeParams.athleteId) : null;
+  const isCoachTargeted = isCoach && targetAthleteId != null;
+
+  // Garde de rôle : un nageur ne peut pas cibler un autre nageur.
+  useEffect(() => {
+    if (targetAthleteId != null && !isCoach) navigate("/strength");
+  }, [targetAthleteId, isCoach, navigate]);
+
   // ── Focus mode : hide the bottom dock while the wizard is open ──
   useEffect(() => {
     document.body.dataset.focusMode = "strength";
@@ -132,10 +145,12 @@ export default function KpiWizard() {
   });
 
   // ── Wizard state ──
-  const [phase, setPhase] = useState<Phase>(isCoach ? "select-athlete" : "steps");
+  const [phase, setPhase] = useState<Phase>(
+    isCoachTargeted ? "steps" : isCoach ? "select-athlete" : "steps",
+  );
   const [stepIndex, setStepIndex] = useState(0);
   const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(
-    isCoach ? null : userId,
+    isCoachTargeted ? targetAthleteId : isCoach ? null : userId,
   );
   const [attempts, setAttempts] = useState<AttemptsByKpi>(emptyAttempts);
   const [assistedBy, setAssistedBy] = useState<number | null>(null);
@@ -418,11 +433,17 @@ export default function KpiWizard() {
     setFailedKeys([]);
     setSessionWrites({});
     setStepIndex(0);
-    setPhase(isCoach ? "select-athlete" : "steps");
+    // Cible imposée (fil conducteur coach) → on re-mesure le même nageur.
+    setPhase(isCoachTargeted ? "steps" : isCoach ? "select-athlete" : "steps");
   };
 
   const closeWizard = () => {
-    navigate("/strength");
+    // Fil conducteur coach : on revient à l'écran bilan (cible conservée).
+    navigate(
+      isCoachTargeted
+        ? `/coach/strength-assessment/${targetAthleteId}`
+        : "/strength",
+    );
   };
 
   const hasAnyInput =
