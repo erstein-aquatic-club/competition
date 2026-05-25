@@ -18780,3 +18780,22 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 **Note — incident parallélisation #6.** L'agent de fond chargé du seau core (R5) devait travailler en worktree isolé ; en pratique il a écrit + commité dans l'arbre principal (`main`, commit `11750db1b`, **non poussé**). Récupération : le commit core a été préservé sur la branche **`feat/muscu-seau-core-r5-draft`** (DRAFT, valeurs à valider coach, migrations 00203/00204 NON appliquées — prod confirmée inchangée), `main` réinitialisé sur `origin/main` (§311), puis #5 ré-appliqué proprement. Le seau core reste **hors `main`** jusqu'à validation coach.
 
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1369/1369 node:test + 20/20 vitest** (+4 #5) ✅ ; `npm run build` OK ✅. Pas de migration, pas de `test:rls`.
+
+## §313 — Seau tronc/core (R5) : livré + déployé après validation coach (2026-05-26)
+
+**Contexte.** R5 (audits matrice + robustesse §311) : le moteur n'avait que 5 seaux entraînables, le tronc (ondulation papillon/dos, rotation crawl/dos, gainage/streamline) n'était pilotable qu'indirectement. Conçu en parallèle (agent de fond, cf. note incident §312), parqué en DRAFT sur `feat/muscu-seau-core-r5-draft`, puis **validé par le coach (François)** et déployé.
+
+**Décisions validées :**
+1. **Matrice d'emphase core** (ancrée crawl, composée comme les autres seaux) — distances : 50→0.45, 100→0.50, 200→0.60, 400+→0.65, fond→0.70 ; signatures : crawl ×1.0, **papillon ×1.40** (ondulation = max), 4 nages ×1.30, dos ×1.25, brasse ×0.85. Papillon/4N/dos ressortent (objectif R5), socle permanent (jamais nul), tout ≤ 1.0.
+2. **Core NON scoré (option a)** — pas de KPI dédié, traité comme la mobilité : hors `ALL_BUCKETS` de priorisation. Évite la sur-priorisation `emphasis × (100 − 0)` qu'aurait causé un 6ᵉ seau scoré `null`, colle à la doctrine (le tronc est un socle permanent, pas une qualité « à rattraper »), et ne re-dégrade pas le `lowestBaremeConfidence` fiabilisé en §309.
+3. **Catalogue** — 12 exercices re-taggés `upper/lower_strength → core` (Hollow Body, Gainage lesté, Planches latérale/dynamique/instable, Pallof Press, Dead Bug, Ab Wheel, Relevés jambes, Plank walkout, Abdos, Superman dynamique). Lancers médecine-ball rotatif/latéral (53/54) **restent `upper_power`** (balistique).
+4. **Périodisation** — cycles génériques, bloc core inséré en fin de séance de développement (modèle mobilité).
+
+**Changements :**
+- `src/lib/strength/mesocycleEngine.types.ts` + `src/lib/api/types.ts` : `StrengthBucket += 'core'` ; `composeTemplate.ts` : `EMPHASIS_BUCKETS += 'core'` avec garde rétrocompat (`?? 0 / ?? 1` → pas de NaN si la DB n'a pas encore la clé) ; `mesocycleEngine.ts` : `scoreBuckets.core=null`, hors `ALL_BUCKETS`, bloc core systématique en séance de dev (`buildCoreExercise`) ; labels UI (`MesocyclePreview`, `CoachMesocyclePanel`) ; type-guard `strength-catalog.ts`.
+- Migrations **00203** (clé `core` dans `strength_stroke_signatures` + `strength_distance_profiles`) et **00204** (re-tag 12 exos + CHECK `dim_exercices.bucket` élargi) — **appliquées via MCP** ; vérif prod : core=12 exos, US 37→26, LS 19→18, clés core posées sur les 5 nages + 5 distances.
+- Design : `docs/plans/2026-05-26-muscu-seau-core-r5-design.md` (matrice + sources + 4 décisions).
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1377/1377 node:test + 20/20 vitest** (+8 core TDD : matrice, fly=max, ordre 4N>dos>crawl>brasse, core jamais 0, rétrocompat, core jamais priorisé, bloc inséré si emphase>0) ✅ ; `npm run build` OK. `test:rls` non requis (00203/00204 = données de référence + CHECK, aucune policy/RLS/helper auth).
+
+**Limites / suites :** valeurs d'emphase = direction littérature (pas de norme chiffrée publiée), ajustables par migration. Nuance UI : core non scoré → absent des barres de score du `ReasoningPanel` (présent comme bloc de séance, taggé « Tronc / gainage ») ; visibilité dédiée = petit ajout UI futur via `/frontend-design`. Opportunité d'un vrai KPI core (option b) laissée ouverte. Le nudge `sprint_50` upper_power (#7) reste à consolider avec cette emphase.

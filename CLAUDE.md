@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§312** — Garde double-apply (#5 : `applyLikelySucceededDespiteError`, retry-safe après timeout réseau) ; #7 revu sans changement. `npm test` 1369+20, tsc 0, build 0. *(§311 — audit robustesse/perf/élite + #1 withTimeout apply/revert, #2 garde-fou §308, #4 profil `fond` mig 00202.)* Seau core R5 en DRAFT hors `main` (branche `feat/muscu-seau-core-r5-draft`, à valider coach).
+Dernier § livré : **§313** — Seau tronc/core (R5) livré + déployé : 6ᵉ seau `core` (papillon ×1.40, non scoré façon mobilité — option a), 12 exos re-taggés, mig 00203/00204. `npm test` 1377+20, tsc 0, build 0. *(§312 — garde double-apply #5 ; §311 — audit + #1 withTimeout, #2 garde-fou §308, #4 profil `fond` mig 00202.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
