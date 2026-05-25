@@ -9,11 +9,15 @@ import {
   getTrainingCycles,
   getObjectives,
   getCompetitions,
+  getLatestAssessment,
+  getLatestKpiMeasurements,
+  getActiveMesocycle,
 } from "@/lib/api";
+import { nextBilanStep } from "@/lib/strength/bilanProgress";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Activity, ArrowLeft, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, Dumbbell, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, Dumbbell, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CoachBreadcrumb from "@/components/shared/CoachBreadcrumb";
@@ -146,6 +150,26 @@ export default function CoachSwimmerFullView({
     staleTime,
   });
 
+  // ── Bilan muscu — données pour le CTA "Démarrer / Reprendre" (§A) ──
+  const { data: latestAssessment } = useQuery({
+    queryKey: ["strength-assessment", athleteId],
+    queryFn: () => getLatestAssessment(athleteId!),
+    enabled: athleteId != null,
+    staleTime,
+  });
+  const { data: bilanKpis } = useQuery({
+    queryKey: ["kpi-latest", athleteId],
+    queryFn: () => getLatestKpiMeasurements(athleteId!),
+    enabled: athleteId != null,
+    staleTime,
+  });
+  const { data: activeMesocycle } = useQuery({
+    queryKey: ["active-mesocycle", athleteId],
+    queryFn: () => getActiveMesocycle(athleteId!),
+    enabled: athleteId != null,
+    staleTime,
+  });
+
   const swimAnalytics = useSwimAnalytics({
     userId: athleteId ?? undefined,
     weeks: swimWeeks,
@@ -178,6 +202,22 @@ export default function CoachSwimmerFullView({
   }, [cycles]);
 
   const objectivesCount = objectives?.length ?? 0;
+
+  // ── Bilan step derivation (§A) ──
+  const bilanStatus = latestAssessment?.status ?? null;
+  const bilanHasKpis = !!bilanKpis && Object.keys(bilanKpis).length > 0;
+  const bilanHasActiveMeso = activeMesocycle != null;
+  const bilanStep = nextBilanStep(bilanStatus, bilanHasKpis, bilanHasActiveMeso);
+  const bilanNavTarget: string = (() => {
+    switch (bilanStep) {
+      case "start": return `/coach/strength-assessment/${athleteId}`;
+      case "questionnaire": return `/coach/questionnaire/${athleteId}`;
+      case "kpis": return `/coach/kpi-wizard/${athleteId}`;
+      case "physical": return `/coach/strength-assessment/${athleteId}`;
+      case "generate": return `/coach/mesocycle-generate/${athleteId}`;
+      case "done": return `/coach/strength-assessment/${athleteId}`;
+    }
+  })();
 
   const displayName = profile?.display_name ?? athleteName ?? "Nageur";
   const avatarUrl = profile?.avatar_url ?? null;
@@ -509,7 +549,28 @@ export default function CoachSwimmerFullView({
                       <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
                     </button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2">
+                  <CollapsibleContent className="mt-2 space-y-3">
+                    {/* §A — resume-aware bilan CTA */}
+                    <button
+                      type="button"
+                      onClick={() => navigate(bilanNavTarget)}
+                      className="w-full flex items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-left text-sm font-medium text-violet-800 transition-colors hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                    >
+                      <span>
+                        {bilanStep === "start"
+                          ? `Démarrer le bilan de ${displayName}`
+                          : bilanStep === "questionnaire"
+                          ? `Reprendre — Questionnaire`
+                          : bilanStep === "kpis"
+                          ? `Reprendre — KPIs`
+                          : bilanStep === "physical"
+                          ? `Reprendre — Bilan physique`
+                          : bilanStep === "generate"
+                          ? `Reprendre — Génération`
+                          : `Voir le bilan de ${displayName}`}
+                      </span>
+                      <ArrowRight className="h-4 w-4 shrink-0" />
+                    </button>
                     <CoachMesocyclePanel
                       athleteId={athleteId}
                       athleteName={displayName}
