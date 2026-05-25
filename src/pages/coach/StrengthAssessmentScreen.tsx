@@ -241,6 +241,16 @@ export default function StrengthAssessmentScreen() {
   });
   const profileComplete = isProfileComplete(athleteProfile);
 
+  /* ── Fil conducteur — 4 étapes du bilan (§302/§A) ──────────────────────────
+     §316 (fix #310) — `useBilanSteps` DOIT être appelé inconditionnellement,
+     AVANT tout `return` anticipé (accès coach / sélection nageur). Son hook
+     interne (`useLocation`) variait sinon entre rendus null↔sélectionné →
+     « Rendered more hooks than during the previous render ». Il gère
+     `selectedAthleteId == null` (→ []). */
+  const hasKpis = !!kpis && Object.keys(kpis).length > 0;
+  const bilanSteps = useBilanSteps(selectedAthleteId, status, hasKpis, hasActiveMesocycle, "physical");
+  const BilanProgressStrip = <BilanProgress steps={bilanSteps} />;
+
   /** Note du bilan précédent pour un axe (null si aucun bilan antérieur). */
   const prevScoreFor = (item: AssessmentScoreItem): number | null => {
     if (!prevPhysical) return null;
@@ -476,11 +486,6 @@ export default function StrengthAssessmentScreen() {
       </Button>
     </div>
   );
-
-  /* ── Fil conducteur — 4 étapes du bilan, navigation cible conservée (§302/§A) ── */
-  const hasKpis = !!kpis && Object.keys(kpis).length > 0;
-  const bilanSteps = useBilanSteps(selectedAthleteId, status, hasKpis, hasActiveMesocycle, "physical");
-  const BilanProgressStrip = <BilanProgress steps={bilanSteps} />;
 
   /* ════════════════════════════════════════════════════════════
      Loading the assessment

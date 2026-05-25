@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§315** — Bilan muscu hors-ligne (#3) **COMPLET** : Slice B = KPIs idempotents (clé `client_dedup_key` + UPSERT, mig 00205) en file offline ; au bord du bassin sous réseau coupé, le coach mesure tout le bilan (questionnaire+physique §314 + KPIs §315) → replay idempotent à la reconnexion. `npm test` 1378+20, tsc 0, build 0. *(§313 seau core R5 ; §312 garde double-apply #5 ; §311 audit + #1/#2/#4.)*
+Dernier § livré : **§317** — Fix 409 sync nageurs records : guard `occupiedIufs` dans `syncClubRecordSwimmersFromUsers()` évite l'INSERT qui violait la contrainte unique `iuf`. **§316** — Fix React #310 `StrengthAssessmentScreen` : hoist `useBilanSteps` avant les return anticipés. `npm test` 1378+21, tsc 0. *(§315 KPIs offline ; §314 questionnaire+physique offline ; §313 seau core R5.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

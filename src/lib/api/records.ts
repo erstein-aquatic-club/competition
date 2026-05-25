@@ -532,9 +532,13 @@ export async function syncClubRecordSwimmersFromUsers(): Promise<void> {
 
   const { data: existing } = await supabase
     .from("club_record_swimmers")
-    .select("id, user_id, iuf, sex, birthdate, display_name")
-    .eq("source_type", "user");
-  const existingByUserId = new Map((existing ?? []).map((s: any) => [s.user_id, s]));
+    .select("id, user_id, iuf, sex, birthdate, display_name, source_type");
+  const allEntries = existing ?? [];
+  const existingByUserId = new Map(
+    allEntries.filter((s: any) => s.source_type === "user").map((s: any) => [s.user_id, s])
+  );
+  // Track all occupied IUFs to prevent unique-constraint violations on insert
+  const occupiedIufs = new Set(allEntries.filter((s: any) => s.iuf).map((s: any) => s.iuf));
 
   const { data: profiles } = await supabase
     .from("user_profiles")
@@ -549,7 +553,8 @@ export async function syncClubRecordSwimmersFromUsers(): Promise<void> {
 
     const existingEntry = existingByUserId.get(user.id);
     if (!existingEntry) {
-      // Insert new entry
+      // Skip insert if IUF already exists in another entry (manual swimmer not yet merged)
+      if (iuf && occupiedIufs.has(iuf)) continue;
       await supabase.from("club_record_swimmers").insert({
         source_type: "user",
         user_id: user.id,

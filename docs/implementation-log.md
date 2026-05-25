@@ -18830,3 +18830,39 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **#3 COMPLET** (Slice A questionnaire+physique §314 + Slice B KPIs §315) : au bord du bassin hors-ligne, le coach mesure tout le bilan → file localStorage → replay idempotent à la reconnexion.
 
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1378/1378 node:test + 20/20 vitest** (+1 dedup) ✅ ; `npm run build` OK ✅ ; smoke prod : index unique `client_dedup_key` présent. Pas de `test:rls` (00205 = colonne + index, aucune policy/RLS/helper auth).
+
+## §317 — Fix 409 sync nageurs records (2026-05-25)
+
+**Contexte.** En cliquant "Mettre à jour" dans l'admin des records, le navigateur rapportait un 409. Débogage via logs MCP Supabase : la 409 venait d'un `POST /rest/v1/club_record_swimmers` émis par le **navigateur** (pas l'edge function), déclenchée au chargement de `RecordsAdmin` via `syncClubRecordSwimmersFromUsers()`.
+
+**Root cause.** La fonction de sync :
+1. Cherchait les entrées existantes filtrées par `source_type='user'` uniquement.
+2. Pour tout utilisateur sans entrée `source_type='user'`, tentait un `INSERT`.
+3. La contrainte unique sur `iuf` (`idx_club_record_swimmers_iuf_unique`) bloquait quand l'IUF de l'utilisateur existait déjà dans une entrée `source_type='manual'` (nageur manuel non encore fusionné).
+
+**Cas concret :** `Reibel Adele` (user_id=17, ffn_iuf='1672905') avait déjà un `club_record_swimmers` manuel (id=51, source_type='manual', user_id=null) avec le même IUF. Le sync essayait d'insérer un doublon → 409.
+
+**Fix (`src/lib/api/records.ts`) :**
+- La requête existing récupère maintenant **toutes** les entrées (sans filtre `source_type`).
+- On construit `occupiedIufs` = ensemble des IUFs déjà pris dans la table.
+- Avant l'INSERT, si `iuf` est dans `occupiedIufs`, on saute (`continue`) — évite la violation de contrainte.
+- Le nageur manuel non fusionné reste en place ; l'admin peut utiliser le bouton "Fusionner" pour lier le compte.
+
+**Incohérence 25.06 vs 24.93 (screenshot) :** les données en base sont correctes (`club_records` pour 50_FLY/50m/M/age=17 = 24930ms/24.93s, François WAGNER 2026-05-22). L'affichage 25.06 était une valeur React Query en cache (pré-recalculation) — un refresh de page résout l'affichage.
+
+**Fichiers modifiés :**
+- `src/lib/api/records.ts` : `syncClubRecordSwimmersFromUsers()` — requête étendue + guard `occupiedIufs`
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` 1378 node:test + 21 vitest ✅. Pas de migration (fix purement frontend). Pas de `test:rls` (aucune policy/RLS touchée).
+
+## §316 — Fix crash React #310 — `StrengthAssessmentScreen` > sélection d'un nageur (2026-05-26)
+
+**Symptôme (prod).** « Bilan muscu > sélection d'un nageur » → `Error: Minified React error #310` (« Rendered more hooks than during the previous render »), stack `useBilanSteps ← StrengthAssessmentScreen`.
+
+**Cause racine (confirmée par repro).** Violation des Rules of Hooks introduite en §A : `useBilanSteps(...)` était appelé **après** les `return` anticipés de `StrengthAssessmentScreen` (`if (!isCoach) return` ligne 373 ; `if (selectedAthleteId == null) return` ligne 398, l'écran sélecteur). Tant qu'aucun nageur n'était choisi, le composant retournait avant d'atteindre `useBilanSteps` → son hook interne `useLocation` (`useBilanSteps.ts:25`) ne tournait pas. Sélectionner un nageur (`selectedAthleteId` null→id) faisait franchir le `return` → `useBilanSteps` s'exécutait → **un hook de plus que le rendu précédent** → #310. Latent depuis §A : non couvert par les tests (unitaires purs, pas de rendu d'écran) et invisible quand on arrive avec un nageur déjà ciblé (route `:athleteId`).
+
+**Fix.** `src/pages/coach/StrengthAssessmentScreen.tsx` — `useBilanSteps` (+ `hasKpis`/`BilanProgressStrip`) **hoisté au-dessus des return anticipés**, juste après les `useQuery` dont il dépend (toutes les entrées — `status`, `hasKpis`, `hasActiveMesocycle`, `selectedAthleteId` — sont disponibles à ce point). Le hook tourne désormais inconditionnellement à chaque rendu ; `useBilanSteps` gère déjà `athleteId == null` (→ `[]`). Les 2 autres consommateurs (`KpiWizard:225`, `StrengthQuestionnaire:177`) appelaient déjà `useBilanSteps` **avant** leurs return → sains, non touchés.
+
+**Test de régression (TDD, RED→GREEN).** `src/pages/coach/StrengthAssessmentScreen.vitest.tsx` (NOUVEAU) — rend l'écran sans nageur puis en sélectionne un (sélecteur stubé). **Piège évité** : le mock de `wouter.useLocation` doit **consommer un vrai hook** (le vrai en consomme un en interne — c'est LUI que `useBilanSteps` ajoute) ; un mock « fonction pure » effaçait le déclencheur (faux vert). RED reproduisait `Rendered more hooks…` à `useBilanSteps.ts:25` ; GREEN après hoist. Assertions doublées (sélecteur disparu + spy `console.error` sans erreur d'ordre des hooks) pour éviter le faux vert d'un crash-unmount.
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1378/1378 node:test + 21/21 vitest** (+1 repro #310) ✅ ; `npm run build` OK ✅. Pas de migration, pas de `test:rls`.
