@@ -291,6 +291,13 @@ export interface CatalogExercise {
   level: 'beginner' | 'intermediate' | 'advanced' | null;
   /** Zones anatomiques contre-indiquées (ex : `['shoulder', 'knee']`). */
   contraindicationZones: string[];
+  /**
+   * Nages pour lesquelles cet exo est un préhab spécifique (§306 Phase 2).
+   * Quand le mésocycle cible une de ces nages, l'exo est préféré (remonté
+   * au-dessus des non-cores ordinaires de son seau) sans déloger un core de
+   * force. Ex : `['breaststroke']` pour les exos adducteurs.
+   */
+  strokePrehabAffinity: string[];
   /** `true` si exercice fondamental du seau (affiché en premier). */
   isCore: boolean;
   /** URL de l'illustration GIF (ou null si l'exercice n'en a pas). */

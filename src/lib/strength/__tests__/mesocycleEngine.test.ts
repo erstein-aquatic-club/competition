@@ -668,6 +668,7 @@ function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     bucket: 'lower_strength',
     level: 'intermediate',
     contraindicationZones: [],
+    strokePrehabAffinity: [],
     isCore: false,
     illustrationGif: null,
     nbSeriesEndurance: 3,
