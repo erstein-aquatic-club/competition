@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { resolveWaveConfig } from "../chrono-types";
 import type { ChronoState } from "../chrono-types";
 
@@ -17,14 +18,14 @@ function baseState(): Pick<ChronoState, "seriesCount" | "totalDistanceM" | "spli
 describe("resolveWaveConfig", () => {
   it("falls back to global when wave not found", () => {
     const s = baseState();
-    expect(resolveWaveConfig(s, 99)).toEqual({
+    assert.deepEqual(resolveWaveConfig(s, 99), {
       seriesCount: 3, totalDistanceM: 200, splitDistanceM: 50,
     });
   });
 
   it("falls back to global when overrides is null", () => {
     const s = baseState();
-    expect(resolveWaveConfig(s, 1)).toEqual({
+    assert.deepEqual(resolveWaveConfig(s, 1), {
       seriesCount: 3, totalDistanceM: 200, splitDistanceM: 50,
     });
   });
@@ -32,7 +33,7 @@ describe("resolveWaveConfig", () => {
   it("merges partial override with global", () => {
     const s = baseState();
     s.waves[1].overrides = { seriesCount: 6 };
-    expect(resolveWaveConfig(s, 2)).toEqual({
+    assert.deepEqual(resolveWaveConfig(s, 2), {
       seriesCount: 6, totalDistanceM: 200, splitDistanceM: 50,
     });
   });
@@ -40,7 +41,7 @@ describe("resolveWaveConfig", () => {
   it("returns full override when all fields set", () => {
     const s = baseState();
     s.waves[1].overrides = { seriesCount: 6, totalDistanceM: 100, splitDistanceM: 25 };
-    expect(resolveWaveConfig(s, 2)).toEqual({
+    assert.deepEqual(resolveWaveConfig(s, 2), {
       seriesCount: 6, totalDistanceM: 100, splitDistanceM: 25,
     });
   });
