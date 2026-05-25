@@ -900,9 +900,12 @@ function buildSession(
 ): MesocycleSession {
   const mobilityPool = selected.mobility ?? [];
 
-  // Une séance est corrective si elle est mobility-primary (override par slot)
-  // OU si l'override sécurité global est actif (toute la semaine corrective).
-  const isMobilityOverride = primary === 'mobility' || ctx.mobilityOverrideActive;
+  // Une séance est corrective si elle est mobility-primary (override par slot,
+  // comportement legacy) OU si l'override sécurité global rend toute la semaine
+  // corrective — mais uniquement en mode jour-aware (§307). En legacy, seuls les
+  // slots promus mobility restent correctifs, comme avant §307.
+  const isMobilityOverride =
+    primary === 'mobility' || (ctx.jourAware && ctx.mobilityOverrideActive);
   const role = classifyRole(weekday, ctx.primerWeekdays, isMobilityOverride, ctx.jourAware);
 
   // §307 — Amorce PAP : chargement dédié, ignore primary/complement classiques.

@@ -1466,6 +1466,43 @@ describe('generateMesocycle — jour-aware amorce PAP (§307)', () => {
     const hasPap = meso.weeks.some((w) => w.sessions.some((s) => s.role === 'amorce_pap'));
     assert.equal(hasPap, false, 'aucune PAP en mode legacy');
   });
+
+  it('8. legacy + douleur intense : la semaine n’est PAS entièrement corrective (entraînement conservé)', () => {
+    // Mode legacy (pas de weekdays) avec une douleur intense dans le questionnaire :
+    // l'override global ne doit PAS rendre toute la semaine corrective — seuls les
+    // slots promus mobility le sont, comme avant §307. Au moins une séance garde
+    // un exercice principal non-mobility (force/puissance entraînée).
+    const input = jourAwareInput({
+      assessment: {
+        id: 'assess-ja',
+        athlete_id: 42,
+        questionnaire: {
+          ...greatQuestionnaire,
+          pain: [{ body_zone: 'shoulder', intensity: 3 }],
+        },
+        physical_tests: fullPhysicalTests,
+      },
+    });
+    delete input.weekdays; // mode legacy
+
+    const meso = generateMesocycle(input);
+
+    const sessions = meso.weeks.flatMap((w) => w.sessions);
+    const hasTrainingSession = sessions.some((s) =>
+      s.exercises.some((e) => e.bucket !== 'mobility'),
+    );
+    assert.ok(
+      hasTrainingSession,
+      'au moins une séance conserve un exercice non-mobility en mode legacy',
+    );
+    // Et la semaine n'est pas entièrement classée mobilite_corrective via
+    // l'override global jour-aware (qui ne doit pas s'appliquer en legacy).
+    const correctiveCount = sessions.filter((s) => s.role === 'mobilite_corrective').length;
+    assert.ok(
+      correctiveCount < sessions.length,
+      `pas toutes correctives en legacy, obtenu ${correctiveCount}/${sessions.length}`,
+    );
+  });
 });
 
 
