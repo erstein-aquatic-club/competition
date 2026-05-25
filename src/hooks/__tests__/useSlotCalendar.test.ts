@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   getMondayOfWeek,
   materializeSlots,
@@ -13,19 +14,19 @@ import type { TrainingSlot } from "@/lib/api/types";
 describe("getMondayOfWeek", () => {
   it("returns the Monday for offset 0 (current week)", () => {
     const monday = getMondayOfWeek(0);
-    expect(new Date(monday).getDay()).toBe(1); // 1 = Monday
+    assert.equal(new Date(monday).getDay(), 1); // 1 = Monday
   });
   it("returns next Monday for offset +1", () => {
     const thisMonday = getMondayOfWeek(0);
     const nextMonday = getMondayOfWeek(1);
     const diff = (new Date(nextMonday).getTime() - new Date(thisMonday).getTime()) / 86_400_000;
-    expect(diff).toBe(7);
+    assert.equal(diff, 7);
   });
   it("returns previous Monday for offset -1", () => {
     const thisMonday = getMondayOfWeek(0);
     const prevMonday = getMondayOfWeek(-1);
     const diff = (new Date(thisMonday).getTime() - new Date(prevMonday).getTime()) / 86_400_000;
-    expect(diff).toBe(7);
+    assert.equal(diff, 7);
   });
 });
 
@@ -46,18 +47,24 @@ describe("materializeSlots", () => {
 
   it("generates one instance per matching day in the week", () => {
     const instances = materializeSlots([slot], [], [], "2026-03-02");
-    expect(instances).toHaveLength(1);
-    expect(instances[0].date).toBe("2026-03-02");
-    expect(instances[0].state).toBe("empty");
+    assert.equal((instances).length, 1);
+    assert.equal(instances[0].date, "2026-03-02");
+    assert.equal(instances[0].state, "empty");
   });
 
   it("marks instance as cancelled when override exists", () => {
     const overrides = [{ id: "o1", slot_id: "slot-1", override_date: "2026-03-02", status: "cancelled" as const, new_start_time: null, new_end_time: null, new_location: null, reason: null, created_by: null, created_at: "" }];
     const instances = materializeSlots([slot], [], overrides, "2026-03-02");
-    expect(instances[0].state).toBe("cancelled");
+    assert.equal(instances[0].state, "cancelled");
   });
 
   it("falls back to the morning assignment for the same date when no slot link exists", () => {
+    // visible_from est volontairement loin dans le futur : materializeSlots compare
+    // visible_from à toISODate(new Date()) (la date système réelle), donc une date
+    // passée donnerait state="published". Le test cible l'état "draft" (assignation
+    // non encore visible) → on garde visible_from dans le futur pour rester
+    // indépendant de l'horloge. La résolution du fallback (id 11) dépend de
+    // scheduled_date + bucket, pas de visible_from.
     const assignments = [
       {
         id: 11,
@@ -66,7 +73,7 @@ describe("materializeSlots", () => {
         target_group_id: 1,
         scheduled_date: "2026-03-02",
         scheduled_slot: "morning",
-        visible_from: "2026-03-02",
+        visible_from: "2999-01-01",
         notified_at: null,
         status: "assigned",
         session_name: "Matin",
@@ -75,25 +82,35 @@ describe("materializeSlots", () => {
     ];
 
     const instances = materializeSlots([slot], assignments, [], "2026-03-02");
-    expect(instances[0].assignment?.id).toBe(11);
-    expect(instances[0].state).toBe("draft");
+    assert.equal(instances[0].assignment?.id, 11);
+    assert.equal(instances[0].state, "draft");
   });
 });
 
 describe("getSlotScheduleBucket", () => {
   it("maps times before 12:00 to morning", () => {
-    expect(getSlotScheduleBucket("06:00")).toBe("morning");
-    expect(getSlotScheduleBucket("11:59")).toBe("morning");
+    assert.equal(getSlotScheduleBucket("06:00"), "morning");
+    assert.equal(getSlotScheduleBucket("11:59"), "morning");
   });
 
   it("maps times at or after 13:00 to evening", () => {
-    expect(getSlotScheduleBucket("13:00")).toBe("evening");
-    expect(getSlotScheduleBucket("18:30")).toBe("evening");
+    assert.equal(getSlotScheduleBucket("13:00"), "evening");
+    assert.equal(getSlotScheduleBucket("18:30"), "evening");
   });
 
-  it("returns null for the noon gap", () => {
-    expect(getSlotScheduleBucket("12:00")).toBeNull();
-    expect(getSlotScheduleBucket("12:45")).toBeNull();
+  it("buckets noon (12:00–12:59) into morning — §95b removed the noon gap", () => {
+    // L'implémentation initiale renvoyait null pour 12h00–12h59 (« noon gap »).
+    // §95b (commit bd533c230, « harden session assignment flow ») a délibérément
+    // supprimé ce trou : un créneau de midi tombait dans un bucket null et ne
+    // matchait alors jamais d'assignation fallback. Le seuil est désormais
+    // hour < 13 → morning, sinon evening.
+    assert.equal(getSlotScheduleBucket("12:00"), "morning");
+    assert.equal(getSlotScheduleBucket("12:45"), "morning");
+  });
+
+  it("returns null only for an unparseable start time", () => {
+    assert.equal(getSlotScheduleBucket(""), null);
+    assert.equal(getSlotScheduleBucket("not-a-time"), null);
   });
 });
 
@@ -142,7 +159,7 @@ describe("resolveSlotAssignment", () => {
       },
     ]);
 
-    expect(assignment?.id).toBe(1);
+    assert.equal(assignment?.id, 1);
   });
 
   it("matches a fallback by date + bucket + group", () => {
@@ -162,7 +179,7 @@ describe("resolveSlotAssignment", () => {
       },
     ]);
 
-    expect(assignment?.id).toBe(3);
+    assert.equal(assignment?.id, 3);
   });
 });
 
@@ -170,17 +187,17 @@ describe("computeSlotState", () => {
   const today = "2026-03-01";
 
   it("returns 'empty' when no assignment", () => {
-    expect(computeSlotState(undefined, today)).toBe("empty");
+    assert.equal(computeSlotState(undefined, today), "empty");
   });
   it("returns 'published' when visible_from is null", () => {
-    expect(computeSlotState({ visible_from: null } as any, today)).toBe("published");
+    assert.equal(computeSlotState({ visible_from: null } as any, today), "published");
   });
   it("returns 'published' when visible_from <= today", () => {
-    expect(computeSlotState({ visible_from: "2026-02-28" } as any, today)).toBe("published");
-    expect(computeSlotState({ visible_from: "2026-03-01" } as any, today)).toBe("published");
+    assert.equal(computeSlotState({ visible_from: "2026-02-28" } as any, today), "published");
+    assert.equal(computeSlotState({ visible_from: "2026-03-01" } as any, today), "published");
   });
   it("returns 'draft' when visible_from > today", () => {
-    expect(computeSlotState({ visible_from: "2026-03-05" } as any, today)).toBe("draft");
+    assert.equal(computeSlotState({ visible_from: "2026-03-05" } as any, today), "draft");
   });
 });
 
@@ -231,7 +248,7 @@ describe("sumAssignedDistance", () => {
       mkInstance("published", 3000),
       mkInstance("draft", 2500),
     ];
-    expect(sumAssignedDistance(instances)).toBe(5500);
+    assert.equal(sumAssignedDistance(instances), 5500);
   });
 
   it("excludes empty instances with no assignment", () => {
@@ -239,7 +256,7 @@ describe("sumAssignedDistance", () => {
       mkInstance("published", 2000),
       mkInstance("empty", undefined),
     ];
-    expect(sumAssignedDistance(instances)).toBe(2000);
+    assert.equal(sumAssignedDistance(instances), 2000);
   });
 
   it("excludes cancelled instances even when an assignment is attached", () => {
@@ -247,7 +264,7 @@ describe("sumAssignedDistance", () => {
       mkInstance("published", 1500),
       mkInstance("cancelled", 4000),
     ];
-    expect(sumAssignedDistance(instances)).toBe(1500);
+    assert.equal(sumAssignedDistance(instances), 1500);
   });
 
   it("treats null/undefined session_distance as 0", () => {
@@ -255,10 +272,10 @@ describe("sumAssignedDistance", () => {
       mkInstance("published", null),
       mkInstance("draft", 1000),
     ];
-    expect(sumAssignedDistance(instances)).toBe(1000);
+    assert.equal(sumAssignedDistance(instances), 1000);
   });
 
   it("returns 0 for empty input", () => {
-    expect(sumAssignedDistance([])).toBe(0);
+    assert.equal(sumAssignedDistance([]), 0);
   });
 });

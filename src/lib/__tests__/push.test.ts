@@ -1,14 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { urlBase64ToUint8Array, serializeSubscription } from "@/lib/pushHelpers";
 
 describe("pushHelpers", () => {
   it("urlBase64ToUint8Array converts base64url to Uint8Array", () => {
     const result = urlBase64ToUint8Array("AQAB");
-    expect(result).toBeInstanceOf(Uint8Array);
-    expect(result.length).toBe(3);
-    expect(result[0]).toBe(1);
-    expect(result[1]).toBe(0);
-    expect(result[2]).toBe(1);
+    assert.ok(result instanceof Uint8Array);
+    assert.equal(result.length, 3);
+    assert.equal(result[0], 1);
+    assert.equal(result[1], 0);
+    assert.equal(result[2], 1);
   });
 
   it("serializeSubscription extracts endpoint and keys", () => {
@@ -20,8 +21,8 @@ describe("pushHelpers", () => {
       }),
     };
     const result = serializeSubscription(mockSub as any);
-    expect(result.endpoint).toBe("https://fcm.googleapis.com/fcm/send/abc123");
-    expect(result.p256dh).toBe("pubkey123");
-    expect(result.auth).toBe("authkey456");
+    assert.equal(result.endpoint, "https://fcm.googleapis.com/fcm/send/abc123");
+    assert.equal(result.p256dh, "pubkey123");
+    assert.equal(result.auth, "authkey456");
   });
 });

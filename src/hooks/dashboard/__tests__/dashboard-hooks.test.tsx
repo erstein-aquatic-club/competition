@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   assignmentIso,
   assignmentPlannedKm,
@@ -18,32 +19,32 @@ import {
 
 describe("dashboard/internal helpers", () => {
   it("toISODate pads month and day", () => {
-    expect(toISODate(new Date(2026, 0, 3))).toBe("2026-01-03");
+    assert.equal(toISODate(new Date(2026, 0, 3)), "2026-01-03");
   });
 
   it("weekdayMondayIndex makes Monday index 0 and Sunday index 6", () => {
     // 2026-04-13 is a Monday
-    expect(weekdayMondayIndex(new Date(2026, 3, 13))).toBe(0);
+    assert.equal(weekdayMondayIndex(new Date(2026, 3, 13)), 0);
     // 2026-04-19 is a Sunday
-    expect(weekdayMondayIndex(new Date(2026, 3, 19))).toBe(6);
+    assert.equal(weekdayMondayIndex(new Date(2026, 3, 19)), 6);
   });
 
   it("metersToKm + fmtKm round-trip", () => {
-    expect(metersToKm(5000)).toBe(5);
-    expect(fmtKm(5)).toBe("5");
-    expect(fmtKm("not-a-number")).toBe("—");
+    assert.equal(metersToKm(5000), 5);
+    assert.equal(fmtKm(5), "5");
+    assert.equal(fmtKm("not-a-number"), "—");
   });
 
   it("assignmentIso extracts a date-like field", () => {
-    expect(assignmentIso({ assigned_date: "2026-04-13T10:00:00" })).toBe("2026-04-13");
-    expect(assignmentIso({})).toBeNull();
+    assert.equal(assignmentIso({ assigned_date: "2026-04-13T10:00:00" }), "2026-04-13");
+    assert.equal(assignmentIso({}), null);
   });
 
   it("pickAssignmentSlotKey resolves AM/PM from common shapes", () => {
-    expect(pickAssignmentSlotKey({ assigned_slot: "morning" }, 0)).toBe("AM");
-    expect(pickAssignmentSlotKey({ assigned_slot: "evening" }, 0)).toBe("PM");
-    expect(pickAssignmentSlotKey({}, 0)).toBe("AM");
-    expect(pickAssignmentSlotKey({}, 1)).toBe("PM");
+    assert.equal(pickAssignmentSlotKey({ assigned_slot: "morning" }, 0), "AM");
+    assert.equal(pickAssignmentSlotKey({ assigned_slot: "evening" }, 0), "PM");
+    assert.equal(pickAssignmentSlotKey({}, 0), "AM");
+    assert.equal(pickAssignmentSlotKey({}, 1), "PM");
   });
 
   it("assignmentPlannedKm sums items with repetitions", () => {
@@ -54,7 +55,7 @@ describe("dashboard/internal helpers", () => {
       ],
     };
     // (100 * 4 * 2) + (50 * 2 * 1) = 900 m → 0.9 km
-    expect(assignmentPlannedKm(a)).toBe(0.9);
+    assert.equal(assignmentPlannedKm(a), 0.9);
   });
 
   it("assignmentPlannedStrokes groups distances by stroke code", () => {
@@ -64,13 +65,13 @@ describe("dashboard/internal helpers", () => {
       { distance: 50, raw_payload: { exercise_stroke: "4n", exercise_repetitions: 2 } },
     ];
     const strokes = assignmentPlannedStrokes(items);
-    expect(strokes).toEqual({ NL: 100, DOS: 200, BR: 0, PAP: 0, QN: 100 });
+    assert.deepEqual(strokes, { NL: 100, DOS: 200, BR: 0, PAP: 0, QN: 100 });
   });
 
   it("initPresenceDefaults seeds 7 weekdays with AM+PM true", () => {
     const presence = initPresenceDefaults();
-    expect(Object.keys(presence)).toHaveLength(7);
-    expect(presence[0]).toEqual({ AM: true, PM: true });
+    assert.equal((Object.keys(presence)).length, 7);
+    assert.deepEqual(presence[0], { AM: true, PM: true });
   });
 });
 
@@ -79,18 +80,18 @@ describe("dashboard/internal helpers", () => {
 describe("dashboard sub-hook modules export the expected functions", () => {
   it("exports useDashboardSessions", async () => {
     const mod = await import("../useDashboardSessions");
-    expect(typeof mod.useDashboardSessions).toBe("function");
+    assert.equal(typeof mod.useDashboardSessions, "function");
   });
   it("exports useCompletionStatus", async () => {
     const mod = await import("../useCompletionStatus");
-    expect(typeof mod.useCompletionStatus).toBe("function");
+    assert.equal(typeof mod.useCompletionStatus, "function");
   });
   it("exports useDayMetrics", async () => {
     const mod = await import("../useDayMetrics");
-    expect(typeof mod.useDayMetrics).toBe("function");
+    assert.equal(typeof mod.useDayMetrics, "function");
   });
   it("exports useFeedbackDraft", async () => {
     const mod = await import("../useFeedbackDraft");
-    expect(typeof mod.useFeedbackDraft).toBe("function");
+    assert.equal(typeof mod.useFeedbackDraft, "function");
   });
 });

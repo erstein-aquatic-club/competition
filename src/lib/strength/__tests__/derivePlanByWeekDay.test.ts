@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { derivePlanByWeekDay } from "../derivePlanByWeekDay";
 import type { TrainingPlanSession } from "@/lib/api/types";
 import type { ActiveTrainingPlanApplication } from "@/lib/api/training-plans";
@@ -40,7 +41,7 @@ describe("derivePlanByWeekDay", () => {
       applications: [],
       sessions: [],
     });
-    expect(result.size).toBe(0);
+    assert.equal(result.size, 0);
   });
 
   it("maps relative_week 1 to start_date Monday", () => {
@@ -52,8 +53,8 @@ describe("derivePlanByWeekDay", () => {
       applications: [app],
       sessions,
     });
-    expect(result.get("2026-03-23")?.get(4)?.relativeWeek).toBe(1);
-    expect(result.get("2026-03-23")?.get(4)?.session.session_template_id).toBe(14);
+    assert.equal(result.get("2026-03-23")?.get(4)?.relativeWeek, 1);
+    assert.equal(result.get("2026-03-23")?.get(4)?.session.session_template_id, 14);
   });
 
   it("computes relative_week correctly for subsequent weeks", () => {
@@ -69,13 +70,13 @@ describe("derivePlanByWeekDay", () => {
       sessions,
     });
     // S1 (start) → relative_week 1, no sessions for week 1 → empty
-    expect(result.get("2026-03-23")?.size).toBeFalsy();
+    assert.ok(!result.get("2026-03-23")?.size);
     // S2 = 2026-03-30 → relative_week 2
-    expect(result.get("2026-03-30")?.get(0)?.relativeWeek).toBe(2);
+    assert.equal(result.get("2026-03-30")?.get(0)?.relativeWeek, 2);
     // S3
-    expect(result.get("2026-04-06")?.get(2)?.relativeWeek).toBe(3);
+    assert.equal(result.get("2026-04-06")?.get(2)?.relativeWeek, 3);
     // S4
-    expect(result.get("2026-04-13")?.get(4)?.relativeWeek).toBe(4);
+    assert.equal(result.get("2026-04-13")?.get(4)?.relativeWeek, 4);
   });
 
   it("excludes weeks past num_weeks", () => {
@@ -86,8 +87,8 @@ describe("derivePlanByWeekDay", () => {
       applications: [app],
       sessions,
     });
-    expect(result.get("2026-03-23")?.get(0)?.relativeWeek).toBe(1);
-    expect(result.get("2026-04-06")).toBeUndefined();
+    assert.equal(result.get("2026-03-23")?.get(0)?.relativeWeek, 1);
+    assert.equal(result.get("2026-04-06"), undefined);
   });
 
   it("excludes weeks before start_date", () => {
@@ -98,9 +99,9 @@ describe("derivePlanByWeekDay", () => {
       applications: [app],
       sessions,
     });
-    expect(result.get("2026-03-23")).toBeUndefined();
-    expect(result.get("2026-03-30")).toBeUndefined();
-    expect(result.get("2026-04-06")?.get(0)).toBeDefined();
+    assert.equal(result.get("2026-03-23"), undefined);
+    assert.equal(result.get("2026-03-30"), undefined);
+    assert.notEqual(result.get("2026-04-06")?.get(0), undefined);
   });
 
   it("respects end_date override", () => {
@@ -116,9 +117,9 @@ describe("derivePlanByWeekDay", () => {
       applications: [app],
       sessions,
     });
-    expect(result.get("2026-03-23")?.get(0)).toBeDefined();
+    assert.notEqual(result.get("2026-03-23")?.get(0), undefined);
     // 2026-04-06 = Monday after end_date → excluded
-    expect(result.get("2026-04-06")).toBeUndefined();
+    assert.equal(result.get("2026-04-06"), undefined);
   });
 
   it("on overlap, the most recent application wins (sorted desc)", () => {
@@ -147,8 +148,8 @@ describe("derivePlanByWeekDay", () => {
       sessions,
     });
     const cell = result.get("2026-03-23")?.get(0);
-    expect(cell?.planName).toBe("New plan");
-    expect(cell?.session.session_template_id).toBe(200);
+    assert.equal(cell?.planName, "New plan");
+    assert.equal(cell?.session.session_template_id, 200);
   });
 
   it("multi-day in same week", () => {
@@ -164,11 +165,11 @@ describe("derivePlanByWeekDay", () => {
       sessions,
     });
     const week = result.get("2026-03-23")!;
-    expect(week.size).toBe(3);
-    expect(week.get(0)).toBeDefined();
-    expect(week.get(1)).toBeUndefined();
-    expect(week.get(2)).toBeDefined();
-    expect(week.get(3)).toBeUndefined();
-    expect(week.get(4)).toBeDefined();
+    assert.equal(week.size, 3);
+    assert.notEqual(week.get(0), undefined);
+    assert.equal(week.get(1), undefined);
+    assert.notEqual(week.get(2), undefined);
+    assert.equal(week.get(3), undefined);
+    assert.notEqual(week.get(4), undefined);
   });
 });

@@ -1,14 +1,26 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderHook, cleanup } from '@testing-library/react';
 import { useInAppPushBridge } from '../useInAppPushBridge';
 
 describe('useInAppPushBridge', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
   let removeEventListenerSpy: ReturnType<typeof vi.spyOn>;
-  let capturedHandler: ((event: ExtendableMessageEvent) => void) | null = null;
+  let capturedHandler: ((event: MessageEvent) => void) | null = null;
+  let hadServiceWorker = false;
 
   beforeEach(() => {
     capturedHandler = null;
+
+    // jsdom does not define navigator.serviceWorker. The hook guards on
+    // `'serviceWorker' in navigator`, so without a stub it early-returns and
+    // there is nothing to spy on. Install a real EventTarget-backed stub so
+    // both the hook's guard and the spies below have an object to work with.
+    hadServiceWorker = 'serviceWorker' in navigator;
+    Object.defineProperty(navigator, 'serviceWorker', {
+      value: new EventTarget(),
+      configurable: true,
+      writable: true,
+    });
 
     // Spy on navigator.serviceWorker methods to capture the handler
     addEventListenerSpy = vi.spyOn(
@@ -32,6 +44,20 @@ describe('useInAppPushBridge', () => {
       // Call the original method
       EventTarget.prototype.addEventListener.call(this, event, handler);
     } as any);
+  });
+
+  afterEach(() => {
+    // Unmount any rendered hooks *before* removing the stub. RTL's automatic
+    // cleanup runs in its own afterEach; if it fired after we deleted the stub,
+    // the hook's unmount cleanup (navigator.serviceWorker.removeEventListener)
+    // would hit an undefined serviceWorker. Cleaning up here guarantees the
+    // stub still exists when the effect cleanup runs.
+    cleanup();
+    vi.restoreAllMocks();
+    // Remove the stub so we don't leak a fake serviceWorker into other tests.
+    if (!hadServiceWorker) {
+      delete (navigator as { serviceWorker?: unknown }).serviceWorker;
+    }
   });
 
   it('should register message listener on mount', () => {
@@ -78,7 +104,7 @@ describe('useInAppPushBridge', () => {
         type: 'eac-push',
         payload: null,
       },
-    } as unknown as ExtendableMessageEvent;
+    } as unknown as MessageEvent;
 
     // Should not throw when payload is null
     expect(() => {

@@ -329,6 +329,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `supabase/tests/rls/session_assignments.test.ts` | Tests RLS visible_from gate + group_members + cross-coach ownership §174 P0 #1 (§182) | 268 lignes |
 | `supabase/tests/rls/save_strength_run_authz.test.ts` | Tests RLS authz check de `save_strength_run_atomic` via stub fonction §174 P0/P1 #5 migration 00146 (§182) | 171 lignes |
 | `vitest.config.rls.ts` | Config Vitest isolée pour tests RLS (§121) | ~20 lignes |
+| `vitest.config.unit.ts` | Config Vitest jsdom scopée aux `src/**/*.vitest.{ts,tsx}` (hooks/DOM) — chore unification runner | 20 lignes |
+| `scripts/check-test-runner.mjs` | Garde-fou `pretest` : échoue si un `*.test.ts(x)` importe `vitest` (empêche les tests inertes sous node:test) — chore unification runner | 29 lignes |
 | `scripts/test-db-bootstrap.sh` | Bootstrap manuel schéma+seed via psql (§121) | ~55 lignes |
 | `docs/rls-testing.md` | Documentation complète tests RLS (§121) | ~250 lignes |
 | `src/hooks/useMonthlyReport.ts` | Hook rapport mensuel | ~479 lignes |

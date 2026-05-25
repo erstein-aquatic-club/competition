@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { computeObjectivePerfRow, groupAndSortAssignments, selectLinkableForCompetition } from "../info-helpers";
 import type { Objective, SwimmerPerformance, CompetitionAssignment } from "@/lib/api/types";
 
@@ -28,20 +29,22 @@ const perf = (over: Partial<SwimmerPerformance> = {}): SwimmerPerformance => ({
 describe("computeObjectivePerfRow", () => {
   it("returns label, target, pb and positive delta when PB is above target", () => {
     const row = computeObjectivePerfRow(baseObjective(), [perf()]);
-    expect(row.targetSeconds).toBe(24.5);
-    expect(row.pbSeconds).toBe(24.82);
-    expect(row.deltaSeconds).toBeCloseTo(0.32, 2);
+    assert.equal(row.targetSeconds, 24.5);
+    assert.equal(row.pbSeconds, 24.82);
+    // toBeCloseTo(0.32, 2) → tolérance 0.005
+    assert.ok(Math.abs(row.deltaSeconds! - 0.32) < 0.005, `attendu ≈ 0.32, obtenu ${row.deltaSeconds}`);
   });
 
   it("returns negative delta when PB is below target", () => {
     const row = computeObjectivePerfRow(baseObjective(), [perf({ time_seconds: 24.10 })]);
-    expect(row.deltaSeconds).toBeCloseTo(-0.40, 2);
+    // toBeCloseTo(-0.40, 2) → tolérance 0.005
+    assert.ok(Math.abs(row.deltaSeconds! - -0.40) < 0.005, `attendu ≈ -0.40, obtenu ${row.deltaSeconds}`);
   });
 
   it("returns null pb when no perf matches event_code+poolLength", () => {
     const row = computeObjectivePerfRow(baseObjective(), [perf({ event_code: "100 Pap." })]);
-    expect(row.pbSeconds).toBeNull();
-    expect(row.deltaSeconds).toBeNull();
+    assert.equal(row.pbSeconds, null);
+    assert.equal(row.deltaSeconds, null);
   });
 
   it("picks the minimum (best) time when multiple perfs match", () => {
@@ -50,15 +53,15 @@ describe("computeObjectivePerfRow", () => {
       perf({ time_seconds: 24.55 }),
       perf({ time_seconds: 24.95 }),
     ]);
-    expect(row.pbSeconds).toBe(24.55);
+    assert.equal(row.pbSeconds, 24.55);
   });
 
   it("returns null target and pb when objective has no target_time_seconds", () => {
     const row = computeObjectivePerfRow(baseObjective({ target_time_seconds: null }), [perf()]);
-    expect(row.targetSeconds).toBeNull();
-    expect(row.deltaSeconds).toBeNull();
+    assert.equal(row.targetSeconds, null);
+    assert.equal(row.deltaSeconds, null);
     // pb is still computed because it doesn't depend on target
-    expect(row.pbSeconds).toBe(24.82);
+    assert.equal(row.pbSeconds, 24.82);
   });
 
   it("respects pool_length when filtering perfs", () => {
@@ -66,7 +69,7 @@ describe("computeObjectivePerfRow", () => {
       baseObjective({ pool_length: 25 }),
       [perf({ pool_length: 50, time_seconds: 24.10 })],
     );
-    expect(row.pbSeconds).toBeNull();
+    assert.equal(row.pbSeconds, null);
   });
 });
 
@@ -97,7 +100,7 @@ describe("groupAndSortAssignments", () => {
       profiles,
       objectivesByAthlete,
     );
-    expect(rows.map((r) => r.displayName)).toEqual(["Alice", "Bob", "Charlie"]);
+    assert.deepEqual(rows.map((r) => r.displayName), ["Alice", "Bob", "Charlie"]);
   });
 
   it("attaches objectives count from map", () => {
@@ -106,7 +109,7 @@ describe("groupAndSortAssignments", () => {
     ]);
     const objectivesByAthlete = new Map<number, number>([[1, 3]]);
     const [row] = groupAndSortAssignments([a(1)], profiles, objectivesByAthlete);
-    expect(row.objectivesCount).toBe(3);
+    assert.equal(row.objectivesCount, 3);
   });
 
   it("buckets athletes without group into 'Sans groupe' at the end", () => {
@@ -115,13 +118,13 @@ describe("groupAndSortAssignments", () => {
       [2, { user_id: 2, display_name: "Bob", group_label: "G1", avatar_url: null }],
     ]);
     const rows = groupAndSortAssignments([a(1), a(2)], profiles, new Map());
-    expect(rows.map((r) => r.groupLabel)).toEqual(["G1", "Sans groupe"]);
+    assert.deepEqual(rows.map((r) => r.groupLabel), ["G1", "Sans groupe"]);
   });
 
   it("skips assignments whose profile is missing", () => {
     const profiles = new Map<number, TestProfile>();
     const rows = groupAndSortAssignments([a(1)], profiles, new Map());
-    expect(rows).toEqual([]);
+    assert.deepEqual(rows, []);
   });
 });
 
@@ -147,7 +150,7 @@ describe("selectLinkableForCompetition", () => {
       ],
       "c1",
     );
-    expect(out.map((o) => o.id)).toEqual(["2", "3"]);
+    assert.deepEqual(out.map((o) => o.id), ["2", "3"]);
   });
 
   it("keeps objectives linked to other competitions", () => {
@@ -155,7 +158,7 @@ describe("selectLinkableForCompetition", () => {
       [obj({ id: "a", competition_ids: ["c2", "c3"] })],
       "c1",
     );
-    expect(out.map((o) => o.id)).toEqual(["a"]);
+    assert.deepEqual(out.map((o) => o.id), ["a"]);
   });
 
   it("keeps objectives with empty competition_ids", () => {
@@ -163,17 +166,17 @@ describe("selectLinkableForCompetition", () => {
       [obj({ id: "a", competition_ids: [] })],
       "c1",
     );
-    expect(out).toHaveLength(1);
+    assert.equal((out).length, 1);
   });
 
   it("returns an empty array when input is empty", () => {
-    expect(selectLinkableForCompetition([], "c1")).toEqual([]);
+    assert.deepEqual(selectLinkableForCompetition([], "c1"), []);
   });
 
   it("preserves input order", () => {
     const a = obj({ id: "a" });
     const b = obj({ id: "b" });
     const c = obj({ id: "c" });
-    expect(selectLinkableForCompetition([a, b, c], "x").map((o) => o.id)).toEqual(["a", "b", "c"]);
+    assert.deepEqual(selectLinkableForCompetition([a, b, c], "x").map((o) => o.id), ["a", "b", "c"]);
   });
 });

@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { mergeStrengthSlots, mergeStrengthWeekMeta } from "@/lib/strengthPlanningMerge";
 import type {
   StrengthPlanningSlot,
@@ -37,27 +38,27 @@ describe("mergeStrengthSlots", () => {
   it("returns group slots unchanged when no overrides", () => {
     const groupSlots = [baseSlot({}), baseSlot({ id: "g2", day_of_week: 1 })];
     const result = mergeStrengthSlots(groupSlots, []);
-    expect(result).toHaveLength(2);
-    expect(result.every((s) => !s.overridden)).toBe(true);
+    assert.equal(result.length, 2);
+    assert.equal(result.every((s) => !s.overridden), true);
   });
 
   it("replaces group slot with matching override", () => {
     const groupSlots = [baseSlot({ session_template_id: 10 })];
     const overrides = [baseOverride({ session_template_id: 42 })];
     const result = mergeStrengthSlots(groupSlots, overrides);
-    expect(result).toHaveLength(1);
-    expect(result[0].session_template_id).toBe(42);
-    expect(result[0].overridden).toBe(true);
-    expect(result[0].overrideId).toBe("o1");
+    assert.equal(result.length, 1);
+    assert.equal(result[0].session_template_id, 42);
+    assert.equal(result[0].overridden, true);
+    assert.equal(result[0].overrideId, "o1");
   });
 
   it("adds override-only slot (group has no slot on that day)", () => {
     const groupSlots: StrengthPlanningSlot[] = [];
     const overrides = [baseOverride({})];
     const result = mergeStrengthSlots(groupSlots, overrides);
-    expect(result).toHaveLength(1);
-    expect(result[0].overridden).toBe(true);
-    expect(result[0].athlete_id).toBe(1);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].overridden, true);
+    assert.equal(result[0].athlete_id, 1);
   });
 
   it("keeps non-overridden group slots alongside overridden ones", () => {
@@ -69,38 +70,38 @@ describe("mergeStrengthSlots", () => {
     const result = mergeStrengthSlots(groupSlots, overrides);
     const day0 = result.find((s) => s.day_of_week === 0);
     const day1 = result.find((s) => s.day_of_week === 1);
-    expect(day0?.overridden).toBe(true);
-    expect(day0?.session_template_id).toBe(99);
-    expect(day1?.overridden).toBeFalsy();
-    expect(day1?.session_template_id).toBe(20);
+    assert.equal(day0?.overridden, true);
+    assert.equal(day0?.session_template_id, 99);
+    assert.ok(!day1?.overridden);
+    assert.equal(day1?.session_template_id, 20);
   });
 
   it("uses override session_template_id null when override clears the session", () => {
     const groupSlots = [baseSlot({ session_template_id: 10 })];
     const overrides = [baseOverride({ session_template_id: null })];
     const result = mergeStrengthSlots(groupSlots, overrides);
-    expect(result[0].session_template_id).toBeNull();
-    expect(result[0].overridden).toBe(true);
+    assert.equal(result[0].session_template_id, null);
+    assert.equal(result[0].overridden, true);
   });
 
   it("preserves group slot notes when no override notes", () => {
     const groupSlots = [baseSlot({ notes: "Charge légère" })];
     const result = mergeStrengthSlots(groupSlots, []);
-    expect(result[0].notes).toBe("Charge légère");
+    assert.equal(result[0].notes, "Charge légère");
   });
 
   it("override notes take precedence over group notes", () => {
     const groupSlots = [baseSlot({ notes: "Charge légère" })];
     const overrides = [baseOverride({ notes: "Adapté pour blessure" })];
     const result = mergeStrengthSlots(groupSlots, overrides);
-    expect(result[0].notes).toBe("Adapté pour blessure");
+    assert.equal(result[0].notes, "Adapté pour blessure");
   });
 
   it("does not duplicate slots when override matches group key", () => {
     const groupSlots = [baseSlot({})];
     const overrides = [baseOverride({})];
     const result = mergeStrengthSlots(groupSlots, overrides);
-    expect(result).toHaveLength(1);
+    assert.equal(result.length, 1);
   });
 });
 
@@ -124,12 +125,12 @@ describe("mergeStrengthWeekMeta", () => {
 
   it("returns none when nothing is set", () => {
     const result = mergeStrengthWeekMeta(null, null);
-    expect(result).toEqual({ week_type: null, notes: null, source: "none" });
+    assert.deepEqual(result, { week_type: null, notes: null, source: "none" });
   });
 
   it("returns group meta when no athlete override", () => {
     const result = mergeStrengthWeekMeta(groupMeta, null);
-    expect(result).toEqual({
+    assert.deepEqual(result, {
       week_type: "force",
       notes: "Semaine groupe",
       source: "group",
@@ -138,7 +139,7 @@ describe("mergeStrengthWeekMeta", () => {
 
   it("athlete override takes precedence over group", () => {
     const result = mergeStrengthWeekMeta(groupMeta, athleteOverride);
-    expect(result).toEqual({
+    assert.deepEqual(result, {
       week_type: "taper",
       notes: "Allègement personnel",
       source: "athlete",
@@ -151,14 +152,14 @@ describe("mergeStrengthWeekMeta", () => {
       week_type: null,
       notes: null,
     });
-    expect(result.source).toBe("athlete");
-    expect(result.week_type).toBeNull();
-    expect(result.notes).toBeNull();
+    assert.equal(result.source, "athlete");
+    assert.equal(result.week_type, null);
+    assert.equal(result.notes, null);
   });
 
   it("athlete-only override (no group meta) works", () => {
     const result = mergeStrengthWeekMeta(null, athleteOverride);
-    expect(result.source).toBe("athlete");
-    expect(result.week_type).toBe("taper");
+    assert.equal(result.source, "athlete");
+    assert.equal(result.week_type, "taper");
   });
 });

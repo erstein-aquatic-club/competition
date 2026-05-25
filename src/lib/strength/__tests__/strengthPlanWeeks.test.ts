@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   parseWeekRange,
   weekInfoFromSNumber,
@@ -33,20 +34,20 @@ function makeSession(id: number, title: string, folderId: number): StrengthSessi
 
 describe("parseWeekRange", () => {
   it("parses simple S13", () => {
-    expect(parseWeekRange("S13 — Force")).toEqual([13, 13]);
+    assert.deepEqual(parseWeekRange("S13 — Force"), [13, 13]);
   });
 
   it("parses range S13-S15", () => {
-    expect(parseWeekRange("S13-S15 — Puissance")).toEqual([13, 15]);
+    assert.deepEqual(parseWeekRange("S13-S15 — Puissance"), [13, 15]);
   });
 
   it("returns null for non-parseable name", () => {
-    expect(parseWeekRange("Semaine foo")).toBeNull();
-    expect(parseWeekRange("Cycle bonus")).toBeNull();
+    assert.equal(parseWeekRange("Semaine foo"), null);
+    assert.equal(parseWeekRange("Cycle bonus"), null);
   });
 
   it("parses wrap-around S52-S02", () => {
-    expect(parseWeekRange("S52-S02 — Compétition")).toEqual([52, 2]);
+    assert.deepEqual(parseWeekRange("S52-S02 — Compétition"), [52, 2]);
   });
 });
 
@@ -56,14 +57,14 @@ describe("weekInfoFromSNumber", () => {
   it("returns correct Monday for S15 in 2026", () => {
     // REF_DATE = week 13 of 2026. S15 → April 6, 2026
     const result = weekInfoFromSNumber(15, REF_DATE);
-    expect(result.weekKey).toBe("2026-04-06");
-    expect(result.weekNumber).toBe(15);
+    assert.equal(result.weekKey, "2026-04-06");
+    assert.equal(result.weekNumber, 15);
   });
 
   it("returns correct Monday for S13 in 2026 (current week)", () => {
     const result = weekInfoFromSNumber(13, REF_DATE);
-    expect(result.weekKey).toBe("2026-03-23");
-    expect(result.weekNumber).toBe(13);
+    assert.equal(result.weekKey, "2026-03-23");
+    assert.equal(result.weekNumber, 13);
   });
 
   it("places sNum far in past into next year (wrap heuristic)", () => {
@@ -71,7 +72,7 @@ describe("weekInfoFromSNumber", () => {
     // sNum=1 with refDate=week 40 → 1 < 40-26=14 → year+1
     const refWeek40 = new Date(2026, 9, 5); // ~Oct 5 2026 = week 40
     const result = weekInfoFromSNumber(1, refWeek40);
-    expect(result.weekKey.startsWith("2027")).toBe(true);
+    assert.equal(result.weekKey.startsWith("2027"), true);
   });
 });
 
@@ -90,12 +91,12 @@ describe("buildWeekInstances", () => {
     const sessionsByFolder = new Map([[10, sessions]]);
     const result = buildWeekInstances(root, [cycle], sessionsByFolder, REF_DATE);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].week.weekNumber).toBe(13);
-    expect(result[0].sessions).toHaveLength(3);
-    expect(result[0].phase).toBe("force");
-    expect(result[0].phaseName).toBe("Force");
-    expect(result[0].dateRangeLabel).toBe("03/03-09/03");
+    assert.equal(result.length, 1);
+    assert.equal(result[0].week.weekNumber, 13);
+    assert.equal(result[0].sessions.length, 3);
+    assert.equal(result[0].phase, "force");
+    assert.equal(result[0].phaseName, "Force");
+    assert.equal(result[0].dateRangeLabel, "03/03-09/03");
   });
 
   it("range cycle S13-S15 → 3 WeekInstances with same sessions duplicated", () => {
@@ -107,14 +108,14 @@ describe("buildWeekInstances", () => {
     const sessionsByFolder = new Map([[20, sessions]]);
     const result = buildWeekInstances(root, [cycle], sessionsByFolder, REF_DATE);
 
-    expect(result).toHaveLength(3);
-    expect(result[0].week.weekNumber).toBe(13);
-    expect(result[1].week.weekNumber).toBe(14);
-    expect(result[2].week.weekNumber).toBe(15);
+    assert.equal(result.length, 3);
+    assert.equal(result[0].week.weekNumber, 13);
+    assert.equal(result[1].week.weekNumber, 14);
+    assert.equal(result[2].week.weekNumber, 15);
     // All share same sessions
     for (const inst of result) {
-      expect(inst.sessions).toHaveLength(2);
-      expect(inst.cycleId).toBe(20);
+      assert.equal(inst.sessions.length, 2);
+      assert.equal(inst.cycleId, 20);
     }
   });
 
@@ -125,8 +126,8 @@ describe("buildWeekInstances", () => {
     const result = buildWeekInstances(root, [cycle], sessionsByFolder, REF_DATE);
 
     // fallback = currentWeekNum(13) + idx(0) = 13
-    expect(result).toHaveLength(1);
-    expect(result[0].cycleShortLabel).toBe("");
+    assert.equal(result.length, 1);
+    assert.equal(result[0].cycleShortLabel, "");
   });
 
   it("sorts multiple cycles chronologically by weekKey", () => {
@@ -137,8 +138,8 @@ describe("buildWeekInstances", () => {
     const sessionsByFolder = new Map([[40, sessA], [41, sessB]]);
     const result = buildWeekInstances(root, [cycleA, cycleB], sessionsByFolder, REF_DATE);
 
-    expect(result[0].week.weekNumber).toBe(13); // S13 first
-    expect(result[1].week.weekNumber).toBe(15); // S15 second
+    assert.equal(result[0].week.weekNumber, 13); // S13 first
+    assert.equal(result[1].week.weekNumber, 15); // S15 second
   });
 
   it("sessions in a cycle are sorted by day index (Ven, Lun, Mer → Lun, Mer, Ven)", () => {
@@ -151,9 +152,9 @@ describe("buildWeekInstances", () => {
     const sessionsByFolder = new Map([[50, sessions]]);
     const result = buildWeekInstances(root, [cycle], sessionsByFolder, REF_DATE);
 
-    expect(result[0].sessions[0].dayLabel).toBe("Lun");
-    expect(result[0].sessions[1].dayLabel).toBe("Mer");
-    expect(result[0].sessions[2].dayLabel).toBe("Ven");
+    assert.equal(result[0].sessions[0].dayLabel, "Lun");
+    assert.equal(result[0].sessions[1].dayLabel, "Mer");
+    assert.equal(result[0].sessions[2].dayLabel, "Ven");
   });
 
   it("sessions with items.length === 0 are excluded", () => {
@@ -165,8 +166,8 @@ describe("buildWeekInstances", () => {
     const sessionsByFolder = new Map([[60, sessions]]);
     const result = buildWeekInstances(root, [cycle], sessionsByFolder, REF_DATE);
 
-    expect(result[0].sessions).toHaveLength(1);
-    expect(result[0].sessions[0].dayLabel).toBe("Mer");
+    assert.equal(result[0].sessions.length, 1);
+    assert.equal(result[0].sessions[0].dayLabel, "Mer");
   });
 
   it("cycle with only empty-item sessions is skipped entirely", () => {
@@ -175,6 +176,6 @@ describe("buildWeekInstances", () => {
     const sessionsByFolder = new Map([[70, sessions]]);
     const result = buildWeekInstances(root, [cycle], sessionsByFolder, REF_DATE);
 
-    expect(result).toHaveLength(0);
+    assert.equal(result.length, 0);
   });
 });
