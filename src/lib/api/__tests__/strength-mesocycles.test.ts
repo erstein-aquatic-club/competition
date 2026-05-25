@@ -156,7 +156,9 @@ describe('applyMesocycle', () => {
     // Paramètres scalaires
     assert.equal(capturedArgs?.p_athlete_id, 42);
     assert.equal(capturedArgs?.p_assessment_id, ASSESS_ID);
-    assert.equal(capturedArgs?.p_template_id, TEMPLATE_ID);
+    // §305 : id de template composé synthétique → p_template_id NULL.
+    // L'event_group (qui porte 'freestyle_100' etc.) est inchangé.
+    assert.equal(capturedArgs?.p_template_id, null);
     assert.equal(capturedArgs?.p_event_group, 'sprint');
     assert.equal(capturedArgs?.p_kind, 'season');
     assert.equal(capturedArgs?.p_target_week_count, 5);
@@ -413,6 +415,170 @@ describe('listMesocycles', () => {
     assert.equal(out.length, 2);
     assert.equal(out[0].id, 'uuid-2');
     assert.deepEqual(eqCalls, [{ col: 'athlete_id', value: 42 }]);
+  });
+});
+
+// ── applyMesocycle : template_id NULL pour un template composé (§305) ──────
+
+describe('applyMesocycle — §305 template composé', () => {
+  it("force p_template_id=null et propage l'event_group composé tel quel", async () => {
+    const { generateMesocyclePreview, applyMesocycle } = await import('../strength-mesocycles.ts');
+    const input = makeMinimalInput();
+    // Simule un template composé (composeTemplate) : id synthétique non-uuid,
+    // event_group de la forme '<stroke>_<distance>'.
+    input.template = {
+      ...input.template,
+      id: 'freestyle_100_season',
+      event_group: 'freestyle_100',
+    };
+    const generated = generateMesocyclePreview(input);
+
+    let capturedArgs: Record<string, unknown> | undefined;
+    rpcImpl = (_fn: unknown, args: unknown) => {
+      capturedArgs = args as Record<string, unknown>;
+      return Promise.resolve({ data: 'uuid-z', error: null });
+    };
+
+    await applyMesocycle(input, generated, '2026-06-01');
+
+    // L'id synthétique ne doit JAMAIS fuiter dans p_template_id (colonne uuid).
+    assert.equal(capturedArgs?.p_template_id, null);
+    assert.notEqual(capturedArgs?.p_template_id, 'freestyle_100_season');
+    // L'event_group composé est transmis intact.
+    assert.equal(capturedArgs?.p_event_group, 'freestyle_100');
+  });
+});
+
+// ── getStrokeSignatures (§305) ─────────────────────────────────────────────
+
+describe('getStrokeSignatures', () => {
+  it('SELECT * sur strength_stroke_signatures, map vers la forme typée', async () => {
+    let capturedTable: unknown;
+    fromImpl = (table: unknown) => {
+      capturedTable = table;
+      return {
+        select: () =>
+          Promise.resolve({
+            data: [
+              {
+                stroke_key: 'freestyle',
+                label: 'Crawl',
+                mult: {
+                  lower_strength: 1,
+                  lower_power: 1,
+                  upper_strength: 1,
+                  upper_power: 1,
+                  mobility: 1,
+                },
+              },
+              {
+                stroke_key: 'breaststroke',
+                label: 'Brasse',
+                mult: {
+                  lower_strength: 1.214,
+                  lower_power: 1.333,
+                  upper_strength: 0.611,
+                  upper_power: 0.75,
+                  mobility: 1.333,
+                },
+              },
+            ],
+            error: null,
+          }),
+      };
+    };
+
+    const { getStrokeSignatures } = await import('../strength-mesocycles.ts');
+    const out = await getStrokeSignatures();
+
+    assert.equal(capturedTable, 'strength_stroke_signatures');
+    assert.equal(out.length, 2);
+    assert.equal(out[0].stroke_key, 'freestyle');
+    assert.equal(out[0].label, 'Crawl');
+    assert.equal(out[0].mult.lower_strength, 1);
+    assert.equal(out[1].stroke_key, 'breaststroke');
+    assert.equal(out[1].mult.mobility, 1.333);
+  });
+
+  it("renvoie [] quand la table est vide (data null)", async () => {
+    fromImpl = () => ({ select: () => Promise.resolve({ data: null, error: null }) });
+    const { getStrokeSignatures } = await import('../strength-mesocycles.ts');
+    assert.deepEqual(await getStrokeSignatures(), []);
+  });
+
+  it("lève si Supabase renvoie une erreur", async () => {
+    fromImpl = () => ({
+      select: () => Promise.resolve({ data: null, error: { message: 'boom signatures' } }),
+    });
+    const { getStrokeSignatures } = await import('../strength-mesocycles.ts');
+    await assert.rejects(() => getStrokeSignatures(), /boom signatures/i);
+  });
+});
+
+// ── getDistanceProfiles (§305) ─────────────────────────────────────────────
+
+describe('getDistanceProfiles', () => {
+  it('SELECT * sur strength_distance_profiles, map (emphasis/structure jsonb)', async () => {
+    let capturedTable: unknown;
+    fromImpl = (table: unknown) => {
+      capturedTable = table;
+      return {
+        select: () =>
+          Promise.resolve({
+            data: [
+              {
+                distance_key: '100',
+                kind: 'season',
+                label: '100 m',
+                emphasis: {
+                  lower_strength: 0.82,
+                  lower_power: 0.85,
+                  upper_strength: 0.97,
+                  upper_power: 0.6,
+                  mobility: 0.42,
+                },
+                structure: {
+                  phases: [
+                    { cycle: 'force_max', min_weeks: 2, nominal_weeks: 3, max_weeks: 4 },
+                  ],
+                },
+                min_week_count: 8,
+                max_week_count: 15,
+              },
+            ],
+            error: null,
+          }),
+      };
+    };
+
+    const { getDistanceProfiles } = await import('../strength-mesocycles.ts');
+    const out = await getDistanceProfiles();
+
+    assert.equal(capturedTable, 'strength_distance_profiles');
+    assert.equal(out.length, 1);
+    const p = out[0];
+    assert.equal(p.distance_key, '100');
+    assert.equal(p.kind, 'season');
+    assert.equal(p.label, '100 m');
+    assert.equal(p.emphasis.upper_strength, 0.97);
+    assert.equal(p.min_week_count, 8);
+    assert.equal(p.max_week_count, 15);
+    assert.equal(p.structure.phases.length, 1);
+    assert.equal(p.structure.phases[0].cycle, 'force_max');
+  });
+
+  it("renvoie [] quand la table est vide (data null)", async () => {
+    fromImpl = () => ({ select: () => Promise.resolve({ data: null, error: null }) });
+    const { getDistanceProfiles } = await import('../strength-mesocycles.ts');
+    assert.deepEqual(await getDistanceProfiles(), []);
+  });
+
+  it("lève si Supabase renvoie une erreur", async () => {
+    fromImpl = () => ({
+      select: () => Promise.resolve({ data: null, error: { message: 'boom profiles' } }),
+    });
+    const { getDistanceProfiles } = await import('../strength-mesocycles.ts');
+    await assert.rejects(() => getDistanceProfiles(), /boom profiles/i);
   });
 });
 

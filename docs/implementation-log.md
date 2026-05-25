@@ -18,16 +18,50 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 ### Tests / vérifs
 - `npm test` : node:test **980 → 1324** passants (**+344 assertions** auparavant inertes) ; vitest **4 fichiers / 20** passants ; `npx tsc --noEmit` exit 0.
-- Garde-fou `pretest` : vert.
 
 ### Corrections de tests périmés (aucun code produit touché)
 - **`export-pace-pdf`** : le test vérifiait encore les zones d'allure **v1**, périmées depuis le refactor v2 (§186). Aligné sur v2.
-- **`useSlotCalendar`** : assertions sur le « trou de midi » (retiré en §95b) et sur une date codée en dur dans le passé. Mises à jour.
-- **Aucun bug produit réel** révélé par la réactivation des 344 assertions.
+- **`useSlotCalendar`** : assertions sur le « trou de midi » (retiré en §95b) et sur une date codée en dur dans le passé. Mises à jour. **Aucun bug produit réel** révélé.
 
 ### Décisions / limites
-- **Un seul runner canonique** : `node:test`. Vitest **scopé jsdom** via la convention de nommage `*.vitest.ts(x)` (jamais `*.test.ts`).
+- **Un seul runner canonique** : `node:test`. Vitest **scopé jsdom** via la convention `*.vitest.ts(x)`.
 - **Limite** : les `*.test.ts` restent **exclus de `tsc`** (convention existante) ; les `*.vitest.ts(x)` sont **type-checkés**.
+
+## §305 — Taxonomie nage × distance : composeTemplate + tables de référence + écran Nage→Épreuve (2026-05-25)
+
+**Branche** : `feat/305-taxonomie-nage-distance`
+**Trigger** : reports §304 — taxonomie nage × distance manquante, template `sprint_100` absent, papillon non couvert. Design : `docs/plans/2026-05-25-muscu-305-taxonomie-nage-distance-design.md`. Plan : `docs/plans/2026-05-25-muscu-305-taxonomie-nage-distance.md`. **Constat** : un seul `event_group` figeait nage+distance dans un template unique ; pas de combinaison libre nage × distance, pas de 100 m, pas de papillon.
+
+### composeTemplate — composition nage × distance (TS pur)
+- **`src/lib/strength/composeTemplate.ts`** (nouveau, TS pur) : `bucket_emphasis[b] = clamp01(round2(distance.emphasis[b] × stroke.mult[b]))` — compose un template-like à partir d'un profil de distance (emphasis ancrée crawl) et d'une signature de nage (multiplicateurs vs crawl). **Reproduit par construction les emphases LIVE** des templates actuels (crawl 50/200/400 + brasse/dos/4n au 200 m) — calibré et vérifié **contre la base** (`strength_periodization_templates`), pas contre le seed `00169` d'origine : la valeur crawl 50 provient du template live **post-`00175` (McEvoy-aligned)**, pas de `00169`. **TDD `node:test`** : 8 cas dont **6 reproductions verrouillées ±0.01**. 100 m & papillon sont de-novo (cf. § Décisions).
+
+### 2 tables de référence (DB, RLS read-all / write coach-admin, calquées sur 00166)
+- **`strength_stroke_signatures`** (mig `00193`) : 5 nages (crawl, dos, brasse, **papillon nouveau**, 4n) — multiplicateurs de seau **vs crawl** (crawl = référence, mult 1.0).
+- **`strength_distance_profiles`** (mig `00194`) : 8 lignes = 4 distances (50/100/200/400plus) × 2 `kind` (season/inter_competition) — emphasis ancrée crawl + arc de périodisation + bornes de durée. 200 m = distance de référence ; `400plus` reprend les valeurs 400 m.
+- **`strength_mesocycles.template_id`** rendu **nullable** (mig `00195`) — l'`event_group` composé (ex. `freestyle_100`) porte désormais la taxonomie ; plus besoin de pointer un template unique.
+
+### API
+- **`getStrokeSignatures`** / **`getDistanceProfiles`** (`src/lib/api/strength-mesocycles.ts`, re-export `index.ts`).
+- **`applyMesocycle`** envoie `p_template_id: null` — la RPC `apply_strength_mesocycle` est inchangée (l'event_group composé suffit).
+
+### UI — écran génération 2 étapes Nage → Épreuve + aperçu composé
+- **`MesocycleGeneration.tsx`** : 2 étapes **Nage → Épreuve** ; distances filtrées (50/100/200 toutes nages ; 400+ crawl/4n uniquement).
+- **`MesocyclePreview.tsx`** : **compose** le template (nage × distance) via `composeTemplate` au lieu de fetch un template unique ; **état d'erreur récupérable** si la combinaison est introuvable.
+
+### Cleanup — 4 tests vitest inertes portés en `node:test`
+- 3 fichiers de tests `vitest` (inertes sous `node --test`, donc jamais exécutés) portés en `node:test` — dont **`strengthProfileMismatch.test.ts` de §304**, dont les assertions s'exécutent enfin. La suite passe **983 → 1025** tests.
+
+### Fichiers
+- `src/lib/strength/composeTemplate.ts` (nouveau, 55 lignes) ; `src/lib/api/strength-mesocycles.ts` (wrappers + `p_template_id: null`) ; `src/lib/api/index.ts` (re-exports) ; `src/lib/api/types.ts` (`StrokeSignature`/`DistanceProfile`) ; `src/pages/MesocycleGeneration.tsx` ; `src/pages/MesocyclePreview.tsx` ; migrations `00193`/`00194`/`00195` (appliquées via MCP) ; tests `composeTemplate.test.ts` + 3 portages `node:test`.
+
+### Tests / vérifs
+- `npm test` — **1025/1025 verts** (983 §304 + composeTemplate + assertions des 4 tests portés enfin exécutées). `npx tsc --noEmit` — exit 0.
+- **Pas de `test:rls`** : tables de référence en **lecture seule** (policies calquées sur `00166`), RPC `apply_strength_mesocycle` **inchangée** → aucune autorisation modifiée.
+
+### Décisions / limites
+- **Simplification vs design initial (YAGNI)** : PAS de colonnes `stroke`/`distance` ni de réécriture de la RPC — l'`event_group` composé suffit ; seul `template_id` devient nullable.
+- **Calibration** : crawl = nage de référence (mult 1.0) ; 200 m = distance de référence ; `400plus` reprend les valeurs 400 m. **100 m et papillon = de-novo, À VALIDER PAR LE COACH avant déploiement.**
+- **Limites / suite** : préhab ciblée par nage → **§306** ; **dette tests préexistante** : ~32 fichiers importent encore `vitest` et restent **inertes** sous `node --test` (jamais exécutés — ex. `paceCalculator`, `offlineSync`, `auth-state`, `swimPlanningMerge`… ; `useInAppPushBridge` en fait partie, non portable sans config jsdom) → **chore de nettoyage dédié à prévoir** (config vitest jsdom OU portage de masse en `node:test`). §305 en a porté 3 (dont `strengthProfileMismatch` de §304). **Déploiement TENU** jusqu'à validation coach des barèmes 100 m / papillon.
 
 ## §304 — Couplage niveau ↔ tier : alerte + alignement 1-clic + re-tag traction lestée (2026-05-25)
 

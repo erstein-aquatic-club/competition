@@ -6,7 +6,9 @@
  *     (posés par /strength/mesocycle-generate). Si absents → retour à l'écran
  *     de génération.
  *  2. Fetch en parallèle : profile (sexe + date de naissance), évaluation,
- *     mesures KPI, template choisi, catalogue d'exercices taggé.
+ *     mesures KPI, taxonomie nage × distance (signatures + profils, §305),
+ *     catalogue d'exercices taggé. Le template est composé localement via
+ *     `composeTemplate(profile, signature, kind)` — plus de fetch par id.
  *  3. Compose `MesocycleInput`, appelle `generateMesocyclePreview` (moteur pur).
  *  4. Affiche : raisonnement auditable (6 scores, priorités, confiance) +
  *     plan détaillé (semaines → cycles → séances → exercices).
@@ -27,7 +29,8 @@ import {
   getLatestKpiMeasurements,
   getProfile,
   getStrengthAthleteSettings,
-  getStrengthPeriodizationTemplate,
+  getStrokeSignatures,
+  getDistanceProfiles,
   listCatalogExercisesTagged,
 } from "@/lib/api";
 import type {
@@ -36,9 +39,12 @@ import type {
 } from "@/lib/api/types";
 import type {
   AllBucket,
+  DistanceKey,
   GeneratedMesocycle,
   MesocycleInput,
+  StrokeKey,
 } from "@/lib/strength/mesocycleEngine.types";
+import { composeTemplate } from "@/lib/strength/composeTemplate";
 import { ageBandFor } from "@/lib/strength/kpiBaremes";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
 import { ZONE_LABEL_FR } from "@/lib/strength/zones";
@@ -72,8 +78,8 @@ import {
 const SESSION_KEY = "eac_pending_mesocycle_params";
 
 interface PendingParams {
-  templateId: string;
-  eventGroup: string;
+  stroke: StrokeKey;
+  distance: DistanceKey;
   kind: "season" | "inter_competition";
   targetWeekCount: number;
   sessionsPerWeek: number;
@@ -161,7 +167,9 @@ function loadPendingParams(): PendingParams | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingParams;
     if (
-      typeof parsed.templateId !== "string" ||
+      typeof parsed.stroke !== "string" ||
+      typeof parsed.distance !== "string" ||
+      typeof parsed.kind !== "string" ||
       typeof parsed.targetWeekCount !== "number" ||
       typeof parsed.sessionsPerWeek !== "number" ||
       typeof parsed.startWeekMonday !== "string"
@@ -272,11 +280,45 @@ export default function MesocyclePreview() {
     previewAthletes?.find((a) => a.id === effectiveAthleteId)?.display_name ??
     null;
 
-  const { data: template, isLoading: tplLoading } = useQuery({
-    queryKey: ["strength-periodization-template", params?.templateId],
-    queryFn: () => getStrengthPeriodizationTemplate(params!.templateId),
-    enabled: params != null,
+  // Taxonomie nage × distance (§305) : on compose le template localement à
+  // partir d'une nage (signature) + une distance/famille (profil) plutôt que
+  // de fetcher un template unique par id.
+  const { data: signatures = [], isLoading: signaturesLoading } = useQuery({
+    queryKey: ["strength-stroke-signatures"],
+    queryFn: () => getStrokeSignatures(),
+    staleTime: 5 * 60 * 1000,
   });
+
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: ["strength-distance-profiles"],
+    queryFn: () => getDistanceProfiles(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const signature = useMemo(
+    () =>
+      params
+        ? signatures.find((s) => s.stroke_key === params.stroke) ?? null
+        : null,
+    [signatures, params?.stroke],
+  );
+  const profile_ = useMemo(
+    () =>
+      params
+        ? profiles.find(
+            (p) => p.distance_key === params.distance && p.kind === params.kind,
+          ) ?? null
+        : null,
+    [profiles, params?.distance, params?.kind],
+  );
+
+  const template = useMemo(
+    // `params!` est sûr : signature/profile_ ne sont truthy que si params != null
+    // (les deux lookups renvoient null tant que params est null).
+    () =>
+      signature && profile_ ? composeTemplate(profile_, signature, params!.kind) : null,
+    [signature, profile_, params?.kind],
+  );
 
   const {
     data: catalog = [],
@@ -293,7 +335,8 @@ export default function MesocyclePreview() {
     assessLoading ||
     kpiLoading ||
     settingsLoading ||
-    tplLoading ||
+    signaturesLoading ||
+    profilesLoading ||
     catLoading;
 
   // ── Composition de MesocycleInput + run du moteur ────────────────────────
@@ -406,6 +449,17 @@ export default function MesocyclePreview() {
   if (!catLoading && catalog.length === 0) {
     return (
       <EngineErrorScreen message="Aucun exercice taggé trouvé dans le catalogue. Préviens ton coach pour qu'il vérifie le seedage de dim_exercices." />
+    );
+  }
+
+  // Combinaison nage/distance non résolue alors que le chargement est terminé :
+  // tables de taxonomie vides, Supabase offline (getStrokeSignatures/Profiles
+  // renvoient [] sans erreur), ou payload sessionStorage périmé après reseed.
+  // → état d'erreur récupérable (CTA vers la génération) plutôt qu'un skeleton
+  //   permanent (template null ⇒ input/generated null mais allLoading déjà false).
+  if (!signature || !profile_) {
+    return (
+      <EngineErrorScreen message="Combinaison nage/distance introuvable — relance la génération" />
     );
   }
 

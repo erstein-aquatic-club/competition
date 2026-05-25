@@ -19,11 +19,13 @@ import {
   generateMesocycle as runEngine,
 } from '@/lib/strength/mesocycleEngine';
 import type {
+  DistanceProfile,
   GeneratedMesocycle,
   MesocycleExercise,
   MesocycleInput,
   MesocycleSession,
   MesocycleWeek,
+  StrokeSignature,
 } from '@/lib/strength/mesocycleEngine.types';
 import type { StrengthMesocycle } from './types';
 
@@ -117,7 +119,9 @@ export async function applyMesocycle(
     await supabase.rpc('apply_strength_mesocycle', {
       p_athlete_id: input.assessment.athlete_id,
       p_assessment_id: input.assessment.id,
-      p_template_id: input.template.id,
+      // §305 : l'id du template composé (nage×distance) est synthétique
+      // (ex. 'freestyle_100_season'), pas un uuid. La colonne est nullable.
+      p_template_id: null,
       p_event_group: input.template.event_group,
       p_kind: input.template.kind,
       p_target_week_count: input.targetWeekCount,
@@ -416,4 +420,62 @@ export async function getMesocycleSessionsContent(
     if (a.weekNumber !== b.weekNumber) return a.weekNumber - b.weekNumber;
     return a.sessionNumber - b.sessionNumber;
   });
+}
+
+// ── Taxonomie nage × distance (§305) ─────────────────────────────────────────
+
+/**
+ * Liste les signatures de nage — multiplicateur par seau vs crawl (crawl ≡ 1.0).
+ *
+ * Lecture seule (5 lignes en seed §305). Sert à composer un template via
+ * `composeTemplate(profile, signature, kind)` sans relire de table de templates.
+ * Le champ `mult` est stocké en jsonb keyé par `StrengthBucket`.
+ */
+export async function getStrokeSignatures(): Promise<StrokeSignature[]> {
+  if (!canUseSupabase()) return [];
+  const data = assertSupabase(
+    await supabase.from('strength_stroke_signatures').select('*'),
+  );
+  type Row = {
+    stroke_key: StrokeSignature['stroke_key'];
+    label: string;
+    mult: StrokeSignature['mult'];
+  };
+  return ((data ?? []) as Row[]).map((r) => ({
+    stroke_key: r.stroke_key,
+    label: r.label,
+    mult: r.mult as StrokeSignature['mult'],
+  }));
+}
+
+/**
+ * Liste les profils de distance — emphase canonique ancrée crawl + arc de
+ * périodisation par famille (`season` / `inter_competition`).
+ *
+ * Lecture seule (8 lignes en seed §305). Les champs `emphasis` et `structure`
+ * sont stockés en jsonb. Sert à composer un template via `composeTemplate`.
+ */
+export async function getDistanceProfiles(): Promise<DistanceProfile[]> {
+  if (!canUseSupabase()) return [];
+  const data = assertSupabase(
+    await supabase.from('strength_distance_profiles').select('*'),
+  );
+  type Row = {
+    distance_key: DistanceProfile['distance_key'];
+    kind: DistanceProfile['kind'];
+    label: string;
+    emphasis: DistanceProfile['emphasis'];
+    structure: DistanceProfile['structure'];
+    min_week_count: number;
+    max_week_count: number;
+  };
+  return ((data ?? []) as Row[]).map((r) => ({
+    distance_key: r.distance_key,
+    kind: r.kind,
+    label: r.label,
+    emphasis: r.emphasis as DistanceProfile['emphasis'],
+    structure: r.structure as DistanceProfile['structure'],
+    min_week_count: r.min_week_count,
+    max_week_count: r.max_week_count,
+  }));
 }

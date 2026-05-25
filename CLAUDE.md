@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§304** — Couplage niveau↔tier (alerte + alignement 1-clic) + re-tag traction lestée intermédiaire (fix GA audit 100 NL H).
+Dernier § livré : **§305** — Taxonomie nage × distance : composeTemplate(emphasis distance × mult nage), tables stroke_signatures/distance_profiles, écran Nage→Épreuve, papillon + 100 m (barèmes 100/papillon à valider coach).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

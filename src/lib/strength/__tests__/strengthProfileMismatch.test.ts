@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import {
   hasUnderLeveledProfile,
   RECOMMENDED_LEVEL_FOR_TIER,
-} from '../strengthProfileMismatch';
+} from '../strengthProfileMismatch.ts';
 
 describe('hasUnderLeveledProfile', () => {
   it('signale national/élite quand le niveau est sous "advanced"', () => {
