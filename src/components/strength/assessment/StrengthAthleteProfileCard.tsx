@@ -29,7 +29,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, Check, Loader2, SlidersHorizontal } from "lucide-react";
-import { hasUnderLeveledProfile } from "@/lib/strength/strengthProfileMismatch";
+import {
+  hasUnderLeveledProfile,
+  RECOMMENDED_LEVEL_FOR_TIER,
+} from "@/lib/strength/strengthProfileMismatch";
 import { toast } from "sonner";
 
 type PracticeLevel = "beginner" | "intermediate" | "advanced";
@@ -229,8 +232,9 @@ export function StrengthAthleteProfileCard({
                   <button
                     type="button"
                     onClick={() => {
-                      setLevel("advanced");
-                      persist({ practice_level: "advanced", performance_tier: tier });
+                      const target = RECOMMENDED_LEVEL_FOR_TIER[tier];
+                      setLevel(target);
+                      persist({ practice_level: target, performance_tier: tier });
                     }}
                     className="rounded-md border border-amber-400 bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 transition-colors hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100"
                   >
