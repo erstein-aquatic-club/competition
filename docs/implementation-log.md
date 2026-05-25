@@ -10,7 +10,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 **Trigger** : reports §304 — taxonomie nage × distance manquante, template `sprint_100` absent, papillon non couvert. Design : `docs/plans/2026-05-25-muscu-305-taxonomie-nage-distance-design.md`. Plan : `docs/plans/2026-05-25-muscu-305-taxonomie-nage-distance.md`. **Constat** : un seul `event_group` figeait nage+distance dans un template unique ; pas de combinaison libre nage × distance, pas de 100 m, pas de papillon.
 
 ### composeTemplate — composition nage × distance (TS pur)
-- **`src/lib/strength/composeTemplate.ts`** (nouveau, TS pur) : `bucket_emphasis[b] = clamp01(round2(distance.emphasis[b] × stroke.mult[b]))` — compose un template-like à partir d'un profil de distance (emphasis ancrée crawl) et d'une signature de nage (multiplicateurs vs crawl). **Reproduit par construction** les 7 emphases existantes. **TDD `node:test`** : 8 cas (dont 6 reproductions ±0.01 des emphases historiques).
+- **`src/lib/strength/composeTemplate.ts`** (nouveau, TS pur) : `bucket_emphasis[b] = clamp01(round2(distance.emphasis[b] × stroke.mult[b]))` — compose un template-like à partir d'un profil de distance (emphasis ancrée crawl) et d'une signature de nage (multiplicateurs vs crawl). **Reproduit par construction les emphases LIVE** des templates actuels (crawl 50/200/400 + brasse/dos/4n au 200 m) — calibré et vérifié **contre la base** (`strength_periodization_templates`), pas contre le seed `00169` d'origine : la valeur crawl 50 provient du template live **post-`00175` (McEvoy-aligned)**, pas de `00169`. **TDD `node:test`** : 8 cas dont **6 reproductions verrouillées ±0.01**. 100 m & papillon sont de-novo (cf. § Décisions).
 
 ### 2 tables de référence (DB, RLS read-all / write coach-admin, calquées sur 00166)
 - **`strength_stroke_signatures`** (mig `00193`) : 5 nages (crawl, dos, brasse, **papillon nouveau**, 4n) — multiplicateurs de seau **vs crawl** (crawl = référence, mult 1.0).
@@ -38,7 +38,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 ### Décisions / limites
 - **Simplification vs design initial (YAGNI)** : PAS de colonnes `stroke`/`distance` ni de réécriture de la RPC — l'`event_group` composé suffit ; seul `template_id` devient nullable.
 - **Calibration** : crawl = nage de référence (mult 1.0) ; 200 m = distance de référence ; `400plus` reprend les valeurs 400 m. **100 m et papillon = de-novo, À VALIDER PAR LE COACH avant déploiement.**
-- **Limites / suite** : préhab ciblée par nage → **§306** ; `useInAppPushBridge.test.ts` reste inerte (besoin d'une config vitest jsdom — chore séparé) ; **déploiement TENU** jusqu'à validation coach des barèmes 100 m / papillon.
+- **Limites / suite** : préhab ciblée par nage → **§306** ; **dette tests préexistante** : ~32 fichiers importent encore `vitest` et restent **inertes** sous `node --test` (jamais exécutés — ex. `paceCalculator`, `offlineSync`, `auth-state`, `swimPlanningMerge`… ; `useInAppPushBridge` en fait partie, non portable sans config jsdom) → **chore de nettoyage dédié à prévoir** (config vitest jsdom OU portage de masse en `node:test`). §305 en a porté 3 (dont `strengthProfileMismatch` de §304). **Déploiement TENU** jusqu'à validation coach des barèmes 100 m / papillon.
 
 ## §304 — Couplage niveau ↔ tier : alerte + alignement 1-clic + re-tag traction lestée (2026-05-25)
 
