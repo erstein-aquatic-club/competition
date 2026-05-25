@@ -71,6 +71,7 @@ import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
 import { initials } from "@/components/strength/kpi/kpiHelpers";
 import { AssessmentContext } from "@/components/strength/assessment/AssessmentContext";
 import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
+import { StrengthAthleteProfileCard } from "@/components/strength/assessment/StrengthAthleteProfileCard";
 import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
 import { computeBilanProgress } from "@/lib/strength/bilanProgress";
 import {
@@ -770,6 +771,9 @@ export default function StrengthAssessmentScreen() {
           questionnaire={assessment?.questionnaire ?? null}
           kpis={kpis}
         />
+
+        {/* Profil muscu coach-set — niveau de pratique (G3) + tier (G1) */}
+        <StrengthAthleteProfileCard athleteId={selectedAthleteId} />
 
         {/* 0-3 scale legend */}
         <div className="rounded-xl border bg-muted/30 p-3">
