@@ -399,6 +399,9 @@ export {
   listMesocycles,
   listActiveMesocyclesWithAthletes,
   getMesocycleSessionsContent,
+  // Taxonomie nage × distance (§305)
+  getStrokeSignatures,
+  getDistanceProfiles,
 } from './strength-mesocycles';
 export type {
   ActiveMesocycleWithAthlete,
