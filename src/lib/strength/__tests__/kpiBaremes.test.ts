@@ -35,6 +35,25 @@ describe('kpiScore', () => {
   });
 });
 
+// Task 1 (muscu G1) — au-delà de la dernière ancre, kpiScore extrapole la pente
+// du dernier segment (p90→100) au lieu de plafonner à 90 : les profils > p90
+// restent discriminables.
+describe('kpiScore — plafond extrapolé (Task 1)', () => {
+  const wp1: Bareme = [[0, 10], [10, 50], [20, 90]]; // dernier segment slope = 4 pts/unité
+  it('atteint 90 pile sur la dernière ancre', () => {
+    assert.equal(kpiScore(wp1, 20), 90);
+  });
+  it('extrapole au-dessus de p90 au lieu de plafonner à 90', () => {
+    assert.equal(kpiScore(wp1, 22.5), 100); // 90 + 2.5*4
+  });
+  it('clampe à 100 pour les valeurs très au-dessus', () => {
+    assert.equal(kpiScore(wp1, 50), 100);
+  });
+  it('garde le plancher sous la première ancre', () => {
+    assert.equal(kpiScore(wp1, -5), 10);
+  });
+});
+
 describe('KPI_BAREMES — structure', () => {
   const KPI_KEYS: StrengthKpiKey[] = [
     'vertical_jump',

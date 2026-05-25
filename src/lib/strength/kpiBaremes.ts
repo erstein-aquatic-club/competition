@@ -24,7 +24,8 @@ export type Bareme = readonly (readonly [number, number])[];
  * par morceaux entre les ancres du barème.
  *
  *  - `value` sous la première ancre  → score de la première ancre (plancher) ;
- *  - `value` au-dessus de la dernière → score de la dernière ancre (plafond) ;
+ *  - `value` au-dessus de la dernière → extrapolation de la pente du dernier
+ *    segment (p90→100), pas de plateau plat à la dernière ancre ;
  *  - entre deux ancres                → interpolation linéaire ;
  *  - le résultat est borné à [0, 100].
  *
@@ -39,7 +40,14 @@ export function kpiScore(bareme: Bareme, value: number): number {
   const first = bareme[0];
   const last = bareme[bareme.length - 1];
   if (value <= first[0]) return clamp(first[1]);
-  if (value >= last[0]) return clamp(last[1]);
+  if (value >= last[0]) {
+    // Extrapole la pente du dernier segment au-delà de l'ancre haute (p90→100),
+    // pour que les profils > p90 restent discriminables (au lieu de saturer à 90).
+    const [xPrev, sPrev] = bareme[bareme.length - 2];
+    const [xLast, sLast] = last;
+    const slope = (sLast - sPrev) / (xLast - xPrev);
+    return clamp(sLast + (value - xLast) * slope);
+  }
 
   for (let i = 1; i < bareme.length; i++) {
     const [x0, s0] = bareme[i - 1];
