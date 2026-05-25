@@ -4,6 +4,15 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## Audit matrice — R3 + R6 (recalibration dos + 100 m) (2026-05-25)
+
+**Branche** : `main` (recalibrations data 1-ligne, appliquées via MCP). Suite de l'audit matrice (`docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`).
+
+- **Migration `00199_audit_recalibration_r3_r6.sql`** (MCP, `jsonb_set`) : **R3** signature backstroke `lower_strength` ×0.857→**×0.95** (le dos s'appuie sur le coup de pied dauphin au mur ischios/fessiers + départs explosifs ; ⚠️ **override d'une valeur seedée historiquement** — reproduit l'ancien template dos au 200 m, pas de-novo → à valider coach) ; **R6** profil 100 m `upper_power` 0.60→**0.65** (les 2 kinds season/inter ; le 100 soutient la puissance plus longtemps que le 50 — nudge optionnel, 100 m déjà ✅). Vérifié `SELECT` (backstroke=0.95 ; 100.season=100.inter=0.65).
+- **Effet composé** : dos `lower_strength` 50 .73→.81 / 100 .70→.78 / 200 .60→.67 / 400+ .69→.76 ; `upper_power` 100 m crawl .60→.65, papillon .81→.88, dos .68→.73, brasse .45→.49, 4n .60→.65.
+- **Pas un §** (recalibration data) ; pas de tests (donnée DB, `composeTemplate` testé sur mocks, valeurs live priment) ; **pas de `test:rls`**. Effet immédiat sans déploiement (signatures/profils lus en base à la génération). Réversible.
+- **Restes audit** : R4 (profil fond 800/1500 distinct), R5 (seau tronc/core).
+
 ## §306 — Préhab ciblée par nage — Phase 2 (préhab proactif event-aware) (2026-05-25)
 
 **Branche** : `main`. **Suite de la Phase 1.** Couche « élite » proactive : préférer les exos préhab spécifiques à la nage ciblée (V1 brasse → adducteurs), là où `selectExercises` n'était pas event-aware.
