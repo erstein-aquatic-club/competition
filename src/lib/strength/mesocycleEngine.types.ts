@@ -159,6 +159,18 @@ export interface SelectedExercise {
 // ── Séance ─────────────────────────────────────────────────────────────────────
 
 /**
+ * Rôle d'une séance dans la logique « jour-aware » (amorce PAP §307).
+ *
+ * - `amorce_pap` : micro-dose post-activation-potentiation un jour de sprint
+ *   piscine (lundi/jeudi par défaut) — 1 lourd-court + 1 explosif + warmup.
+ * - `developpement` : séance « off-pool » qui porte le vrai stimulus de
+ *   périodisation, biaisée force.
+ * - `mobilite_corrective` : séance dictée par l'override sécurité mobilité
+ *   (douleur intense / dysfonction) — jamais convertie en PAP.
+ */
+export type SessionRole = 'amorce_pap' | 'developpement' | 'mobilite_corrective';
+
+/**
  * Une séance d'une semaine du mésocycle.
  */
 export interface MesocycleSession {
@@ -167,6 +179,14 @@ export interface MesocycleSession {
    * Correspond à l'ordre dans `MesocycleWeek.sessions`.
    */
   sessionNumber: number;
+  /**
+   * Jour de la semaine sur lequel tombe la séance (0=Lun…6=Dim). Posé par le
+   * moteur : en mode jour-aware via `input.weekdays`, sinon dérivé d'une carte
+   * legacy alignée sur la RPC `apply_strength_mesocycle`.
+   */
+  weekday: number;
+  /** Rôle de la séance (classification jour-aware §307). */
+  role: SessionRole;
   /**
    * Seaux travaillés dans cette séance (peut être plusieurs si séances mixtes).
    */
@@ -344,6 +364,10 @@ export interface MesocycleInput {
   targetWeekCount: number;
   /** Nombre de séances par semaine (relu de l'évaluation, ajustable). */
   sessionsPerWeek: number;
+  /** Jours muscu cochés (0=Lun…6=Dim), triés, sans samedi(5). Si absent → mode legacy. */
+  weekdays?: number[];
+  /** Sous-ensemble de weekdays en amorce PAP. Défaut: {0,3} ∩ weekdays. */
+  primerWeekdays?: number[];
   /**
    * Catalogue d'exercices taggés (dim_exercices, issu de la migration 00164).
    * Passé en paramètre pour que le moteur reste pur.

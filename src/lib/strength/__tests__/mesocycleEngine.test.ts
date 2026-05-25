@@ -1228,6 +1228,246 @@ describe('generateMesocycle', () => {
 const _generatedMesocycleTypeCheck: GeneratedMesocycle | null = null;
 void _generatedMesocycleTypeCheck;
 
+// ── jour-aware amorce PAP (§307) ─────────────────────────────────────────────
+
+/**
+ * Catalogue ciblé pour les tests jour-aware : un core par seau de force/
+ * puissance avec des %1RM force explicites, + 2 mobility.
+ * - strength buckets (upper/lower_strength) : core, force% = 85.
+ * - power buckets (lower/upper_power) : core plyo, force% = 0.
+ */
+function jourAwareCatalog(): CatalogExercise[] {
+  return [
+    makeExercise({
+      id: 2001,
+      nomExercice: 'upper_strength_core',
+      bucket: 'upper_strength',
+      level: 'beginner',
+      isCore: true,
+      pourcentageCharge1rmForce: 85,
+      nbSeriesForce: 4,
+      nbRepsForce: 5,
+    }),
+    makeExercise({
+      id: 2002,
+      nomExercice: 'lower_strength_core',
+      bucket: 'lower_strength',
+      level: 'beginner',
+      isCore: true,
+      pourcentageCharge1rmForce: 85,
+      nbSeriesForce: 4,
+      nbRepsForce: 5,
+    }),
+    makeExercise({
+      id: 2003,
+      nomExercice: 'lower_power_plyo',
+      bucket: 'lower_power',
+      level: 'beginner',
+      isCore: true,
+      pourcentageCharge1rmForce: 0,
+      nbSeriesForce: 4,
+      nbRepsForce: 5,
+    }),
+    makeExercise({
+      id: 2004,
+      nomExercice: 'upper_power_plyo',
+      bucket: 'upper_power',
+      level: 'beginner',
+      isCore: true,
+      pourcentageCharge1rmForce: 0,
+      nbSeriesForce: 4,
+      nbRepsForce: 5,
+    }),
+    makeExercise({
+      id: 2005,
+      nomExercice: 'mobility_1',
+      bucket: 'mobility',
+      level: 'beginner',
+      isCore: true,
+    }),
+    makeExercise({
+      id: 2006,
+      nomExercice: 'mobility_2',
+      bucket: 'mobility',
+      level: 'beginner',
+      isCore: false,
+    }),
+  ];
+}
+
+/** Template 50 m crawl inter_competition (phases maintien/puissance/affutage/pic). */
+function fiftyFreeTemplate(): StrengthPeriodizationTemplate {
+  return {
+    id: 'tpl-50free',
+    event_group: 'freestyle_50',
+    kind: 'inter_competition',
+    name: '50 m crawl inter-compétitions',
+    min_week_count: 4,
+    max_week_count: 10,
+    structure: {
+      phases: [
+        { cycle: 'maintien', min_weeks: 1, nominal_weeks: 2, max_weeks: 4 },
+        { cycle: 'puissance', min_weeks: 1, nominal_weeks: 2, max_weeks: 3 },
+        { cycle: 'affutage', min_weeks: 1, nominal_weeks: 2, max_weeks: 2 },
+        { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      ],
+      bucket_emphasis: {
+        lower_strength: 1.0,
+        lower_power: 1.0,
+        upper_strength: 0.5,
+        upper_power: 0.5,
+        mobility: 0.5,
+      },
+    },
+    created_at: '2026-05-01T00:00:00Z',
+    updated_at: '2026-05-01T00:00:00Z',
+  };
+}
+
+/** Input jour-aware : athlète F adulte, catalogue ciblé, template 50-free. */
+function jourAwareInput(overrides: Partial<MesocycleInput> = {}): MesocycleInput {
+  return {
+    assessment: {
+      id: 'assess-ja',
+      athlete_id: 42,
+      questionnaire: greatQuestionnaire,
+      physical_tests: fullPhysicalTests,
+    },
+    kpiMeasurements: [
+      makeMeasurement('vertical_jump', 51.1, '2026-05-01T00:00:00Z', 'W/kg'),
+      makeMeasurement('broad_jump', 175, '2026-05-01T00:00:00Z', 'cm'),
+      makeMeasurement('imtp', 95, '2026-05-01T00:00:00Z', 'kg'),
+      makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
+      makeMeasurement('medball_vertical_throw', 115, '2026-05-01T00:00:00Z', 'cm'),
+    ],
+    athlete: { sex: 'F', ageBand: 'adulte', level: 'intermediate', performanceTier: 'club' },
+    template: fiftyFreeTemplate(),
+    targetWeekCount: 7, // = Σ nominal (2+2+2+1)
+    sessionsPerWeek: 3,
+    exerciseCatalog: jourAwareCatalog(),
+    ...overrides,
+  };
+}
+
+describe('generateMesocycle — jour-aware amorce PAP (§307)', () => {
+  it('1. weekday assignment : weekdays triés et posés sur les séances', () => {
+    const meso = generateMesocycle(jourAwareInput({ weekdays: [3, 0, 1] }));
+    const week1 = meso.weeks[0];
+    assert.deepEqual(
+      week1.sessions.map((s) => s.weekday),
+      [0, 1, 3],
+      'weekdays triés croissant',
+    );
+    assert.equal(meso.sessionsPerWeek, 3, 'sessionsPerWeek cohérent');
+    assert.equal(week1.sessions.length, 3);
+  });
+
+  it('2. role classification : primers PAP, autres developpement', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({ weekdays: [0, 1, 3], primerWeekdays: [0, 3] }),
+    );
+    const byDay = new Map(meso.weeks[0].sessions.map((s) => [s.weekday, s.role]));
+    assert.equal(byDay.get(0), 'amorce_pap');
+    assert.equal(byDay.get(3), 'amorce_pap');
+    assert.equal(byDay.get(1), 'developpement');
+  });
+
+  it('3. safety override : douleur intense → toutes mobilite_corrective (PAP supprimé)', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        assessment: {
+          id: 'assess-ja',
+          athlete_id: 42,
+          questionnaire: {
+            ...greatQuestionnaire,
+            pain: [{ body_zone: 'shoulder', intensity: 3 }],
+          },
+          physical_tests: fullPhysicalTests,
+        },
+      }),
+    );
+    for (const session of meso.weeks[0].sessions) {
+      assert.equal(
+        session.role,
+        'mobilite_corrective',
+        `J${session.weekday} doit être mobilite_corrective`,
+      );
+    }
+  });
+
+  it('4. PAP loading : ≤3 exos, 1 potentiateur lourd-court + 1 explosif 0%', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({ weekdays: [0, 1, 3], primerWeekdays: [0, 3] }),
+    );
+    const primer = meso.weeks[0].sessions.find((s) => s.weekday === 0);
+    assert.ok(primer, 'séance primer J0 présente');
+    assert.equal(primer.role, 'amorce_pap');
+    assert.ok(primer.exercises.length <= 3, `≤3 exos, obtenu ${primer.exercises.length}`);
+
+    const nonMobility = primer.exercises.filter((e) => e.bucket !== 'mobility');
+    const potentiator = nonMobility.find(
+      (e) => (e.intensityPct1rm ?? 0) >= 80 && e.reps <= 3 && e.sets <= 2,
+    );
+    assert.ok(potentiator, 'potentiateur lourd-court présent (≥80%, ≤2x3)');
+    const explosive = nonMobility.find((e) => e.intensityPct1rm === 0);
+    assert.ok(explosive, 'exo explosif à 0% présent');
+  });
+
+  it('5. force-bias : semaine maintien 50-free → jour dev chargé comme force_max', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({ weekdays: [0, 1, 3], primerWeekdays: [0, 3] }),
+    );
+    const week1 = meso.weeks[0];
+    assert.equal(week1.cycle, 'maintien', 'semaine 1 = maintien');
+    const dev = week1.sessions.find((s) => s.weekday === 1);
+    assert.ok(dev, 'jour dev J1 présent');
+    assert.equal(dev.role, 'developpement');
+    // Exo principal (premier non-mobility) doit être chargé force_max, pas maintien.
+    const mainExo = dev.exercises.find((e) => e.bucket !== 'mobility');
+    assert.ok(mainExo, 'exo principal présent');
+    assert.ok(mainExo.sets >= 3, `force_max sets≥3, obtenu ${mainExo.sets}`);
+    assert.ok((mainExo.intensityPct1rm ?? 0) >= 80, `force_max %≥80, obtenu ${mainExo.intensityPct1rm}`);
+  });
+
+  it('6. semaine puissance inchangée sur jour dev (%1RM < 85)', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({ weekdays: [0, 1, 3], primerWeekdays: [0, 3] }),
+    );
+    const puissanceWeek = meso.weeks.find((w) => w.cycle === 'puissance');
+    assert.ok(puissanceWeek, 'semaine puissance présente');
+    const dev = puissanceWeek.sessions.find((s) => s.weekday === 1);
+    assert.ok(dev, 'jour dev J1 présent');
+    const mainExo = dev.exercises.find(
+      (e) => e.bucket !== 'mobility' && (e.intensityPct1rm ?? 0) > 0,
+    );
+    assert.ok(mainExo, 'exo principal chargé présent');
+    assert.ok(
+      (mainExo.intensityPct1rm ?? 0) < 85,
+      `puissance %<85, obtenu ${mainExo.intensityPct1rm}`,
+    );
+  });
+
+  it('7. legacy mode untouched : pas de weekdays → 3 séances developpement, weekdays [0,2,4]', () => {
+    const input = jourAwareInput(); // pas de weekdays
+    delete input.weekdays;
+    const meso = generateMesocycle(input);
+    const week1 = meso.weeks[0];
+    assert.equal(week1.sessions.length, 3);
+    assert.deepEqual(
+      week1.sessions.map((s) => s.weekday),
+      [0, 2, 4],
+      'carte legacy 3 séances → [0,2,4]',
+    );
+    for (const session of week1.sessions) {
+      assert.equal(session.role, 'developpement', `J${session.weekday} legacy = developpement`);
+    }
+    // Aucune séance ne doit être PAP en mode legacy.
+    const hasPap = meso.weeks.some((w) => w.sessions.some((s) => s.role === 'amorce_pap'));
+    assert.equal(hasPap, false, 'aucune PAP en mode legacy');
+  });
+});
+
 
 
 

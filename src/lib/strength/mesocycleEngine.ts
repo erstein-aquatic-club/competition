@@ -34,6 +34,7 @@ import type {
   MesocycleWeek,
   PeriodizedWeek,
   SelectedExercise,
+  SessionRole,
 } from './mesocycleEngine.types.ts';
 
 /** Sélectionne la mesure la plus récente pour chaque KPI. */
@@ -547,7 +548,70 @@ function buildOverrideRationale(painZones: string[], dysfns: string[]): string {
 // ── generateMesocycle ────────────────────────────────────────────────────────
 
 /** Version sémantique du moteur — incrémentée à chaque modification de logique. */
-export const ENGINE_VERSION = '1.0.0';
+export const ENGINE_VERSION = '1.1.0';
+
+/** Seaux de force pure (potentiateur lourd-court d'une amorce PAP). §307. */
+const STRENGTH_BUCKETS: StrengthBucket[] = ['upper_strength', 'lower_strength'];
+/** Seaux de puissance (exo explosif d'une amorce PAP). §307. */
+const POWER_BUCKETS: StrengthBucket[] = ['lower_power', 'upper_power'];
+
+/**
+ * Sous le seuil, un seau de force est jugé « à développer » et déclenche le
+ * biais force d'une semaine de maintien sur les jours développement. §307.
+ */
+const FORCE_BIAS_SCORE_THRESHOLD = 60;
+
+/** Distances qui imposent un biais force (sprint, où la force prime). §307. */
+const FORCE_BIAS_DISTANCES = new Set<string>(['50', '100']);
+
+/** Distances reconnues du suffixe `<nage>_<distance>` (§305). */
+const KNOWN_DISTANCES = new Set(['50', '100', '200', '400plus']);
+
+/**
+ * Carte legacy jour-de-semaine, alignée sur le tableau codé en dur dans la RPC
+ * `apply_strength_mesocycle` : utilisée quand `input.weekdays` est absent.
+ * 0=Lun…6=Dim ; samedi(5) n'est jamais auto-assigné en deçà de 6 séances.
+ */
+function legacyWeekdays(sessionsPerWeek: number): number[] {
+  const MAP: Record<number, number[]> = {
+    1: [0],
+    2: [0, 3],
+    3: [0, 2, 4],
+    4: [0, 1, 3, 4],
+    5: [0, 1, 2, 3, 4],
+    6: [0, 1, 2, 3, 4, 5],
+    7: [0, 1, 2, 3, 4, 5, 6],
+  };
+  return MAP[sessionsPerWeek] ?? [0, 1, 2, 3, 4, 5, 6].slice(0, sessionsPerWeek);
+}
+
+/**
+ * Dérive la distance ciblée depuis l'`event_group` composé (§305) — ex.
+ * `freestyle_50` → `50`. Renvoie `null` si le suffixe n'est pas une distance
+ * connue (dégradation gracieuse, pas de biais force forcé).
+ */
+function deriveDistanceKey(eventGroup: string | undefined | null): string | null {
+  if (!eventGroup) return null;
+  const suffix = eventGroup.split('_')[1];
+  return suffix && KNOWN_DISTANCES.has(suffix) ? suffix : null;
+}
+
+/**
+ * Classe le rôle d'une séance (§307) :
+ * - override mobilité (sécurité) → `mobilite_corrective` (jamais converti en PAP).
+ * - jour-aware + jour primer → `amorce_pap`.
+ * - sinon → `developpement`.
+ */
+function classifyRole(
+  weekday: number,
+  primerWeekdays: Set<number>,
+  isMobilityOverride: boolean,
+  jourAware: boolean,
+): SessionRole {
+  if (isMobilityOverride) return 'mobilite_corrective';
+  if (jourAware && primerWeekdays.has(weekday)) return 'amorce_pap';
+  return 'developpement';
+}
 
 /** Nombre d'exercices par bloc d'une séance.
  *
@@ -615,8 +679,44 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
 
   const periodizedWeeks = periodize(input.template, input.targetWeekCount);
 
+  // §307 — résolution jour-aware : jours muscu + jours amorce PAP.
+  const jourAware = !!(input.weekdays && input.weekdays.length > 0);
+  const weekdays =
+    input.weekdays && input.weekdays.length > 0
+      ? [...input.weekdays].sort((a, b) => a - b)
+      : legacyWeekdays(input.sessionsPerWeek);
+  const primerWeekdays = new Set(
+    input.primerWeekdays ?? weekdays.filter((d) => d === 0 || d === 3),
+  );
+
+  // §307 — biais force : distance sprint OU force pure faible. Appliqué
+  // uniquement en mode jour-aware sur les séances développement.
+  const distanceKey = deriveDistanceKey(input.template.event_group);
+  const maxStrengthScore = Math.max(
+    bucketScores.lower_strength ?? 0,
+    bucketScores.upper_strength ?? 0,
+  );
+  const forceBiasRequired =
+    (distanceKey !== null && FORCE_BIAS_DISTANCES.has(distanceKey)) ||
+    maxStrengthScore < FORCE_BIAS_SCORE_THRESHOLD;
+
+  // §307 — override sécurité mobilité actif (douleur intense / dysfonction) :
+  // toute la semaine devient corrective, la PAP est supprimée. Détecté via le
+  // flag posé par `prioritizeBuckets` sur le seau mobility.
+  const mobilityOverrideActive = bucketPriorities.some(
+    (p) => p.bucket === 'mobility' && p.overrideApplied,
+  );
+
+  // §307 — ordre de priorité des seaux entraînables (focus puis maintien),
+  // utilisé pour choisir le seau force/puissance d'une amorce PAP.
+  const bucketPriorityOrder = bucketAllocations.map((a) => a.bucket);
+
   const weeks: MesocycleWeek[] = periodizedWeeks.map((pw) =>
-    buildWeek(pw, bucketAllocations, selected, input.sessionsPerWeek),
+    buildWeek(pw, bucketAllocations, selected, weekdays, primerWeekdays, jourAware, {
+      forceBiasRequired,
+      mobilityOverrideActive,
+      bucketPriorityOrder,
+    }),
   );
 
   const reasoning = buildReasoning({
@@ -639,16 +739,33 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
 
 // ── helpers internes : sessions + chargement ─────────────────────────────────
 
-/** Pour une semaine, construit `sessionsPerWeek` séances chargées. */
+/**
+ * Pour une semaine, construit une séance par jour muscu (`weekdays.length`),
+ * chargée selon le cycle. §307 — chaque séance reçoit son `weekday` (trié) et
+ * son `role` (PAP / développement / mobilité corrective).
+ */
 function buildWeek(
   pw: PeriodizedWeek,
   allocations: BucketAllocation[],
   selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
-  sessionsPerWeek: number,
+  weekdays: number[],
+  primerWeekdays: Set<number>,
+  jourAware: boolean,
+  flags: {
+    forceBiasRequired: boolean;
+    mobilityOverrideActive: boolean;
+    bucketPriorityOrder: StrengthBucket[];
+  },
 ): MesocycleWeek {
-  const slots = distributeSessionSlots(allocations, sessionsPerWeek);
+  const slots = distributeSessionSlots(allocations, weekdays.length);
   const sessions: MesocycleSession[] = slots.map((slot, idx) =>
-    buildSession(idx + 1, slot.primary, slot.complement, pw.cycle, selected),
+    buildSession(idx + 1, weekdays[idx], slot.primary, slot.complement, pw.cycle, selected, {
+      primerWeekdays,
+      jourAware,
+      forceBiasRequired: flags.forceBiasRequired,
+      mobilityOverrideActive: flags.mobilityOverrideActive,
+      bucketPriorityOrder: flags.bucketPriorityOrder,
+    }),
   );
   return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
 }
@@ -743,10 +860,30 @@ function pickComplement(
   return focusBuckets[0];
 }
 
+/** Contexte jour-aware (§307) passé à `buildSession`. */
+interface JourAwareContext {
+  primerWeekdays: Set<number>;
+  jourAware: boolean;
+  forceBiasRequired: boolean;
+  /**
+   * `true` si un override sécurité mobilité (douleur intense / dysfonction) est
+   * actif : la séance entière devient corrective, la PAP est supprimée.
+   */
+  mobilityOverrideActive: boolean;
+  /** Seaux entraînables ordonnés par priorité (focus puis maintien). §307. */
+  bucketPriorityOrder: StrengthBucket[];
+}
+
 /**
  * Construit une séance multi-bucket : warmup mobility + bloc PRIMAIRE +
  * (optionnellement) bloc COMPLEMENT. Si `primary === 'mobility'` (override
  * sécurité), la séance est entièrement mobilité, mono-bucket.
+ *
+ * §307 — jour-aware : la séance reçoit son `weekday` et un `role` classé. Un
+ * jour primer (`amorce_pap`) reçoit un chargement PAP dédié (lourd-court +
+ * explosif + warmup, ≤3 exos). Un jour développement biaise son cycle vers
+ * `force_max` si la semaine est en `maintien` et que le biais force est requis.
+ * Une séance d'override mobilité (`mobilite_corrective`) garde son comportement.
  *
  * Ordre des `buckets` : [primary, complement?, 'mobility'?]. `buckets[0]` =
  * primary est utilisé par la RPC apply pour le nom du template
@@ -754,17 +891,29 @@ function pickComplement(
  */
 function buildSession(
   sessionNumber: number,
+  weekday: number,
   primary: StrengthBucket,
   complement: StrengthBucket | null,
   cycle: PeriodizationCycle,
   selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
+  ctx: JourAwareContext,
 ): MesocycleSession {
   const mobilityPool = selected.mobility ?? [];
+
+  // Une séance est corrective si elle est mobility-primary (override par slot)
+  // OU si l'override sécurité global est actif (toute la semaine corrective).
+  const isMobilityOverride = primary === 'mobility' || ctx.mobilityOverrideActive;
+  const role = classifyRole(weekday, ctx.primerWeekdays, isMobilityOverride, ctx.jourAware);
+
+  // §307 — Amorce PAP : chargement dédié, ignore primary/complement classiques.
+  if (role === 'amorce_pap') {
+    return buildPapSession(sessionNumber, weekday, selected, mobilityPool, ctx.bucketPriorityOrder);
+  }
 
   let exercises: MesocycleExercise[];
   const buckets: StrengthBucket[] = [];
 
-  if (primary === 'mobility') {
+  if (isMobilityOverride) {
     // Cas override sécurité — la séance entière est mobilité corrective.
     // isWarmup=false ici car ce n'est pas un échauffement mais le focus
     // principal (l'effectiveWarmup côté toMesocycleExercise détectera
@@ -774,6 +923,12 @@ function buildSession(
       .map((s) => toMesocycleExercise(s, cycle, false));
     buckets.push('mobility');
   } else {
+    // §307 — biais force des séances développement : une semaine de maintien
+    // qui requiert le biais force est chargée comme force_max sur les blocs
+    // principaux (warmup et override mobilité non affectés).
+    const effectiveCycle: PeriodizationCycle =
+      ctx.jourAware && ctx.forceBiasRequired && cycle === 'maintien' ? 'force_max' : cycle;
+
     const primaryPool = selected[primary] ?? [];
     const useComplement = complement != null && complement !== primary;
     const complementPool = useComplement ? (selected[complement] ?? []) : [];
@@ -785,10 +940,10 @@ function buildSession(
       .map((s) => toMesocycleExercise(s, cycle, true));
     const primaryBlock = primaryPool
       .slice(0, PRIMARY_BLOCK_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle, false));
+      .map((s) => toMesocycleExercise(s, effectiveCycle, false));
     const complementBlock = complementPool
       .slice(0, COMPLEMENT_BLOCK_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle, false));
+      .map((s) => toMesocycleExercise(s, effectiveCycle, false));
 
     // Ordre chronologique : warmup → primary → complement.
     exercises = [...warmup, ...primaryBlock, ...complementBlock];
@@ -802,7 +957,105 @@ function buildSession(
     if (warmup.length > 0) buckets.push('mobility');
   }
 
-  return { sessionNumber, buckets, exercises };
+  return { sessionNumber, weekday, role, buckets, exercises };
+}
+
+// ── Amorce PAP (§307) ─────────────────────────────────────────────────────────
+
+/** Charge un exercice PAP avec des paramètres explicites (hors chemin cycle). */
+function buildPapExercise(
+  selectedEx: SelectedExercise,
+  params: { sets: number; reps: number; intensityPct1rm: number | null; restSeconds: number; intention: string },
+): MesocycleExercise {
+  const ex = selectedEx.exercise;
+  return {
+    exerciseId: ex.id,
+    nomExercice: ex.nomExercice,
+    bucket: (ex.bucket ?? 'mobility') as StrengthBucket,
+    isCore: ex.isCore,
+    sets: params.sets,
+    reps: params.reps,
+    intensityPct1rm: params.intensityPct1rm,
+    restSeconds: params.restSeconds,
+    intention: params.intention,
+    substituted: selectedEx.substituted,
+    originalExerciseId: selectedEx.originalExerciseId,
+    illustrationGif: ex.illustrationGif,
+  };
+}
+
+/** Premier exo core d'un seau du pool, sinon le premier disponible, sinon null. */
+function firstCore(pool: SelectedExercise[]): SelectedExercise | null {
+  return pool.find((s) => s.exercise.isCore) ?? pool[0] ?? null;
+}
+
+/**
+ * Construit une séance d'amorce PAP (§307) : 1 potentiateur lourd-court (seau
+ * de force le plus prioritaire présent) + 1 explosif (seau de puissance le plus
+ * prioritaire présent) + 1 warmup mobilité. Volume mini (≤3 exos) pour rester
+ * frais avant le sprint piscine. Ne jette jamais : inclut seulement ce qui existe.
+ */
+function buildPapSession(
+  sessionNumber: number,
+  weekday: number,
+  selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
+  mobilityPool: SelectedExercise[],
+  bucketPriorityOrder: StrengthBucket[],
+): MesocycleSession {
+  const exercises: MesocycleExercise[] = [];
+  const buckets: StrengthBucket[] = [];
+
+  // Le seau le plus prioritaire (parmi les seaux alloués, ordre focus→maintien)
+  // d'une catégorie donnée qui dispose d'au moins un exo sélectionné.
+  const pickByPriority = (category: StrengthBucket[]): StrengthBucket | null =>
+    bucketPriorityOrder.find(
+      (b) => category.includes(b) && (selected[b]?.length ?? 0) > 0,
+    ) ?? null;
+
+  // Potentiateur lourd-court : seau de force le plus prioritaire présent.
+  const strengthBucket = pickByPriority(STRENGTH_BUCKETS);
+  if (strengthBucket) {
+    const sel = firstCore(selected[strengthBucket] ?? []);
+    if (sel) {
+      exercises.push(
+        buildPapExercise(sel, {
+          sets: 2,
+          reps: 2,
+          intensityPct1rm: sel.exercise.pourcentageCharge1rmForce,
+          restSeconds: 180,
+          intention: 'Potentiateur lourd — explosivité, pas de fatigue.',
+        }),
+      );
+      buckets.push(strengthBucket);
+    }
+  }
+
+  // Explosif : seau de puissance le plus prioritaire présent.
+  const powerBucket = pickByPriority(POWER_BUCKETS);
+  if (powerBucket) {
+    const sel = firstCore(selected[powerBucket] ?? []);
+    if (sel) {
+      exercises.push(
+        buildPapExercise(sel, {
+          sets: 2,
+          reps: 3,
+          intensityPct1rm: sel.exercise.pourcentageCharge1rmForce ?? 0,
+          restSeconds: 150,
+          intention: 'Explosif — vitesse maximale, potentialise le sprint.',
+        }),
+      );
+      buckets.push(powerBucket);
+    }
+  }
+
+  // 1 warmup mobilité (chargement endurance via le chemin existant).
+  const warmupSel = mobilityPool[0] ?? null;
+  if (warmupSel) {
+    exercises.push(toMesocycleExercise(warmupSel, 'prepa_generale', true));
+    buckets.push('mobility');
+  }
+
+  return { sessionNumber, weekday, role: 'amorce_pap', buckets, exercises };
 }
 
 /** Centre d'un intervalle, arrondi à l'entier. */
