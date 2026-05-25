@@ -10,16 +10,18 @@
  *  rassemble 4 paramètres puis hand-offe à l'écran d'aperçu via
  *  sessionStorage + navigate('/strength/mesocycle-preview').
  *
- *  Paramètres collectés :
- *   • event_group       — épreuve ciblée (chips, 7 valeurs seedées §292).
+ *  Paramètres collectés (taxonomie nage × distance, §305) :
+ *   • stroke            — nage ciblée (chips, 5 clés seedées §305).
+ *   • distance          — épreuve/distance (chips filtrés selon la nage).
  *   • kind              — famille de prépa (season | inter_competition).
  *   • target_week_count — durée cible, bornée à [min_week_count, max_week_count]
- *                         du template choisi. Peut s'aligner sur une compétition.
+ *                         du DistanceProfile (distance, kind). Peut s'aligner
+ *                         sur une compétition.
  *   • sessions_per_week — relue de l'évaluation, ajustable 1..7.
  *
  * Disclosure
  * ──────────
- *  Les 4 sections sont toutes affichées en pile verticale. Les sections en
+ *  Les 5 sections sont toutes affichées en pile verticale. Les sections en
  *  aval d'une réponse manquante restent visibles mais grisées + non
  *  interactives — laisser l'aperçu de l'étape suivante visible aide à
  *  l'orientation sans demander de défilement après chaque clic.
@@ -34,12 +36,16 @@ import { useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   getAthletes,
+  getDistanceProfiles,
   getLatestAssessment,
   getProfile,
-  listStrengthPeriodizationTemplates,
-  listStrengthTemplateEventGroups,
+  getStrokeSignatures,
 } from "@/lib/api";
-import type { Competition, StrengthPeriodizationTemplate } from "@/lib/api/types";
+import type { Competition } from "@/lib/api/types";
+import type {
+  DistanceKey,
+  StrokeKey,
+} from "@/lib/strength/mesocycleEngine.types";
 import { useAuth } from "@/lib/auth";
 import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
 import { useCompetitionsByWeek } from "@/hooks/useCompetitionsByWeek";
@@ -64,27 +70,32 @@ import {
 
 // ── Constantes UI ────────────────────────────────────────────────────────────
 
-/** Mapping event_group → label FR pour les chips. Aligné sur seed §292. */
-const EVENT_GROUP_LABELS: Record<string, string> = {
-  sprint_50: "Sprint 50 m",
-  breaststroke: "Brasse",
-  backstroke: "Dos",
-  "200m": "200 m",
-  "400m": "400 m",
-  distance: "Demi-fond",
-  medley: "4 nages",
-};
-
-/** Ordre stable d'affichage des épreuves (sprint → fond → spécial). */
-const EVENT_GROUP_ORDER = [
-  "sprint_50",
-  "200m",
-  "400m",
-  "distance",
-  "breaststroke",
+/** Ordre stable d'affichage des nages (ne PAS dépendre de l'ordre DB). §305. */
+const STROKE_ORDER: StrokeKey[] = [
+  "freestyle",
+  "butterfly",
   "backstroke",
+  "breaststroke",
   "medley",
 ];
+
+/** Ordre stable d'affichage des distances (du sprint vers le fond). §305. */
+const DISTANCE_ORDER: DistanceKey[] = ["50", "100", "200", "400plus"];
+
+/** Labels FR de secours si une ligne du catalogue manque (préférer `row.label`). */
+const STROKE_LABELS_FALLBACK: Record<StrokeKey, string> = {
+  freestyle: "Crawl",
+  butterfly: "Papillon",
+  backstroke: "Dos",
+  breaststroke: "Brasse",
+  medley: "4 nages",
+};
+const DISTANCE_LABELS_FALLBACK: Record<DistanceKey, string> = {
+  "50": "50 m",
+  "100": "100 m",
+  "200": "200 m",
+  "400plus": "400 m +",
+};
 
 /** Clé sessionStorage pour le hand-off vers l'écran d'aperçu. */
 const SESSION_KEY = "eac_pending_mesocycle_params";
@@ -192,50 +203,85 @@ export default function MesocycleGeneration() {
   const targetName =
     athletes?.find((a) => a.id === effectiveAthleteId)?.display_name ?? null;
 
-  // ── Données du catalogue ─────────────────────────────────────────────────
-  const { data: eventGroups = [] } = useQuery({
-    queryKey: ["strength-template-event-groups"],
-    queryFn: () => listStrengthTemplateEventGroups(),
+  // ── Données du catalogue — taxonomie nage × distance (§305) ──────────────
+  const { data: strokeSignatures = [], isLoading: strokesLoading } = useQuery({
+    queryKey: ["strength-stroke-signatures"],
+    queryFn: () => getStrokeSignatures(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: distanceProfiles = [] } = useQuery({
+    queryKey: ["strength-distance-profiles"],
+    queryFn: () => getDistanceProfiles(),
     staleTime: 5 * 60 * 1000,
   });
 
-  // ── État local des 4 sections ────────────────────────────────────────────
-  const [eventGroup, setEventGroup] = useState<string | null>(null);
+  // ── État local des sections ──────────────────────────────────────────────
+  const [stroke, setStroke] = useState<StrokeKey | null>(null);
+  const [distance, setDistance] = useState<DistanceKey | null>(null);
   const [kind, setKind] = useState<"season" | "inter_competition" | null>(null);
   const [weeks, setWeeks] = useState<number | null>(null);
   const [sessionsPerWeek, setSessionsPerWeek] = useState<number | null>(null);
 
   // Reset des sections aval quand l'amont change.
   useEffect(() => {
+    setDistance(null);
     setKind(null);
     setWeeks(null);
-  }, [eventGroup]);
+  }, [stroke]);
+
+  useEffect(() => {
+    setKind(null);
+    setWeeks(null);
+  }, [distance]);
 
   useEffect(() => {
     setWeeks(null);
   }, [kind]);
 
-  // ── Template courant (selon eventGroup + kind) ───────────────────────────
-  const { data: templates = [], isFetching: templatesFetching } = useQuery({
-    queryKey: ["strength-periodization-templates", eventGroup, kind],
-    queryFn: () =>
-      listStrengthPeriodizationTemplates({
-        eventGroup: eventGroup!,
-        kind: kind!,
-      }),
-    enabled: eventGroup != null && kind != null,
-  });
-  const template: StrengthPeriodizationTemplate | null = templates[0] ?? null;
+  // ── Labels des chips (préférer le label du catalogue, fallback statique) ──
+  const strokeLabelByKey = useMemo(() => {
+    const m = new Map<StrokeKey, string>();
+    for (const s of strokeSignatures) m.set(s.stroke_key, s.label);
+    return m;
+  }, [strokeSignatures]);
 
-  // Quand le template arrive, initialise `weeks` au milieu de la plage.
+  const distanceLabelByKey = useMemo(() => {
+    // Une distance a deux lignes (season + inter_competition) avec le même
+    // label ; on déduplique par clé pour la libellisation des chips.
+    const m = new Map<DistanceKey, string>();
+    for (const p of distanceProfiles) if (!m.has(p.distance_key)) m.set(p.distance_key, p.label);
+    return m;
+  }, [distanceProfiles]);
+
+  // Distances disponibles pour la nage choisie : 50/100/200 pour toutes, plus
+  // 400plus uniquement pour crawl et 4 nages. §305.
+  const availableDistances = useMemo<DistanceKey[]>(() => {
+    if (stroke == null) return [];
+    const base: DistanceKey[] = ["50", "100", "200"];
+    if (stroke === "freestyle" || stroke === "medley") base.push("400plus");
+    return DISTANCE_ORDER.filter((d) => base.includes(d));
+  }, [stroke]);
+
+  // ── Profil de distance courant (selon distance + kind) → bornes semaines ──
+  const distanceProfile = useMemo(
+    () =>
+      distance != null && kind != null
+        ? (distanceProfiles.find(
+            (p) => p.distance_key === distance && p.kind === kind,
+          ) ?? null)
+        : null,
+    [distanceProfiles, distance, kind],
+  );
+
+  // Quand le profil arrive, initialise `weeks` au milieu de la plage.
   useEffect(() => {
-    if (template && weeks == null) {
+    if (distanceProfile && weeks == null) {
       const mid = Math.round(
-        (template.min_week_count + template.max_week_count) / 2,
+        (distanceProfile.min_week_count + distanceProfile.max_week_count) / 2,
       );
       setWeeks(mid);
     }
-  }, [template, weeks]);
+  }, [distanceProfile, weeks]);
 
   // ── sessions_per_week — par défaut depuis l'évaluation ───────────────────
   useEffect(() => {
@@ -274,22 +320,31 @@ export default function MesocycleGeneration() {
 
   // ── Validation finale ────────────────────────────────────────────────────
   const canSubmit =
-    eventGroup != null &&
+    stroke != null &&
+    distance != null &&
     kind != null &&
-    template != null &&
+    distanceProfile != null &&
     weeks != null &&
-    weeks >= template.min_week_count &&
-    weeks <= template.max_week_count &&
+    weeks >= distanceProfile.min_week_count &&
+    weeks <= distanceProfile.max_week_count &&
     sessionsPerWeek != null &&
     sessionsPerWeek >= 1 &&
     sessionsPerWeek <= 7;
 
   function handleSubmit() {
-    if (!canSubmit || !template || weeks == null || sessionsPerWeek == null) return;
+    if (
+      !canSubmit ||
+      stroke == null ||
+      distance == null ||
+      kind == null ||
+      weeks == null ||
+      sessionsPerWeek == null
+    )
+      return;
     const payload = {
-      templateId: template.id,
-      eventGroup: template.event_group,
-      kind: template.kind,
+      stroke,
+      distance,
+      kind,
       targetWeekCount: weeks,
       sessionsPerWeek,
       startWeekMonday: startMondayIso,
@@ -333,50 +388,78 @@ export default function MesocycleGeneration() {
             </span>
           </div>
         )}
-        {/* ── Section 01 — Épreuve ciblée ──────────────────────────────── */}
+        {/* ── Section 01 — Nage ────────────────────────────────────────── */}
         <SectionCard
           number="01"
-          title="Épreuve ciblée"
-          subtitle="Sur quelle épreuve veux-tu construire ce cycle ?"
+          title="Nage"
+          subtitle="Quelle nage veux-tu travailler en priorité ?"
           enabled
-          active={eventGroup == null}
+          active={stroke == null}
         >
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {EVENT_GROUP_ORDER.filter((eg) => eventGroups.includes(eg)).map(
-              (eg) => {
-                const selected = eventGroup === eg;
-                return (
-                  <button
-                    key={eg}
-                    type="button"
-                    onClick={() => setEventGroup(eg)}
-                    className={cn(
-                      "min-h-[48px] rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
-                      selected
-                        ? "border-violet-600 bg-violet-600 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500"
-                        : "border-border bg-card hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30",
-                    )}
-                  >
-                    {EVENT_GROUP_LABELS[eg] ?? eg}
-                  </button>
-                );
-              },
-            )}
+            {STROKE_ORDER.map((sk) => {
+              const selected = stroke === sk;
+              return (
+                <button
+                  key={sk}
+                  type="button"
+                  onClick={() => setStroke(sk)}
+                  className={cn(
+                    "min-h-[48px] rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
+                    selected
+                      ? "border-violet-600 bg-violet-600 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500"
+                      : "border-border bg-card hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30",
+                  )}
+                >
+                  {strokeLabelByKey.get(sk) ?? STROKE_LABELS_FALLBACK[sk]}
+                </button>
+              );
+            })}
           </div>
-          {eventGroups.length === 0 && (
+          {!strokesLoading && strokeSignatures.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              Aucun template chargé — réessayer plus tard.
+              Catalogue de nages indisponible — réessayer plus tard.
             </p>
           )}
         </SectionCard>
 
-        {/* ── Section 02 — Famille de prépa ────────────────────────────── */}
+        {/* ── Section 02 — Épreuve (distance) ──────────────────────────── */}
         <SectionCard
           number="02"
+          title="Épreuve"
+          subtitle="Sur quelle distance veux-tu construire ce cycle ?"
+          enabled={stroke != null}
+          active={stroke != null && distance == null}
+        >
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {availableDistances.map((dk) => {
+              const selected = distance === dk;
+              return (
+                <button
+                  key={dk}
+                  type="button"
+                  onClick={() => setDistance(dk)}
+                  className={cn(
+                    "min-h-[48px] rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
+                    selected
+                      ? "border-violet-600 bg-violet-600 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500"
+                      : "border-border bg-card hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30",
+                  )}
+                >
+                  {distanceLabelByKey.get(dk) ?? DISTANCE_LABELS_FALLBACK[dk]}
+                </button>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        {/* ── Section 03 — Famille de prépa ────────────────────────────── */}
+        <SectionCard
+          number="03"
           title="Famille de prépa"
           subtitle="Long terme ou relance entre deux compétitions ?"
-          enabled={eventGroup != null}
-          active={eventGroup != null && kind == null}
+          enabled={stroke != null && distance != null}
+          active={stroke != null && distance != null && kind == null}
         >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {KIND_OPTIONS.map((opt) => {
@@ -418,29 +501,31 @@ export default function MesocycleGeneration() {
           </div>
         </SectionCard>
 
-        {/* ── Section 03 — Durée cible ─────────────────────────────────── */}
+        {/* ── Section 04 — Durée cible ─────────────────────────────────── */}
         <SectionCard
-          number="03"
+          number="04"
           title="Durée cible"
           subtitle={
-            template
-              ? `${template.name} · ${template.min_week_count}–${template.max_week_count} semaines`
+            distanceProfile
+              ? `${distanceProfile.min_week_count}–${distanceProfile.max_week_count} semaines`
               : "Choisis une famille de prépa pour voir la plage disponible."
           }
-          enabled={eventGroup != null && kind != null}
-          active={eventGroup != null && kind != null && weeks != null && sessionsPerWeek == null}
+          enabled={stroke != null && distance != null && kind != null}
+          active={
+            stroke != null &&
+            distance != null &&
+            kind != null &&
+            weeks != null &&
+            sessionsPerWeek == null
+          }
         >
-          {templatesFetching && (
-            <div className="h-24 animate-pulse rounded-xl bg-muted" />
-          )}
-
-          {template && weeks != null && (
+          {distanceProfile && weeks != null && (
             <>
               <DurationTapeMeasure
                 weeks={weeks}
                 onChange={setWeeks}
-                min={template.min_week_count}
-                max={template.max_week_count}
+                min={distanceProfile.min_week_count}
+                max={distanceProfile.max_week_count}
                 competitions={compsWithGap}
               />
 
@@ -459,8 +544,8 @@ export default function MesocycleGeneration() {
                 <ul className="space-y-2">
                   {compsWithGap.map(({ comp, weeks: gap }) => {
                     const inRange =
-                      gap >= template.min_week_count &&
-                      gap <= template.max_week_count;
+                      gap >= distanceProfile.min_week_count &&
+                      gap <= distanceProfile.max_week_count;
                     const isCurrent = weeks === gap;
                     return (
                       <li key={comp.id}>
@@ -535,17 +620,23 @@ export default function MesocycleGeneration() {
           )}
         </SectionCard>
 
-        {/* ── Section 04 — Séances / semaine ───────────────────────────── */}
+        {/* ── Section 05 — Séances / semaine ───────────────────────────── */}
         <SectionCard
-          number="04"
+          number="05"
           title="Séances par semaine"
           subtitle={
             assessment.sessions_per_week != null
               ? "Valeur de ton bilan, modifiable."
               : "Choisis ton rythme — modifiable plus tard avec ton coach."
           }
-          enabled={eventGroup != null && kind != null && weeks != null}
-          active={eventGroup != null && kind != null && weeks != null && sessionsPerWeek != null}
+          enabled={stroke != null && distance != null && kind != null && weeks != null}
+          active={
+            stroke != null &&
+            distance != null &&
+            kind != null &&
+            weeks != null &&
+            sessionsPerWeek != null
+          }
         >
           {sessionsPerWeek != null && (
             <SessionsCounter value={sessionsPerWeek} onChange={setSessionsPerWeek} />
@@ -553,14 +644,18 @@ export default function MesocycleGeneration() {
         </SectionCard>
 
         {/* ── Récap discret avant le CTA ───────────────────────────────── */}
-        {canSubmit && template && weeks != null && sessionsPerWeek != null && (
+        {canSubmit && stroke != null && distance != null && weeks != null && sessionsPerWeek != null && (
           <Card className="border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-700 dark:text-violet-300">
               Récap
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-violet-900 dark:text-violet-100">
-              <span className="font-bold">{template.name}</span> ·{" "}
-              <span className="tabular-nums">{weeks}</span> semaines ·{" "}
+              <span className="font-bold">
+                {strokeLabelByKey.get(stroke) ?? STROKE_LABELS_FALLBACK[stroke]}
+                {" · "}
+                {distanceLabelByKey.get(distance) ?? DISTANCE_LABELS_FALLBACK[distance]}
+              </span>{" "}
+              · <span className="tabular-nums">{weeks}</span> semaines ·{" "}
               <span className="tabular-nums">{sessionsPerWeek}</span> séances/sem.
             </p>
             <p className="mt-0.5 text-[11px] text-violet-700/80 dark:text-violet-300/80">
