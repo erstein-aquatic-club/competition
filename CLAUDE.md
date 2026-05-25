@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§313** — Seau tronc/core (R5) livré + déployé : 6ᵉ seau `core` (papillon ×1.40, non scoré façon mobilité — option a), 12 exos re-taggés, mig 00203/00204. `npm test` 1377+20, tsc 0, build 0. *(§312 — garde double-apply #5 ; §311 — audit + #1 withTimeout, #2 garde-fou §308, #4 profil `fond` mig 00202.)*
+Dernier § livré : **§314** — Bilan muscu hors-ligne (#3) Slice A : questionnaire + bilan physique branchés sur la file offline (`tryWithOfflineQueue`, replay idempotent) — coach plus bloqué au bord du bassin sous réseau coupé. Slice B (KPI append-only, mig idempotence 00205) à suivre. `npm test` 1377+20, tsc 0, build 0. *(§313 seau core R5 ; §312 garde double-apply #5 ; §311 audit + #1/#2/#4.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
