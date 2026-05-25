@@ -518,6 +518,29 @@ describe('prioritizeBuckets', () => {
 
     assert.equal(out[out.length - 1].bucket, 'psychology');
   });
+
+  // ── §R5 (DRAFT) — le core ne doit JAMAIS être priorisé (option a) ─────────────
+  it('core NON priorisé même avec emphase core forte (anti sur-priorisation null→0)', () => {
+    // scoreBuckets pose core:null. Si on l'incluait dans la priorisation, son
+    // emphase forte (0.84, papillon) × (100 − 0) = 84 le mettrait quasi rang 1 et
+    // volerait du volume focus. L'option (a) le tient hors classement.
+    const scores = scoreBuckets(makeAssessment(), [], makeAthlete());
+    assert.equal(scores.core, null); // jamais scoré
+    const template = makeTemplate({
+      lower_strength: 0.8,
+      lower_power: 0.85,
+      upper_strength: 0.9,
+      upper_power: 0.8,
+      mobility: 0.42,
+      core: 0.84, // papillon — la plus forte emphase de la matrice
+    });
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+
+    // Aucune entrée core dans le classement (toujours 6 seaux scorés, pas 7).
+    assert.equal(out.length, 6);
+    assert.ok(!out.some((p) => p.bucket === 'core'), 'core ne doit pas apparaître dans les priorités');
+  });
 });
 
 // ── allocateVolume ───────────────────────────────────────────────────────────
@@ -967,6 +990,8 @@ function richCatalog(): CatalogExercise[] {
     'upper_strength',
     'upper_power',
     'mobility',
+    // §R5 (DRAFT) — pool tronc, pour que le bloc core systématique ait des exos.
+    'core',
   ];
   let id = 1;
   for (const bucket of buckets) {
@@ -1137,6 +1162,56 @@ describe('generateMesocycle', () => {
         assert.ok(hasMobility, `S${week.weekNumber}-${session.sessionNumber} sans mobility`);
       }
     }
+  });
+
+  // ── §R5 (DRAFT) — bloc tronc systématique ─────────────────────────────────
+  it('bloc core inséré dans les séances de développement quand emphase core > 0', () => {
+    const input = fullInput();
+    // Template avec emphase core (comme composeTemplate la produirait post-00203).
+    input.template = makeTemplate({
+      lower_strength: 0.5,
+      lower_power: 1.0,
+      upper_strength: 0.5,
+      upper_power: 1.0,
+      mobility: 0.5,
+      core: 0.6,
+    });
+
+    const meso = generateMesocycle(input);
+
+    // Au moins une séance porte un exercice core + le tag bucket 'core'.
+    const devSessions = meso.weeks
+      .flatMap((w) => w.sessions)
+      .filter((s) => s.role === 'developpement');
+    assert.ok(devSessions.length > 0, 'au moins une séance de développement');
+    for (const s of devSessions) {
+      assert.ok(
+        s.exercises.some((e) => e.bucket === 'core'),
+        `séance dev sans exercice core (J${s.weekday})`,
+      );
+      assert.ok(s.buckets.includes('core'), 'tag bucket core manquant');
+    }
+    // Le core est chargé en contrôle (intention dédiée, charge légère, jamais 0 série).
+    const coreEx = meso.weeks
+      .flatMap((w) => w.sessions)
+      .flatMap((s) => s.exercises)
+      .find((e) => e.bucket === 'core');
+    assert.ok(coreEx, 'au moins un exercice core généré');
+    assert.ok(coreEx!.sets >= 1 && coreEx!.reps >= 1);
+    assert.ok(coreEx!.restSeconds <= 60, 'core chargé en endurance (repos court)');
+  });
+
+  it('AUCUN bloc core quand le template n’a pas d’emphase core (DB pré-migration)', () => {
+    // fullInput() utilise un template SANS clé core → coreEmphasis = 0.
+    const meso = generateMesocycle(fullInput());
+    const hasCore = meso.weeks
+      .flatMap((w) => w.sessions)
+      .flatMap((s) => s.exercises)
+      .some((e) => e.bucket === 'core');
+    assert.equal(hasCore, false, 'pas de bloc core sans emphase core (rétrocompat)');
+    // Et le core n'apparaît jamais dans les priorités/allocations.
+    assert.equal(meso.reasoning.bucketAllocations.length, 5);
+    assert.ok(!meso.reasoning.bucketPriorities.some((p) => p.bucket === 'core'));
   });
 
   // ── Vague C §293 — séances multi-bucket à la McEvoy ─────────────────────

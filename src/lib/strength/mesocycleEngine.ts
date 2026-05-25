@@ -118,6 +118,10 @@ function scorePsychology(
  * - `upper_power`    ← `medball_vertical_throw`
  * - `mobility`       ← `physical_tests` (bilan coach)
  * - `psychology`     ← `questionnaire.psychology`
+ * - `core`           ← **non scoré** (toujours `null`). Socle permanent sans KPI
+ *   dédié (cf. design R5 §2, option a). Tenu hors priorisation (`ALL_BUCKETS`)
+ *   pour ne PAS être sur-priorisé par `emphasis × (100 − 0)` ; inséré comme bloc
+ *   systématique à la place (cf. `buildSession`).
  */
 export function scoreBuckets(
   assessment: MesocycleInput['assessment'],
@@ -136,12 +140,21 @@ export function scoreBuckets(
     upper_power: scoreKpi('medball_vertical_throw', latest, athlete),
     mobility: scoreMobility(assessment.physical_tests),
     psychology: scorePsychology(assessment.questionnaire),
+    // core : pas de KPI (option a) → null. NON priorisé (hors ALL_BUCKETS).
+    core: null,
   };
 }
 
 // ── prioritizeBuckets ────────────────────────────────────────────────────────
 
-/** Tous les seaux dans un ordre stable (utilisé pour itérer et casser les égalités). */
+/**
+ * Seaux **priorisés** dans un ordre stable (itération + tie-break).
+ *
+ * §R5 — `core` est volontairement ABSENT : il n'est pas scoré (option a) et ne
+ * doit pas entrer dans `emphasis × (100 − score)` (sinon `null→0` le sur-priorise
+ * sur tout). Il est traité comme un bloc systématique en aval (`buildSession`),
+ * pas comme un seau prioritaire.
+ */
 const ALL_BUCKETS: AllBucket[] = [
   'lower_strength',
   'lower_power',
@@ -159,6 +172,7 @@ const BUCKET_LABEL_FR: Record<AllBucket, string> = {
   upper_power: 'Puissance haut du corps',
   mobility: 'Mobilité',
   psychology: 'Psychologie',
+  core: 'Tronc / gainage',
 };
 
 /**
@@ -633,6 +647,13 @@ function classifyRole(
 const MOBILITY_WARMUP_COUNT = 2;
 const PRIMARY_BLOCK_COUNT = 2;
 const COMPLEMENT_BLOCK_COUNT = 1;
+/**
+ * §R5 (DRAFT) — nombre d'exos tronc insérés par séance de développement quand le
+ * template porte une emphase core > 0. 1 partout pour l'instant ; le passage à 2
+ * sur fly/4N/dos-long (emphasis ≥ ~0.8) est une décision d'entraînement laissée
+ * en TODO coach (cf. design R5 §2 et §7).
+ */
+const CORE_BLOCK_COUNT = 1;
 /** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
  *  mobility), on cible jusqu'à 5 exercices mobility pour rester productive. */
 const MOBILITY_ONLY_COUNT = 5;
@@ -686,6 +707,26 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
     deriveStrokeKey(input.template.event_group),
   );
 
+  // §R5 (DRAFT) — sélection du pool `core`. Le core n'est ni scoré ni priorisé
+  // (option a) → absent de `bucketAllocations`. On le sélectionne via une
+  // allocation synthétique (rôle maintien, neutre) pour disposer d'un pool d'exos
+  // tronc filtré niveau + contre-indications, comme les autres seaux. Inséré
+  // comme bloc systématique par `buildSession` quand l'emphase core du template
+  // est > 0. Rétrocompat : tant que la DB n'a pas re-taggé d'exos `core`
+  // (migration 00204 non appliquée) ce pool est vide → aucun effet.
+  const coreSelected = selectExercises(
+    [{ bucket: 'core', sessionsPerWeek: 0, role: 'maintien' }],
+    input.exerciseCatalog,
+    input.athlete.level,
+    painZones,
+    deriveStrokeKey(input.template.event_group),
+  );
+  if (coreSelected.core) selected.core = coreSelected.core;
+
+  // §R5 — l'emphase core du template (0 si DB pré-migration) décide si on insère
+  // un bloc tronc systématique dans chaque séance de développement.
+  const coreEmphasis = input.template.structure.bucket_emphasis.core ?? 0;
+
   const periodizedWeeks = periodize(input.template, input.targetWeekCount);
 
   // §307 — résolution jour-aware : jours muscu + jours amorce PAP.
@@ -725,6 +766,7 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
       forceBiasRequired,
       mobilityOverrideActive,
       bucketPriorityOrder,
+      coreEmphasis,
     }),
   );
 
@@ -764,6 +806,8 @@ function buildWeek(
     forceBiasRequired: boolean;
     mobilityOverrideActive: boolean;
     bucketPriorityOrder: StrengthBucket[];
+    /** §R5 — emphase core du template (0 = pas de bloc tronc, ex. DB pré-migration). */
+    coreEmphasis: number;
   },
 ): MesocycleWeek {
   const slots = distributeSessionSlots(allocations, weekdays.length);
@@ -774,6 +818,7 @@ function buildWeek(
       forceBiasRequired: flags.forceBiasRequired,
       mobilityOverrideActive: flags.mobilityOverrideActive,
       bucketPriorityOrder: flags.bucketPriorityOrder,
+      coreEmphasis: flags.coreEmphasis,
     }),
   );
   return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
@@ -881,6 +926,12 @@ interface JourAwareContext {
   mobilityOverrideActive: boolean;
   /** Seaux entraînables ordonnés par priorité (focus puis maintien). §307. */
   bucketPriorityOrder: StrengthBucket[];
+  /**
+   * §R5 — emphase core du template (0 si DB pré-migration). Si > 0 et qu'un exo
+   * core admissible existe, un bloc tronc systématique est inséré dans la séance
+   * de développement (après le warmup, avant le bloc primaire).
+   */
+  coreEmphasis: number;
 }
 
 /**
@@ -957,16 +1008,29 @@ function buildSession(
       .slice(0, COMPLEMENT_BLOCK_COUNT)
       .map((s) => toMesocycleExercise(s, effectiveCycle, false));
 
-    // Ordre chronologique : warmup → primary → complement.
-    exercises = [...warmup, ...primaryBlock, ...complementBlock];
+    // §R5 (DRAFT) — bloc tronc systématique : inséré si le template porte une
+    // emphase core > 0 ET qu'un exo core admissible existe (pool non vide après
+    // filtres niveau/contre-indication). Chargé en endurance/contrôle (socle
+    // permanent, jamais en pic) via `buildCoreExercise`. Tant que la DB n'a pas
+    // de seau core (migration non appliquée), coreEmphasis = 0 → aucun bloc.
+    const corePool = selected.core ?? [];
+    const coreBlock =
+      ctx.coreEmphasis > 0
+        ? corePool.slice(0, CORE_BLOCK_COUNT).map((s) => buildCoreExercise(s))
+        : [];
+
+    // Ordre chronologique : warmup → primary → complement → core (gainage en fin
+    // de séance, n'entame pas la fraîcheur des blocs principaux).
+    exercises = [...warmup, ...primaryBlock, ...complementBlock, ...coreBlock];
 
     // Ordre des tags buckets : primary en tête (pour le nom de session côté
-    // RPC), puis complement, puis mobility.
+    // RPC), puis complement, puis mobility, puis core.
     buckets.push(primary);
     if (useComplement && complementBlock.length > 0) {
       buckets.push(complement as StrengthBucket);
     }
     if (warmup.length > 0) buckets.push('mobility');
+    if (coreBlock.length > 0) buckets.push('core');
   }
 
   return { sessionNumber, weekday, role, buckets, exercises };
@@ -1070,6 +1134,32 @@ function buildPapSession(
   }
 
   return { sessionNumber, weekday, role: 'amorce_pap', buckets, exercises };
+}
+
+/**
+ * §R5 (DRAFT) — charge un exercice du seau `core` (tronc / gainage).
+ *
+ * Le core est un **socle permanent** (cf. design R5 §4) : chargé en
+ * endurance/contrôle quelle que soit la semaine (jamais en pic/force max), comme
+ * la mobilité. On lit les colonnes `*_endurance` du catalogue (séries courtes,
+ * tenues), repos clampé à 60 s. Intention explicite « transfert/gainage ».
+ */
+function buildCoreExercise(selectedEx: SelectedExercise): MesocycleExercise {
+  const ex = selectedEx.exercise;
+  return {
+    exerciseId: ex.id,
+    nomExercice: ex.nomExercice,
+    bucket: 'core',
+    isCore: ex.isCore,
+    sets: ex.nbSeriesEndurance ?? 3,
+    reps: ex.nbRepsEndurance ?? 12,
+    intensityPct1rm: ex.pourcentageCharge1rmEndurance ?? 0,
+    restSeconds: Math.min(60, ex.recupSeriesEndurance ?? 45),
+    intention: 'Tronc / transfert — gainage contrôlé, anti-rotation, pas l’effort max.',
+    substituted: selectedEx.substituted,
+    originalExerciseId: selectedEx.originalExerciseId,
+    illustrationGif: ex.illustrationGif,
+  };
 }
 
 /** Centre d'un intervalle, arrondi à l'entier. */

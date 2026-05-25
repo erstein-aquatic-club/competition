@@ -1036,13 +1036,22 @@ export interface StrengthKpiMeasurement {
   created_at: string;
 }
 
-/** Les 5 seaux d'exercices entraînables (cf. dim_exercices.bucket). */
+/**
+ * Les 6 seaux d'exercices entraînables (cf. dim_exercices.bucket).
+ *
+ * §R5 (DRAFT 2026-05-26) — ajout de `core` (tronc : ondulation, rotation,
+ * gainage/streamline), jusqu'ici dispersé dans upper/lower_strength. Le core est
+ * un **socle permanent** (comme la mobilité) : il a des exercices et une emphase
+ * par nage×distance, mais reste **hors scoring KPI** (pas de KPI dédié — cf.
+ * docs/plans/2026-05-26-muscu-seau-core-r5-design.md §2, option a).
+ */
 export type StrengthBucket =
   | 'lower_strength'
   | 'lower_power'
   | 'upper_strength'
   | 'upper_power'
-  | 'mobility';
+  | 'mobility'
+  | 'core';
 
 /** Cycle d'une semaine de périodisation. 3 blocs (multi-semaines, le cœur du
  *  travail) et 3 transitions (semaine isolée). Vocabulaire validé par le coach

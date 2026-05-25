@@ -57,7 +57,10 @@ import { ZONE_LABEL_FR } from "@/lib/strength/zones";
 import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 import type { PeriodizationCycle } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
-import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
+import {
+  canGenerateMesocycle,
+  applyLikelySucceededDespiteError,
+} from "@/lib/strength/mesocycleGating";
 import { hasUnderLeveledProfile } from "@/lib/strength/strengthProfileMismatch";
 
 import { Button } from "@/components/ui/button";
@@ -103,6 +106,8 @@ const BUCKET_LABEL_FR: Record<AllBucket, string> = {
   upper_power: "Puissance haut du corps",
   mobility: "Mobilité",
   psychology: "Psychologie",
+  // §R5 — tronc/gainage : socle permanent, non scoré (cf. design R5 §2).
+  core: "Tronc / gainage",
 };
 
 const BUCKET_SHORT_FR: Record<AllBucket, string> = {
@@ -112,6 +117,7 @@ const BUCKET_SHORT_FR: Record<AllBucket, string> = {
   upper_power: "Puissance haut",
   mobility: "Mobilité",
   psychology: "Psycho",
+  core: "Tronc",
 };
 
 /** Libellés courts FR des 7 jours, indexés 0=Lun…6=Dim. §307. */
@@ -430,7 +436,28 @@ export default function MesocyclePreview() {
   }, [input]);
 
   // ── Mutation apply ───────────────────────────────────────────────────────
+  // Effets de bord post-application réussie (réutilisés par onSuccess ET par la
+  // récupération onError #5 : apply abouti côté serveur malgré une erreur réseau).
+  const finishApplied = (description: string) => {
+    try {
+      window.sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Ignore : sessionStorage peut être bloqué (private mode).
+    }
+    queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-active", effectiveAthleteId] });
+    queryClient.invalidateQueries({ queryKey: ["strength_planning_slot_overrides"] });
+    queryClient.invalidateQueries({ queryKey: ["strength_planning_week_overrides"] });
+    queryClient.invalidateQueries({ queryKey: ["strength_planning_slots"] });
+    toast.success("Mésocycle appliqué", { description });
+    // Mode coach → retour à la fiche nageur (onglet Planning) ; sinon /strength.
+    navigate(isCoachMode ? `/coach/swimmer/${effectiveAthleteId}` : "/strength");
+  };
+
   const applyMutation = useMutation({
+    // #5 (audit 2026-05-26) — on horodate le départ pour distinguer, en cas
+    // d'erreur réseau, un apply qui a abouti côté serveur (méso créé pendant la
+    // tentative) d'un échec franc.
+    onMutate: () => ({ startedAt: Date.now() }),
     mutationFn: async () => {
       if (!input || !generated || !params)
         throw new Error("Données incomplètes pour appliquer le mésocycle.");
@@ -438,30 +465,35 @@ export default function MesocyclePreview() {
       // gère la 1re semaine partielle).
       return applyMesocycle(input, generated, params.startDate);
     },
-    onSuccess: (mesocycleId) => {
-      // Nettoie le hand-off pour ne pas re-déclencher au prochain visit.
-      try {
-        window.sessionStorage.removeItem(SESSION_KEY);
-      } catch {
-        // Ignore : sessionStorage peut être bloqué (private mode).
-      }
-      queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-active", effectiveAthleteId] });
-      queryClient.invalidateQueries({ queryKey: ["strength_planning_slot_overrides"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_planning_week_overrides"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_planning_slots"] });
-      toast.success("Mésocycle appliqué", {
-        description: isCoachMode
+    onSuccess: () => {
+      finishApplied(
+        isCoachMode
           ? `${generated?.totalWeeks ?? "?"} semaines posées sur la planif de ${targetName ?? "ce nageur"}. Il a été notifié.`
           : `${generated?.totalWeeks ?? "?"} semaines posées sur ta planif muscu. Ton coach a été notifié.`,
-      });
-      // ID renvoyé par la RPC — utile pour debug, pas pour le routing.
-      void mesocycleId;
-      // Mode coach → retour à la fiche nageur (onglet Planning) ; sinon /strength.
-      navigate(isCoachMode ? `/coach/swimmer/${effectiveAthleteId}` : "/strength");
+      );
     },
-    onError: (err: unknown) => {
+    onError: async (err: unknown, _vars, context) => {
+      // #5 — garde double-apply : si la RPC a réussi côté serveur mais que le
+      // client a time-out, un méso actif créé PENDANT la tentative existe. On le
+      // re-lit et, le cas échéant, on traite comme un succès plutôt que d'inviter
+      // à recommencer (ce qui empilerait un méso superseded en doublon).
+      if (effectiveAthleteId != null && context?.startedAt != null) {
+        try {
+          const active = await getActiveMesocycle(effectiveAthleteId);
+          if (applyLikelySucceededDespiteError(context.startedAt, active?.created_at)) {
+            finishApplied(
+              "Le réseau a coupé pendant l'envoi, mais le plan a bien été enregistré. Vérifie ta planif.",
+            );
+            return;
+          }
+        } catch {
+          // Re-lecture impossible (toujours hors-ligne) → on retombe sur l'erreur.
+        }
+      }
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
-      toast.error("Impossible d'appliquer le mésocycle", { description: msg });
+      toast.error("Impossible d'appliquer le mésocycle", {
+        description: `${msg} — vérifie ta connexion, puis réessaie.`,
+      });
     },
   });
 
