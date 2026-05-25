@@ -28,7 +28,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, Loader2, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Check, Loader2, SlidersHorizontal } from "lucide-react";
+import {
+  hasUnderLeveledProfile,
+  RECOMMENDED_LEVEL_FOR_TIER,
+} from "@/lib/strength/strengthProfileMismatch";
 import { toast } from "sonner";
 
 type PracticeLevel = "beginner" | "intermediate" | "advanced";
@@ -107,6 +111,8 @@ export function StrengthAthleteProfileCard({
     practice_level: PracticeLevel;
     performance_tier: PerformanceTier;
   }) => mutation.mutate(next);
+
+  const underLeveled = hasUnderLeveledProfile(level, tier);
 
   return (
     <Card>
@@ -210,6 +216,33 @@ export function StrengthAthleteProfileCard({
                 barre aux niveaux supérieurs).
               </p>
             </div>
+
+            {underLeveled && (
+              <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="min-w-0 space-y-1.5 leading-tight">
+                  <p className="text-[11px]">
+                    Niveau «&nbsp;
+                    {PERFORMANCE_TIERS.find((t) => t.value === tier)?.label}&nbsp;» mais
+                    pratique «&nbsp;
+                    {PRACTICE_LEVELS.find((l) => l.value === level)?.label}&nbsp;» : les
+                    tractions lestées, l'haltérophilie et la pliométrie avancée ne seront
+                    pas proposées.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = RECOMMENDED_LEVEL_FOR_TIER[tier];
+                      setLevel(target);
+                      persist({ practice_level: target, performance_tier: tier });
+                    }}
+                    className="rounded-md border border-amber-400 bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 transition-colors hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100"
+                  >
+                    Aligner sur Confirmé
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </CardContent>
