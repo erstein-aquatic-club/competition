@@ -349,6 +349,27 @@ const LEVEL_ORDER: Record<'beginner' | 'intermediate' | 'advanced', number> = {
   advanced: 3,
 };
 
+/** Nages reconnues (préfixe des event_group composés `<nage>_<distance>`). */
+const KNOWN_STROKES = new Set([
+  'freestyle',
+  'butterfly',
+  'backstroke',
+  'breaststroke',
+  'medley',
+]);
+
+/**
+ * Dérive la nage ciblée depuis l'`event_group` composé (§305) — ex.
+ * `breaststroke_100` → `breaststroke`. Renvoie `null` pour les `event_group`
+ * legacy non préfixés par une nage connue (`sprint_50`, `200m`, …) → la passe
+ * de préférence préhab (§306 P2) reste alors inactive (dégradation gracieuse).
+ */
+function deriveStrokeKey(eventGroup: string | undefined | null): string | null {
+  if (!eventGroup) return null;
+  const prefix = eventGroup.split('_')[0];
+  return KNOWN_STROKES.has(prefix) ? prefix : null;
+}
+
 /**
  * Sélectionne, pour chaque seau alloué, les exercices du catalogue admissibles.
  *
@@ -375,9 +396,14 @@ export function selectExercises(
   exerciseCatalog: CatalogExercise[],
   athleteLevel: 'beginner' | 'intermediate' | 'advanced',
   painZones: string[],
+  strokeKey: string | null = null,
 ): Partial<Record<StrengthBucket, SelectedExercise[]>> {
   const athleteLevelNum = LEVEL_ORDER[athleteLevel];
   const painSet = new Set(painZones);
+
+  // §306 P2 — un exo dont l'affinité préhab contient la nage ciblée est préféré.
+  const matchesStroke = (e: CatalogExercise): boolean =>
+    strokeKey !== null && e.strokePrehabAffinity.includes(strokeKey);
 
   const isContraindicated = (ex: CatalogExercise): boolean =>
     ex.contraindicationZones.some((z) => painSet.has(z));
@@ -396,9 +422,14 @@ export function selectExercises(
     const safe = inLevel.filter((e) => !isContraindicated(e));
     const excludedCores = inLevel.filter((e) => e.isCore && isContraindicated(e));
 
-    // Tri : core en premier, puis niveau décroissant (intermediate > beginner > null).
+    // Tri : core d'abord (force préservée) ; puis (§306 P2) affinité préhab nage
+    // avant les autres non-cores ; puis niveau décroissant (intermediate >
+    // beginner > null). L'affinité ne déloge jamais un core.
     const ordered = safe.slice().sort((a, b) => {
       if (a.isCore !== b.isCore) return a.isCore ? -1 : 1;
+      const am = matchesStroke(a);
+      const bm = matchesStroke(b);
+      if (am !== bm) return am ? -1 : 1;
       const al = a.level ? LEVEL_ORDER[a.level] : 0;
       const bl = b.level ? LEVEL_ORDER[b.level] : 0;
       return bl - al;
@@ -579,6 +610,7 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
     input.exerciseCatalog,
     input.athlete.level,
     painZones,
+    deriveStrokeKey(input.template.event_group),
   );
 
   const periodizedWeeks = periodize(input.template, input.targetWeekCount);

@@ -754,6 +754,26 @@ describe('selectExercises', () => {
     assert.ok(ids.includes(2), 'l’exo sans contre-indication doit rester');
   });
 
+  it('§306 P2 — affinité nage : un non-core affinité passe devant les autres non-cores, sans déloger un core', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, bucket: 'lower_strength', isCore: false, level: 'beginner' }),
+      makeExercise({ id: 2, bucket: 'lower_strength', isCore: false, level: 'beginner', strokePrehabAffinity: ['breaststroke'] }),
+      makeExercise({ id: 3, bucket: 'lower_strength', isCore: true, level: 'beginner' }),
+    ];
+
+    // brasse : core (3) d'abord, puis l'affinité non-core (2), puis le non-core ordinaire (1).
+    const breast = selectExercises(allocFor(['lower_strength']), catalog, 'advanced', [], 'breaststroke');
+    assert.deepEqual(breast.lower_strength!.map((s) => s.exercise.id), [3, 2, 1]);
+
+    // crawl : aucune affinité → ordre stable (core 3, puis 1, 2 dans l'ordre du catalogue).
+    const free = selectExercises(allocFor(['lower_strength']), catalog, 'advanced', [], 'freestyle');
+    assert.deepEqual(free.lower_strength!.map((s) => s.exercise.id), [3, 1, 2]);
+
+    // sans strokeKey : comportement inchangé (rétro-compatible).
+    const none = selectExercises(allocFor(['lower_strength']), catalog, 'advanced', []);
+    assert.deepEqual(none.lower_strength!.map((s) => s.exercise.id), [3, 1, 2]);
+  });
+
   it('trie : exercices core en premier, puis level décroissant', () => {
     const catalog: CatalogExercise[] = [
       makeExercise({ id: 1, isCore: false, level: 'intermediate' }),
