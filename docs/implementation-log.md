@@ -4,6 +4,26 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §306 — Préhab ciblée par nage — Phase 2 (préhab proactif event-aware) (2026-05-25)
+
+**Branche** : `main`. **Suite de la Phase 1.** Couche « élite » proactive : préférer les exos préhab spécifiques à la nage ciblée (V1 brasse → adducteurs), là où `selectExercises` n'était pas event-aware.
+
+### Changements
+- **Migration `00198_stroke_prehab_affinity.sql`** (MCP) : `ALTER TABLE dim_exercices ADD COLUMN IF NOT EXISTS stroke_prehab_affinity text[]` + tag `{breaststroke}` sur 58 Copenhague, 37 Fente latérale, 33 Squat bulgare. Nullable, idempotent. Vérifiée `SELECT`.
+- **`src/lib/strength/mesocycleEngine.types.ts`** : `CatalogExercise.strokePrehabAffinity: string[]` (champ requis, cohérent avec `contraindicationZones`).
+- **`src/lib/api/strength-catalog.ts`** : `DbRow.stroke_prehab_affinity` + colonne ajoutée au `SELECT` explicite + `mapRow` (`?? []`).
+- **`src/lib/strength/mesocycleEngine.ts`** : `selectExercises(…, strokeKey: string | null = null)` — après le tri `isCore`, une **passe de préférence** remonte les exos dont `strokePrehabAffinity` contient `strokeKey` **au-dessus des non-cores ordinaires**, sans jamais déloger un core de force. Helper `deriveStrokeKey(event_group)` (`breaststroke_100` → `breaststroke` ; legacy non préfixé → `null` → passe inactive) ; `generateMesocycle` le câble.
+
+### Tests / vérifs
+- **+1 cas** `mesocycleEngine.test.ts` : affinité brasse → non-core affinité avant les autres non-cores ; crawl/sans strokeKey → ordre inchangé ; core jamais délogé.
+- `npm test` : **node:test 1343/1343 + vitest 20/20**, fail 0. `npx tsc --noEmit` exit 0. **Pas de `test:rls`** (données/colonne + tri pur, aucune policy ni logique d'autorisation).
+- **Mapping `mapRow` non testé unitairement** (aucun harness `strength-catalog` existant ; mock supabase = net-new lourd pour un champ trivialement câblé) → couvert par `tsc` (type requis traversant `DbRow → mapRow → CatalogExercise`) + le test comportemental moteur.
+
+### Décisions / limites
+- **Préférence, pas garantie d'inclusion** : la passe remonte l'exo dans le pool ; il entre dans le bloc primaire (2 exos) seulement si peu de cores le précèdent ou si un core est exclu (contre-indication). Surfacer un préhab *en plus* des lifts principaux exigerait un slot dédié dans `buildSession` (hors périmètre, plus invasif).
+- **Affinité = choix coach** (V1 brasse 58/37/33 ; extensible coiffe/épaule → crawl/fly/dos). À valider, réversible.
+- **§306 complet** (Phase 1 défensif + Phase 2 proactif). Restes audit hors §306 : R3 dos `lower_strength`, R4 profil fond, R5 seau tronc/core, R6 nudge `upper_power` 100 m.
+
 ## §306 — Préhab ciblée par nage — Phase 1 (défensif : zone aine déclarable) (2026-05-25)
 
 **Branche** : `main`.
