@@ -1,10 +1,10 @@
 /**
- * bilanProgress — état du « fil conducteur » du bilan muscu coach (§302).
+ * bilanProgress — état du « fil conducteur » du bilan muscu coach (§302/§A).
  *
- * Donne, pour les 3 étapes (questionnaire / KPIs / bilan physique), un état
- * `done` | `current` | `todo` dérivé du statut de l'assessment et de la
- * présence de mesures KPI. Les KPIs sont **indépendants** du statut (ils
- * peuvent être saisis à tout moment) : ils n'ont donc pas d'état `current`.
+ * Donne, pour les 4 étapes (questionnaire / KPIs / bilan physique / génération),
+ * un état `done` | `current` | `todo` dérivé du statut de l'assessment et de la
+ * présence de mesures KPI (+ méso actif pour la 4e étape). Les KPIs sont
+ * **indépendants** du statut (ils peuvent être saisis à tout moment).
  */
 import type { StrengthAssessment } from "@/lib/api/types";
 
@@ -14,6 +14,7 @@ export interface BilanProgressState {
   questionnaire: StepState;
   kpis: StepState;
   physical: StepState;
+  generation: StepState;
 }
 
 export type BilanStepKey =
@@ -42,6 +43,7 @@ export function nextBilanStep(
 export function computeBilanProgress(
   status: Status,
   hasKpis: boolean,
+  hasActiveMesocycle = false,
 ): BilanProgressState {
   const questionnaire: StepState =
     status === "questionnaire_pending"
@@ -60,5 +62,12 @@ export function computeBilanProgress(
   // Les KPIs sont indépendants du statut de l'assessment.
   const kpis: StepState = hasKpis ? "done" : "todo";
 
-  return { questionnaire, kpis, physical };
+  const generation: StepState =
+    status === "completed"
+      ? hasActiveMesocycle
+        ? "done"
+        : "current"
+      : "todo";
+
+  return { questionnaire, kpis, physical, generation };
 }

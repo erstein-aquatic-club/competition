@@ -2,14 +2,16 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { computeBilanProgress, nextBilanStep } from '../bilanProgress.ts';
 
-// §302 — fil conducteur coach : état des 3 étapes (questionnaire / KPIs /
-// bilan physique) dérivé du statut de l'assessment + présence de KPIs.
+// §302 — fil conducteur coach : état des 4 étapes (questionnaire / KPIs /
+// bilan physique / génération) dérivé du statut de l'assessment et de la
+// présence de mesures KPI (+ méso actif pour la 4e étape).
 describe('computeBilanProgress', () => {
   it('aucun bilan : tout à faire', () => {
     assert.deepEqual(computeBilanProgress(null, false), {
       questionnaire: 'todo',
       kpis: 'todo',
       physical: 'todo',
+      generation: 'todo',
     });
   });
 
@@ -18,6 +20,7 @@ describe('computeBilanProgress', () => {
       questionnaire: 'current',
       kpis: 'todo',
       physical: 'todo',
+      generation: 'todo',
     });
   });
 
@@ -26,6 +29,7 @@ describe('computeBilanProgress', () => {
       questionnaire: 'done',
       kpis: 'done',
       physical: 'current',
+      generation: 'todo',
     });
   });
 
@@ -34,15 +38,23 @@ describe('computeBilanProgress', () => {
       questionnaire: 'done',
       kpis: 'todo',
       physical: 'current',
+      generation: 'todo',
     });
   });
 
-  it('completed + KPIs : tout fait', () => {
+  it('completed + KPIs : physique fait, génération en cours (pas de méso actif)', () => {
     assert.deepEqual(computeBilanProgress('completed', true), {
       questionnaire: 'done',
       kpis: 'done',
       physical: 'done',
+      generation: 'current',
     });
+  });
+
+  it("computeBilanProgress expose l'étape génération", () => {
+    assert.equal(computeBilanProgress('bilan_pending', true).generation, 'todo');
+    assert.equal(computeBilanProgress('completed', true).generation, 'current');
+    assert.equal(computeBilanProgress('completed', true, true).generation, 'done');
   });
 });
 
