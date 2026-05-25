@@ -18717,3 +18717,32 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 - `isProfileComplete` extrait dans `bilanProgress.ts` (partageable avec `MesocyclePreview`).
 - L'illustration ROM utilise des angles calibrés par score (non mesurés directement) ; la valeur en degrés est indicative, pas la mesure réelle du nageur.
 - Axe `scapula_control` et `trunk_neck_alignment` (qualitatifs) : barre de stabilité 4 segments à la place de l'arc (pas d'angle de référence publié).
+
+## §311 — Audit robustesse/perf/élite + 3 correctifs (withTimeout apply/revert, garde-fou remplacement §308, profil fond R4) (2026-05-26)
+
+**Contexte.** Audit transversal lecture-seule de la génération de plans muscu + mesure du bilan (`docs/audits/2026-05-26-audit-robustesse-perf-elite-edition.md`), 4 axes : robustesse (dont réseau) / UI-UX / cohérence élite / éditabilité. Verdict : élite **largement fermée** (R1/R2/R3/R6 de l'audit matrice ont landé — vérifié en base : `00196` papillon UP/MOB ×1.35, `00197` aine brasse, `00199` dos LS 0.95 + 100m UP 0.65). 4 fragilités réelles restantes : bilan Supabase-only hors-ligne, écrasement §308 silencieux, `apply`/`revert` non bornés, régression fond ≥800 (R4) + absence de seau core (R5). 3 correctifs validés par le coach (François) appliqués ci-dessous (#1, #2, #4) ; #3 (file offline bilan) et #5/#6 (core, double-apply) différés.
+
+**#1 — Borne réseau `applyMesocycle` / `revertMesocycle` (invariant §298).** Les 2 RPC étaient des `await supabase.rpc(...)` bruts (pas de `withTimeout`) → sur connexion coupée au bord du bassin, spinner potentiellement infini.
+- `src/lib/api/strength-mesocycles.ts` : `apply` → `withTimeout(..., 30_000, 'apply_strength_mesocycle')` (RPC longue : matérialise N semaines) ; `revert` → `withTimeout(..., 15_000, 'revert_strength_mesocycle')`. Import `withTimeout` ajouté.
+- TDD `src/lib/api/__tests__/strength-mesocycles.test.ts` : override `withTimeout` 80 ms dans le mock (pattern `reconcileTimeout.test.ts`) ; 2 tests RED→GREEN (« rejette (timeout) si la RPC ne répond jamais ») pour apply et revert. RED vérifié sur fichier seul avec `--test-timeout=8000` (le hang devient échec, pas freeze).
+
+**#2 — Garde-fou remplacement §308 (UI, `/frontend-design`).** Re-générer purge le plan (et les édits coach manuels) à partir de la date de départ (comportement voulu §308) mais **aucun écran ne le signalait** (« Régénérer » de `CoachMesocyclePanel` navigue direct, aperçu muet).
+- `src/pages/MesocyclePreview.tsx` : query `getActiveMesocycle(effectiveAthleteId)` + prop `replacePlan` passée à `ReasoningPanel` → `NoteStrip` ambre (réutilise le primitif banner existant) « Remplace le plan en cours » quand un méso actif existe, juste au-dessus du CTA de confirmation. Affiche l'épreuve/kind/durée du plan actif + « remplacé à partir du {date}, ajustements manuels perdus (récupérables via Annuler), séances passées conservées ». Couvre tous les chemins (coach régen, nageur régen, deeplink). Pas de blocage dur (régen souvent intentionnelle) — visibilité au point de décision.
+
+**#4 — Profil de distance `fond` (≥ 800 m, demi-fond) — R4.** `400plus` servait 400/800/1500 avec la même emphase « 400 m » (LP 0.60 trop haut, MOB 0.80 trop bas pour le fond pur).
+- `supabase/migrations/00202_distance_profile_fond.sql` (NOUVEAU, appliqué via MCP) : élargit le CHECK `distance_key` à `fond` ; relabel `400plus` → « 400 m » ; INSERT `fond` season + inter_competition, emphase demi-fond historique `{LS .75, LP .40, US 1.0, UP .45, MOB 1.0}`. Arc season : base aérobie longue + force-économie, **sans bloc puissance balistique**, affûtage + pic conservés (Σmin 9 = min_wc, Σmax 20 = max_wc) ; inter_competition : maintien→force_max→affûtage→pic (5-8 sem.). Idempotent (`ON CONFLICT`). Aucune RLS touchée.
+- `src/lib/strength/mesocycleEngine.types.ts` : `DistanceKey += 'fond'`. `src/lib/strength/mesocycleEngine.ts` : `KNOWN_DISTANCES += 'fond'` (fond ∉ `FORCE_BIAS_DISTANCES` → pas de biais force, correct pour l'aérobie).
+- `src/pages/MesocycleGeneration.tsx` : `DISTANCE_ORDER += 'fond'`, label « 800 m / 1500 m » (et `400plus` → « 400 m »), `availableDistances` expose `fond` pour le **crawl uniquement** (épreuves LCM de fond).
+- `composeTemplate.test.ts` : regression guard « crawl × fond → emphase demi-fond, distincte du 400 m » (invariant fond.LP < 400plus.LP & fond.MOB > 400plus.MOB).
+
+**Tests / vérifs :**
+- `npx tsc --noEmit` — **0** ✅
+- `npm test` — **1365/1365 node:test** (+3 : 2 timeout apply/revert, 1 fond composeTemplate) **+ 20/20 vitest** ✅
+- `npm run build` — OK (precache 277) ✅
+- Pas de `test:rls` : `00202` = relâchement de CHECK + seed de table de référence, **aucune policy/RLS/helper auth** touché (critères CLAUDE.md non remplis).
+- Smoke prod (MCP) : `strength_distance_profiles` contient bien `fond` season (9-20 sem.) + inter_competition (5-8 sem.) avec l'emphase demi-fond ; `400plus` relabelisé « 400 m ».
+
+**Décisions / limites :**
+- Garde-fou §308 = **bannière** (soft), pas un blocage : la régénération reste fluide pour le cas courant (intentionnel) ; la conséquence est rendue visible au point de décision. Un blocage dur (acquittement explicite) jugé sur-contraignant.
+- `fond` exposé **crawl uniquement** (800/1500 = épreuves freestyle LCM ; 400 4N reste sur `400plus`). Pas de seau core (R5) ni file offline bilan (#3) ni garde double-apply (#5) — différés, documentés dans l'audit.
+- Valeurs `fond` = template demi-fond historique (sourcé audit matrice) ; arc sans puissance balistique = choix défendable pour un 1500 (validé coach), ajustable par migration ultérieure.

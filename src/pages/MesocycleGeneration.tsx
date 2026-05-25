@@ -85,8 +85,8 @@ const STROKE_ORDER: StrokeKey[] = [
   "medley",
 ];
 
-/** Ordre stable d'affichage des distances (du sprint vers le fond). §305. */
-const DISTANCE_ORDER: DistanceKey[] = ["50", "100", "200", "400plus"];
+/** Ordre stable d'affichage des distances (du sprint vers le fond). §305 ; +`fond` (R4). */
+const DISTANCE_ORDER: DistanceKey[] = ["50", "100", "200", "400plus", "fond"];
 
 /** Labels FR de secours si une ligne du catalogue manque (préférer `row.label`). */
 const STROKE_LABELS_FALLBACK: Record<StrokeKey, string> = {
@@ -100,7 +100,8 @@ const DISTANCE_LABELS_FALLBACK: Record<DistanceKey, string> = {
   "50": "50 m",
   "100": "100 m",
   "200": "200 m",
-  "400plus": "400 m +",
+  "400plus": "400 m",
+  fond: "800 m / 1500 m",
 };
 
 /** Clé sessionStorage pour le hand-off vers l'écran d'aperçu. */
@@ -332,12 +333,14 @@ export default function MesocycleGeneration() {
     return m;
   }, [distanceProfiles]);
 
-  // Distances disponibles pour la nage choisie : 50/100/200 pour toutes, plus
-  // 400plus uniquement pour crawl et 4 nages. §305.
+  // Distances disponibles pour la nage choisie : 50/100/200 pour toutes ;
+  // 400plus pour crawl et 4 nages (400 NL + 400 4N) ; `fond` (800/1500)
+  // uniquement crawl — épreuves LCM de fond (R4, audit 2026-05-26). §305.
   const availableDistances = useMemo<DistanceKey[]>(() => {
     if (stroke == null) return [];
     const base: DistanceKey[] = ["50", "100", "200"];
     if (stroke === "freestyle" || stroke === "medley") base.push("400plus");
+    if (stroke === "freestyle") base.push("fond");
     return DISTANCE_ORDER.filter((d) => base.includes(d));
   }, [stroke]);
 

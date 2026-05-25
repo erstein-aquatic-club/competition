@@ -15,6 +15,15 @@ before(async () => {
     namedExports: {
       ...real,
       canUseSupabase: () => true,
+      // Audit 2026-05-26 — withTimeout borné à 80 ms pour tester vite la borne
+      // réseau de apply/revert (sinon le défaut prod 30 s/15 s gèlerait la suite).
+      withTimeout: <T>(promise: PromiseLike<T>, _ms: number, label = 'rpc'): Promise<T> =>
+        Promise.race([
+          promise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`${label}: timeout after 80ms`)), 80),
+          ),
+        ]),
       supabase: {
         from: (...args: unknown[]) => fromImpl(...args),
         rpc: (...args: unknown[]) => rpcImpl(...args),
@@ -290,6 +299,25 @@ describe('applyMesocycle', () => {
   });
 });
 
+// ── applyMesocycle : borne réseau (audit 2026-05-26) ──────────────────────
+
+describe('applyMesocycle — borne réseau', () => {
+  it('rejette (timeout) si la RPC ne répond jamais — pas de spinner infini', async () => {
+    const { generateMesocyclePreview, applyMesocycle } = await import('../strength-mesocycles.ts');
+    const input = makeMinimalInput();
+    const generated = generateMesocyclePreview(input);
+
+    // RPC qui ne se résout/rejette jamais : sans withTimeout, l'await pendrait
+    // indéfiniment (spinner infini au bord du bassin sur connexion coupée).
+    rpcImpl = () => new Promise(() => {/* hangs forever */});
+
+    await assert.rejects(
+      () => applyMesocycle(input, generated, '2026-06-01'),
+      /timeout/i,
+    );
+  });
+});
+
 // ── revertMesocycle ──────────────────────────────────────────────────────
 
 describe('revertMesocycle', () => {
@@ -316,6 +344,16 @@ describe('revertMesocycle', () => {
       Promise.resolve({ data: null, error: { message: 'only active can be reverted' } });
 
     await assert.rejects(() => revertMesocycle('uuid'), /only active/i);
+  });
+
+  it('rejette (timeout) si la RPC ne répond jamais — borne réseau (audit 2026-05-26)', async () => {
+    const { revertMesocycle } = await import('../strength-mesocycles.ts');
+    rpcImpl = () => new Promise(() => {/* hangs forever */});
+
+    await assert.rejects(
+      () => revertMesocycle('d0000000-0000-0000-0000-000000000099'),
+      /timeout/i,
+    );
   });
 });
 

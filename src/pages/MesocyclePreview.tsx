@@ -26,6 +26,7 @@ import { toast } from "sonner";
 
 import {
   applyMesocycle,
+  getActiveMesocycle,
   getAthletes,
   generateMesocyclePreview,
   getLatestAssessment,
@@ -300,6 +301,16 @@ export default function MesocyclePreview() {
     enabled: effectiveAthleteId != null,
   });
 
+  // Audit 2026-05-26 (§308 ↔ édition) — un mésocycle actif existe-t-il déjà ?
+  // Si oui, confirmer cet aperçu REMPLACE le plan en cours à partir de la date
+  // de départ (purge §308) → les ajustements manuels du coach sur cette fenêtre
+  // sont perdus (récupérables par « Annuler »). On le signale explicitement.
+  const { data: existingActiveMesocycle } = useQuery({
+    queryKey: ["strength-mesocycle-active", effectiveAthleteId],
+    queryFn: () => getActiveMesocycle(effectiveAthleteId!),
+    enabled: effectiveAthleteId != null,
+  });
+
   // Nom du nageur ciblé (mode coach) — en-tête de cible non ambigu.
   const { data: previewAthletes } = useQuery({
     queryKey: ["athletes"],
@@ -533,6 +544,17 @@ export default function MesocyclePreview() {
             level: input.athlete.level,
             performanceTier: input.athlete.performanceTier,
           }}
+          replacePlan={
+            existingActiveMesocycle
+              ? {
+                  eventGroup: existingActiveMesocycle.event_group,
+                  kind: existingActiveMesocycle.kind,
+                  weeks: existingActiveMesocycle.target_week_count,
+                  startDateIso: params.startDate,
+                  isCoach: isCoachMode,
+                }
+              : null
+          }
         />
         <PlanPanel generated={generated} startDateIso={params.startDate} />
       </div>
@@ -610,6 +632,7 @@ function ReasoningPanel({
   generated,
   bilanPending,
   normesContext,
+  replacePlan,
 }: {
   generated: GeneratedMesocycle;
   bilanPending: boolean;
@@ -618,6 +641,15 @@ function ReasoningPanel({
     level: MesocycleInput["athlete"]["level"];
     performanceTier: MesocycleInput["athlete"]["performanceTier"];
   };
+  /** Audit 2026-05-26 (§308) — plan actif qui sera remplacé par cet apply,
+   *  ou `null` si aucun (1re génération). */
+  replacePlan: {
+    eventGroup: string;
+    kind: string;
+    weeks: number;
+    startDateIso: string;
+    isCoach: boolean;
+  } | null;
 }) {
   const [open, setOpen] = useState(true);
   const reasoning = generated.reasoning;
@@ -722,6 +754,14 @@ function ReasoningPanel({
           </div>
 
           {/* Notes additionnelles */}
+          {replacePlan && (
+            <NoteStrip
+              tone="amber"
+              icon={<RefreshCw className="h-4 w-4" />}
+              title="Remplace le plan en cours"
+              body={`${replacePlan.isCoach ? "Ce nageur a" : "Tu as"} déjà un mésocycle actif (${replacePlan.eventGroup} · ${replacePlan.kind === "season" ? "Saison" : "Mini-prépa"}, ${replacePlan.weeks} sem.). Confirmer le remplace à partir du ${fmtShortDate(replacePlan.startDateIso)} — les ajustements manuels de cette période seront perdus (récupérables via « Annuler le mésocycle »). Les séances déjà passées avant cette date sont conservées.`}
+            />
+          )}
           {reasoning.psychFlag && (
             <NoteStrip
               tone="amber"

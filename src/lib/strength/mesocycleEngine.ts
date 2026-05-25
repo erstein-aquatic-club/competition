@@ -564,8 +564,8 @@ const FORCE_BIAS_SCORE_THRESHOLD = 60;
 /** Distances qui imposent un biais force (sprint, où la force prime). §307. */
 const FORCE_BIAS_DISTANCES = new Set<string>(['50', '100']);
 
-/** Distances reconnues du suffixe `<nage>_<distance>` (§305). */
-const KNOWN_DISTANCES = new Set(['50', '100', '200', '400plus']);
+/** Distances reconnues du suffixe `<nage>_<distance>` (§305 ; +`fond` audit R4). */
+const KNOWN_DISTANCES = new Set(['50', '100', '200', '400plus', 'fond']);
 
 /**
  * Dose d'une amorce PAP (§307) — le « dimensionnement » qui doit laisser le

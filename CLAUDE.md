@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§A (§310)** — Flux bilan coach unifié + illustrations ROM animées. `nextBilanStep()` + `useBilanSteps` hook DRY + "Continuer →" à chaque étape + CTA "Démarrer/Reprendre" depuis page nageur + arcs SVG ROM par axe. `npm test` 1362+20, tsc 0, build 0.
+Dernier § livré : **§311** — Audit robustesse/perf/élite + 3 correctifs : `withTimeout` sur apply/revert, garde-fou remplacement §308 (bannière aperçu), profil distance `fond` ≥800m (R4, mig 00202). `npm test` 1365+20, tsc 0, build 0.
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

@@ -88,9 +88,20 @@ const BREASTSTROKE = sig('breaststroke', 'Brasse', BREAST_MULT);
 const BACKSTROKE = sig('backstroke', 'Dos', DOS_MULT);
 const MEDLEY = sig('medley', '4 nages', MEDLEY_MULT);
 
+// Audit 2026-05-26 (R4) — emphase demi-fond (≥ 800 m), distincte du 400 m.
+// Rétablit l'ancien template demi-fond : moins de puissance jambes, préhab max.
+const EFOND: Record<StrengthBucket, number> = {
+  lower_strength: 0.75,
+  lower_power: 0.4,
+  upper_strength: 1.0,
+  upper_power: 0.45,
+  mobility: 1.0,
+};
+
 const D50 = profile('50', '50m', E50);
 const D200 = profile('200', '200m', E200);
-const D400 = profile('400plus', '400m+', E400);
+const D400 = profile('400plus', '400m', E400);
+const DFOND = profile('fond', '800 m / 1500 m', EFOND);
 
 // Tolérance : emphase composée à ±0.01 (arrondi 2 décimales + clamp).
 const TOL = 0.01;
@@ -173,6 +184,24 @@ describe('composeTemplate — reproductions de calibration (§305)', () => {
       upper_power: 0.8,
       mobility: 0.8,
     });
+  });
+
+  // Audit 2026-05-26 (R4) — le fond doit composer une emphase demi-fond, PAS
+  // celle du 400 m : moins de lower_power, mobilité (préhab) au maximum.
+  it('crawl × fond → emphase demi-fond, distincte du 400 m', () => {
+    const t = composeTemplate(DFOND, FREESTYLE, 'season');
+    closeBuckets(t.structure.bucket_emphasis as Record<StrengthBucket, number>, {
+      lower_strength: 0.75,
+      lower_power: 0.4,
+      upper_strength: 1.0,
+      upper_power: 0.45,
+      mobility: 1.0,
+    });
+    assert.equal(t.event_group, 'freestyle_fond');
+    // Invariant R4 : fond ≠ 400plus (sinon la régression fond est ré-introduite).
+    const fond = t.structure.bucket_emphasis as Record<StrengthBucket, number>;
+    assert.ok(fond.lower_power < E400.lower_power, 'fond doit avoir moins de lower_power que 400plus');
+    assert.ok(fond.mobility > E400.mobility, 'fond doit avoir plus de mobilité que 400plus');
   });
 });
 

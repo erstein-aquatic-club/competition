@@ -378,7 +378,10 @@ export interface MesocycleInput {
 // ── Taxonomie nage × distance (§305) ─────────────────────────────────────────
 
 export type StrokeKey = 'freestyle' | 'butterfly' | 'backstroke' | 'breaststroke' | 'medley';
-export type DistanceKey = '50' | '100' | '200' | '400plus';
+// Audit 2026-05-26 (R4) — `fond` (≥ 800 m, demi-fond) séparé de `400plus`
+// (le 400/800/1500 partageaient l'emphase 400 m : trop de puissance, pas assez
+// de préhab pour le fond pur). Voir migration 00202.
+export type DistanceKey = '50' | '100' | '200' | '400plus' | 'fond';
 
 /** Multiplicateur par seau d'une nage vs crawl (crawl ≡ 1.0). §305. */
 export interface StrokeSignature {

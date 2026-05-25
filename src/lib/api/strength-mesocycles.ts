@@ -14,7 +14,7 @@
  *      RPC matérialise + retourne l'UUID du mésocycle persisté.
  *   4. Coach (ou nageur) peut appeler `revertMesocycle(id)` pour annuler.
  */
-import { supabase, canUseSupabase, assertSupabase } from './client';
+import { supabase, canUseSupabase, assertSupabase, withTimeout } from './client';
 import { getMonday, toISODate } from '@/lib/date';
 import {
   generateMesocycle as runEngine,
@@ -140,23 +140,31 @@ export async function applyMesocycle(
 ): Promise<string> {
   if (!canUseSupabase()) throw new Error('Supabase not available');
 
+  // Audit 2026-05-26 — borne réseau (invariant §298 : tout await apply/revert
+  // doit être `withTimeout`-borné). Sans ça, une RPC qui traîne sur connexion
+  // coupée (bord du bassin) pendait le spinner indéfiniment. 30 s : l'apply
+  // matérialise N semaines (RPC potentiellement longue), borne généreuse.
   const data = assertSupabase(
-    await supabase.rpc('apply_strength_mesocycle', {
-      p_athlete_id: input.assessment.athlete_id,
-      p_assessment_id: input.assessment.id,
-      // §305 : l'id du template composé (nage×distance) est synthétique
-      // (ex. 'freestyle_100_season'), pas un uuid. La colonne est nullable.
-      p_template_id: null,
-      p_event_group: input.template.event_group,
-      p_kind: input.template.kind,
-      p_target_week_count: input.targetWeekCount,
-      p_sessions_per_week: input.sessionsPerWeek,
-      p_start_week_monday: mondayOf(startDate),
-      p_start_date: toDateString(startDate),
-      p_bucket_priorities: generated.reasoning,
-      p_engine_version: generated.engineVersion,
-      p_weeks: serializeWeeks(generated.weeks),
-    }),
+    await withTimeout(
+      supabase.rpc('apply_strength_mesocycle', {
+        p_athlete_id: input.assessment.athlete_id,
+        p_assessment_id: input.assessment.id,
+        // §305 : l'id du template composé (nage×distance) est synthétique
+        // (ex. 'freestyle_100_season'), pas un uuid. La colonne est nullable.
+        p_template_id: null,
+        p_event_group: input.template.event_group,
+        p_kind: input.template.kind,
+        p_target_week_count: input.targetWeekCount,
+        p_sessions_per_week: input.sessionsPerWeek,
+        p_start_week_monday: mondayOf(startDate),
+        p_start_date: toDateString(startDate),
+        p_bucket_priorities: generated.reasoning,
+        p_engine_version: generated.engineVersion,
+        p_weeks: serializeWeeks(generated.weeks),
+      }),
+      30_000,
+      'apply_strength_mesocycle',
+    ),
   );
 
   if (typeof data !== 'string') {
@@ -176,10 +184,15 @@ export async function applyMesocycle(
  */
 export async function revertMesocycle(mesocycleId: string): Promise<void> {
   if (!canUseSupabase()) throw new Error('Supabase not available');
+  // Audit 2026-05-26 — borne réseau (invariant §298), cf. applyMesocycle.
   assertSupabase(
-    await supabase.rpc('revert_strength_mesocycle', {
-      p_mesocycle_id: mesocycleId,
-    }),
+    await withTimeout(
+      supabase.rpc('revert_strength_mesocycle', {
+        p_mesocycle_id: mesocycleId,
+      }),
+      15_000,
+      'revert_strength_mesocycle',
+    ),
   );
 }
 
