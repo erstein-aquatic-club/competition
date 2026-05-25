@@ -7,7 +7,7 @@
  * ────
  *  Le nageur, son bilan muscu complété, vient ici pour configurer son
  *  prochain mésocycle. Cet écran ne génère rien ni ne persiste : il
- *  rassemble 4 paramètres puis hand-offe à l'écran d'aperçu via
+ *  rassemble 5 paramètres puis hand-offe à l'écran d'aperçu via
  *  sessionStorage + navigate('/strength/mesocycle-preview').
  *
  *  Paramètres collectés (taxonomie nage × distance, §305) :
@@ -209,11 +209,12 @@ export default function MesocycleGeneration() {
     queryFn: () => getStrokeSignatures(),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: distanceProfiles = [] } = useQuery({
-    queryKey: ["strength-distance-profiles"],
-    queryFn: () => getDistanceProfiles(),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: distanceProfiles = [], isLoading: distanceProfilesLoading } =
+    useQuery({
+      queryKey: ["strength-distance-profiles"],
+      queryFn: () => getDistanceProfiles(),
+      staleTime: 5 * 60 * 1000,
+    });
 
   // ── État local des sections ──────────────────────────────────────────────
   const [stroke, setStroke] = useState<StrokeKey | null>(null);
@@ -451,6 +452,11 @@ export default function MesocycleGeneration() {
               );
             })}
           </div>
+          {!distanceProfilesLoading && distanceProfiles.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Catalogue d'épreuves indisponible — réessayer plus tard.
+            </p>
+          )}
         </SectionCard>
 
         {/* ── Section 03 — Famille de prépa ────────────────────────────── */}
@@ -711,8 +717,8 @@ function Header({ onBack }: { onBack: () => void }) {
         </div>
       </div>
       <p className="mx-auto max-w-2xl px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
-        Choisis l'épreuve ciblée, la famille de prépa, et la durée alignée sur ta
-        prochaine compétition.
+        Choisis la nage, l'épreuve, la famille de prépa, la durée et le nombre de
+        séances.
       </p>
     </header>
   );
@@ -930,7 +936,7 @@ function PageSkeleton() {
         <div className="mx-auto h-9 max-w-2xl animate-pulse rounded bg-muted" />
       </div>
       <div className="mx-auto max-w-2xl space-y-3 px-4 pt-4">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
         ))}
       </div>
