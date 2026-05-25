@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§302** — Fluidité parcours coach : intégration KPI au flux (route `/coach/kpi-wizard/:athleteId`), fil conducteur `BilanProgress` (3 étapes tappables), cible nageur persistante (`/coach/strength-assessment/:athleteId`), fin du cul-de-sac questionnaire→notation (audit recos 3+4). Précédent §301 — Fiabilité mesure Bilan Muscu (T1→T5) : `weighted_pullup` 0/assisté (mig `00190`), démos KPI câblées sur GIFs catalogue, confiance barème par-KPI, détente verticale = moyenne + écart-type, rubrique mobilité 0-3 par niveau + repères chiffrés + note du bilan précédent. Recos fluidité parcours coach → §302. (Aussi récents : §300 édition coach séance générée, §299 parcours 2 modes.)
+Dernier § livré : **§303** — Dé-jeunification moteur muscu (G1+G3) : bande d'âge adulte, tier de performance (`shiftAnchors`), plafond barème débridé, niveau de pratique lu en table (`strength_athlete_settings`).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

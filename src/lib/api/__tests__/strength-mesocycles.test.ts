@@ -56,7 +56,7 @@ function makeMinimalInput(): MesocycleInput {
       },
     },
     kpiMeasurements: [],
-    athlete: { sex: 'M', ageBand: '15-16', level: 'intermediate' },
+    athlete: { sex: 'M', ageBand: '15-16', level: 'intermediate', performanceTier: 'club' },
     template: {
       id: TEMPLATE_ID,
       event_group: 'sprint',

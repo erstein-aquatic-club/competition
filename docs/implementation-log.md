@@ -4,6 +4,39 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §303 — Dé-jeunification du moteur de mésocycle muscu (G1+G3) (2026-05-24)
+
+**Branche** : `feat/muscu-dejeunification-g1-g3`
+**Trigger** : audit `docs/audits/2026-05-24-audit-muscu-200nl-femmes-elite-vs-generateur.md` (méthodes muscu des nageuses élite 200m NL confrontées au générateur). Design : `docs/plans/2026-05-24-muscu-dejeunification-g1-g3-design.md`. Plan : `docs/plans/2026-05-24-muscu-dejeunification-g1-g3-plan.md`. **Décision produit (2026-05-24)** : les 2 écarts traités sont **swim-independent** (aucun lien planif/séances natation) ; G2 (couplage macrocycle natation) et G6 (transfert eau) **écartés** du périmètre ; autorégulation G4 = autre chantier.
+
+### G1 — Barèmes : fin de la jeunification (le moteur traitait toute adulte/forte comme une ado 17-18 sur normes scolaires)
+- **Constat** : scores plafonnés à 90 (dernier segment p90) → priorisation des seaux effondrée pour les athlètes au-dessus du plafond scolaire ; pas de bande d'âge adulte ; aucun ajustement au niveau de performance.
+- **`kpiBaremes.ts`** : (a) **`kpiScore` extrapole** la pente du dernier segment au-delà de p90 jusqu'à 100 (`Math.max(0, slope)` + plancher au pic, précondition « ancres x strictement croissants » documentée) — **fin du plafond à 90** ; (b) bande d'âge **`'adulte'`** (≥19 ans) ajoutée à `AgeBand`, `ageBandFor` mappe ≥19→adulte ; dérivée des ancres `17-18` (plateau de maturité) via `KPI_BAREMES_BASE` + `Object.fromEntries` (DRY, même référence, **zéro duplication**) ; (c) **`PerformanceTier`** (`club|regional|national|elite`) + **`shiftAnchors(anchors, tier)`** : décale les ancres de `Δ = k(tier)×(val_p90−val_p10)` (k = 0/0.18/0.35/0.5), translation **en espace valeur brute** → robuste aux unités et aux ancres négatives, `club` = identité.
+- **Moteur** (`mesocycleEngine.ts`) : branché à l'**unique chokepoint** `scoreKpi` — `kpiScore(shiftAnchors(bareme.anchors, athlete.performanceTier), value)`. `MesocycleInput['athlete']` gagne `performanceTier` (requis).
+
+### G3 — Niveau de pratique figé (`"intermediate"` codé en dur)
+- **`MesocyclePreview.tsx`** : lit `level` (et `performanceTier`) **depuis la table** `strength_athlete_settings` au lieu du `"intermediate"` codé en dur (défauts `intermediate`/`club` = comportement actuel) ; `selectExercises` sert enfin les exercices `advanced` au bon niveau.
+
+### Persistance : table `strength_athlete_settings`
+- **Migration `00191_strength_athlete_settings.sql`** (appliquée via MCP) : PK `athlete_id`, colonnes `practice_level`/`performance_tier` nullable + CHECK, `updated_by`/`updated_at`.
+- **RLS asymétrique** : athlète **LECTURE SEULE** de sa ligne (`_own_read` FOR SELECT), coach/admin **lecture + écriture club-wide** (`_coach` FOR ALL).
+- **Wrappers** `getStrengthAthleteSettings`/`upsertStrengthAthleteSettings` (`src/lib/api/strength-assessments.ts`, re-export `index.ts`).
+
+### UI coach
+- **`StrengthAthleteProfileCard.tsx`** (nouveau, UI via `/frontend-design`) : 2 selects autosave — **niveau de pratique** + **tier de performance** — labels FR, indicateur « Enregistré » transitoire, skeleton de chargement, a11y. Rendu dans la branche notation `bilan_pending` de `StrengthAssessmentScreen`.
+- **`MesocyclePreview`** affiche le contexte « Normes : {ageBand} · niveau {level} · tier {performanceTier} » dans le raisonnement auditable.
+
+### Tests / vérifs
+- `npm test` — **982/982 verts** (+16 vs §302). `npx tsc --noEmit` — exit 0.
+- `npm run test:rls` — **233 passed** (nouveau `supabase/tests/rls/strength_athlete_settings.test.ts`, 9 cas : athlète lit sa ligne / ne lit pas celle d'un autre / ne peut pas INSERT (throw RLS) / ne peut pas UPDATE (0 rows + valeur persistée vérifiée) / coach + admin lecture + upsert). Les 2 échecs RLS `coach_pace_zones`/`pace_share_links` sont **pré-existants** (drift v1/v2), hors scope.
+
+### Décisions / limites
+- Les `k(tier)` sont des **estimations de départ à calibrer**.
+- Bande `adulte` = ancres 17-18 (confiance affichée) — pas de normes adultes sourcées séparément.
+- `updated_by` non rempli (suite possible).
+- Bloc coach `StrengthAthleteProfileCard` rendu **uniquement** dans la branche `bilan_pending`.
+- **Écartés** : G2 (couplage macrocycle natation) et G6 (transfert eau) — hors périmètre ; autorégulation G4 — autre chantier.
+
 ## §302 — Fluidité du parcours coach : intégration KPI + fil conducteur (2026-05-24)
 
 **Branche** : `feat/301-fiabilite-mesure`

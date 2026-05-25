@@ -24,9 +24,13 @@ export type Bareme = readonly (readonly [number, number])[];
  * par morceaux entre les ancres du barème.
  *
  *  - `value` sous la première ancre  → score de la première ancre (plancher) ;
- *  - `value` au-dessus de la dernière → score de la dernière ancre (plafond) ;
+ *  - `value` au-dessus de la dernière → extrapolation de la pente du dernier
+ *    segment (p90→100), pas de plateau plat à la dernière ancre ;
  *  - entre deux ancres                → interpolation linéaire ;
  *  - le résultat est borné à [0, 100].
+ *
+ * Précondition : les ancres doivent avoir des valeursBrutes (x) strictement
+ * croissantes — l'interpolation et l'extrapolation en dépendent.
  *
  * Lève une `Error` si le barème compte moins de 2 ancres.
  */
@@ -39,7 +43,19 @@ export function kpiScore(bareme: Bareme, value: number): number {
   const first = bareme[0];
   const last = bareme[bareme.length - 1];
   if (value <= first[0]) return clamp(first[1]);
-  if (value >= last[0]) return clamp(last[1]);
+  if (value >= last[0]) {
+    // Extrapole la pente du dernier segment au-delà de l'ancre haute (p90→100),
+    // pour que les profils > p90 restent discriminables (au lieu de saturer à 90).
+    const [xPrev, sPrev] = bareme[bareme.length - 2];
+    const [xLast, sLast] = last;
+    const slope = (sLast - sPrev) / (xLast - xPrev);
+    // Garde anti-redescente : sur un barème non monotone (pente du dernier
+    // segment <= 0 ou pic avant la dernière ancre), l'extrapolation ne doit
+    // jamais redescendre sous le score de pointe. On borne donc par le bas au
+    // score maximum des ancres (Math.max(0, slope) neutralise la pente négative).
+    const peak = Math.max(...bareme.map(([, s]) => s));
+    return clamp(Math.max(peak, sLast + (value - xLast) * Math.max(0, slope)));
+  }
 
   for (let i = 1; i < bareme.length; i++) {
     const [x0, s0] = bareme[i - 1];
@@ -53,13 +69,41 @@ export function kpiScore(bareme: Bareme, value: number): number {
   return clamp(last[1]);
 }
 
+/** Niveau de référence d'un athlète : décale le barème pour relever la barre. */
+export type PerformanceTier = 'club' | 'regional' | 'national' | 'elite';
+
+/** Décalage du barème par tier, en fraction de l'étendue (val_dernière − val_première). */
+const TIER_SHIFT_K: Record<PerformanceTier, number> = {
+  club: 0,
+  regional: 0.18,
+  national: 0.35,
+  elite: 0.5,
+};
+
+/**
+ * Décale les ancres vers la droite de Δ = k(tier) × (val_dernière − val_première)
+ * pour relever la barre au tier supérieur (à perf égale, score plus bas).
+ * Translation en espace valeur brute → robuste aux unités et aux ancres négatives.
+ * `club` (k=0) → identité. Cf. design §2b.
+ */
+export function shiftAnchors(anchors: Bareme, tier: PerformanceTier): Bareme {
+  const k = TIER_SHIFT_K[tier];
+  if (k === 0) return anchors;
+  const spread = anchors[anchors.length - 1][0] - anchors[0][0];
+  const delta = k * spread;
+  return anchors.map(([x, s]) => [x + delta, s] as const);
+}
+
 import type { StrengthKpiKey } from '@/lib/api/types';
 
 /** Niveau de confiance d'un barème — voir docs/plans/bilan-muscu-baremes-sources.md. */
 export type BaremeConfidence = 'solid' | 'transposed' | 'placeholder';
 
 /** Bandes d'âge du Bilan Muscu (pas de bilan avant 13 ans). */
-export type AgeBand = '13-14' | '15-16' | '17-18';
+export type AgeBand = '13-14' | '15-16' | '17-18' | 'adulte';
+
+/** Bandes d'âge avec des ancres propres ; 'adulte' en dérive (cf. §2a). */
+type AgeBandBase = '13-14' | '15-16' | '17-18';
 
 export type BaremeSex = 'M' | 'F';
 
@@ -77,9 +121,9 @@ export interface BaremeEntry {
  * des tranches A2/A3/A4 du document. La tranche A1 (11-12) du document est
  * volontairement OMISE (décision coach 2026-05-17 : pas de bilan avant 13 ans).
  */
-export const KPI_BAREMES: Record<
+const KPI_BAREMES_BASE: Record<
   StrengthKpiKey,
-  Record<BaremeSex, Record<AgeBand, BaremeEntry>>
+  Record<BaremeSex, Record<AgeBandBase, BaremeEntry>>
 > = {
   // § 5 — détente verticale : PUISSANCE RELATIVE (W/kg) — TRANSPOSÉ.
   // Mesurée en puissance depuis le §293 (et non plus en hauteur cm). Ancres =
@@ -247,12 +291,33 @@ export const KPI_BAREMES: Record<
   },
 };
 
+/**
+ * Barèmes par KPI × sexe × bande d'âge, **incluant 'adulte'**.
+ *
+ * La bande 'adulte' (>= 19 ans) réutilise les ancres '17-18' (plateau de
+ * maturité) — cf. design §2a. Dérivée par programmation (pas de duplication des
+ * ancres) à partir de `KPI_BAREMES_BASE`.
+ */
+export const KPI_BAREMES: Record<
+  StrengthKpiKey,
+  Record<BaremeSex, Record<AgeBand, BaremeEntry>>
+> = Object.fromEntries(
+  (Object.keys(KPI_BAREMES_BASE) as StrengthKpiKey[]).map((kpi) => [
+    kpi,
+    {
+      M: { ...KPI_BAREMES_BASE[kpi].M, adulte: KPI_BAREMES_BASE[kpi].M['17-18'] },
+      F: { ...KPI_BAREMES_BASE[kpi].F, adulte: KPI_BAREMES_BASE[kpi].F['17-18'] },
+    },
+  ]),
+) as Record<StrengthKpiKey, Record<BaremeSex, Record<AgeBand, BaremeEntry>>>;
+
 /** Bande d'âge pour un âge donné. `null` si < 13 ans (pas de bilan). */
 export function ageBandFor(age: number): AgeBand | null {
   if (age < 13) return null;
   if (age <= 14) return '13-14';
   if (age <= 16) return '15-16';
-  return '17-18';
+  if (age <= 18) return '17-18';
+  return 'adulte';
 }
 
 /** Récupère le barème d'un KPI pour un sexe et une bande d'âge. */

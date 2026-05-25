@@ -1288,6 +1288,42 @@ CREATE POLICY strength_kpi_measurements_coach ON public.strength_kpi_measurement
   WITH CHECK (app_user_role() IN ('coach','admin'));
 
 -- =============================================================================
+-- strength_athlete_settings (Task 5 — déjeunification G1-G3) — Chantier "muscu"
+-- "Niveau de pratique + palier de performance" renseignés PAR LE COACH, lus par
+-- le nageur pour calibrer son barème KPI. Keep in sync with migration
+-- 00191_strength_athlete_settings.sql.
+--
+-- RLS asymétrique (≠ strength_assessments) :
+--   - `_own_read` : le nageur a la LECTURE SEULE de SA ligne (FOR SELECT). Pas de
+--     policy d'écriture athlète → un nageur ne peut PAS écrire ses propres réglages
+--     (c'est une décision coach, pas un auto-déclaratif).
+--   - `_coach`    : coach/admin ont l'accès complet (FOR ALL) club-wide en
+--     lecture + écriture.
+-- =============================================================================
+
+CREATE TABLE public.strength_athlete_settings (
+  athlete_id        INTEGER PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  practice_level    TEXT CHECK (practice_level IN ('beginner','intermediate','advanced')),
+  performance_tier  TEXT CHECK (performance_tier IN ('club','regional','national','elite')),
+  updated_by        INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- RLS — strength_athlete_settings
+ALTER TABLE public.strength_athlete_settings ENABLE ROW LEVEL SECURITY;
+
+-- Athlète : lecture seule de SA ligne.
+CREATE POLICY strength_athlete_settings_own_read ON public.strength_athlete_settings
+  FOR SELECT TO authenticated
+  USING (athlete_id = app_user_id());
+
+-- Coach/admin : lecture + écriture club-wide.
+CREATE POLICY strength_athlete_settings_coach ON public.strength_athlete_settings
+  FOR ALL TO authenticated
+  USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
+
+-- =============================================================================
 -- strength_periodization_templates (§292) — Chantier A
 -- "Bilan Muscu → Mésocycle". Référentiel des templates de périodisation.
 -- Keep in sync with migration 00166_strength_periodization_templates.sql

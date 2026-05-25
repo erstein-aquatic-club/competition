@@ -59,6 +59,7 @@ function makeAthlete(overrides: Partial<MesocycleInput['athlete']> = {}): Mesocy
     sex: 'M',
     ageBand: '15-16',
     level: 'intermediate',
+    performanceTier: 'club',
     ...overrides,
   };
 }
@@ -213,6 +214,32 @@ describe('scoreBuckets', () => {
     );
 
     assert.equal(scores.psychology, null);
+  });
+
+  it('un tier plus élevé décale le barème et abaisse le score (restaure la discrimination)', () => {
+    // Athlète adulte F, weighted_pullup = 10 kg : valeur dans la plage
+    // d'interpolation du barème. Un tier 'national' décale les ancres vers la
+    // droite → le même 10 kg vaut un score strictement inférieur au tier 'club'.
+    const measurements: StrengthKpiMeasurement[] = [
+      makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
+    ];
+
+    const club = scoreBuckets(
+      makeAssessment({ physical_tests: null, questionnaire: null }),
+      measurements,
+      makeAthlete({ sex: 'F', ageBand: 'adulte', level: 'intermediate', performanceTier: 'club' }),
+    );
+    const nat = scoreBuckets(
+      makeAssessment({ physical_tests: null, questionnaire: null }),
+      measurements,
+      makeAthlete({ sex: 'F', ageBand: 'adulte', level: 'intermediate', performanceTier: 'national' }),
+    );
+
+    assert.ok(club.upper_strength !== null && nat.upper_strength !== null);
+    assert.ok(
+      nat.upper_strength! < club.upper_strength!,
+      `national (${nat.upper_strength}) doit être < club (${club.upper_strength})`,
+    );
   });
 
   it('respecte le sexe et la bande d’âge dans le choix du barème', () => {
@@ -956,7 +983,7 @@ function fullInput(): MesocycleInput {
       makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
       makeMeasurement('medball_vertical_throw', 115, '2026-05-01T00:00:00Z', 'cm'),
     ],
-    athlete: { sex: 'M', ageBand: '15-16', level: 'intermediate' },
+    athlete: { sex: 'M', ageBand: '15-16', level: 'intermediate', performanceTier: 'club' },
     template: makeTemplate({
       lower_strength: 0.5,
       lower_power: 1.0,

@@ -2,6 +2,7 @@
 import { supabase, canUseSupabase, assertSupabase } from './client';
 import type {
   StrengthAssessment,
+  StrengthAthleteSettings,
   StrengthPhysicalTests,
   StrengthQuestionnaire,
 } from './types';
@@ -129,4 +130,46 @@ export async function updateAssessmentPhysicalTests(
   if (!data || data.length === 0) {
     throw new Error('Assessment not found or not allowed to update');
   }
+}
+
+// ── Réglages muscu par athlète (mig 00191, dé-jeunification G1+G3) ────────────
+
+/**
+ * Lit les réglages muscu d'un athlète, ou `null` s'il n'a pas encore de ligne
+ * (RLS refuse / aucune ligne). Le caller applique les défauts applicatifs
+ * (`practice_level` → 'intermediate', `performance_tier` → 'club').
+ */
+export async function getStrengthAthleteSettings(
+  athleteId: number,
+): Promise<StrengthAthleteSettings | null> {
+  if (!canUseSupabase()) return null;
+  const data = assertSupabase(
+    await supabase
+      .from('strength_athlete_settings')
+      .select('*')
+      .eq('athlete_id', athleteId)
+      .maybeSingle(),
+  );
+  return (data as StrengthAthleteSettings | null) ?? null;
+}
+
+/**
+ * Crée ou met à jour les réglages muscu d'un athlète (UPSERT sur `athlete_id`).
+ * Réservé coach/admin par RLS. `updated_at` est géré côté base (DEFAULT now() +
+ * trigger BEFORE UPDATE) ; `updated_by` n'est PAS auto-rempli — laissé `null`
+ * pour l'instant (l'attribution de l'auteur est une suite possible, non câblée).
+ */
+export async function upsertStrengthAthleteSettings(
+  athleteId: number,
+  patch: Pick<StrengthAthleteSettings, 'practice_level' | 'performance_tier'>,
+): Promise<void> {
+  if (!canUseSupabase()) throw new Error('Supabase not available');
+  assertSupabase(
+    await supabase
+      .from('strength_athlete_settings')
+      .upsert(
+        { athlete_id: athleteId, ...patch },
+        { onConflict: 'athlete_id' },
+      ),
+  );
 }

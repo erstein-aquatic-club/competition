@@ -4,10 +4,14 @@ import {
   kpiScore,
   KPI_BAREMES,
   baremeConfidenceFor,
+  ageBandFor,
+  getBareme,
+  shiftAnchors,
   type AgeBand,
   type Bareme,
   type BaremeConfidence,
   type BaremeSex,
+  type PerformanceTier,
 } from '../kpiBaremes.ts';
 import type { StrengthKpiKey } from '@/lib/api/types';
 
@@ -32,6 +36,86 @@ describe('kpiScore', () => {
   });
   it('throw si le barème a moins de 2 ancres', () => {
     assert.throws(() => kpiScore([[10, 0]], 10), /at least 2/);
+  });
+});
+
+// Task 1 (muscu G1) — au-delà de la dernière ancre, kpiScore extrapole la pente
+// du dernier segment (p90→100) au lieu de plafonner à 90 : les profils > p90
+// restent discriminables.
+describe('kpiScore — plafond extrapolé (Task 1)', () => {
+  const wp1: Bareme = [[0, 10], [10, 50], [20, 90]]; // dernier segment slope = 4 pts/unité
+  it('atteint 90 pile sur la dernière ancre', () => {
+    assert.equal(kpiScore(wp1, 20), 90);
+  });
+  it('extrapole au-dessus de p90 au lieu de plafonner à 90', () => {
+    assert.equal(kpiScore(wp1, 22.5), 100); // 90 + 2.5*4
+  });
+  it('clampe à 100 pour les valeurs très au-dessus', () => {
+    assert.equal(kpiScore(wp1, 50), 100);
+  });
+  it('garde le plancher sous la première ancre', () => {
+    assert.equal(kpiScore(wp1, -5), 10);
+  });
+  it('ne descend pas sous le score de pointe si le dernier segment a une pente <= 0', () => {
+    // Barème non-monotone en haut (10→90 puis 20→80) : l'extrapolation au-delà
+    // de la dernière ancre ne doit jamais redescendre — garde slope>=0 → 90.
+    const nonMono: Bareme = [[0, 10], [10, 90], [20, 80]];
+    assert.equal(kpiScore(nonMono, 30), 90);
+  });
+});
+
+// Task 2 (muscu G1) — bande 'adulte' (>=19 ans) dérivée des ancres 17-18
+// (plateau de maturité), pour ne plus rabattre les adultes sur la population
+// scolaire 17-18 sans le dire.
+describe('bande adulte (Task 2)', () => {
+  it('mappe 18 ans sur 17-18 et 19+ sur adulte', () => {
+    assert.equal(ageBandFor(18), '17-18');
+    assert.equal(ageBandFor(19), 'adulte');
+    assert.equal(ageBandFor(27), 'adulte');
+  });
+  it('initialise adulte sur les ancres 17-18 pour chaque KPI×sexe', () => {
+    assert.deepEqual(
+      getBareme('weighted_pullup', 'F', 'adulte').anchors,
+      getBareme('weighted_pullup', 'F', '17-18').anchors,
+    );
+    assert.deepEqual(
+      getBareme('imtp', 'M', 'adulte').anchors,
+      getBareme('imtp', 'M', '17-18').anchors,
+    );
+  });
+});
+
+// Task 3 (muscu G1) — un tier de performance décale le barème vers la droite
+// (relève la barre) : à valeur brute égale, le score décroît quand le tier
+// monte. `club` = identité. Translation en espace valeur brute → robuste aux
+// ancres négatives.
+describe('shiftAnchors / tier (Task 3)', () => {
+  const wp: Bareme = [[-5, 10], [0, 30], [5, 50], [10, 70], [20, 90]];
+  // toBeCloseTo(x, n) : |actual − x| < 0.5 * 10^(−n).
+  const closeTo = (actual: number, expected: number, digits: number): void => {
+    assert.ok(
+      Math.abs(actual - expected) < 0.5 * 10 ** -digits,
+      `attendu ~${expected} (${digits} déc.), obtenu ${actual}`,
+    );
+  };
+
+  it('club = identité', () => {
+    assert.deepEqual(shiftAnchors(wp, 'club'), wp);
+  });
+  it('relève la barre : à valeur égale, score décroît quand le tier monte', () => {
+    const v = 10;
+    const sClub = kpiScore(shiftAnchors(wp, 'club'), v);
+    const sReg = kpiScore(shiftAnchors(wp, 'regional'), v);
+    const sNat = kpiScore(shiftAnchors(wp, 'national'), v);
+    const sElite = kpiScore(shiftAnchors(wp, 'elite'), v);
+    assert.ok(sClub >= sReg, `sClub(${sClub}) >= sReg(${sReg})`);
+    assert.ok(sReg >= sNat, `sReg(${sReg}) >= sNat(${sNat})`);
+    assert.ok(sNat >= sElite, `sNat(${sNat}) >= sElite(${sElite})`);
+    assert.equal(sClub, 70);
+    closeTo(sNat, 35, 0); // Δ = 0.35*(20-(-5)) = 8.75 ; kpiScore(wp, 1.25) = 35
+  });
+  it('gère les ancres négatives', () => {
+    closeTo(shiftAnchors(wp, 'national')[0][0], 3.75, 2);
   });
 });
 

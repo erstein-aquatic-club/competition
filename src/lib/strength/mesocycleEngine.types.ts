@@ -323,6 +323,8 @@ export interface MesocycleInput {
     ageBand: import('@/lib/strength/kpiBaremes').AgeBand;
     /** Niveau de pratique muscu (filtre les exercices). */
     level: 'beginner' | 'intermediate' | 'advanced';
+    /** Tier de performance (cale les barèmes KPI). Défaut applicatif : 'club'. */
+    performanceTier: import('@/lib/strength/kpiBaremes').PerformanceTier;
   };
   /** Template de périodisation choisi par le nageur. */
   template: import('@/lib/api/types').StrengthPeriodizationTemplate;

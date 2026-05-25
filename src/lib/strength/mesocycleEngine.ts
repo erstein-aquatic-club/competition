@@ -17,7 +17,7 @@ import type {
   StrengthPhysicalTests,
 } from '@/lib/api/types';
 import type { BaremeConfidence } from './kpiBaremes';
-import { getBareme, kpiScore } from './kpiBaremes';
+import { getBareme, kpiScore, shiftAnchors } from './kpiBaremes';
 import { PERIODIZATION_CYCLES } from './periodizationCycles';
 import type {
   AllBucket,
@@ -59,7 +59,7 @@ function scoreKpi(
   const m = latest[kpi];
   if (!m) return null;
   const bareme = getBareme(kpi, athlete.sex, athlete.ageBand);
-  return kpiScore(bareme.anchors, m.value);
+  return kpiScore(shiftAnchors(bareme.anchors, athlete.performanceTier), m.value);
 }
 
 /** Moyenne des scores non-null. `null` si tous sont null. */

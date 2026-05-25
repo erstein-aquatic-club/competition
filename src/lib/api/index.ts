@@ -385,6 +385,8 @@ export {
   getPreviousCompletedPhysicalTests,
   updateAssessmentQuestionnaire,
   updateAssessmentPhysicalTests,
+  getStrengthAthleteSettings,
+  upsertStrengthAthleteSettings,
 } from './strength-assessments';
 
 // Bilan Muscu — Mésocycle (Chantier C+D, §293)

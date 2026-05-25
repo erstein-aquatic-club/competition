@@ -26,6 +26,7 @@ import {
   getLatestAssessment,
   getLatestKpiMeasurements,
   getProfile,
+  getStrengthAthleteSettings,
   getStrengthPeriodizationTemplate,
   listCatalogExercisesTagged,
 } from "@/lib/api";
@@ -251,6 +252,14 @@ export default function MesocyclePreview() {
     enabled: effectiveAthleteId != null,
   });
 
+  // Réglages muscu coach (niveau de pratique G3 + tier de performance G1).
+  // Null si pas de ligne / Supabase off → défauts applicatifs côté input.
+  const { data: settings, isLoading: settingsLoading } = useQuery({
+    queryKey: ["strength-athlete-settings", effectiveAthleteId],
+    queryFn: () => getStrengthAthleteSettings(effectiveAthleteId!),
+    enabled: effectiveAthleteId != null,
+  });
+
   // Nom du nageur ciblé (mode coach) — en-tête de cible non ambigu.
   const { data: previewAthletes } = useQuery({
     queryKey: ["athletes"],
@@ -279,7 +288,12 @@ export default function MesocyclePreview() {
   });
 
   const allLoading =
-    profileLoading || assessLoading || kpiLoading || tplLoading || catLoading;
+    profileLoading ||
+    assessLoading ||
+    kpiLoading ||
+    settingsLoading ||
+    tplLoading ||
+    catLoading;
 
   // ── Composition de MesocycleInput + run du moteur ────────────────────────
   const input = useMemo<MesocycleInput | null>(() => {
@@ -301,14 +315,15 @@ export default function MesocyclePreview() {
       athlete: {
         sex: profile.sex,
         ageBand,
-        level: "intermediate",
+        level: settings?.practice_level ?? "intermediate",
+        performanceTier: settings?.performance_tier ?? "club",
       },
       template,
       targetWeekCount: params.targetWeekCount,
       sessionsPerWeek: params.sessionsPerWeek,
       exerciseCatalog: catalog,
     };
-  }, [params, profile, assessment, template, kpiLatest, catalog, allLoading]);
+  }, [params, profile, assessment, template, kpiLatest, settings, catalog, allLoading]);
 
   const { generated, engineError } = useMemo<{
     generated: GeneratedMesocycle | null;
@@ -393,7 +408,7 @@ export default function MesocyclePreview() {
     );
   }
 
-  if (!generated || !template) {
+  if (!input || !generated || !template) {
     return <PageSkeleton />;
   }
 
@@ -422,6 +437,11 @@ export default function MesocyclePreview() {
         <ReasoningPanel
           generated={generated}
           bilanPending={assessment.status === "bilan_pending"}
+          normesContext={{
+            ageBand: input.athlete.ageBand,
+            level: input.athlete.level,
+            performanceTier: input.athlete.performanceTier,
+          }}
         />
         <PlanPanel generated={generated} startMondayIso={params.startWeekMonday} />
       </div>
@@ -498,9 +518,15 @@ function Header({
 function ReasoningPanel({
   generated,
   bilanPending,
+  normesContext,
 }: {
   generated: GeneratedMesocycle;
   bilanPending: boolean;
+  normesContext: {
+    ageBand: MesocycleInput["athlete"]["ageBand"];
+    level: MesocycleInput["athlete"]["level"];
+    performanceTier: MesocycleInput["athlete"]["performanceTier"];
+  };
 }) {
   const [open, setOpen] = useState(true);
   const reasoning = generated.reasoning;
@@ -629,6 +655,16 @@ function ReasoningPanel({
               body="Le score Mobilité est conservateur et la confiance des données est réduite. Ton coach pourra l'enrichir ensuite."
             />
           )}
+
+          {/* Footer contexte des normes (G1+G3 : tier + niveau résolus) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-100/60 px-3 py-2 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+            <span className="font-bold">Normes :</span>{" "}
+            <span className="font-mono">{normesContext.ageBand}</span>
+            {" · niveau "}
+            <span className="font-mono">{normesContext.level}</span>
+            {" · tier "}
+            <span className="font-mono">{normesContext.performanceTier}</span>
+          </div>
 
           {/* Footer barème confidence */}
           <div className="rounded-xl border border-slate-200 bg-slate-100/60 px-3 py-2 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">

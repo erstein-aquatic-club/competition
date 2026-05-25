@@ -214,6 +214,16 @@ INSERT INTO public.strength_kpi_measurements
   ('b0000000-0000-0000-0000-000000000002', 2, 'vertical_jump', 38.0, 'cm', 'wizard_athlete', false);
 
 -- ═════════════════════════════════════════════════════════════════════════════
+-- Task 5 (déjeunification G1-G3) — strength_athlete_settings
+-- See strength_athlete_settings.test.ts. One row per seeded athlete, set by
+-- Carol (coach, id=3). athlete_id is the PK (one settings row per athlete).
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.strength_athlete_settings
+  (athlete_id, practice_level, performance_tier, updated_by) VALUES
+  (1, 'intermediate', 'regional', 3),  -- Alice
+  (2, 'beginner',     'club',     3);  -- Bob
+
+-- ═════════════════════════════════════════════════════════════════════════════
 -- §292 — strength_periodization_templates
 -- See strength-periodization-templates.test.ts. World-readable referential:
 -- one seeded template lets the swimmer-CAN-SELECT test assert a real row.
