@@ -39,6 +39,8 @@ import {
   updateAssessmentPhysicalTests,
   getLatestKpiMeasurements,
   getPreviousCompletedPhysicalTests,
+  getActiveMesocycle,
+  getProfile,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type {
@@ -52,6 +54,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -73,7 +76,7 @@ import { AssessmentContext } from "@/components/strength/assessment/AssessmentCo
 import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
 import { StrengthAthleteProfileCard } from "@/components/strength/assessment/StrengthAthleteProfileCard";
 import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
-import { computeBilanProgress } from "@/lib/strength/bilanProgress";
+import { computeBilanProgress, isProfileComplete } from "@/lib/strength/bilanProgress";
 import {
   MOBILITY_SCORES,
   MOVEMENT_SCORES,
@@ -220,6 +223,21 @@ export default function StrengthAssessmentScreen() {
       getPreviousCompletedPhysicalTests(selectedAthleteId!, assessment?.id),
     enabled: selectedAthleteId != null,
   });
+
+  // ── Méso actif + profil nageur — pour la 4e étape du fil conducteur (§A) ──
+  const { data: activeMesocycle } = useQuery({
+    queryKey: ["active-mesocycle", selectedAthleteId],
+    queryFn: () => getActiveMesocycle(selectedAthleteId!),
+    enabled: selectedAthleteId != null,
+  });
+  const hasActiveMesocycle = activeMesocycle != null;
+
+  const { data: athleteProfile } = useQuery({
+    queryKey: ["profile", selectedAthleteId],
+    queryFn: () => getProfile({ userId: selectedAthleteId! }),
+    enabled: selectedAthleteId != null,
+  });
+  const profileComplete = isProfileComplete(athleteProfile);
 
   /** Note du bilan précédent pour un axe (null si aucun bilan antérieur). */
   const prevScoreFor = (item: AssessmentScoreItem): number | null => {
@@ -443,9 +461,9 @@ export default function StrengthAssessmentScreen() {
     </div>
   );
 
-  /* ── Fil conducteur — 3 étapes du bilan, navigation cible conservée (§302) ── */
+  /* ── Fil conducteur — 4 étapes du bilan, navigation cible conservée (§302/§A) ── */
   const hasKpis = !!kpis && Object.keys(kpis).length > 0;
-  const progress = computeBilanProgress(status, hasKpis);
+  const progress = computeBilanProgress(status, hasKpis, hasActiveMesocycle);
   const bilanSteps: BilanStep[] = [
     {
       key: "questionnaire",
@@ -471,6 +489,15 @@ export default function StrengthAssessmentScreen() {
       key: "physical",
       label: "Bilan physique",
       state: progress.physical,
+    },
+    {
+      key: "generation",
+      label: "Génération",
+      state: progress.generation,
+      onTap:
+        progress.generation !== "todo" && selectedAthleteId != null
+          ? () => navigate(`/coach/mesocycle-generate/${selectedAthleteId}`)
+          : undefined,
     },
   ];
   const BilanProgressStrip = <BilanProgress steps={bilanSteps} />;
@@ -531,20 +558,24 @@ export default function StrengthAssessmentScreen() {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background">
         {TopBar}
+        <div className="mx-auto w-full max-w-md px-4 pt-4">
+          {BilanProgressStrip}
+        </div>
         <CenteredState
           icon={<Check className="h-7 w-7" />}
           tone="primary"
           title="Bilan complété"
-          description={`Le bilan muscu de ${athleteName} est enregistré. Le mésocycle pourra être généré à partir de ces données.`}
+          description={`Le bilan muscu de ${athleteName} est enregistré. Le mésocycle peut maintenant être généré.`}
         >
-          <div className="mt-5 flex flex-col gap-2">
+          <div className="mt-5 flex w-full flex-col gap-2">
             <Button
-              className="rounded-xl"
+              className="h-12 w-full rounded-2xl text-base font-bold"
               onClick={() =>
                 navigate(`/coach/mesocycle-generate/${selectedAthleteId}`)
               }
             >
-              Générer le mésocycle
+              Continuer — Générer le mésocycle
+              <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
             <Button
               variant="outline"
@@ -752,6 +783,27 @@ export default function StrengthAssessmentScreen() {
       <div className="mx-auto w-full max-w-md flex-1 space-y-4 px-4 py-5 pb-32">
         {AthleteStrip}
         {BilanProgressStrip}
+
+        {!profileComplete && athleteProfile !== undefined && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/8 px-3 py-2.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div className="min-w-0 flex-1 text-sm">
+              <span className="font-semibold text-amber-800 dark:text-amber-400">
+                Profil incomplet&nbsp;—
+              </span>{" "}
+              <span className="text-amber-700 dark:text-amber-300">
+                sexe et date de naissance requis pour générer le mésocycle.
+              </span>{" "}
+              <button
+                type="button"
+                onClick={() => navigate(`/coach/swimmers`)}
+                className="font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900 dark:text-amber-400"
+              >
+                Compléter le profil
+              </button>
+            </div>
+          </div>
+        )}
 
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">
