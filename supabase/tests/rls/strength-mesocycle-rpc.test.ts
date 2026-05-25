@@ -469,3 +469,108 @@ describe("revert_strength_mesocycle RLS", () => {
       });
     });
 });
+
+// ── §308 — Re-génération propre (clean replace, mid-week, isolation) ──────────
+//
+// La RPC apply, post-§307, ne contenait aucun DELETE : re-générer un plan avec
+// un autre jeu de jours laissait les slots de l'ancien plan (superseded) sur les
+// jours non réutilisés → plan affiché = UNION ancien+nouveau (séances zombies).
+// §308 ajoute un nettoyage des slot/week overrides À PARTIR de la date de départ
+// (jours pré-départ déjà entraînés préservés), avant la matérialisation.
+
+/** apply 12-arg (§307/§308) : week count, sessions/sem. et date de départ explicites. */
+const applySqlV2 = `SELECT apply_strength_mesocycle(
+  $1::int, $2::uuid, $3::uuid, 'sprint', 'season',
+  $4::int, $5::int, $6::date, $7::jsonb, '1.1.0', $8::jsonb, $9::date
+) AS mesocycle_id`;
+// args : athlete_id, assessment, template, target_week_count, sessions_per_week,
+//        start_week_monday, reasoning, weeks_payload, start_date
+
+const THURSDAY = "2026-06-04"; // START_MONDAY (lun 1er juin) + 3
+
+/** Payload p_weeks jour-aware : 1 semaine, une séance par weekday coché. */
+function weekdayPayload(weekdays: number[], cycle = "force_max"): string {
+  return JSON.stringify([
+    {
+      week_number: 1,
+      cycle,
+      sessions: weekdays.map((wd, i) => ({
+        session_number: i + 1,
+        weekday: wd,
+        role: wd === 0 || wd === 3 ? "amorce_pap" : "developpement",
+        buckets: ["lower_strength"],
+        exercises: [
+          { exercise_id: 1002, bucket: "lower_strength", is_core: true, sets: 4, reps: 5, intensity_pct_1rm: 85, rest_seconds: 180, intention: null, substituted: false, original_exercise_id: null },
+        ],
+      })),
+    },
+  ]);
+}
+
+/** Jours (day_of_week) occupés par un athlète en semaine 1 (START_MONDAY). */
+async function daysOf(c: Parameters<Parameters<typeof asUser>[1]>[0], athleteId: number): Promise<number[]> {
+  const r = await c.query<{ day_of_week: number }>(
+    `SELECT day_of_week FROM strength_planning_slot_overrides
+      WHERE athlete_id = $1 AND week_start = $2::date ORDER BY day_of_week`,
+    [athleteId, START_MONDAY],
+  );
+  return r.rows.map((x) => x.day_of_week);
+}
+
+describe("§308 — re-génération propre (clean replace / mid-week / isolation)", () => {
+  it("re-générer avec un autre jeu de jours ne laisse PAS de séance orpheline", async () => {
+    await asUser(ALICE, async (c) => {
+      // M0 : Lun/Mer/Ven (3 séances).
+      await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 3, START_MONDAY, REASONING, weekdayPayload([0, 2, 4]), null]);
+      expect(await daysOf(c, 1)).toEqual([0, 2, 4]);
+
+      // M1 : Lun/Jeu (2 séances) → doit REMPLACER, pas fusionner.
+      await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), null]);
+
+      // Sans nettoyage : {0,2,4} ∪ {0,3} = {0,2,3,4} (orphelins Mer/Ven). Avec §308 : {0,3}.
+      expect(await daysOf(c, 1)).toEqual([0, 3]);
+    });
+  });
+
+  it("départ mid-week : jours pré-départ préservés, jour de départ ré-écrit", async () => {
+    await asUser(ALICE, async (c) => {
+      // M0 plein Lun/Jeu démarrant lundi.
+      await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), null]);
+      expect(await daysOf(c, 1)).toEqual([0, 3]);
+
+      // M1 mêmes jours mais départ JEUDI : lundi (pré-départ, déjà entraîné) doit
+      // rester sur M0 ; jeudi ré-écrit par M1.
+      await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), THURSDAY]);
+      expect(await daysOf(c, 1)).toEqual([0, 3]);
+
+      const notes = await c.query<{ day_of_week: number; notes: string }>(
+        `SELECT day_of_week, notes FROM strength_planning_slot_overrides
+          WHERE athlete_id = 1 AND week_start = $1::date ORDER BY day_of_week`,
+        [START_MONDAY],
+      );
+      // Lundi (M0 préservé) et jeudi (M1) pointent sur 2 mésocycles distincts.
+      expect(notes.rows[0].notes).not.toBe(notes.rows[1].notes);
+    });
+  });
+
+  it("isolation multi-nageurs : générer pour Bob ne touche pas les slots d'Alice", async () => {
+    await asUser(CAROL, async (c) => {
+      await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), null]);
+      const aliceBefore = await daysOf(c, 1);
+      await c.query(applySqlV2, [2, B_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([1, 4]), null]);
+      expect(await daysOf(c, 1)).toEqual(aliceBefore); // Alice intacte
+      expect(await daysOf(c, 2)).toEqual([1, 4]);      // Bob a ses propres jours
+    });
+  });
+
+  it("revert après re-génération restaure l'état d'avant (supersede + snapshot)", async () => {
+    await asUser(ALICE, async (c) => {
+      await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 3, START_MONDAY, REASONING, weekdayPayload([0, 2, 4]), null]);
+      const m1 = await c.query<{ mesocycle_id: string }>(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), null]);
+      expect(await daysOf(c, 1)).toEqual([0, 3]);
+
+      await c.query("SELECT revert_strength_mesocycle($1::uuid)", [m1.rows[0].mesocycle_id]);
+      expect(await daysOf(c, 1)).toEqual([0, 2, 4]); // snapshot M0 restauré
+    });
+  });
+});

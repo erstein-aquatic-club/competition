@@ -18626,3 +18626,38 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 - Les deux écrans n'ont pas de tests unitaires (UI pure) ; le moteur + la RPC sont couverts par `strength-mesocycles.test.ts` (non touché ici).
 - Pas de `npm run test:rls` : patch purement UI/wiring, aucune policy/RLS/wrapper d'autorisation modifié.
 - **DIFFÉRÉ** : badges jour/rôle dans `MyPlanTab` (Task 4.3) — hors scope de ce dispatch.
+
+## §308 — Mésocycle muscu : remplacement propre d'un plan en cours (anti-orphelins) (2026-05-25)
+
+**Contexte (audit robustesse post-§307).** La RPC `apply_strength_mesocycle` (00200, prod) ne contenait **aucun DELETE** : le supersede (étape 2) ne change que le `status` de la *ligne* mésocycle ; la matérialisation (étapes 5/6) est un **UPSERT** sur `(athlete_id, week_start, day_of_week, time_slot)`. Donc tout jour-de-semaine que le **nouveau** plan n'occupe pas mais que l'**ancien** occupait restait intact, pointant sur l'ancien template (superseded). Comme `MyPlanTab` lit **tous** les slot overrides de l'athlète sans filtre mésocycle (`MyPlanTab.tsx:112-116`), le plan affiché devenait l'**UNION** ancien+nouveau → séances orphelines (zombies). Latent avant §307 (les cartes legacy se chevauchaient sur `[0]`), **exposé et amplifié** par le picker jour-aware §307 (jeux de jours arbitraires, ex. passer de Lun/Mer/Ven à Lun/Jeu) + le départ mid-week.
+
+**Décision (coach).** « Remplacement propre dès la date de départ » : la nouvelle génération **remplace** l'ancien plan **à partir de la date de départ effective** ; les jours **avant** `v_effective_start` (1re semaine partielle, déjà entraînés) sont **préservés**. Le revert reste correct (le snapshot capture l'état avant purge).
+
+**Changements :**
+- `supabase/migrations/00201_mesocycle_clean_replace.sql` (NOUVEAU) — `CREATE OR REPLACE FUNCTION apply_strength_mesocycle` (signature 12-arg de 00200, **inchangée** → replace pur, pas de DROP). Ajout, **entre le snapshot (étape 4) et la matérialisation (étape 5)**, d'un nettoyage :
+  ```sql
+  DELETE FROM strength_planning_slot_overrides
+   WHERE athlete_id = p_athlete_id
+     AND week_start BETWEEN p_start_week_monday AND v_window_end
+     AND (week_start + day_of_week) >= v_effective_start;
+  DELETE FROM strength_planning_week_overrides
+   WHERE athlete_id = p_athlete_id
+     AND week_start BETWEEN p_start_week_monday AND v_window_end;
+  ```
+  Athlete-scoped, borné sur la fenêtre du snapshot. **Pas** de DELETE de templates (`strength_sessions` du plan superseded conservés = filet du revert, comme avant). Appliqué via MCP Supabase (`fscnobivsgornxdwqwlk`).
+- `supabase/tests/schema.sql` (MODIFIÉ) — la fonction harness `apply_strength_mesocycle` était restée à l'ère **00181** (11-arg, `v_days` uniquement). Remise au niveau **00200 + 00201** : param `p_start_date date DEFAULT NULL`, `v_effective_start`, source du jour `COALESCE(NULLIF(weekday,'')::int, v_days[…])`, garde `v_day_of_week IS NULL`, skip 1re semaine partielle, **bloc DELETE §308**, GRANT 12-arg. Nommage simplifié `[Méso …]` conservé (les tests existants en dépendent).
+- `supabase/tests/rls/strength-mesocycle-rpc.test.ts` (MODIFIÉ) — nouveau describe **§308** (TDD : RED→GREEN) : (1) re-générer avec un autre jeu de jours ne laisse pas d'orphelin (`[0,2,4]`→`[0,3]` donne bien `{0,3}`, pas `{0,2,3,4}`) ; (2) départ mid-week préserve les jours pré-départ ; (3) isolation multi-nageurs (générer pour Bob ne touche pas Alice) ; (4) revert après re-génération restaure le snapshot. Helpers `applySqlV2` (12-arg), `weekdayPayload`, `daysOf`.
+
+**Tests :**
+- `npx tsc --noEmit` — 0 ✅
+- `npm test` (node:test) — 1353/1353 ✅ ; vitest — 20/20 ✅
+- `npm run test:rls -- strength-mesocycle-rpc` — **17/17 ✅** (RED confirmé avant fix : `[0,2,3,4]` ≠ `[0,3]`)
+- `npm run build` — OK ✅
+- Smoke prod : `pg_get_function_arguments` → 1 seule signature 12-arg ; `§308` présent dans `pg_get_functiondef`.
+
+**Verdict répétabilité (audit D) :** isolation multi-nageurs ✅, concurrence 2 athlètes ✅, déterminisme moteur ✅, revert après départ mid-week ✅ (fenêtre dérivée des slots réellement écrits). Re-génération mid-saison **corrigée** (était l'union ancien+nouveau). Idempotence stricte : surface du plan convergente ; chaque apply crée néanmoins une nouvelle ligne mésocycle + de nouveaux templates (filet revert) — accepté.
+
+**Décisions / limites :**
+- Les **édits coach manuels** dans la fenêtre à partir de la date de départ sont écrasés par une re-génération (et restaurables par revert) — cohérent avec « nouvelle génération = nouveau plan ».
+- **Edge non couvert** : un ancien plan strictement plus long (ex. 8 sem.) qu'un nouveau (7 sem.) laisse des slots de la semaine au-delà de `v_window_end` (hors fenêtre snapshot/purge). Rare ; documenté.
+- Note mineure (non corrigée) : après revert, `getActiveMesocycle` = `null` alors que les slots restaurés s'affichent (le bandeau « mésocycle actif » disparaît).

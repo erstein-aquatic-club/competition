@@ -1489,7 +1489,8 @@ CREATE OR REPLACE FUNCTION public.apply_strength_mesocycle(
   p_start_week_monday date,
   p_bucket_priorities jsonb,
   p_engine_version    text,
-  p_weeks             jsonb
+  p_weeks             jsonb,
+  p_start_date        date DEFAULT NULL
 ) RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1519,6 +1520,7 @@ DECLARE
   v_ordre            integer;
   v_block            text;
   v_warmup_left      integer;
+  v_effective_start  date;
 BEGIN
   v_caller_id   := app_user_id();
   v_caller_role := app_user_role();
@@ -1536,6 +1538,7 @@ BEGIN
     RAISE EXCEPTION 'apply_strength_mesocycle: sessions_per_week must be 1..7';
   END IF;
   v_window_end := p_start_week_monday + ((p_target_week_count - 1) * 7);
+  v_effective_start := COALESCE(p_start_date, p_start_week_monday);
   v_days := CASE p_sessions_per_week
     WHEN 1 THEN ARRAY[0]
     WHEN 2 THEN ARRAY[0, 3]
@@ -1565,6 +1568,17 @@ BEGIN
     COALESCE((SELECT jsonb_agg(to_jsonb(w.*)) FROM strength_planning_week_overrides w
        WHERE w.athlete_id = p_athlete_id AND w.week_start BETWEEN p_start_week_monday AND v_window_end), '[]'::jsonb)
   );
+  -- §308 — remplacement propre : purge les slots/weeks de l'athlète À PARTIR de la
+  -- date de départ effective (jours pré-départ déjà entraînés préservés), avant de
+  -- matérialiser. Le snapshot ci-dessus a déjà capturé l'état pour le revert. Sans
+  -- ce nettoyage, re-générer avec un autre jeu de jours laisse des séances orphelines.
+  DELETE FROM strength_planning_slot_overrides
+   WHERE athlete_id = p_athlete_id
+     AND week_start BETWEEN p_start_week_monday AND v_window_end
+     AND (week_start + day_of_week) >= v_effective_start;
+  DELETE FROM strength_planning_week_overrides
+   WHERE athlete_id = p_athlete_id
+     AND week_start BETWEEN p_start_week_monday AND v_window_end;
   FOR v_week IN SELECT * FROM jsonb_array_elements(p_weeks) LOOP
     v_week_number := (v_week->>'week_number')::int;
     v_cycle := v_week->>'cycle';
@@ -1586,8 +1600,11 @@ BEGIN
       SET week_type = EXCLUDED.week_type, notes = EXCLUDED.notes, updated_at = now();
     FOR v_session IN SELECT * FROM jsonb_array_elements(v_week->'sessions') LOOP
       v_session_number := (v_session->>'session_number')::int;
-      IF v_session_number < 1 OR v_session_number > array_length(v_days, 1) THEN CONTINUE; END IF;
-      v_day_of_week := v_days[v_session_number];
+      -- §307 — source du jour : weekday par séance (moteur jour-aware) sinon carte legacy.
+      v_day_of_week := COALESCE(NULLIF(v_session->>'weekday','')::int, v_days[v_session_number]);
+      IF v_day_of_week IS NULL THEN CONTINUE; END IF;
+      -- §307 — 1re semaine partielle : ignorer un jour avant la date de départ effective.
+      IF (v_week_start + v_day_of_week) < v_effective_start THEN CONTINUE; END IF;
       INSERT INTO strength_sessions (name, description, folder_id, created_by) VALUES (
         format('[Méso %s] S%s J%s · %s · %s', v_short_id, lpad(v_week_number::text, 2, '0'),
           v_session_number, v_cycle, COALESCE(v_session->'buckets'->>0, 'mixed')),
@@ -1655,7 +1672,7 @@ END;
 $func$;
 
 GRANT EXECUTE ON FUNCTION public.apply_strength_mesocycle(
-  integer, uuid, uuid, text, text, integer, integer, date, jsonb, text, jsonb
+  integer, uuid, uuid, text, text, integer, integer, date, jsonb, text, jsonb, date
 ) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.revert_strength_mesocycle(p_mesocycle_id uuid) RETURNS void

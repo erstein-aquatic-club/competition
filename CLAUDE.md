@@ -75,7 +75,9 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§307 Phase 4** — Mésocycle muscu jour-aware (UI). Écran génération : picker **jours de muscu** (7 boutons, amorce Lun/Jeu ambre vs dev violet, samedi off) + **date de départ** (input natif, 1re semaine partielle) ; payload `{weekdays, startDate}` ; `sessionsPerWeek` dérivé. Aperçu : `MesocycleInput` jour-aware (`primerWeekdays`), `applyMesocycle(…, startDate)`, séances avec **jour + badge rôle** (amorce/dev/correctif). `npm test` 1353+20 verts, tsc 0, build 0. **Différé** : badges `MyPlanTab` (Task 4.3).
+Dernier § livré : **§308** — Mésocycle muscu : remplacement propre d'un plan en cours. La RPC `apply_strength_mesocycle` purge désormais les slot/week overrides de l'athlète **à partir de la date de départ** (jours pré-départ préservés) avant de matérialiser → re-générer avec un autre jeu de jours ne laisse plus de séances orphelines (mig **00201**, replace pur 12-arg). Harness RLS remis au niveau 00200+00201 (était à 00181) + 4 tests §308 (clean-replace, mid-week, isolation 2-nageurs, revert). `npm test` 1353+20, RLS 17/17, tsc 0, build 0.
+
+§307 Phase 4 (précédent) : picker jours de muscu + date de départ, aperçu jour-aware, badges rôle. Différé : badges `MyPlanTab` (Task 4.3).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 
