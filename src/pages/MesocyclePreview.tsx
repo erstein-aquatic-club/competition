@@ -46,6 +46,7 @@ import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 import type { PeriodizationCycle } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
+import { hasUnderLeveledProfile } from "@/lib/strength/strengthProfileMismatch";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -653,6 +654,17 @@ function ReasoningPanel({
               icon={<AlertCircle className="h-4 w-4" />}
               title="Bilan physique coach non encore réalisé"
               body="Le score Mobilité est conservateur et la confiance des données est réduite. Ton coach pourra l'enrichir ensuite."
+            />
+          )}
+          {hasUnderLeveledProfile(
+            normesContext.level,
+            normesContext.performanceTier,
+          ) && (
+            <NoteStrip
+              tone="amber"
+              icon={<AlertCircle className="h-4 w-4" />}
+              title="Profil sous-calibré pour ce niveau"
+              body={`Tier « ${normesContext.performanceTier} » mais pratique « ${normesContext.level} » : les exercices avancés (tractions lestées, haltérophilie, pliométrie avancée) ne sont pas débloqués. Ajuste le niveau de pratique dans « Profil muscu ».`}
             />
           )}
 
