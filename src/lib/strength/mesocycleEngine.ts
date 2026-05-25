@@ -568,6 +568,15 @@ const FORCE_BIAS_DISTANCES = new Set<string>(['50', '100']);
 const KNOWN_DISTANCES = new Set(['50', '100', '200', '400plus']);
 
 /**
+ * Dose d'une amorce PAP (§307) — le « dimensionnement » qui doit laisser le
+ * nageur frais pour enchaîner un sprint 100 % en bassin. Centralisé ici pour
+ * être ajustable d'un seul endroit (le potentiateur garde le %1RM du catalogue,
+ * lourd-court ; l'explosif vise la vitesse, charge ~nulle).
+ */
+const PAP_POTENTIATOR = { sets: 2, reps: 2, restSeconds: 180 } as const;
+const PAP_EXPLOSIVE = { sets: 2, reps: 3, restSeconds: 150 } as const;
+
+/**
  * Carte legacy jour-de-semaine, alignée sur le tableau codé en dur dans la RPC
  * `apply_strength_mesocycle` : utilisée quand `input.weekdays` est absent.
  * 0=Lun…6=Dim ; samedi(5) n'est jamais auto-assigné en deçà de 6 séances.
@@ -1022,10 +1031,12 @@ function buildPapSession(
     if (sel) {
       exercises.push(
         buildPapExercise(sel, {
-          sets: 2,
-          reps: 2,
+          sets: PAP_POTENTIATOR.sets,
+          reps: PAP_POTENTIATOR.reps,
+          // `null` (force% non renseignée) est intentionnel : charge lourde « au
+          // ressenti » plutôt que 0 % — un potentiateur n'est jamais à vide.
           intensityPct1rm: sel.exercise.pourcentageCharge1rmForce,
-          restSeconds: 180,
+          restSeconds: PAP_POTENTIATOR.restSeconds,
           intention: 'Potentiateur lourd — explosivité, pas de fatigue.',
         }),
       );
@@ -1040,10 +1051,10 @@ function buildPapSession(
     if (sel) {
       exercises.push(
         buildPapExercise(sel, {
-          sets: 2,
-          reps: 3,
+          sets: PAP_EXPLOSIVE.sets,
+          reps: PAP_EXPLOSIVE.reps,
           intensityPct1rm: sel.exercise.pourcentageCharge1rmForce ?? 0,
-          restSeconds: 150,
+          restSeconds: PAP_EXPLOSIVE.restSeconds,
           intention: 'Explosif — vitesse maximale, potentialise le sprint.',
         }),
       );
