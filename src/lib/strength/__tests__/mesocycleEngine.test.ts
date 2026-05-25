@@ -740,6 +740,19 @@ describe('selectExercises', () => {
     assert.deepEqual(ids, [2, 3]);
   });
 
+  it('§306 — exclut un exo tagué left_groin quand l’aine est douloureuse', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 1, bucket: 'lower_strength', isCore: true, contraindicationZones: ['left_groin', 'right_groin'] }),
+      makeExercise({ id: 2, bucket: 'lower_strength', contraindicationZones: [] }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'advanced', ['left_groin']);
+
+    const ids = (out.lower_strength ?? []).map((s) => s.exercise.id);
+    assert.ok(!ids.includes(1), 'l’exo adducteurs (left_groin) doit être exclu');
+    assert.ok(ids.includes(2), 'l’exo sans contre-indication doit rester');
+  });
+
   it('trie : exercices core en premier, puis level décroissant', () => {
     const catalog: CatalogExercise[] = [
       makeExercise({ id: 1, isCore: false, level: 'intermediate' }),
