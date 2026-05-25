@@ -33,6 +33,8 @@ export const ZONE_LABEL_FR: Record<string, string> = {
   right_ankle: 'cheville D',
   left_calf: 'mollet G',
   right_calf: 'mollet D',
+  left_groin: 'aine G',
+  right_groin: 'aine D',
 
   // Fallbacks génériques (compatibilité ascendante)
   shoulder: 'épaule',
