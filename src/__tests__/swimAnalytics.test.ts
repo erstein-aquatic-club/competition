@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import type { SwimBlock } from "../lib/swimTextParser";
 import {
   aggregateByWeek,
@@ -12,47 +13,47 @@ import {
 
 describe("normalizeStroke", () => {
   it("maps crawl/nl/nage libre to NL", () => {
-    expect(normalizeStroke("crawl")).toBe("NL");
-    expect(normalizeStroke("nl")).toBe("NL");
-    expect(normalizeStroke("NL")).toBe("NL");
-    expect(normalizeStroke("nage libre")).toBe("NL");
+    assert.equal(normalizeStroke("crawl"), "NL");
+    assert.equal(normalizeStroke("nl"), "NL");
+    assert.equal(normalizeStroke("NL"), "NL");
+    assert.equal(normalizeStroke("nage libre"), "NL");
   });
 
   it("maps dos to DOS", () => {
-    expect(normalizeStroke("dos")).toBe("DOS");
-    expect(normalizeStroke("Dos")).toBe("DOS");
+    assert.equal(normalizeStroke("dos"), "DOS");
+    assert.equal(normalizeStroke("Dos"), "DOS");
   });
 
   it("maps brasse/br to BR", () => {
-    expect(normalizeStroke("brasse")).toBe("BR");
-    expect(normalizeStroke("br")).toBe("BR");
-    expect(normalizeStroke("BR")).toBe("BR");
+    assert.equal(normalizeStroke("brasse"), "BR");
+    assert.equal(normalizeStroke("br"), "BR");
+    assert.equal(normalizeStroke("BR"), "BR");
   });
 
   it("maps papillon/pap to PAP", () => {
-    expect(normalizeStroke("papillon")).toBe("PAP");
-    expect(normalizeStroke("pap")).toBe("PAP");
-    expect(normalizeStroke("PAP")).toBe("PAP");
+    assert.equal(normalizeStroke("papillon"), "PAP");
+    assert.equal(normalizeStroke("pap"), "PAP");
+    assert.equal(normalizeStroke("PAP"), "PAP");
   });
 
   it("maps 4n/qn/quatre nages to QN", () => {
-    expect(normalizeStroke("4n")).toBe("QN");
-    expect(normalizeStroke("qn")).toBe("QN");
-    expect(normalizeStroke("QN")).toBe("QN");
-    expect(normalizeStroke("quatre nages")).toBe("QN");
-    expect(normalizeStroke("4 nages")).toBe("QN");
+    assert.equal(normalizeStroke("4n"), "QN");
+    assert.equal(normalizeStroke("qn"), "QN");
+    assert.equal(normalizeStroke("QN"), "QN");
+    assert.equal(normalizeStroke("quatre nages"), "QN");
+    assert.equal(normalizeStroke("4 nages"), "QN");
   });
 
   it("maps educ/éducatif to EDU", () => {
-    expect(normalizeStroke("educ")).toBe("EDU");
-    expect(normalizeStroke("éducatif")).toBe("EDU");
-    expect(normalizeStroke("educatif")).toBe("EDU");
+    assert.equal(normalizeStroke("educ"), "EDU");
+    assert.equal(normalizeStroke("éducatif"), "EDU");
+    assert.equal(normalizeStroke("educatif"), "EDU");
   });
 
   it("returns MIXTE for unknown strokes", () => {
-    expect(normalizeStroke("")).toBe("MIXTE");
-    expect(normalizeStroke("unknown")).toBe("MIXTE");
-    expect(normalizeStroke("ondulation")).toBe("MIXTE");
+    assert.equal(normalizeStroke(""), "MIXTE");
+    assert.equal(normalizeStroke("unknown"), "MIXTE");
+    assert.equal(normalizeStroke("ondulation"), "MIXTE");
   });
 });
 
@@ -60,43 +61,43 @@ describe("normalizeStroke", () => {
 
 describe("classifyWorkType", () => {
   it("V0 → endurance", () => {
-    expect(classifyWorkType({ intensity: "V0" })).toBe("endurance");
+    assert.equal(classifyWorkType({ intensity: "V0" }), "endurance");
   });
 
   it("V1 → endurance", () => {
-    expect(classifyWorkType({ intensity: "V1" })).toBe("endurance");
+    assert.equal(classifyWorkType({ intensity: "V1" }), "endurance");
   });
 
   it("V2 → mixte", () => {
-    expect(classifyWorkType({ intensity: "V2" })).toBe("mixte");
+    assert.equal(classifyWorkType({ intensity: "V2" }), "mixte");
   });
 
   it("V3 → vitesse", () => {
-    expect(classifyWorkType({ intensity: "V3" })).toBe("vitesse");
+    assert.equal(classifyWorkType({ intensity: "V3" }), "vitesse");
   });
 
   it("Max → vitesse", () => {
-    expect(classifyWorkType({ intensity: "Max" })).toBe("vitesse");
+    assert.equal(classifyWorkType({ intensity: "Max" }), "vitesse");
   });
 
   it("Prog → mixte", () => {
-    expect(classifyWorkType({ intensity: "Prog" })).toBe("mixte");
+    assert.equal(classifyWorkType({ intensity: "Prog" }), "mixte");
   });
 
   it("strokeType educ → technique (overrides intensity)", () => {
-    expect(classifyWorkType({ intensity: "V3", strokeType: "educ" })).toBe("technique");
+    assert.equal(classifyWorkType({ intensity: "V3", strokeType: "educ" }), "technique");
   });
 
   it("strokeType with éduc → technique", () => {
-    expect(classifyWorkType({ strokeType: "éducatif" })).toBe("technique");
+    assert.equal(classifyWorkType({ strokeType: "éducatif" }), "technique");
   });
 
   it("strokeType technique → technique", () => {
-    expect(classifyWorkType({ strokeType: "technique" })).toBe("technique");
+    assert.equal(classifyWorkType({ strokeType: "technique" }), "technique");
   });
 
   it("defaults to mixte when no intensity/strokeType", () => {
-    expect(classifyWorkType({})).toBe("mixte");
+    assert.equal(classifyWorkType({}), "mixte");
   });
 });
 
@@ -149,13 +150,13 @@ describe("computeSessionVolume", () => {
 
     const result = computeSessionVolume(blocks);
 
-    expect(result.totalMeters).toBe(1200);
-    expect(result.byStroke.NL).toBe(800);
-    expect(result.byStroke.PAP).toBe(400);
-    expect(result.byType.endurance).toBe(800);
-    expect(result.byType.vitesse).toBe(400);
-    expect(result.byIntensity.V1).toBe(800);
-    expect(result.byIntensity.Max).toBe(400);
+    assert.equal(result.totalMeters, 1200);
+    assert.equal(result.byStroke.NL, 800);
+    assert.equal(result.byStroke.PAP, 400);
+    assert.equal(result.byType.endurance, 800);
+    assert.equal(result.byType.vitesse, 400);
+    assert.equal(result.byIntensity.V1, 800);
+    assert.equal(result.byIntensity.Max, 400);
   });
 
   it("handles block repetitions", () => {
@@ -185,18 +186,18 @@ describe("computeSessionVolume", () => {
     const result = computeSessionVolume(blocks);
 
     // 2 * 100 * 3 = 600
-    expect(result.totalMeters).toBe(600);
-    expect(result.byStroke.DOS).toBe(600);
-    expect(result.byType.mixte).toBe(600);
+    assert.equal(result.totalMeters, 600);
+    assert.equal(result.byStroke.DOS, 600);
+    assert.equal(result.byType.mixte, 600);
   });
 
   it("returns zeros for empty blocks array", () => {
     const result = computeSessionVolume([]);
 
-    expect(result.totalMeters).toBe(0);
-    expect(Object.keys(result.byStroke)).toHaveLength(0);
-    expect(Object.keys(result.byType)).toHaveLength(0);
-    expect(Object.keys(result.byIntensity)).toHaveLength(0);
+    assert.equal(result.totalMeters, 0);
+    assert.equal((Object.keys(result.byStroke)).length, 0);
+    assert.equal((Object.keys(result.byType)).length, 0);
+    assert.equal((Object.keys(result.byIntensity)).length, 0);
   });
 
   it("skips exercises with null distance", () => {
@@ -236,8 +237,8 @@ describe("computeSessionVolume", () => {
 
     const result = computeSessionVolume(blocks);
 
-    expect(result.totalMeters).toBe(200);
-    expect(result.byStroke.BR).toBe(200);
+    assert.equal(result.totalMeters, 200);
+    assert.equal(result.byStroke.BR, 200);
   });
 
   it("classifies educ strokeType as technique", () => {
@@ -266,8 +267,8 @@ describe("computeSessionVolume", () => {
 
     const result = computeSessionVolume(blocks);
 
-    expect(result.totalMeters).toBe(200);
-    expect(result.byType.technique).toBe(200);
+    assert.equal(result.totalMeters, 200);
+    assert.equal(result.byType.technique, 200);
   });
 });
 
@@ -294,15 +295,15 @@ describe("aggregateByWeek", () => {
 
     const result = aggregateByWeek(entries);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].weekStart).toBe("2026-03-23");
-    expect(result[0].totalMeters).toBe(5000);
-    expect(result[0].byStroke.NL).toBe(3000);
-    expect(result[0].byStroke.DOS).toBe(1000);
-    expect(result[0].byStroke.PAP).toBe(1000);
-    expect(result[0].byType.endurance).toBe(3000);
-    expect(result[0].byType.vitesse).toBe(1000);
-    expect(result[0].byType.technique).toBe(1000);
+    assert.equal((result).length, 1);
+    assert.equal(result[0].weekStart, "2026-03-23");
+    assert.equal(result[0].totalMeters, 5000);
+    assert.equal(result[0].byStroke.NL, 3000);
+    assert.equal(result[0].byStroke.DOS, 1000);
+    assert.equal(result[0].byStroke.PAP, 1000);
+    assert.equal(result[0].byType.endurance, 3000);
+    assert.equal(result[0].byType.vitesse, 1000);
+    assert.equal(result[0].byType.technique, 1000);
   });
 
   it("separates entries from different weeks", () => {
@@ -325,11 +326,11 @@ describe("aggregateByWeek", () => {
 
     const result = aggregateByWeek(entries);
 
-    expect(result).toHaveLength(2);
-    expect(result[0].weekStart).toBe("2026-03-23");
-    expect(result[0].totalMeters).toBe(3000);
-    expect(result[1].weekStart).toBe("2026-03-30");
-    expect(result[1].totalMeters).toBe(2000);
+    assert.equal((result).length, 2);
+    assert.equal(result[0].weekStart, "2026-03-23");
+    assert.equal(result[0].totalMeters, 3000);
+    assert.equal(result[1].weekStart, "2026-03-30");
+    assert.equal(result[1].totalMeters, 2000);
   });
 
   it("returns sorted by weekStart ascending", () => {
@@ -359,10 +360,10 @@ describe("aggregateByWeek", () => {
 
     const result = aggregateByWeek(entries);
 
-    expect(result).toHaveLength(3);
-    expect(result[0].weekStart).toBe("2026-03-16");
-    expect(result[1].weekStart).toBe("2026-03-23");
-    expect(result[2].weekStart).toBe("2026-03-30");
+    assert.equal((result).length, 3);
+    assert.equal(result[0].weekStart, "2026-03-16");
+    assert.equal(result[1].weekStart, "2026-03-23");
+    assert.equal(result[2].weekStart, "2026-03-30");
   });
 
   it("handles Sunday correctly (belongs to previous Monday)", () => {
@@ -378,11 +379,11 @@ describe("aggregateByWeek", () => {
 
     const result = aggregateByWeek(entries);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].weekStart).toBe("2026-03-23");
+    assert.equal((result).length, 1);
+    assert.equal(result[0].weekStart, "2026-03-23");
   });
 
   it("returns empty array for empty input", () => {
-    expect(aggregateByWeek([])).toEqual([]);
+    assert.deepEqual(aggregateByWeek([]), []);
   });
 });

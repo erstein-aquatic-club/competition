@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   computeRunTonnage,
   computeRunTotalReps,
@@ -18,7 +19,7 @@ describe("computeRunTonnage", () => {
       { weight: 85, reps: 8 },
       { weight: 90, reps: 6 },
     ]);
-    expect(computeRunTonnage(logs)).toBe(80 * 10 + 85 * 8 + 90 * 6);
+    assert.equal(computeRunTonnage(logs), 80 * 10 + 85 * 8 + 90 * 6);
   });
 
   it("ignores logs with null weight or reps", () => {
@@ -27,37 +28,37 @@ describe("computeRunTonnage", () => {
       { weight: null, reps: 8 },
       { weight: 60, reps: null },
     ]);
-    expect(computeRunTonnage(logs)).toBe(800);
+    assert.equal(computeRunTonnage(logs), 800);
   });
 
   it("returns 0 for empty logs", () => {
-    expect(computeRunTonnage([])).toBe(0);
+    assert.equal(computeRunTonnage([]), 0);
   });
 });
 
 describe("computeRunTotalReps", () => {
   it("sums reps", () => {
     const logs = makeLogs([{ reps: 10 }, { reps: 8 }, { reps: 6 }]);
-    expect(computeRunTotalReps(logs)).toBe(24);
+    assert.equal(computeRunTotalReps(logs), 24);
   });
 
   it("skips null reps", () => {
     const logs = makeLogs([{ reps: 10 }, { reps: null }]);
-    expect(computeRunTotalReps(logs)).toBe(10);
+    assert.equal(computeRunTotalReps(logs), 10);
   });
 });
 
 describe("computeRunSRPE", () => {
   it("uses run rpe * duration when available", () => {
-    expect(computeRunSRPE(7, 45)).toBe(315);
+    assert.equal(computeRunSRPE(7, 45), 315);
   });
 
   it("returns 0 when rpe is null", () => {
-    expect(computeRunSRPE(null, 45)).toBe(0);
+    assert.equal(computeRunSRPE(null, 45), 0);
   });
 
   it("returns 0 when duration is null", () => {
-    expect(computeRunSRPE(7, null)).toBe(0);
+    assert.equal(computeRunSRPE(7, null), 0);
   });
 });
 
@@ -74,12 +75,12 @@ describe("groupLogsByExercise", () => {
       [2, "Curl"],
     ]);
     const groups = groupLogsByExercise(logs, exerciseMap);
-    expect(groups).toHaveLength(2);
-    expect(groups[0].exerciseId).toBe(1);
-    expect(groups[0].exerciseName).toBe("Squat");
-    expect(groups[0].sets).toHaveLength(2);
-    expect(groups[1].exerciseId).toBe(2);
-    expect(groups[1].sets).toHaveLength(2);
+    assert.equal((groups).length, 2);
+    assert.equal(groups[0].exerciseId, 1);
+    assert.equal(groups[0].exerciseName, "Squat");
+    assert.equal((groups[0].sets).length, 2);
+    assert.equal(groups[1].exerciseId, 2);
+    assert.equal((groups[1].sets).length, 2);
   });
 
   it("computes volume and maxWeight per group", () => {
@@ -88,29 +89,29 @@ describe("groupLogsByExercise", () => {
       { exercise_id: 1, weight: 90, reps: 6 },
     ]);
     const groups = groupLogsByExercise(logs, new Map([[1, "Squat"]]));
-    expect(groups[0].volume).toBe(80 * 10 + 90 * 6);
-    expect(groups[0].maxWeight).toBe(90);
+    assert.equal(groups[0].volume, 80 * 10 + 90 * 6);
+    assert.equal(groups[0].maxWeight, 90);
   });
 
   it("uses fallback name when exercise not in map", () => {
     const logs = makeLogs([{ exercise_id: 99, weight: 50, reps: 10 }]);
     const groups = groupLogsByExercise(logs, new Map());
-    expect(groups[0].exerciseName).toBe("Exercice #99");
+    assert.equal(groups[0].exerciseName, "Exercice #99");
   });
 });
 
 describe("computeAvgDifficulty", () => {
   it("averages difficulty values", () => {
     const logs = makeLogs([{ difficulty: 3 }, { difficulty: 5 }, { difficulty: 4 }]);
-    expect(computeAvgDifficulty(logs)).toBe(4);
+    assert.equal(computeAvgDifficulty(logs), 4);
   });
 
   it("skips null difficulty", () => {
     const logs = makeLogs([{ difficulty: 3 }, { difficulty: null }, { difficulty: 5 }]);
-    expect(computeAvgDifficulty(logs)).toBe(4);
+    assert.equal(computeAvgDifficulty(logs), 4);
   });
 
   it("returns 0 for no difficulty data", () => {
-    expect(computeAvgDifficulty([])).toBe(0);
+    assert.equal(computeAvgDifficulty([]), 0);
   });
 });

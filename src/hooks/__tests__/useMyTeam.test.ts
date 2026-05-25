@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { buildTeam, type TeamMember } from "../useMyTeam";
 import type { CoachManualSwimmer } from "@/lib/api/coach-manual-swimmers";
 
@@ -29,42 +30,42 @@ describe("buildTeam", () => {
 
     const { team, accounts, manuals: m } = buildTeam(mySwimmerIds, allAthletes, manuals);
 
-    expect(accounts).toHaveLength(2);
-    expect(m).toHaveLength(1);
-    expect(team).toHaveLength(3);
+    assert.equal((accounts).length, 2);
+    assert.equal((m).length, 1);
+    assert.equal((team).length, 3);
     // alpha sort
-    expect(team.map(t => t.displayName)).toEqual(["Alice", "Marc", "Zoé"]);
+    assert.deepEqual(team.map(t => t.displayName), ["Alice", "Marc", "Zoé"]);
   });
 
   it("account members have kind=account and correct accountId", () => {
     const { team } = buildTeam([5], [athlete(5, "Léo")], []);
-    expect(team[0].kind).toBe("account");
-    expect(team[0].accountId).toBe(5);
-    expect(team[0].id).toBe("account-5");
+    assert.equal(team[0].kind, "account");
+    assert.equal(team[0].accountId, 5);
+    assert.equal(team[0].id, "account-5");
   });
 
   it("manual members have kind=manual, carry birthdate/sex", () => {
     const m = manual("uuid-1", "Sara", { birthdate: "2010-05-15", sex: "F" });
     const { team } = buildTeam([], [], [m]);
-    expect(team[0].kind).toBe("manual");
-    expect(team[0].manualId).toBe("uuid-1");
-    expect(team[0].id).toBe("manual-uuid-1");
-    expect(team[0].birthdate).toBe("2010-05-15");
-    expect(team[0].sex).toBe("F");
+    assert.equal(team[0].kind, "manual");
+    assert.equal(team[0].manualId, "uuid-1");
+    assert.equal(team[0].id, "manual-uuid-1");
+    assert.equal(team[0].birthdate, "2010-05-15");
+    assert.equal(team[0].sex, "F");
   });
 
   it("excludes athletes not in mySwimmerIds", () => {
     const allAthletes = [athlete(1, "Alice"), athlete(2, "Bob")];
     const { accounts } = buildTeam([1], allAthletes, []);
-    expect(accounts).toHaveLength(1);
-    expect(accounts[0].displayName).toBe("Alice");
+    assert.equal((accounts).length, 1);
+    assert.equal(accounts[0].displayName, "Alice");
   });
 
   it("returns empty team when both sources are empty", () => {
     const { team, accounts, manuals: m } = buildTeam([], [], []);
-    expect(team).toHaveLength(0);
-    expect(accounts).toHaveLength(0);
-    expect(m).toHaveLength(0);
+    assert.equal((team).length, 0);
+    assert.equal((accounts).length, 0);
+    assert.equal((m).length, 0);
   });
 
   it("sort is case-insensitive", () => {
@@ -73,7 +74,7 @@ describe("buildTeam", () => {
       [athlete(1, "zoé"), athlete(2, "Alice")],
       [],
     );
-    expect(team[0].displayName).toBe("Alice");
-    expect(team[1].displayName).toBe("zoé");
+    assert.equal(team[0].displayName, "Alice");
+    assert.equal(team[1].displayName, "zoé");
   });
 });

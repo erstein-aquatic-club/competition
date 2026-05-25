@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { computeDailyLoads } from "../hooks/useTrainingLoad";
 
 // We test the pure `computeDailyLoads` function that does all the heavy lifting
@@ -16,10 +17,10 @@ describe("computeDailyLoads", () => {
 
   it("returns one entry per day in the given period", () => {
     const result = computeDailyLoads([], [], 7);
-    expect(result.length).toBe(7);
+    assert.equal(result.length, 7);
     // First entry should be 6 days ago, last should be today
-    expect(result[0].date).toBe(daysAgoStr(6));
-    expect(result[result.length - 1].date).toBe(today);
+    assert.equal(result[0].date, daysAgoStr(6));
+    assert.equal(result[result.length - 1].date, today);
   });
 
   it("aggregates swim sRPE by date (rpe * duration)", () => {
@@ -30,9 +31,9 @@ describe("computeDailyLoads", () => {
     const result = computeDailyLoads(swimRows, [], 3);
     const todayEntry = result.find((d) => d.date === today)!;
     // 5*90 + 3*60 = 450 + 180 = 630
-    expect(todayEntry.swimLoad).toBe(630);
-    expect(todayEntry.strengthLoad).toBe(0);
-    expect(todayEntry.totalLoad).toBe(630);
+    assert.equal(todayEntry.swimLoad, 630);
+    assert.equal(todayEntry.strengthLoad, 0);
+    assert.equal(todayEntry.totalLoad, 630);
   });
 
   it("uses legacy duration when session_duration_minutes is null", () => {
@@ -42,7 +43,7 @@ describe("computeDailyLoads", () => {
     const result = computeDailyLoads(swimRows, [], 3);
     const todayEntry = result.find((d) => d.date === today)!;
     // 4 * 60 = 240
-    expect(todayEntry.swimLoad).toBe(240);
+    assert.equal(todayEntry.swimLoad, 240);
   });
 
   it("defaults to 90min when no duration available", () => {
@@ -52,7 +53,7 @@ describe("computeDailyLoads", () => {
     const result = computeDailyLoads(swimRows, [], 3);
     const todayEntry = result.find((d) => d.date === today)!;
     // 2 * 90 = 180
-    expect(todayEntry.swimLoad).toBe(180);
+    assert.equal(todayEntry.swimLoad, 180);
   });
 
   it("skips swim rows with rpe <= 0", () => {
@@ -62,7 +63,7 @@ describe("computeDailyLoads", () => {
     ];
     const result = computeDailyLoads(swimRows, [], 3);
     const todayEntry = result.find((d) => d.date === today)!;
-    expect(todayEntry.swimLoad).toBe(0);
+    assert.equal(todayEntry.swimLoad, 0);
   });
 
   it("computes strength load from set log RPEs", () => {
@@ -83,7 +84,11 @@ describe("computeDailyLoads", () => {
     // avg RPE = (7+8+6)/3 = 7, normalized = 0.7
     // duration from timestamps = 45 min
     // sRPE = 0.7 * 45 = 31.5
-    expect(todayEntry.strengthLoad).toBeCloseTo(31.5, 0);
+    // toBeCloseTo(31.5, 0) → tolérance 0.5
+    assert.ok(
+      Math.abs(todayEntry.strengthLoad - 31.5) < 0.5,
+      `attendu ≈ 31.5 (±0.5), obtenu ${todayEntry.strengthLoad}`,
+    );
   });
 
   it("falls back to volume-based load when no RPE in logs", () => {
@@ -101,7 +106,7 @@ describe("computeDailyLoads", () => {
     const result = computeDailyLoads([], strengthRuns, 3);
     const todayEntry = result.find((d) => d.date === today)!;
     // volume = 50*10 + 60*8 = 500 + 480 = 980, normalized = 980/100 = 9.8, rounded = 10
-    expect(todayEntry.strengthLoad).toBe(10);
+    assert.equal(todayEntry.strengthLoad, 10);
   });
 
   it("merges swim and strength loads on the same day", () => {
@@ -118,9 +123,9 @@ describe("computeDailyLoads", () => {
     ];
     const result = computeDailyLoads(swimRows, strengthRuns, 3);
     const todayEntry = result.find((d) => d.date === today)!;
-    expect(todayEntry.swimLoad).toBe(450); // 5 * 90
-    expect(todayEntry.strengthLoad).toBeGreaterThan(0);
-    expect(todayEntry.totalLoad).toBe(todayEntry.swimLoad + todayEntry.strengthLoad);
+    assert.equal(todayEntry.swimLoad, 450); // 5 * 90
+    assert.ok(todayEntry.strengthLoad > 0);
+    assert.equal(todayEntry.totalLoad, todayEntry.swimLoad + todayEntry.strengthLoad);
   });
 
   it("excludes data outside the date range", () => {
@@ -131,13 +136,13 @@ describe("computeDailyLoads", () => {
     const result = computeDailyLoads(swimRows, [], 3);
     // oldDate is 10 days ago but range is only 3 days
     const allLoads = result.reduce((s, d) => s + d.swimLoad, 0);
-    expect(allLoads).toBe(0);
+    assert.equal(allLoads, 0);
   });
 
   it("returns sorted entries from oldest to newest", () => {
     const result = computeDailyLoads([], [], 5);
     for (let i = 1; i < result.length; i++) {
-      expect(result[i].date >= result[i - 1].date).toBe(true);
+      assert.ok(result[i].date >= result[i - 1].date);
     }
   });
 });

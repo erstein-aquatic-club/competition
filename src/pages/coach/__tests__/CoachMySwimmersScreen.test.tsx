@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 
 // Lightweight importability + pure-logic tests.
 // Full rendering requires QueryClient + Supabase — covered by manual E2E.
@@ -6,7 +7,7 @@ import { describe, it, expect } from "vitest";
 describe("CoachMySwimmersScreen — importability", () => {
   it("default export is a function", async () => {
     const mod = await import("../CoachMySwimmersScreen");
-    expect(typeof mod.default).toBe("function");
+    assert.equal(typeof mod.default, "function");
   });
 });
 
@@ -14,24 +15,24 @@ describe("parseDeepLinkAction — deep-link helper", () => {
   it("opens dialog on mount when ?action=new-manual is present", async () => {
     const { parseDeepLinkAction } = await import("../CoachMySwimmersScreen");
     const { action } = parseDeepLinkAction("#/coach?section=swimmers&action=new-manual");
-    expect(action).toBe("new-manual");
+    assert.equal(action, "new-manual");
     const { action: noAction } = parseDeepLinkAction("#/coach?section=swimmers");
-    expect(noAction).toBeNull();
+    assert.equal(noAction, null);
   });
 
   it("removes the param after opening", async () => {
     const { parseDeepLinkAction } = await import("../CoachMySwimmersScreen");
     const { cleanPath } = parseDeepLinkAction("#/coach?section=swimmers&action=new-manual");
-    expect(cleanPath).toBe("/coach?section=swimmers");
+    assert.equal(cleanPath, "/coach?section=swimmers");
     const { cleanPath: noQuery } = parseDeepLinkAction("#/coach?action=new-manual");
-    expect(noQuery).toBe("/coach");
+    assert.equal(noQuery, "/coach");
   });
 });
 
 describe("ManualSwimmerDialog — importability", () => {
   it("is a function component", async () => {
     const mod = await import("@/components/coach/ManualSwimmerDialog");
-    expect(typeof mod.ManualSwimmerDialog).toBe("function");
+    assert.equal(typeof mod.ManualSwimmerDialog, "function");
   });
 });
 
@@ -40,10 +41,10 @@ describe("ManualSwimmerDialog — validation logic", () => {
     const isValid = (name: string, sex: string) =>
       name.trim().length > 0 && (sex === "M" || sex === "F");
 
-    expect(isValid("", "M")).toBe(false);
-    expect(isValid("  ", "F")).toBe(false);
-    expect(isValid("Léo", "M")).toBe(true);
-    expect(isValid("Sara", "F")).toBe(true);
-    expect(isValid("Valid", "")).toBe(false);
+    assert.equal(isValid("", "M"), false);
+    assert.equal(isValid("  ", "F"), false);
+    assert.equal(isValid("Léo", "M"), true);
+    assert.equal(isValid("Sara", "F"), true);
+    assert.equal(isValid("Valid", ""), false);
   });
 });
