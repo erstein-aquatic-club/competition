@@ -9,10 +9,13 @@
  *     mesures KPI, taxonomie nage × distance (signatures + profils, §305),
  *     catalogue d'exercices taggé. Le template est composé localement via
  *     `composeTemplate(profile, signature, kind)` — plus de fetch par id.
- *  3. Compose `MesocycleInput`, appelle `generateMesocyclePreview` (moteur pur).
+ *  3. Compose `MesocycleInput` (jour-aware §307 : `weekdays` + `primerWeekdays`,
+ *     `sessionsPerWeek` dérivé de `weekdays.length`), appelle
+ *     `generateMesocyclePreview` (moteur pur).
  *  4. Affiche : raisonnement auditable (6 scores, priorités, confiance) +
- *     plan détaillé (semaines → cycles → séances → exercices).
- *  5. CTA confirmer → `applyMesocycle` (RPC) → toast + retour /strength.
+ *     plan détaillé (semaines → cycles → séances avec jour + rôle → exercices).
+ *  5. CTA confirmer → `applyMesocycle(input, generated, startDate)` (RPC) →
+ *     toast + retour /strength.
  *
  * Focus mode (dock masqué) — convention KpiWizard / Questionnaire.
  */
@@ -42,9 +45,11 @@ import type {
   DistanceKey,
   GeneratedMesocycle,
   MesocycleInput,
+  SessionRole,
   StrokeKey,
 } from "@/lib/strength/mesocycleEngine.types";
 import { composeTemplate } from "@/lib/strength/composeTemplate";
+import { getMonday, toISODate } from "@/lib/date";
 import { ageBandFor } from "@/lib/strength/kpiBaremes";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
 import { ZONE_LABEL_FR } from "@/lib/strength/zones";
@@ -82,8 +87,10 @@ interface PendingParams {
   distance: DistanceKey;
   kind: "season" | "inter_competition";
   targetWeekCount: number;
-  sessionsPerWeek: number;
-  startWeekMonday: string;
+  /** Jours muscu cochés (0=Lun…6=Dim, sans samedi). sessions/sem = length. §307. */
+  weekdays: number[];
+  /** Date de départ réelle (ISO YYYY-MM-DD), 1re semaine partielle possible. §307. */
+  startDate: string;
   /** Nageur ciblé (mode coach). Absent/égal à la session → mode nageur. */
   athleteId?: number | null;
 }
@@ -104,6 +111,28 @@ const BUCKET_SHORT_FR: Record<AllBucket, string> = {
   upper_power: "Puissance haut",
   mobility: "Mobilité",
   psychology: "Psycho",
+};
+
+/** Libellés courts FR des 7 jours, indexés 0=Lun…6=Dim. §307. */
+const WEEKDAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+/** Style + label d'un badge de rôle de séance (jour-aware §307). */
+const ROLE_BADGE: Record<SessionRole, { label: string; className: string }> = {
+  amorce_pap: {
+    label: "Amorce SNC",
+    className:
+      "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  },
+  developpement: {
+    label: "Développement",
+    className:
+      "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  },
+  mobilite_corrective: {
+    label: "Correctif",
+    className:
+      "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+  },
 };
 
 /** Couleur (tonalité Tailwind) par cycle pour le pastille de phase. */
@@ -171,8 +200,10 @@ function loadPendingParams(): PendingParams | null {
       typeof parsed.distance !== "string" ||
       typeof parsed.kind !== "string" ||
       typeof parsed.targetWeekCount !== "number" ||
-      typeof parsed.sessionsPerWeek !== "number" ||
-      typeof parsed.startWeekMonday !== "string"
+      !Array.isArray(parsed.weekdays) ||
+      parsed.weekdays.length === 0 ||
+      !parsed.weekdays.every((d) => typeof d === "number") ||
+      typeof parsed.startDate !== "string"
     ) {
       return null;
     }
@@ -364,7 +395,10 @@ export default function MesocyclePreview() {
       },
       template,
       targetWeekCount: params.targetWeekCount,
-      sessionsPerWeek: params.sessionsPerWeek,
+      // §307 — sessions/sem dérivé des jours cochés ; jour-aware via weekdays.
+      sessionsPerWeek: params.weekdays.length,
+      weekdays: params.weekdays,
+      primerWeekdays: params.weekdays.filter((d) => d === 0 || d === 3),
       exerciseCatalog: catalog,
     };
   }, [params, profile, assessment, template, kpiLatest, settings, catalog, allLoading]);
@@ -389,7 +423,9 @@ export default function MesocyclePreview() {
     mutationFn: async () => {
       if (!input || !generated || !params)
         throw new Error("Données incomplètes pour appliquer le mésocycle.");
-      return applyMesocycle(input, generated, params.startWeekMonday);
+      // §307 — on transmet la date de départ réelle (la RPC dérive le lundi et
+      // gère la 1re semaine partielle).
+      return applyMesocycle(input, generated, params.startDate);
     },
     onSuccess: (mesocycleId) => {
       // Nettoie le hand-off pour ne pas re-déclencher au prochain visit.
@@ -498,7 +534,7 @@ export default function MesocyclePreview() {
             performanceTier: input.athlete.performanceTier,
           }}
         />
-        <PlanPanel generated={generated} startMondayIso={params.startWeekMonday} />
+        <PlanPanel generated={generated} startDateIso={params.startDate} />
       </div>
 
       <CtaBar
@@ -862,11 +898,19 @@ function NoteStrip({
 
 function PlanPanel({
   generated,
-  startMondayIso,
+  startDateIso,
 }: {
   generated: GeneratedMesocycle;
-  startMondayIso: string;
+  /** Date de départ réelle (peut tomber en milieu de semaine). §307. */
+  startDateIso: string;
 }) {
+  // §307 — les libellés de semaine sont ancrés sur le lundi de la semaine de
+  // départ (la date de départ pouvant tomber en milieu de semaine).
+  const startMondayIso = useMemo(
+    () => toISODate(getMonday(new Date(startDateIso + "T00:00:00"))),
+    [startDateIso],
+  );
+
   // Par défaut : TOUT REPLIÉ. La vue est dense (5-23 semaines × 2-5 séances ×
   // 3-5 exercices) — le repli laisse la timeline lisible, l'utilisateur ouvre
   // ce qu'il veut auditer. Bouton "Tout déplier" toujours disponible.
@@ -980,14 +1024,24 @@ function SessionCard({
   session: GeneratedMesocycle["weeks"][number]["sessions"][number];
   cycleColor: (typeof CYCLE_COLOR)[PeriodizationCycle];
 }) {
+  const dayLabel = WEEKDAY_LABELS[session.weekday] ?? `J${session.sessionNumber}`;
+  const roleBadge = ROLE_BADGE[session.role];
   return (
     <div className="rounded-xl border bg-background p-3 shadow-sm">
       <div className="mb-2.5 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-bold">
-          <span className="font-mono text-[10px] font-black tabular-nums text-muted-foreground">
-            J{session.sessionNumber}
+          <span className="font-mono text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+            {dayLabel}
           </span>
-          <span>Séance {session.sessionNumber}</span>
+          <Badge
+            variant="outline"
+            className={cn(
+              "h-5 px-1.5 text-[9px] font-black uppercase tracking-wider",
+              roleBadge.className,
+            )}
+          >
+            {roleBadge.label}
+          </Badge>
         </h3>
         <div className="flex flex-wrap items-center justify-end gap-1">
           {session.buckets.map((b) => (

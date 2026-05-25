@@ -18597,3 +18597,32 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 - **Les notifs `Créneau annulé` et `Nouvelle séance` n'ont pas encore d'`expires_at`** : pas dans le scope §163 (faible volume, 1 événement = 1 notif, peu de bruit accumulé). À ajouter plus tard si l'audit UX le révèle nécessaire (expire par ex. `scheduled_date + 1 day`).
 - **Les bodies ont des ponctuations mixtes** (certains terminent par `.`, d'autres non) : seulement wellness/compétition/entretien alignés avec point final, les autres (créneau, séance assignée, séance terminée) gardent leur forme actuelle. Détail cosmétique mineur, pas prioritaire.
 - **Pas de test E2E UX** : vérifier post-déploiement que les anciennes notifs wellness/séance disparaissent effectivement de la vue nageur après un reload.
+
+## §307 — Mésocycle muscu jour-aware : Phase 4 — UI génération + aperçu (amorce PAP) (2026-05-25)
+
+**Contexte :** le moteur (v1.1.0) et la RPC `apply_strength_mesocycle` ont déjà été migrés (phases antérieures) pour émettre un `weekday` (0=Lun…6=Dim) + un `role` (`amorce_pap` | `developpement` | `mobilite_corrective`) par séance, gatés sur `MesocycleInput.weekdays` (mode legacy si absent). `applyMesocycle(input, generated, startDate)` prend désormais la **date de départ réelle** (3ᵉ param) et gère une 1re semaine partielle. Phase 4 câble l'UI : le nageur/coach choisit ses **jours de muscu** + une **date de départ** sur l'écran de génération ; l'aperçu construit le `MesocycleInput` jour-aware, appelle `applyMesocycle` avec la date de départ, et affiche le jour + le rôle de chaque séance.
+
+**Conventions :** jours 0=Lun…6=Dim ; samedi (5) non sélectionnable ; amorce = {Lun(0), Jeu(3)} ∩ jours cochés ; `primerWeekdays = weekdays.filter(d=>d===0||d===3)` ; `sessionsPerWeek` dérivé = `weekdays.length`.
+
+**Changements :**
+
+- `src/pages/MesocycleGeneration.tsx` (MODIFIÉ, 976→1244 l.) :
+  - State : remplacement de `sessionsPerWeek` par `weekdays: number[]` (défaut depuis `assessment.sessions_per_week` via `defaultWeekdaysFor`, favorise le rythme Lun/Jeu) + `startDate: string` (défaut = prochain jour coché ≥ aujourd'hui via `nextTrainingDateIso`, recalculé tant que non touché manuellement).
+  - Section 05 retitrée **« Jours de muscu »** : nouveau composant `WeekdayPicker` (rangée 7 boutons `min-h-[48px]`, `role="checkbox"`/`aria-checked`, samedi `disabled`+`aria-disabled`+barré). Amorce cochée = ambre, dev cochée = violet, non cochée = neutre. Légende des rôles présents + avertissement ambre si sprint (50/100) sans jour de dev force.
+  - Nouvelle Section 06 **« Date de départ »** : `StartDatePicker` (input natif `type="date"` stylé violet focus, `min`=aujourd'hui, résolution lisible `fmtShortDate`, hint 1re semaine partielle si pas un lundi).
+  - `canSubmit` : `weekdays.length >= 1` + `startDate` valide (clause `sessionsPerWeek 1..7` supprimée). Payload : `{ stroke, distance, kind, targetWeekCount, weekdays, startDate, athleteId }` (drop `sessionsPerWeek`/`startWeekMonday`). Récap affiche les jours (`Lun · Mar · Jeu`) + `Début {date}`. Suppression de `SessionsCounter` et du `todayMonday` mort.
+- `src/pages/MesocyclePreview.tsx` (MODIFIÉ, 1242→1296 l.) :
+  - Type `PendingParams` : `weekdays: number[]` + `startDate: string` (remplacent `sessionsPerWeek`/`startWeekMonday`) ; `loadPendingParams` valide le nouveau format.
+  - `MesocycleInput` : `weekdays`, `primerWeekdays = weekdays.filter(d=>d===0||d===3)`, `sessionsPerWeek = weekdays.length`. `applyMesocycle(input, generated, params.startDate)`.
+  - `SessionCard` : libellé jour (`WEEKDAY_LABELS[session.weekday]`) + badge rôle (`ROLE_BADGE` : amorce ambre, développement violet, correctif slate). `PlanPanel` prend `startDateIso` et dérive le lundi via `getMonday`/`toISODate` pour les libellés de semaine.
+- `src/lib/api/strength-mesocycles.ts` (MODIFIÉ, 1 l. de doc) — commentaire pipeline aligné sur `applyMesocycle(input, generated, startDate)`.
+
+**Tests :**
+- `npx tsc --noEmit` — 0 erreur ✅
+- `npm test` (node:test) — 1353/1353 ✅ (inchangé) ; vitest — 20/20 ✅
+- `npm run build` — OK ✅ (exit 0)
+
+**Décisions / limites :**
+- Les deux écrans n'ont pas de tests unitaires (UI pure) ; le moteur + la RPC sont couverts par `strength-mesocycles.test.ts` (non touché ici).
+- Pas de `npm run test:rls` : patch purement UI/wiring, aucune policy/RLS/wrapper d'autorisation modifié.
+- **DIFFÉRÉ** : badges jour/rôle dans `MyPlanTab` (Task 4.3) — hors scope de ce dispatch.

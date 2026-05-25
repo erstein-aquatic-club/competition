@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§306 (complet)** — Préhab ciblée par nage. **Phase 1 défensif** : zone douleur **aine** déclarable (body-map `left/right_groin`) + contre-indication 6 exos adducteurs (mig `00197`) — ferme le 🔴 brasse. **Phase 2 proactif event-aware** : colonne `dim_exercices.stroke_prehab_affinity` (mig `00198`, V1 brasse→adducteurs) + `selectExercises(…, strokeKey?)` qui préfère les exos à affinité-nage sans déloger un core (`deriveStrokeKey(event_group)`). `npm test` 1343+20 verts, tsc 0. Avant (hors §, 2026-05-25) : audit matrice §305 vs élite (`docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`) → **100 m validé ✅**, **R1 papillon** (mig `00196`). **R3 dos** (`lower_strength` ×0.95) + **R6 100 m** (`upper_power` 0.65) appliqués (mig `00199`). Restes audit : **R4 profil fond distinct, R5 seau tronc/core**.
+Dernier § livré : **§307 Phase 4** — Mésocycle muscu jour-aware (UI). Écran génération : picker **jours de muscu** (7 boutons, amorce Lun/Jeu ambre vs dev violet, samedi off) + **date de départ** (input natif, 1re semaine partielle) ; payload `{weekdays, startDate}` ; `sessionsPerWeek` dérivé. Aperçu : `MesocycleInput` jour-aware (`primerWeekdays`), `applyMesocycle(…, startDate)`, séances avec **jour + badge rôle** (amorce/dev/correctif). `npm test` 1353+20 verts, tsc 0, build 0. **Différé** : badges `MyPlanTab` (Task 4.3).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

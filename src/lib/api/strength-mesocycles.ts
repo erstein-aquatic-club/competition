@@ -10,7 +10,7 @@
  *   1. UI rassemble `MesocycleInput` (évaluation, KPI, athlète, template,
  *      durée, sessions/semaine, catalogue).
  *   2. UI appelle `generateMesocyclePreview(input)` → aperçu local.
- *   3. UI confirme → `applyMesocycle(input, generated, startWeekMonday)` →
+ *   3. UI confirme → `applyMesocycle(input, generated, startDate)` →
  *      RPC matérialise + retourne l'UUID du mésocycle persisté.
  *   4. Coach (ou nageur) peut appeler `revertMesocycle(id)` pour annuler.
  */
