@@ -302,6 +302,9 @@ export default function MesocyclePreview() {
         sex: profile.sex,
         ageBand,
         level: "intermediate",
+        // TODO(Task 7) : câbler le vrai fetch des réglages athlète
+        // (strength_athlete_settings). Défaut 'club' temporaire = identité barème.
+        performanceTier: "club",
       },
       template,
       targetWeekCount: params.targetWeekCount,
