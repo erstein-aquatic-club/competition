@@ -998,10 +998,27 @@ export interface VerticalJumpAttempts {
 }
 
 /**
- * Essais bruts d'une mesure KPI : un tableau de valeurs (4 KPIs « valeur
- * simple ») ou le détail structuré de la détente verticale (puissance).
+ * Détail structuré d'un lancer médecine-ball assis (§309). La grandeur scorée
+ * est l'indice = masse × meilleure distance ; la masse est conservée pour le
+ * suivi à masse constante.
  */
-export type KpiAttempts = number[] | VerticalJumpAttempts;
+export interface MedballThrowAttempts {
+  /** Masse du ballon utilisée (kg). */
+  ball_mass_kg: number;
+  /** Distances des essais saisis (cm). */
+  distances_cm: number[];
+  /** Meilleure distance retenue (cm). */
+  best_distance_cm: number;
+  /** Indice scoré = masse × meilleure distance (kg·m). */
+  index_kg_m: number;
+}
+
+/**
+ * Essais bruts d'une mesure KPI : un tableau de valeurs (3 KPIs « valeur
+ * simple »), le détail structuré de la détente verticale (puissance) ou du
+ * lancer médecine-ball assis (indice masse × distance).
+ */
+export type KpiAttempts = number[] | VerticalJumpAttempts | MedballThrowAttempts;
 
 export interface StrengthKpiMeasurement {
   id: string;

@@ -2,8 +2,10 @@
  * Barèmes KPI du Bilan Muscu — population de référence : SCOLAIRE GÉNÉRALE.
  *
  * 1 KPI sur 5 (`broad_jump`) repose sur des normes publiées réelles ; les
- * 4 autres sont transposés (`vertical_jump`, `weighted_pullup`, `imtp`) ou
- * de simples placeholders à calibrer (`medball_vertical_throw`).
+ * 4 autres sont transposés (`vertical_jump`, `weighted_pullup`, `imtp`,
+ * `medball_vertical_throw`). §309 : `medball_vertical_throw` n'est plus un
+ * placeholder — barème transposé des normes Seated Medicine Ball Throw 2 kg,
+ * exprimé en indice masse×distance (cf. `medballPower.ts`).
  *
  * Source détaillée et raisonnement : `docs/plans/bilan-muscu-baremes-sources.md`.
  * Barèmes validés par le coach le 2026-05-17 (3 bandes d'âge — pas de bilan
@@ -258,34 +260,44 @@ const KPI_BAREMES_BASE: Record<
     },
   },
 
-  // § 8 — lancer vertical médecine-ball 10 kg, hauteur (cm) — PLACEHOLDER.
+  // § 8 — lancer médecine-ball ASSIS (§309) : indice balistique = masse(kg) ×
+  // distance(m), en kg·m (cf. `medballPower.ts`). Remplace l'ancien lancer
+  // vertical allongé (hauteur estimée à l'œil, non fiable, sans norme publiée).
+  // TRANSPOSÉ des normes scolaires du Seated Medicine Ball Throw 2 kg (Utah,
+  // biorxiv 2021 — adolescents, population générale = notre référence) :
+  // distances M 12-13 4,3±0,7 m / 14-15 5,2±0,8 m, F 12-13 3,4±0,5 / 14-15
+  // 3,7±0,5 m, interpolées/prolongées sur nos bandes + bornes adultes ; indice =
+  // 2 kg × distance. Ancres p10/p30/p50/p70/p90 (z = ±1,28 / ±0,52 / 0).
+  // L'indice masse×distance permet de choisir la masse adaptée à l'athlète
+  // (hypothèse iso-énergie documentée dans `medballPower.ts` — suivi à masse
+  // constante).
   medball_vertical_throw: {
     M: {
       '13-14': {
-        anchors: [[45, 10], [65, 30], [85, 50], [105, 70], [130, 90]],
-        confidence: 'placeholder',
+        anchors: [[7.5, 10], [8.6, 30], [9.4, 50], [10.2, 70], [11.3, 90]],
+        confidence: 'transposed',
       },
       '15-16': {
-        anchors: [[65, 10], [90, 30], [115, 50], [140, 70], [170, 90]],
-        confidence: 'placeholder',
+        anchors: [[8.8, 10], [10.0, 30], [10.8, 50], [11.6, 70], [12.9, 90]],
+        confidence: 'transposed',
       },
       '17-18': {
-        anchors: [[80, 10], [110, 30], [135, 50], [160, 70], [195, 90]],
-        confidence: 'placeholder',
+        anchors: [[9.6, 10], [10.9, 30], [11.8, 50], [12.7, 70], [14.0, 90]],
+        confidence: 'transposed',
       },
     },
     F: {
       '13-14': {
-        anchors: [[30, 10], [42, 30], [55, 50], [70, 70], [88, 90]],
-        confidence: 'placeholder',
+        anchors: [[5.8, 10], [6.6, 30], [7.1, 50], [7.6, 70], [8.4, 90]],
+        confidence: 'transposed',
       },
       '15-16': {
-        anchors: [[38, 10], [52, 30], [68, 50], [84, 70], [105, 90]],
-        confidence: 'placeholder',
+        anchors: [[6.5, 10], [7.3, 30], [7.8, 50], [8.3, 70], [9.1, 90]],
+        confidence: 'transposed',
       },
       '17-18': {
-        anchors: [[45, 10], [60, 30], [78, 50], [95, 70], [118, 90]],
-        confidence: 'placeholder',
+        anchors: [[7.0, 10], [7.8, 30], [8.4, 50], [9.0, 70], [9.8, 90]],
+        confidence: 'transposed',
       },
     },
   },
@@ -336,8 +348,7 @@ export function getBareme(
  * du mésocycle. §301.
  *
  * Rappel : seul `broad_jump` est `solid` (normes publiées) ; `vertical_jump`,
- * `imtp`, `weighted_pullup` sont `transposed` ; `medball_vertical_throw` est
- * `placeholder` (à calibrer).
+ * `imtp`, `weighted_pullup` et `medball_vertical_throw` (§309) sont `transposed`.
  */
 export function baremeConfidenceFor(kpiKey: StrengthKpiKey): BaremeConfidence {
   return KPI_BAREMES[kpiKey].M['15-16'].confidence;

@@ -183,7 +183,7 @@ describe('baremeConfidenceFor', () => {
     vertical_jump: 'transposed',
     imtp: 'transposed',
     weighted_pullup: 'transposed',
-    medball_vertical_throw: 'placeholder',
+    medball_vertical_throw: 'transposed',
   };
 
   for (const [kpi, confidence] of Object.entries(EXPECTED)) {

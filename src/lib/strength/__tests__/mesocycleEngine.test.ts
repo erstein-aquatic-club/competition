@@ -94,13 +94,13 @@ describe('scoreBuckets', () => {
   it('mappe chaque KPI à son seau via les barèmes (sexe + bande d’âge)', () => {
     // Athlète M 15-16 — médian sur tous les KPI → score ≈ 50 par seau force/puissance.
     // Barème vertical_jump : ancre p50 = 51.1 W/kg ; broad_jump : 175 cm ;
-    // imtp : 95 kg ; weighted_pullup : 10 kg ; medball_vertical_throw : 115 cm.
+    // imtp : 95 kg ; weighted_pullup : 10 kg ; medball indice 10,8 kg·m (p50).
     const measurements: StrengthKpiMeasurement[] = [
       makeMeasurement('vertical_jump', 51.1, '2026-05-01T00:00:00Z', 'W/kg'),
       makeMeasurement('broad_jump', 175, '2026-05-01T00:00:00Z', 'cm'),
       makeMeasurement('imtp', 95, '2026-05-01T00:00:00Z', 'kg'),
       makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
-      makeMeasurement('medball_vertical_throw', 115, '2026-05-01T00:00:00Z', 'cm'),
+      makeMeasurement('medball_vertical_throw', 10.8, '2026-05-01T00:00:00Z', 'kg·m'),
     ];
 
     const scores = scoreBuckets(makeAssessment(), measurements, makeAthlete());
@@ -1015,7 +1015,7 @@ function fullInput(): MesocycleInput {
       makeMeasurement('broad_jump', 175, '2026-05-01T00:00:00Z', 'cm'),
       makeMeasurement('imtp', 95, '2026-05-01T00:00:00Z', 'kg'),
       makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
-      makeMeasurement('medball_vertical_throw', 115, '2026-05-01T00:00:00Z', 'cm'),
+      makeMeasurement('medball_vertical_throw', 10.8, '2026-05-01T00:00:00Z', 'kg·m'),
     ],
     athlete: { sex: 'M', ageBand: '15-16', level: 'intermediate', performanceTier: 'club' },
     template: makeTemplate({
@@ -1209,8 +1209,9 @@ describe('generateMesocycle', () => {
   it('lowestBaremeConfidence reflète la confiance minimale parmi les barèmes utilisés', () => {
     const meso = generateMesocycle(fullInput());
 
-    // medball_vertical_throw est 'placeholder', donc lowest doit être 'placeholder'
-    assert.equal(meso.reasoning.lowestBaremeConfidence, 'placeholder');
+    // §309 — tous les barèmes consultés sont 'transposed' (broad_jump 'solid'),
+    // donc la confiance minimale est 'transposed' (medball n'est plus placeholder).
+    assert.equal(meso.reasoning.lowestBaremeConfidence, 'transposed');
   });
 
   it('aucune mesure KPI → lowestBaremeConfidence = placeholder par défaut', () => {
@@ -1338,7 +1339,7 @@ function jourAwareInput(overrides: Partial<MesocycleInput> = {}): MesocycleInput
       makeMeasurement('broad_jump', 175, '2026-05-01T00:00:00Z', 'cm'),
       makeMeasurement('imtp', 95, '2026-05-01T00:00:00Z', 'kg'),
       makeMeasurement('weighted_pullup', 10, '2026-05-01T00:00:00Z', 'kg'),
-      makeMeasurement('medball_vertical_throw', 115, '2026-05-01T00:00:00Z', 'cm'),
+      makeMeasurement('medball_vertical_throw', 10.8, '2026-05-01T00:00:00Z', 'kg·m'),
     ],
     athlete: { sex: 'F', ageBand: 'adulte', level: 'intermediate', performanceTier: 'club' },
     template: fiftyFreeTemplate(),

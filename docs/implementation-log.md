@@ -18661,3 +18661,28 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 - Les **édits coach manuels** dans la fenêtre à partir de la date de départ sont écrasés par une re-génération (et restaurables par revert) — cohérent avec « nouvelle génération = nouveau plan ».
 - **Edge non couvert** : un ancien plan strictement plus long (ex. 8 sem.) qu'un nouveau (7 sem.) laisse des slots de la semaine au-delà de `v_window_end` (hors fenêtre snapshot/purge). Rare ; documenté.
 - Note mineure (non corrigée) : après revert, `getActiveMesocycle` = `null` alors que les slots restaurés s'affichent (le bandeau « mésocycle actif » disparaît).
+
+## §309 — KPI `medball_vertical_throw` fiabilisé : lancer assis + indice masse × distance (2026-05-25)
+
+**Contexte (audit fiabilité).** Le barème `medball_vertical_throw` (→ seau `upper_power`) était en confiance **`placeholder`** — le score le moins fiable du bilan, remonté à l'aperçu par `computeLowestBaremeConfidence`. Pire, le **protocole** (allongé, ballon 10 kg lancé vertical, hauteur **estimée à l'œil** par le binôme) n'a aucune norme publiée et la mesure visuelle n'est pas répétable.
+
+**Recherche & décisions (coach).** Recherche externe (WebSearch) : le **Seated Medicine Ball Throw** (assis dos au mur, lancer en distance) est le test normé/fiable (ICC>0,9), avec normes scolaires 2 kg (Utah/biorxiv 2021, population générale = notre référence). Pistes flight-time de pompe pliométrique écartées (le coach a raison : temps de vol ~200 ms × erreur chrono humain ~150-250 ms → non répétable). **Contrainte coach** : pouvoir **choisir la masse du ballon** (2 kg plafonne chez un homme, 15 kg inatteignable chez une femme). Décision validée : **lancer assis pour la distance + score sur un indice masse × distance** (∝ énergie au lâcher à ~45° : E = ½·m·g·d) → toute masse fonctionne sur une échelle unique. Hypothèse iso-énergie documentée (force-vitesse → une masse lourde peut légèrement majorer le score ; **suivi à masse constante**).
+
+**Changements :**
+- `src/lib/strength/medballPower.ts` (NOUVEAU, 63 l.) — `medballThrowResult(massKg, distancesCm)` → `{ value=masse×meilleureDistance(m), ballMassKg, bestDistanceCm, bestDistanceM }`. Pur, garde-fous (masse>0, ≥1 distance>0). TDD `node:test` (4 cas).
+- `src/lib/strength/kpiBaremes.ts` (MODIFIÉ) — barème `medball_vertical_throw` reconstruit en **indice kg·m** (anchors p10/p30/p50/p70/p90 = distances 2 kg ×2, transposées des normes scolaires sexe × âge), confiance **`transposed`** (plus placeholder). Header + docstring `baremeConfidenceFor` mis à jour.
+- `src/lib/strength/kpiProtocols.ts` (MODIFIÉ) — protocole : lancer **assis** dos au mur, masse choisie + conservée, distance au mètre ruban, `unit: 'kg·m'`. `key` conservée (compat DB / `StrengthKpiKey` — comme `imtp`).
+- `src/lib/api/types.ts` (MODIFIÉ) — `MedballThrowAttempts` (`ball_mass_kg`, `distances_cm`, `best_distance_cm`, `index_kg_m`) ajouté à l'union `KpiAttempts`. **Pas de migration** : masse stockée dans `attempts` jsonb, indice dans `value`, unité dans `unit`.
+- `src/pages/KpiWizard.tsx` (MODIFIÉ) — branche `medball_vertical_throw` : champ masse (slot `weight`) + distances → `medballThrowResult`, validation exige la masse, `attempts` structuré.
+- `src/components/strength/kpi/MedballThrowInputs.tsx` (NOUVEAU, 165 l., via `/frontend-design`) — saisie masse (kg) + 3 distances (cm) + encart indice live ; style aligné sur `VerticalJumpInputs` (cohérence wizard). Branche ajoutée dans `KpiStepCard.tsx`.
+
+**Tests :**
+- `npx tsc --noEmit` — 0 ✅
+- `npm test` (node:test) — **1357/1357** ✅ (+4 medballPower ; 2 tests moteur mis à jour : medball passe en indice 10,8 kg·m = p50 M 15-16, `lowestBaremeConfidence` placeholder→transposed) ; vitest — 20/20 ✅
+- `npm run build` — OK ✅
+- Pas de `test:rls` : aucune policy/RPC/table RLS (données TS + UI + type).
+
+**Décisions / limites :**
+- `key` reste `medball_vertical_throw` (stable, compat DB) bien que le test soit désormais un lancer assis — documenté dans le protocole (précédent : `imtp`).
+- Indice masse×distance ≡ iso-courbe `distance ∝ 1/masse` (iso-énergie) ; par la relation force-vitesse une masse plus lourde majore un peu le travail → **comparer un même nageur à masse constante**. Confiance `transposed` (honnête).
+- L'aperçu mésocycle : `lowestBaremeConfidence` n'est plus tiré à `placeholder` par ce KPI (seau `upper_power` désormais défendable, cohérent avec la proposition d'audit de monter `upper_power` au papillon).

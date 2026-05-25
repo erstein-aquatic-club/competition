@@ -75,9 +75,9 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§308** — Mésocycle muscu : remplacement propre d'un plan en cours. La RPC `apply_strength_mesocycle` purge désormais les slot/week overrides de l'athlète **à partir de la date de départ** (jours pré-départ préservés) avant de matérialiser → re-générer avec un autre jeu de jours ne laisse plus de séances orphelines (mig **00201**, replace pur 12-arg). Harness RLS remis au niveau 00200+00201 (était à 00181) + 4 tests §308 (clean-replace, mid-week, isolation 2-nageurs, revert). `npm test` 1353+20, RLS 17/17, tsc 0, build 0.
+Dernier § livré : **§309** — KPI `medball_vertical_throw` fiabilisé. L'ancien lancer vertical allongé (hauteur estimée à l'œil, barème `placeholder`) devient un **lancer médecine-ball assis pour la distance** (Seated MB Throw, normé), scoré sur un **indice masse × distance** (kg·m, ∝ énergie au lâcher) qui laisse **choisir la masse du ballon** sur une échelle unique. Barème **`transposed`** (normes scolaires 2 kg sexe × âge). Nouveau `medballPower.ts` (TDD) + `MedballThrowInputs.tsx` (style aligné `VerticalJumpInputs`) + branche wizard ; masse dans `attempts` jsonb (pas de migration). `npm test` 1357+20, tsc 0, build 0.
 
-§307 Phase 4 (précédent) : picker jours de muscu + date de départ, aperçu jour-aware, badges rôle. Différé : badges `MyPlanTab` (Task 4.3).
+§308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

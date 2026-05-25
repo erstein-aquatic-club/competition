@@ -35,6 +35,7 @@ import {
   sanitizeNumericInput,
 } from "@/lib/strength/kpiMeasurement";
 import { verticalJumpResult } from "@/lib/strength/jumpPower";
+import { medballThrowResult } from "@/lib/strength/medballPower";
 import type {
   KpiAttempts,
   StrengthKpiKey,
@@ -74,8 +75,9 @@ const emptyAttempts = (): AttemptsByKpi =>
   Object.fromEntries(
     PROTOCOLS.map((p) => [
       p.key,
-      // The vertical-jump (power) step also carries a body-weight field.
-      p.key === "vertical_jump"
+      // The vertical-jump (body weight) and medball-throw (ball mass) steps also
+      // carry a numeric "weight" field beside their attempts.
+      p.key === "vertical_jump" || p.key === "medball_vertical_throw"
         ? { raw: Array(p.attempts).fill(""), weight: "" }
         : { raw: Array(p.attempts).fill("") },
     ]),
@@ -273,7 +275,9 @@ export default function KpiWizard() {
         const allowNonPositive = KPI_PROTOCOLS[k].allowNonPositive ?? false;
         if (parseAttempts(attempts[k].raw, { allowNonPositive }).length === 0)
           return false;
-        if (k === "vertical_jump") {
+        // vertical_jump (poids) & medball (masse du ballon) requièrent le champ
+        // numérique annexe pour calculer la valeur scorée.
+        if (k === "vertical_jump" || k === "medball_vertical_throw") {
           return parsePositiveNumber(attempts[k].weight ?? "") != null;
         }
         return true;
@@ -323,6 +327,23 @@ export default function KpiWizard() {
               flight_times: r.flightTimes,
               height_cm: r.heightCm,
               peak_power_w: r.peakPowerW,
+            };
+          } else if (key === "medball_vertical_throw") {
+            // Lancer assis : masse du ballon + distances → indice masse×distance
+            // (kg·m), grandeur scorée. La masse est conservée dans `attempts`
+            // (traçabilité / suivi à masse constante).
+            const ballMass = parsePositiveNumber(attempts[key].weight ?? "");
+            const distances = parseAttempts(attempts[key].raw);
+            if (ballMass == null || distances.length === 0) {
+              throw new Error("Lancer médecine-ball : masse du ballon ou distance manquante");
+            }
+            const r = medballThrowResult(ballMass, distances);
+            value = r.value;
+            recordedAttempts = {
+              ball_mass_kg: r.ballMassKg,
+              distances_cm: distances,
+              best_distance_cm: r.bestDistanceCm,
+              index_kg_m: r.value,
             };
           } else {
             const parsed = parseAttempts(attempts[key].raw, {

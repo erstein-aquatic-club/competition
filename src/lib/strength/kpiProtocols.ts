@@ -92,18 +92,24 @@ export const KPI_PROTOCOLS: Record<StrengthKpiKey, KpiProtocol> = {
     gifUrl: null,
     allowNonPositive: true,
   },
+  // `key` reste 'medball_vertical_throw' (compat DB / `StrengthKpiKey`) — §309 le
+  // test n'est plus un lancer vertical allongé (hauteur estimée à l'œil, non
+  // fiable, sans norme) mais un LANCER ASSIS pour la distance (Seated Medicine
+  // Ball Throw), objectif et répétable, scoré sur l'indice masse×distance qui
+  // permet de choisir la masse du ballon (cf. `medballPower.ts`).
   medball_vertical_throw: {
     key: 'medball_vertical_throw',
-    label: 'Lancer vertical médecine-ball',
+    label: 'Lancer médecine-ball assis',
     bucket: 'Puissance haut du corps',
-    unit: 'cm',
+    unit: 'kg·m', // indice scoré = masse(kg) × meilleure distance(m)
     attempts: 3,
     steps: [
-      'Allongé sur le dos, médecine-ball 10 kg tenu poitrine, coudes au sol.',
-      'Propulser le ballon verticalement le plus haut possible.',
+      'Choisir une masse de ballon adaptée (le lancer doit rester mesurable : ni plafonné, ni trop court). Garder la MÊME masse d\'un bilan à l\'autre pour le suivi.',
+      'Assis au sol, jambes tendues, dos plaqué contre un mur, ballon tenu à deux mains contre la poitrine.',
+      'Lancer le ballon vers l\'avant le plus loin possible (~45°) sans décoller le dos du mur. 3 essais.',
     ],
-    partnerRole: 'Se place de côté, estime la hauteur max atteinte par le ballon.',
-    measurement: 'Hauteur verticale du lancer, en cm. Médecine-ball 10 kg. Meilleur de 3.',
+    partnerRole: 'Mesure au mètre ruban, du mur jusqu\'au 1er contact du ballon au sol. Note la masse du ballon + les 3 distances.',
+    measurement: 'Masse du ballon (kg) + meilleure distance (m) → indice masse × distance (kg·m). Meilleur de 3.',
     gifUrl: null,
   },
 };

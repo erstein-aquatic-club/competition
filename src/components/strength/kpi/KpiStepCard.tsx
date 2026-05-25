@@ -10,11 +10,13 @@
  *  - the measurement inputs.
  *
  * Input model depends on the KPI:
- *  - 4 KPIs ("simple value") → `protocol.attempts` numeric inputs, best kept;
- *  - `vertical_jump` (power)  → body weight + flight times (VerticalJumpInputs).
+ *  - 3 KPIs ("simple value") → `protocol.attempts` numeric inputs, best kept;
+ *  - `vertical_jump` (power)  → body weight + flight times (VerticalJumpInputs);
+ *  - `medball_vertical_throw` → ball mass + distances → indice (MedballThrowInputs).
  */
 import { KpiGifPanel } from "./KpiGifPanel";
 import { VerticalJumpInputs } from "./VerticalJumpInputs";
+import { MedballThrowInputs } from "./MedballThrowInputs";
 import { bestAttempt, parseAttempts } from "@/lib/strength/kpiMeasurement";
 import type { KpiProtocol } from "@/lib/strength/kpiProtocols";
 import { Input } from "@/components/ui/input";
@@ -118,13 +120,20 @@ export function KpiStepCard({
         </div>
       </div>
 
-      {/* Measurement inputs — power KPI vs simple-value KPIs */}
+      {/* Measurement inputs — power KPI / medball index / simple-value KPIs */}
       {protocol.key === "vertical_jump" ? (
         <VerticalJumpInputs
           flightTimesRaw={attempts.raw}
           weightRaw={attempts.weight ?? ""}
           onChangeFlightTime={onChangeAttempt}
           onChangeWeight={onChangeWeight}
+        />
+      ) : protocol.key === "medball_vertical_throw" ? (
+        <MedballThrowInputs
+          distancesRaw={attempts.raw}
+          massRaw={attempts.weight ?? ""}
+          onChangeDistance={onChangeAttempt}
+          onChangeMass={onChangeWeight}
         />
       ) : (
         <GenericKpiInputs
