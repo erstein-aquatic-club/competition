@@ -4,6 +4,26 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## R5 — Seau « tronc / core » (DESIGN + DRAFT TDD, non déployé) (2026-05-26)
+
+**Branche** : `feat/coach-bilan-unifie` (worktree isolé). **Lève R5** des audits matrice (`2026-05-25-…-matrice-complete-vs-elite.md` §4-E) et robustesse (`2026-05-26-…-robustesse-perf-elite-edition.md` §3). **Aucune migration appliquée en prod, rien poussé.**
+
+### Livrables
+- **Design** : `docs/plans/2026-05-26-muscu-seau-core-r5-design.md` — 4 décisions tranchées (matrice emphase nage×distance, choix KPI, re-tag catalogue, périodisation) + sources littérature. Valeurs d'emphase marquées « À VALIDER COACH ».
+- **Migrations DRAFT (NON appliquées)** : `00203_strength_core_bucket_signatures_profiles.sql` (clé `core` dans `strength_stroke_signatures.mult` + `strength_distance_profiles.emphasis` via `jsonb_set` idempotent) ; `00204_dim_exercices_core_bucket.sql` (CHECK élargi + re-tag de 12 exos tronc → `core`, ids vérifiés read-only sur prod).
+- **Implémentation TDD** : `StrengthBucket += 'core'` (`api/types.ts`), `EMPHASIS_BUCKETS` (`composeTemplate.ts`, rétrocompat `?? 0 / ?? 1` → pas de NaN tant que la DB n'a pas la clé), `scoreBuckets.core = null` + `BUCKET_LABEL_FR` (`mesocycleEngine.ts`), labels `core` dans `MesocyclePreview.tsx`/`CoachMesocyclePanel.tsx`, type-guard `isStrengthBucket` (`strength-catalog.ts`). Bloc tronc systématique inséré dans les séances de développement quand `template.bucket_emphasis.core > 0` (helper `buildCoreExercise`, chargé endurance/contrôle).
+
+### Décision clé (KPI) — option (a)
+Le core est **non scoré** (pas de KPI dédié) et **hors `ALL_BUCKETS`** de priorisation → évite la sur-priorisation `emphasis × (100 − 0)` qu'un 6ᵉ seau scoré `null` provoquerait. Traité comme socle permanent (modèle mobilité). Le score §309 reste protégé (aucun barème `placeholder` ajouté).
+
+### Tests / vérifs
+- `npx tsc --noEmit` exit 0. `npm test` : **node:test 1377/1377 (+8) + vitest 20/20**, fail 0.
+- Nouveaux tests : `composeTemplate.test.ts` (matrice core composée, fly = max, ordre 4N>dos>crawl>brasse, core jamais 0, rétrocompat NaN) ; `mesocycleEngine.test.ts` (core jamais priorisé, bloc core inséré si emphase>0, aucun bloc si DB pré-migration).
+- **Pas de `test:rls`** (data de référence + logique pure, aucune policy touchée).
+
+### Reste à valider coach
+Valeurs chiffrées de la matrice ; sort du lancer rotatif médecine-ball (53, reste upper_power par défaut) ; 1 vs 2 exos core sur fly/4N/dos-long ; vrai KPI core à terme (option b). **À appliquer post-validation** : 00203 puis 00204 via MCP, puis redéploiement front.
+
 ## Audit matrice — R3 + R6 (recalibration dos + 100 m) (2026-05-25)
 
 **Branche** : `main` (recalibrations data 1-ligne, appliquées via MCP). Suite de l'audit matrice (`docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`).

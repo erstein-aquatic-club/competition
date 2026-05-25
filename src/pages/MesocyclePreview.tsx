@@ -106,6 +106,8 @@ const BUCKET_LABEL_FR: Record<AllBucket, string> = {
   upper_power: "Puissance haut du corps",
   mobility: "Mobilité",
   psychology: "Psychologie",
+  // §R5 — tronc/gainage : socle permanent, non scoré (cf. design R5 §2).
+  core: "Tronc / gainage",
 };
 
 const BUCKET_SHORT_FR: Record<AllBucket, string> = {
@@ -115,6 +117,7 @@ const BUCKET_SHORT_FR: Record<AllBucket, string> = {
   upper_power: "Puissance haut",
   mobility: "Mobilité",
   psychology: "Psycho",
+  core: "Tronc",
 };
 
 /** Libellés courts FR des 7 jours, indexés 0=Lun…6=Dim. §307. */

@@ -40,7 +40,9 @@ function isStrengthBucket(value: unknown): value is StrengthBucket {
     value === 'lower_power' ||
     value === 'upper_strength' ||
     value === 'upper_power' ||
-    value === 'mobility'
+    value === 'mobility' ||
+    // §R5 — `core` accepté dès que la migration 00204 re-tag les exercices.
+    value === 'core'
   );
 }
 

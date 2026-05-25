@@ -72,6 +72,8 @@ const BUCKET_LABEL_FR: Record<AnyBucket, string> = {
   upper_power: "Puissance haut du corps",
   mobility: "Mobilité",
   psychology: "Psychologie",
+  // §R5 — tronc/gainage (cf. design R5 §2).
+  core: "Tronc / gainage",
 };
 
 const BUCKET_SHORT_FR: Record<AnyBucket, string> = {
@@ -81,6 +83,7 @@ const BUCKET_SHORT_FR: Record<AnyBucket, string> = {
   upper_power: "Puissance haut",
   mobility: "Mobilité",
   psychology: "Psycho",
+  core: "Tronc",
 };
 
 /** Couleurs par cycle (alignées sur MesocyclePreview pour cohérence visuelle). */

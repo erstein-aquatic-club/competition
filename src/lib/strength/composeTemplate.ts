@@ -20,12 +20,18 @@ import type {
   PeriodizationTemplateKind,
 } from '@/lib/api/types';
 
+// §R5 (DRAFT 2026-05-26) — `core` ajouté : 6ᵉ seau « tronc/gainage ». Composé
+// comme les autres (profil.emphasis.core × signature.mult.core). Les valeurs
+// vivent en DB (00203, NON appliquée) — À VALIDER COACH. Tant que la DB ne porte
+// pas la clé `core`, `composeTemplate` la lit comme `undefined` → géré ci-dessous
+// (emphase 0, rétrocompatible).
 const EMPHASIS_BUCKETS: StrengthBucket[] = [
   'lower_strength',
   'lower_power',
   'upper_strength',
   'upper_power',
   'mobility',
+  'core',
 ];
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
@@ -39,7 +45,15 @@ export function composeTemplate(
   kind: PeriodizationTemplateKind,
 ): StrengthPeriodizationTemplate {
   const bucket_emphasis = Object.fromEntries(
-    EMPHASIS_BUCKETS.map((b) => [b, clamp01(round2(profile.emphasis[b] * signature.mult[b]))]),
+    EMPHASIS_BUCKETS.map((b) => {
+      // §R5 — rétrocompat : tant que la DB ne porte pas la clé `core`
+      // (migration 00203 non appliquée), `emphasis[b]`/`mult[b]` valent
+      // `undefined` → on retombe sur 0 (resp. 1.0 pour le mult, neutre) plutôt
+      // que NaN. Les 5 seaux historiques ne sont pas affectés.
+      const emphasis = profile.emphasis[b] ?? 0;
+      const mult = signature.mult[b] ?? 1;
+      return [b, clamp01(round2(emphasis * mult))];
+    }),
   ) as Record<StrengthBucket, number>;
   return {
     id: `${signature.stroke_key}_${profile.distance_key}_${kind}`,
