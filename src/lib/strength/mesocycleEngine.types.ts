@@ -11,7 +11,12 @@
  * @see docs/plans/2026-05-18-bilan-muscu-moteur-generation-design.md §5-6
  */
 
-import type { StrengthBucket, PeriodizationCycle } from '@/lib/api/types';
+import type {
+  StrengthBucket,
+  PeriodizationCycle,
+  PeriodizationStructure,
+  PeriodizationTemplateKind,
+} from '@/lib/api/types';
 import type { BaremeConfidence } from '@/lib/strength/kpiBaremes';
 
 // ── Scoring des seaux ──────────────────────────────────────────────────────────
@@ -337,4 +342,27 @@ export interface MesocycleInput {
    * Passé en paramètre pour que le moteur reste pur.
    */
   exerciseCatalog: CatalogExercise[];
+}
+
+// ── Taxonomie nage × distance (§305) ─────────────────────────────────────────
+
+export type StrokeKey = 'freestyle' | 'butterfly' | 'backstroke' | 'breaststroke' | 'medley';
+export type DistanceKey = '50' | '100' | '200' | '400plus';
+
+/** Multiplicateur par seau d'une nage vs crawl (crawl ≡ 1.0). §305. */
+export interface StrokeSignature {
+  stroke_key: StrokeKey;
+  label: string;
+  mult: Record<StrengthBucket, number>;
+}
+
+/** Emphase canonique (ancrée crawl) + arc de périodisation d'une distance. §305. */
+export interface DistanceProfile {
+  distance_key: DistanceKey;
+  kind: PeriodizationTemplateKind;
+  label: string;
+  emphasis: Record<StrengthBucket, number>;
+  structure: PeriodizationStructure;
+  min_week_count: number;
+  max_week_count: number;
 }
