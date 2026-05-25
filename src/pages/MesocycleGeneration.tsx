@@ -17,7 +17,12 @@
  *   • target_week_count — durée cible, bornée à [min_week_count, max_week_count]
  *                         du DistanceProfile (distance, kind). Peut s'aligner
  *                         sur une compétition.
- *   • sessions_per_week — relue de l'évaluation, ajustable 1..7.
+ *   • weekdays          — jours muscu cochés (0=Lun…6=Dim, sans samedi). §307.
+ *                         Lun/Jeu = amorce PAP avant le sprint bassin, les
+ *                         autres jours développent la force. sessions_per_week
+ *                         est dérivé = weekdays.length.
+ *   • start_date        — date de départ réelle (1re semaine partielle si en
+ *                         milieu de semaine). §307.
  *
  * Disclosure
  * ──────────
@@ -60,6 +65,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
   Calendar,
+  CalendarDays,
   Check,
   ChevronRight,
   Dumbbell,
@@ -119,6 +125,74 @@ const KIND_OPTIONS: Array<{
     range: "5 à 8 semaines",
   },
 ];
+
+// ── Jours de muscu (§307) ─────────────────────────────────────────────────────
+
+/** Libellés courts FR des 7 jours, indexés 0=Lun…6=Dim. */
+const WEEKDAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+/** Samedi (5) n'est jamais sélectionnable — pas de muscu le samedi. */
+const SATURDAY = 5;
+
+/** `true` si `d` est un jour d'amorce PAP (lundi ou jeudi). §307. */
+function isPrimerWeekday(d: number): boolean {
+  return d === 0 || d === 3;
+}
+
+/**
+ * Jours par défaut depuis le nombre de séances de l'évaluation, en favorisant
+ * le rythme Lun/Jeu (amorce avant le sprint bassin). §307.
+ *  1→[0] · 2→[0,3] · 3→[0,1,3] · 4→[0,1,3,4] · 5→[0,1,2,3,4] · sinon N premiers
+ *  jours non-samedi.
+ */
+function defaultWeekdaysFor(count: number): number[] {
+  switch (count) {
+    case 1:
+      return [0];
+    case 2:
+      return [0, 3];
+    case 3:
+      return [0, 1, 3];
+    case 4:
+      return [0, 1, 3, 4];
+    case 5:
+      return [0, 1, 2, 3, 4];
+    default: {
+      // Sélectionne les N premiers jours en sautant le samedi.
+      const out: number[] = [];
+      for (let d = 0; d < 7 && out.length < count; d++) {
+        if (d !== SATURDAY) out.push(d);
+      }
+      return out;
+    }
+  }
+}
+
+/**
+ * Première date de départ (ISO) tombant sur un jour coché, à partir
+ * d'aujourd'hui inclus. Si aucun jour coché cette semaine n'arrive après
+ * aujourd'hui, prend le premier jour coché de la semaine prochaine. §307.
+ */
+function nextTrainingDateIso(weekdays: number[], today: Date): string {
+  if (weekdays.length === 0) return toISODate(today);
+  const set = new Set(weekdays);
+  // Cherche dans les 14 prochains jours (couvre cette semaine + la suivante).
+  for (let offset = 0; offset < 14; offset++) {
+    const d = addDays(today, offset);
+    const jsDay = d.getDay(); // 0=Dim…6=Sam
+    const weekday = (jsDay + 6) % 7; // 0=Lun…6=Dim
+    if (set.has(weekday)) return toISODate(d);
+  }
+  return toISODate(today);
+}
+
+/** Libellé « Lun · Mar · Jeu » d'une liste de jours triée. */
+function formatWeekdayList(weekdays: number[]): string {
+  return [...weekdays]
+    .sort((a, b) => a - b)
+    .map((d) => WEEKDAY_LABELS[d])
+    .join(" · ");
+}
 
 // ── Helpers internes ─────────────────────────────────────────────────────────
 
@@ -221,7 +295,11 @@ export default function MesocycleGeneration() {
   const [distance, setDistance] = useState<DistanceKey | null>(null);
   const [kind, setKind] = useState<"season" | "inter_competition" | null>(null);
   const [weeks, setWeeks] = useState<number | null>(null);
-  const [sessionsPerWeek, setSessionsPerWeek] = useState<number | null>(null);
+  // §307 — jours muscu cochés (0=Lun…6=Dim, sans samedi) ; sessions/sem dérivé.
+  const [weekdays, setWeekdays] = useState<number[] | null>(null);
+  // §307 — date de départ réelle (ISO YYYY-MM-DD), 1re semaine partielle si en
+  // milieu de semaine.
+  const [startDate, setStartDate] = useState<string>("");
 
   // Reset des sections aval quand l'amont change.
   useEffect(() => {
@@ -284,25 +362,38 @@ export default function MesocycleGeneration() {
     }
   }, [distanceProfile, weeks]);
 
-  // ── sessions_per_week — par défaut depuis l'évaluation ───────────────────
+  // ── weekdays — par défaut depuis l'évaluation (favorise Lun/Jeu) §307 ─────
   useEffect(() => {
-    if (assessment && sessionsPerWeek == null) {
-      setSessionsPerWeek(assessment.sessions_per_week ?? 3);
+    if (assessment && weekdays == null) {
+      setWeekdays(defaultWeekdaysFor(assessment.sessions_per_week ?? 3));
     }
-  }, [assessment, sessionsPerWeek]);
+  }, [assessment, weekdays]);
 
   // ── Compétitions à venir + ancrage temporel ──────────────────────────────
   const { visibleCompetitions } = useCompetitionsByWeek(effectiveAthleteId);
 
-  const todayMonday = useMemo(() => getMonday(new Date()), []);
   const todayIso = useMemo(() => toISODate(new Date()), []);
 
-  // Date de démarrage : lundi de la semaine prochaine, jamais cette semaine.
+  // §307 — date de départ par défaut = prochain jour coché à partir d'aujourd'hui.
+  // Recalculée tant que l'utilisateur n'a pas saisi de date manuellement.
+  const [startDateTouched, setStartDateTouched] = useState(false);
+  useEffect(() => {
+    if (!startDateTouched && weekdays != null && weekdays.length > 0) {
+      setStartDate(nextTrainingDateIso(weekdays, new Date()));
+    }
+  }, [weekdays, startDateTouched]);
+
+  // Lundi de la semaine de départ (dérivé de startDate) — ancre le calcul de
+  // l'écart en semaines des compétitions à venir.
   const startMonday = useMemo(
-    () => getMonday(addDays(new Date(), 7)),
-    [],
+    () => (startDate ? getMonday(new Date(startDate + "T00:00:00")) : getMonday(new Date())),
+    [startDate],
   );
-  const startMondayIso = useMemo(() => toISODate(startMonday), [startMonday]);
+  /** `true` si la date de départ ne tombe pas un lundi → 1re semaine partielle. */
+  const startIsPartialWeek = useMemo(
+    () => startDate !== "" && toISODate(startMonday) !== startDate,
+    [startDate, startMonday],
+  );
 
   const upcomingComps = useMemo(
     () => pickUpcoming(visibleCompetitions, todayIso, 5),
@@ -319,6 +410,21 @@ export default function MesocycleGeneration() {
     [upcomingComps, startMonday],
   );
 
+  // §307 — jours d'amorce (Lun/Jeu) et de développement parmi les jours cochés.
+  const primerDaysChosen = useMemo(
+    () => (weekdays ?? []).filter(isPrimerWeekday),
+    [weekdays],
+  );
+  const devDaysChosen = useMemo(
+    () => (weekdays ?? []).filter((d) => !isPrimerWeekday(d)),
+    [weekdays],
+  );
+  /** Sprint (50/100) avec uniquement des jours d'amorce → pas de jour de dev force. */
+  const sprintNoDevDay =
+    (distance === "50" || distance === "100") &&
+    (weekdays?.length ?? 0) >= 1 &&
+    devDaysChosen.length === 0;
+
   // ── Validation finale ────────────────────────────────────────────────────
   const canSubmit =
     stroke != null &&
@@ -328,9 +434,9 @@ export default function MesocycleGeneration() {
     weeks != null &&
     weeks >= distanceProfile.min_week_count &&
     weeks <= distanceProfile.max_week_count &&
-    sessionsPerWeek != null &&
-    sessionsPerWeek >= 1 &&
-    sessionsPerWeek <= 7;
+    weekdays != null &&
+    weekdays.length >= 1 &&
+    startDate !== "";
 
   function handleSubmit() {
     if (
@@ -339,7 +445,8 @@ export default function MesocycleGeneration() {
       distance == null ||
       kind == null ||
       weeks == null ||
-      sessionsPerWeek == null
+      weekdays == null ||
+      startDate === ""
     )
       return;
     const payload = {
@@ -347,8 +454,8 @@ export default function MesocycleGeneration() {
       distance,
       kind,
       targetWeekCount: weeks,
-      sessionsPerWeek,
-      startWeekMonday: startMondayIso,
+      weekdays: [...weekdays].sort((a, b) => a - b),
+      startDate,
       athleteId: effectiveAthleteId,
     };
     try {
@@ -358,6 +465,18 @@ export default function MesocycleGeneration() {
       // via le route state ; l'écran d'aperçu fera son propre fallback.
     }
     navigate("/strength/mesocycle-preview");
+  }
+
+  /** Coche/décoche un jour muscu (samedi ignoré). §307. */
+  function toggleWeekday(d: number) {
+    if (d === SATURDAY) return;
+    setWeekdays((prev) => {
+      const base = prev ?? [];
+      const next = base.includes(d)
+        ? base.filter((x) => x !== d)
+        : [...base, d];
+      return next.sort((a, b) => a - b);
+    });
   }
 
   // ── États écran ──────────────────────────────────────────────────────────
@@ -522,7 +641,7 @@ export default function MesocycleGeneration() {
             distance != null &&
             kind != null &&
             weeks != null &&
-            sessionsPerWeek == null
+            (weekdays == null || weekdays.length === 0)
           }
         >
           {distanceProfile && weeks != null && (
@@ -626,31 +745,64 @@ export default function MesocycleGeneration() {
           )}
         </SectionCard>
 
-        {/* ── Section 05 — Séances / semaine ───────────────────────────── */}
+        {/* ── Section 05 — Jours de muscu ──────────────────────────────── */}
         <SectionCard
           number="05"
-          title="Séances par semaine"
-          subtitle={
-            assessment.sessions_per_week != null
-              ? "Valeur de ton bilan, modifiable."
-              : "Choisis ton rythme — modifiable plus tard avec ton coach."
-          }
+          title="Jours de muscu"
+          subtitle="Coche tes jours. Lun & Jeu = amorce avant le sprint bassin ; les autres développent la force. Pas de muscu le samedi."
           enabled={stroke != null && distance != null && kind != null && weeks != null}
           active={
             stroke != null &&
             distance != null &&
             kind != null &&
             weeks != null &&
-            sessionsPerWeek != null
+            (weekdays == null || weekdays.length === 0)
           }
         >
-          {sessionsPerWeek != null && (
-            <SessionsCounter value={sessionsPerWeek} onChange={setSessionsPerWeek} />
+          {weekdays != null && (
+            <WeekdayPicker
+              weekdays={weekdays}
+              onToggle={toggleWeekday}
+              primerCount={primerDaysChosen.length}
+              devCount={devDaysChosen.length}
+              sprintNoDevDay={sprintNoDevDay}
+            />
           )}
         </SectionCard>
 
+        {/* ── Section 06 — Date de départ ──────────────────────────────── */}
+        <SectionCard
+          number="06"
+          title="Date de départ"
+          subtitle="Quand démarre le cycle ? 1re semaine partielle si tu commences en milieu de semaine."
+          enabled={
+            stroke != null &&
+            distance != null &&
+            kind != null &&
+            weeks != null &&
+            weekdays != null &&
+            weekdays.length >= 1
+          }
+          active={
+            weeks != null &&
+            weekdays != null &&
+            weekdays.length >= 1 &&
+            startDate === ""
+          }
+        >
+          <StartDatePicker
+            value={startDate}
+            min={todayIso}
+            onChange={(v) => {
+              setStartDateTouched(true);
+              setStartDate(v);
+            }}
+            isPartialWeek={startIsPartialWeek}
+          />
+        </SectionCard>
+
         {/* ── Récap discret avant le CTA ───────────────────────────────── */}
-        {canSubmit && stroke != null && distance != null && weeks != null && sessionsPerWeek != null && (
+        {canSubmit && stroke != null && distance != null && weeks != null && weekdays != null && (
           <Card className="border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-700 dark:text-violet-300">
               Récap
@@ -662,10 +814,10 @@ export default function MesocycleGeneration() {
                 {distanceLabelByKey.get(distance) ?? DISTANCE_LABELS_FALLBACK[distance]}
               </span>{" "}
               · <span className="tabular-nums">{weeks}</span> semaines ·{" "}
-              <span className="tabular-nums">{sessionsPerWeek}</span> séances/sem.
+              <span className="font-semibold">{formatWeekdayList(weekdays)}</span>
             </p>
             <p className="mt-0.5 text-[11px] text-violet-700/80 dark:text-violet-300/80">
-              Début prévu lundi {fmtShortDate(startMondayIso)}
+              Début {fmtShortDate(startDate)}
             </p>
           </Card>
         )}
@@ -717,8 +869,8 @@ function Header({ onBack }: { onBack: () => void }) {
         </div>
       </div>
       <p className="mx-auto max-w-2xl px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
-        Choisis la nage, l'épreuve, la famille de prépa, la durée et le nombre de
-        séances.
+        Choisis la nage, l'épreuve, la famille de prépa, la durée, tes jours de
+        muscu et la date de départ.
       </p>
     </header>
   );
@@ -891,40 +1043,156 @@ function DurationTapeMeasure({
   );
 }
 
-interface SessionsCounterProps {
-  value: number;
-  onChange: (v: number) => void;
+interface WeekdayPickerProps {
+  /** Jours cochés (0=Lun…6=Dim). */
+  weekdays: number[];
+  /** Coche/décoche un jour. */
+  onToggle: (d: number) => void;
+  /** Nb de jours d'amorce (Lun/Jeu) cochés — pilote la légende. */
+  primerCount: number;
+  /** Nb de jours de développement cochés — pilote la légende. */
+  devCount: number;
+  /** Sprint (50/100) sans jour de développement force → avertissement. */
+  sprintNoDevDay: boolean;
 }
 
-function SessionsCounter({ value, onChange }: SessionsCounterProps) {
+/**
+ * Rangée de 7 boutons jour (Lun…Dim). §307.
+ *  - Samedi (5) désactivé (pas de muscu le samedi).
+ *  - Jour d'amorce coché (Lun/Jeu) → ambre ; jour de dev coché → violet.
+ *  - Légende des rôles présents + avertissement sprint sans jour de dev.
+ */
+function WeekdayPicker({
+  weekdays,
+  onToggle,
+  primerCount,
+  devCount,
+  sprintNoDevDay,
+}: WeekdayPickerProps) {
+  const set = new Set(weekdays);
   return (
-    <div className="flex items-center justify-center gap-4">
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(1, value - 1))}
-        aria-label="−1 séance"
-        disabled={value <= 1}
-        className="flex h-10 w-10 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
-      >
-        <Minus className="h-4 w-4" />
-      </button>
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-4xl font-black tabular-nums leading-none">
-          {value}
-        </span>
-        <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          séances/sem.
-        </span>
+    <div className="space-y-3">
+      <div className="grid grid-cols-7 gap-1.5">
+        {WEEKDAY_LABELS.map((label, d) => {
+          const isSaturday = d === SATURDAY;
+          const selected = set.has(d);
+          const primer = isPrimerWeekday(d);
+          return (
+            <button
+              key={d}
+              type="button"
+              role="checkbox"
+              aria-checked={selected}
+              aria-disabled={isSaturday}
+              aria-label={
+                isSaturday
+                  ? `${label} — pas de muscu le samedi`
+                  : primer
+                    ? `${label} — jour d'amorce`
+                    : `${label} — jour de développement`
+              }
+              disabled={isSaturday}
+              onClick={() => onToggle(d)}
+              className={cn(
+                "flex min-h-[48px] flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-xs font-semibold transition-colors",
+                isSaturday &&
+                  "cursor-not-allowed border-dashed border-border bg-muted/30 text-muted-foreground/50 line-through opacity-50",
+                !isSaturday &&
+                  selected &&
+                  primer &&
+                  "border-amber-500 bg-amber-500 text-white shadow-sm dark:border-amber-400 dark:bg-amber-400",
+                !isSaturday &&
+                  selected &&
+                  !primer &&
+                  "border-violet-600 bg-violet-600 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500",
+                !isSaturday &&
+                  !selected &&
+                  "border-border bg-card hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
-      <button
-        type="button"
-        onClick={() => onChange(Math.min(7, value + 1))}
-        aria-label="+1 séance"
-        disabled={value >= 7}
-        className="flex h-10 w-10 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
-      >
-        <Plus className="h-4 w-4" />
-      </button>
+
+      {/* Légende — uniquement les rôles présents. */}
+      {(primerCount > 0 || devCount > 0) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+          {primerCount > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+              Amorce SNC (Lun/Jeu)
+            </span>
+          )}
+          {devCount > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-violet-600 dark:bg-violet-500" />
+              Développement force
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Avertissement : sprint avec uniquement des jours d'amorce. */}
+      {sprintNoDevDay && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+          <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-400" />
+          <span>
+            Aucun jour de développement force — coche un jour off-bassin
+            (Mar/Mer/Ven) pour construire la force.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface StartDatePickerProps {
+  /** Date ISO (YYYY-MM-DD) ou "" si pas encore choisie. */
+  value: string;
+  /** Borne min (aujourd'hui ISO). */
+  min: string;
+  onChange: (iso: string) => void;
+  /** `true` si la date ne tombe pas un lundi → 1re semaine partielle. */
+  isPartialWeek: boolean;
+}
+
+/** Sélecteur de date de départ — input natif stylé + résolution lisible. §307. */
+function StartDatePicker({
+  value,
+  min,
+  onChange,
+  isPartialWeek,
+}: StartDatePickerProps) {
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="date"
+          value={value}
+          min={min}
+          aria-label="Date de départ du mésocycle"
+          onChange={(e) => onChange(e.target.value)}
+          className="min-h-[48px] w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm font-semibold outline-none transition-colors focus:border-violet-500 focus:ring-2 focus:ring-violet-200 dark:focus:border-violet-400 dark:focus:ring-violet-900/50"
+        />
+      </div>
+      {value !== "" && (
+        <p className="text-[11px] text-muted-foreground">
+          Démarre le{" "}
+          <span className="font-semibold text-foreground">
+            {fmtShortDate(value)}
+          </span>
+          .
+        </p>
+      )}
+      {isPartialWeek && (
+        <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+          1re semaine partielle — les jours avant cette date ne sont pas
+          planifiés.
+        </p>
+      )}
     </div>
   );
 }
@@ -936,7 +1204,7 @@ function PageSkeleton() {
         <div className="mx-auto h-9 max-w-2xl animate-pulse rounded bg-muted" />
       </div>
       <div className="mx-auto max-w-2xl space-y-3 px-4 pt-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
         ))}
       </div>
