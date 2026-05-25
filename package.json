@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "tsc",
+    "pretest": "node scripts/check-test-runner.mjs",
     "test": "node --test --experimental-test-module-mocks --import tsx \"src/**/*.test.ts\" \"src/**/*.test.tsx\" && vitest run --config vitest.config.unit.ts",
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
     "test:rls": "vitest run --config vitest.config.rls.ts",
