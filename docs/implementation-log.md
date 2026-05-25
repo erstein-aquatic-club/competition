@@ -18686,3 +18686,34 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 - `key` reste `medball_vertical_throw` (stable, compat DB) bien que le test soit désormais un lancer assis — documenté dans le protocole (précédent : `imtp`).
 - Indice masse×distance ≡ iso-courbe `distance ∝ 1/masse` (iso-énergie) ; par la relation force-vitesse une masse plus lourde majore un peu le travail → **comparer un même nageur à masse constante**. Confiance `transposed` (honnête).
 - L'aperçu mésocycle : `lowestBaremeConfidence` n'est plus tiré à `placeholder` par ce KPI (seau `upper_power` désormais défendable, cohérent avec la proposition d'audit de monter `upper_power` au papillon).
+
+## §A (§310) — Flux bilan coach unifié : continuer →, reprise automatique, illustrations ROM (2026-05-25)
+
+**Contexte.** Le parcours bilan coach était un hub-and-spoke : chaque écran (Questionnaire, KPIs, Physique, Génération) était une île isolée sans lien "Continuer →". Le coach devait naviguer manuellement entre 4 écrans distincts. Design validé en amont (`docs/plans/2026-05-25-coach-bilan-unifie.md`).
+
+**Objectif.** Transformer le bilan en flux guidé avec bouton "Continuer →" à chaque étape, reprise automatique depuis la page nageur, et illustrations ROM animées sur le bilan physique.
+
+**Changements :**
+
+- `src/lib/strength/bilanProgress.ts` (MODIFIÉ) — Ajout `BilanStepKey` type + `nextBilanStep()` (résout le prochain écran), ajout `generation: StepState` dans `BilanProgressState`, `computeBilanProgress` enrichi du 3ème param `hasActiveMesocycle`, `isProfileComplete()` helper partagé.
+- `src/lib/strength/__tests__/bilanProgress.test.ts` (MODIFIÉ) — 4 nouveaux tests `nextBilanStep`, mise à jour des `deepEqual` avec `generation`. Total : 10 tests.
+- `src/hooks/useBilanSteps.ts` (NOUVEAU) — Hook DRY qui construit le tableau `BilanStep[]` pour le strip de progression, avec `onTap` résolu et suppression de l'onglet courant (`currentKey`). Remplace le code dupliqué dans chaque écran.
+- `src/pages/StrengthQuestionnaire.tsx` (MODIFIÉ) — Strip BilanProgress en haut (coach) ; état done → bouton "Continuer — Mesurer les KPIs" + secondaire "Revenir au bilan".
+- `src/pages/KpiWizard.tsx` (MODIFIÉ) — Strip BilanProgress (coach) ; skip link "Passer cette étape → Bilan physique" ; prop `closeLabel` sur `KpiRecap` → "Continuer — Bilan physique".
+- `src/components/strength/kpi/KpiRecap.tsx` (MODIFIÉ) — Prop `closeLabel?: string` (défaut "Terminer") pour adapter le libellé du bouton de fin selon le contexte.
+- `src/pages/coach/StrengthAssessmentScreen.tsx` (MODIFIÉ) — Strip BilanProgress (hook) ; état done → "Continuer — Générer le mésocycle" (bouton pleine largeur) ; bannière amber "Profil incomplet" si `!isProfileComplete(athleteProfile)`.
+- `src/pages/coach/CoachSwimmerFullView.tsx` (MODIFIÉ) — 3 queries bilan (`latestAssessment`, `bilanKpis`, `activeMesocycle`) ; CTA "Démarrer / Reprendre — [étape]" dans la section Mésocycle muscu, navigue directement à la bonne étape.
+- `src/components/strength/assessment/AssessmentRomIllustration.tsx` (NOUVEAU) — Diagramme SVG articulaire animé : arc `stroke-dashoffset` de 0° à l'angle ROM mesuré, coloré rouge/amber/cyan/vert selon le score 0-3. Axes angulaires : flexion épaule, rotation thoracique, hanche, hip hinge. Axes qualitatifs (scapula, plank) : barre de stabilité segmentée. Animation CSS pure, re-joue à chaque changement de score via `key=`.
+- `src/components/strength/assessment/AssessmentScoreField.tsx` (MODIFIÉ) — Intégration `AssessmentRomIllustration` dans le bloc descripteur choisi (côté droit).
+
+**Tests :**
+- `npx tsc --noEmit` — 0 ✅
+- `npm test` — **1362/1362 node:test + 20/20 vitest** ✅
+- `npm run build` — OK ✅
+- Pas de `test:rls` : aucune policy/RPC/table RLS.
+
+**Décisions / limites :**
+- Le hook `useBilanSteps` supprime la navigation vers l'écran courant (`currentKey`) pour éviter les taps no-op ; le strip reste cliquable pour les autres étapes.
+- `isProfileComplete` extrait dans `bilanProgress.ts` (partageable avec `MesocyclePreview`).
+- L'illustration ROM utilise des angles calibrés par score (non mesurés directement) ; la valeur en degrés est indicative, pas la mesure réelle du nageur.
+- Axe `scapula_control` et `trunk_neck_alignment` (qualitatifs) : barre de stabilité 4 segments à la place de l'arc (pas d'angle de référence publié).

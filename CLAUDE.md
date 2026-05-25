@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§309** — KPI `medball_vertical_throw` fiabilisé. L'ancien lancer vertical allongé (hauteur estimée à l'œil, barème `placeholder`) devient un **lancer médecine-ball assis pour la distance** (Seated MB Throw, normé), scoré sur un **indice masse × distance** (kg·m, ∝ énergie au lâcher) qui laisse **choisir la masse du ballon** sur une échelle unique. Barème **`transposed`** (normes scolaires 2 kg sexe × âge). Nouveau `medballPower.ts` (TDD) + `MedballThrowInputs.tsx` (style aligné `VerticalJumpInputs`) + branche wizard ; masse dans `attempts` jsonb (pas de migration). `npm test` 1357+20, tsc 0, build 0.
+Dernier § livré : **§A (§310)** — Flux bilan coach unifié + illustrations ROM animées. `nextBilanStep()` + `useBilanSteps` hook DRY + "Continuer →" à chaque étape + CTA "Démarrer/Reprendre" depuis page nageur + arcs SVG ROM par axe. `npm test` 1362+20, tsc 0, build 0.
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
