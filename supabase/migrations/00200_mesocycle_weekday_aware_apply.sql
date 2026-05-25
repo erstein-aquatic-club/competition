@@ -35,6 +35,14 @@
 
 BEGIN;
 
+-- §307 — Supprime l'ancienne signature 11-arg (00181) pour éviter une dérive de
+-- surcharges : sans ce DROP, `CREATE OR REPLACE` sur la signature 12-arg laisse
+-- coexister les deux. Après le DROP, un appel 11-arg (frontend prod déployé)
+-- résout vers la fonction 12-arg via `p_start_date DEFAULT NULL` (rétro-compatible).
+DROP FUNCTION IF EXISTS apply_strength_mesocycle(
+  integer, uuid, uuid, text, text, integer, integer, date, jsonb, text, jsonb
+);
+
 CREATE OR REPLACE FUNCTION apply_strength_mesocycle(
   p_athlete_id        integer,
   p_assessment_id     uuid,
