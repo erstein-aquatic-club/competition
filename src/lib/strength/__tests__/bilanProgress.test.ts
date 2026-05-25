@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { computeBilanProgress } from '../bilanProgress.ts';
+import { computeBilanProgress, nextBilanStep } from '../bilanProgress.ts';
 
 // §302 — fil conducteur coach : état des 3 étapes (questionnaire / KPIs /
 // bilan physique) dérivé du statut de l'assessment + présence de KPIs.
@@ -43,5 +43,23 @@ describe('computeBilanProgress', () => {
       kpis: 'done',
       physical: 'done',
     });
+  });
+});
+
+describe('nextBilanStep', () => {
+  it("pas d'assessment → start", () => {
+    assert.equal(nextBilanStep(null, false), 'start');
+  });
+  it('questionnaire_pending → questionnaire', () => {
+    assert.equal(nextBilanStep('questionnaire_pending', false), 'questionnaire');
+    assert.equal(nextBilanStep('questionnaire_pending', true), 'questionnaire');
+  });
+  it('bilan_pending sans KPIs → kpis ; avec KPIs → physical', () => {
+    assert.equal(nextBilanStep('bilan_pending', false), 'kpis');
+    assert.equal(nextBilanStep('bilan_pending', true), 'physical');
+  });
+  it('completed → generate (done si méso actif)', () => {
+    assert.equal(nextBilanStep('completed', true), 'generate');
+    assert.equal(nextBilanStep('completed', true, true), 'done');
   });
 });

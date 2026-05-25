@@ -16,7 +16,28 @@ export interface BilanProgressState {
   physical: StepState;
 }
 
+export type BilanStepKey =
+  | "start"
+  | "questionnaire"
+  | "kpis"
+  | "physical"
+  | "generate"
+  | "done";
+
 type Status = StrengthAssessment["status"] | null | undefined;
+
+/** Première étape incomplète du parcours bilan. Dérivée du statut + présence
+ *  de KPIs (+ méso actif) → reprise sans état persistant. */
+export function nextBilanStep(
+  status: Status,
+  hasKpis: boolean,
+  hasActiveMesocycle = false,
+): BilanStepKey {
+  if (status == null) return "start";
+  if (status === "questionnaire_pending") return "questionnaire";
+  if (status === "bilan_pending") return hasKpis ? "physical" : "kpis";
+  return hasActiveMesocycle ? "done" : "generate"; // completed
+}
 
 export function computeBilanProgress(
   status: Status,
