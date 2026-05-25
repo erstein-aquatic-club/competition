@@ -4,6 +4,8 @@ import {
   kpiScore,
   KPI_BAREMES,
   baremeConfidenceFor,
+  ageBandFor,
+  getBareme,
   type AgeBand,
   type Bareme,
   type BaremeConfidence,
@@ -51,6 +53,27 @@ describe('kpiScore — plafond extrapolé (Task 1)', () => {
   });
   it('garde le plancher sous la première ancre', () => {
     assert.equal(kpiScore(wp1, -5), 10);
+  });
+});
+
+// Task 2 (muscu G1) — bande 'adulte' (>=19 ans) dérivée des ancres 17-18
+// (plateau de maturité), pour ne plus rabattre les adultes sur la population
+// scolaire 17-18 sans le dire.
+describe('bande adulte (Task 2)', () => {
+  it('mappe 18 ans sur 17-18 et 19+ sur adulte', () => {
+    assert.equal(ageBandFor(18), '17-18');
+    assert.equal(ageBandFor(19), 'adulte');
+    assert.equal(ageBandFor(27), 'adulte');
+  });
+  it('initialise adulte sur les ancres 17-18 pour chaque KPI×sexe', () => {
+    assert.deepEqual(
+      getBareme('weighted_pullup', 'F', 'adulte').anchors,
+      getBareme('weighted_pullup', 'F', '17-18').anchors,
+    );
+    assert.deepEqual(
+      getBareme('imtp', 'M', 'adulte').anchors,
+      getBareme('imtp', 'M', '17-18').anchors,
+    );
   });
 });
 

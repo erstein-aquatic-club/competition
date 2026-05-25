@@ -67,7 +67,10 @@ import type { StrengthKpiKey } from '@/lib/api/types';
 export type BaremeConfidence = 'solid' | 'transposed' | 'placeholder';
 
 /** Bandes d'âge du Bilan Muscu (pas de bilan avant 13 ans). */
-export type AgeBand = '13-14' | '15-16' | '17-18';
+export type AgeBand = '13-14' | '15-16' | '17-18' | 'adulte';
+
+/** Bandes d'âge avec des ancres propres ; 'adulte' en dérive (cf. §2a). */
+type AgeBandBase = '13-14' | '15-16' | '17-18';
 
 export type BaremeSex = 'M' | 'F';
 
@@ -85,9 +88,9 @@ export interface BaremeEntry {
  * des tranches A2/A3/A4 du document. La tranche A1 (11-12) du document est
  * volontairement OMISE (décision coach 2026-05-17 : pas de bilan avant 13 ans).
  */
-export const KPI_BAREMES: Record<
+const KPI_BAREMES_BASE: Record<
   StrengthKpiKey,
-  Record<BaremeSex, Record<AgeBand, BaremeEntry>>
+  Record<BaremeSex, Record<AgeBandBase, BaremeEntry>>
 > = {
   // § 5 — détente verticale : PUISSANCE RELATIVE (W/kg) — TRANSPOSÉ.
   // Mesurée en puissance depuis le §293 (et non plus en hauteur cm). Ancres =
@@ -255,12 +258,33 @@ export const KPI_BAREMES: Record<
   },
 };
 
+/**
+ * Barèmes par KPI × sexe × bande d'âge, **incluant 'adulte'**.
+ *
+ * La bande 'adulte' (>= 19 ans) réutilise les ancres '17-18' (plateau de
+ * maturité) — cf. design §2a. Dérivée par programmation (pas de duplication des
+ * ancres) à partir de `KPI_BAREMES_BASE`.
+ */
+export const KPI_BAREMES: Record<
+  StrengthKpiKey,
+  Record<BaremeSex, Record<AgeBand, BaremeEntry>>
+> = Object.fromEntries(
+  (Object.keys(KPI_BAREMES_BASE) as StrengthKpiKey[]).map((kpi) => [
+    kpi,
+    {
+      M: { ...KPI_BAREMES_BASE[kpi].M, adulte: KPI_BAREMES_BASE[kpi].M['17-18'] },
+      F: { ...KPI_BAREMES_BASE[kpi].F, adulte: KPI_BAREMES_BASE[kpi].F['17-18'] },
+    },
+  ]),
+) as Record<StrengthKpiKey, Record<BaremeSex, Record<AgeBand, BaremeEntry>>>;
+
 /** Bande d'âge pour un âge donné. `null` si < 13 ans (pas de bilan). */
 export function ageBandFor(age: number): AgeBand | null {
   if (age < 13) return null;
   if (age <= 14) return '13-14';
   if (age <= 16) return '15-16';
-  return '17-18';
+  if (age <= 18) return '17-18';
+  return 'adulte';
 }
 
 /** Récupère le barème d'un KPI pour un sexe et une bande d'âge. */
