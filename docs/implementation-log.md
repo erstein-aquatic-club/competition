@@ -4,6 +4,30 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §306 — Préhab ciblée par nage — Phase 1 (défensif : zone aine déclarable) (2026-05-25)
+
+**Branche** : `main`.
+**Trigger** : reco **R2** de l'audit matrice (`docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`), seul écart 🔴 : la douleur **adducteurs/aine** (blessure-signature brasse) n'était pas déclarable (body-map sans zone aine) alors que la brasse porte l'emphasis jambes max → la modulation pouvait charger une aine blessée. Design : `docs/plans/2026-05-25-muscu-306-prehab-ciblee-nage-design.md`. Plan : `docs/plans/2026-05-25-muscu-306-prehab-ciblee-nage.md`. **Implémentation phasée : Phase 1 (défensif) ici ; Phase 2 (préhab proactif event-aware) à suivre.**
+
+### Changements (données + UI uniquement — zéro logique moteur)
+- **`src/lib/strength/zones.ts`** : `ZONE_LABEL_FR += { left_groin:'aine G', right_groin:'aine D' }`.
+- **`src/components/wellness/BodySvg.tsx`** : +2 entrées `BODY_ZONES` (`left_groin`/`right_groin`, side front) + positions `FRONT_POSITIONS` (intérieur de cuisse, `cx 88/112, cy 266, r 11`, médial). Rendu **identique** aux 12 zones existantes (même chemin `BODY_ZONES → FRONT_POSITIONS → <circle>`). Propagation automatique à `BodyHeatMap` (sélecteur nageur), `PainHistoryMap` (coach), `AssessmentContext`. (`/frontend-design` invoqué, scope = placement cohérent, pas de redesign.)
+- **Migration `00197_contraindication_groin_adductors.sql`** (appliquée via MCP) : append gardé idempotent `left_groin,right_groin` aux `contraindication_zones` de 6 exos adducteurs (58 Copenhague, 37 Fente latérale, 33 Squat bulgare, 36 RDL unilat., 76 Fente sautée, 92 départ ceinture). Vérifiée par `SELECT`.
+
+### Pourquoi zéro changement moteur
+L'override douleur (`prioritizeBuckets`, `mesocycleEngine.ts:235-245`) et le filtre contre-indication (`selectExercises`, `:382-396`) sont **déjà génériques** sur des chaînes de zones → la nouvelle zone fonctionne dès qu'elle est déclarable + portée par des exos.
+
+### Tests / vérifs
+- **Nouveau** `src/lib/strength/__tests__/zones.test.ts` (TDD : label aine) ; **+1 cas** dans `mesocycleEngine.test.ts` (garde-fou : exo tagué `left_groin` exclu quand l'aine ∈ painZones).
+- `npm test` : **node:test 1342/1342 + vitest 20/20**, fail 0. `npx tsc --noEmit` exit 0.
+- **Pas de `test:rls`** : données/UI, aucune policy modifiée.
+
+### Décisions / limites
+- **Liste d'exos contre-indiqués = choix coach** (proposée, à valider — réversible). Volontairement focalisée (pas tous les exos « hanche » → sur-exclusion évitée).
+- **Latéralité côté douleur uniquement** (pas de prescription unilatérale « jambe saine » — hors périmètre V1).
+- **Phase 2 (préhab proactif event-aware)** non faite : colonne `stroke_prehab_affinity` + passe de préférence dans `selectExercises` (Tasks 6-9 du plan).
+- `right_calf` manquant au body-map (asymétrie notée par l'audit) : hors périmètre §306.
+
 ## Audit matrice complète muscu (§305) + R1 — recalibration signature papillon (2026-05-25)
 
 **Branche** : `main` (audit lecture seule + 1 migration data appliquée directement via MCP, sur demande).
