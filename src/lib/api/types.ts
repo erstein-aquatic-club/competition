@@ -957,6 +957,21 @@ export interface StrengthAssessment {
   updated_at: string;
 }
 
+/**
+ * Réglages muscu par athlète, coach-set (mig 00191, dé-jeunification G1+G3).
+ * `practice_level` filtre les exercices proposés ; `performance_tier` cale les
+ * barèmes KPI. Défauts applicatifs côté lecture : `null` → 'intermediate'
+ * (niveau) / 'club' (tier). 1 ligne / athlète (PK athlete_id). RLS : athlète en
+ * lecture seule de sa ligne, coach/admin lecture + écriture club-wide.
+ */
+export interface StrengthAthleteSettings {
+  athlete_id: number;
+  practice_level: 'beginner' | 'intermediate' | 'advanced' | null;
+  performance_tier: 'club' | 'regional' | 'national' | 'elite' | null;
+  updated_by: number | null;
+  updated_at: string;
+}
+
 export type StrengthKpiKey =
   | 'vertical_jump'
   | 'broad_jump'
