@@ -22,6 +22,7 @@ import {
   upsertPainReports,
   updateAssessmentQuestionnaire,
   updateAssessmentPhysicalTests,
+  recordKpiMeasurement,
 } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
@@ -115,6 +116,17 @@ function isQueuedAssessmentPhysical(
   mutation: QueuedMutation,
 ): mutation is QueuedMutation & { payload: QueuedAssessmentPhysicalPayload } {
   return mutation.type === "assessment-physical-tests";
+}
+
+// §314 (#3 Slice B) — mesure KPI append-only : le payload porte une
+// `client_dedup_key` → `recordKpiMeasurement` fait un UPSERT idempotent
+// (mig 00205), donc le replay après ACK perdu ne crée pas de doublon.
+type QueuedKpiMeasurementPayload = Parameters<typeof recordKpiMeasurement>[0];
+
+function isQueuedKpiMeasurement(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedKpiMeasurementPayload } {
+  return mutation.type === "kpi-measurement";
 }
 
 // §252 — Sub-§C2 : SuiviSemaine + Administratif mutations replay.
@@ -381,6 +393,13 @@ export function OfflineMutationSync() {
               mutation.payload.assessmentId,
               mutation.payload.physicalTests,
             );
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedKpiMeasurement(mutation)) {
+            // UPSERT idempotent via client_dedup_key (mig 00205) → replay sûr.
+            await recordKpiMeasurement(mutation.payload);
             removeQueueItem(mutation.id);
             syncedCount += 1;
             continue;

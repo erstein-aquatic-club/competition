@@ -18814,3 +18814,19 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Reste — Slice B (KPI) :** `recordKpiMeasurement` est un **INSERT append-only** → la mise en file demande une **clé de déduplication** (colonne + index unique + `ON CONFLICT`) pour que le replay après ACK perdu ne crée pas de doublon. Migration `00205` + threading dans `KpiWizard` (qui a déjà une logique de retry `failedKeys` à concilier). **Non livré dans cette slice** (data-integrity-sensible, traité à part).
 
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` 1377/1377 + 20/20 ✅ ; `npm run build` OK. Câblage offline suivant le pattern testé existant (Records/SuiviSemaine) — `tryWithOfflineQueue`/dédup déjà couverts par `offlineQueue.test.ts` ; pas de `test:rls` (aucune policy).
+
+## §315 — Bilan muscu hors-ligne (#3) — Slice B : KPIs idempotents (2026-05-26)
+
+**Contexte.** Suite §314 (Slice A : questionnaire + physique offline). Les KPIs (sauts, lancers, tractions — mesurés AU BORD DU BASSIN, là où le réseau coupe) restaient online-only. `recordKpiMeasurement` est un **INSERT append-only** : le mettre en file posait le risque ACK-perdu (replay → doublon de mesure).
+
+**Solution — idempotence par clé de dédup :**
+- **Migration `00205`** (appliquée MCP) : colonne `client_dedup_key text` + **index unique** `strength_kpi_measurements_client_dedup_key_uidx` sur cette seule colonne. En Postgres les NULL sont distincts dans un index unique → lignes historiques (clé NULL) et écritures sans clé non contraintes. Aucune RLS touchée (colonne + index). Réversible.
+- `src/lib/api/strength-kpi.ts` : `RecordKpiInput.client_dedup_key?` ; `recordKpiMeasurement` fait un **UPSERT `ON CONFLICT (client_dedup_key)`** quand la clé est fournie (sinon INSERT inchangé). TDD : 1 test RED→GREEN (`strength-kpi.test.ts`) — « upsert sur client_dedup_key quand fourni » ; les 3 tests existants (sans clé) restent verts (INSERT).
+- `src/pages/KpiWizard.tsx` : `dedupKeysRef` — clé **stable par KPI** sur la durée du wizard (`??= crypto.randomUUID()`), réutilisée à chaque retry/replay → un INSERT commité-mais-ACK-perdu (retry online) OU rejoué depuis la file ne duplique jamais. La boucle de soumission enveloppe `recordKpiMeasurement` dans `tryWithOfflineQueue("kpi-measurement", …)` ; un KPI mis en file va dans `queued` (≠ `failures`) → recap affiché avec la valeur saisie, toast « N en file (hors-ligne, synchronisé au retour réseau) », `failedKeys` ne contient QUE les vrais échecs.
+- `src/components/shared/OfflineMutationSync.tsx` : prédicat + branche replay `"kpi-measurement"` (`recordKpiMeasurement(payload)`, idempotent) ; invalidation `["kpi-latest"]` déjà posée en §314.
+
+**Conciliation `failedKeys` (KpiWizard) :** un KPI **en file** n'est PAS un échec → il sort de `failedKeys` (pas de re-soumission manuelle ; la file le rejoue automatiquement à la reconnexion). Le pattern append-only retry §301 reste pour les vrais échecs non-transitoires.
+
+**#3 COMPLET** (Slice A questionnaire+physique §314 + Slice B KPIs §315) : au bord du bassin hors-ligne, le coach mesure tout le bilan → file localStorage → replay idempotent à la reconnexion.
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1378/1378 node:test + 20/20 vitest** (+1 dedup) ✅ ; `npm run build` OK ✅ ; smoke prod : index unique `client_dedup_key` présent. Pas de `test:rls` (00205 = colonne + index, aucune policy/RLS/helper auth).

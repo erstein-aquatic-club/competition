@@ -20,29 +20,40 @@ export interface RecordKpiInput {
   assisted_by?: number | null;
   source: 'wizard_athlete' | 'wizard_coach';
   notes?: string | null;
+  /**
+   * §314 (#3 Slice B) — clé d'idempotence générée côté client (UUID), stable
+   * par mesure. Quand fournie, l'écriture devient un UPSERT `ON CONFLICT
+   * (client_dedup_key)` → un replay de la file offline (ACK perdu) ne crée pas
+   * de doublon. Absente (autres appelants) → INSERT classique inchangé.
+   */
+  client_dedup_key?: string;
 }
 
 export async function recordKpiMeasurement(
   input: RecordKpiInput,
 ): Promise<StrengthKpiMeasurement> {
   if (!canUseSupabase()) throw new Error('Supabase not available');
-  const data = assertSupabase(
-    await supabase
-      .from('strength_kpi_measurements')
-      .insert({
-        athlete_id: input.athlete_id,
-        kpi_key: input.kpi_key,
-        value: input.value,
-        unit: input.unit,
-        attempts: input.attempts ?? null,
-        measured_by: input.measured_by,
-        assisted_by: input.assisted_by ?? null,
-        source: input.source,
-        notes: input.notes ?? null,
-      })
-      .select()
-      .single(),
-  );
+  const row = {
+    athlete_id: input.athlete_id,
+    kpi_key: input.kpi_key,
+    value: input.value,
+    unit: input.unit,
+    attempts: input.attempts ?? null,
+    measured_by: input.measured_by,
+    assisted_by: input.assisted_by ?? null,
+    source: input.source,
+    notes: input.notes ?? null,
+    client_dedup_key: input.client_dedup_key ?? null,
+  };
+  const table = supabase.from('strength_kpi_measurements');
+  // §314 (#3 Slice B) — avec une clé de dédup, UPSERT ON CONFLICT
+  // (client_dedup_key) : un replay de la file offline après ACK perdu ne
+  // duplique pas la mesure (l'index unique sur client_dedup_key, mig 00205,
+  // ignore les NULL → les écritures sans clé restent un INSERT normal).
+  const builder = input.client_dedup_key
+    ? table.upsert(row, { onConflict: 'client_dedup_key' })
+    : table.insert(row);
+  const data = assertSupabase(await builder.select().single());
   return data as StrengthKpiMeasurement;
 }
 

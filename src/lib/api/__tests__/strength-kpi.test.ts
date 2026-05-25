@@ -127,6 +127,43 @@ describe("strength-kpi API", () => {
         /insert failed/,
       );
     });
+
+    // §314 (#3 Slice B) — idempotence offline : avec une clé de dédup, l'écriture
+    // doit être un UPSERT ON CONFLICT (client_dedup_key) pour que le replay de la
+    // file (ACK perdu) ne duplique pas la mesure.
+    it("upserts on client_dedup_key (idempotent) when a dedup key is provided", async () => {
+      let usedUpsert = false;
+      let usedInsert = false;
+      let capturedOnConflict: unknown;
+      let capturedPayload: Record<string, unknown> | undefined;
+      fromImpl = () => ({
+        insert: () => {
+          usedInsert = true;
+          return { select: () => ({ single: () => Promise.resolve({ data: mockMeasurement(), error: null }) }) };
+        },
+        upsert: (payload: unknown, opts: unknown) => {
+          usedUpsert = true;
+          capturedPayload = payload as Record<string, unknown>;
+          capturedOnConflict = (opts as { onConflict?: unknown })?.onConflict;
+          return { select: () => ({ single: () => Promise.resolve({ data: mockMeasurement({ id: "m-dedup" }), error: null }) }) };
+        },
+      });
+      const { recordKpiMeasurement } = await import("../strength-kpi.ts");
+      const result = await recordKpiMeasurement({
+        athlete_id: 42,
+        kpi_key: "imtp",
+        value: 1200,
+        unit: "N",
+        measured_by: 7,
+        source: "wizard_coach",
+        client_dedup_key: "dedup-123",
+      });
+      assert.equal(usedUpsert, true, "doit utiliser upsert quand une clé de dédup est fournie");
+      assert.equal(usedInsert, false, "ne doit PAS faire un insert simple quand une clé de dédup est fournie");
+      assert.equal(capturedOnConflict, "client_dedup_key");
+      assert.equal(capturedPayload?.client_dedup_key, "dedup-123");
+      assert.equal(result.id, "m-dedup");
+    });
   });
 
   describe("getKpiHistory", () => {

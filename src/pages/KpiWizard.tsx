@@ -17,7 +17,7 @@
  * bottom navigation dock is hidden while the wizard is open (AppLayout
  * observes `data-focus-mode`).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,6 +29,7 @@ import {
   getExerciseGifs,
   type RecordKpiInput,
 } from "@/lib/api";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
 import { KPI_PROTOCOLS, KPI_DEMO_EXERCISE_ID } from "@/lib/strength/kpiProtocols";
 import {
@@ -169,6 +170,11 @@ export default function KpiWizard() {
   // `strength_kpi_measurements` table is append-only, re-inserting would
   // duplicate). A fully successful submit clears this.
   const [failedKeys, setFailedKeys] = useState<StrengthKpiKey[]>([]);
+  // §314 (#3 Slice B) — clé d'idempotence STABLE par KPI sur la durée du wizard.
+  // Réutilisée à chaque (re)soumission/retry du même KPI → l'UPSERT serveur
+  // `ON CONFLICT (client_dedup_key)` empêche tout doublon, qu'un INSERT ait été
+  // commité-mais-ACK-perdu (retry online) ou rejoué depuis la file offline.
+  const dedupKeysRef = useRef<Partial<Record<StrengthKpiKey, string>>>({});
   // Measurements actually persisted during THIS wizard session, keyed by
   // KPI. Merged on top of the server `latestMeasurements` so that a
   // same-athlete "Nouveau bilan" diffs against the values we just wrote,
@@ -335,6 +341,9 @@ export default function KpiWizard() {
       // strand already-persisted rows AND make a retry re-insert them.
       const results: StrengthKpiMeasurement[] = [];
       const failures: { key: StrengthKpiKey; error: Error }[] = [];
+      // §314 (#3 Slice B) — KPIs mis en file hors-ligne (valeur connue localement,
+      // pas encore confirmée serveur). Ni succès serveur, ni échec : "en attente".
+      const queued: { key: StrengthKpiKey; value: number; unit: string }[] = [];
       for (const key of keysToSubmit) {
         const protocol = KPI_PROTOCOLS[key];
         try {
@@ -379,7 +388,7 @@ export default function KpiWizard() {
             value = bestAttempt(parsed);
             recordedAttempts = parsed;
           }
-          const recorded = await recordKpiMeasurement({
+          const recordInput: RecordKpiInput = {
             athlete_id: athleteId,
             kpi_key: key,
             value,
@@ -388,8 +397,21 @@ export default function KpiWizard() {
             measured_by: userId,
             assisted_by: assistedBy,
             source,
-          });
-          results.push(recorded);
+            // Clé stable par KPI (réutilisée au retry/replay) → idempotence.
+            client_dedup_key: (dedupKeysRef.current[key] ??= crypto.randomUUID()),
+          };
+          // §314 (#3 Slice B) — au bord du bassin sous réseau coupé, on met la
+          // mesure en file plutôt que d'échouer ; replay idempotent via la clé.
+          const outcome = await tryWithOfflineQueue(
+            "kpi-measurement",
+            recordInput as unknown as Record<string, unknown>,
+            () => recordKpiMeasurement(recordInput),
+          );
+          if (isOfflineQueuedResult(outcome)) {
+            queued.push({ key, value, unit: protocol.unit });
+          } else {
+            results.push(outcome);
+          }
         } catch (err) {
           failures.push({
             key,
@@ -397,9 +419,9 @@ export default function KpiWizard() {
           });
         }
       }
-      return { results, failures };
+      return { results, failures, queued };
     },
-    onSuccess: async ({ results, failures }) => {
+    onSuccess: async ({ results, failures, queued }) => {
       // Layer the just-written rows into the session baseline so a
       // same-athlete restart diffs against fresh values (I2).
       const writes: Partial<Record<StrengthKpiKey, StrengthKpiMeasurement>> = {};
@@ -416,6 +438,11 @@ export default function KpiWizard() {
         // `null` → known-absent (genuine 1ère mesure). KpiRecap distinguishes.
         previous: baselineReliable ? mergedBaseline[r.kpi_key] ?? null : undefined,
       }));
+      // §314 (#3 Slice B) — KPIs mis en file hors-ligne : on les affiche au recap
+      // avec la valeur saisie (pas de comparaison serveur → previous undefined).
+      for (const q of queued) {
+        entries.push({ kpi_key: q.key, value: q.value, unit: q.unit, previous: undefined });
+      }
       // Merge into any existing recap: a retry's `results` carry only the
       // retried KPIs — keep the originally-succeeded entries visible too.
       setRecapEntries((prev) => {
@@ -424,7 +451,8 @@ export default function KpiWizard() {
         return KPI_KEYS.filter((k) => byKey.has(k)).map((k) => byKey.get(k)!);
       });
 
-      // Remember which keys still need a retry; clear on full success.
+      // Remember which keys still need a retry; clear on full success. Queued
+      // KPIs are NOT failures (handed to the offline queue, replayed on reconnect).
       setFailedKeys(failures.map((f) => f.key));
 
       // Refresh server cache so the rest of the app (and a later wizard run
@@ -437,21 +465,31 @@ export default function KpiWizard() {
 
       setPhase("recap");
 
+      const queuedNote =
+        queued.length > 0
+          ? ` ${queued.length} en file (hors-ligne, synchronisé${queued.length > 1 ? "s" : ""} au retour réseau).`
+          : "";
       if (failures.length === 0) {
-        toast.success(
-          `${results.length} KPI enregistré${results.length > 1 ? "s" : ""}`,
-        );
-      } else if (results.length === 0) {
+        if (results.length === 0 && queued.length > 0) {
+          toast.success(
+            `${queued.length} KPI enregistré${queued.length > 1 ? "s" : ""} hors-ligne — synchronisé${queued.length > 1 ? "s" : ""} au retour du réseau.`,
+          );
+        } else {
+          toast.success(
+            `${results.length} KPI enregistré${results.length > 1 ? "s" : ""}.${queuedNote}`,
+          );
+        }
+      } else if (results.length === 0 && queued.length === 0) {
         toast.error(
           `Échec — aucun KPI enregistré (${failures.length}). Réessaie.`,
         );
       } else {
         toast.warning(
-          `${results.length} KPI enregistré${results.length > 1 ? "s" : ""}, ` +
+          `${results.length} enregistré${results.length > 1 ? "s" : ""}, ` +
             `${failures.length} échec${failures.length > 1 ? "s" : ""} — ` +
             `réessaie le${failures.length > 1 ? "s" : ""} KPI manquant${
               failures.length > 1 ? "s" : ""
-            }.`,
+            }.${queuedNote}`,
         );
       }
     },
