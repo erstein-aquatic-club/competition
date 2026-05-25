@@ -22,6 +22,7 @@ import {
   type AssessmentScoreItem,
   type AssessmentLevel,
 } from "./assessmentScores";
+import { AssessmentRomIllustration } from "./AssessmentRomIllustration";
 
 const LEVELS: AssessmentLevel[] = [0, 1, 2, 3];
 
@@ -113,15 +114,18 @@ export function AssessmentScoreField({
         labelHigh={`3 · ${item.labelHigh}`}
       />
 
-      {/* Descripteur du niveau choisi — surfacé dès la sélection */}
+      {/* Descripteur du niveau choisi + illustration ROM */}
       {picked ? (
-        <div className="flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground tabular-nums">
-            {value}
-          </span>
-          <p className="text-[12px] leading-snug text-foreground">
-            {item.levels[value as AssessmentLevel]}
-          </p>
+        <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2">
+          <div className="flex min-w-0 flex-1 items-start gap-2.5">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground tabular-nums">
+              {value}
+            </span>
+            <p className="text-[12px] leading-snug text-foreground">
+              {item.levels[value as AssessmentLevel]}
+            </p>
+          </div>
+          <AssessmentRomIllustration axisKey={item.key} score={value} />
         </div>
       ) : (
         <p className="text-[11px] leading-snug text-muted-foreground">{item.hint}</p>
