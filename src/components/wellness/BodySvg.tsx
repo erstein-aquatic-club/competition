@@ -29,6 +29,8 @@ export const BODY_ZONES: BodyZone[] = [
   { id: "right_knee", label: "Genou D", side: "front" },
   { id: "left_ankle", label: "Cheville G", side: "front" },
   { id: "right_ankle", label: "Cheville D", side: "front" },
+  { id: "left_groin", label: "Aine G", side: "front" },
+  { id: "right_groin", label: "Aine D", side: "front" },
   // Back
   { id: "neck", label: "Nuque", side: "back" },
   { id: "upper_back", label: "Dos haut", side: "back" },
@@ -57,6 +59,8 @@ const FRONT_POSITIONS: Record<string, ZonePos> = {
   right_knee:     { cx: 116, cy: 310, r: 13 },
   left_ankle:     { cx: 84,  cy: 378, r: 10 },
   right_ankle:    { cx: 116, cy: 378, r: 10 },
+  left_groin:     { cx: 88,  cy: 266, r: 11 },
+  right_groin:    { cx: 112, cy: 266, r: 11 },
 };
 
 const BACK_POSITIONS: Record<string, ZonePos> = {
