@@ -4,6 +4,31 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## Chore — Unification du runner de tests (node:test + vitest jsdom scopé) (2026-05-25)
+
+**Branche** : `chore/test-runner-unification`
+**Trigger** : découvert lors de la revue §305. Le runner du projet est `node --test`, mais **35 fichiers `*.test.ts(x)`** importaient `vitest` (`describe`/`it`/`expect`/`vi`). Sous `node --test`, ces imports sont **inertes** : les blocs ne sont jamais exécutés, **0 assertion lancée**, faux vert. Conséquence : ~344 assertions réelles ne tournaient pas alors que la CI passait au vert.
+
+### Changements
+- **`vitest.config.unit.ts`** (nouveau) : config Vitest dédiée — environnement `jsdom`, `include: ['src/**/*.vitest.{ts,tsx}']`. Ne tourne **que** sur les vrais tests DOM (convention de nommage `*.vitest.ts(x)`).
+- **4 fichiers renommés `*.test.ts` → `*.vitest.ts`** (besoin réel de jsdom / env Vite) : `useDebouncedValue`, `useDelayedLoading`, `useInAppPushBridge` (hooks interactifs), `export-pace-pdf` (env Vite).
+- **31 fichiers portés `vitest` → `node:test`** : logique pure directe ; mocks/DOM via `mock` natif de node + stubs ; composants via `renderToStaticMarkup`.
+- **`npm test`** = `node --test … && vitest run --config vitest.config.unit.ts` (les deux runners enchaînés).
+- **Garde-fou `scripts/check-test-runner.mjs`** câblé en `pretest` : échoue si un `*.test.ts(x)` importe `vitest` (empêche la régression de réintroduire des tests inertes).
+
+### Tests / vérifs
+- `npm test` : node:test **980 → 1324** passants (**+344 assertions** auparavant inertes) ; vitest **4 fichiers / 20** passants ; `npx tsc --noEmit` exit 0.
+- Garde-fou `pretest` : vert.
+
+### Corrections de tests périmés (aucun code produit touché)
+- **`export-pace-pdf`** : le test vérifiait encore les zones d'allure **v1**, périmées depuis le refactor v2 (§186). Aligné sur v2.
+- **`useSlotCalendar`** : assertions sur le « trou de midi » (retiré en §95b) et sur une date codée en dur dans le passé. Mises à jour.
+- **Aucun bug produit réel** révélé par la réactivation des 344 assertions.
+
+### Décisions / limites
+- **Un seul runner canonique** : `node:test`. Vitest **scopé jsdom** via la convention de nommage `*.vitest.ts(x)` (jamais `*.test.ts`).
+- **Limite** : les `*.test.ts` restent **exclus de `tsc`** (convention existante) ; les `*.vitest.ts(x)` sont **type-checkés**.
+
 ## §304 — Couplage niveau ↔ tier : alerte + alignement 1-clic + re-tag traction lestée (2026-05-25)
 
 **Branche** : `feat/304-couplage-niveau-tier`

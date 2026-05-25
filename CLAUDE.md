@@ -10,7 +10,7 @@ Application web de suivi d'entraînement (natation + musculation) pour l'Erstein
 - **Frontend** : React 19, TypeScript, Vite 7, Tailwind CSS 4, Radix UI/Shadcn (55 composants), Zustand 5, React Query 5, Wouter (hash routing)
 - **Backend** : Supabase (PostgreSQL, Auth, Edge Functions Deno)
 - **Déploiement** : GitHub Pages (frontend), Supabase Cloud (backend)
-- **Tests** : Vitest, 31 fichiers de tests
+- **Tests** : runner principal **`node:test`** (`npm test`, ~158 fichiers `*.test.ts(x)`) + **vitest scopé jsdom** pour les `*.vitest.ts(x)` (hooks/DOM, 4 fichiers) ; garde-fou `pretest` bloque tout import `vitest` dans un `*.test.ts(x)`
 
 ## Architecture
 
