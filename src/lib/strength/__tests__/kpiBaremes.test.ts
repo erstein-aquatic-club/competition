@@ -56,6 +56,12 @@ describe('kpiScore — plafond extrapolé (Task 1)', () => {
   it('garde le plancher sous la première ancre', () => {
     assert.equal(kpiScore(wp1, -5), 10);
   });
+  it('ne descend pas sous le score de pointe si le dernier segment a une pente <= 0', () => {
+    // Barème non-monotone en haut (10→90 puis 20→80) : l'extrapolation au-delà
+    // de la dernière ancre ne doit jamais redescendre — garde slope>=0 → 90.
+    const nonMono: Bareme = [[0, 10], [10, 90], [20, 80]];
+    assert.equal(kpiScore(nonMono, 30), 90);
+  });
 });
 
 // Task 2 (muscu G1) — bande 'adulte' (>=19 ans) dérivée des ancres 17-18

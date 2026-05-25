@@ -29,6 +29,9 @@ export type Bareme = readonly (readonly [number, number])[];
  *  - entre deux ancres                → interpolation linéaire ;
  *  - le résultat est borné à [0, 100].
  *
+ * Précondition : les ancres doivent avoir des valeursBrutes (x) strictement
+ * croissantes — l'interpolation et l'extrapolation en dépendent.
+ *
  * Lève une `Error` si le barème compte moins de 2 ancres.
  */
 export function kpiScore(bareme: Bareme, value: number): number {
@@ -46,7 +49,12 @@ export function kpiScore(bareme: Bareme, value: number): number {
     const [xPrev, sPrev] = bareme[bareme.length - 2];
     const [xLast, sLast] = last;
     const slope = (sLast - sPrev) / (xLast - xPrev);
-    return clamp(sLast + (value - xLast) * slope);
+    // Garde anti-redescente : sur un barème non monotone (pente du dernier
+    // segment <= 0 ou pic avant la dernière ancre), l'extrapolation ne doit
+    // jamais redescendre sous le score de pointe. On borne donc par le bas au
+    // score maximum des ancres (Math.max(0, slope) neutralise la pente négative).
+    const peak = Math.max(...bareme.map(([, s]) => s));
+    return clamp(Math.max(peak, sLast + (value - xLast) * Math.max(0, slope)));
   }
 
   for (let i = 1; i < bareme.length; i++) {
