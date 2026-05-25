@@ -800,6 +800,33 @@ Voir [`docs/patch-report.md`](./patch-report.md) pour le détail complet des ite
 
 ---
 
+## Backlog — Audit muscu matrice §305 (reste à faire)
+
+> Issu de `docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`.
+> **Déjà livré** : 100 m validé ✅ ; R1 papillon (mig `00196`) ; §306 zone aine
+> défensive + préhab proactif event-aware (mig `00197`/`00198`) ; R3 dos + R6
+> 100 m (mig `00199`). Ci-dessous le reste, non commencé.
+
+### R4 — Profil fond 800/1500 distinct (🟠)
+- **Problème** : tout ≥ 400 mappe sur `400plus`, qui reproduit l'ancien template **400 m**. L'ancien profil **demi-fond** (`{LP .4, UP .45, MOB 1.0}`) n'est plus exprimé → 800/1500 sur-puissés / sous-préhabilités.
+- **Implémentation proposée** : préférer une nouvelle `distance_key` (`fond`/`800plus`) dans `strength_distance_profiles` (CHECK + 2 lignes season/inter, emphasis demi-fond + arc) **et l'exposer dans le sélecteur** `MesocycleGeneration.tsx` ; alternative = seuil dans `composeTemplate` abaissant `lower_power` au-delà de 800 m.
+- **Complexité** : Moyenne (table + sélecteur UI). **Brainstorm conseillé.**
+
+### R5 — Seau tronc/core (🟠)
+- **Problème** : pas de 6e seau entraînable ; ondulation (papillon/4N), rotation (crawl/dos), gainage streamline ne sont pilotables qu'indirectement (dispersés dans `upper_strength`/`lower_strength`).
+- **Implémentation proposée** : ajouter un bucket `trunk` à `StrengthBucket` + `EMPHASIS_BUCKETS`/`ALL_BUCKETS`, un mult par nage (`strength_stroke_signatures`) + emphasis par distance, taguer `dim_exercices.bucket='trunk'`, propager dans le moteur (scoring/priorisation/allocation/sélection) + UI. KPI tronc à définir (sinon score conservateur).
+- **Complexité** : Haute (2 tables + `composeTemplate` + `mesocycleEngine` + catalogue + UI + tests). **Brainstorm + plan obligatoires.**
+
+### Divers — `right_calf` absent du body-map (🟡)
+- **Problème** : `BodySvg.tsx` n'a que `left_calf` → un mollet droit n'est ni déclarable ni contre-indiquable (asymétrie ; `dim_exercices` n'utilise aussi que `left_calf`).
+- **Implémentation proposée** : +1 entrée `BODY_ZONES`/`BACK_POSITIONS` (`right_calf`) — label `zones.ts` déjà présent (« mollet D ») — + retag des exos mollet. Même forme que §306 Phase 1.
+- **Complexité** : Faible.
+
+### Validation coach (transverse)
+- Les valeurs **de-novo / recalibrées** (papillon R1, dos R3, listes d'exos contre-indication aine + affinité brasse §306) sont **directionnelles** — à faire trancher par le coach. Toutes ajustables par une petite migration sur `strength_stroke_signatures` / `strength_distance_profiles` / `dim_exercices`. **Réversibles.**
+
+---
+
 ## Ordre d'implémentation recommandé
 
 ```
