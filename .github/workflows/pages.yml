@@ -12,17 +12,24 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+# Node 20 sur les runners GitHub est déprécié (forcé en Node 24 le 2026-06-02,
+# retiré le 2026-09-16). checkout/setup-node passent en v5 (runtime Node 24
+# natif) ; peaceiris/actions-gh-pages n'a pas de release Node 24 (toujours v4) →
+# on le force en Node 24 via cette variable (mécanisme officiel GitHub).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
