@@ -155,7 +155,9 @@ export async function getStrengthAthleteSettings(
 
 /**
  * Crée ou met à jour les réglages muscu d'un athlète (UPSERT sur `athlete_id`).
- * Réservé coach/admin par RLS. `updated_by` / `updated_at` sont gérés côté base.
+ * Réservé coach/admin par RLS. `updated_at` est géré côté base (DEFAULT now() +
+ * trigger BEFORE UPDATE) ; `updated_by` n'est PAS auto-rempli — laissé `null`
+ * pour l'instant (l'attribution de l'auteur est une suite possible, non câblée).
  */
 export async function upsertStrengthAthleteSettings(
   athleteId: number,

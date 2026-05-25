@@ -13,7 +13,7 @@
  *
  * Design : docs/plans/2026-05-24-muscu-dejeunification-g1-g3-design.md §4.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getStrengthAthleteSettings,
@@ -66,6 +66,15 @@ export function StrengthAthleteProfileCard({
 
   const [level, setLevel] = useState<PracticeLevel>(DEFAULT_LEVEL);
   const [tier, setTier] = useState<PerformanceTier>(DEFAULT_TIER);
+  // Confirmation transitoire "Enregistré" (s'efface après ~2 s).
+  const [showSaved, setShowSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    },
+    [],
+  );
 
   // Synchronise l'état local quand la ligne charge / change (null → défauts).
   useEffect(() => {
@@ -82,6 +91,9 @@ export function StrengthAthleteProfileCard({
       queryClient.invalidateQueries({
         queryKey: ["strength-athlete-settings", athleteId],
       });
+      setShowSaved(true);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setShowSaved(false), 2000);
     },
     onError: (err: Error) => {
       toast.error("Échec de l'enregistrement du profil", {
@@ -111,7 +123,7 @@ export function StrengthAthleteProfileCard({
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Enregistrement…
               </>
-            ) : mutation.isSuccess ? (
+            ) : showSaved ? (
               <>
                 <Check className="h-3 w-3 text-primary" />
                 Enregistré
