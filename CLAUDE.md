@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§303** — Dé-jeunification moteur muscu (G1+G3) : bande d'âge adulte, tier de performance (`shiftAnchors`), plafond barème débridé, niveau de pratique lu en table (`strength_athlete_settings`).
+Dernier § livré : **§304** — Couplage niveau↔tier (alerte + alignement 1-clic) + re-tag traction lestée intermédiaire (fix GA audit 100 NL H).
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

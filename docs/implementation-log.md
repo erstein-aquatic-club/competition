@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §304 — Couplage niveau ↔ tier : alerte + alignement 1-clic + re-tag traction lestée (2026-05-25)
+
+**Branche** : `feat/304-couplage-niveau-tier`
+**Trigger** : écart **GA** de l'audit `docs/audits/2026-05-25-audit-muscu-100nl-hommes-elite-vs-generateur.md` (méthodes muscu des nageurs élite 100m NL confrontées au générateur). Design : `docs/plans/2026-05-25-muscu-304-couplage-niveau-tier-design.md`. Plan : `docs/plans/2026-05-25-muscu-304-couplage-niveau-tier.md`. **Constat** : le pool d'exercices avancés (tractions lestées, haltérophilie, pliométrie avancée) est verrouillé derrière `practice_level='advanced'`, **désynchronisable** du `performance_tier` (un nageur tier `national`/`elite` resté en `intermediate` ne reçoit jamais ces exos) ; et le KPI `weighted_pullup` est **mesuré** mais l'unique exo de traction lestée (id 13) n'était prescrit qu'au niveau confirmé.
+
+### Helper pur de détection du mismatch
+- **`src/lib/strength/strengthProfileMismatch.ts`** (nouveau, TS pur) : `RECOMMENDED_LEVEL_FOR_TIER` (club→beginner, regional→intermediate, national/elite→advanced) + **`hasUnderLeveledProfile(level, tier)`** → `true` quand tier ∈ {national, elite} ET niveau ≠ advanced. **Mismatch à sens unique** : l'inverse (niveau élevé / tier bas) n'est pas un problème et n'est pas signalé. **TDD** : 4 cas (`strengthProfileMismatch.test.ts`).
+
+### UI coach — alerte + alignement 1-clic
+- **`StrengthAthleteProfileCard.tsx`** : encart d'alerte « Profil sous-calibré » (rendu quand `hasUnderLeveledProfile`) + bouton **« Aligner sur Confirmé »** qui passe `practice_level='advanced'` via l'**upsert existant** (`upsertStrengthAthleteSettings`, aucun nouveau wrapper API).
+
+### Aperçu — bandeau lecture-seule
+- **`MesocyclePreview.tsx`** (ReasoningPanel) : bandeau read-only « Profil sous-calibré » affiché dans le raisonnement auditable quand le profil chargé est sous-calibré. **L'action vit dans la carte profil** (pas de bouton ici) — le bandeau ne fait que signaler.
+
+### Migration — re-tag de la traction lestée
+- **Migration `00192_retag_tractions_lestees_intermediate.sql`** (appliquée via MCP, vérifiée en base) : `Tractions lestées` (`id=13`) **advanced → intermediate** — cohérence KPI `weighted_pullup` (mesuré dès l'intermédiaire) ↔ prescription. Re-tag ciblé par `id=13`. **Migration data-only** (un seul `UPDATE`, aucune policy/table sous RLS touchée).
+
+### Fichiers
+- `src/lib/strength/strengthProfileMismatch.ts` (nouveau) ; `src/components/strength/assessment/StrengthAthleteProfileCard.tsx` ; `src/pages/MesocyclePreview.tsx` ; `supabase/migrations/00192_retag_tractions_lestees_intermediate.sql` (nouveau) ; test `src/lib/strength/__tests__/strengthProfileMismatch.test.ts` (nouveau).
+
+### Tests / vérifs
+- `strengthProfileMismatch.test.ts` — 4 cas verts. `npm test` — **983/983 verts**. `npx tsc --noEmit` — exit 0.
+- **Pas de `test:rls`** : la migration est un `UPDATE` de données catalogue (aucune policy ni helper RLS touché).
+
+### Décisions / limites
+- Mismatch **à sens unique** (signale seulement tier ∈ {national, élite} & niveau ≠ advanced).
+- Bandeau aperçu **read-only** — l'action d'alignement vit dans la carte profil.
+- Re-tag par `id=13` (ciblage exact).
+- **Hors scope** : la *préférence* de la traction lestée aux tiers élevés (vs simple disponibilité) → **§305** ; le bandeau aperçu affiche les **tokens bruts** (`national`/`intermediate`) — polish i18n possible. La taxonomie nage × distance + template `sprint_100` + papillon manquant sont reportés à **§305**.
+
 ## §303 — Dé-jeunification du moteur de mésocycle muscu (G1+G3) (2026-05-24)
 
 **Branche** : `feat/muscu-dejeunification-g1-g3`
