@@ -18799,3 +18799,18 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1377/1377 node:test + 20/20 vitest** (+8 core TDD : matrice, fly=max, ordre 4N>dos>crawl>brasse, core jamais 0, rétrocompat, core jamais priorisé, bloc inséré si emphase>0) ✅ ; `npm run build` OK. `test:rls` non requis (00203/00204 = données de référence + CHECK, aucune policy/RLS/helper auth).
 
 **Limites / suites :** valeurs d'emphase = direction littérature (pas de norme chiffrée publiée), ajustables par migration. Nuance UI : core non scoré → absent des barres de score du `ReasoningPanel` (présent comme bloc de séance, taggé « Tronc / gainage ») ; visibilité dédiée = petit ajout UI futur via `/frontend-design`. Opportunité d'un vrai KPI core (option b) laissée ouverte. Le nudge `sprint_50` upper_power (#7) reste à consolider avec cette emphase.
+
+## §314 — Bilan muscu hors-ligne (#3) — Slice A : questionnaire + bilan physique (2026-05-26)
+
+**Contexte (#3 de l'audit §311).** Au bord du bassin le réseau est souvent instable/faible/coupé (confirmé coach). Les écritures du bilan étaient **Supabase-only** (`throw 'Supabase not available'`, aucune file offline — la file `offlineQueue`/`OfflineMutationSync` ne servait que natation/chrono). Le coach pouvait être bloqué pour mesurer/noter. #3 = brancher le bilan sur la file offline existante (générique, localStorage, dédup, replay).
+
+**Slice A (cette entrée) — écritures idempotentes (UPDATE/UPSERT), sans migration :**
+- `src/pages/StrengthQuestionnaire.tsx` : le submit (opération **composée** miroir douleur `upsertPainReports` PUIS `updateAssessmentQuestionnaire`) passe par `tryWithOfflineQueue("assessment-questionnaire-submit", …)`. Hors-ligne/erreur transitoire → mis en file, toast « enregistré hors-ligne, synchronisé au retour du réseau » + done-state local ; pas d'invalidation (serveur pas encore écrit).
+- `src/pages/coach/StrengthAssessmentScreen.tsx` : le submit physique (`updateAssessmentPhysicalTests`, UPDATE idempotent) passe par `tryWithOfflineQueue("assessment-physical-tests", …)`. Même UX hors-ligne.
+- `src/components/shared/OfflineMutationSync.tsx` : 2 prédicats + 2 branches de replay (questionnaire = replay composé pain→questionnaire ; physique = UPDATE) + invalidation `["strength-assessment"]` / `["kpi-latest"]` après sync.
+
+Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) → replay sûr sans doublon. Pas de clé de dédup imposée (re-submit avec corrections hors-ligne → dernier replay FIFO gagne).
+
+**Reste — Slice B (KPI) :** `recordKpiMeasurement` est un **INSERT append-only** → la mise en file demande une **clé de déduplication** (colonne + index unique + `ON CONFLICT`) pour que le replay après ACK perdu ne crée pas de doublon. Migration `00205` + threading dans `KpiWizard` (qui a déjà une logique de retry `failedKeys` à concilier). **Non livré dans cette slice** (data-integrity-sensible, traité à part).
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` 1377/1377 + 20/20 ✅ ; `npm run build` OK. Câblage offline suivant le pattern testé existant (Records/SuiviSemaine) — `tryWithOfflineQueue`/dédup déjà couverts par `offlineQueue.test.ts` ; pas de `test:rls` (aucune policy).

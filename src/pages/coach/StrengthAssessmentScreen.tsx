@@ -42,6 +42,7 @@ import {
   getActiveMesocycle,
   getProfile,
 } from "@/lib/api";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
 import type {
   StrengthAssessment,
@@ -308,10 +309,24 @@ export default function StrengthAssessmentScreen() {
         },
         filled_at: new Date().toISOString(),
       };
-      await updateAssessmentPhysicalTests(assessment.id, physicalTests);
+      // §314 (#3) — le coach note la mobilité/mouvement au bord du bassin, où le
+      // réseau est souvent instable/coupé. UPDATE idempotent → mise en file +
+      // replay sûr hors-ligne (pas de doublon).
+      return tryWithOfflineQueue(
+        "assessment-physical-tests",
+        { assessmentId: assessment.id, physicalTests } as unknown as Record<string, unknown>,
+        () => updateAssessmentPhysicalTests(assessment.id, physicalTests),
+      );
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setSubmittedLocally(true);
+      if (isOfflineQueuedResult(result)) {
+        toast.success("Bilan enregistré hors-ligne", {
+          description: "Il sera synchronisé automatiquement au retour du réseau.",
+        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       toast.success("Bilan enregistré", {
         description: `Le bilan muscu de ${athleteName} est complété.`,
       });

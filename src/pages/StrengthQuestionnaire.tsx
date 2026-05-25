@@ -46,6 +46,7 @@ import {
   getLatestKpiMeasurements,
   getActiveMesocycle,
 } from "@/lib/api";
+import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
 import type {
   StrengthAssessment,
@@ -218,19 +219,30 @@ export default function StrengthQuestionnaire() {
         psychology: { confidence, motivation, stress },
         filled_at: new Date().toISOString(),
       };
-      // 1. Mirror the declared pain into pain_reports for today so the
-      //    coach's wellness/pain views stay consistent. Done FIRST: if it
-      //    throws, the assessment is still `questionnaire_pending`, so a
-      //    retry genuinely works (the screen stays editable).
-      await upsertPainReports(effectiveAthleteId, todayISODate(), painEntries);
-      // 2. Persist the questionnaire — the commit-like final step: it flips
-      //    status to `bilan_pending`. Done LAST on purpose, so a failed
-      //    pain write above never strands the screen in a non-retryable
-      //    done-state with the pain mirror lost.
-      await updateAssessmentQuestionnaire(assessment.id, questionnaire);
+      const date = todayISODate();
+      // §314 (#3) — au bord du bassin, réseau souvent instable/coupé. On envoie
+      // l'opération COMPOSÉE (miroir douleur PUIS questionnaire) ; hors-ligne
+      // ou sur erreur transitoire, `tryWithOfflineQueue` la met en file (les 2
+      // écritures sont idempotentes : UPSERT pain + UPDATE assessment → replay
+      // sûr). L'ordre interne (pain d'abord, questionnaire ensuite) est conservé.
+      return tryWithOfflineQueue(
+        "assessment-questionnaire-submit",
+        { athleteId: effectiveAthleteId, date, painEntries, assessmentId: assessment.id, questionnaire } as unknown as Record<string, unknown>,
+        async () => {
+          await upsertPainReports(effectiveAthleteId, date, painEntries);
+          await updateAssessmentQuestionnaire(assessment.id, questionnaire);
+        },
+      );
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setSubmittedLocally(true);
+      if (isOfflineQueuedResult(result)) {
+        toast.success("Questionnaire enregistré hors-ligne", {
+          description: "Il sera synchronisé automatiquement au retour du réseau.",
+        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return; // Rien à invalider : le serveur n'a pas encore reçu l'écriture.
+      }
       toast.success("Questionnaire envoyé", {
         description: isCoachMode
           ? "Tu peux maintenant noter le bilan physique."

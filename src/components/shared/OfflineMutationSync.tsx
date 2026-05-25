@@ -19,6 +19,9 @@ import {
   saveSwimSessionAtomic,
   uploadAvatar,
   dataUrlToBlob,
+  upsertPainReports,
+  updateAssessmentQuestionnaire,
+  updateAssessmentPhysicalTests,
 } from "@/lib/api";
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
@@ -84,6 +87,34 @@ function isQueuedSwimRecord(
   mutation: QueuedMutation,
 ): mutation is QueuedMutation & { payload: QueuedSwimRecordPayload } {
   return mutation.type === "swim-record-upsert";
+}
+
+// §314 (#3) — Bilan muscu hors-ligne : mesures saisies au bord du bassin sous
+// réseau instable/coupé. Écritures idempotentes (UPSERT pain + UPDATE de la
+// ligne assessment) → rejouables sans risque de doublon. Le questionnaire est
+// une opération COMPOSÉE (miroir douleur + questionnaire) rejouée d'un bloc.
+type QueuedAssessmentQuestionnairePayload = {
+  athleteId: number;
+  date: string;
+  painEntries: Parameters<typeof upsertPainReports>[2];
+  assessmentId: string;
+  questionnaire: Parameters<typeof updateAssessmentQuestionnaire>[1];
+};
+type QueuedAssessmentPhysicalPayload = {
+  assessmentId: string;
+  physicalTests: Parameters<typeof updateAssessmentPhysicalTests>[1];
+};
+
+function isQueuedAssessmentQuestionnaire(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedAssessmentQuestionnairePayload } {
+  return mutation.type === "assessment-questionnaire-submit";
+}
+
+function isQueuedAssessmentPhysical(
+  mutation: QueuedMutation,
+): mutation is QueuedMutation & { payload: QueuedAssessmentPhysicalPayload } {
+  return mutation.type === "assessment-physical-tests";
 }
 
 // §252 — Sub-§C2 : SuiviSemaine + Administratif mutations replay.
@@ -336,6 +367,24 @@ export function OfflineMutationSync() {
             syncedCount += 1;
             continue;
           }
+          // §314 (#3) — Bilan muscu hors-ligne : questionnaire (composé) + physique.
+          if (isQueuedAssessmentQuestionnaire(mutation)) {
+            const p = mutation.payload;
+            await upsertPainReports(p.athleteId, p.date, p.painEntries);
+            await updateAssessmentQuestionnaire(p.assessmentId, p.questionnaire);
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
+          if (isQueuedAssessmentPhysical(mutation)) {
+            await updateAssessmentPhysicalTests(
+              mutation.payload.assessmentId,
+              mutation.payload.physicalTests,
+            );
+            removeQueueItem(mutation.id);
+            syncedCount += 1;
+            continue;
+          }
           // Unrecognised type: typically means the queue was written by a
           // newer build and the swimmer reverted to an older PWA. Track it
           // so we can surface a single user-visible warning instead of the
@@ -378,6 +427,9 @@ export function OfflineMutationSync() {
         // §262 — invalidate swim session logs queries after atomic save replay.
         queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-by-catalog"] });
         queryClient.invalidateQueries({ queryKey: ["swim-exercise-logs-history"] });
+        // §314 (#3) — bilan muscu : rafraîchir l'évaluation après replay offline.
+        queryClient.invalidateQueries({ queryKey: ["strength-assessment"] });
+        queryClient.invalidateQueries({ queryKey: ["kpi-latest"] });
         // §263 — invalidate hall-of-fame already covered above; profile query
         // re-invalidated here so the new avatar URL surfaces immediately.
         queryClient.invalidateQueries({ queryKey: ["profile"] });
