@@ -15,6 +15,7 @@
  *   4. Coach (ou nageur) peut appeler `revertMesocycle(id)` pour annuler.
  */
 import { supabase, canUseSupabase, assertSupabase } from './client';
+import { getMonday, toISODate } from '@/lib/date';
 import {
   generateMesocycle as runEngine,
 } from '@/lib/strength/mesocycleEngine';
@@ -61,6 +62,8 @@ function serializeExercise(ex: MesocycleExercise): Record<string, unknown> {
 function serializeSession(s: MesocycleSession): Record<string, unknown> {
   return {
     session_number: s.sessionNumber,
+    weekday: s.weekday,
+    role: s.role,
     buckets: s.buckets,
     exercises: s.exercises.map(serializeExercise),
   };
@@ -91,6 +94,19 @@ function toDateString(d: string | Date): string {
 }
 
 /**
+ * Lundi (`YYYY-MM-DD`, date locale) de la semaine contenant `d`.
+ *
+ * Réutilise `getMonday`/`toISODate` de `src/lib/date.ts` — même convention
+ * que `toDateString` (date LOCALE, lundi = début de semaine), donc pas de
+ * dérive de fuseau horaire. Pour une date `string`, on l'ancre à minuit local
+ * (`T00:00:00`) avant de la passer à `getMonday`.
+ */
+function mondayOf(d: string | Date): string {
+  const dateObj = typeof d === 'string' ? new Date(d + 'T00:00:00') : d;
+  return toISODate(getMonday(dateObj));
+}
+
+/**
  * Matérialise un mésocycle généré sur la timeline `strength_planning_*` du
  * nageur, via la RPC `apply_strength_mesocycle` (migration 00172).
  *
@@ -103,15 +119,24 @@ function toDateString(d: string | Date): string {
  * - Supersede des mésocycles `active` précédents du même athlète
  * - Notification ciblée sur le groupe du nageur
  *
- * @param input          Données ayant servi à `generateMesocyclePreview`
- * @param generated      Mésocycle produit par le moteur (à confirmer)
- * @param startWeekMonday Lundi de la première semaine (Date ou 'YYYY-MM-DD')
+ * §307 — Le 3ᵉ paramètre est désormais la **date de départ réelle** du
+ * mésocycle (et non plus le lundi de la semaine 1). On en dérive le lundi de
+ * la première semaine (`p_start_week_monday = mondayOf(startDate)`) et on
+ * transmet la date exacte (`p_start_date`) à la RPC, qui peut alors ignorer
+ * les séances tombant avant cette date (première semaine partielle si départ
+ * en milieu de semaine). Rétro-compatible : un appelant qui passe déjà un
+ * lundi obtient `mondayOf(lundi) = lundi`, donc aucune séance écartée.
+ *
+ * @param input     Données ayant servi à `generateMesocyclePreview`
+ * @param generated Mésocycle produit par le moteur (à confirmer)
+ * @param startDate Date de départ réelle (Date ou 'YYYY-MM-DD'). Peut tomber
+ *                  en milieu de semaine — la 1re semaine sera alors partielle.
  * @returns L'UUID du mésocycle persisté.
  */
 export async function applyMesocycle(
   input: MesocycleInput,
   generated: GeneratedMesocycle,
-  startWeekMonday: string | Date,
+  startDate: string | Date,
 ): Promise<string> {
   if (!canUseSupabase()) throw new Error('Supabase not available');
 
@@ -126,7 +151,8 @@ export async function applyMesocycle(
       p_kind: input.template.kind,
       p_target_week_count: input.targetWeekCount,
       p_sessions_per_week: input.sessionsPerWeek,
-      p_start_week_monday: toDateString(startWeekMonday),
+      p_start_week_monday: mondayOf(startDate),
+      p_start_date: toDateString(startDate),
       p_bucket_priorities: generated.reasoning,
       p_engine_version: generated.engineVersion,
       p_weeks: serializeWeeks(generated.weeks),

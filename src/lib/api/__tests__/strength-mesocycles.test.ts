@@ -163,7 +163,10 @@ describe('applyMesocycle', () => {
     assert.equal(capturedArgs?.p_kind, 'season');
     assert.equal(capturedArgs?.p_target_week_count, 5);
     assert.equal(capturedArgs?.p_sessions_per_week, 2);
+    // §307 : départ un lundi → p_start_week_monday = la date elle-même,
+    // p_start_date = la date exacte (pas de semaine partielle ici).
     assert.equal(capturedArgs?.p_start_week_monday, '2026-06-01');
+    assert.equal(capturedArgs?.p_start_date, '2026-06-01');
     assert.equal(capturedArgs?.p_engine_version, generated.engineVersion);
     // Reasoning passé brut (le moteur l'a déjà construit)
     assert.deepEqual(capturedArgs?.p_bucket_priorities, generated.reasoning);
@@ -195,6 +198,14 @@ describe('applyMesocycle', () => {
     assert.ok(sessions.length > 0);
     const firstSession = sessions[0];
     assert.equal(typeof firstSession.session_number, 'number');
+    // §307 : weekday (0=Lun…6=Dim) + role portés par la sérialisation.
+    assert.equal(typeof firstSession.weekday, 'number');
+    assert.ok(
+      ['amorce_pap', 'developpement', 'mobilite_corrective'].includes(
+        firstSession.role as string,
+      ),
+      `role inattendu: ${String(firstSession.role)}`,
+    );
     assert.ok(Array.isArray(firstSession.exercises));
 
     const exercises = firstSession.exercises as Array<Record<string, unknown>>;
@@ -226,6 +237,42 @@ describe('applyMesocycle', () => {
     await applyMesocycle(input, generated, new Date(2026, 5, 1));
 
     assert.equal(capturedDate, '2026-06-01');
+  });
+
+  it("§307 : départ en milieu de semaine → p_start_week_monday = lundi de la semaine, p_start_date = la date exacte", async () => {
+    const { generateMesocyclePreview, applyMesocycle } = await import('../strength-mesocycles.ts');
+    const input = makeMinimalInput();
+    const generated = generateMesocyclePreview(input);
+
+    let capturedArgs: Record<string, unknown> | undefined;
+    rpcImpl = (_fn: unknown, args: unknown) => {
+      capturedArgs = args as Record<string, unknown>;
+      return Promise.resolve({ data: 'uuid-x', error: null });
+    };
+
+    // Jeudi 4 juin 2026 — la semaine de cette date commence le lundi 1er juin.
+    await applyMesocycle(input, generated, '2026-06-04');
+
+    assert.equal(capturedArgs?.p_start_week_monday, '2026-06-01');
+    assert.equal(capturedArgs?.p_start_date, '2026-06-04');
+  });
+
+  it("§307 : départ en milieu de semaine en Date → lundi de la semaine + date exacte", async () => {
+    const { generateMesocyclePreview, applyMesocycle } = await import('../strength-mesocycles.ts');
+    const input = makeMinimalInput();
+    const generated = generateMesocyclePreview(input);
+
+    let capturedArgs: Record<string, unknown> | undefined;
+    rpcImpl = (_fn: unknown, args: unknown) => {
+      capturedArgs = args as Record<string, unknown>;
+      return Promise.resolve({ data: 'uuid-x', error: null });
+    };
+
+    // Jeudi 4 juin 2026 (mois = 5, 0-indexed) en objet Date.
+    await applyMesocycle(input, generated, new Date(2026, 5, 4));
+
+    assert.equal(capturedArgs?.p_start_week_monday, '2026-06-01');
+    assert.equal(capturedArgs?.p_start_date, '2026-06-04');
   });
 
   it('lève si la RPC renvoie une erreur', async () => {
