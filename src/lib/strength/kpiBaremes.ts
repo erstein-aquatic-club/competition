@@ -61,6 +61,31 @@ export function kpiScore(bareme: Bareme, value: number): number {
   return clamp(last[1]);
 }
 
+/** Niveau de référence d'un athlète : décale le barème pour relever la barre. */
+export type PerformanceTier = 'club' | 'regional' | 'national' | 'elite';
+
+/** Décalage du barème par tier, en fraction de l'étendue (val_dernière − val_première). */
+const TIER_SHIFT_K: Record<PerformanceTier, number> = {
+  club: 0,
+  regional: 0.18,
+  national: 0.35,
+  elite: 0.5,
+};
+
+/**
+ * Décale les ancres vers la droite de Δ = k(tier) × (val_dernière − val_première)
+ * pour relever la barre au tier supérieur (à perf égale, score plus bas).
+ * Translation en espace valeur brute → robuste aux unités et aux ancres négatives.
+ * `club` (k=0) → identité. Cf. design §2b.
+ */
+export function shiftAnchors(anchors: Bareme, tier: PerformanceTier): Bareme {
+  const k = TIER_SHIFT_K[tier];
+  if (k === 0) return anchors;
+  const spread = anchors[anchors.length - 1][0] - anchors[0][0];
+  const delta = k * spread;
+  return anchors.map(([x, s]) => [x + delta, s] as const);
+}
+
 import type { StrengthKpiKey } from '@/lib/api/types';
 
 /** Niveau de confiance d'un barème — voir docs/plans/bilan-muscu-baremes-sources.md. */

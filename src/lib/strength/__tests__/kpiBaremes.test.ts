@@ -6,10 +6,12 @@ import {
   baremeConfidenceFor,
   ageBandFor,
   getBareme,
+  shiftAnchors,
   type AgeBand,
   type Bareme,
   type BaremeConfidence,
   type BaremeSex,
+  type PerformanceTier,
 } from '../kpiBaremes.ts';
 import type { StrengthKpiKey } from '@/lib/api/types';
 
@@ -74,6 +76,40 @@ describe('bande adulte (Task 2)', () => {
       getBareme('imtp', 'M', 'adulte').anchors,
       getBareme('imtp', 'M', '17-18').anchors,
     );
+  });
+});
+
+// Task 3 (muscu G1) — un tier de performance décale le barème vers la droite
+// (relève la barre) : à valeur brute égale, le score décroît quand le tier
+// monte. `club` = identité. Translation en espace valeur brute → robuste aux
+// ancres négatives.
+describe('shiftAnchors / tier (Task 3)', () => {
+  const wp: Bareme = [[-5, 10], [0, 30], [5, 50], [10, 70], [20, 90]];
+  // toBeCloseTo(x, n) : |actual − x| < 0.5 * 10^(−n).
+  const closeTo = (actual: number, expected: number, digits: number): void => {
+    assert.ok(
+      Math.abs(actual - expected) < 0.5 * 10 ** -digits,
+      `attendu ~${expected} (${digits} déc.), obtenu ${actual}`,
+    );
+  };
+
+  it('club = identité', () => {
+    assert.deepEqual(shiftAnchors(wp, 'club'), wp);
+  });
+  it('relève la barre : à valeur égale, score décroît quand le tier monte', () => {
+    const v = 10;
+    const sClub = kpiScore(shiftAnchors(wp, 'club'), v);
+    const sReg = kpiScore(shiftAnchors(wp, 'regional'), v);
+    const sNat = kpiScore(shiftAnchors(wp, 'national'), v);
+    const sElite = kpiScore(shiftAnchors(wp, 'elite'), v);
+    assert.ok(sClub >= sReg, `sClub(${sClub}) >= sReg(${sReg})`);
+    assert.ok(sReg >= sNat, `sReg(${sReg}) >= sNat(${sNat})`);
+    assert.ok(sNat >= sElite, `sNat(${sNat}) >= sElite(${sElite})`);
+    assert.equal(sClub, 70);
+    closeTo(sNat, 35, 0); // Δ = 0.35*(20-(-5)) = 8.75 ; kpiScore(wp, 1.25) = 35
+  });
+  it('gère les ancres négatives', () => {
+    closeTo(shiftAnchors(wp, 'national')[0][0], 3.75, 2);
   });
 });
 
