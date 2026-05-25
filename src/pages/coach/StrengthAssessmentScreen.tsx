@@ -75,8 +75,9 @@ import { initials } from "@/components/strength/kpi/kpiHelpers";
 import { AssessmentContext } from "@/components/strength/assessment/AssessmentContext";
 import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
 import { StrengthAthleteProfileCard } from "@/components/strength/assessment/StrengthAthleteProfileCard";
-import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
-import { computeBilanProgress, isProfileComplete } from "@/lib/strength/bilanProgress";
+import { BilanProgress } from "@/components/strength/assessment/BilanProgress";
+import { isProfileComplete } from "@/lib/strength/bilanProgress";
+import { useBilanSteps } from "@/hooks/useBilanSteps";
 import {
   MOBILITY_SCORES,
   MOVEMENT_SCORES,
@@ -463,43 +464,7 @@ export default function StrengthAssessmentScreen() {
 
   /* ── Fil conducteur — 4 étapes du bilan, navigation cible conservée (§302/§A) ── */
   const hasKpis = !!kpis && Object.keys(kpis).length > 0;
-  const progress = computeBilanProgress(status, hasKpis, hasActiveMesocycle);
-  const bilanSteps: BilanStep[] = [
-    {
-      key: "questionnaire",
-      label: "Questionnaire",
-      state: progress.questionnaire,
-      // Actionnable seulement tant qu'il n'est pas rempli (remplir avec le nageur).
-      onTap:
-        progress.questionnaire === "current" && selectedAthleteId != null
-          ? () => navigate(`/coach/questionnaire/${selectedAthleteId}`)
-          : undefined,
-    },
-    {
-      key: "kpis",
-      label: "KPIs",
-      state: progress.kpis,
-      // Toujours (re)mesurable.
-      onTap:
-        selectedAthleteId != null
-          ? () => navigate(`/coach/kpi-wizard/${selectedAthleteId}`)
-          : undefined,
-    },
-    {
-      key: "physical",
-      label: "Bilan physique",
-      state: progress.physical,
-    },
-    {
-      key: "generation",
-      label: "Génération",
-      state: progress.generation,
-      onTap:
-        progress.generation !== "todo" && selectedAthleteId != null
-          ? () => navigate(`/coach/mesocycle-generate/${selectedAthleteId}`)
-          : undefined,
-    },
-  ];
+  const bilanSteps = useBilanSteps(selectedAthleteId, status, hasKpis, hasActiveMesocycle, "physical");
   const BilanProgressStrip = <BilanProgress steps={bilanSteps} />;
 
   /* ════════════════════════════════════════════════════════════

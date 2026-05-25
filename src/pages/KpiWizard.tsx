@@ -24,6 +24,8 @@ import {
   getAthletes,
   recordKpiMeasurement,
   getLatestKpiMeasurements,
+  getLatestAssessment,
+  getActiveMesocycle,
   getExerciseGifs,
   type RecordKpiInput,
 } from "@/lib/api";
@@ -64,19 +66,11 @@ import { KpiStepCard, type KpiAttemptsState, parseAttempts } from "@/components/
 import { KpiRecap, type KpiRecapEntry } from "@/components/strength/kpi/KpiRecap";
 import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
 import { initials } from "@/components/strength/kpi/kpiHelpers";
-import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
+import { BilanProgress } from "@/components/strength/assessment/BilanProgress";
+import { useBilanSteps } from "@/hooks/useBilanSteps";
 
 const PROTOCOLS = Object.values(KPI_PROTOCOLS);
 const KPI_KEYS = PROTOCOLS.map((p) => p.key);
-
-/** 4-step progress strip shown in coach-targeted mode. KPIs = current;
- *  questionnaire/physical/generation unknown here — fixed with useBilanSteps in §A 2.4. */
-const KPIS_BILAN_STEPS: BilanStep[] = [
-  { key: "questionnaire", label: "Questionnaire", state: "todo" },
-  { key: "kpis", label: "KPIs", state: "current" },
-  { key: "physical", label: "Bilan physique", state: "todo" },
-  { key: "generation", label: "Génération", state: "todo" },
-];
 
 /** Per-KPI attempt state, keyed by KPI key. */
 type AttemptsByKpi = Record<StrengthKpiKey, KpiAttemptsState>;
@@ -206,6 +200,29 @@ export default function KpiWizard() {
     queryFn: () => getLatestKpiMeasurements(athleteId!),
     enabled: athleteId != null,
   });
+
+  // ── Assessment status + active mesocycle (coach-targeted only — for the
+  //    4-step bilan progress strip; not needed for the KPI measurement flow) ──
+  const { data: assessmentForStrip } = useQuery({
+    queryKey: ["strength-assessment", athleteId],
+    queryFn: () => getLatestAssessment(athleteId!),
+    enabled: isCoachTargeted && athleteId != null,
+    staleTime: 5 * 60_000,
+  });
+  const { data: activeMesoForStrip } = useQuery({
+    queryKey: ["active-mesocycle", athleteId],
+    queryFn: () => getActiveMesocycle(athleteId!),
+    enabled: isCoachTargeted && athleteId != null,
+    staleTime: 5 * 60_000,
+  });
+  const hasKpisForStrip = !!latestMeasurements && Object.keys(latestMeasurements).length > 0;
+  const bilanSteps = useBilanSteps(
+    isCoachTargeted ? targetAthleteId : null,
+    assessmentForStrip?.status ?? null,
+    hasKpisForStrip,
+    activeMesoForStrip != null,
+    "kpis",
+  );
 
   // Effective diff baseline = server "latest" with this session's own writes
   // layered on top (so a same-athlete second run compares correctly).
@@ -624,12 +641,7 @@ export default function KpiWizard() {
         {isCoachTargeted && (
           <div className="border-b bg-background/95 px-4 py-3">
             <div className="mx-auto w-full max-w-md">
-              <BilanProgress steps={[
-                { key: "questionnaire", label: "Questionnaire", state: "todo" },
-                { key: "kpis", label: "KPIs", state: "done" },
-                { key: "physical", label: "Bilan physique", state: "todo" },
-                { key: "generation", label: "Génération", state: "todo" },
-              ]} />
+              <BilanProgress steps={bilanSteps} />
             </div>
           </div>
         )}
@@ -675,7 +687,7 @@ export default function KpiWizard() {
       {isCoachTargeted && (
         <div className="border-b bg-background/95 px-4 py-3">
           <div className="mx-auto w-full max-w-md">
-            <BilanProgress steps={KPIS_BILAN_STEPS} />
+            <BilanProgress steps={bilanSteps} />
           </div>
         </div>
       )}

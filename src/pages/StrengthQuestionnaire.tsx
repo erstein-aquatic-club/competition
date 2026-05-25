@@ -43,6 +43,8 @@ import {
   getLatestAssessment,
   updateAssessmentQuestionnaire,
   upsertPainReports,
+  getLatestKpiMeasurements,
+  getActiveMesocycle,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type {
@@ -71,8 +73,8 @@ import { toast } from "sonner";
 
 import { BodyHeatMap } from "@/components/wellness/BodyHeatMap";
 import { ScaleField } from "@/components/strength/questionnaire/ScaleField";
-import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
-import { computeBilanProgress } from "@/lib/strength/bilanProgress";
+import { BilanProgress } from "@/components/strength/assessment/BilanProgress";
+import { useBilanSteps } from "@/hooks/useBilanSteps";
 
 /** Local date as YYYY-MM-DD (pain_reports keys on a calendar date). */
 function todayISODate(): string {
@@ -144,6 +146,22 @@ export default function StrengthQuestionnaire() {
   const [motivation, setMotivation] = useState(0);
   const [stress, setStress] = useState(0);
 
+  // ── KPIs + active mesocycle (coach mode — for 4-step progress strip) ──
+  const { data: kpiLatest } = useQuery({
+    queryKey: ["kpi-latest", effectiveAthleteId],
+    queryFn: () => getLatestKpiMeasurements(effectiveAthleteId!),
+    enabled: isCoachMode && effectiveAthleteId != null,
+    staleTime: 5 * 60_000,
+  });
+  const { data: activeMeso } = useQuery({
+    queryKey: ["active-mesocycle", effectiveAthleteId],
+    queryFn: () => getActiveMesocycle(effectiveAthleteId!),
+    enabled: isCoachMode && effectiveAthleteId != null,
+    staleTime: 5 * 60_000,
+  });
+  const hasKpis = !!kpiLatest && Object.keys(kpiLatest).length > 0;
+  const hasActiveMesocycle = activeMeso != null;
+
   // ── Status routing ──
   const status = assessment?.status ?? null;
   const isEditable = status === "questionnaire_pending";
@@ -153,29 +171,15 @@ export default function StrengthQuestionnaire() {
   const isDone =
     submittedLocally || status === "bilan_pending" || status === "completed";
 
-  // 4-step progress strip (coach mode only — hasKpis unknown here, fixed in §A Task 2.4)
+  // 4-step progress strip (coach mode only — hook handles compute + navigation)
   const effectiveStatus = submittedLocally ? "bilan_pending" : status;
-  const _bilanProgress = computeBilanProgress(effectiveStatus, false);
-  const bilanSteps: BilanStep[] = [
-    { key: "questionnaire", label: "Questionnaire", state: _bilanProgress.questionnaire },
-    {
-      key: "kpis",
-      label: "KPIs",
-      state: _bilanProgress.kpis,
-      onTap: effectiveAthleteId != null
-        ? () => navigate(`/coach/kpi-wizard/${effectiveAthleteId}`)
-        : undefined,
-    },
-    {
-      key: "physical",
-      label: "Bilan physique",
-      state: _bilanProgress.physical,
-      onTap: effectiveAthleteId != null
-        ? () => navigate(`/coach/strength-assessment/${effectiveAthleteId}`)
-        : undefined,
-    },
-    { key: "generation", label: "Génération", state: _bilanProgress.generation },
-  ];
+  const bilanSteps = useBilanSteps(
+    isCoachMode ? effectiveAthleteId : null,
+    effectiveStatus,
+    hasKpis,
+    hasActiveMesocycle,
+    "questionnaire",
+  );
 
   // En mode coach (bilan accompagné), on revient au fil conducteur du bilan
   // (cible conservée) plutôt qu'à la fiche nageur — §302.
