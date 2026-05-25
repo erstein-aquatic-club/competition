@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { computeReadinessScore, sleepDurationScore } from '../wellness';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { computeReadinessScore, sleepDurationScore } from '../wellness.ts';
 
 describe('computeReadinessScore', () => {
   it('returns 100 for best values (all 1s)', () => {
@@ -11,7 +12,7 @@ describe('computeReadinessScore', () => {
       stress: 1,
     });
     // (5 + (11-2) + (11-2) + 5 + (11-2)) / 25 * 100 = (5+9+9+5+9)/25*100 = 37/25*100 = 148 → clamped to 100
-    expect(score).toBe(100);
+    assert.equal(score, 100);
   });
 
   it('returns 0 or near 0 for worst values (all 5s)', () => {
@@ -23,7 +24,7 @@ describe('computeReadinessScore', () => {
       stress: 5,
     });
     // (1 + (11-10) + (11-10) + 1 + (11-10)) / 25 * 100 = (1+1+1+1+1)/25*100 = 5/25*100 = 20
-    expect(score).toBe(20);
+    assert.equal(score, 20);
   });
 
   it('returns a mid-range value for mixed inputs', () => {
@@ -35,7 +36,7 @@ describe('computeReadinessScore', () => {
       stress: 3,
     });
     // (3 + (11-6) + (11-6) + 3 + (11-6)) / 25 * 100 = (3+5+5+3+5)/25*100 = 21/25*100 = 84
-    expect(score).toBe(84);
+    assert.equal(score, 84);
   });
 
   it('clamps to 100 maximum', () => {
@@ -47,7 +48,7 @@ describe('computeReadinessScore', () => {
       mood: 5,
       stress: 1,
     });
-    expect(score).toBeLessThanOrEqual(100);
+    assert.ok(score <= 100);
   });
 
   it('clamps to 0 minimum', () => {
@@ -60,7 +61,7 @@ describe('computeReadinessScore', () => {
       mood: 1,
       stress: 5,
     });
-    expect(score).toBeGreaterThanOrEqual(0);
+    assert.ok(score >= 0);
   });
 
   it('penalises short sleep duration even with good perceived quality', () => {
@@ -79,7 +80,7 @@ describe('computeReadinessScore', () => {
       mood: 3,
       stress: 3,
     });
-    expect(shortNight).toBeLessThan(withoutHours);
+    assert.ok(shortNight < withoutHours);
   });
 
   it('rewards optimal 8h sleep compared to 5h with same quality', () => {
@@ -92,16 +93,16 @@ describe('computeReadinessScore', () => {
     };
     const optimal = computeReadinessScore({ ...base, sleep_hours: 8 });
     const short = computeReadinessScore({ ...base, sleep_hours: 5 });
-    expect(optimal).toBeGreaterThan(short);
+    assert.ok(optimal > short);
   });
 
   it('sleepDurationScore peaks at 8h and decays symmetrically', () => {
-    expect(sleepDurationScore(8)).toBe(5);
-    expect(sleepDurationScore(7)).toBe(4);
-    expect(sleepDurationScore(9)).toBe(4);
-    expect(sleepDurationScore(4)).toBe(1);
-    expect(sleepDurationScore(12)).toBe(1);
-    expect(sleepDurationScore(0)).toBe(1);
+    assert.equal(sleepDurationScore(8), 5);
+    assert.equal(sleepDurationScore(7), 4);
+    assert.equal(sleepDurationScore(9), 4);
+    assert.equal(sleepDurationScore(4), 1);
+    assert.equal(sleepDurationScore(12), 1);
+    assert.equal(sleepDurationScore(0), 1);
   });
 
   it('returns integer values', () => {
@@ -112,6 +113,6 @@ describe('computeReadinessScore', () => {
       mood: 4,
       stress: 3,
     });
-    expect(Number.isInteger(score)).toBe(true);
+    assert.equal(Number.isInteger(score), true);
   });
 });
