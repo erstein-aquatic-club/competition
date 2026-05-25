@@ -20,3 +20,31 @@ type Status = StrengthAssessment["status"] | null | undefined;
 export function canGenerateMesocycle(status: Status): boolean {
   return status === "bilan_pending" || status === "completed";
 }
+
+/**
+ * Garde double-apply (#5, audit 2026-05-26). L'apply matérialise un mésocycle
+ * via une RPC transactionnelle ; si elle **réussit côté serveur** mais que le
+ * **client time-out** (réseau coupé après commit), un retour en erreur pourrait
+ * pousser l'utilisateur à **réessayer** → un 2ᵉ apply qui supersede le méso
+ * fraîchement créé et en empile un autre (la surface converge via §308, mais on
+ * accumule des mésos superseded inutiles).
+ *
+ * Après une erreur d'apply, on **re-lit le mésocycle actif** : s'il a été créé
+ * **pendant ou après** le début de la tentative, c'est que l'apply a en fait
+ * abouti → on traite comme un succès (rediriger vers le plan) au lieu d'inviter
+ * à recommencer. Comparaison en temps absolu (`created_at` serveur vs instant de
+ * départ client) : tolérante au petit écart d'horloge à l'échelle des secondes.
+ *
+ * @param attemptStartedAtMs  `Date.now()` capturé au lancement de l'apply.
+ * @param activeMesocycleCreatedAtIso  `created_at` du méso actif re-lu, ou null.
+ * @returns `true` si l'apply a vraisemblablement abouti malgré l'erreur.
+ */
+export function applyLikelySucceededDespiteError(
+  attemptStartedAtMs: number,
+  activeMesocycleCreatedAtIso: string | null | undefined,
+): boolean {
+  if (!activeMesocycleCreatedAtIso) return false;
+  const createdMs = Date.parse(activeMesocycleCreatedAtIso);
+  if (Number.isNaN(createdMs)) return false;
+  return createdMs >= attemptStartedAtMs;
+}

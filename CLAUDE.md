@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§311** — Audit robustesse/perf/élite + 3 correctifs : `withTimeout` sur apply/revert, garde-fou remplacement §308 (bannière aperçu), profil distance `fond` ≥800m (R4, mig 00202). `npm test` 1365+20, tsc 0, build 0.
+Dernier § livré : **§312** — Garde double-apply (#5 : `applyLikelySucceededDespiteError`, retry-safe après timeout réseau) ; #7 revu sans changement. `npm test` 1369+20, tsc 0, build 0. *(§311 — audit robustesse/perf/élite + #1 withTimeout apply/revert, #2 garde-fou §308, #4 profil `fond` mig 00202.)* Seau core R5 en DRAFT hors `main` (branche `feat/muscu-seau-core-r5-draft`, à valider coach).
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

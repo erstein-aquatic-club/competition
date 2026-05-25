@@ -18746,3 +18746,17 @@ Après le §161 (nettoyage serveur), audit des textes pour évaluer **cohérence
 - Garde-fou §308 = **bannière** (soft), pas un blocage : la régénération reste fluide pour le cas courant (intentionnel) ; la conséquence est rendue visible au point de décision. Un blocage dur (acquittement explicite) jugé sur-contraignant.
 - `fond` exposé **crawl uniquement** (800/1500 = épreuves freestyle LCM ; 400 4N reste sur `400plus`). Pas de seau core (R5) ni file offline bilan (#3) ni garde double-apply (#5) — différés, documentés dans l'audit.
 - Valeurs `fond` = template demi-fond historique (sourcé audit matrice) ; arc sans puissance balistique = choix défendable pour un 1500 (validé coach), ajustable par migration ultérieure.
+
+## §312 — Garde double-apply (#5 audit robustesse) + #7 revu (2026-05-26)
+
+**Contexte.** Suite de l'audit §311 (correctifs #1/#2/#4 livrés). #5 = garde contre le double-apply au retry après timeout réseau ; #7 = revu, sans changement (voir plus bas).
+
+**#5 — Garde double-apply.** Avec `withTimeout` (#1), un apply peut **réussir côté serveur** puis **time-out côté client** (réseau coupé après commit). Sur erreur, un retour à zéro pousserait l'utilisateur à réessayer → un 2ᵉ apply supersede le méso fraîchement créé et en empile un autre (la surface converge via §308, mais on accumule des mésos superseded inutiles).
+- `src/lib/strength/mesocycleGating.ts` : nouveau helper pur `applyLikelySucceededDespiteError(attemptStartedAtMs, activeMesocycleCreatedAtIso)` — `true` si un méso actif a été créé **pendant/après** le début de la tentative (donc l'apply a abouti malgré l'erreur). TDD, 4 cas (`mesocycleGating.test.ts`, RED→GREEN).
+- `src/pages/MesocyclePreview.tsx` : `applyMutation` horodate le départ (`onMutate`) ; `onError` re-lit `getActiveMesocycle` et, si l'apply a vraisemblablement abouti, traite comme un **succès** (toast « le réseau a coupé mais le plan est enregistré », redirige vers la planif) au lieu d'inviter à recommencer. Helper `finishApplied` factorisé (réutilisé par `onSuccess` et la récupération `onError`).
+
+**#7 — Revu, sans changement.** (a) « Bandeau post-revert » : à l'inspection, **pas un bug** — après revert `getActiveMesocycle=null` est correct (il n'y a plus de mésocycle actif), le toast de revert annonce déjà « La planif d'avant a été restaurée », et `EmptyState` montre l'historique (méso reverted inclus). Inventer un bandeau ajouterait du bruit. (b) Nudge `sprint_50` `upper_power` : marginal (crawl 50 était ✅) **et** le profil 50 étant stroke-agnostic, le bump remonterait l'UP de **toutes** les nages à 50 m → effet de bord transverse, à consolider avec la revue d'emphase du seau core (R5, branche `feat/muscu-seau-core-r5-draft`) plutôt qu'en migration isolée. **Différé/consolidé.**
+
+**Note — incident parallélisation #6.** L'agent de fond chargé du seau core (R5) devait travailler en worktree isolé ; en pratique il a écrit + commité dans l'arbre principal (`main`, commit `11750db1b`, **non poussé**). Récupération : le commit core a été préservé sur la branche **`feat/muscu-seau-core-r5-draft`** (DRAFT, valeurs à valider coach, migrations 00203/00204 NON appliquées — prod confirmée inchangée), `main` réinitialisé sur `origin/main` (§311), puis #5 ré-appliqué proprement. Le seau core reste **hors `main`** jusqu'à validation coach.
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1369/1369 node:test + 20/20 vitest** (+4 #5) ✅ ; `npm run build` OK ✅. Pas de migration, pas de `test:rls`.
