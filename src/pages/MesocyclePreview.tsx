@@ -295,16 +295,26 @@ export default function MesocyclePreview() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const signature = params
-    ? signatures.find((s) => s.stroke_key === params.stroke) ?? null
-    : null;
-  const profile_ = params
-    ? profiles.find(
-        (p) => p.distance_key === params.distance && p.kind === params.kind,
-      ) ?? null
-    : null;
+  const signature = useMemo(
+    () =>
+      params
+        ? signatures.find((s) => s.stroke_key === params.stroke) ?? null
+        : null,
+    [signatures, params?.stroke],
+  );
+  const profile_ = useMemo(
+    () =>
+      params
+        ? profiles.find(
+            (p) => p.distance_key === params.distance && p.kind === params.kind,
+          ) ?? null
+        : null,
+    [profiles, params?.distance, params?.kind],
+  );
 
   const template = useMemo(
+    // `params!` est sûr : signature/profile_ ne sont truthy que si params != null
+    // (les deux lookups renvoient null tant que params est null).
     () =>
       signature && profile_ ? composeTemplate(profile_, signature, params!.kind) : null,
     [signature, profile_, params?.kind],
@@ -439,6 +449,17 @@ export default function MesocyclePreview() {
   if (!catLoading && catalog.length === 0) {
     return (
       <EngineErrorScreen message="Aucun exercice taggé trouvé dans le catalogue. Préviens ton coach pour qu'il vérifie le seedage de dim_exercices." />
+    );
+  }
+
+  // Combinaison nage/distance non résolue alors que le chargement est terminé :
+  // tables de taxonomie vides, Supabase offline (getStrokeSignatures/Profiles
+  // renvoient [] sans erreur), ou payload sessionStorage périmé après reseed.
+  // → état d'erreur récupérable (CTA vers la génération) plutôt qu'un skeleton
+  //   permanent (template null ⇒ input/generated null mais allLoading déjà false).
+  if (!signature || !profile_) {
+    return (
+      <EngineErrorScreen message="Combinaison nage/distance introuvable — relance la génération" />
     );
   }
 
