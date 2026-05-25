@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§305** — Taxonomie nage × distance : composeTemplate(emphasis distance × mult nage), tables stroke_signatures/distance_profiles, écran Nage→Épreuve, papillon + 100 m (barèmes 100/papillon à valider coach).
+Dernier § livré : **§305** — Taxonomie nage × distance : composeTemplate(emphasis distance × mult nage), tables stroke_signatures/distance_profiles, écran Nage→Épreuve, papillon + 100 m. Suivi (2026-05-25, hors §) : **audit matrice complète vs élite** (`docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`) → **100 m validé ✅** ; **R1 appliqué** (mig `00196`) recalibre la signature **papillon** (`upper_power`/`mobility` ×1.35, à valider coach). Restes audit : brasse zone adducteurs/aine (→ §306), profil fond distinct, dos `lower_strength`, seau tronc/core.
 
 Pour ajouter un nouveau chantier, suivre le workflow § "Workflow de documentation obligatoire" ci-dessous.
 

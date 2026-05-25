@@ -4,6 +4,29 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## Audit matrice complète muscu (§305) + R1 — recalibration signature papillon (2026-05-25)
+
+**Branche** : `main` (audit lecture seule + 1 migration data appliquée directement via MCP, sur demande).
+**Trigger** : §305 a déployé la taxonomie nage × distance **sans validation coach des barèmes de-novo** (100 m + papillon). Porte de validation demandée : audit de cohérence de **toute la matrice sexe × distance × nage** + de la **modulation** (douleurs + KPI) vs l'élite mondiale.
+
+### Livrable 1 — Audit (lecture seule)
+- **`docs/audits/2026-05-25-audit-muscu-matrice-complete-vs-elite.md`** (nouveau) : recherche web (3 streams parallèles : papillon ; dos+brasse ; 4 nages+fond+sexe, sources datées) croisée avec cartographie code/DB lecture seule. **Calibration vérifiée par SQL** : signatures × profil 200 m reproduisent **au bit près** les anciens templates dos/brasse/4n (`mult = stroke_emphasis ÷ crawl_200`) ; crawl reproduit sprint_50/200m/400m. **Surface de-novo confirmée** : papillon (aucun template historique) + 100 m (idem) = 100 % de-novo ; signatures appliquées hors 200 m = extrapolation.
+- **Verdicts cibles de-novo** : **100 m ✅ validé** (interpolation 50↔200 cohérente, arc sain) ; **papillon 🟠 partiellement invalidé** (`upper_power` ×1.05 et `mobility` ×1.15 trop bas vs élite).
+- **Findings** : 🔴 brasse — douleur adducteurs/aine **non déclarable** (zone absente de `BodySvg.tsx`) × emphasis jambes max → recoupe §306 ; 🟠 fond 800/1500 servi en profil 400 m (ancien template demi-fond non reproduit) ; 🟠 dos `lower_strength` ×0.857 non étayé ; 🟠 pas de seau tronc/core ; ✅ sexe traité correctement (emphasis non sexuée, seuls barèmes KPI le sont) ; modulation douleurs/KPI saine (`emphasis×(100−score)`, override intensité≥3/dysfonction, missing=0 conservateur).
+
+### Livrable 2 — R1 appliqué (migration `00196`)
+- **`supabase/migrations/00196_butterfly_signature_recalibration.sql`** (nouveau, appliqué via MCP `apply_migration`) : `UPDATE strength_stroke_signatures WHERE stroke_key='butterfly'` → `upper_power` ×1.05→**×1.35**, `mobility` ×1.15→**×1.35** (lower_strength/lower_power/upper_strength inchangés). Option `upper_strength` ×1.0→1.05 **volontairement omise** (impact marginal, ×1.0 acceptable selon littérature).
+- **Effet composé papillon** (lu en base, format LS/LP/US/UP/MOB) : 50 `.85/1.0/1.0/.53→.68/.35→.41` ; 100 `.82/.98/.97/.63→.81/.48→.57` ; 200 `.70/.86/.90/.84→1.0/.69→.81` ; 400+ `.80/.69/1.0/.68→.88/.92→1.0`. **Effet immédiat, sans déploiement** (signatures lues en base à la génération).
+
+### Tests / vérifs
+- **Pas de tests lancés** : changement de **donnée DB pure** ; aucun test TS ne dépend du seed (`composeTemplate` testé sur mocks, pas la base — `grep` confirmé) ; **pas de policy/RLS touchée** → pas de `test:rls`. Application MCP vérifiée par `SELECT` (mult à jour, `updated_at` bumpé).
+
+### Décisions / limites
+- **Pas un § à part entière** (recalibration 1-ligne issue de l'audit) ; le slot **§306** reste réservé à la **préhab ciblée par nage** (dont la zone adducteurs/aine — R2).
+- **Valeurs papillon = de-novo, directionnelles** (élite fly peu documentée) — **À VALIDER COACH** sur le niveau exact `upper_power`/`mobility`. Réversible (restaurer ×1.05/×1.15).
+- **Limite structurelle connue** : une signature est un scalaire distance-agnostique → relève le niveau `upper_power` fly mais **n'inverse pas** l'ordre 50<100<200 (vient du profil distance ancré crawl). « Sprint = upper_power max » exigerait un profil papillon-spécifique (hors R1).
+- **Restes audit** (non faits) : R2 zone aine (§306), R3 dos `lower_strength`, R4 profil fond distinct, R5 seau tronc/core, R6 nudge `upper_power` 100 m.
+
 ## Chore — Unification du runner de tests (node:test + vitest jsdom scopé) (2026-05-25)
 
 **Branche** : `chore/test-runner-unification`
