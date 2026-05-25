@@ -64,9 +64,19 @@ import { KpiStepCard, type KpiAttemptsState, parseAttempts } from "@/components/
 import { KpiRecap, type KpiRecapEntry } from "@/components/strength/kpi/KpiRecap";
 import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
 import { initials } from "@/components/strength/kpi/kpiHelpers";
+import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
 
 const PROTOCOLS = Object.values(KPI_PROTOCOLS);
 const KPI_KEYS = PROTOCOLS.map((p) => p.key);
+
+/** 4-step progress strip shown in coach-targeted mode. KPIs = current;
+ *  questionnaire/physical/generation unknown here — fixed with useBilanSteps in §A 2.4. */
+const KPIS_BILAN_STEPS: BilanStep[] = [
+  { key: "questionnaire", label: "Questionnaire", state: "todo" },
+  { key: "kpis", label: "KPIs", state: "current" },
+  { key: "physical", label: "Bilan physique", state: "todo" },
+  { key: "generation", label: "Génération", state: "todo" },
+];
 
 /** Per-KPI attempt state, keyed by KPI key. */
 type AttemptsByKpi = Record<StrengthKpiKey, KpiAttemptsState>;
@@ -611,6 +621,18 @@ export default function KpiWizard() {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background">
         {TopBar}
+        {isCoachTargeted && (
+          <div className="border-b bg-background/95 px-4 py-3">
+            <div className="mx-auto w-full max-w-md">
+              <BilanProgress steps={[
+                { key: "questionnaire", label: "Questionnaire", state: "todo" },
+                { key: "kpis", label: "KPIs", state: "done" },
+                { key: "physical", label: "Bilan physique", state: "todo" },
+                { key: "generation", label: "Génération", state: "todo" },
+              ]} />
+            </div>
+          </div>
+        )}
         <div className="mx-auto w-full max-w-md flex-1 px-4 py-6">
           <KpiRecap
             entries={recapEntries}
@@ -622,6 +644,7 @@ export default function KpiWizard() {
             onRetry={() => submitMutation.mutate()}
             onRestart={restart}
             onClose={closeWizard}
+            closeLabel={isCoachTargeted ? "Continuer — Bilan physique" : undefined}
           />
         </div>
       </div>
@@ -647,6 +670,15 @@ export default function KpiWizard() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       {TopBar}
+
+      {/* Bilan progress strip — coach-targeted mode only */}
+      {isCoachTargeted && (
+        <div className="border-b bg-background/95 px-4 py-3">
+          <div className="mx-auto w-full max-w-md">
+            <BilanProgress steps={KPIS_BILAN_STEPS} />
+          </div>
+        </div>
+      )}
 
       {/* Progress: step dots */}
       <div className="border-b bg-background/95 px-4 py-3">
@@ -771,6 +803,15 @@ export default function KpiWizard() {
             <p className="text-center text-[11px] text-muted-foreground">
               Un KPI peut être laissé vide — le bilan partiel est accepté.
             </p>
+          )}
+          {isCoachTargeted && (
+            <button
+              type="button"
+              onClick={() => navigate(`/coach/strength-assessment/${targetAthleteId}`)}
+              className="w-full text-center text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Passer cette étape → Bilan physique
+            </button>
           )}
         </div>
       </div>

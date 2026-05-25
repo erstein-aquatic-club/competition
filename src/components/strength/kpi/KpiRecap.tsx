@@ -70,6 +70,7 @@ export function KpiRecap({
   onRetry,
   onRestart,
   onClose,
+  closeLabel = "Terminer",
 }: {
   entries: KpiRecapEntry[];
   athleteName: string;
@@ -84,6 +85,8 @@ export function KpiRecap({
   onRetry?: () => void;
   onRestart: () => void;
   onClose: () => void;
+  /** Overrides the default "Terminer" label on the primary close action. */
+  closeLabel?: string;
 }) {
   const hasFailures = failedCount > 0;
 
@@ -266,7 +269,7 @@ export function KpiRecap({
       {/* Actions */}
       <div className="flex flex-col gap-2 pt-1">
         <Button className="h-12 w-full rounded-2xl text-base font-semibold" onClick={onClose}>
-          Terminer
+          {closeLabel}
         </Button>
         <Button
           variant="outline"
