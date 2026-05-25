@@ -6,7 +6,7 @@
  * présence de mesures KPI (+ méso actif pour la 4e étape). Les KPIs sont
  * **indépendants** du statut (ils peuvent être saisis à tout moment).
  */
-import type { StrengthAssessment } from "@/lib/api/types";
+import type { StrengthAssessment, UserProfile } from "@/lib/api/types";
 
 export type StepState = "done" | "current" | "todo";
 
@@ -70,4 +70,14 @@ export function computeBilanProgress(
       : "todo";
 
   return { questionnaire, kpis, physical, generation };
+}
+
+/** True si le profil athlete contient les données requises par la génération
+ *  (sexe M/F + date de naissance). Partagé entre StrengthAssessmentScreen et
+ *  MesocyclePreview pour éviter de dupliquer la règle. */
+export function isProfileComplete(
+  profile: Pick<UserProfile, "birthdate" | "sex"> | null | undefined,
+): boolean {
+  if (!profile) return false;
+  return !!profile.birthdate && (profile.sex === "M" || profile.sex === "F");
 }

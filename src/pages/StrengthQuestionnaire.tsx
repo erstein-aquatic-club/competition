@@ -56,6 +56,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
+  ArrowRight,
   Bandage,
   Check,
   ClipboardList,
@@ -70,6 +71,8 @@ import { toast } from "sonner";
 
 import { BodyHeatMap } from "@/components/wellness/BodyHeatMap";
 import { ScaleField } from "@/components/strength/questionnaire/ScaleField";
+import { BilanProgress, type BilanStep } from "@/components/strength/assessment/BilanProgress";
+import { computeBilanProgress } from "@/lib/strength/bilanProgress";
 
 /** Local date as YYYY-MM-DD (pain_reports keys on a calendar date). */
 function todayISODate(): string {
@@ -149,6 +152,30 @@ export default function StrengthQuestionnaire() {
   const [submittedLocally, setSubmittedLocally] = useState(false);
   const isDone =
     submittedLocally || status === "bilan_pending" || status === "completed";
+
+  // 4-step progress strip (coach mode only — hasKpis unknown here, fixed in §A Task 2.4)
+  const effectiveStatus = submittedLocally ? "bilan_pending" : status;
+  const _bilanProgress = computeBilanProgress(effectiveStatus, false);
+  const bilanSteps: BilanStep[] = [
+    { key: "questionnaire", label: "Questionnaire", state: _bilanProgress.questionnaire },
+    {
+      key: "kpis",
+      label: "KPIs",
+      state: _bilanProgress.kpis,
+      onTap: effectiveAthleteId != null
+        ? () => navigate(`/coach/kpi-wizard/${effectiveAthleteId}`)
+        : undefined,
+    },
+    {
+      key: "physical",
+      label: "Bilan physique",
+      state: _bilanProgress.physical,
+      onTap: effectiveAthleteId != null
+        ? () => navigate(`/coach/strength-assessment/${effectiveAthleteId}`)
+        : undefined,
+    },
+    { key: "generation", label: "Génération", state: _bilanProgress.generation },
+  ];
 
   // En mode coach (bilan accompagné), on revient au fil conducteur du bilan
   // (cible conservée) plutôt qu'à la fiche nageur — §302.
@@ -272,6 +299,11 @@ export default function StrengthQuestionnaire() {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background">
         {TopBar}
+        {isCoachMode && (
+          <div className="mx-auto w-full max-w-md px-4 pt-4">
+            <BilanProgress steps={bilanSteps} />
+          </div>
+        )}
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
             <Check className="h-7 w-7 text-primary" />
@@ -281,27 +313,28 @@ export default function StrengthQuestionnaire() {
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {isCoachMode
-              ? `Le questionnaire de ${targetName ?? "ce nageur"} est enregistré. Enchaîne sur la notation du bilan physique.`
+              ? `Le questionnaire de ${targetName ?? "ce nageur"} est enregistré. Continue sur la mesure des KPIs.`
               : "Ton auto-évaluation a bien été enregistrée. Ton coach réalisera le bilan physique lors de la prochaine séance."}
           </p>
           {isCoachMode ? (
-            <div className="mt-5 flex flex-col gap-2">
+            <div className="mt-5 flex w-full flex-col gap-2">
               <Button
-                className="rounded-xl"
-                onClick={() =>
-                  navigate(`/coach/strength-assessment/${effectiveAthleteId}`)
-                }
-              >
-                Noter le bilan physique
-              </Button>
-              <Button
-                variant="outline"
                 className="rounded-xl"
                 onClick={() =>
                   navigate(`/coach/kpi-wizard/${effectiveAthleteId}`)
                 }
               >
-                Mesurer les KPIs
+                Continuer — Mesurer les KPIs
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() =>
+                  navigate(`/coach/strength-assessment/${effectiveAthleteId}`)
+                }
+              >
+                Revenir au bilan
               </Button>
             </div>
           ) : (
@@ -409,6 +442,7 @@ export default function StrengthQuestionnaire() {
       {TopBar}
 
       <div className="mx-auto w-full max-w-md flex-1 space-y-4 px-4 py-5 pb-32">
+        {isCoachMode && <BilanProgress steps={bilanSteps} />}
         {isCoachMode && (
           <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
             <Users className="h-4 w-4 shrink-0 text-primary" />
