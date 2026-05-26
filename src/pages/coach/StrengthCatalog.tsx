@@ -67,6 +67,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
+import { ExercisePrioritySelector } from "@/components/coach/strength/ExercisePrioritySelector";
 // Lazy-loaded children : ne sont rendus qu'à l'ouverture de modals/sheets
 // ou via un onglet (TabsContent). Évite ~1100 LOC dans le bundle initial du wrapper.
 const CopyToAthleteDialog = lazyWithRetry(
@@ -1019,6 +1020,12 @@ export default function StrengthCatalog() {
                 </Select>
               </div>
             ) : null}
+            <ExercisePrioritySelector
+              value={editingExercise.selection_priority ?? 0}
+              onChange={(v) =>
+                setEditingExercise((prev) => (prev ? { ...prev, selection_priority: v } : prev))
+              }
+            />
             {editingExercise.exercise_type !== "warmup" ? (
               <fieldset
                 disabled={(editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
@@ -1212,6 +1219,10 @@ export default function StrengthCatalog() {
               </Select>
             </div>
           ) : null}
+          <ExercisePrioritySelector
+            value={newExercise.selection_priority ?? 0}
+            onChange={(v) => setNewExercise((prev) => ({ ...prev, selection_priority: v }))}
+          />
           {newExercise.exercise_type !== "warmup" ? (
             <fieldset
               disabled={(newExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}

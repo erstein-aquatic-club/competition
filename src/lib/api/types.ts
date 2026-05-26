@@ -61,6 +61,12 @@ export interface Exercise {
   is_bodyweight?: boolean;
   /** §298 — Métrique d'intensité. Défaut 'weight_kg'. Pilote runner UI + gating 1RM. */
   intensity_metric?: IntensityMetric;
+  /**
+   * §319/§320 — Priorité de sélection coach. Plus élevé = pioché en premier dans
+   * son seau lors de la génération du mésocycle (trié avant is_core/niveau).
+   * Défaut 0 (normal) ; négatif = évité. Éditable par le coach au catalogue.
+   */
+  selection_priority?: number;
 }
 
 export type StrengthCycleType = "endurance" | "hypertrophie" | "force";

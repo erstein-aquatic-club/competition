@@ -27,6 +27,32 @@ describe("exercise mappers — is_bodyweight (§297)", () => {
     const result = mapApiExerciseToDb(ex);
     assert.equal(result.is_bodyweight, false);
   });
+});
+
+describe("exercise mappers — selection_priority (§320)", () => {
+  it("mapDbExerciseToApi reads selection_priority from DB row", () => {
+    assert.equal(mapDbExerciseToApi({ id: 1, nom_exercice: "Tractions lestées", selection_priority: 100 }).selection_priority, 100);
+    assert.equal(mapDbExerciseToApi({ id: 2, nom_exercice: "Front Lever", selection_priority: -10 }).selection_priority, -10);
+  });
+
+  it("mapDbExerciseToApi défaut 0 quand absent (pas de perte au round-trip)", () => {
+    assert.equal(mapDbExerciseToApi({ id: 1, nom_exercice: "Squat" }).selection_priority, 0);
+  });
+
+  it("normalizeExercise lit selection_priority (sinon éditer un exo l'écraserait à 0)", () => {
+    assert.equal(normalizeExercise({ id: 1, nom_exercice: "Box Jump", selection_priority: 100 }).selection_priority, 100);
+    assert.equal(normalizeExercise({ id: 2, nom_exercice: "Squat" }).selection_priority, 0);
+  });
+
+  it("mapApiExerciseToDb écrit selection_priority (persistance de l'édition coach)", () => {
+    const ex = { id: 1, nom_exercice: "Box Jump", selection_priority: 90 } as Parameters<typeof mapApiExerciseToDb>[0];
+    assert.equal(mapApiExerciseToDb(ex).selection_priority, 90);
+  });
+
+  it("mapApiExerciseToDb défaut 0 quand undefined", () => {
+    const ex = { id: 1, nom_exercice: "Squat" } as Parameters<typeof mapApiExerciseToDb>[0];
+    assert.equal(mapApiExerciseToDb(ex).selection_priority, 0);
+  });
 
   it("normalizeExercise preserves is_bodyweight from localStorage", () => {
     const ex = { id: 1, nom_exercice: "Dips", is_bodyweight: true };

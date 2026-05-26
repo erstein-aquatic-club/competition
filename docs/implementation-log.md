@@ -18898,3 +18898,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1379/1379 node:test + 21/21 vitest** ✅ ; `npm run build` OK ✅ ; seed vérifié en prod. Pas de `test:rls` (colonne + données de référence, aucune policy).
 
 **Limites / suites :** priorité **globale** (par exo), pas par épreuve — bon défaut (les staples sont transverses) mais une préférence par-événement serait un cran plus fin. Édition de la priorité **en UI** non livrée (valeurs seedées par migration ; le coach ne peut pas encore les éditer dans l'app — chantier UI futur via `/frontend-design`). Le badge cosmétique `is_core`/« core » (§318 #4) reste à traiter.
+
+## §320 — Édition UI de `selection_priority` au catalogue coach (2026-05-26)
+
+**Contexte.** §319 a introduit `selection_priority` (préférence de sélection d'exercices) mais seedée par migration — le coach ne pouvait pas l'éditer dans l'app. Demande : l'exposer en UI au catalogue.
+
+**Changements :**
+- `src/components/coach/strength/ExercisePrioritySelector.tsx` (NOUVEAU, via `/frontend-design`) — contrôle : saisie numérique (pas de 10, ordonnancement fin entre 2 staples) + badge de palier color-codé (⭐ Prioritaire ≥50 / Préféré >0 / Normal 0 / À éviter <0) + pastilles d'accès rapide (100/50/0/-10) + aide. Aligné sur le style des champs du dialog catalogue.
+- `src/lib/api/types.ts` — `Exercise.selection_priority?: number`.
+- **Mappers** (TDD, `exerciseMappers.test.ts` +5) : `mapApiExerciseToDb` (client.ts) **écrit** `selection_priority` (persiste l'édition) ; `mapDbExerciseToApi` (client.ts) + `normalizeExercise` (helpers.ts) le **lisent** (défaut 0). **Catch data-safety** : sans lecture, éditer un exo (ex. son nom) ré-écrirait `selection_priority` à 0 → perte des priorités seedées. Le catalogue charge via `getExercises → select('*') → normalizeExercise` → la valeur est bien chargée puis préservée.
+- `src/pages/coach/StrengthCatalog.tsx` — `ExercisePrioritySelector` câblé dans les 2 dialogs (édition + création), state `editingExercise`/`newExercise`. La sauvegarde (`updateExercise`/`createExercise` → `mapApiExerciseToDb`) persiste la priorité.
+
+**Décisions / limites :** **pas de migration** (colonne `selection_priority` déjà créée en §319/mig 00207). Priorité **globale** par exo (pas par épreuve) — inchangé vs §319. Le badge cosmétique `is_core`/« core » (§318 #4) reste à traiter.
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1384/1384 node:test + 21/21 vitest** (+5 mappers `selection_priority`) ✅ ; `npm run build` OK ✅. Pas de `test:rls` (UI + mappers + type, aucune policy).

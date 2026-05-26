@@ -92,6 +92,9 @@ export const normalizeExercise = (exercise: Record<string, unknown>): Exercise =
   recup_exercices_force: safeOptionalInt(exercise.recup_exercices_force),
   is_bodyweight: exercise.is_bodyweight === true,
   intensity_metric: normalizeIntensityMetric(exercise.intensity_metric),
+  // §320 — priorité de sélection coach (défaut 0). Lu ici pour ne pas l'écraser
+  // au round-trip d'édition (le catalogue liste via normalizeExercise).
+  selection_priority: typeof exercise.selection_priority === "number" ? exercise.selection_priority : 0,
 });
 
 // --- Session Mapping ---

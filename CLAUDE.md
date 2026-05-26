@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§319** — Préférence de sélection d'exercices : champ `selection_priority` (coach-pilotable, trié en 1er dans `selectExercises`), seedé staples sprint (tractions lestées, box jump, roue abdos, pull-over fly) + démote Front Lever/gainage lesté (mig 00207). Fini les exos exotiques/arbitraires. `npm test` 1379+21, tsc 0. *(§318 50 m fidèle McEvoy ; §317 fix 409 sync records ; §316 fix React #310.)*
+Dernier § livré : **§320** — Édition UI de `selection_priority` au catalogue coach : nouveau `ExercisePrioritySelector` (saisie + paliers Prioritaire/Préféré/Normal/Éviter) dans les dialogs édition/création ; `Exercise.selection_priority` threadé dans les mappers (read+write, catch data-safety anti-clobber). `npm test` 1384+21, tsc 0. *(§319 champ selection_priority + seed staples ; §318 50 m fidèle McEvoy ; §317 fix 409 sync.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

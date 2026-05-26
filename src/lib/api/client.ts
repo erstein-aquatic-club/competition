@@ -246,6 +246,9 @@ export const mapDbExerciseToApi = (row: Record<string, unknown>): Exercise => ({
   folder_id: safeOptionalInt(row.folder_id),
   is_bodyweight: row.is_bodyweight === true,
   intensity_metric: normalizeIntensityMetric(row.intensity_metric),
+  // §320 — priorité de sélection coach (défaut 0). Doit être lu ici sinon
+  // éditer un exo écraserait la priorité seedée à 0.
+  selection_priority: typeof row.selection_priority === "number" ? row.selection_priority : 0,
 });
 
 export const mapApiExerciseToDb = (exercise: Partial<Exercise>) => ({
@@ -272,6 +275,8 @@ export const mapApiExerciseToDb = (exercise: Partial<Exercise>) => ({
   folder_id: exercise.folder_id ?? null,
   is_bodyweight: exercise.is_bodyweight === true,
   intensity_metric: normalizeIntensityMetric(exercise.intensity_metric),
+  // §320 — persiste la priorité de sélection éditée par le coach (défaut 0).
+  selection_priority: exercise.selection_priority ?? 0,
 });
 
 // --- Misc utilities ---
