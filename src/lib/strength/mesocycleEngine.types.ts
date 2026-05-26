@@ -395,6 +395,13 @@ export interface StrokeSignature {
   stroke_key: StrokeKey;
   label: string;
   mult: Record<StrengthBucket, number>;
+  /**
+   * §323 — Seaux à forcer en focus pour cette nage **sur les sprints** (50/100),
+   * doctrine événement (cf. `forced_focus` §322). Stroke-aware : crawl/papillon/
+   * dos (pull-dominants) → `['upper_strength','upper_power']` ; brasse (jambes) →
+   * `['lower_strength','lower_power']`. Composé par `composeTemplate` (gated sprint).
+   */
+  forcedFocus?: StrengthBucket[];
 }
 
 /** Emphase canonique (ancrée crawl) + arc de périodisation d'une distance. §305. */

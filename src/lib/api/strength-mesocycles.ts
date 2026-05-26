@@ -479,11 +479,14 @@ export async function getStrokeSignatures(): Promise<StrokeSignature[]> {
     stroke_key: StrokeSignature['stroke_key'];
     label: string;
     mult: StrokeSignature['mult'];
+    forced_focus?: StrokeSignature['forcedFocus'];
   };
   return ((data ?? []) as Row[]).map((r) => ({
     stroke_key: r.stroke_key,
     label: r.label,
     mult: r.mult as StrokeSignature['mult'],
+    // §323 — focus forcé stroke-aware (sprints) ; absent → undefined (= aucun).
+    forcedFocus: r.forced_focus ?? undefined,
   }));
 }
 

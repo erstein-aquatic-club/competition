@@ -240,6 +240,32 @@ describe('composeTemplate — clamp & métadonnées (§305)', () => {
     assert.equal(t.kind, 'season');
     assert.equal(t.min_week_count, 8);
   });
+
+  // §323 — forced_focus stroke-aware : sur un SPRINT (50/100) le focus forcé vient
+  // de la nage (crawl/pap → haut ; brasse → bas) ; hors sprint, aucun forçage.
+  it('forced_focus stroke-aware : sprint = nage, hors-sprint = aucun', () => {
+    const crawlSprint: StrokeSignature = {
+      stroke_key: 'freestyle', label: 'Crawl', mult: FREE_MULT,
+      forcedFocus: ['upper_strength', 'upper_power'],
+    };
+    const breastSprint: StrokeSignature = {
+      stroke_key: 'breaststroke', label: 'Brasse', mult: BREAST_MULT,
+      forcedFocus: ['lower_strength', 'lower_power'],
+    };
+    assert.deepEqual(
+      composeTemplate(D50, crawlSprint, 'season').structure.forced_focus,
+      ['upper_strength', 'upper_power'],
+    );
+    assert.deepEqual(
+      composeTemplate(D50, breastSprint, 'season').structure.forced_focus,
+      ['lower_strength', 'lower_power'],
+    );
+    // 200 m n'est pas un sprint → pas de forçage (le score pilote le focus).
+    assert.deepEqual(
+      composeTemplate(D200, crawlSprint, 'season').structure.forced_focus ?? [],
+      [],
+    );
+  });
 });
 
 // ── §R5 (DRAFT) — seau core (tronc/gainage) — À VALIDER COACH ──────────────────

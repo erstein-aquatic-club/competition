@@ -37,6 +37,10 @@ const EMPHASIS_BUCKETS: StrengthBucket[] = [
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// §323 — Distances « sprint » sur lesquelles le focus forcé suit la nage
+// (doctrine événement). Au-delà, le score pilote le focus (endurance/équilibre).
+const SPRINT_DISTANCE_KEYS = new Set(['50', '100']);
+
 /** Compose un template-like (consommé tel quel par mesocycleEngine) depuis une
  *  distance (emphase ancrée crawl + arc) et une nage (multiplicateur par seau). §305. */
 export function composeTemplate(
@@ -62,8 +66,17 @@ export function composeTemplate(
     name: `${signature.label} ${profile.label}`,
     min_week_count: profile.min_week_count,
     max_week_count: profile.max_week_count,
-    // §322 — propage les seaux focus forcés du profil (ex. puissance explosive sprint).
-    structure: { phases: profile.structure.phases, bucket_emphasis, forced_focus: profile.structure.forced_focus },
+    // §322/§323 — focus forcé STROKE-AWARE sur les sprints (50/100) : la nage
+    // dicte les seaux à garantir (crawl/pap/dos pull-dominants → haut du corps ;
+    // brasse → bas du corps). Hors sprint, on retombe sur l'éventuel
+    // `forced_focus` du profil de distance (vide par défaut → score pilote).
+    structure: {
+      phases: profile.structure.phases,
+      bucket_emphasis,
+      forced_focus: SPRINT_DISTANCE_KEYS.has(profile.distance_key)
+        ? signature.forcedFocus ?? []
+        : profile.structure.forced_focus,
+    },
     created_at: '',
     updated_at: '',
   };

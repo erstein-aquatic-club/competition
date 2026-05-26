@@ -18940,3 +18940,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Limites / suites :** `forced_focus` est par **distance** (stroke-agnostic) → forcer `upper_power` au 50 m s'applique aussi à la **brasse 50** (jambes-dominante) où ce serait moins pertinent — un `forced_focus` **par nage×distance** serait plus fin (suite possible). Avec `['upper_power']` seul, les **tractions lestées** (upper_strength) ne sont pas garanties (le 2ᵉ créneau focus va au point faible) — décision coach en attente : forcer aussi `upper_strength` pour les sprints pull-dominants (crawl/papillon) ?
 
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1386/1386 node:test + 21/21 vitest** (+2 forced_focus) ✅ ; `npm run build` OK ✅ ; seed vérifié en prod. Pas de `test:rls` (jsonb data + logique TS).
+
+## §323 — Focus événement forcé STROKE-AWARE (`forced_focus` par nage) (2026-05-26)
+
+**Contexte (suite §322, validation coach « ok et ok aussi pour forced focus pr nage »).** Le `forced_focus` du §322 vivait sur le **profil de distance** → stroke-agnostique : `["upper_power"]` au 50 m s'appliquait aussi à la **brasse 50** (jambes-dominante), où forcer la puissance HAUTE est contre-doctrine. De plus, avec un seul seau forcé, les **tractions lestées** (`upper_strength`) — pilier du 50 m façon McEvoy — n'étaient pas garanties (le 2ᵉ créneau focus partait au point faible).
+
+**Solution — `forced_focus` par nage, appliqué aux sprints :**
+- `src/lib/strength/mesocycleEngine.types.ts` — `StrokeSignature.forcedFocus?: StrengthBucket[]` (les seaux à forcer pour CETTE nage sur les sprints).
+- `src/lib/strength/composeTemplate.ts` — calcule le `forced_focus` du template : sur une distance **sprint** (`SPRINT_DISTANCE_KEYS = {50, 100}`) → `signature.forcedFocus` (piloté par la nage) ; hors sprint → l'éventuel `forced_focus` du profil (désormais vide → le score pilote). **L'ordre du tableau compte** : 1ᵉʳ seau = bloc PRIMAIRE (2 exos), 2ᵉ = complément (1 exo).
+- `src/lib/api/strength-mesocycles.ts` — `getStrokeSignatures` mappe `forced_focus` (DB) → `forcedFocus`.
+- Migration **00210** (appliquée MCP) : colonne `forced_focus jsonb` sur `strength_stroke_signatures`, seedée par doctrine (validée par les multiplicateurs en base) — crawl/papillon/dos (pull-dominantes) `["upper_strength","upper_power"]`, brasse (jambes) `["lower_strength","lower_power"]`, 4 nages (équilibrée) `["upper_power","lower_power"]`. Retire le `forced_focus` per-distance du §322 (devenu redondant, single-source).
+
+**Effet (50 m crawl, KPIs forts) :** focus forcé = **`upper_strength` (primaire) + `upper_power` (complément)** → la séance dev contient tractions lestées + pull-over fly poulie (bloc primaire) **puis** bench pull explosif (complément) — le « 50 m McEvoy-idéal ». La brasse 50 force désormais le bas du corps (cohérent), plus d'`upper_power` parasite.
+
+**Tests / vérifs :** TDD `composeTemplate.test.ts` (+1 : sprint = nage, hors-sprint = aucun) ✅ ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1387/1387 node:test + 21/21 vitest** ✅ ; `npm run build` OK ✅ ; seeds vérifiés en prod (5 nages + 0 profil avec `forced_focus`). Pas de `test:rls` (jsonb data + logique TS).
