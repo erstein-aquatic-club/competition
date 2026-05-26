@@ -1324,6 +1324,47 @@ describe('generateMesocycle', () => {
     }
   });
 
+  // ── §324 — pas de seau maintien « fantôme » ──────────────────────────────
+  it('tout seau entraînable alloué apparaît dans ≥1 séance (cas sprint dos : 4 seaux / 3 séances)', () => {
+    // Reproduit le squeeze terrain de Victoria (100 dos) : forced_focus = {force
+    // haut, puissance haut} + force bas / puissance bas en maintien, sur 3
+    // séances/sem. La distribution n'attribue un créneau PRIMAIRE qu'à 3 des 4
+    // seaux non-mobilité ; le 4e (un maintien) ne doit PAS disparaître du plan —
+    // il doit sortir en complément (sinon : zéro saut/puissance jambes pour une
+    // dossiste sprint).
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.6,
+      lower_power: 0.85,
+      upper_strength: 0.97,
+      upper_power: 0.65,
+      mobility: 0.56,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 3;
+
+    const meso = generateMesocycle(input);
+
+    // Seaux entraînables alloués (hors mobilité = échauffement systématique).
+    const allocated = meso.reasoning.bucketAllocations
+      .map((a) => a.bucket)
+      .filter((b) => b !== 'mobility');
+    assert.ok(
+      allocated.length >= 4,
+      `attendu ≥4 seaux entraînables alloués, obtenu [${allocated.join(', ')}]`,
+    );
+
+    const bucketsSeen = new Set(
+      meso.weeks.flatMap((w) => w.sessions).flatMap((s) => s.buckets),
+    );
+    for (const b of allocated) {
+      assert.ok(
+        bucketsSeen.has(b),
+        `seau alloué « ${b} » absent de TOUTES les séances (seau maintien fantôme)`,
+      );
+    }
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {

@@ -865,6 +865,19 @@ interface SessionSlot {
 }
 
 /**
+ * §324 — sibling anatomique force↔puissance d'un même segment. Sert à pairer un
+ * seau « maintien » orphelin (sans créneau primaire) avec le primaire du même
+ * segment : un jour jambes (force bas) accueille la puissance bas (saut), pas un
+ * seau du haut du corps. Cohérent avec une séance S&C réelle.
+ */
+const BUCKET_SIBLING: Partial<Record<StrengthBucket, StrengthBucket>> = {
+  upper_strength: 'upper_power',
+  upper_power: 'upper_strength',
+  lower_strength: 'lower_power',
+  lower_power: 'lower_strength',
+};
+
+/**
  * Répartit `sessionsPerWeek` créneaux entre les seaux non-mobility selon leurs
  * allocations fractionnaires (méthode du plus grand reste). Mobility n'est pas
  * un "bucket principal" : c'est un échauffement systématique greffé sur chaque
@@ -919,10 +932,30 @@ function distributeSessionSlots(
     .filter((a) => a.role === 'focus' && a.bucket !== 'mobility')
     .map((a) => a.bucket);
 
-  return finalPrimaries.map((primary) => ({
-    primary,
-    complement: pickComplement(primary, focusBuckets),
-  }));
+  // §324 — seaux entraînables alloués qui n'ont PAS décroché de créneau primaire
+  // (typiquement 4 seaux non-mobilité pour 3 séances : 1 maintien reste orphelin).
+  // Sans rien faire, le complément d'une séance « maintien » ré-utilise un focus
+  // déjà couvert → l'orphelin disparaît du plan (cas Victoria : zéro puissance
+  // jambes / ondulation sous-marine pour une dossiste sprint). On le place donc
+  // en complément d'une séance à primaire maintien, sibling anatomique d'abord.
+  const covered = new Set(finalPrimaries);
+  const uncovered = allocations
+    .filter((a) => a.bucket !== 'mobility' && !covered.has(a.bucket))
+    .map((a) => a.bucket);
+
+  return finalPrimaries.map((primary): SessionSlot => {
+    // Un primaire focus garde l'appariement focus#1↔focus#2 (McEvoy). Seuls les
+    // primaires « maintien » servent à héberger un orphelin (sans gonfler le
+    // volume — c'est le créneau complément, pas un bloc en plus).
+    const isFocus = focusBuckets.includes(primary);
+    if (focusBuckets.length >= 2 && !isFocus && uncovered.length > 0) {
+      const sibling = BUCKET_SIBLING[primary];
+      const idx = sibling && uncovered.includes(sibling) ? uncovered.indexOf(sibling) : 0;
+      const [complement] = uncovered.splice(idx, 1);
+      return { primary, complement };
+    }
+    return { primary, complement: pickComplement(primary, focusBuckets) };
+  });
 }
 
 /**

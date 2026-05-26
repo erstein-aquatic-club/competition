@@ -18954,3 +18954,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Effet (50 m crawl, KPIs forts) :** focus forcé = **`upper_strength` (primaire) + `upper_power` (complément)** → la séance dev contient tractions lestées + pull-over fly poulie (bloc primaire) **puis** bench pull explosif (complément) — le « 50 m McEvoy-idéal ». La brasse 50 force désormais le bas du corps (cohérent), plus d'`upper_power` parasite.
 
 **Tests / vérifs :** TDD `composeTemplate.test.ts` (+1 : sprint = nage, hors-sprint = aucun) ✅ ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1387/1387 node:test + 21/21 vitest** ✅ ; `npm run build` OK ✅ ; seeds vérifiés en prod (5 nages + 0 profil avec `forced_focus`). Pas de `test:rls` (jsonb data + logique TS).
+
+## §324 — Pas de seau entraînable « fantôme » : l'orphelin de maintien sort en complément (2026-05-26)
+
+**Contexte (retour terrain — bilan + méso 100 dos de Victoria Schnepf, F, advanced/national).** Audit du plan généré : `lower_power` (puissance jambes = ondulation sous-marine, arme n°1 du dos sprint) **n'apparaissait dans AUCUNE séance** alors qu'il était bien alloué (maintien). Cause structurelle : avec `forced_focus` = {upper_strength, upper_power} (§323) + 3 séances/sem, **4 seaux non-mobilité se disputent 3 créneaux PRIMAIRES** → 1 seau de maintien reste sans créneau ; et `pickComplement` faisait re-piocher le complément d'une séance « maintien » dans un focus **déjà couvert** → l'orphelin disparaissait du plan. Reproductible post-§323 (`forced_focus` règle la priorisation d'`upper_*`, **pas** la disparition de `lower_power`).
+
+**Solution — `distributeSessionSlots` couvre l'orphelin en complément (0 volume ajouté) :**
+- `src/lib/strength/mesocycleEngine.ts` — après calcul des `finalPrimaries`, on liste les seaux entraînables alloués **non couverts** par un créneau primaire ; pour une séance dont le primaire est un seau de **maintien** (et s'il reste ≥2 focus), le complément héberge cet orphelin au lieu de ré-utiliser un focus. Préférence au **sibling anatomique** (`BUCKET_SIBLING` : force↔puissance d'un même segment) → un jour jambes devient *force bas + puissance bas* (squat/SDT + Box Jump), pas un mélange haut/bas. C'est le créneau complément, **pas un bloc en plus** → respecte le plafond `MAX_SESSION_ITEMS=5` (§318).
+- Séances à primaire **focus** inchangées (appariement focus#1↔focus#2 McEvoy). `forced_focus`, override sécurité mobilité, amorce PAP : inchangés.
+
+**Effet (100 dos, Victoria) :** le jour jambes (primaire `lower_strength`) accueille désormais `lower_power` en complément → un saut (Box Jump) entre dans le plan, l'ondulation sous-marine cesse d'être ignorée. Généralise à tout sprint pull-dominant (crawl/papillon/dos) : le 4ᵉ seau entraînable n'est plus fantôme.
+
+**Tests / vérifs :** TDD `mesocycleEngine.test.ts` (+1 : invariant « tout seau entraînable alloué apparaît dans ≥1 séance », cas 4 seaux/3 séances) — vu RED (lower_strength absent) → GREEN ✅ ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1388/1388 node:test + 21/21 vitest** ✅. Pas de migration (logique TS pure), pas de `test:rls`.
+
+**Suite prévue :** régénérer le plan de Victoria (décision coach) pour appliquer §323 (focus stroke-aware) + §324 (dose `lower_power`). Poids de corps 60 kg renseigné en base (`user_profiles.body_weight`). Open connexe non retenu ici : pondération `mobility` du 100 (0.56 après mult dos, < doctrine dos 0.8) — préhab scapulaire à renforcer côté contenu/sélection.

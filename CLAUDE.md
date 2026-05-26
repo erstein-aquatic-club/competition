@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§323** — Focus événement forcé **STROKE-AWARE** : `StrokeSignature.forcedFocus` (par nage) ; `composeTemplate` l'applique aux sprints (50/100) — crawl/papillon/dos → `[upper_strength, upper_power]` (tractions lestées primaire + bench pull explosif), brasse → `[lower_strength, lower_power]` ; mig **00210** (col `forced_focus` sur `strength_stroke_signatures`, retire le per-distance §322). `npm test` 1387+21, tsc 0. *(§322 forced_focus per-distance ; §321 fix inscription groupe ; §320 édition UI selection_priority.)*
+Dernier § livré : **§324** — Pas de seau entraînable « fantôme » : un seau de maintien sans créneau primaire (ex. puissance jambes du 100 dos = ondulation sous-marine) sort en **complément** d'une séance à primaire maintien (sibling anatomique, 0 volume ajouté) au lieu de disparaître — `distributeSessionSlots`. `npm test` 1388+21, tsc 0. *(§323 forced_focus stroke-aware ; §322 forced_focus per-distance ; §321 fix inscription groupe.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
