@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§320** — Édition UI de `selection_priority` au catalogue coach : nouveau `ExercisePrioritySelector` (saisie + paliers Prioritaire/Préféré/Normal/Éviter) dans les dialogs édition/création ; `Exercise.selection_priority` threadé dans les mappers (read+write, catch data-safety anti-clobber). `npm test` 1384+21, tsc 0. *(§319 champ selection_priority + seed staples ; §318 50 m fidèle McEvoy ; §317 fix 409 sync.)*
+Dernier § livré : **§321** — Fix inscription : sélecteur de groupe bloqué car `groups_select` était `TO authenticated` (mig 00126) alors que `getGroups()` lit en anon avant login ; mig **00208** rouvre le SELECT à `anon` (écritures inchangées). *(§320 édition UI selection_priority ; §319 champ + seed staples ; §318 50 m fidèle McEvoy.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

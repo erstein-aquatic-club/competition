@@ -39,7 +39,7 @@ Tous les feature flags sont activés.
 | Login email/password | ✅ | `Login.tsx`, `auth.ts` | Supabase Auth |
 | Gestion des rôles | ✅ | `auth.ts` | nageur, coach, comité, admin |
 | Refresh token | ✅ | `auth.ts` | JWT automatique Supabase |
-| Inscription self-service | ✅ | `Login.tsx`, `auth.ts`, `App.tsx`, `Admin.tsx` | Option B : validation coach/admin, écran post-inscription, gate approbation |
+| Inscription self-service | ✅ | `Login.tsx`, `auth.ts`, `App.tsx`, `Admin.tsx` | Option B : validation coach/admin, écran post-inscription, gate approbation. §321 : fix sélecteur de groupe bloqué — `groups_select` rouvert au rôle `anon` (mig 00208), `getGroups()` lit avant login |
 | Approbation inscriptions | ✅ | `Admin.tsx`, `api.ts` | Section "Inscriptions en attente" pour coach/admin |
 | Mot de passe oublié | ✅ | `Login.tsx`, `App.tsx`, `auth.ts` | Flow complet : email de reset + route `/#/reset-password` + detection token recovery |
 | Création compte (admin) | ✅ | `Admin.tsx` | Via panel admin |

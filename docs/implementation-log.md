@@ -18912,3 +18912,16 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Décisions / limites :** **pas de migration** (colonne `selection_priority` déjà créée en §319/mig 00207). Priorité **globale** par exo (pas par épreuve) — inchangé vs §319. Le badge cosmétique `is_core`/« core » (§318 #4) reste à traiter.
 
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1384/1384 node:test + 21/21 vitest** (+5 mappers `selection_priority`) ✅ ; `npm run build` OK ✅. Pas de `test:rls` (UI + mappers + type, aucune policy).
+
+## §321 — Fix inscription : sélecteur de groupe bloqué (RLS anon sur `groups`) (2026-05-26)
+
+**Contexte.** Une utilisatrice ne pouvait pas créer son compte : à l'étape « 3/3 — Club », le `<Select>` « Sélectionnez un groupe » était impossible à ouvrir (grisé) et l'erreur « Groupe requis » bloquait la soumission.
+
+**Cause racine.** L'écran d'inscription (`src/pages/Login.tsx` → `getGroups()`, requête `register-groups` `enabled` quand `activeTab === "signup"`) charge la liste des groupes **avant** authentification, donc en rôle **`anon`**. La migration **00126** avait re-scopé la policy `groups_select` en `TO authenticated` (commentaire : « ces tables ne sont jamais accédées en anon » — faux). Conséquence : la requête anon renvoyait 0 ligne (RLS deny par défaut, pas d'erreur → placeholder neutre « Sélectionnez un groupe ») ; côté front `disabled={groupsLoading || groups.length === 0}` désactivait le Select et aucun défaut n'était posé (`groupId` vide → « Groupe requis »). Confirmé en prod via MCP : `set role anon; select count(*) from groups` → **0** (vs 3 en `authenticated`).
+
+**Changements :**
+- `supabase/migrations/00208_groups_select_anon_signup.sql` (NOUVEAU) — recrée `groups_select` en `TO anon, authenticated USING (true)`. Une seule policy par action conservée (pas de régression `multiple_permissive_policies`). Appliquée via MCP Supabase. Policies d'écriture (`insert/update/delete`) **inchangées** (`authenticated` + `app_user_role()` admin/coach) → anon reste read-only.
+
+**Décisions / limites :** noms de groupes non sensibles, c'était le comportement d'origine pré-00126 (`USING (true)` PUBLIC). Aucun changement front nécessaire — le Select se ré-active dès que `groups` n'est plus vide. Pas de garde-fou « zéro groupe en base » ajouté (3 groupes existent en prod, scénario hors-périmètre).
+
+**Tests / vérifs :** vérif MCP post-migration : `set role anon; select count(*) from groups` → **3** ✅ ; policies `groups_select` = `{anon, authenticated}`, écritures = `{authenticated}` ✅. `test:rls` non lancé (Docker non démarré ; correctif vérifié directement en prod par impersonation de rôle).
