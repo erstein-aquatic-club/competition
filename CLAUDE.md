@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§318** — 50 m crawl plus fidèle à McEvoy : soulevé trap-bar re-tagué `lower_strength` (anti-répétition), `upper_power` 50 m 0.50→0.95 (traction explosive domine), plafond séance 5 exos (bloc core §313 n'ajoute plus), mig 00206. `npm test` 1378+21, tsc 0. *(§317 fix 409 sync records ; §316 fix React #310 ; §315 KPIs offline.)*
+Dernier § livré : **§319** — Préférence de sélection d'exercices : champ `selection_priority` (coach-pilotable, trié en 1er dans `selectExercises`), seedé staples sprint (tractions lestées, box jump, roue abdos, pull-over fly) + démote Front Lever/gainage lesté (mig 00207). Fini les exos exotiques/arbitraires. `npm test` 1379+21, tsc 0. *(§318 50 m fidèle McEvoy ; §317 fix 409 sync records ; §316 fix React #310.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

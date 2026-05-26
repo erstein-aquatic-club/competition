@@ -23,6 +23,7 @@ interface DbRow {
   contraindication_zones: string[] | null;
   stroke_prehab_affinity: string[] | null;
   is_core: boolean | null;
+  selection_priority: number | null;
   illustration_gif: string | null;
   nb_series_endurance: number | null;
   nb_reps_endurance: number | null;
@@ -59,6 +60,7 @@ function mapRow(row: DbRow): CatalogExercise {
     contraindicationZones: row.contraindication_zones ?? [],
     strokePrehabAffinity: row.stroke_prehab_affinity ?? [],
     isCore: row.is_core ?? false,
+    selectionPriority: row.selection_priority ?? 0,
     illustrationGif: row.illustration_gif ?? null,
     nbSeriesEndurance: row.nb_series_endurance,
     nbRepsEndurance: row.nb_reps_endurance,
@@ -84,7 +86,7 @@ export async function listCatalogExercisesTagged(): Promise<CatalogExercise[]> {
     await supabase
       .from('dim_exercices')
       .select(
-        'id, nom_exercice, bucket, level, contraindication_zones, stroke_prehab_affinity, is_core, illustration_gif,' +
+        'id, nom_exercice, bucket, level, contraindication_zones, stroke_prehab_affinity, is_core, selection_priority, illustration_gif,' +
           ' nb_series_endurance, nb_reps_endurance, pourcentage_charge_1rm_endurance, recup_series_endurance,' +
           ' nb_series_force, nb_reps_force, pourcentage_charge_1rm_force, recup_series_force',
       )

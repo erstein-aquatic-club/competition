@@ -441,6 +441,12 @@ export function selectExercises(
     // avant les autres non-cores ; puis niveau décroissant (intermediate >
     // beginner > null). L'affinité ne déloge jamais un core.
     const ordered = safe.slice().sort((a, b) => {
+      // §319 — priorité coach d'abord : impose les staples (tractions lestées,
+      // box jump, roue abdos…) et démote les exotiques (Front Lever) sans les
+      // retirer du catalogue. Défaut 0 → départage par is_core/niveau (historique).
+      if (a.selectionPriority !== b.selectionPriority) {
+        return b.selectionPriority - a.selectionPriority;
+      }
       if (a.isCore !== b.isCore) return a.isCore ? -1 : 1;
       const am = matchesStroke(a);
       const bm = matchesStroke(b);

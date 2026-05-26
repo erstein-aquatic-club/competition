@@ -320,6 +320,13 @@ export interface CatalogExercise {
   strokePrehabAffinity: string[];
   /** `true` si exercice fondamental du seau (affiché en premier). */
   isCore: boolean;
+  /**
+   * Priorité de sélection coach (§319). Plus élevé = préféré dans son seau
+   * (trié AVANT is_core/niveau). Défaut 0 (comportement historique). Permet au
+   * coach d'imposer ses staples (tractions lestées, box jump, roue abdos…) et de
+   * démoter les exotiques (Front Lever) sans les retirer du catalogue.
+   */
+  selectionPriority: number;
   /** URL de l'illustration GIF (ou null si l'exercice n'en a pas). */
   illustrationGif: string | null;
   // Paramètres de charge catalogue (stratégie `catalogue` des cycles).

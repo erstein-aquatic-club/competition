@@ -693,6 +693,7 @@ function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     contraindicationZones: [],
     strokePrehabAffinity: [],
     isCore: false,
+    selectionPriority: 0,
     illustrationGif: null,
     nbSeriesEndurance: 3,
     nbRepsEndurance: 12,
@@ -810,6 +811,26 @@ describe('selectExercises', () => {
 
     // Core first : 3 (intermediate), 2 (beginner) — puis non-core : 1, 4.
     assert.deepEqual(ordered, [3, 2, 1, 4]);
+  });
+
+  // §319 — la priorité coach prime sur is_core ET sur le niveau : un staple
+  // (ex. tractions lestées) doit sortir avant l'exo le + avancé/composé.
+  it('selectionPriority coach prime sur is_core et niveau', () => {
+    const catalog: CatalogExercise[] = [
+      // Exo exotique : core + advanced (gagnerait le tri historique).
+      makeExercise({ id: 1, isCore: true, level: 'advanced', selectionPriority: 0 }),
+      // Staple coach : non-core, intermediate, MAIS priorité haute.
+      makeExercise({ id: 2, isCore: false, level: 'intermediate', selectionPriority: 100 }),
+      // Démoté explicitement.
+      makeExercise({ id: 3, isCore: true, level: 'intermediate', selectionPriority: -10 }),
+    ];
+
+    const out = selectExercises(allocFor(['lower_strength']), catalog, 'advanced', []);
+    const ordered = out.lower_strength!.map((s) => s.exercise.id);
+
+    // Le staple (2) sort en tête malgré non-core ; l'exotique core+advanced (1)
+    // ensuite (priorité 0) ; le démoté (3) en dernier.
+    assert.deepEqual(ordered, [2, 1, 3]);
   });
 
   it('substitution : un core exclu → un remplaçant marqué substituted', () => {

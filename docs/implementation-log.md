@@ -18882,3 +18882,19 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1378/1378 node:test + 21/21 vitest** ✅ ; `npm run build` OK ✅ ; migration 00206 appliquée via MCP (vérifié : id 7 = lower_strength, 50 upper_power = 0.95 ×2). Pas de `test:rls` (données de référence + re-tag, aucune policy).
 
 **Limites :** valeurs validées coach mais profil 50 stroke-agnostic (cf. cross-nages ci-dessus) ; le badge `is_core` cosmétique reste à traiter ; opportunité de différencier `upper_power` 50 m par nage (vs profil unique) laissée ouverte.
+
+## §319 — Préférence de sélection d'exercices (`selection_priority`) — staples coach (2026-05-26)
+
+**Contexte (retour terrain François, 50 m crawl).** La séance servait des exos exotiques/arbitraires plutôt que les staples du coach : **Front Lever** (au lieu de **tractions lestées**), **Gainage lesté** (au lieu de roue abdos / relevé jambes), **Trap Bar** (au lieu de **Box Jump**), et **jamais** le pull-over poulie « schéma papillon ». Cause racine : `selectExercises` triait `is_core → niveau décroissant → ordre catalogue` — aucun critère ne capture « l'exo go-to du coach » → il sert le plus avancé/composé (Front Lever, advanced/is_core, gagne sur tractions lestées intermediate) ou un arbitraire (départage par ordre catalogue entre exos égaux). François est `advanced`/`national` (niveau correct) → le problème n'est pas son niveau mais la logique de sélection.
+
+**Solution — champ `selection_priority` coach-pilotable :**
+- `src/lib/strength/mesocycleEngine.types.ts` : `CatalogExercise.selectionPriority: number` (défaut 0).
+- `src/lib/strength/mesocycleEngine.ts` : `selectExercises` trie **selection_priority décroissant EN PREMIER**, avant is_core/affinité/niveau. Défaut 0 → départage historique inchangé (rétrocompat totale pour les exos non seedés). TDD : 1 test RED→GREEN (« selectionPriority prime sur is_core et niveau »).
+- `src/lib/api/strength-catalog.ts` : `selection_priority` ajouté au SELECT + `mapRow` (`?? 0`).
+- Migration **00207** (appliquée MCP) : colonne `selection_priority int NOT NULL DEFAULT 0` + seed validé coach — upper_strength : Tractions lestées (13)=100, Straight-Arm Pulldown papillon (12)=90, Front Lever + variantes (62/65/66/67/69)=-10 ; upper_power : Ice Cream Maker (68)=-10 ; lower_power : Box Jump (8)=100 ; core : Ab Wheel (72)=100, Relevés jambes suspendu (23)=90, Gainage lesté (61)=-10.
+
+**Effet (50 m François) :** haut = **tractions lestées + pull-over fly** ; puissance bas = **box jump** ; tronc = **roue abdos** ; plus de Front Lever ni gainage lesté (restent au catalogue mais démotés). Beaucoup plus proche de la prépa McEvoy.
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1379/1379 node:test + 21/21 vitest** ✅ ; `npm run build` OK ✅ ; seed vérifié en prod. Pas de `test:rls` (colonne + données de référence, aucune policy).
+
+**Limites / suites :** priorité **globale** (par exo), pas par épreuve — bon défaut (les staples sont transverses) mais une préférence par-événement serait un cran plus fin. Édition de la priorité **en UI** non livrée (valeurs seedées par migration ; le coach ne peut pas encore les éditer dans l'app — chantier UI futur via `/frontend-design`). Le badge cosmétique `is_core`/« core » (§318 #4) reste à traiter.
