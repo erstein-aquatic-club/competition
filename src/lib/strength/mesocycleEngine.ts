@@ -860,7 +860,16 @@ function buildWeek(
     papPreferLegPower: boolean;
   },
 ): MesocycleWeek {
-  const slots = distributeSessionSlots(allocations, weekdays.length);
+  let slots = distributeSessionSlots(allocations, weekdays.length);
+  // §327 — garantit que le seau focus#1 forcé décroche un bloc de DÉVELOPPEMENT
+  // (sinon ses créneaux primaires tombent sur les jours d'amorce PAP → jamais
+  // développé ; cf. tirage poulie papillon absent du 50 papillon de François).
+  if (jourAware) {
+    const focusBuckets = allocations
+      .filter((a) => a.role === 'focus' && a.bucket !== 'mobility')
+      .map((a) => a.bucket);
+    slots = ensureFocusDevelopmentSession(slots, weekdays, primerWeekdays, focusBuckets);
+  }
   const sessions: MesocycleSession[] = slots.map((slot, idx) =>
     buildSession(idx + 1, weekdays[idx], slot.primary, slot.complement, pw.cycle, selected, {
       primerWeekdays,
@@ -976,6 +985,47 @@ function distributeSessionSlots(
     }
     return { primary, complement: pickComplement(primary, focusBuckets) };
   });
+}
+
+/**
+ * §327 — Garantit qu'au moins une séance de DÉVELOPPEMENT (jour hors amorce)
+ * prenne le seau focus#1 en primaire, pour qu'il décroche son bloc 2 exos
+ * (`PRIMARY_BLOCK_COUNT`, ex. tractions lestées + tirage poulie « schéma
+ * papillon »). Sinon, quand les créneaux primaires de focus#1 tombent tous sur
+ * des jours d'amorce PAP (duo lourd + explosif, jamais un bloc force complet),
+ * le seau forcé n'est jamais DÉVELOPPÉ — retour terrain papillon 50 de François :
+ * le tirage poulie (`upper_strength`, 2ᵉ staple) n'apparaissait dans aucune
+ * séance. On échange un créneau focus#1 d'un jour amorce avec un créneau de DÉV
+ * d'un seau NON-focus (pour ne pas priver focus#2 de son propre bloc dév).
+ *
+ * No-op si : focus#1 a déjà un créneau dév, ou il n'y a que des amorces / que du
+ * dév, ou focus#1 n'est primaire nulle part. L'échange conserve l'ensemble des
+ * créneaux (primaire + complément), il ne fait que les réassigner aux jours.
+ */
+function ensureFocusDevelopmentSession(
+  slots: SessionSlot[],
+  weekdays: number[],
+  primerWeekdays: Set<number>,
+  focusBuckets: StrengthBucket[],
+): SessionSlot[] {
+  if (focusBuckets.length === 0 || slots.length < 2) return slots;
+  const topFocus = focusBuckets[0];
+  const isPrimer = (i: number) => primerWeekdays.has(weekdays[i]);
+  const devIdx = slots.map((_, i) => i).filter((i) => !isPrimer(i));
+  const primerIdx = slots.map((_, i) => i).filter((i) => isPrimer(i));
+  if (devIdx.length === 0 || primerIdx.length === 0) return slots;
+  // focus#1 déjà développé un jour de DÉV ? rien à faire.
+  if (devIdx.some((i) => slots[i].primary === topFocus)) return slots;
+  // focus#1 primaire sur un jour d'amorce ?
+  const srcPrimer = primerIdx.find((i) => slots[i].primary === topFocus);
+  if (srcPrimer == null) return slots;
+  // Cible DÉV à échanger : un seau NON-focus d'abord (squat/jambes → bon
+  // potentiateur d'amorce après l'échange) ; sinon le premier DÉV disponible.
+  const dstDev =
+    devIdx.find((i) => !focusBuckets.includes(slots[i].primary)) ?? devIdx[0];
+  const out = slots.slice();
+  [out[srcPrimer], out[dstDev]] = [out[dstDev], out[srcPrimer]];
+  return out;
 }
 
 /**

@@ -1396,6 +1396,36 @@ describe('generateMesocycle', () => {
     assert.ok(papWithLegs, "l'amorce PAP doit porter un explosif lower_power (saut)");
   });
 
+  // ── §327 — le seau focus#1 forcé décroche un bloc de DÉVELOPPEMENT ──────────
+  it("§327 — focus#1 (haut force) a une séance de DÉV en primaire (papillon 50, 4 séances)", () => {
+    // Terrain François (papillon 50, 4 séances [Lun,Mar,Jeu,Ven] = primers Lun/Jeu).
+    // Les 2 créneaux primaires d'upper_strength tombaient sur les 2 jours d'amorce
+    // PAP (duo lourd+explosif) → AUCUNE séance de dév ne donnait à upper_strength
+    // son bloc 2 exos (tractions lestées + tirage poulie « schéma papillon »).
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 4;
+    input.weekdays = [0, 1, 3, 4]; // Lun, Mar, Jeu, Ven
+    input.primerWeekdays = [0, 3]; // Lun + Jeu = amorces
+
+    const meso = generateMesocycle(input);
+
+    const devUpperStrength = meso.weeks
+      .flatMap((w) => w.sessions)
+      .some((s) => s.role === 'developpement' && s.buckets[0] === 'upper_strength');
+    assert.ok(
+      devUpperStrength,
+      'au moins une séance de développement doit avoir upper_strength en primaire (bloc 2 exos)',
+    );
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {

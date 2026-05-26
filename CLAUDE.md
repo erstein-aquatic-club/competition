@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§326** — Confirmation planif : (A) fix crash **React #310** sur `/coach/swimmer/:id` (`useMemo(breadcrumbSegments)` hoisté au-dessus du `return` anticipé, même classe que §316 ; régression vitest) ; (B) **suppression des notifs broadcast** « nouveau mésocycle » — la RPC ciblait tout le groupe du nageur (mig **00211** recrée `apply_strength_mesocycle` sans le bloc notification, autorisation intacte) + UI sans mention « notifié ». `npm test` 1389+22, tsc 0. *(§325 amorce PAP event-aware ; §324 seau maintien fantôme→complément ; §323 forced_focus stroke-aware.)*
+Dernier § livré : **§327** — Le seau **focus#1 forcé décroche un bloc de DÉVELOPPEMENT** : `ensureFocusDevelopmentSession` (dans `buildWeek`, jour-aware) échange un créneau focus#1 d'un jour d'amorce avec un créneau dév d'un seau non-focus, pour que `upper_strength` ait son bloc 2 exos (tractions lestées + tirage poulie papillon) au lieu de n'être que potentiateur d'amorce — retour terrain papillon 50 François. `npm test` 1390+22, tsc 0. *(§326 fix crash #310 confirmation planif + suppression notifs broadcast ; §325 amorce PAP event-aware ; §324 seau maintien fantôme→complément.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
