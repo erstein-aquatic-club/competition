@@ -259,6 +259,21 @@ export function prioritizeBuckets(
     }
   }
 
+  // 3bis. §322 — Focus événement forcé : les seaux `forced_focus` du template
+  // (ex. `upper_power` pour un sprint — la puissance explosive « domine ») sont
+  // remontés dans les créneaux focus quel que soit leur score, APRÈS l'éventuel
+  // override mobilité (la sécurité prime). Doctrine événement > point faible.
+  const forcedFocus = template.structure.forced_focus ?? [];
+  if (forcedFocus.length > 0) {
+    const prefix = overrideMobility ? items.slice(0, 1) : [];
+    const tail = overrideMobility ? items.slice(1) : items.slice();
+    const forced = forcedFocus
+      .map((b) => tail.find((i) => i.bucket === b))
+      .filter((x): x is (typeof items)[number] => x != null);
+    const rest = tail.filter((i) => !forced.includes(i));
+    items.splice(0, items.length, ...prefix, ...forced, ...rest);
+  }
+
   // 4. Sérialiser → BucketPriority[] avec rang + override flag + rationale finale.
   return items.map((it, idx): BucketPriority => {
     const rank = idx + 1;

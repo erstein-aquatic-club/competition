@@ -1093,6 +1093,13 @@ export interface PeriodizationStructure {
   /** Emphase de l'épreuve par seau, poids 0-1 (le moteur la combine avec
    *  la priorité « seau le plus faible » de l'évaluation — Chantier C). */
   bucket_emphasis: Partial<Record<StrengthBucket, number>>;
+  /**
+   * §322 — Seaux **forcés en focus** quelle que soit la note de l'athlète
+   * (doctrine événement > point faible). Pour un sprint, garantit la puissance
+   * explosive (`upper_power`) même si le nageur y est déjà fort. Vide/absent =
+   * focus 100 % piloté par `emphasis × (100 − score)` (comportement historique).
+   */
+  forced_focus?: StrengthBucket[];
 }
 
 /** Famille d'un template : prépa de saison ou mini-prépa inter-compétitions. */

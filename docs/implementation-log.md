@@ -18925,3 +18925,18 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Décisions / limites :** noms de groupes non sensibles, c'était le comportement d'origine pré-00126 (`USING (true)` PUBLIC). Aucun changement front nécessaire — le Select se ré-active dès que `groups` n'est plus vide. Pas de garde-fou « zéro groupe en base » ajouté (3 groupes existent en prod, scénario hors-périmètre).
 
 **Tests / vérifs :** vérif MCP post-migration : `set role anon; select count(*) from groups` → **3** ✅ ; policies `groups_select` = `{anon, authenticated}`, écritures = `{authenticated}` ✅. `test:rls` non lancé (Docker non démarré ; correctif vérifié directement en prod par impersonation de rôle).
+## §322 — Focus événement forcé pour les sprints (`forced_focus`) (2026-05-26)
+
+**Contexte (retour terrain François, suite §318-§320).** La priorisation des seaux = `emphasis × (100 − score)` → entraîne le **point faible** de l'athlète. Pour un sprinteur déjà puissant (François, national), la **puissance haute explosive** (que l'épreuve DEMANDE — McEvoy : « la traction explosive domine ») n'était pas forcément en focus → absente de la séance, malgré l'emphase montée à 0.95 (§318). Demande coach : garantir l'explosif quel que soit le niveau.
+
+**Solution — `forced_focus` (doctrine événement > point faible) :**
+- `src/lib/api/types.ts` — `PeriodizationStructure.forced_focus?: StrengthBucket[]` (vit dans le `structure` jsonb du profil, pas de nouvelle colonne).
+- `src/lib/strength/mesocycleEngine.ts` — `prioritizeBuckets` remonte les seaux `forced_focus` dans les créneaux focus (étape 3bis), **APRÈS** l'override mobilité (la sécurité prime). TDD : 2 tests (forced en focus malgré score élevé ; respect de l'override douleur). 
+- `src/lib/strength/composeTemplate.ts` — propage `forced_focus` du profil dans le template composé.
+- Migration **00209** (appliquée MCP) : `forced_focus = ["upper_power"]` sur 50 m + 100 m (season + inter_competition), via `jsonb_set` sur `structure`. Coach-tunable (jsonb). (§321 « autre terminal » ayant pris le numéro 00208 pour `groups_select` anon, cette migration est renumérotée 00209.)
+
+**Effet (50 m François, KPIs forts) :** focus = **puissance haute + force bas** → la séance dev contient Bench Pull explosif + lancer rotatif médecine-ball (explosif garanti) — vérifié en lançant le moteur.
+
+**Limites / suites :** `forced_focus` est par **distance** (stroke-agnostic) → forcer `upper_power` au 50 m s'applique aussi à la **brasse 50** (jambes-dominante) où ce serait moins pertinent — un `forced_focus` **par nage×distance** serait plus fin (suite possible). Avec `['upper_power']` seul, les **tractions lestées** (upper_strength) ne sont pas garanties (le 2ᵉ créneau focus va au point faible) — décision coach en attente : forcer aussi `upper_strength` pour les sprints pull-dominants (crawl/papillon) ?
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1386/1386 node:test + 21/21 vitest** (+2 forced_focus) ✅ ; `npm run build` OK ✅ ; seed vérifié en prod. Pas de `test:rls` (jsonb data + logique TS).

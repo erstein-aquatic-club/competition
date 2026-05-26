@@ -313,6 +313,38 @@ const cleanPhysical: StrengthPhysicalTests = {
 };
 
 describe('prioritizeBuckets', () => {
+  // §322 — focus événement forcé : un seau listé dans structure.forced_focus est
+  // garanti dans les FOCUS_COUNT premiers, même si l'athlète y a une note élevée
+  // (combiné bas). Pour le sprint, garantit la puissance explosive (McEvoy).
+  it('un seau forced_focus est garanti en focus malgré un score élevé', () => {
+    const scores = {
+      lower_strength: 30, lower_power: 40, upper_strength: 45,
+      upper_power: 95, mobility: 50, psychology: 50, core: null,
+    } as BucketScores;
+    const template = makeTemplate({
+      lower_strength: 0.85, lower_power: 0.9, upper_strength: 1.0, upper_power: 0.95, mobility: 0.3,
+    });
+    template.structure.forced_focus = ['upper_power'];
+
+    const out = prioritizeBuckets(scores, template, noPain, cleanPhysical);
+    const upRank = out.find((p) => p.bucket === 'upper_power')!.rank;
+    // Sans forced_focus, upper_power (combiné 0.95×5=4.75) serait dernier des entraînables.
+    assert.ok(upRank <= 2, `upper_power doit être en focus (rank ${upRank}, attendu ≤ 2)`);
+  });
+
+  it("forced_focus respecte l'override sécurité (mobilité reste rang 1 sur douleur)", () => {
+    const scores = emptyScores();
+    const template = makeTemplate({
+      lower_strength: 0.85, lower_power: 0.9, upper_strength: 1.0, upper_power: 0.95, mobility: 0.3,
+    });
+    template.structure.forced_focus = ['upper_power'];
+    const pain: PainReport[] = [{ body_zone: 'left_shoulder', intensity: 3 } as PainReport];
+
+    const out = prioritizeBuckets(scores, template, pain, cleanPhysical);
+    assert.equal(out[0].bucket, 'mobility', 'mobilité forcée rang 1 (sécurité) avant le forced_focus');
+    assert.equal(out[1].bucket, 'upper_power', 'forced_focus prend le créneau focus restant');
+  });
+
   it('classe par score combiné = emphasis × (100 − score) décroissant', () => {
     // upper_power : score 30, emphasis 1.0 → combiné 70
     // lower_strength : score 30, emphasis 0.5 → combiné 35

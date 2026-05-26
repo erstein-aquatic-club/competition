@@ -62,7 +62,8 @@ export function composeTemplate(
     name: `${signature.label} ${profile.label}`,
     min_week_count: profile.min_week_count,
     max_week_count: profile.max_week_count,
-    structure: { phases: profile.structure.phases, bucket_emphasis },
+    // §322 — propage les seaux focus forcés du profil (ex. puissance explosive sprint).
+    structure: { phases: profile.structure.phases, bucket_emphasis, forced_focus: profile.structure.forced_focus },
     created_at: '',
     updated_at: '',
   };
