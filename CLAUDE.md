@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§317** — Fix 409 sync nageurs records : guard `occupiedIufs` dans `syncClubRecordSwimmersFromUsers()` évite l'INSERT qui violait la contrainte unique `iuf`. **§316** — Fix React #310 `StrengthAssessmentScreen` : hoist `useBilanSteps` avant les return anticipés. `npm test` 1378+21, tsc 0. *(§315 KPIs offline ; §314 questionnaire+physique offline ; §313 seau core R5.)*
+Dernier § livré : **§318** — 50 m crawl plus fidèle à McEvoy : soulevé trap-bar re-tagué `lower_strength` (anti-répétition), `upper_power` 50 m 0.50→0.95 (traction explosive domine), plafond séance 5 exos (bloc core §313 n'ajoute plus), mig 00206. `npm test` 1378+21, tsc 0. *(§317 fix 409 sync records ; §316 fix React #310 ; §315 KPIs offline.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

@@ -1190,6 +1190,12 @@ describe('generateMesocycle', () => {
         `séance dev sans exercice core (J${s.weekday})`,
       );
       assert.ok(s.buckets.includes('core'), 'tag bucket core manquant');
+      // §318 (#2) — le bloc core ne doit PAS gonfler la séance au-delà du
+      // plafond de 5 exos (sinon trop de volume sur un sprint — retour terrain).
+      assert.ok(
+        s.exercises.length <= 5,
+        `séance dev à ${s.exercises.length} exos (> plafond 5, J${s.weekday})`,
+      );
     }
     // Le core est chargé en contrôle (intention dédiée, charge légère, jamais 0 série).
     const coreEx = meso.weeks

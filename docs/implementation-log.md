@@ -18866,3 +18866,19 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Test de régression (TDD, RED→GREEN).** `src/pages/coach/StrengthAssessmentScreen.vitest.tsx` (NOUVEAU) — rend l'écran sans nageur puis en sélectionne un (sélecteur stubé). **Piège évité** : le mock de `wouter.useLocation` doit **consommer un vrai hook** (le vrai en consomme un en interne — c'est LUI que `useBilanSteps` ajoute) ; un mock « fonction pure » effaçait le déclencheur (faux vert). RED reproduisait `Rendered more hooks…` à `useBilanSteps.ts:25` ; GREEN après hoist. Assertions doublées (sélecteur disparu + spy `console.error` sans erreur d'ordre des hooks) pour éviter le faux vert d'un crash-unmount.
 
 **Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1378/1378 node:test + 21/21 vitest** (+1 repro #310) ✅ ; `npm run build` OK ✅. Pas de migration, pas de `test:rls`.
+
+## §318 — 50 m crawl plus fidèle à McEvoy : anti-répétition + emphase upper_power + plafond séance (2026-05-26)
+
+**Contexte (retour terrain François, 50 m crawl).** Plan généré jugé mauvais vs la prépa de référence McEvoy (`docs/plans/bilan-muscu-templates-sources.md` T1 `sprint_50`) : **répétition** (2 trap-bar consécutifs) et **trop de séries/exos** (6). Diagnostic (données live `dim_exercices` + profils §305) : 3 causes racines, 3 correctifs validés coach.
+
+**#1 — Répétition : `Soulevé de terre trap bar` (id 7) mal classé `lower_power`.** Comme `Trap Bar Jump` (90), il était `lower_power` ; or 5×3 @85 % = **force max**, pas puissance. `lower_power` étant focus du 50 m, l'allocation piochait les 2 trap-bar. **Fix** : re-tag `lower_power → lower_strength` (mig **00206**) → puissance (sauts/cleans) et force (squat/SDT) séparées.
+
+**#3 — Emphase : `upper_power` du 50 m = 0.50 vs McEvoy 1.0.** Le doc référence dit « le 50 m est une épreuve de puissance quasi pure ; la traction explosive domine » (upper_power 1.0), mais §305 (00194) l'avait mis à 0.50 → la puissance haute n'était pas focus → aucune traction explosive/med-ball dans la séance. **Fix** : `strength_distance_profiles` 50 m `upper_power` 0.50 → **0.95** (mig 00206, season + inter_competition). ⚠️ profil 50 stroke-agnostic → relève aussi papillon/dos 50 (clampé à 1.0 — cohérent, sprints explosifs). Conséquence : focus 50 m passe de {US, LP} à {US, UP} → la séance injecte enfin la puissance haute explosive (+ supprime le 2ᵉ trap-bar via la démotion de lower_power en maintien).
+
+**#2 — Trop d'exos : le bloc core §313 s'AJOUTAIT (6ᵉ exo).** **Fix** (`mesocycleEngine.ts`, TDD) : plafond `MAX_SESSION_ITEMS = 5` par séance de développement ; le warmup mobilité est dimensionné dynamiquement (`warmupCount = clamp(MIN_WARMUP_COUNT=1 … MOBILITY_WARMUP_COUNT=2)`) pour absorber le bloc core SANS dépasser 5, en préservant les blocs de travail (primary + complement + core). Séance sans core inchangée (5). Test : assertion `≤ 5` ajoutée au test « bloc core inséré » (RED 6 → GREEN 5).
+
+**(Non retenu : #4 badge `is_core`/« core » cosmétique — collision visuelle avec le seau core §313, laissé pour plus tard.)**
+
+**Tests / vérifs :** `npx tsc --noEmit` 0 ✅ ; `npm test` **1378/1378 node:test + 21/21 vitest** ✅ ; `npm run build` OK ✅ ; migration 00206 appliquée via MCP (vérifié : id 7 = lower_strength, 50 upper_power = 0.95 ×2). Pas de `test:rls` (données de référence + re-tag, aucune policy).
+
+**Limites :** valeurs validées coach mais profil 50 stroke-agnostic (cf. cross-nages ci-dessus) ; le badge `is_core` cosmétique reste à traiter ; opportunité de différencier `upper_power` 50 m par nage (vs profil unique) laissée ouverte.

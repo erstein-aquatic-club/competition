@@ -654,6 +654,16 @@ const COMPLEMENT_BLOCK_COUNT = 1;
  * en TODO coach (cf. design R5 §2 et §7).
  */
 const CORE_BLOCK_COUNT = 1;
+/**
+ * §318 (#2) — plafond d'exercices par séance de développement. Retour terrain
+ * (50 m crawl) : le bloc core §313 s'AJOUTAIT (warmup 2 + primary 2 + complement
+ * 1 + core 1 = 6) → trop de volume vs la prépa McEvoy (qualité > volume). Le core
+ * est désormais INCLUS dans le plafond : on rogne d'abord le warmup (mobilité
+ * d'activation, le moins coûteux) jusqu'à `MIN_WARMUP_COUNT`, en préservant les
+ * blocs de travail (primary + complement + core). Séance sans core inchangée (5).
+ */
+const MAX_SESSION_ITEMS = 5;
+const MIN_WARMUP_COUNT = 1;
 /** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
  *  mobility), on cible jusqu'à 5 exercices mobility pour rester productive. */
 const MOBILITY_ONLY_COUNT = 5;
@@ -996,11 +1006,6 @@ function buildSession(
     const useComplement = complement != null && complement !== primary;
     const complementPool = useComplement ? (selected[complement] ?? []) : [];
 
-    // §297 — Warmup items reçoivent isWarmup=true → chargement endurance
-    // + intention activation, indépendamment du cycle de la semaine.
-    const warmup = mobilityPool
-      .slice(0, MOBILITY_WARMUP_COUNT)
-      .map((s) => toMesocycleExercise(s, cycle, true));
     const primaryBlock = primaryPool
       .slice(0, PRIMARY_BLOCK_COUNT)
       .map((s) => toMesocycleExercise(s, effectiveCycle, false));
@@ -1018,6 +1023,22 @@ function buildSession(
       ctx.coreEmphasis > 0
         ? corePool.slice(0, CORE_BLOCK_COUNT).map((s) => buildCoreExercise(s))
         : [];
+
+    // §318 (#2) — le warmup est dimensionné pour que le total reste ≤
+    // MAX_SESSION_ITEMS : on rogne le warmup (le moins coûteux) avant les blocs
+    // de travail, tout en gardant ≥ MIN_WARMUP_COUNT activation mobilité. Sans
+    // bloc core, le total retombe au comportement historique (5).
+    const nonWarmupCount =
+      primaryBlock.length + complementBlock.length + coreBlock.length;
+    const warmupCount = Math.max(
+      MIN_WARMUP_COUNT,
+      Math.min(MOBILITY_WARMUP_COUNT, MAX_SESSION_ITEMS - nonWarmupCount),
+    );
+    // §297 — Warmup items reçoivent isWarmup=true → chargement endurance
+    // + intention activation, indépendamment du cycle de la semaine.
+    const warmup = mobilityPool
+      .slice(0, warmupCount)
+      .map((s) => toMesocycleExercise(s, cycle, true));
 
     // Ordre chronologique : warmup → primary → complement → core (gainage en fin
     // de séance, n'entame pas la fraîcheur des blocs principaux).
