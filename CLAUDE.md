@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§324** — Pas de seau entraînable « fantôme » : un seau de maintien sans créneau primaire (ex. puissance jambes du 100 dos = ondulation sous-marine) sort en **complément** d'une séance à primaire maintien (sibling anatomique, 0 volume ajouté) au lieu de disparaître — `distributeSessionSlots`. `npm test` 1388+21, tsc 0. *(§323 forced_focus stroke-aware ; §322 forced_focus per-distance ; §321 fix inscription groupe.)*
+Dernier § livré : **§325** — Amorce PAP event-aware : si aucune séance de développement ne couvre les jambes (jours muscu surtout des amorces), l'explosif de l'amorce bascule sur `lower_power` (saut) ; + défaut 3 séances [Lun,Mar,Jeu]→[Lun,Mer,Ven]. `npm test` 1389+21, tsc 0. *(§324 seau maintien fantôme→complément ; §323 forced_focus stroke-aware ; §322 forced_focus per-distance.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

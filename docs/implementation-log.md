@@ -18968,3 +18968,15 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs :** TDD `mesocycleEngine.test.ts` (+1 : invariant « tout seau entraînable alloué apparaît dans ≥1 séance », cas 4 seaux/3 séances) — vu RED (lower_strength absent) → GREEN ✅ ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1388/1388 node:test + 21/21 vitest** ✅. Pas de migration (logique TS pure), pas de `test:rls`.
 
 **Suite prévue :** régénérer le plan de Victoria (décision coach) pour appliquer §323 (focus stroke-aware) + §324 (dose `lower_power`). Poids de corps 60 kg renseigné en base (`user_profiles.body_weight`). Open connexe non retenu ici : pondération `mobility` du 100 (0.56 après mult dos, < doctrine dos 0.8) — préhab scapulaire à renforcer côté contenu/sélection.
+
+## §325 — Amorce PAP event-aware : jambes jamais à zéro (2026-05-26)
+
+**Contexte (retour terrain — régénération 100 dos de Victoria).** En ouvrant l'aperçu de régénération : « il n'y a plus rien sur les jambes ». Cause racine **reproduite** (run moteur [0,1,4] vs [0,1,3]) : le défaut de l'écran de génération pour 3 séances était **[Lun, Mar, Jeu]** → `isPrimerWeekday = {Lun, Jeu}` → **2 séances sur 3** deviennent des amorces PAP, **codées haut-du-corps** (potentiateur traction + explosif puissance haute). Or le moteur place le créneau primaire jambes (`lower_strength`) sur le **dernier** jour (Jeudi), une amorce → la séance jambes est convertie en amorce haut-du-corps et le complément `lower_power` (§324) est jeté avec la conversion → **zéro jambes**.
+
+**Solution (validée coach — « amorce event-aware + meilleur défaut ») :**
+- `src/lib/strength/mesocycleEngine.ts` — `generateMesocycle` détecte si **aucun** seau jambes (`lower_strength`/`lower_power`) n'est couvert par une séance de **développement** (jour non-primer) via `distributeSessionSlots` + la carte des jours primer (`papPreferLegPower`). Si c'est le cas, `buildPapSession` bascule son **explosif** sur `lower_power` (un saut) au lieu de répéter la puissance haute → un minimum de jambes même un jour amorce. Le potentiateur reste haut (traction = potentialise le tirage dos). Threadé via `buildWeek` + `JourAwareContext`.
+- `src/pages/MesocycleGeneration.tsx` — défaut 3 séances **[0,1,3] → [0,2,4]** (Lun = unique amorce, Mer + Ven = 2 vrais jours de développement → le jour jambes/Ven n'est plus une amorce). Défauts 1/2/4/5 inchangés.
+
+**Effet :** défaut 3 séances → Lun amorce (haut) · Mer dev haut · Ven dev jambes (squat/SDT + Box Jump). Et si le coach choisit quand même une config majoritairement amorce (ex. [Lun, Mar, Jeu]), l'amorce porte un Box Jump → jambes présentes (plus jamais zéro). Limite connue : `lower_strength` (squat lourd) peut rester absent quand seules les amorces portent les jambes (c'est l'explosif/saut qui est garanti) — acceptable en maintenance (jambes élite de Victoria).
+
+**Tests / vérifs :** TDD `mesocycleEngine.test.ts` (+1 §325 : weekdays [0,1,3] primer {0,3} → l'amorce porte un explosif `lower_power`) vu RED → GREEN ✅ ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1389/1389 node:test + 21/21 vitest** ✅. Pas de migration (logique TS + défaut UI), pas de `test:rls`.

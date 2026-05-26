@@ -1365,6 +1365,37 @@ describe('generateMesocycle', () => {
     }
   });
 
+  // ── §325 — jambes jamais à zéro quand les jours muscu sont surtout des amorces ──
+  it("§325 — l'amorce PAP porte un explosif jambes quand les jambes seraient sinon absentes (Lun/Mar/Jeu)", () => {
+    // Terrain Victoria : le défaut 3 séances plaçait le seul créneau jambes le
+    // Jeudi (jour primer/amorce) → converti en amorce PAP codée HAUT du corps →
+    // zéro jambes. L'explosif d'amorce doit basculer sur lower_power (saut).
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.6,
+      lower_power: 0.79,
+      upper_strength: 0.92,
+      upper_power: 0.73,
+      mobility: 0.56,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 3;
+    input.weekdays = [0, 1, 3]; // Lun, Mar, Jeu
+    input.primerWeekdays = [0, 3]; // Lun + Jeu = amorces (2 séances/3 en PAP)
+
+    const meso = generateMesocycle(input);
+
+    const seen = new Set(meso.weeks.flatMap((w) => w.sessions).flatMap((s) => s.buckets));
+    assert.ok(
+      seen.has('lower_power') || seen.has('lower_strength'),
+      'aucun seau jambes alors que les jours muscu sont surtout des amorces',
+    );
+    const papWithLegs = meso.weeks
+      .flatMap((w) => w.sessions)
+      .some((s) => s.role === 'amorce_pap' && s.buckets.includes('lower_power'));
+    assert.ok(papWithLegs, "l'amorce PAP doit porter un explosif lower_power (saut)");
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {

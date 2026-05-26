@@ -143,8 +143,13 @@ function isPrimerWeekday(d: number): boolean {
 /**
  * Jours par défaut depuis le nombre de séances de l'évaluation, en favorisant
  * le rythme Lun/Jeu (amorce avant le sprint bassin). §307.
- *  1→[0] · 2→[0,3] · 3→[0,1,3] · 4→[0,1,3,4] · 5→[0,1,2,3,4] · sinon N premiers
+ *  1→[0] · 2→[0,3] · 3→[0,2,4] · 4→[0,1,3,4] · 5→[0,1,2,3,4] · sinon N premiers
  *  jours non-samedi.
+ *
+ *  §325 — 3 séances = [Lun, Mer, Ven] (et non plus [Lun, Mar, Jeu]) : Lun reste
+ *  l'unique amorce, Mer + Ven sont deux vrais jours de développement. L'ancien
+ *  [0,1,3] mettait 2 amorces (Lun + Jeu) sur 3 séances, et le seul créneau jambes
+ *  tombait le Jeudi (amorce) → converti en amorce haut-du-corps → zéro jambes.
  */
 function defaultWeekdaysFor(count: number): number[] {
   switch (count) {
@@ -153,7 +158,7 @@ function defaultWeekdaysFor(count: number): number[] {
     case 2:
       return [0, 3];
     case 3:
-      return [0, 1, 3];
+      return [0, 2, 4];
     case 4:
       return [0, 1, 3, 4];
     case 5:

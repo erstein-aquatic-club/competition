@@ -792,12 +792,29 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
   // utilisé pour choisir le seau force/puissance d'une amorce PAP.
   const bucketPriorityOrder = bucketAllocations.map((a) => a.bucket);
 
+  // §325 — amorce event-aware : si le seul créneau jambes tombe un jour primer
+  // (amorce PAP, codée haut du corps), les jambes disparaissent du plan (retour
+  // terrain Victoria, défaut [Lun, Mar, Jeu] = 2 amorces / 3 séances). On détecte
+  // ici si AUCUN seau jambes n'est couvert par une séance de DÉVELOPPEMENT ; si
+  // c'est le cas, l'explosif de l'amorce basculera sur `lower_power` (un saut)
+  // pour garantir un minimum de puissance jambes, même un jour amorce.
+  const isLegBucket = (b: StrengthBucket | null): boolean =>
+    b === 'lower_strength' || b === 'lower_power';
+  const coverageSlots = distributeSessionSlots(bucketAllocations, weekdays.length);
+  const legsCoveredInDev = coverageSlots.some(
+    (slot, idx) =>
+      !primerWeekdays.has(weekdays[idx]) &&
+      (isLegBucket(slot.primary) || isLegBucket(slot.complement)),
+  );
+  const papPreferLegPower = jourAware && !legsCoveredInDev;
+
   const weeks: MesocycleWeek[] = periodizedWeeks.map((pw) =>
     buildWeek(pw, bucketAllocations, selected, weekdays, primerWeekdays, jourAware, {
       forceBiasRequired,
       mobilityOverrideActive,
       bucketPriorityOrder,
       coreEmphasis,
+      papPreferLegPower,
     }),
   );
 
@@ -839,6 +856,8 @@ function buildWeek(
     bucketPriorityOrder: StrengthBucket[];
     /** §R5 — emphase core du template (0 = pas de bloc tronc, ex. DB pré-migration). */
     coreEmphasis: number;
+    /** §325 — l'amorce PAP bascule son explosif sur lower_power (jambes absentes ailleurs). */
+    papPreferLegPower: boolean;
   },
 ): MesocycleWeek {
   const slots = distributeSessionSlots(allocations, weekdays.length);
@@ -850,6 +869,7 @@ function buildWeek(
       mobilityOverrideActive: flags.mobilityOverrideActive,
       bucketPriorityOrder: flags.bucketPriorityOrder,
       coreEmphasis: flags.coreEmphasis,
+      papPreferLegPower: flags.papPreferLegPower,
     }),
   );
   return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
@@ -996,6 +1016,13 @@ interface JourAwareContext {
    * de développement (après le warmup, avant le bloc primaire).
    */
   coreEmphasis: number;
+  /**
+   * §325 — `true` si les jambes ne sont couvertes par aucune séance de
+   * développement (jours muscu surtout des amorces). L'explosif de l'amorce PAP
+   * bascule alors sur `lower_power` (un saut) plutôt que de répéter la puissance
+   * haute, pour garantir un minimum de jambes.
+   */
+  papPreferLegPower: boolean;
 }
 
 /**
@@ -1034,7 +1061,7 @@ function buildSession(
 
   // §307 — Amorce PAP : chargement dédié, ignore primary/complement classiques.
   if (role === 'amorce_pap') {
-    return buildPapSession(sessionNumber, weekday, selected, mobilityPool, ctx.bucketPriorityOrder);
+    return buildPapSession(sessionNumber, weekday, selected, mobilityPool, ctx.bucketPriorityOrder, ctx.papPreferLegPower);
   }
 
   let exercises: MesocycleExercise[];
@@ -1152,6 +1179,7 @@ function buildPapSession(
   selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
   mobilityPool: SelectedExercise[],
   bucketPriorityOrder: StrengthBucket[],
+  papPreferLegPower: boolean,
 ): MesocycleSession {
   const exercises: MesocycleExercise[] = [];
   const buckets: StrengthBucket[] = [];
@@ -1183,8 +1211,14 @@ function buildPapSession(
     }
   }
 
-  // Explosif : seau de puissance le plus prioritaire présent.
-  const powerBucket = pickByPriority(POWER_BUCKETS);
+  // Explosif : seau de puissance le plus prioritaire présent. §325 — si les
+  // jambes seraient sinon totalement absentes du plan, l'explosif bascule sur
+  // `lower_power` (un saut) même un jour amorce, plutôt que de répéter la
+  // puissance haute — garantit un minimum de jambes (retour terrain Victoria).
+  const powerBucket =
+    papPreferLegPower && (selected.lower_power?.length ?? 0) > 0
+      ? 'lower_power'
+      : pickByPriority(POWER_BUCKETS);
   if (powerBucket) {
     const sel = firstCore(selected[powerBucket] ?? []);
     if (sel) {
