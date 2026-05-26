@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§325** — Amorce PAP event-aware : si aucune séance de développement ne couvre les jambes (jours muscu surtout des amorces), l'explosif de l'amorce bascule sur `lower_power` (saut) ; + défaut 3 séances [Lun,Mar,Jeu]→[Lun,Mer,Ven]. `npm test` 1389+21, tsc 0. *(§324 seau maintien fantôme→complément ; §323 forced_focus stroke-aware ; §322 forced_focus per-distance.)*
+Dernier § livré : **§326** — Confirmation planif : (A) fix crash **React #310** sur `/coach/swimmer/:id` (`useMemo(breadcrumbSegments)` hoisté au-dessus du `return` anticipé, même classe que §316 ; régression vitest) ; (B) **suppression des notifs broadcast** « nouveau mésocycle » — la RPC ciblait tout le groupe du nageur (mig **00211** recrée `apply_strength_mesocycle` sans le bloc notification, autorisation intacte) + UI sans mention « notifié ». `npm test` 1389+22, tsc 0. *(§325 amorce PAP event-aware ; §324 seau maintien fantôme→complément ; §323 forced_focus stroke-aware.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

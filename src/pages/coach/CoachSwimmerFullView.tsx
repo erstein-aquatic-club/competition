@@ -224,6 +224,17 @@ export default function CoachSwimmerFullView({
   const groupLabel = profile?.group_label ?? null;
   const handleBack = onBack ?? (() => navigate("/coach?section=swimmers"));
 
+  // §325 — DOIT rester AU-DESSUS du `return` anticipé `if (!athleteId)` : sinon
+  // ce hook ne tourne pas quand athleteId est falsy, et la bascule null→défini
+  // (navigation post-apply vers /coach/swimmer/:id) ajoute un hook → React #310.
+  const breadcrumbSegments = useMemo(
+    () => [
+      { label: 'Nageurs', href: '#/coach?section=swimmers' },
+      { label: displayName },
+    ],
+    [displayName],
+  );
+
   if (!athleteId) {
     return (
       <div className="p-4 text-center text-muted-foreground">
@@ -234,14 +245,6 @@ export default function CoachSwimmerFullView({
       </div>
     );
   }
-
-  const breadcrumbSegments = useMemo(
-    () => [
-      { label: 'Nageurs', href: '#/coach?section=swimmers' },
-      { label: displayName },
-    ],
-    [displayName],
-  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">

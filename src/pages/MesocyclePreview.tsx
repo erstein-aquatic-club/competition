@@ -467,9 +467,11 @@ export default function MesocyclePreview() {
     },
     onSuccess: () => {
       finishApplied(
+        // §326 — plus de notification émise (broadcast supprimé) : on ne promet
+        // donc plus « a été notifié ».
         isCoachMode
-          ? `${generated?.totalWeeks ?? "?"} semaines posées sur la planif de ${targetName ?? "ce nageur"}. Il a été notifié.`
-          : `${generated?.totalWeeks ?? "?"} semaines posées sur ta planif muscu. Ton coach a été notifié.`,
+          ? `${generated?.totalWeeks ?? "?"} semaines posées sur la planif de ${targetName ?? "ce nageur"}.`
+          : `${generated?.totalWeeks ?? "?"} semaines posées sur ta planif muscu.`,
       );
     },
     onError: async (err: unknown, _vars, context) => {
@@ -1217,7 +1219,7 @@ function CtaBar({
         <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
           Confirme l'application sur ta planif muscu pour les{" "}
           <span className="tabular-nums font-bold">{totalWeeks}</span> prochaines
-          semaines. Ton coach sera notifié et pourra ajuster.
+          semaines. Ton coach pourra la consulter et l'ajuster.
         </p>
         {/*
          * Stacke vertical sur mobile (flex-col-reverse → CTA primaire au-dessus
