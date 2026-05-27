@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§327** — Le seau **focus#1 forcé décroche un bloc de DÉVELOPPEMENT** : `ensureFocusDevelopmentSession` (dans `buildWeek`, jour-aware) échange un créneau focus#1 d'un jour d'amorce avec un créneau dév d'un seau non-focus, pour que `upper_strength` ait son bloc 2 exos (tractions lestées + tirage poulie papillon) au lieu de n'être que potentiateur d'amorce — retour terrain papillon 50 François. `npm test` 1390+22, tsc 0. *(§326 fix crash #310 confirmation planif + suppression notifs broadcast ; §325 amorce PAP event-aware ; §324 seau maintien fantôme→complément.)*
+Dernier § livré : **§328** — **Table rase à la régénération** : `apply_strength_mesocycle` (mig **00212**) purge désormais TOUTE la semaine en cours de l'ancien plan (le `DELETE` des slot_overrides perd la garde `>= date de départ` du §308) → plus de jour pré-départ fantôme de l'ancien plan dans la semaine de départ ; snapshot/revert intacts. Schema RLS répliqué, test §308 mid-week réécrit (table rase), `test:rls` strength-mesocycle-rpc 17/17. *(§327 focus#1 décroche un bloc dév = tirage poulie papillon ; §326 fix crash #310 confirmation planif + suppression notifs broadcast ; §325 amorce PAP event-aware.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

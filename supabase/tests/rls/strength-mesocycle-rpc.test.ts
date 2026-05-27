@@ -532,24 +532,26 @@ describe("§308 — re-génération propre (clean replace / mid-week / isolation
     });
   });
 
-  it("départ mid-week : jours pré-départ préservés, jour de départ ré-écrit", async () => {
+  it("§328 — départ mid-week : table rase de la semaine, seuls les jours ≥ départ restent", async () => {
     await asUser(ALICE, async (c) => {
       // M0 plein Lun/Jeu démarrant lundi.
       await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), null]);
       expect(await daysOf(c, 1)).toEqual([0, 3]);
 
-      // M1 mêmes jours mais départ JEUDI : lundi (pré-départ, déjà entraîné) doit
-      // rester sur M0 ; jeudi ré-écrit par M1.
+      // M1 mêmes jours mais départ JEUDI. §328 (table rase) : le lundi pré-départ
+      // de M0 est PURGÉ (plus de résidu de l'ancien plan) ; M1 ne pose que le
+      // jeudi (≥ date de départ ; le lundi < départ est sauté par le moteur).
       await c.query(applySqlV2, [1, A_ASSESS, TEMPLATE, 1, 2, START_MONDAY, REASONING, weekdayPayload([0, 3]), THURSDAY]);
-      expect(await daysOf(c, 1)).toEqual([0, 3]);
+      expect(await daysOf(c, 1)).toEqual([3]);
 
+      // L'unique créneau restant (jeudi) appartient bien à M1, pas à M0.
       const notes = await c.query<{ day_of_week: number; notes: string }>(
         `SELECT day_of_week, notes FROM strength_planning_slot_overrides
           WHERE athlete_id = 1 AND week_start = $1::date ORDER BY day_of_week`,
         [START_MONDAY],
       );
-      // Lundi (M0 préservé) et jeudi (M1) pointent sur 2 mésocycles distincts.
-      expect(notes.rows[0].notes).not.toBe(notes.rows[1].notes);
+      expect(notes.rows).toHaveLength(1);
+      expect(notes.rows[0].day_of_week).toBe(3);
     });
   });
 

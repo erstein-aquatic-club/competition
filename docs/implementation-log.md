@@ -19007,3 +19007,14 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 - Effet : une séance de dév prend `upper_strength` en primaire → bloc 2 exos = **tractions lestées + tirage poulie papillon**. Le plan papillon 50 retrouve son staple McEvoy.
 
 **Tests / vérifs :** TDD `mesocycleEngine.test.ts` (+1 §327 : papillon 50, 4 séances [0,1,3,4] primers {0,3}, forced upper → ≥1 séance `developpement` avec `upper_strength` en primaire) vu RED (aucune) → GREEN ✅ ; suite moteur 71/71 (régressions §324/§325 OK) ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1390/1390 node:test + 22/22 vitest** ✅ ; `npm run build` OK ✅. Pas de migration (logique TS pure), pas de `test:rls`.
+
+## §328 — Table rase : régénérer un plan purge toute la semaine en cours de l'ancien (2026-05-27)
+
+**Contexte (retour terrain François, admin).** En régénérant un plan, la semaine en cours affichait un **mélange ancien/nouveau** : le lundi pré-départ de l'ANCIEN plan (mésocycle superseded, template fantôme) survivait à côté des jours mar/jeu/ven du nouveau. Cause : §308 préservait délibérément les jours **pré-départ** (« déjà entraînés ») — pertinent pour un athlète en milieu de cycle, mais déroutant pour le **workflow coach** (régénérations fréquentes pendant la mise en place). Décision coach : **table rase** (« oui table rase »).
+
+**Solution — purge de toute la fenêtre du plan :**
+- `apply_strength_mesocycle` (mig **00212**, appliquée MCP) : le `DELETE` des `strength_planning_slot_overrides` perd sa garde `AND (week_start + day_of_week) >= v_effective_start` → on purge **toute** la fenêtre (`week_start BETWEEN start_monday AND window_end`). Le `DELETE` des `week_overrides` purgeait déjà toute la fenêtre (inchangé). Le **snapshot** (pris AVANT le DELETE) reste intact → **revert** restaure l'état d'avant. Les jours pré-départ ne sont pas ré-écrits (le moteur les saute, `< v_effective_start`) → ils deviennent simplement vides, cohérent avec un plan qui démarre à sa date. Autorisation et matérialisation inchangées (recrée la fonction §326 sans-notification + ce seul changement).
+- `supabase/tests/schema.sql` — même changement répliqué dans la RPC du harness RLS hand-crafted.
+- Nettoyage one-off en base : suppression du créneau lundi résiduel de François (template fantôme du plan précédent).
+
+**Tests / vérifs :** test `strength-mesocycle-rpc.test.ts:535` réécrit — « départ mid-week : **table rase** de la semaine, seuls les jours ≥ départ restent » (M1 départ jeudi → `daysOf == [3]`, le lundi M0 purgé) ; le test §308 « clean replace, pas d'orphelin » (start lundi) reste vert (la garde ne changeait rien pour un départ lundi). `npm run test:rls` : **`strength-mesocycle-rpc` 17/17** ✅, 237 passés (2 suites pace en échec **pré-existant** : `coach_pace_zones` + `pace_share_links`, schema drift, non liées). `npx tsc --noEmit` 0 ✅.

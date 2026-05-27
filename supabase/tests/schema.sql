@@ -1568,14 +1568,14 @@ BEGIN
     COALESCE((SELECT jsonb_agg(to_jsonb(w.*)) FROM strength_planning_week_overrides w
        WHERE w.athlete_id = p_athlete_id AND w.week_start BETWEEN p_start_week_monday AND v_window_end), '[]'::jsonb)
   );
-  -- §308 — remplacement propre : purge les slots/weeks de l'athlète À PARTIR de la
-  -- date de départ effective (jours pré-départ déjà entraînés préservés), avant de
-  -- matérialiser. Le snapshot ci-dessus a déjà capturé l'état pour le revert. Sans
-  -- ce nettoyage, re-générer avec un autre jeu de jours laisse des séances orphelines.
+  -- §328 — table rase : purge TOUTE la fenêtre du plan (semaine en cours comprise),
+  -- pas seulement à partir de la date de départ → un jour pré-départ d'un ANCIEN
+  -- plan ne survit plus dans la semaine de départ. Le snapshot ci-dessus a capturé
+  -- l'état pour le revert. Les jours pré-départ ne sont pas ré-écrits (sautés par
+  -- le moteur) → simplement vides, cohérent avec un plan qui démarre à sa date.
   DELETE FROM strength_planning_slot_overrides
    WHERE athlete_id = p_athlete_id
-     AND week_start BETWEEN p_start_week_monday AND v_window_end
-     AND (week_start + day_of_week) >= v_effective_start;
+     AND week_start BETWEEN p_start_week_monday AND v_window_end;
   DELETE FROM strength_planning_week_overrides
    WHERE athlete_id = p_athlete_id
      AND week_start BETWEEN p_start_week_monday AND v_window_end;
