@@ -19073,3 +19073,18 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Effet attendu (à la prochaine régénération).** Séances de construction `force_max` ~77 → ~60 min ; semaines pic/affûtage ~37 → ~31 min ; amorces inchangées (26-27 min). ⚠️ Les plans **déjà matérialisés** (séances générées avant le patch) conservent les anciennes valeurs — il faut **régénérer** pour en bénéficier (via l'UI nageur ; apply RPC par MCP bloqué = usurpation JWT).
 
 **Tests / vérifs (TDD) :** `mesocycleEngine.test.ts` — nouveau test §332 (catalogue à repos 330 s : cycles dérivés bornés ≤ bande config ; contrôle inverse `force_max` garde 330 s) RED→GREEN. `npx tsc --noEmit` 0 ✅ ; `npm test` **node:test 1401/1401 + vitest 24/24** ✅ ; `npm run build` OK ✅. Migration data pure (pas de policy/DDL) → pas de `test:rls`.
+
+## §333 — Mode coach secondaire : plus de détail sur l'état de forme des nageurs (2026-05-27)
+
+**Contexte (demande François).** En **mode coach secondaire** (`CoachSwimmerQuickView` — fiche dépannage d'un nageur qui n'est pas dans ses prises en charge), la section « Forme (7 derniers jours) » se résumait au seul composant `SwimmerFormBadge`, qui n'affichait qu'un readiness agrégé. Demande : enrichir le détail de l'état de forme.
+
+**Bug découvert au passage (échelle readiness).** `SwimmerFormBadge` traitait `readiness_score` comme une note **/10** (seuils 7/5/0, fallback `?? 5`, sparkline `score/10`, libellé `/10`) alors que le score est stocké et utilisé **0-100 partout ailleurs** : `ReadinessGauge` (0-100), `WellnessBanner` (`{score}%`), bandes `WellnessTrend` (70/40), `useMonthlyReport`, `Progress`, `CoachSwimmersOverview`. Conséquences visibles : libellé toujours « Bonne » (tout score ≥ 7), texte « Bonne — 70.0/10 », et barres sparkline surdimensionnées (`4 + score/10*20` → ~150 px) et toujours vertes. Donc le seul indicateur de forme du mode coach secondaire était de fait cassé.
+
+**Changements (`src/components/coach/swimmer-kpis/SwimmerFormBadge.tsx`) :**
+- **Échelle corrigée** : `readinessConfig(s)` aligné sur le reste de l'app (`> 70` Bonne / `40-70` Moyenne / `< 40` Basse, mêmes couleurs) ; moyenne et « aujourd'hui » affichés en **`%`** ; sparkline remise à l'échelle 0-100 (`4 + score/100*24`) ; fallback `?? computeReadinessScore(c)` (cohérent avec `WellnessTrend`) au lieu de `?? 5`.
+- **Ajout détail (demande)** : grille des **5 sous-métriques** moyennées sur les relevés des 7 j (`Sommeil`/`Fatigue`/`Courbatures`/`Humeur`/`Stress`, échelle 1-5, libellés & icônes alignés sur `WellnessForm`), colorées « bon ↔ mauvais » via `metricTone` (normalisation `positive ? avg : 6-avg` → vert ≥4 / ambre ≥3 / rouge). `avgMetric` ne compte que les valeurs ≥ 1 (0 = champ non rempli côté form).
+- **Heures de sommeil moyennes** (`X.X h`) dans le pied + **dernière note bien-être** non vide (relevé le plus récent), `line-clamp-3`.
+
+**Portée.** `SwimmerFormBadge` est un composant générique `{ userId }` **importé uniquement par `CoachSwimmerQuickView`** (grep) → l'enrichissement ne touche que le mode coach secondaire, conformément à la demande. Aucune autre vue impactée.
+
+**Tests / vérifs.** `npx tsc --noEmit` 0 ✅ ; `npm test` **node:test 1401/1401 + vitest 24/24** ✅ ; `npm run build` OK ✅. Patch purement UI + lecture (`getWellnessRange` déjà existant, table sous RLS inchangée) → pas de migration, pas de `test:rls`. Le test existant `SwimmerFormBadge.test.tsx` (smoke import/props) reste vert.

@@ -116,7 +116,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/QuickViewCommentDialog.tsx` | Dialog ajout commentaire séance par substituant (max 500 car.) (§152) | 78 lignes |
 | `src/pages/coach/QuickViewAssignDrawer.tsx` | Sheet assignation séance : onglet Bibliothèque (search + liste) + Nouvelle (ad-hoc) (§152) | 176 lignes |
 | `src/lib/api/coach-quickview.ts` | Module API QuickView : getSwimmerBriefing (RPC), recordAttendanceAsSub, addSessionCommentAsSub, assignSessionToSlotAsSub (§152) | 143 lignes |
-| `src/components/coach/swimmer-kpis/SwimmerFormBadge.tsx` | Badge couleur readiness_score (vert/ambre/rouge) + heure du relevé (§152) | 51 lignes |
+| `src/components/coach/swimmer-kpis/SwimmerFormBadge.tsx` | Badge forme nageur (mode coach secondaire) : readiness moy. 7j 0-100 + sparkline + détail 5 sous-métriques (sommeil/fatigue/courbatures/humeur/stress) + heures sommeil + dernière note (§152, enrichi §333) | 178 lignes |
 | `src/components/coach/swimmer-kpis/PainIndicator.tsx` | Indicateur douleur : dot couleur selon reports_7d (§152) | 36 lignes |
 | `src/components/coach/swimmer-kpis/LoadMini.tsx` | KPI charge : grille km 7j/28j / séances / RPE moyen (§152) | 34 lignes |
 | `src/components/coach/swimmer-kpis/ObjectiveChips.tsx` | Chips objectifs (event_code + temps) max 4 (§152) | 37 lignes |
