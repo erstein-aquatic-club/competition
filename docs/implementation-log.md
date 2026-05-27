@@ -19041,3 +19041,19 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs :** `src/lib/__tests__/lazyWithRetry.vitest.tsx` (2 tests) — (1) 1ᵉʳ échec → caches purgés + reload appelé + flag posé ; (2) 2ᵉ échec consécutif → pas de reload (flag consommé), erreur relancée. `npx tsc --noEmit` 0 ✅ ; vitest **24/24** ✅ ; `npm run build` OK ✅. Pas de migration, pas de `test:rls`.
 
 **Honnêteté / suite :** correctif basé sur l'**hypothèse la plus probable** (cache PWA périmé sur route lazy) — non confirmé par le message d'erreur exact (PWA, console non capturée). Si, **sur une version fraîche vérifiée**, le crash persiste, ce serait un bug de rendu spécifique → besoin du texte d'erreur console pour le cibler.
+
+## §331 — Durée estimée d'une séance muscu affichée dans le preview (2026-05-27)
+
+**Contexte (demande François).** Aucun calcul de durée n'existait pour les séances de muscu (la natation a une `estimated_duration` saisie par le coach ; la muscu n'avait rien — ni colonne DB, ni calcul, ni affichage). Demande : compter **1 min par série** + les durées de **récupération**, et afficher la durée calculée dans le preview (muscu > Mon plan > clic sur une séance).
+
+**Modèle de calcul (validé par l'utilisateur, AskUserQuestion) :**
+- Par exercice : `sets × (60s exec + repos)` — **1 repos par série** (le repos après la dernière série couvre la transition vers l'exo suivant ; lecture littérale de la consigne, légèrement majorante).
+- **Tous les items comptent** (échauffement/mobilité inclus = temps réellement passé).
+- `repos` = `rest_seconds` de l'item = **repos entre séries** (`rest_series_s` en DB ; `rest_exercise_s` quasi toujours `null` dans les séances générées, donc non disponible côté preview).
+- Garde-fous : `sets` ≤ 0 / non fini → l'exo compte 0 ; `rest_seconds` négatif / non fini → traité comme 0.
+
+**Changements :**
+- **Nouveau** `src/lib/strength/sessionDuration.ts` (fonction pure) : `estimateStrengthSessionDurationSeconds(items)` (Σ secondes), `formatApproxMinutes(seconds)` (« ~X min », arrondi minute, plancher 1 min), constante `EXEC_SECONDS_PER_SET = 60`.
+- `src/components/strength/SessionDetailPreview.tsx` : `useMemo` de la durée + **badge dédié** (choix utilisateur « plus visible ») `⏱ ~X min` sous la ligne cycle/exercices, rendu **uniquement si durée > 0**. Réutilise la pastille du design system (`rounded-full px-2 py-0.5 text-[11px]`, teinte `primary`). Visible aux **deux** sites de rendu du composant (bibliothèque catalogue + Mon plan) gratuitement.
+
+**Tests / vérifs (TDD) :** nouveau `src/lib/strength/__tests__/sessionDuration.test.ts` (9 tests : nominal N-repos, somme multi-exos, repos absent, séance vide, sets nul/négatif/NaN, repos invalide, items warmup inclus, format arrondi + plancher 1 min) RED→GREEN. `npx tsc --noEmit` 0 ✅ ; `npm test` **node:test fail 0 + vitest 24/24** ✅ ; `npm run build` OK ✅. Pas de migration, pas de RLS → pas de `test:rls`.

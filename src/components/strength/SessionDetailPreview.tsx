@@ -13,13 +13,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { ChevronLeft, ChevronDown, Play, RefreshCw, Plus } from "lucide-react";
+import { ChevronLeft, ChevronDown, Play, RefreshCw, Plus, Timer } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { fadeIn, staggerChildren, listItem } from "@/lib/animations";
 import { BottomActionBar, SaveState } from "@/components/shared/BottomActionBar";
 import { ExercisePicker } from "@/components/strength/ExercisePicker";
+import { estimateStrengthSessionDurationSeconds, formatApproxMinutes } from "@/lib/strength/sessionDuration";
 import { cn } from "@/lib/utils";
 import type { OneRmEntry } from "@/lib/types";
 
@@ -83,6 +84,12 @@ export function SessionDetailPreview({
   }, [exercises]);
 
   const items = session.items ?? [];
+
+  // §331 — durée estimée de la séance : Σ sets × (1min exec + repos), tous items inclus.
+  const durationSeconds = useMemo(
+    () => estimateStrengthSessionDurationSeconds(items),
+    [items],
+  );
 
   // Preload GIFs immediately on mount so downloads start before animations play.
   // Fixes Safari iOS lazy-load suppression inside opacity:0 Framer Motion elements.
@@ -150,6 +157,15 @@ export function SessionDetailPreview({
               </>
             )}
           </div>
+          {/* §331 — Durée estimée de la séance (badge dédié) */}
+          {durationSeconds > 0 && (
+            <div className="mt-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                <Timer className="h-3 w-3" />
+                {formatApproxMinutes(durationSeconds)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

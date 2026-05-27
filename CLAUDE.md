@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§330** — **Auto-réparation du cache PWA** : `lazyWithRetry` purge les caches du service worker AVANT de recharger sur échec de chargement de chunk (`import()` dynamique d'une route/composant lazy) → fin des crashes post-déploiement quand le PWA sert d'anciens noms de chunks hashés (avant : reload sans purge → re-sert le precache cassé → crash). Régression vitest (2 tests). `tsc` 0, vitest 24, build 0. *(§329 exo jambes PAP à l'amorce mig 00213 ; §328 table rase à la régénération mig 00212 ; §327 focus#1 décroche un bloc dév = tirage poulie papillon.)*
+Dernier § livré : **§331** — **Durée estimée d'une séance muscu** : helper pur `estimateStrengthSessionDurationSeconds` (`src/lib/strength/sessionDuration.ts`) = Σ `sets × (60s exec + repos)` (1 repos/série, tous items inclus) + badge `⏱ ~X min` dans `SessionDetailPreview` (header, si > 0). 9 tests node:test. `tsc` 0, node:test fail 0, vitest 24, build 0. *(§330 auto-réparation cache PWA ; §329 exo jambes PAP à l'amorce mig 00213 ; §328 table rase à la régénération mig 00212.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
