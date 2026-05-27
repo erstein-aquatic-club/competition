@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§329** — **Exo jambes PAP à l'amorce** : sur une nage upper-dominante, l'amorce gagne un exo jambes en plus, alterné par `buildWeek` — `lower_power` (box jump) le 1ᵉʳ jour d'amorce, `lower_strength` (trap bar) le 2ᵉ — ajouté par `buildPapSession`, **dédupliqué** (brasse & co inchangées). Mig **00213** : `selection_priority` du trap bar squat → 100 (staple `lower_strength`). TDD ; `npm test` 1391+22, tsc 0. *(§328 table rase à la régénération mig 00212 ; §327 focus#1 décroche un bloc dév = tirage poulie papillon ; §326 fix crash #310 + suppression notifs broadcast.)*
+Dernier § livré : **§330** — **Auto-réparation du cache PWA** : `lazyWithRetry` purge les caches du service worker AVANT de recharger sur échec de chargement de chunk (`import()` dynamique d'une route/composant lazy) → fin des crashes post-déploiement quand le PWA sert d'anciens noms de chunks hashés (avant : reload sans purge → re-sert le precache cassé → crash). Régression vitest (2 tests). `tsc` 0, vitest 24, build 0. *(§329 exo jambes PAP à l'amorce mig 00213 ; §328 table rase à la régénération mig 00212 ; §327 focus#1 décroche un bloc dév = tirage poulie papillon.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
