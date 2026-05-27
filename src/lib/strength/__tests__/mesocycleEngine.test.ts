@@ -1426,6 +1426,43 @@ describe('generateMesocycle', () => {
     );
   });
 
+  // ── §329 — composante jambes PAP à l'amorce (box jump lun / trap bar jeu) ────
+  it("§329 — l'amorce d'une nage haut-dominante porte un exo jambes PAP, alterné (lun lower_power / jeu lower_strength)", () => {
+    // Terrain François (papillon 50, upper-dominant) : l'amorce était 100% haut
+    // du corps → ni box jump ni trap bar. On ajoute un exo jambes PAP, alterné
+    // explosif (lower_power = box jump) le 1ᵉʳ jour d'amorce / lourd (lower_strength
+    // = trap bar) le 2ᵉ.
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 4;
+    input.weekdays = [0, 1, 3, 4]; // Lun, Mar, Jeu, Ven
+    input.primerWeekdays = [0, 3]; // Lun + Jeu = amorces
+
+    const meso = generateMesocycle(input);
+    const amorces = meso.weeks[0].sessions.filter((s) => s.role === 'amorce_pap');
+    const monday = amorces.find((s) => s.weekday === 0);
+    const thursday = amorces.find((s) => s.weekday === 3);
+    assert.ok(monday, 'amorce lundi attendue');
+    assert.ok(thursday, 'amorce jeudi attendue');
+    // 1ᵉʳ jour d'amorce → explosif jambes (lower_power = box jump).
+    assert.ok(
+      monday!.buckets.includes('lower_power'),
+      "l'amorce du lundi doit inclure lower_power (box jump)",
+    );
+    // 2ᵉ jour d'amorce → force jambes (lower_strength = trap bar).
+    assert.ok(
+      thursday!.buckets.includes('lower_strength'),
+      "l'amorce du jeudi doit inclure lower_strength (trap bar squat)",
+    );
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {

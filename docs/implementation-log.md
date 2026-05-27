@@ -19018,3 +19018,15 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 - Nettoyage one-off en base : suppression du créneau lundi résiduel de François (template fantôme du plan précédent).
 
 **Tests / vérifs :** test `strength-mesocycle-rpc.test.ts:535` réécrit — « départ mid-week : **table rase** de la semaine, seuls les jours ≥ départ restent » (M1 départ jeudi → `daysOf == [3]`, le lundi M0 purgé) ; le test §308 « clean replace, pas d'orphelin » (start lundi) reste vert (la garde ne changeait rien pour un départ lundi). `npm run test:rls` : **`strength-mesocycle-rpc` 17/17** ✅, 237 passés (2 suites pace en échec **pré-existant** : `coach_pace_zones` + `pace_share_links`, schema drift, non liées). `npx tsc --noEmit` 0 ✅.
+
+## §329 — L'amorce porte un exo jambes PAP (box jump lundi / trap bar squat jeudi) (2026-05-27)
+
+**Contexte (retour terrain François, papillon 50).** Le plan d'une nage **upper-dominante** (papillon/crawl/dos) a une amorce PAP 100 % haut-du-corps (potentiateur tractions + explosif médecine-ball) → **ni box jump ni trap bar squat** dans tout le plan. Le coach veut ces deux staples jambes aux jours d'amorce (lun/jeu), **en plus** de l'activation SNC — un set de travail réel sur jour de décharge légère étant assumé. Idéal : lundi box jump (explosif), jeudi trap bar (lourd).
+
+**Solution — composante jambes PAP alternée :**
+- `src/lib/strength/mesocycleEngine.ts` — `buildWeek` calcule le **rang d'amorce** de la semaine (jours d'amorce via `classifyRole`) et passe un `papLegBucket` alterné : `lower_power` (explosif, box jump) le 1ᵉʳ jour d'amorce, `lower_strength` (lourd, trap bar) le 2ᵉ. `buildPapSession` ajoute cet exo jambes (PAP_EXPLOSIVE pour lower_power, PAP_POTENTIATOR pour lower_strength), **dédupliqué** : si le seau jambes est déjà couvert (nage jambes-dominante comme la brasse, ou `lower_power` déjà posé en explosif par §325) → **aucun ajout** (pas de doublon). Donc la brasse & co restent inchangées ; seules les nages upper-dominantes gagnent le bloc jambes. `JourAwareContext.papLegBucket` threadé.
+- Migration **00213** (appliquée MCP) : `selection_priority` du **trap bar squat** (id 7) → **100** (pair de Box Jump = staple `lower_power`) pour qu'il soit LE squat retenu par `firstCore` à l'amorce (et en dév). Coach-pilotable via l'UI §320.
+
+**Effet (papillon 50, primers Lun/Jeu) :** amorce lundi = tractions + médecine-ball + **box jump** ; amorce jeudi = tractions + médecine-ball + **trap bar squat**. Le plan retrouve ses staples jambes sans toucher aux nages jambes-dominantes.
+
+**Tests / vérifs :** TDD `mesocycleEngine.test.ts` (+1 §329 : nage upper-dominante 4 séances primers {0,3} → amorce lundi inclut `lower_power`, jeudi `lower_strength`) RED→GREEN ; suite moteur 72/72 (régressions §324/§325/§327 OK) ; `npx tsc --noEmit` 0 ✅ ; `npm test` **1391/1391 node:test + 22/22 vitest** ✅ ; `npm run build` OK ✅. Migration = data `selection_priority` (pas de policy/RLS) → pas de `test:rls`.

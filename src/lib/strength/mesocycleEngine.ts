@@ -870,8 +870,24 @@ function buildWeek(
       .map((a) => a.bucket);
     slots = ensureFocusDevelopmentSession(slots, weekdays, primerWeekdays, focusBuckets);
   }
-  const sessions: MesocycleSession[] = slots.map((slot, idx) =>
-    buildSession(idx + 1, weekdays[idx], slot.primary, slot.complement, pw.cycle, selected, {
+  // §329 — composante jambes PAP à l'amorce, ALTERNÉE entre jours d'amorce :
+  // explosif (`lower_power`, box jump) le 1ᵉʳ jour d'amorce, lourd
+  // (`lower_strength`, trap bar) le 2ᵉ, etc. On calcule le rang d'amorce par
+  // semaine (les jours d'amorce sont déterminés par `classifyRole`, comme dans
+  // `buildSession`). `buildPapSession` dédupliquera (nage déjà jambes-dominante).
+  let amorceRank = 0;
+  const sessions: MesocycleSession[] = slots.map((slot, idx) => {
+    const weekday = weekdays[idx];
+    const isMobOverride =
+      slot.primary === 'mobility' || (jourAware && flags.mobilityOverrideActive);
+    const isAmorce =
+      classifyRole(weekday, primerWeekdays, isMobOverride, jourAware) === 'amorce_pap';
+    const papLegBucket: StrengthBucket | null = isAmorce
+      ? amorceRank++ % 2 === 0
+        ? 'lower_power'
+        : 'lower_strength'
+      : null;
+    return buildSession(idx + 1, weekday, slot.primary, slot.complement, pw.cycle, selected, {
       primerWeekdays,
       jourAware,
       forceBiasRequired: flags.forceBiasRequired,
@@ -879,8 +895,9 @@ function buildWeek(
       bucketPriorityOrder: flags.bucketPriorityOrder,
       coreEmphasis: flags.coreEmphasis,
       papPreferLegPower: flags.papPreferLegPower,
-    }),
-  );
+      papLegBucket,
+    });
+  });
   return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
 }
 
@@ -1073,6 +1090,14 @@ interface JourAwareContext {
    * haute, pour garantir un minimum de jambes.
    */
   papPreferLegPower: boolean;
+  /**
+   * §329 — seau jambes à ajouter en exo PAP supplémentaire à l'amorce (retour
+   * terrain François, plan papillon upper-dominant : ni box jump ni trap bar).
+   * Alterné par `buildWeek` entre jours d'amorce : `lower_power` (explosif, box
+   * jump) le 1ᵉʳ, `lower_strength` (lourd, trap bar) le 2ᵉ. `null` hors amorce.
+   * Dédupliqué dans `buildPapSession` (nage déjà jambes-dominante → pas d'ajout).
+   */
+  papLegBucket: StrengthBucket | null;
 }
 
 /**
@@ -1111,7 +1136,7 @@ function buildSession(
 
   // §307 — Amorce PAP : chargement dédié, ignore primary/complement classiques.
   if (role === 'amorce_pap') {
-    return buildPapSession(sessionNumber, weekday, selected, mobilityPool, ctx.bucketPriorityOrder, ctx.papPreferLegPower);
+    return buildPapSession(sessionNumber, weekday, selected, mobilityPool, ctx.bucketPriorityOrder, ctx.papPreferLegPower, ctx.papLegBucket);
   }
 
   let exercises: MesocycleExercise[];
@@ -1230,6 +1255,7 @@ function buildPapSession(
   mobilityPool: SelectedExercise[],
   bucketPriorityOrder: StrengthBucket[],
   papPreferLegPower: boolean,
+  papLegBucket: StrengthBucket | null = null,
 ): MesocycleSession {
   const exercises: MesocycleExercise[] = [];
   const buckets: StrengthBucket[] = [];
@@ -1282,6 +1308,39 @@ function buildPapSession(
         }),
       );
       buckets.push(powerBucket);
+    }
+  }
+
+  // §329 — exo jambes PAP supplémentaire (retour terrain François, papillon
+  // upper-dominant : l'amorce n'avait ni box jump ni trap bar). Alterné par
+  // `buildWeek` : `lower_power` (explosif, box jump) le 1ᵉʳ jour d'amorce,
+  // `lower_strength` (lourd, trap bar) le 2ᵉ. Dédupliqué : si ce seau jambes est
+  // déjà couvert (potentiateur/explosif d'une nage jambes-dominante, ou
+  // `lower_power` déjà posé par §325), on n'ajoute rien (pas de doublon). Set de
+  // travail réel assumé sur un jour de décharge (validation coach).
+  if (
+    papLegBucket &&
+    !buckets.includes(papLegBucket) &&
+    (selected[papLegBucket]?.length ?? 0) > 0
+  ) {
+    const sel = firstCore(selected[papLegBucket] ?? []);
+    if (sel) {
+      const isPower = papLegBucket === 'lower_power';
+      const params = isPower ? PAP_EXPLOSIVE : PAP_POTENTIATOR;
+      exercises.push(
+        buildPapExercise(sel, {
+          sets: params.sets,
+          reps: params.reps,
+          intensityPct1rm: isPower
+            ? (sel.exercise.pourcentageCharge1rmForce ?? 0)
+            : sel.exercise.pourcentageCharge1rmForce,
+          restSeconds: params.restSeconds,
+          intention: isPower
+            ? 'Explosif jambes — amorce du départ/coulée.'
+            : 'Force jambes lourde-courte — potentiateur sprint.',
+        }),
+      );
+      buckets.push(papLegBucket);
     }
   }
 

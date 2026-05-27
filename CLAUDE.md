@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§328** — **Table rase à la régénération** : `apply_strength_mesocycle` (mig **00212**) purge désormais TOUTE la semaine en cours de l'ancien plan (le `DELETE` des slot_overrides perd la garde `>= date de départ` du §308) → plus de jour pré-départ fantôme de l'ancien plan dans la semaine de départ ; snapshot/revert intacts. Schema RLS répliqué, test §308 mid-week réécrit (table rase), `test:rls` strength-mesocycle-rpc 17/17. *(§327 focus#1 décroche un bloc dév = tirage poulie papillon ; §326 fix crash #310 confirmation planif + suppression notifs broadcast ; §325 amorce PAP event-aware.)*
+Dernier § livré : **§329** — **Exo jambes PAP à l'amorce** : sur une nage upper-dominante, l'amorce gagne un exo jambes en plus, alterné par `buildWeek` — `lower_power` (box jump) le 1ᵉʳ jour d'amorce, `lower_strength` (trap bar) le 2ᵉ — ajouté par `buildPapSession`, **dédupliqué** (brasse & co inchangées). Mig **00213** : `selection_priority` du trap bar squat → 100 (staple `lower_strength`). TDD ; `npm test` 1391+22, tsc 0. *(§328 table rase à la régénération mig 00212 ; §327 focus#1 décroche un bloc dév = tirage poulie papillon ; §326 fix crash #310 + suppression notifs broadcast.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
