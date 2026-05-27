@@ -75,7 +75,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§331** — **Durée estimée d'une séance muscu** : helper pur `estimateStrengthSessionDurationSeconds` (`src/lib/strength/sessionDuration.ts`) = Σ `sets × (60s exec + repos)` (1 repos/série, tous items inclus) + badge `⏱ ~X min` dans `SessionDetailPreview` (header, si > 0). 9 tests node:test. `tsc` 0, node:test fail 0, vitest 24, build 0. *(§330 auto-réparation cache PWA ; §329 exo jambes PAP à l'amorce mig 00213 ; §328 table rase à la régénération mig 00212.)*
+Dernier § livré : **§332** — **Cohérence de durée des séances muscu** : le repos des cycles dérivés (`puissance`/`maintien`/`affutage`/`pic`) est désormais borné dans la bande `periodizationCycles.ts` (`clampToRange` dans `toMesocycleExercise` Règle 3 — fin du 330 s catalogue propagé jusqu'en semaine de pic) ; `force_max` & amorce PAP non touchés. Mig **00214** allège 3 staples : tractions #13 & trap bar #7 `recup_series_force` 330→210 s, médecine-ball #53 6→4 séries. Effet à la **prochaine régénération** (séances de construction ~77→60 min) — plans déjà matérialisés inchangés. `tsc` 0, node:test 1401, vitest 24, build 0. *(§331 badge durée estimée ; §330 auto-réparation cache PWA ; §329 exo jambes PAP à l'amorce mig 00213.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

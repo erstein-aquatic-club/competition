@@ -1385,6 +1385,11 @@ function midRange(range: readonly [number, number]): number {
   return Math.round((range[0] + range[1]) / 2);
 }
 
+/** Borne une valeur dans une fourchette `[min, max]` (clamp). §332. */
+function clampToRange(value: number, range: readonly [number, number]): number {
+  return Math.min(range[1], Math.max(range[0], value));
+}
+
 /**
  * Charge un exercice avec les paramètres adaptés au contexte (§297).
  *
@@ -1455,7 +1460,16 @@ function toMesocycleExercise(
     const baseSets = ex.nbSeriesForce ?? 4;
     const baseReps = ex.nbRepsForce ?? 5;
     const baseIntensity = ex.pourcentageCharge1rmForce;
-    const baseRest = ex.recupSeriesForce ?? 180;
+    // §332 — le repos catalogue (`recupSeriesForce`) peut excéder la bande validée
+    // du cycle (ex. tractions lestées 330 s sur une semaine de pic/affûtage =
+    // incohérent avec « nerveux, volume minimal »). On le borne dans la fourchette
+    // `restSeconds` de la config (periodizationCycles.ts, validée coach) ; la
+    // modulation séries/reps/intensité reste dérivée du catalogue. `force_max`
+    // (stratégie `catalogue`, Règle 2) n'est PAS concerné — il lit le repos brut.
+    const baseRest = clampToRange(
+      ex.recupSeriesForce ?? 180,
+      cycleConfig.loading.scheme.restSeconds,
+    );
 
     if (cycle === 'puissance') {
       sets = baseSets;

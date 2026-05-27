@@ -19057,3 +19057,19 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 - `src/components/strength/SessionDetailPreview.tsx` : `useMemo` de la durée + **badge dédié** (choix utilisateur « plus visible ») `⏱ ~X min` sous la ligne cycle/exercices, rendu **uniquement si durée > 0**. Réutilise la pastille du design system (`rounded-full px-2 py-0.5 text-[11px]`, teinte `primary`). Visible aux **deux** sites de rendu du composant (bibliothèque catalogue + Mon plan) gratuitement.
 
 **Tests / vérifs (TDD) :** nouveau `src/lib/strength/__tests__/sessionDuration.test.ts` (9 tests : nominal N-repos, somme multi-exos, repos absent, séance vide, sets nul/négatif/NaN, repos invalide, items warmup inclus, format arrondi + plancher 1 min) RED→GREEN. `npx tsc --noEmit` 0 ✅ ; `npm test` **node:test fail 0 + vitest 24/24** ✅ ; `npm run build` OK ✅. Pas de migration, pas de RLS → pas de `test:rls`.
+
+## §332 — Cohérence de durée des séances : repos des cycles dérivés borné + 2 staples allégés (2026-05-27)
+
+**Contexte (vérification François, plan actif `butterfly_50` 5 sem.).** Audit de cohérence de durée (suite §331) sur le plan réel : amorces PAP très régulières (26-27 min) mais **séances de développement à 77-81 min** en semaines de construction. Deux causes :
+1. **Bug latent moteur** — `toMesocycleExercise` Règle 3 (cycles dérivés `puissance`/`maintien`/`affutage`/`pic`) ne lisait **que** `scheme.intention` de `periodizationCycles.ts` ; `scheme.sets/reps/intensityPct1rm/restSeconds` jamais lus (`midRange` = code mort). Le repos catalogue `recupSeriesForce` (330 s sur les tractions) était propagé tel quel **même en semaine de pic/affûtage**, alors que la config validée coach prescrit 120-180 s → 13 min de repos sur les tractions d'une semaine censée être « nerveuse, volume minimal ».
+2. **Valeurs catalogue** — tractions lestées (#13) & trap bar (#7) repos force 330 s (haut extrême) ; lancer médecine-ball (#53) 6 séries de force pour un exo explosif.
+
+**Décisions (AskUserQuestion).** (1) Fix moteur = **repos seulement, clamp dans la bande config** (séries/reps/intensité inchangés, courbe de périodisation préservée). (2) Trap bar #7 aligné comme les tractions.
+
+**Changements :**
+- `src/lib/strength/mesocycleEngine.ts` : nouveau helper pur `clampToRange(value, [min,max])` ; en Règle 3, `baseRest` = `clampToRange(recupSeriesForce ?? 180, cycleConfig.loading.scheme.restSeconds)`. **`force_max` (Règle 2 `catalogue`) non concerné** — lit toujours le repos catalogue brut (le bloc force garde ses repos longs légitimes). L'**amorce PAP** est immunisée (repos 180/150 s codés en dur).
+- Migration **00214** (data `dim_exercices`, appliquée MCP, prod vérifiée) : #13 & #7 `recup_series_force` 330 → **210 s** (zone force max 3-5 min, -10 min/séance de construction) ; #53 `nb_series_force` 6 → **4** (volume explosif standard).
+
+**Effet attendu (à la prochaine régénération).** Séances de construction `force_max` ~77 → ~60 min ; semaines pic/affûtage ~37 → ~31 min ; amorces inchangées (26-27 min). ⚠️ Les plans **déjà matérialisés** (séances générées avant le patch) conservent les anciennes valeurs — il faut **régénérer** pour en bénéficier (via l'UI nageur ; apply RPC par MCP bloqué = usurpation JWT).
+
+**Tests / vérifs (TDD) :** `mesocycleEngine.test.ts` — nouveau test §332 (catalogue à repos 330 s : cycles dérivés bornés ≤ bande config ; contrôle inverse `force_max` garde 330 s) RED→GREEN. `npx tsc --noEmit` 0 ✅ ; `npm test` **node:test 1401/1401 + vitest 24/24** ✅ ; `npm run build` OK ✅. Migration data pure (pas de policy/DDL) → pas de `test:rls`.

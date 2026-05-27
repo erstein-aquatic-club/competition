@@ -1034,6 +1034,7 @@ describe('periodize', () => {
 
 import { generateMesocycle } from '../mesocycleEngine.ts';
 import type { GeneratedMesocycle } from '../mesocycleEngine.types.ts';
+import { PERIODIZATION_CYCLES } from '../periodizationCycles.ts';
 
 function richCatalog(): CatalogExercise[] {
   const out: CatalogExercise[] = [];
@@ -1204,6 +1205,54 @@ describe('generateMesocycle', () => {
       assert.ok(ex.reps >= 1, `${ex.nomExercice} reps=${ex.reps}`);
       assert.ok(ex.restSeconds >= 30, `${ex.nomExercice} rest=${ex.restSeconds}`);
     }
+  });
+
+  // ── §332 — repos des cycles dérivés borné dans la bande config ────────────
+  it('§332 — cycles dérivés : repos catalogue trop long borné dans la bande du cycle', () => {
+    const input = fullInput();
+    // Catalogue avec un repos de force très long (330 s, comme les tractions
+    // lestées en prod) — hors de la bande des cycles dérivés (≤ 180 s).
+    input.exerciseCatalog = input.exerciseCatalog.map((e) => ({
+      ...e,
+      recupSeriesForce: 330,
+    }));
+
+    const meso = generateMesocycle(input);
+
+    // Cycles génériques (puissance/pic ici) : le moteur doit borner le repos
+    // catalogue dans la fourchette restSeconds validée (periodizationCycles.ts),
+    // pas le propager tel quel (330 s sur une semaine de pic = incohérent).
+    let checkedDerived = 0;
+    for (const week of meso.weeks) {
+      const cfg = PERIODIZATION_CYCLES[week.cycle];
+      if (cfg.loading.kind !== 'generique') continue;
+      const max = cfg.loading.scheme.restSeconds[1];
+      for (const session of week.sessions) {
+        if (session.role !== 'developpement') continue; // amorce = repos codé en dur
+        for (const ex of session.exercises) {
+          if (ex.bucket === 'mobility' || ex.bucket === 'core') continue; // warmup/core = endurance
+          checkedDerived++;
+          assert.ok(
+            ex.restSeconds <= max,
+            `S${week.weekNumber} ${week.cycle} ${ex.nomExercice}: rest=${ex.restSeconds} > bande ${max}`,
+          );
+        }
+      }
+    }
+    assert.ok(checkedDerived > 0, 'au moins un exercice de cycle dérivé vérifié');
+
+    // Contrôle inverse — force_max (stratégie catalogue) garde le repos catalogue
+    // brut (330 s), non borné : seuls les cycles génériques sont clampés.
+    const forceMaxWorked = meso.weeks
+      .filter((w) => w.cycle === 'force_max')
+      .flatMap((w) => w.sessions)
+      .filter((s) => s.role === 'developpement')
+      .flatMap((s) => s.exercises)
+      .filter((e) => e.bucket !== 'mobility' && e.bucket !== 'core');
+    assert.ok(
+      forceMaxWorked.some((e) => e.restSeconds === 330),
+      'force_max doit conserver le repos catalogue (330 s), non borné',
+    );
   });
 
   it('mobility présente dans chaque session (échauffement systématique)', () => {
