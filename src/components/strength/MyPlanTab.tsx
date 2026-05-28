@@ -71,7 +71,10 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // ── Récap muscu « Wrapped » (§ recap) ───────────────────────────────────────
   // Hooks appelés inconditionnellement, AVANT tout early-return (mémoire §316/§326
   // — un hook sous un return conditionnel = React #310).
-  const wrapped = useStrengthWrapped(athleteId);
+  // { active: false } → visibilité du bouton seulement (signaux pas chers
+  // hasMeso/kpiCount) ; l'overlay, monté à l'ouverture, refait le hook en actif
+  // (défaut) → la requête history/exercises lourde ne part qu'à l'ouverture, 1×.
+  const wrapped = useStrengthWrapped(athleteId, { active: false });
   const [recapOpen, setRecapOpen] = useState(false);
 
   // Stable week starts for the next 12 weeks
@@ -435,14 +438,16 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     </div>
   ) : null;
 
-  const recapOverlay = (
+  // Monté SEULEMENT à l'ouverture → l'overlay refait useStrengthWrapped en actif
+  // (fetch lourd) une seule fois, à la demande, pas pour chaque rendu de la liste.
+  const recapOverlay = recapOpen ? (
     <StrengthWrappedRecap
       athleteId={athleteId}
-      open={recapOpen}
+      open
       onClose={() => setRecapOpen(false)}
       viewerContext="self"
     />
-  );
+  ) : null;
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
   if (foldersLoading) {

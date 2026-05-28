@@ -101,4 +101,45 @@ describe('useStrengthWrapped', () => {
     // cover + outro uniquement quand tout est vide.
     expect(result.current.slides.map((s) => s.kind)).toEqual(['cover', 'outro']);
   });
+
+  it('{ active: false } : enabled via méso (signal pas cher) mais pas de fetch lourd → aucune slide volume', async () => {
+    mocks.getProfile.mockResolvedValue({
+      id: 3, display_name: 'Léger', birthdate: '2000-01-01', sex: 'M',
+    } as any);
+    mocks.getActiveMesocycle.mockResolvedValue({
+      event_group: 'sprint', target_week_count: 8, sessions_per_week: 3,
+      bucket_priorities: null,
+    } as any);
+    mocks.getLatestKpiMeasurements.mockResolvedValue({} as any);
+    // history/exercises NE doivent PAS être appelés quand active=false.
+    mocks.getExercises.mockResolvedValue([
+      { id: 1, nom_exercice: 'Tractions lestées' },
+    ] as any);
+    mocks.getStrengthHistory.mockResolvedValue({
+      runs: [
+        { id: 'r1', started_at: '2026-05-20T10:00:00Z', strength_set_logs: [
+          { exercise_id: 1, reps: 5, weight: 20, set_number: 1, completed_at: null },
+        ] },
+      ],
+    } as any);
+
+    const { result } = renderHook(
+      () => useStrengthWrapped(3, { active: false }),
+      { wrapper: wrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // enabled = vrai via le méso (signal pas cher), même sans le fetch lourd.
+    expect(result.current.enabled).toBe(true);
+    // Les requêtes lourdes sont gated → jamais appelées.
+    expect(mocks.getStrengthHistory).not.toHaveBeenCalled();
+    expect(mocks.getExercises).not.toHaveBeenCalled();
+    // Donc aucune slide dérivée de l'historique (volume/progressions/funstat).
+    const kinds = result.current.slides.map((s) => s.kind);
+    expect(kinds).toContain('objective');
+    expect(kinds).not.toContain('volume');
+    expect(kinds).not.toContain('progressions');
+    expect(kinds).not.toContain('funstat');
+  });
 });

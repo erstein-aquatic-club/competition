@@ -58,7 +58,15 @@ export interface UseStrengthWrappedResult {
   data: WrappedData;
 }
 
-export function useStrengthWrapped(athleteId: number | null): UseStrengthWrappedResult {
+export function useStrengthWrapped(
+  athleteId: number | null,
+  opts?: { active?: boolean },
+): UseStrengthWrappedResult {
+  // `active` = false → ne déclenche PAS les requêtes lourdes (history limit:200 +
+  // exercises). Les hôtes appellent avec { active: false } juste pour la visibilité
+  // du bouton (basée sur les signaux pas chers hasMeso/kpiCount) ; l'overlay, monté
+  // seulement à l'ouverture, utilise le défaut active=true → fetch complet une fois.
+  const active = opts?.active ?? true;
   const { data: profile, isLoading: lp } = useQuery({
     queryKey: ['profile', athleteId],
     queryFn: () => getProfile({ userId: athleteId! }),
@@ -87,13 +95,13 @@ export function useStrengthWrapped(athleteId: number | null): UseStrengthWrapped
     queryFn: () => getStrengthHistory(athleteName, {
       athleteId: athleteId!, status: 'completed', from: fromISO, limit: 200, order: 'desc',
     }),
-    enabled: athleteId != null,
+    enabled: athleteId != null && active,
     staleTime: STALE_MS,
   });
   const { data: exercises, isLoading: le } = useQuery({
     queryKey: ['exercises'],
     queryFn: () => getExercises(),
-    enabled: athleteId != null,
+    enabled: athleteId != null && active,
     staleTime: STALE_MS,
   });
 

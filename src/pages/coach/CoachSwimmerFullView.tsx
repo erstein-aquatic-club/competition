@@ -240,7 +240,10 @@ export default function CoachSwimmerFullView({
   // ── Récap muscu « Wrapped » (§ recap) ───────────────────────────────────────
   // Hooks appelés inconditionnellement, AVANT le early-return `if (!athleteId)`
   // (mémoire §316/§326 — sinon React #310). Le hook tolère athleteId null.
-  const wrapped = useStrengthWrapped(athleteId);
+  // { active: false } → visibilité du bouton seulement : ÉVITE la requête history
+  // (limit:200) pour CHAQUE nageur que le coach ouvre. L'overlay, monté à
+  // l'ouverture, refait le hook en actif → fetch lourd une seule fois, à la demande.
+  const wrapped = useStrengthWrapped(athleteId, { active: false });
   const [recapOpen, setRecapOpen] = useState(false);
 
   if (!athleteId) {
@@ -599,10 +602,10 @@ export default function CoachSwimmerFullView({
                       athleteId={athleteId}
                       athleteName={displayName}
                     />
-                    {athleteId != null && (
+                    {recapOpen && athleteId != null && (
                       <StrengthWrappedRecap
                         athleteId={athleteId}
-                        open={recapOpen}
+                        open
                         onClose={() => setRecapOpen(false)}
                         viewerContext="coach"
                         displayName={(profile?.display_name ?? '').split(' ')[0] || undefined}
