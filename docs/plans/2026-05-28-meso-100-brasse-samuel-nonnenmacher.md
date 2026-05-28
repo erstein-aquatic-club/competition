@@ -114,12 +114,23 @@ Profil `100 season` (nominal 10 sem) étiré à 12 par round-robin (+1 prépa g�
 
 ### 3.1 Répartition hebdo (4 séances)
 
-| Jour | Type | Contenu |
+> **Répartition spécifique Samuel (patch terrain).** Comme il **n'a pas besoin de garder les lundi/jeudi
+> légers** (pas de contrainte de fraîcheur bassin), on abandonne le format « 2 amorces + 2 dév » au profit de
+> **4 vraies séances réparties** (2 Force / 2 Puissance) — meilleur étalement de la charge, box jump ramené de
+> 4×/sem à 2×, force jambes ET tractions travaillées 2×/sem. *(Plan généré par défaut = amorces ; ceci est une
+> personnalisation en base pour lui. Une régénération depuis l'app reviendrait au format amorces.)*
+
+| Jour | Type | Contenu (charges de la phase) |
 |---|---|---|
-| **Lundi** | Amorce PAP | potentiateur lourd-court jambes + explosif, puis bassin frais |
-| **Mardi** | Développement A | **Force jambes** (primaire) + Puissance jambes (complément) + core |
-| **Jeudi** | Amorce PAP | potentiateur + explosif (alterné : box jump / trap bar) |
-| **Vendredi** | Développement B + **HAUT garanti** | **Force jambes** + **bloc maintien haut du corps NON négociable** (tractions lestées + lancer/poussée) + core |
+| **Lundi** | **Force** | Trap bar + Squat bulgare + **Tractions lestées** + Ab Wheel (+ Face Pull) |
+| **Mardi** | **Puissance** | Box Jump + Trap Bar Jump + Ab Wheel (+ Face Pull) |
+| **Jeudi** | **Force** | Trap bar + Squat bulgare + **Tractions lestées** + Ab Wheel (+ Face Pull) |
+| **Vendredi** | **Puissance** | Box Jump + Trap Bar Jump + Ab Wheel (+ Face Pull) |
+
+> Jours **Force** (Lun/Jeu) espacés ~72 h (récup SNC) ; jours **Puissance** (Mar/Ven) intercalés, CNS plus
+> légère. Force jambes **2×/sem** (son déficit #1 = fréquence), tractions **2×/sem** (entretien du point fort),
+> box jump **2×/sem** (fin de la sur-sollicitation tendineuse), core 4×. La **semaine 1** (tronquée, en cours)
+> reste sur l'ancien format (2 jours seulement).
 
 > Doctrine : espacement SNC 48-72 h, **pas de muscu le samedi**, amorces les jours de gros bassin.
 > Les amorces sont **dimensionnées pour laisser frais** (ne jamais cramer la séance d'eau).
