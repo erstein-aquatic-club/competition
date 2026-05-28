@@ -12,8 +12,11 @@ import {
   getTrainingPlanSessionsForPlans,
 } from "@/lib/api";
 import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib/api/types";
-import { FolderOpen, Trophy } from "lucide-react";
+import { FolderOpen, Trophy, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useStrengthWrapped } from "@/hooks/useStrengthWrapped";
+import { StrengthWrappedRecap } from "@/components/strength/wrapped/StrengthWrappedRecap";
 import { isCurrentWeek, fmtDD_MM, getMonday, getISOWeekNumber } from "@/components/coach/swim/swimPlanningShared";
 import { toISODate } from "@/lib/date";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
@@ -64,6 +67,12 @@ interface MyPlanTabProps {
 function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: MyPlanTabProps) {
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
+
+  // ── Récap muscu « Wrapped » (§ recap) ───────────────────────────────────────
+  // Hooks appelés inconditionnellement, AVANT tout early-return (mémoire §316/§326
+  // — un hook sous un return conditionnel = React #310).
+  const wrapped = useStrengthWrapped(athleteId);
+  const [recapOpen, setRecapOpen] = useState(false);
 
   // Stable week starts for the next 12 weeks
   const weekStarts = useMemo(() => buildWeekStarts(PLAN_WEEK_COUNT), []);
@@ -412,6 +421,29 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // ── Competitions ────────────────────────────────────────────────────────────
   const { competitionsByWeek, getDayCompetitions } = useCompetitionsByWeek(athleteId);
 
+  // ── Récap : bouton discret + overlay (DRY, réutilisés dans les 3 états réels) ──
+  const recapButton = wrapped.enabled ? (
+    <div className="flex justify-end -mt-1 mb-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1.5 text-muted-foreground"
+        onClick={() => setRecapOpen(true)}
+      >
+        <Sparkles className="h-4 w-4" /> Récap
+      </Button>
+    </div>
+  ) : null;
+
+  const recapOverlay = (
+    <StrengthWrappedRecap
+      athleteId={athleteId}
+      open={recapOpen}
+      onClose={() => setRecapOpen(false)}
+      viewerContext="self"
+    />
+  );
+
   // ── Loading skeleton ────────────────────────────────────────────────────────
   if (foldersLoading) {
     return (
@@ -427,25 +459,33 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // No Phase 3 applications AND no Phase 2 slots AND no Phase 1 cycles → show "aucun plan"
   if (!usePhase3 && !usePhase2 && rootFolders.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <FolderOpen className="h-10 w-10 mb-4 text-muted-foreground/30" />
-        <p className="text-sm font-medium text-muted-foreground">Aucun plan personnalisé</p>
-        <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[240px]">
-          Ton coach peut créer un plan d'entraînement depuis le catalogue musculation.
-        </p>
+      <div>
+        {recapButton}
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <FolderOpen className="h-10 w-10 mb-4 text-muted-foreground/30" />
+          <p className="text-sm font-medium text-muted-foreground">Aucun plan personnalisé</p>
+          <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[240px]">
+            Ton coach peut créer un plan d'entraînement depuis le catalogue musculation.
+          </p>
+        </div>
+        {recapOverlay}
       </div>
     );
   }
 
   if (weekInstances.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Les séances de ce plan n'ont pas encore d'exercices configurés.
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Demande à ton coach de compléter ta planification.
-        </p>
+      <div>
+        {recapButton}
+        <div className="rounded-xl border border-dashed p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            Les séances de ce plan n'ont pas encore d'exercices configurés.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Demande à ton coach de compléter ta planification.
+          </p>
+        </div>
+        {recapOverlay}
       </div>
     );
   }
@@ -453,6 +493,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // ── Timeline ────────────────────────────────────────────────────────────────
   return (
     <div className="relative pt-1 pb-4">
+      {recapButton}
       {/* Vertical timeline rail */}
       <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
 
@@ -517,6 +558,8 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
           </SheetContent>
         </Sheet>
       )}
+
+      {recapOverlay}
     </div>
   );
 }
