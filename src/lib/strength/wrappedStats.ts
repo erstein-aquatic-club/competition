@@ -97,3 +97,37 @@ export function computeProgressions(sets: SetEntry[], now: number): ProgressionI
   }
   return items.sort((a, b) => b.deltaPct - a.deltaPct).slice(0, 3);
 }
+
+export interface VolumeStats {
+  totalTonnageKg: number;
+  totalSets: number;
+  totalReps: number;
+  sessions: number;       // séances distinctes (runKey)
+  topExerciseName: string | null;
+}
+
+export function computeVolumeStats(sets: SetEntry[], now: number): VolumeStats {
+  let tonnage = 0, totalSets = 0, totalReps = 0;
+  const runs = new Set<string>();
+  const setsByExo = new Map<number, { name: string; n: number }>();
+  for (const s of sets) {
+    if (now - s.ts > WINDOW_MS) continue;
+    const reps = Number(s.reps ?? 0) || 0;
+    const w = Number.isFinite(s.weight) && (s.weight ?? 0) > 0 ? (s.weight as number) : 0;
+    tonnage += reps * w;
+    totalSets += 1;
+    totalReps += reps;
+    if (s.runKey) runs.add(s.runKey);
+    const e = setsByExo.get(s.exerciseId) ?? { name: s.exerciseName, n: 0 };
+    e.n += 1;
+    setsByExo.set(s.exerciseId, e);
+  }
+  let top: { name: string; n: number } | null = null;
+  for (const e of setsByExo.values()) if (!top || e.n > top.n) top = e;
+  return {
+    totalTonnageKg: Math.round(tonnage),
+    totalSets, totalReps,
+    sessions: runs.size,
+    topExerciseName: top?.name ?? null,
+  };
+}

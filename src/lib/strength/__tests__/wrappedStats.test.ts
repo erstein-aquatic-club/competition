@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreToBand, rankKpis, computeProgressions, type SetEntry } from '../wrappedStats';
+import { scoreToBand, rankKpis, computeProgressions, computeVolumeStats, type SetEntry } from '../wrappedStats';
 import type { StrengthKpiMeasurement } from '@/lib/api/types';
 
 test('scoreToBand: paliers percentiles', () => {
@@ -68,4 +68,21 @@ test('computeProgressions: ignore exos sans base précédente', () => {
     { exerciseId: 9, exerciseName: 'Squat', reps: 1, weight: 100, ts: d(3) },
   ];
   assert.equal(computeProgressions(sets, NOW).length, 0);
+});
+
+test('computeVolumeStats: tonnage/séries/reps + exo le plus pratiqué', () => {
+  const NOW2 = Date.parse('2026-05-28T00:00:00Z');
+  const day = (n: number) => NOW2 - n * 86400_000;
+  const sets = [
+    { exerciseId: 1, exerciseName: 'Tractions', reps: 5, weight: 20, ts: day(1), runKey: 'A' },
+    { exerciseId: 1, exerciseName: 'Tractions', reps: 5, weight: 20, ts: day(1), runKey: 'A' },
+    { exerciseId: 2, exerciseName: 'Squat', reps: 3, weight: 100, ts: day(2), runKey: 'B' },
+    { exerciseId: 9, exerciseName: 'Vieux', reps: 5, weight: 50, ts: day(200), runKey: 'Z' },
+  ];
+  const v = computeVolumeStats(sets as any, NOW2);
+  assert.equal(v.totalTonnageKg, 5*20 + 5*20 + 3*100); // 500, l'ancien exclu
+  assert.equal(v.totalSets, 3);
+  assert.equal(v.totalReps, 13);
+  assert.equal(v.sessions, 2);
+  assert.equal(v.topExerciseName, 'Tractions');
 });
