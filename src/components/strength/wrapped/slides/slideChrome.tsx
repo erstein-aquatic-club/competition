@@ -26,18 +26,6 @@ export const SLIDE_GRADIENTS: Record<WrappedSlideKind, string> = {
   outro: "from-[#04122e] via-[#241456] to-[#6d1b8e]",
 };
 
-/** Accent texte par slide pour les chiffres / mots-clés mis en exergue. */
-export const SLIDE_ACCENTS: Record<WrappedSlideKind, string> = {
-  cover: "text-[#c4b5ff]",
-  objective: "text-[#7df0ff]",
-  forces: "text-[#ffd089]",
-  potential: "text-[#caffb0]",
-  progressions: "text-[#ffd0bc]",
-  volume: "text-[#ffb3ee]",
-  funstat: "text-[#fff0bc]",
-  outro: "text-[#d8c4ff]",
-};
-
 /**
  * Coquille commune d'une slide : dégradé plein écran + texture grain + halo,
  * et un conteneur de contenu centré, en colonne, avec marges sûres (notch / home bar).
