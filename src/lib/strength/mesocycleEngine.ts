@@ -898,7 +898,94 @@ function buildWeek(
       papLegBucket,
     });
   });
-  return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions };
+
+  // §335 — garantie « minimum haut du corps » (symétrique des §324/§325/§329, sens
+  // inverse). Quand les 2 focus monopolisent un même segment (ex. brasse sprint =
+  // jambes via `forced_focus`), l'autre segment (le top seau maintien) ne décroche
+  // ni primaire dév (les dév se pairent focus↔focus) ni amorce (potentiateur = seau
+  // de force le + prioritaire = jambes) → ZÉRO travail sur tout le méso. On l'injecte
+  // alors en complément d'une séance de dév dont le complément est redondant. No-op
+  // si le seau est déjà couvert quelque part (cas focus-haut : les jambes remontent
+  // via les amorces §329 → on ne dénature pas le plan crawl 50 validé).
+  const finalSessions = jourAware
+    ? ensureMaintienRepresentation(sessions, slots, weekdays, pw.cycle, selected, allocations, {
+        primerWeekdays,
+        jourAware,
+        forceBiasRequired: flags.forceBiasRequired,
+        mobilityOverrideActive: flags.mobilityOverrideActive,
+        bucketPriorityOrder: flags.bucketPriorityOrder,
+        coreEmphasis: flags.coreEmphasis,
+        papPreferLegPower: flags.papPreferLegPower,
+        papLegBucket: null,
+      })
+    : sessions;
+
+  return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions: finalSessions };
+}
+
+/**
+ * §335 — Garantit qu'au moins le seau MAINTIEN entraînable le plus prioritaire
+ * (hors mobility) apparaisse dans une séance de DÉVELOPPEMENT quand il est sinon
+ * totalement absent du plan de la semaine.
+ *
+ * Cas visé : `forced_focus` met les 2 focus sur le même segment (brasse sprint =
+ * jambes) → le haut du corps n'a aucun chemin vers une séance (pairing focus↔focus
+ * + complément maintien = top focus + amorces codées jambes). Résultat terrain
+ * (Samuel, 100 brasse) : zéro tractions/poussée sur 15 semaines.
+ *
+ * On remplace le complément d'UNE séance de dév par le top seau maintien — mais
+ * uniquement un complément **redondant** (dont le seau est déjà primaire d'une
+ * autre séance de dév), pour ne priver aucun seau de son unique bloc et préserver
+ * les 2 focus. No-op si le seau est déjà couvert (les amorces §329 couvrent les
+ * jambes pour une nage haut-dominante → plan crawl 50 inchangé) ou si aucun
+ * complément redondant n'existe.
+ */
+function ensureMaintienRepresentation(
+  sessions: MesocycleSession[],
+  slots: SessionSlot[],
+  weekdays: number[],
+  cycle: PeriodizationCycle,
+  selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
+  allocations: BucketAllocation[],
+  ctx: JourAwareContext,
+): MesocycleSession[] {
+  const target = allocations.find(
+    (a) => a.role === 'maintien' && a.bucket !== 'mobility',
+  )?.bucket;
+  if (!target) return sessions;
+  if ((selected[target]?.length ?? 0) === 0) return sessions;
+  // Déjà présent quelque part (primaire/complément dév OU potentiateur/explosif/
+  // jambes d'une amorce) → rien à garantir.
+  if (sessions.some((s) => s.buckets.includes(target))) return sessions;
+
+  // Seaux primaires d'une séance de dév → un complément dont le seau est là-dedans
+  // est « redondant » (le remplacer ne supprime pas son unique occurrence).
+  const devPrimaries = new Set(
+    sessions.filter((s) => s.role === 'developpement').map((s) => s.buckets[0]),
+  );
+  const complementBucketOf = (s: MesocycleSession): StrengthBucket | null =>
+    s.buckets.length > 1 && s.buckets[1] !== 'mobility' && s.buckets[1] !== 'core'
+      ? s.buckets[1]
+      : null;
+
+  const idx = sessions.findIndex((s) => {
+    if (s.role !== 'developpement') return false;
+    const comp = complementBucketOf(s);
+    return comp != null && comp !== s.buckets[0] && devPrimaries.has(comp);
+  });
+  if (idx < 0) return sessions;
+
+  const out = sessions.slice();
+  out[idx] = buildSession(
+    sessions[idx].sessionNumber,
+    weekdays[idx],
+    slots[idx].primary,
+    target,
+    cycle,
+    selected,
+    ctx,
+  );
+  return out;
 }
 
 /** Une séance = un bucket primaire + (optionnellement) un bucket complément. */

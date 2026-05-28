@@ -1512,6 +1512,81 @@ describe('generateMesocycle', () => {
     );
   });
 
+  // ── §335 — minimum haut du corps garanti quand le focus monopolise les jambes ──
+  it("§335 — un seau maintien haut décroche une séance de DÉV quand les 2 focus sont des jambes (brasse 100, 4 séances)", () => {
+    // Terrain Samuel (100 brasse, 4 séances [Lun,Mar,Jeu,Ven] = primers Lun/Jeu).
+    // forced_focus = {force bas, puissance bas} → les 2 focus sont des jambes ; le
+    // haut du corps (maintien) ne décroche ni primaire dév (les 2 dév se pairent
+    // jambes↔jambes) ni amorce (potentiateur = lower_strength) → ZÉRO travail haut
+    // sur tout le méso. Le top seau maintien (upper_strength) doit être injecté en
+    // complément d'une séance de dév (symétrique des §324/§325/§329, sens inverse).
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 1.0,
+      lower_power: 1.0,
+      upper_strength: 0.59,
+      upper_power: 0.45,
+      mobility: 0.56,
+    });
+    input.template.structure.forced_focus = ['lower_strength', 'lower_power'];
+    input.sessionsPerWeek = 4;
+    input.weekdays = [0, 1, 3, 4]; // Lun, Mar, Jeu, Ven
+    input.primerWeekdays = [0, 3]; // Lun + Jeu = amorces
+
+    const meso = generateMesocycle(input);
+
+    const devUpper = meso.weeks
+      .flatMap((w) => w.sessions)
+      .some((s) => s.role === 'developpement' && s.buckets.includes('upper_strength'));
+    assert.ok(
+      devUpper,
+      'au moins une séance de développement doit porter upper_strength (maintien haut garanti)',
+    );
+
+    // Les 2 focus jambes restent développés (on remplace un complément redondant,
+    // jamais un primaire) : lower_strength ET lower_power restent en primaire dév.
+    const devPrimaries = new Set(
+      meso.weeks
+        .flatMap((w) => w.sessions)
+        .filter((s) => s.role === 'developpement')
+        .map((s) => s.buckets[0]),
+    );
+    assert.ok(devPrimaries.has('lower_strength'), 'force bas reste un primaire dév');
+    assert.ok(devPrimaries.has('lower_power'), 'puissance bas reste un primaire dév');
+  });
+
+  it("§335 non-régression — focus haut (crawl 50) : aucun seau JAMBES injecté en dév (déjà couvert par les amorces §329)", () => {
+    // Cas symétrique déjà géré : forced_focus = haut → les jambes (maintien)
+    // remontent via les amorces PAP (§325/§329). La garantie §335 ne doit donc PAS
+    // se déclencher : les séances de DÉV restent 100 % haut du corps (+ core/mobilité),
+    // sinon on dénaturerait le plan crawl 50 validé (McEvoy).
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 4;
+    input.weekdays = [0, 1, 3, 4]; // Lun, Mar, Jeu, Ven
+    input.primerWeekdays = [0, 3]; // Lun + Jeu = amorces
+
+    const meso = generateMesocycle(input);
+
+    const devBuckets = new Set(
+      meso.weeks
+        .flatMap((w) => w.sessions)
+        .filter((s) => s.role === 'developpement')
+        .flatMap((s) => s.buckets),
+    );
+    assert.ok(
+      !devBuckets.has('lower_strength') && !devBuckets.has('lower_power'),
+      `aucun seau jambes ne doit être injecté en dév (obtenu : [${[...devBuckets].join(', ')}])`,
+    );
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {
