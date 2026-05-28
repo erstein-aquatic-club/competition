@@ -19088,3 +19088,21 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Portée.** `SwimmerFormBadge` est un composant générique `{ userId }` **importé uniquement par `CoachSwimmerQuickView`** (grep) → l'enrichissement ne touche que le mode coach secondaire, conformément à la demande. Aucune autre vue impactée.
 
 **Tests / vérifs.** `npx tsc --noEmit` 0 ✅ ; `npm test` **node:test 1401/1401 + vitest 24/24** ✅ ; `npm run build` OK ✅. Patch purement UI + lecture (`getWellnessRange` déjà existant, table sous RLS inchangée) → pas de migration, pas de `test:rls`. Le test existant `SwimmerFormBadge.test.tsx` (smoke import/props) reste vert.
+
+## §334 — Trigger d'inscription persiste enfin le sexe + débloque la génération méso pour Ines (2026-05-28)
+
+**Contexte (terrain François, demande coach « générer 5 sem 50 m crawl à Ines »).** Génération bloquée par l'écran `ProfileIncompleteScreen` (`src/pages/MesocyclePreview.tsx:393` et `:507`) : le moteur exige `profile.sex ∈ {'M','F'}` parce que les barèmes KPI (`kpiBaremes.ts`) sont sexués (anchors p10/p30/p50/p70/p90 par sexe × bande d'âge). `user_profiles.sex` d'Ines = NULL malgré une inscription complète.
+
+**Cause racine.** Le trigger `handle_new_auth_user` (dernière révision mig 00031) ne lisait **pas** la clé `sex` du `raw_user_meta_data` — alors que `Login.tsx:43` la requiert (`z.enum(["M","F"], { required_error: "Sexe requis" })`) et l'envoie bien dans `auth.signUp({ options: { data: { …, sex: data.sex } } })` (`Login.tsx:164`). Conséquence : tout nouveau compte landait avec `sex = NULL`, le formulaire de signup n'avait aucun effet côté DB. 4 coachs encore `NULL` en base (non bloquant — pas de bilan).
+
+**Décisions (AskUserQuestion coach).** (1) Set Ines `sex='F'`, `body_weight=80` (estimation coach, athlète n'a pas donné). (2) Sexe **obligatoire à l'inscription** = corriger le trigger pour qu'il persiste vraiment ce que le formulaire envoie. (3) **`body_weight` jamais affiché côté nageur** — coach-only ; si l'athlète n'est pas à l'aise, le coach estime. Audit du codebase confirme : `body_weight` n'apparaît dans aucun composant athlete-facing (uniquement `src/lib/api/types.ts` + `src/lib/api/users.ts`) → règle déjà respectée structurellement, sauvegardée en mémoire (`body-weight-coach-only.md`) pour ne pas se faire piéger plus tard.
+
+**Changements :**
+- Migration **00215** (`signup_persist_sex`, appliquée MCP, prod vérifiée) : `handle_new_auth_user` extrait `user_sex := CASE WHEN raw_meta ->> 'sex' IN ('M','F') THEN ... ELSE NULL END` et l'insère dans `user_profiles.sex`. **Défensif** sur le domaine `{'M','F'}` — toute valeur hors-domaine retombe sur NULL → l'écran `ProfileIncompleteScreen` se déclenche proprement plutôt que de corrompre silencieusement le lookup de barème.
+- Données : `UPDATE user_profiles SET sex='F', body_weight=80 WHERE user_id=18` (Ines débloquée).
+
+**Bilan KPI Ines (F / 17-18, transmis au coach).** vertical_jump 61.4 W/kg ≫ p90 / broad_jump 185 cm ≫ p90 (+22 cm) / IMTP 160 kg ≫ p90 (+50 kg) / weighted_pullup 0 kg ≈ p30 / medball 16.25 kg·m ≫ p90 (iso-énergie 5 kg, transposed). Profil **force-puissance global d'élite, tirage haut du corps sous-développé vs le reste** — pile le levier d'un 50 m crawl. Stack moteur prévu : `sprint_50/inter_competition` (5-8 sem ✓), stroke=freestyle, focus forcé §323 = `[upper_strength, upper_power]` (tractions lestées staple §319 + tirage explosif), PAP amorce §325/§329, maintien jambes via box jump/trap bar.
+
+**Effet.** Inscription : `sex` persisté à partir du prochain signup (effet trigger immédiat). Ines : génération débloquée, le coach peut lancer le méso depuis l'écran coach (réponse `AskUserQuestion` = « Je passe par l'écran coach »).
+
+**Tests / vérifs.** Migration trigger SQL pure (pas de policy RLS modifiée, pas de table sous RLS touchée) → pas de `test:rls` requis (cf. CLAUDE.md règles). Pas de code TS modifié dans ce § → pas de `npm test` requis non plus. Vérif manuelle : `UPDATE` Ines + `apply_migration` retournent les bons rows.
