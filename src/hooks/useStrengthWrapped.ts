@@ -12,6 +12,9 @@ import {
 } from '@/lib/strength/wrappedStats';
 
 const DAYS_180 = 180;
+/** Aligné sur les écrans co-locataires (MyPlanTab/CoachSwimmerFullView/StrengthCatalog)
+ *  qui partagent ces query keys → évite de marquer leur cache stale au montage. */
+const STALE_MS = 5 * 60 * 1000;
 
 function ageFromBirthdate(birthdate: string | null | undefined): number | null {
   if (!birthdate) return null;
@@ -27,10 +30,10 @@ function ageFromBirthdate(birthdate: string | null | undefined): number | null {
 /** Aplati les runs (Supabase: strength_set_logs / localStorage: logs) en SetEntry[]. */
 function flattenRuns(runs: any[], nameById: Map<number, string>): SetEntry[] {
   const out: SetEntry[] = [];
-  for (const run of runs) {
+  runs.forEach((run, index) => {
     const logs = run.strength_set_logs ?? run.logs ?? [];
     const ts = new Date(run.started_at ?? run.date ?? run.created_at ?? 0).getTime();
-    const runKey = String(run.id ?? run.started_at ?? Math.random());
+    const runKey = String(run.id ?? run.started_at ?? `idx:${index}`);
     for (const log of logs) {
       const exerciseId = Number(log.exercise_id);
       if (!Number.isFinite(exerciseId)) continue;
@@ -43,7 +46,7 @@ function flattenRuns(runs: any[], nameById: Map<number, string>): SetEntry[] {
         runKey,
       });
     }
-  }
+  });
   return out;
 }
 
@@ -60,16 +63,19 @@ export function useStrengthWrapped(athleteId: number | null): UseStrengthWrapped
     queryKey: ['profile', athleteId],
     queryFn: () => getProfile({ userId: athleteId! }),
     enabled: athleteId != null,
+    staleTime: STALE_MS,
   });
   const { data: meso, isLoading: lm } = useQuery({
     queryKey: ['active-mesocycle', athleteId],
     queryFn: () => getActiveMesocycle(athleteId!),
     enabled: athleteId != null,
+    staleTime: STALE_MS,
   });
   const { data: kpis, isLoading: lk } = useQuery({
     queryKey: ['kpi-latest', athleteId],
     queryFn: () => getLatestKpiMeasurements(athleteId!),
     enabled: athleteId != null,
+    staleTime: STALE_MS,
   });
   const athleteName = profile?.display_name ?? '';
   const fromISO = useMemo(() => {
@@ -82,10 +88,13 @@ export function useStrengthWrapped(athleteId: number | null): UseStrengthWrapped
       athleteId: athleteId!, status: 'completed', from: fromISO, limit: 200, order: 'desc',
     }),
     enabled: athleteId != null,
+    staleTime: STALE_MS,
   });
-  const { data: exercises } = useQuery({
+  const { data: exercises, isLoading: le } = useQuery({
     queryKey: ['exercises'],
     queryFn: () => getExercises(),
+    enabled: athleteId != null,
+    staleTime: STALE_MS,
   });
 
   return useMemo(() => {
@@ -111,10 +120,10 @@ export function useStrengthWrapped(athleteId: number | null): UseStrengthWrapped
 
     return {
       enabled,
-      isLoading: lp || lm || lk || lh,
+      isLoading: lp || lm || lk || lh || le,
       athleteName,
       slides: buildWrappedSlides(data),
       data,
     };
-  }, [profile, meso, kpis, history, exercises, athleteName, lp, lm, lk, lh]);
+  }, [profile, meso, kpis, history, exercises, athleteName, lp, lm, lk, lh, le]);
 }
