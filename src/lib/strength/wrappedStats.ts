@@ -1,6 +1,7 @@
 import type { StrengthKpiKey, StrengthKpiMeasurement } from '@/lib/api/types';
 import { KPI_PROTOCOLS } from './kpiProtocols';
 import { getBareme, kpiScore, type AgeBand } from './kpiBaremes';
+import { estimateOneRm } from '@/lib/api/client';
 
 export interface ScoreBand {
   /** Libellé affiché au nageur (jamais de valeur brute). */
@@ -55,4 +56,44 @@ export function rankKpis(
     });
   }
   return out.sort((a, b) => b.score - a.score);
+}
+
+export interface SetEntry {
+  exerciseId: number;
+  exerciseName: string;
+  reps: number | null;
+  weight: number | null;
+  ts: number; // epoch ms de la séance
+  runKey?: string;
+}
+
+export interface ProgressionItem {
+  exerciseId: number;
+  exerciseName: string;
+  deltaPct: number;   // arrondi
+}
+
+const WINDOW_MS = 90 * 86400_000;
+
+export function computeProgressions(sets: SetEntry[], now: number): ProgressionItem[] {
+  // best 1RM estimé par exo, par fenêtre (recent = [now-90j, now], prev = [now-180j, now-90j])
+  const best = new Map<number, { name: string; recent: number; prev: number }>();
+  for (const s of sets) {
+    const est = estimateOneRm(s.weight, s.reps);
+    if (est == null) continue; // bodyweight / invalide
+    const age = now - s.ts;
+    const slot = age <= WINDOW_MS ? 'recent' : age <= 2 * WINDOW_MS ? 'prev' : null;
+    if (!slot) continue;
+    const cur = best.get(s.exerciseId) ?? { name: s.exerciseName, recent: 0, prev: 0 };
+    cur[slot] = Math.max(cur[slot], est);
+    best.set(s.exerciseId, cur);
+  }
+  const items: ProgressionItem[] = [];
+  for (const [exerciseId, b] of best) {
+    if (b.prev <= 0 || b.recent <= 0) continue;
+    const deltaPct = Math.round(((b.recent - b.prev) / b.prev) * 100);
+    if (deltaPct <= 0) continue; // on ne montre que les progressions
+    items.push({ exerciseId, exerciseName: b.name, deltaPct });
+  }
+  return items.sort((a, b) => b.deltaPct - a.deltaPct).slice(0, 3);
 }

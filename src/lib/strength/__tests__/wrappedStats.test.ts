@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreToBand, rankKpis } from '../wrappedStats';
+import { scoreToBand, rankKpis, computeProgressions, type SetEntry } from '../wrappedStats';
 import type { StrengthKpiMeasurement } from '@/lib/api/types';
 
 test('scoreToBand: paliers percentiles', () => {
@@ -42,4 +42,30 @@ test('rankKpis: profil incomplet → vide', () => {
     { sex: null, ageBand: 'adulte' },
   );
   assert.equal(ranked.length, 0);
+});
+
+const NOW = Date.parse('2026-05-28T00:00:00Z');
+const d = (daysAgo: number) => NOW - daysAgo * 86400_000;
+
+test('computeProgressions: Δ% best 1RM 90j vs 90j précédents, top 3', () => {
+  const sets: SetEntry[] = [
+    // Traction : 90j prec best ~ 1RM(100,1)=100 ; recent best ~ 1RM(112,1)=112 → +12%
+    { exerciseId: 1, exerciseName: 'Tractions lestées', reps: 1, weight: 100, ts: d(120) },
+    { exerciseId: 1, exerciseName: 'Tractions lestées', reps: 1, weight: 112, ts: d(10) },
+    // DC : prec 80 → recent 88 = +10%
+    { exerciseId: 2, exerciseName: 'Développé couché', reps: 1, weight: 80, ts: d(100) },
+    { exerciseId: 2, exerciseName: 'Développé couché', reps: 1, weight: 88, ts: d(5) },
+  ];
+  const prog = computeProgressions(sets, NOW);
+  assert.equal(prog[0].exerciseName, 'Tractions lestées');
+  assert.equal(prog[0].deltaPct, 12);
+  assert.equal(prog[1].deltaPct, 10);
+  assert.ok(prog.length <= 3);
+});
+
+test('computeProgressions: ignore exos sans base précédente', () => {
+  const sets: SetEntry[] = [
+    { exerciseId: 9, exerciseName: 'Squat', reps: 1, weight: 100, ts: d(3) },
+  ];
+  assert.equal(computeProgressions(sets, NOW).length, 0);
 });
