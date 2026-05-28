@@ -117,7 +117,9 @@ export function computeVolumeStats(sets: SetEntry[], now: number): VolumeStats {
     tonnage += reps * w;
     totalSets += 1;
     totalReps += reps;
-    if (s.runKey) runs.add(s.runKey);
+    // Fallback : sans runKey, regroupe par jour (sinon `sessions` lirait 0
+    // alors que `totalSets > 0`).
+    runs.add(s.runKey || `day:${Math.floor(s.ts / 86400_000)}`);
     const e = setsByExo.get(s.exerciseId) ?? { name: s.exerciseName, n: 0 };
     e.n += 1;
     setsByExo.set(s.exerciseId, e);
@@ -152,13 +154,31 @@ const BUCKET_FR: Record<string, string> = {
   core: 'Gainage / tronc',
 };
 
-/** Best-effort : tente d'extraire le seau prioritaire du JSONB ; null si forme inconnue. */
+/**
+ * Best-effort : extrait le seau ENTRAÎNABLE le plus prioritaire du JSONB.
+ *
+ * Le `bucket_priorities` stocke l'objet `MesocycleReasoning` du moteur
+ * (`src/lib/strength/mesocycleEngine.types.ts`), dont `bucketPriorities` est un
+ * tableau `{ bucket, score, rank, ... }` (rank 1 = priorité la plus haute) qui
+ * peut contenir des seaux non entraînables ('mobility', psy). On retourne le
+ * libellé du PREMIER seau (par rank croissant) présent dans `BUCKET_FR` ; null
+ * sur toute forme inattendue.
+ */
 function extractFocusLabel(bp: StrengthMesocycle['bucket_priorities']): string | null {
   if (!bp || typeof bp !== 'object') return null;
-  // forme attendue best-effort : { focus?: string[] } ou { priorities?: {bucket,score}[] }
-  const focus = (bp as any).focus;
-  if (Array.isArray(focus) && typeof focus[0] === 'string') {
-    return BUCKET_FR[focus[0]] ?? null;
+  const priorities = (bp as { bucketPriorities?: unknown }).bucketPriorities;
+  if (!Array.isArray(priorities)) return null;
+  const entries = priorities
+    .filter((e): e is { bucket: string; rank?: unknown } =>
+      !!e && typeof e === 'object' && typeof (e as { bucket?: unknown }).bucket === 'string')
+    .sort((a, b) => {
+      const ra = typeof a.rank === 'number' ? a.rank : Number.POSITIVE_INFINITY;
+      const rb = typeof b.rank === 'number' ? b.rank : Number.POSITIVE_INFINITY;
+      return ra - rb;
+    });
+  for (const e of entries) {
+    const label = BUCKET_FR[e.bucket];
+    if (label) return label;
   }
   return null;
 }

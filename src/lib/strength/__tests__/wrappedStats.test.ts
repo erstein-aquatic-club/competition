@@ -122,3 +122,47 @@ test('buildWrappedSlides: ordre complet quand tout présent', () => {
   assert.deepEqual(slides.map(s => s.kind),
     ['cover', 'objective', 'forces', 'potential', 'progressions', 'volume', 'funstat', 'outro']);
 });
+
+test('describeObjective: focus = top trainable bucket (mobility sautée)', () => {
+  const o = describeObjective({
+    event_group: 'sprint', target_week_count: 8, sessions_per_week: 3,
+    bucket_priorities: {
+      bucketScores: {},
+      bucketPriorities: [
+        { bucket: 'mobility', rank: 1, score: 0, rationale: '', overrideApplied: true },
+        { bucket: 'upper_power', rank: 2, score: 50, rationale: '', overrideApplied: false },
+      ],
+    },
+  } as any);
+  assert.equal(o.focusLabel, 'Puissance du haut du corps');
+});
+
+test('describeObjective: focus = bucket de rank 1 si entraînable', () => {
+  const o = describeObjective({
+    event_group: 'sprint', target_week_count: 8, sessions_per_week: 3,
+    bucket_priorities: {
+      bucketPriorities: [{ bucket: 'upper_strength', rank: 1, score: 10, rationale: '', overrideApplied: false }],
+    },
+  } as any);
+  assert.equal(o.focusLabel, 'Force du haut du corps');
+});
+
+test('describeObjective: bucket_priorities null ou forme inconnue → focusLabel null', () => {
+  assert.equal(describeObjective({ event_group: 'sprint', target_week_count: 8, sessions_per_week: 3, bucket_priorities: null } as any).focusLabel, null);
+  assert.equal(describeObjective({ event_group: 'sprint', target_week_count: 8, sessions_per_week: 3, bucket_priorities: { garbage: true } } as any).focusLabel, null);
+});
+
+test('computeVolumeStats: fallback session par jour quand runKey absent', () => {
+  const NOW3 = Date.parse('2026-05-28T00:00:00Z');
+  const day = (n: number) => NOW3 - n * 86400_000;
+  const sameDay = [
+    { exerciseId: 1, exerciseName: 'A', reps: 5, weight: 20, ts: day(1) },
+    { exerciseId: 2, exerciseName: 'B', reps: 5, weight: 20, ts: day(1) },
+  ];
+  assert.equal(computeVolumeStats(sameDay as any, NOW3).sessions, 1);
+  const diffDays = [
+    { exerciseId: 1, exerciseName: 'A', reps: 5, weight: 20, ts: day(1) },
+    { exerciseId: 2, exerciseName: 'B', reps: 5, weight: 20, ts: day(2) },
+  ];
+  assert.equal(computeVolumeStats(diffDays as any, NOW3).sessions, 2);
+});
