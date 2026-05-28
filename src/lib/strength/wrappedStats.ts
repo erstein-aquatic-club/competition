@@ -1,4 +1,4 @@
-import type { StrengthKpiKey, StrengthKpiMeasurement } from '@/lib/api/types';
+import type { StrengthKpiKey, StrengthKpiMeasurement, StrengthMesocycle } from '@/lib/api/types';
 import { KPI_PROTOCOLS } from './kpiProtocols';
 import { getBareme, kpiScore, type AgeBand } from './kpiBaremes';
 import { estimateOneRm } from '@/lib/api/client';
@@ -130,4 +130,76 @@ export function computeVolumeStats(sets: SetEntry[], now: number): VolumeStats {
     sessions: runs.size,
     topExerciseName: top?.name ?? null,
   };
+}
+
+export interface ObjectiveInfo {
+  title: string;
+  focusLabel: string | null;
+  weeks: number;
+  sessionsPerWeek: number;
+}
+
+const EVENT_GROUP_LABELS: Record<string, string> = {
+  sprint: 'Préparation sprint',
+  fond: 'Préparation demi-fond / fond',
+};
+
+const BUCKET_FR: Record<string, string> = {
+  upper_strength: 'Force du haut du corps',
+  upper_power: 'Puissance du haut du corps',
+  lower_strength: 'Force du bas du corps',
+  lower_power: 'Puissance du bas du corps',
+  core: 'Gainage / tronc',
+};
+
+/** Best-effort : tente d'extraire le seau prioritaire du JSONB ; null si forme inconnue. */
+function extractFocusLabel(bp: StrengthMesocycle['bucket_priorities']): string | null {
+  if (!bp || typeof bp !== 'object') return null;
+  // forme attendue best-effort : { focus?: string[] } ou { priorities?: {bucket,score}[] }
+  const focus = (bp as any).focus;
+  if (Array.isArray(focus) && typeof focus[0] === 'string') {
+    return BUCKET_FR[focus[0]] ?? null;
+  }
+  return null;
+}
+
+export function describeObjective(meso: StrengthMesocycle): ObjectiveInfo {
+  return {
+    title: EVENT_GROUP_LABELS[meso.event_group] ?? `Plan ${meso.event_group}`,
+    focusLabel: extractFocusLabel(meso.bucket_priorities), // best-effort, peut être null
+    weeks: meso.target_week_count,
+    sessionsPerWeek: meso.sessions_per_week,
+  };
+}
+
+export function hasEnoughWrappedData(d: {
+  hasMeso: boolean; kpiCount: number; completedRuns: number;
+}): boolean {
+  return d.hasMeso || d.kpiCount >= 1 || d.completedRuns >= 3;
+}
+
+export type WrappedSlideKind =
+  | 'cover' | 'objective' | 'forces' | 'potential'
+  | 'progressions' | 'volume' | 'funstat' | 'outro';
+
+export interface WrappedSlide { kind: WrappedSlideKind }
+
+export interface WrappedData {
+  objective: ObjectiveInfo | null;
+  forces: RankedKpi[];
+  potentialAxis: RankedKpi | null;
+  progressions: ProgressionItem[];
+  volume: VolumeStats | null;
+}
+
+export function buildWrappedSlides(data: WrappedData): WrappedSlide[] {
+  const slides: WrappedSlide[] = [{ kind: 'cover' }];
+  if (data.objective) slides.push({ kind: 'objective' });
+  if (data.forces.length > 0) slides.push({ kind: 'forces' });
+  if (data.potentialAxis) slides.push({ kind: 'potential' });
+  if (data.progressions.length > 0) slides.push({ kind: 'progressions' });
+  if (data.volume && data.volume.totalSets > 0) slides.push({ kind: 'volume' });
+  if (data.volume && data.volume.topExerciseName) slides.push({ kind: 'funstat' });
+  slides.push({ kind: 'outro' });
+  return slides;
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreToBand, rankKpis, computeProgressions, computeVolumeStats, type SetEntry } from '../wrappedStats';
+import { scoreToBand, rankKpis, computeProgressions, computeVolumeStats, describeObjective, hasEnoughWrappedData, buildWrappedSlides, type SetEntry } from '../wrappedStats';
 import type { StrengthKpiMeasurement } from '@/lib/api/types';
 
 test('scoreToBand: paliers percentiles', () => {
@@ -85,4 +85,40 @@ test('computeVolumeStats: tonnage/séries/reps + exo le plus pratiqué', () => {
   assert.equal(v.totalReps, 13);
   assert.equal(v.sessions, 2);
   assert.equal(v.topExerciseName, 'Tractions');
+});
+
+test('describeObjective: libellé lisible', () => {
+  const o = describeObjective({ event_group: 'sprint', target_week_count: 8, sessions_per_week: 3 } as any);
+  assert.ok(o.title.length > 0);
+  assert.equal(o.weeks, 8);
+  assert.equal(o.sessionsPerWeek, 3);
+});
+
+test('hasEnoughWrappedData: vrai si au moins une source', () => {
+  assert.equal(hasEnoughWrappedData({ hasMeso: false, kpiCount: 0, completedRuns: 0 }), false);
+  assert.equal(hasEnoughWrappedData({ hasMeso: true, kpiCount: 0, completedRuns: 0 }), true);
+  assert.equal(hasEnoughWrappedData({ hasMeso: false, kpiCount: 1, completedRuns: 0 }), true);
+  assert.equal(hasEnoughWrappedData({ hasMeso: false, kpiCount: 0, completedRuns: 3 }), true);
+  assert.equal(hasEnoughWrappedData({ hasMeso: false, kpiCount: 0, completedRuns: 2 }), false);
+});
+
+test('buildWrappedSlides: saute les sections vides, garde cover+outro', () => {
+  const slides = buildWrappedSlides({
+    objective: null, forces: [], potentialAxis: null,
+    progressions: [], volume: null,
+  });
+  // cover + outro toujours présents
+  assert.deepEqual(slides.map(s => s.kind), ['cover', 'outro']);
+});
+
+test('buildWrappedSlides: ordre complet quand tout présent', () => {
+  const slides = buildWrappedSlides({
+    objective: { title: 'Sprint', focusLabel: null, weeks: 8, sessionsPerWeek: 3 },
+    forces: [{ key: 'imtp', label: 'X', bucket: 'B', score: 80, band: scoreToBand(80) }],
+    potentialAxis: { key: 'weighted_pullup', label: 'Y', bucket: 'B', score: 20, band: scoreToBand(20) },
+    progressions: [{ exerciseId: 1, exerciseName: 'Tractions', deltaPct: 12 }],
+    volume: { totalTonnageKg: 700, totalSets: 40, totalReps: 200, sessions: 12, topExerciseName: 'Tractions' },
+  });
+  assert.deepEqual(slides.map(s => s.kind),
+    ['cover', 'objective', 'forces', 'potential', 'progressions', 'volume', 'funstat', 'outro']);
 });
