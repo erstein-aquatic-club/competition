@@ -50,3 +50,22 @@ test('phaseAtWeek: week beyond nominal length → null', () => {
 test('phaseAtWeek: negative weekIndex → null', () => {
   assert.equal(phaseAtWeek(T8, -1), null);
 });
+
+test('phaseAtWeek: empty phases → null', () => {
+  const empty = { ...T8, structure: { phases: [], bucket_emphasis: {} } };
+  assert.equal(phaseAtWeek(empty, 0), null);
+});
+
+test('phaseAtWeek: zero-week phase is skipped', () => {
+  const tpl = {
+    ...T8,
+    structure: {
+      phases: [
+        { cycle: 'maintien' as const, min_weeks: 0, nominal_weeks: 0, max_weeks: 1 },
+        { cycle: 'puissance' as const, min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      ],
+      bucket_emphasis: {},
+    },
+  };
+  assert.equal(phaseAtWeek(tpl, 0), 'puissance');
+});
