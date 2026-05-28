@@ -60,16 +60,19 @@ export function StrengthWrappedRecap({
   const resolvedName = displayName?.trim() || athleteName;
 
   // Référentiels pour gérer hold / tap / swipe sans re-render.
-  const pointerDownAt = useRef(0);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didHold = useRef(false);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // Reset à chaque ouverture.
+  // Reset à chaque ouverture + focus initial sur la croix (a11y : le focus entre
+  // dans le dialog plutôt que de rester sur la page derrière). Pas de focus-trap
+  // complet en v1.
   useEffect(() => {
     if (open) {
       setIndex(0);
       setPaused(false);
+      closeButtonRef.current?.focus();
     }
   }, [open]);
 
@@ -124,7 +127,6 @@ export function StrengthWrappedRecap({
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    pointerDownAt.current = Date.now();
     pointerStart.current = { x: e.clientX, y: e.clientY };
     didHold.current = false;
     clearHold();
@@ -138,17 +140,20 @@ export function StrengthWrappedRecap({
     clearHold();
     const start = pointerStart.current;
     pointerStart.current = null;
+    const wasHold = didHold.current;
+    didHold.current = false;
 
-    // Reprise après une pause par appui maintenu : pas de navigation.
-    if (didHold.current) {
-      setPaused(false);
-      didHold.current = false;
+    // Swipe vers le bas → fermeture. Évalué EN PREMIER : un appui qui s'attarde
+    // (>HOLD_PAUSE_MS) PUIS glisse vers le bas doit fermer, pas être avalé par la
+    // branche "reprise de pause".
+    if (start && e.clientY - start.y > SWIPE_DOWN_PX) {
+      onClose();
       return;
     }
 
-    // Swipe vers le bas → fermeture.
-    if (start && e.clientY - start.y > SWIPE_DOWN_PX) {
-      onClose();
+    // Reprise après une pause par appui maintenu sans glissement : pas de navigation.
+    if (wasHold) {
+      setPaused(false);
       return;
     }
 
@@ -194,7 +199,10 @@ export function StrengthWrappedRecap({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       >
+        {/* `key={index}` : chaque navigation remonte la slide → rejoue le count-up
+            (effet de montage) et les entrées framer-motion (Volume/Progressions). */}
         <SlideRenderer
+          key={index}
           slide={current}
           viewerContext={viewerContext}
           displayName={resolvedName}
@@ -234,6 +242,7 @@ export function StrengthWrappedRecap({
 
       {/* Croix de fermeture. */}
       <button
+        ref={closeButtonRef}
         type="button"
         onClick={onClose}
         aria-label="Fermer le récap"

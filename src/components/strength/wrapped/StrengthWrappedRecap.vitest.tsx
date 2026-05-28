@@ -53,13 +53,32 @@ beforeEach(() => {
   })) as unknown as typeof window.matchMedia;
 });
 
+function zone(): HTMLElement {
+  const z = document.querySelector(".touch-none") as HTMLElement;
+  expect(z).toBeTruthy();
+  Object.defineProperty(z, "clientWidth", { value: 400, configurable: true });
+  return z;
+}
+
 function tapRight() {
-  // La zone interactive plein écran : on tape à droite (clientX > moitié largeur).
-  const zone = document.querySelector(".touch-none") as HTMLElement;
-  expect(zone).toBeTruthy();
-  Object.defineProperty(zone, "clientWidth", { value: 400, configurable: true });
-  fireEvent.pointerDown(zone, { clientX: 350, clientY: 300 });
-  fireEvent.pointerUp(zone, { clientX: 350, clientY: 300 });
+  // Tape à droite (clientX > moitié largeur).
+  const z = zone();
+  fireEvent.pointerDown(z, { clientX: 350, clientY: 300 });
+  fireEvent.pointerUp(z, { clientX: 350, clientY: 300 });
+}
+
+function tapLeft() {
+  // Tape à gauche (clientX < moitié largeur).
+  const z = zone();
+  fireEvent.pointerDown(z, { clientX: 50, clientY: 300 });
+  fireEvent.pointerUp(z, { clientX: 50, clientY: 300 });
+}
+
+function swipeDown() {
+  // Glissement vers le bas (> SWIPE_DOWN_PX).
+  const z = zone();
+  fireEvent.pointerDown(z, { clientX: 200, clientY: 100 });
+  fireEvent.pointerUp(z, { clientX: 200, clientY: 400 });
 }
 
 describe("StrengthWrappedRecap — moteur de stories", () => {
@@ -99,6 +118,28 @@ describe("StrengthWrappedRecap — moteur de stories", () => {
     tapRight(); // → 3 (dernière)
     expect(onClose).not.toHaveBeenCalled();
     tapRight(); // dépasse → onClose
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("navigue avant → arrière → avant jusqu'à une slide count-up (remount key=index)", () => {
+    render(
+      <StrengthWrappedRecap athleteId={1} open onClose={() => {}} viewerContext="self" />,
+    );
+    tapRight(); // → 1 objective
+    tapRight(); // → 2 volume (count-up)
+    expect(screen.getByText("kg au total")).toBeTruthy();
+    tapLeft(); // → 1 objective
+    expect(screen.getByText("Préparation sprint")).toBeTruthy();
+    tapRight(); // → 2 volume à nouveau (doit re-rendre via key={index})
+    expect(screen.getByText("kg au total")).toBeTruthy();
+  });
+
+  it("un swipe vers le bas appelle onClose (même après un appui qui s'attarde)", () => {
+    const onClose = vi.fn();
+    render(
+      <StrengthWrappedRecap athleteId={1} open onClose={onClose} viewerContext="self" />,
+    );
+    swipeDown();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
