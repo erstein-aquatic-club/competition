@@ -45,8 +45,16 @@ export function rankKpis(
   for (const key of KPI_KEYS) {
     const m = latest[key];
     if (!m) continue;
+    // Garde défensive : `getBareme` est typé non-null mais peut renvoyer
+    // `undefined` au runtime pour une combinaison non couverte (sexe inattendu,
+    // KPI ajouté à KPI_KEYS sans barème, etc.). On saute le KPI plutôt que de
+    // crasher tout le render (ce hook tourne à chaque render de la fiche nageur).
     const bareme = getBareme(key, athlete.sex, athlete.ageBand);
-    const score = kpiScore(bareme.anchors, m.value);
+    const anchors = bareme?.anchors;
+    if (!anchors || anchors.length < 2) continue;
+    const value = m.value;
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const score = kpiScore(anchors, value);
     out.push({
       key,
       label: KPI_PROTOCOLS[key].label,
