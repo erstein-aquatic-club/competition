@@ -17,7 +17,7 @@ import { nextBilanStep } from "@/lib/strength/bilanProgress";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Activity, ArrowLeft, ArrowRight, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, Dumbbell, FileText, Heart, MessageSquare, Target, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, BarChart3, Bell, CalendarClock, CalendarRange, ChevronRight, Clock, Dumbbell, FileText, Heart, MessageSquare, Sparkles, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import CoachBreadcrumb from "@/components/shared/CoachBreadcrumb";
@@ -34,6 +34,9 @@ import { useSwimAnalytics } from "@/hooks/useSwimAnalytics";
 import AttendancePerformanceChart from "@/components/coach/AttendancePerformanceChart";
 import PainHistoryMap from "@/components/coach/PainHistoryMap";
 import CoachMesocyclePanel from "@/components/coach/CoachMesocyclePanel";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { useStrengthWrapped } from "@/hooks/useStrengthWrapped";
+import { StrengthWrappedRecap } from "@/components/strength/wrapped/StrengthWrappedRecap";
 /* ── Helpers ─────────────────────────────────────────────── */
 
 function formatRelative(dateStr: string): string {
@@ -234,6 +237,15 @@ export default function CoachSwimmerFullView({
     ],
     [displayName],
   );
+
+  // ── Récap muscu « Wrapped » (§ recap) ───────────────────────────────────────
+  // Hooks appelés inconditionnellement, AVANT le early-return `if (!athleteId)`
+  // (mémoire §316/§326 — sinon React #310). Le hook tolère athleteId null.
+  // { active: false } → visibilité du bouton seulement : ÉVITE la requête history
+  // (limit:200) pour CHAQUE nageur que le coach ouvre. L'overlay, monté à
+  // l'ouverture, refait le hook en actif → fetch lourd une seule fois, à la demande.
+  const wrapped = useStrengthWrapped(athleteId, { active: false });
+  const [recapOpen, setRecapOpen] = useState(false);
 
   if (!athleteId) {
     return (
@@ -553,6 +565,19 @@ export default function CoachSwimmerFullView({
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-3">
+                    {/* Récap muscu « Wrapped » — bouton discret, visible si données suffisantes */}
+                    {wrapped.enabled && (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-muted-foreground"
+                          onClick={() => setRecapOpen(true)}
+                        >
+                          <Sparkles className="h-4 w-4" /> Récap
+                        </Button>
+                      </div>
+                    )}
                     {/* §A — resume-aware bilan CTA */}
                     <button
                       type="button"
@@ -574,10 +599,27 @@ export default function CoachSwimmerFullView({
                       </span>
                       <ArrowRight className="h-4 w-4 shrink-0" />
                     </button>
-                    <CoachMesocyclePanel
-                      athleteId={athleteId}
-                      athleteName={displayName}
-                    />
+                    <ErrorBoundary
+                      variant="inline"
+                      context="CoachMesocyclePanel"
+                      resetKeys={[athleteId]}
+                      title="Mésocycle indisponible"
+                      description="L'affichage du mésocycle a rencontré un problème. Le reste de la fiche reste utilisable."
+                    >
+                      <CoachMesocyclePanel
+                        athleteId={athleteId}
+                        athleteName={displayName}
+                      />
+                    </ErrorBoundary>
+                    {recapOpen && athleteId != null && (
+                      <StrengthWrappedRecap
+                        athleteId={athleteId}
+                        open
+                        onClose={() => setRecapOpen(false)}
+                        viewerContext="coach"
+                        displayName={(profile?.display_name ?? '').split(' ')[0] || undefined}
+                      />
+                    )}
                   </CollapsibleContent>
                 </Collapsible>
               )}
