@@ -2,6 +2,7 @@
 // sous-arbre (onglet Planning / panneau mésocycle) sans écran-blanchir tout le
 // shell, et `resetKeys` récupère automatiquement quand on change de nageur.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
@@ -54,20 +55,47 @@ describe("ErrorBoundary — variante inline (§337)", () => {
     expect(screen.getByText("contenu sain")).toBeTruthy();
   });
 
-  it("« Réessayer » re-rend le sous-arbre sans recharger la page (inline)", () => {
+  it("« Réessayer » (inline) NE recharge PAS la page + appelle onReset", () => {
+    // Contrat inline : on re-rend le sous-arbre en place (pas de reload dur,
+    // contrairement à la variante fullscreen). On vérifie le contrat observable :
+    // pas de window.location.reload, et onReset appelé pour laisser l'hôte
+    // re-piloter ses props/queries.
+    const reloadSpy = vi.fn();
+    const orig = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...orig, reload: reloadSpy },
+    });
+    const onReset = vi.fn();
+    try {
+      render(
+        <ErrorBoundary variant="inline" onReset={onReset}>
+          <Boom explode />
+        </ErrorBoundary>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Réessayer/i }));
+      expect(reloadSpy).not.toHaveBeenCalled();
+      expect(onReset).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: orig });
+    }
+  });
+
+  it("récupère après « Réessayer » quand la cause a disparu (parent re-render)", () => {
+    // Cas réaliste : la cause du throw vient des props/données. Après reset, si le
+    // parent re-rend avec un enfant sain, le sous-arbre s'affiche (sans reload).
     let explode = true;
+    const onReset = () => { explode = false; };
     function Wrapper() {
+      const [, force] = useState(0);
       return (
-        <ErrorBoundary variant="inline">
+        <ErrorBoundary variant="inline" onReset={() => { onReset(); force((n) => n + 1); }}>
           <Boom explode={explode} />
         </ErrorBoundary>
       );
     }
     render(<Wrapper />);
     expect(screen.queryByText("contenu sain")).toBeNull();
-
-    // La cause disparaît, puis l'utilisateur clique Réessayer → re-render OK
-    explode = false;
     fireEvent.click(screen.getByRole("button", { name: /Réessayer/i }));
     expect(screen.getByText("contenu sain")).toBeTruthy();
   });
