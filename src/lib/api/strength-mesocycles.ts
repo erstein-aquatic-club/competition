@@ -28,7 +28,12 @@ import type {
   MesocycleWeek,
   StrokeSignature,
 } from '@/lib/strength/mesocycleEngine.types';
-import type { StrengthMesocycle } from './types';
+import type {
+  PeriodizationCycle,
+  StrengthMesocycle,
+  StrengthPeriodizationTemplate,
+} from './types';
+import { phaseAtWeek } from '@/lib/strength/phaseAtWeek';
 
 /**
  * Exécute le moteur de génération localement, sans aucun appel réseau.
@@ -497,6 +502,52 @@ export async function getStrokeSignatures(): Promise<StrokeSignature[]> {
  * Lecture seule (8 lignes en seed §305). Les champs `emphasis` et `structure`
  * sont stockés en jsonb. Sert à composer un template via `composeTemplate`.
  */
+/**
+ * Info de phase calculée pour un lundi pivot donné, par rapport au mésocycle
+ * actif. Sert à l'écran d'ajustement mi-cycle (pas d'appel réseau).
+ */
+export interface MesocyclePhaseInfo {
+  /** Index 0-based de la semaine du pivot dans le méso. */
+  weekIndex: number;
+  /** totalWeeks - weekIndex, borné ≥ 0. */
+  weeksRemaining: number;
+  /** Cycle de la phase au weekIndex, ou null s'il ne reste aucune semaine. */
+  phaseKey: PeriodizationCycle | null;
+}
+
+/** Parse une date ISO 'YYYY-MM-DD' en UTC stable (évite la dérive de fuseau). */
+function parseISOUtc(iso: string): number {
+  return new Date(`${iso}T00:00:00Z`).getTime();
+}
+
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Détermine, pour un lundi pivot, l'index de semaine dans le méso, le nombre
+ * de semaines restantes, et la phase de périodisation en cours.
+ *
+ * Helper PUR (aucun appel Supabase). Pivot avant le départ → index 0 ; pivot
+ * après la fin → restantes 0 / phaseKey null.
+ */
+export function getCurrentMesocyclePhaseInfo(args: {
+  startMonday: string;
+  totalWeeks: number;
+  template: StrengthPeriodizationTemplate;
+  pivotMonday: string;
+}): MesocyclePhaseInfo {
+  const { startMonday, totalWeeks, template, pivotMonday } = args;
+  // Le floor ramène un pivot en milieu de semaine (non-lundi) à l'index de sa
+  // semaine contenante — contrat implicite pour l'appelant côté UI.
+  const diffWeeks = Math.floor(
+    (parseISOUtc(pivotMonday) - parseISOUtc(startMonday)) / MS_PER_WEEK,
+  );
+  const weekIndex = Math.min(Math.max(diffWeeks, 0), totalWeeks);
+  const weeksRemaining = Math.max(0, totalWeeks - weekIndex);
+  const phaseKey =
+    weeksRemaining > 0 ? phaseAtWeek(template, weekIndex) : null;
+  return { weekIndex, weeksRemaining, phaseKey };
+}
+
 export async function getDistanceProfiles(): Promise<DistanceProfile[]> {
   if (!canUseSupabase()) return [];
   const data = assertSupabase(
