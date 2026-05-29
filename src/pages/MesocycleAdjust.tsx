@@ -259,9 +259,34 @@ export default function MesocycleAdjust() {
   const apercuDisabled =
     pivotState === "past" || weeksRemaining < 1 || !template || !ready;
 
-  // B4 — l'ecriture sessionStorage + la route d'apercu seront branchees ici.
+  // Reutilise le flux d'apercu existant (MesocyclePreview) en ETENDANT le payload
+  // sessionStorage avec les champs d'ajustement (adjust/startPhase/facteurs).
   const handleApercu = () => {
-    /* B4 : write sessionStorage params + navigate to preview */
+    if (apercuDisabled || !meso || !template || !phaseInfo || !phaseInfo.phaseKey)
+      return;
+    const payload = {
+      stroke: stroke as StrokeKey,
+      distance: distance as DistanceKey,
+      kind: meso.kind,
+      targetWeekCount: phaseInfo.weeksRemaining,
+      weekdays,
+      startDate: pivotMonday,
+      athleteId,
+      // --- extension ajustement (consommee par MesocyclePreview) ---
+      adjust: true,
+      startPhase: phaseInfo.phaseKey,
+      volumeFactor,
+      intensityFactor,
+    };
+    try {
+      window.sessionStorage.setItem(
+        "eac_pending_mesocycle_params",
+        JSON.stringify(payload),
+      );
+    } catch {
+      // sessionStorage peut etre bloque (private mode) : on navigue quand meme.
+    }
+    navigate("/strength/mesocycle-preview");
   };
 
   const handleBack = () =>
