@@ -120,12 +120,18 @@ Profil `100 season` (nominal 10 sem) étiré à 12 par round-robin (+1 prépa g�
 > 4×/sem à 2×, force jambes ET tractions travaillées 2×/sem. *(Plan généré par défaut = amorces ; ceci est une
 > personnalisation en base pour lui. Une régénération depuis l'app reviendrait au format amorces.)*
 
+> **Volume majoré (fenêtre sans bassin de 4 mois).** Samuel n'a pas accès à une piscine sur ~4 mois → aucune
+> contrainte de fraîcheur, on peut **prolonger les séances**. On enrichit chaque jour de **+2 exercices** (sur
+> les 15 semaines, charges modulées par phase → l'affûtage/pic restent allégés). Cible : combler ce que la
+> brasse réclame et qui manquait — **chaîne postérieure** (soulevé roumain), **puissance de hanche** (hip
+> thrust), **poussée** (développé couché, débloquée par l'absence de nage), **puissance haute** (lancer).
+
 | Jour | Type | Contenu (charges de la phase) |
 |---|---|---|
-| **Lundi** | **Force** | Trap bar + Squat bulgare + **Tractions lestées** + Ab Wheel (+ Face Pull) |
-| **Mardi** | **Puissance** | Box Jump + Trap Bar Jump + Ab Wheel (+ Face Pull) |
-| **Jeudi** | **Force** | Trap bar + Squat bulgare + **Tractions lestées** + Ab Wheel (+ Face Pull) |
-| **Vendredi** | **Puissance** | Box Jump + Trap Bar Jump + Ab Wheel (+ Face Pull) |
+| **Lundi** | **Force** | Trap bar + Squat bulgare + **Soulevé de terre roumain** + Tractions lestées + **Développé couché** + Ab Wheel (+ Face Pull) |
+| **Mardi** | **Puissance** | Box Jump + Trap Bar Jump + **Hip Thrust explosif** + **Lancer médecine-ball** + Ab Wheel (+ Face Pull) |
+| **Jeudi** | **Force** | *(identique au lundi)* |
+| **Vendredi** | **Puissance** | *(identique au mardi)* |
 
 > Jours **Force** (Lun/Jeu) espacés ~72 h (récup SNC) ; jours **Puissance** (Mar/Ven) intercalés, CNS plus
 > légère. Force jambes **2×/sem** (son déficit #1 = fréquence), tractions **2×/sem** (entretien du point fort),
