@@ -380,6 +380,15 @@ export interface MesocycleInput {
    * Passé en paramètre pour que le moteur reste pur.
    */
   exerciseCatalog: CatalogExercise[];
+  /**
+   * Cycle à partir duquel démarrer la séquence du template, au lieu du 1ᵉʳ
+   * cycle. Utilisé par l'ajustement mid-cycle : si le pivot tombe dans la
+   * phase puissance du plan original, passer `startPhase='puissance'` fait
+   * tronquer les phases précédentes du template pour que le nouveau plan
+   * reprenne au bon endroit. Absent/null → comportement historique
+   * (démarrage phase 1).
+   */
+  startPhase?: PeriodizationCycle | null;
 }
 
 // ── Taxonomie nage × distance (§305) ─────────────────────────────────────────

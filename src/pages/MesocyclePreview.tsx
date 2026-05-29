@@ -50,6 +50,7 @@ import type {
   StrokeKey,
 } from "@/lib/strength/mesocycleEngine.types";
 import { composeTemplate } from "@/lib/strength/composeTemplate";
+import { applyAdjustmentFactors } from "@/lib/strength/adjustmentFactors";
 import { getMonday, toISODate } from "@/lib/date";
 import { ageBandFor } from "@/lib/strength/kpiBaremes";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
@@ -97,6 +98,11 @@ interface PendingParams {
   startDate: string;
   /** Nageur ciblé (mode coach). Absent/égal à la session → mode nageur. */
   athleteId?: number | null;
+  /** Mode ajustement mi-cycle (meso-adjust) : facteurs charge + phase de depart. */
+  adjust?: boolean;
+  startPhase?: PeriodizationCycle | null;
+  volumeFactor?: number;
+  intensityFactor?: number;
 }
 
 const BUCKET_LABEL_FR: Record<AllBucket, string> = {
@@ -214,6 +220,21 @@ function loadPendingParams(): PendingParams | null {
     ) {
       return null;
     }
+    // Mode ajustement : valider les champs additionnels (un payload adjust
+    // malforme ne doit pas s'appliquer a moitie).
+    if (parsed.adjust === true) {
+      if (
+        typeof parsed.startPhase !== "string" ||
+        typeof parsed.volumeFactor !== "number" ||
+        !Number.isFinite(parsed.volumeFactor) ||
+        parsed.volumeFactor <= 0 ||
+        typeof parsed.intensityFactor !== "number" ||
+        !Number.isFinite(parsed.intensityFactor) ||
+        parsed.intensityFactor <= 0
+      ) {
+        return null;
+      }
+    }
     return parsed;
   } catch {
     return null;
@@ -228,6 +249,13 @@ function flattenLatestKpi(
   return Object.values(byKey).filter(
     (m): m is StrengthKpiMeasurement => m !== null,
   );
+}
+
+/** Facteur (0.5–1.5) → delta lisible signe, ex. 0.8 → "−20 %", 1.0 → "0 %". */
+function formatPctDelta(factor: number): string {
+  const pct = Math.round((factor - 1) * 100);
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct)} %`;
 }
 
 const FR_LONG_DATE = new Intl.DateTimeFormat("fr-FR", {
@@ -412,6 +440,8 @@ export default function MesocyclePreview() {
       },
       template,
       targetWeekCount: params.targetWeekCount,
+      // meso-adjust : reprise mi-cycle en phase de depart (null = mode generation).
+      startPhase: params.startPhase ?? null,
       // §307 — sessions/sem dérivé des jours cochés ; jour-aware via weekdays.
       sessionsPerWeek: params.weekdays.length,
       weekdays: params.weekdays,
@@ -426,14 +456,23 @@ export default function MesocyclePreview() {
   }>(() => {
     if (!input) return { generated: null, engineError: null };
     try {
-      return { generated: generateMesocyclePreview(input), engineError: null };
+      let g = generateMesocyclePreview(input);
+      // meso-adjust : applique les facteurs charge APRES generation (post-process pur).
+      if (params?.adjust) {
+        g = applyAdjustmentFactors(
+          g,
+          params.volumeFactor ?? 1,
+          params.intensityFactor ?? 1,
+        );
+      }
+      return { generated: g, engineError: null };
     } catch (err) {
       return {
         generated: null,
         engineError: err instanceof Error ? err.message : "Erreur du moteur",
       };
     }
-  }, [input]);
+  }, [input, params]);
 
   // ── Mutation apply ───────────────────────────────────────────────────────
   // Effets de bord post-application réussie (réutilisés par onSuccess ET par la
@@ -559,6 +598,30 @@ export default function MesocyclePreview() {
       />
 
       <div className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
+        {params.adjust && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm dark:border-amber-800/60 dark:bg-amber-950/30">
+            <RefreshCw className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span className="text-amber-900 dark:text-amber-100">
+              Ajustement mi-cycle — volume{" "}
+              <span className="font-semibold tabular-nums">
+                {formatPctDelta(params.volumeFactor ?? 1)}
+              </span>
+              , intensité{" "}
+              <span className="font-semibold tabular-nums">
+                {formatPctDelta(params.intensityFactor ?? 1)}
+              </span>
+              {params.startPhase && (
+                <>
+                  , reprise en phase{" "}
+                  <span className="font-semibold">
+                    {PERIODIZATION_CYCLES[params.startPhase]?.label ??
+                      params.startPhase}
+                  </span>
+                </>
+              )}
+            </span>
+          </div>
+        )}
         {isCoachMode && (
           <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
             <Target className="h-4 w-4 shrink-0 text-primary" />

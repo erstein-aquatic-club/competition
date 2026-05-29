@@ -57,6 +57,7 @@ import {
   Layers,
   Loader2,
   RefreshCw,
+  SlidersHorizontal,
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -338,6 +339,17 @@ export default function CoachMesocyclePanel({
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Régénérer
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  navigate(`/strength/mesocycle-adjust/${athleteId}`)
+                }
+              >
+                <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                Ajuster le méso
               </Button>
               <Button
                 type="button"

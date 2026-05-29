@@ -514,8 +514,16 @@ export function selectExercises(
 export function periodize(
   template: StrengthPeriodizationTemplate,
   targetWeekCount: number,
+  startPhase?: PeriodizationCycle | null,
 ): PeriodizedWeek[] {
-  const phases = template.structure.phases;
+  // Ajustement mi-cycle : on tronque les phases amont pour reprendre au bon
+  // cycle de périodisation. Repli défensif si startPhase est absent du template
+  // (idx <= 0) → on garde l'intégralité des phases (= comportement nominal).
+  let phases = template.structure.phases;
+  if (startPhase) {
+    const idx = phases.findIndex((p) => p.cycle === startPhase);
+    if (idx > 0) phases = phases.slice(idx);
+  }
   const totalMin = phases.reduce((s, p) => s + p.min_weeks, 0);
   const totalMax = phases.reduce((s, p) => s + p.max_weeks, 0);
   const totalNominal = phases.reduce((s, p) => s + p.nominal_weeks, 0);
@@ -758,7 +766,7 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
   // un bloc tronc systématique dans chaque séance de développement.
   const coreEmphasis = input.template.structure.bucket_emphasis.core ?? 0;
 
-  const periodizedWeeks = periodize(input.template, input.targetWeekCount);
+  const periodizedWeeks = periodize(input.template, input.targetWeekCount, input.startPhase);
 
   // §307 — résolution jour-aware : jours muscu + jours amorce PAP.
   const jourAware = !!(input.weekdays && input.weekdays.length > 0);

@@ -117,6 +117,7 @@ const KpiWizard = lazyWithRetry(() => import("@/pages/KpiWizard"));
 const StrengthQuestionnaire = lazyWithRetry(() => import("@/pages/StrengthQuestionnaire"));
 const MesocycleGeneration = lazyWithRetry(() => import("@/pages/MesocycleGeneration"));
 const MesocyclePreview = lazyWithRetry(() => import("@/pages/MesocyclePreview"));
+const MesocycleAdjust = lazyWithRetry(() => import("@/pages/MesocycleAdjust"));
 const Suivi = lazyWithRetry(() => import("@/pages/Suivi"));
 const SuiviSemaine = lazyWithRetry(() => import("@/pages/SuiviSemaine"));
 const SuiviPlanification = lazyWithRetry(() => import("@/pages/SuiviPlanification"));
@@ -395,6 +396,11 @@ function AppRouter() {
             <Route path="/strength/mesocycle-preview">
               <Suspense fallback={<ListSkeleton />}>
                 <MesocyclePreview />
+              </Suspense>
+            </Route>
+            <Route path="/strength/mesocycle-adjust/:athleteId">
+              <Suspense fallback={<ListSkeleton />}>
+                <MesocycleAdjust />
               </Suspense>
             </Route>
             <Route path="/strength">
