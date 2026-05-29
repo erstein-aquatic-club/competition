@@ -402,11 +402,14 @@ export {
   // Taxonomie nage × distance (§305)
   getStrokeSignatures,
   getDistanceProfiles,
+  // Ajustement mi-cycle — info de phase au pivot (helper pur)
+  getCurrentMesocyclePhaseInfo,
 } from './strength-mesocycles';
 export type {
   ActiveMesocycleWithAthlete,
   MesocycleSessionContent,
   MesocycleSessionExerciseContent,
+  MesocyclePhaseInfo,
 } from './strength-mesocycles';
 
 // Bilan Muscu — Périodisation templates (Chantier A, §292) — lecture
