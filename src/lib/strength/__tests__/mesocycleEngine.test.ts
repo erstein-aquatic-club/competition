@@ -1030,6 +1030,58 @@ describe('periodize', () => {
   });
 });
 
+// ── periodize startPhase (meso-adjust) ───────────────────────────────────────
+
+function makeT8Template(): StrengthPeriodizationTemplate {
+  return {
+    id: 'tpl-t8', event_group: 'sprint_50', kind: 'inter_competition', name: 'T8',
+    min_week_count: 5, max_week_count: 8,
+    structure: {
+      phases: [
+        { cycle: 'maintien', min_weeks: 1, nominal_weeks: 1, max_weeks: 2 },
+        { cycle: 'puissance', min_weeks: 2, nominal_weeks: 2, max_weeks: 3 },
+        { cycle: 'affutage', min_weeks: 1, nominal_weeks: 1, max_weeks: 2 },
+        { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      ],
+      bucket_emphasis: { lower_strength: 0.5, lower_power: 0.5, upper_strength: 0.5, upper_power: 0.5, mobility: 0.3 },
+    },
+    created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z',
+  };
+}
+
+describe('periodize startPhase', () => {
+  it('startPhase = puissance (2e phase), target 4 → tronque maintien', () => {
+    const weeks = periodize(makeT8Template(), 4, 'puissance');
+    assert.equal(weeks.length, 4);
+    assert.deepEqual(weeks.map((w) => w.cycle), [
+      'puissance', 'puissance', 'affutage', 'pic',
+    ]);
+  });
+
+  it('startPhase = affutage (3e phase), target 2 → [affutage, pic]', () => {
+    const weeks = periodize(makeT8Template(), 2, 'affutage');
+    assert.equal(weeks.length, 2);
+    assert.deepEqual(weeks.map((w) => w.cycle), ['affutage', 'pic']);
+  });
+
+  it('startPhase = pic (4e phase), target 1 → [pic]', () => {
+    const weeks = periodize(makeT8Template(), 1, 'pic');
+    assert.equal(weeks.length, 1);
+    assert.deepEqual(weeks.map((w) => w.cycle), ['pic']);
+  });
+
+  it('startPhase absent du template → identique à sans startPhase', () => {
+    const withAbsent = periodize(makeT8Template(), 5, 'force_max');
+    const without = periodize(makeT8Template(), 5);
+    assert.deepEqual(withAbsent.map((w) => w.cycle), without.map((w) => w.cycle));
+  });
+
+  it('startPhase = affutage mais target < Σ min des phases restantes → throw', () => {
+    // affutage min 1 + pic min 1 = 2 ; target 1 → hors plage.
+    assert.throws(() => periodize(makeT8Template(), 1, 'affutage'), /hors|out|min/i);
+  });
+});
+
 // ── generateMesocycle ────────────────────────────────────────────────────────
 
 import { generateMesocycle } from '../mesocycleEngine.ts';
