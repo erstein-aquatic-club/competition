@@ -19159,7 +19159,7 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 
 **Fichiers.** `src/components/shared/ErrorBoundary.tsx` (réécrit), `src/pages/coach/CoachSwimmerDetail.tsx`, `src/pages/coach/CoachSwimmerFullView.tsx`, `src/lib/strength/wrappedStats.ts` ; tests `src/components/shared/ErrorBoundary.vitest.tsx` (nouveau, 3 tests), `src/lib/strength/__tests__/wrappedStats.test.ts` (+1 test).
 
-**Tests.** node:test **1421/1421**, vitest **37/37** (+3), `tsc --noEmit` **0**, `vite build` **0**. Pas de `test:rls` (UI + helper pur, aucune migration / policy / helper auth touché).
+**Tests.** node:test **1419/1419** (+1), vitest **38/38** (+4 : nouveau `ErrorBoundary.vitest.tsx`), `tsc --noEmit` **0**, `vite build` **0**. Pas de `test:rls` (UI + helper pur, aucune migration / policy / helper auth touché).
 
 **Honnêteté.** Le throw exact en prod n'est PAS confirmé (audit statique + données propres → rien de déterministe ; la PWA n'a pas capturé la console). Ce patch **confine** le crash (le reste de l'app survit, récupération sans reload) et, surtout, **logue désormais en prod** → la prochaine occurrence laissera `[EAC ErrorBoundary] [CoachSwimmerDetail|CoachMesocyclePanel] …` + stack dans la console : transmettre ce texte permettra de pin-pointer la ligne fautive si ça se reproduit. Durcissement `rankKpis` = la seule fragilité réelle trouvée.
 
