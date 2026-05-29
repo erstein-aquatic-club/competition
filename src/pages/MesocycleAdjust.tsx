@@ -3,9 +3,9 @@
  *
  * Le coach choisit un lundi pivot : les semaines avant le pivot sont conservees,
  * les suivantes sont recalculees avec d'eventuels ajustements (jours muscu,
- * facteurs de volume/intensite). B3 = chargement des donnees + etat du
- * formulaire + rendu + banniere/disabled. La navigation reelle du bouton
- * « Apercu » (ecriture sessionStorage + route) est la tache suivante (B4).
+ * facteurs de volume/intensite). « Apercu » ecrit l'etat dans sessionStorage
+ * (cle partagee avec la generation) et navigue vers MesocyclePreview, qui
+ * applique les facteurs et reutilise la RPC apply (snapshot + table rase).
  *
  * Design : docs/plans/2026-05-28-mesocycle-adjust-design.md
  */

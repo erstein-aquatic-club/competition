@@ -42,10 +42,11 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 | `src/hooks/useDashboardState.ts` | Façade dashboard nageur |
 | `src/hooks/useCoachCalendarState.ts` | État calendrier coach |
 | `src/hooks/useStrengthState.ts` | État muscu |
-| `src/lib/strength/mesocycleEngine.ts` | Moteur de génération du mésocycle (6 fonctions TS pures) — §293 |
-| `src/lib/api/strength-mesocycles.ts` | Wrappers API mésocycle (preview/apply/revert/get) — §293 |
+| `src/lib/strength/mesocycleEngine.ts` | Moteur de génération du mésocycle (6 fonctions TS pures ; `periodize` honore `startPhase` §338) — §293 |
+| `src/lib/api/strength-mesocycles.ts` | Wrappers API mésocycle (preview/apply/revert/get) + `getCurrentMesocyclePhaseInfo` (helper pur §338) — §293 |
 | `src/pages/MesocycleGeneration.tsx` | Écran nageur de génération du mésocycle — §293 |
-| `src/pages/MesocyclePreview.tsx` | Écran nageur d'aperçu + confirmation — §293 |
+| `src/pages/MesocyclePreview.tsx` | Écran nageur d'aperçu + confirmation (mode ajustement mid-cycle §338) — §293 |
+| `src/pages/MesocycleAdjust.tsx` | Écran coach d'ajustement d'un méso actif mid-cycle (`/strength/mesocycle-adjust/:athleteId`) — §338 |
 | `supabase/tests/rls/` | Tests RLS intégration (voir `docs/rls-testing.md`) |
 
 **Pour tout autre fichier**, lire `docs/claude/files-map.md` (annuaire complet).
@@ -75,7 +76,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§335** — **Garantie « minimum haut du corps » quand le focus monopolise un segment** : pour une brasse sprint (`forced_focus` = [lower_strength, lower_power], §323), le moteur produisait un méso **100 % jambes** (zéro tractions/poussée) — appariement focus↔focus + complément maintien = top focus + amorce potentiateur = lower_strength. Nouveau `ensureMaintienRepresentation` (`buildWeek`, jour-aware) injecte le **top seau maintien** (hors mobility) en complément d'une séance de DÉV à complément redondant **si** il est absent de toute la semaine — symétrique des §324/325/329 (sens inverse). **Conditionnel** → no-op si déjà couvert (les jambes remontent via amorces §329 pour une nage haut-dominante → plan crawl 50 McEvoy inchangé). Décisions coach : portée 1 seau + patch SQL du plan actif de Samuel (100 brasse, id 16 — 14 séances mardi, complément trap bar→tractions lestées via MCP). TDD `mesocycleEngine.test.ts` 75, node:test 1403, vitest 26, tsc 0 ; pas de migration/RLS. *(§334 trigger sexe/Ines ; §333 badge état de forme coach secondaire ; §332 cohérence durées dérivées.)*
+Dernier § livré : **§338** — **Ajustement du mésocycle en cours (recalcul mid-cycle)** : 3ᵉ levier coach (après édition séance-par-séance et régénération complète) pour re-rouler les semaines restantes d'un méso actif. Approche B (re-roll engine partiel) : `generateMesocycle` avec `targetWeekCount` tronqué + nouveau `startPhase` (`periodize` tronque les phases amont) + post-process `applyAdjustmentFactors` (vol/int, clamp, plio intacts), apply via la RPC existante (snapshot §308 + table rase §328 = 1 undo gratuit). Slice A moteur (`phaseAtWeek`, `adjustmentFactors`, `startPhase`, intégration) + Slice B UI (`MesocycleAdjust.tsx` `/strength/mesocycle-adjust/:athleteId`, helper `getCurrentMesocyclePhaseInfo`, bouton coach gardé sur méso actif, Aperçu→`MesocyclePreview` mode ajustement via clé sessionStorage partagée). Hooks avant early return (garde React #310). TDD : mesocycleEngine 80, +33 tests neufs (phaseAtWeek/factors/phase-info/intégration/vitest), tsc 0, build OK ; pas de migration/RLS. Limite : lundi de départ approximé depuis `generated_at` (start_date §307 non persisté). *(§337 robustesse fiche nageur ; §336 référentiel bandes KPI ; §335 minimum haut du corps brasse.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 
