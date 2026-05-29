@@ -34,6 +34,7 @@ import { useSwimAnalytics } from "@/hooks/useSwimAnalytics";
 import AttendancePerformanceChart from "@/components/coach/AttendancePerformanceChart";
 import PainHistoryMap from "@/components/coach/PainHistoryMap";
 import CoachMesocyclePanel from "@/components/coach/CoachMesocyclePanel";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useStrengthWrapped } from "@/hooks/useStrengthWrapped";
 import { StrengthWrappedRecap } from "@/components/strength/wrapped/StrengthWrappedRecap";
 /* ── Helpers ─────────────────────────────────────────────── */
@@ -598,10 +599,18 @@ export default function CoachSwimmerFullView({
                       </span>
                       <ArrowRight className="h-4 w-4 shrink-0" />
                     </button>
-                    <CoachMesocyclePanel
-                      athleteId={athleteId}
-                      athleteName={displayName}
-                    />
+                    <ErrorBoundary
+                      variant="inline"
+                      context="CoachMesocyclePanel"
+                      resetKeys={[athleteId]}
+                      title="Mésocycle indisponible"
+                      description="L'affichage du mésocycle a rencontré un problème. Le reste de la fiche reste utilisable."
+                    >
+                      <CoachMesocyclePanel
+                        athleteId={athleteId}
+                        athleteName={displayName}
+                      />
+                    </ErrorBoundary>
                     {recapOpen && athleteId != null && (
                       <StrengthWrappedRecap
                         athleteId={athleteId}
