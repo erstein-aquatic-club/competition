@@ -19135,6 +19135,8 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 
 **Confidentialité.** Aucune valeur brute de KPI ni de poids de corps athlète sur les slides nageur (cohérent `body-weight-coach-only`) — uniquement les libellés de bande. Le tonnage d'entraînement cumulé n'est pas une donnée de poids de corps → autorisé.
 
+**Suivi terrain (2026-05-29).** Retour François : « top 10% » sans référentiel n'a pas de sens. Les barèmes KPI (`kpiBaremes.ts`) comparent à une **population scolaire générale, par sexe × tranche d'âge** (pas des nageurs). Ajout d'une légende « Comparé aux jeunes de ton âge et de ton sexe. » sous les bandes des slides `ForcesSlide` et `PotentialSlide` → le référentiel est explicite. Microcopy uniquement (aucune valeur brute, style aligné slide chrome) ; tsc 0, recap vitest 7/7, build 0.
+
 **Tests / vérifs.** `wrappedStats` 15 tests `node:test` ; `useStrengthWrapped` 3 + `StrengthWrappedRecap` 7 vitest. Suite complète (après rebase sur `origin/main` intégrant le §335 d'un autre terminal) : **node:test 1418/1418**, **vitest 34/34**, `tsc --noEmit` 0, `npm run build` 0. Pas de migration / logique RLS → pas de `test:rls`. Exécution en subagent-driven avec double revue (conformité spec + qualité) par tâche + revue finale holistique.
 
 **Limites / différé.** (1) Reprise de barre de progression après pause = redémarre le segment à 0 (acceptable v1). (2) Un athlète qui n'a QUE des séances loggées (ni méso, ni KPI) ne voit pas le bouton (la visibilité s'appuie sur les signaux légers — endossé en revue, cas rare et récap maigre). (3) Pas de partage natif / image serveur — la capture d'écran suffit.

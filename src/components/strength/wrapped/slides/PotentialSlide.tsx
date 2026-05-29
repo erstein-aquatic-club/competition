@@ -39,6 +39,9 @@ export function PotentialSlide({ axis }: { axis: RankedKpi }) {
       >
         <p className="text-xl font-semibold text-white">{axis.label}</p>
         <p className="heading-display mt-1 text-2xl text-[#caffb0]">{axis.band.label}</p>
+        <p className="mt-1 text-sm text-white/60">
+          Comparé aux jeunes de ton âge et de ton sexe.
+        </p>
         <p className="mt-3 text-sm leading-snug text-white/75">
           C'est ici que tu as le plus à gagner — chaque séance compte.
         </p>

@@ -46,6 +46,15 @@ export function ForcesSlide({ forces }: { forces: RankedKpi[] }) {
           </motion.div>
         ))}
       </div>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.7 }}
+        className="text-sm leading-snug text-white/70"
+      >
+        Comparé aux jeunes de ton âge et de ton sexe.
+      </motion.p>
     </SlideShell>
   );
 }
