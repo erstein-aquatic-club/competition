@@ -44,6 +44,23 @@ test('rankKpis: profil incomplet → vide', () => {
   assert.equal(ranked.length, 0);
 });
 
+// §337 — durcissement : le hook recap (`useStrengthWrapped`) appelle rankKpis à
+// CHAQUE render de la fiche nageur. Une mesure à valeur non-numérique (null/NaN,
+// possible sur données legacy/offline) ne doit jamais crasher le render → le KPI
+// fautif est sauté, les mesures valides ressortent.
+test('rankKpis: ignore une mesure dont la valeur n\'est pas un nombre fini (pas de throw)', () => {
+  const ranked = rankKpis(
+    {
+      vertical_jump: meas('vertical_jump', null as unknown as number),
+      broad_jump: meas('broad_jump', Number.NaN),
+      weighted_pullup: meas('weighted_pullup', 10),
+    } as any,
+    { sex: 'F', ageBand: 'adulte' },
+  );
+  assert.equal(ranked.length, 1);
+  assert.equal(ranked[0].key, 'weighted_pullup');
+});
+
 const NOW = Date.parse('2026-05-28T00:00:00Z');
 const d = (daysAgo: number) => NOW - daysAgo * 86400_000;
 

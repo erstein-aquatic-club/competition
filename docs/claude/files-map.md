@@ -110,7 +110,8 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/CoachCalendar.tsx` | Calendrier coach (vue mensuelle assignations) | ~266 lignes |
 | `src/hooks/useCoachCalendarState.ts` | Hook état calendrier coach (grille, query, slots) | ~187 lignes |
 | `src/pages/coach/CoachSwimmersOverview.tsx` | Dashboard synthétique nageurs (grille cards, KPIs) | ~648 lignes |
-| `src/pages/coach/CoachSwimmerDetail.tsx` | Dispatcher thin : route vers CoachSwimmerFullView (titulaire) ou CoachSwimmerQuickView (substituant) selon hasAccess (§152) | 33 lignes |
+| `src/pages/coach/CoachSwimmerDetail.tsx` | Dispatcher thin : route vers CoachSwimmerFullView (titulaire) ou CoachSwimmerQuickView (substituant) selon hasAccess (§152) ; enveloppe `<Inner>` dans un `ErrorBoundary` inline récupérable `resetKeys={[athleteId]}` (§337) | 46 lignes |
+| `src/components/shared/ErrorBoundary.tsx` | Error boundary réutilisable : variantes `fullscreen` (App.tsx, reload) et `inline` (sections récupérables, re-render sans reload) ; auto-reset via `resetKeys` ; **log prod+dev** avec `context` ; détection chunk error (§337, ex-§330) | 198 lignes |
 | `src/pages/coach/CoachSwimmerFullView.tsx` | Page fiche nageur complète (4 onglets: Résumé/Planning/Échanges/Comms) — ex-CoachSwimmerDetail (§152) + CTA "Démarrer/Reprendre" bilan muscu resume-aware dans section Mésocycle muscu (§A) | 638 lignes |
 | `src/pages/coach/CoachSwimmerQuickView.tsx` | Mode dépannage substituant : briefing lecture-seule + présence/commentaire/assignation avec recorded_by (§152) | 346 lignes |
 | `src/pages/coach/QuickViewAttendanceDialog.tsx` | Dialog enregistrement présence substituant (Présent/Absent/Retard + commentaire) (§152) | 90 lignes |
