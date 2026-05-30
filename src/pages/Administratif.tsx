@@ -130,7 +130,11 @@ export default function Administratif({ initialTab = "POINTAGE" }: Administratif
   const staggerVariants = reduce ? {} : stagger;
   const cardVariants = reduce ? {} : cardReveal;
   const queryClient = useQueryClient();
+  // §350 — Garde SSR/test (cf. Admin.tsx) : condition constante par
+  // environnement → ordre des hooks stable, pas de #310 réel.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((s) => s.role);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const userId = typeof window === "undefined" ? useAuth.getState().userId : useAuth((s) => s.userId);
   const isCoach = role === "coach" || role === "admin";
 

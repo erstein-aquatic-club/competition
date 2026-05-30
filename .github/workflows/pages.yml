@@ -35,6 +35,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # §350 — garde-fou React #310 : `react-hooks/rules-of-hooks` en ERREUR.
+      # Une vraie violation bloque le déploiement (les warnings ne bloquent pas).
+      - name: Lint (react-hooks)
+        run: npm run lint
+
       - name: Build
         run: npm run build
         env:

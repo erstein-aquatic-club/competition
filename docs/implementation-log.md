@@ -19366,3 +19366,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 - **UX3** — `RestScreen` : le minuteur de repos (`M:SS`) n'avait ni rôle ni libellé → invisible au lecteur d'écran. Fix : `role="timer"` + `aria-label` (« Repos : X min Y s restantes ») + `aria-live="off"` (pas d'annonce verbeuse à chaque seconde).
 
 **Tests / vérifs.** Changements visuels/a11y → pas de test neuf ; **tsc 0 ; node:test 1501 (inchangé) ; vitest unit 67 (inchangé) ; `npm run build` OK.** Aucune migration. **Audit flux mésocycle : tous les findings traités** (sauf le lint `rules-of-hooks` = chantier infra eslint, documenté §344).
+
+## §350 — Infra eslint : garde-fou `react-hooks/rules-of-hooks` en CI (2026-05-30)
+
+**Contexte.** Dernier point ouvert de l'audit (§344) : le bug React #310 (hook après early return / conditionnel) a frappé 3× (§316, §326) sans garde-fou automatique — le dépôt n'avait **aucun eslint**. Design `docs/plans/2026-05-30-eslint-react-hooks-design.md`. Exécution directe (controller).
+
+**Livré.** eslint 9 flat config **minimal** (`eslint.config.js`) — parser `typescript-eslint` (sans type-aware → rapide), plugin `eslint-plugin-react-hooks` v5, **`react-hooks/rules-of-hooks: 'error'`** (le garde-fou) + **`react-hooks/exhaustive-deps: 'warn'`** (des `eslint-disable` existent déjà → non bloquant) ; plugin `@typescript-eslint` enregistré (rules connues, non activées) pour que les `eslint-disable` existants ne lèvent pas « rule not found » ; `reportUnusedDisableDirectives: 'off'` (évite le faux bruit sur des règles non chargées) ; ignore `dist`/`public`/`supabase`/`*.config.*`/**`*.stories.tsx`** (le `render: () => useState()` de Storybook est un idiome, pas du code applicatif). Script `"lint": "eslint ."` (erreurs bloquent, warnings non). **CI** : étape `Lint (react-hooks)` ajoutée dans `pages.yml` **avant le build** → un vrai #310 fait échouer le déploiement.
+
+**Le lint a attrapé de vraies violations (hors flux méso audité).** `npm run lint` initial : **10 erreurs `rules-of-hooks`** — 6 dans des `*.stories.tsx` (ignorées) + **4 `useAuth` appelé conditionnellement** dans `Admin`/`Administratif`/`Comite` (`typeof window === "undefined" ? useAuth.getState().role : useAuth(s => s.role)`).
+
+**⚠️ Leçon (systematic-debugging).** J'ai d'abord supposé que ce garde `typeof window` était **mort** (SPA client-only) et l'ai supprimé (appel inconditionnel) → **5 tests `node:test` ont cassé** (Admin/Administratif rendus en node:test SANS `window` → la branche `getState()` non-réactive est **load-bearing** pour rendre la page hors DOM). Le garde n'était PAS mort. Correctif : restauré le garde + ajouté un **`// eslint-disable-next-line react-hooks/rules-of-hooks` justifié** sur les 4 lignes (la condition est CONSTANTE par environnement → ordre des hooks stable → pas de #310 réel ; ce n'est pas un bug, c'est un garde SSR/test légitime).
+
+**Vérifs.** `npm run lint` **0 erreur** (42 warnings exhaustive-deps non bloquants) ; **preuve** que la garde fonctionne : un hook après early return injecté temporairement → `npm run lint` échoue (`rules-of-hooks`), retiré. **node:test 1501/0** (régression réparée) ; **tsc 0** ; `npm run build` OK. Aucune migration.
+
+**Limites.** Scope minimal volontaire (pas de nettoyage des warnings `exhaustive-deps`, pas de règles TS/style). Les 4 `eslint-disable` sont des exceptions justifiées (garde SSR/test), pas des #310. **Audit flux mésocycle : 100 % des findings traités + garde-fou anti-régression #310 en place.**

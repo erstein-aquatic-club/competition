@@ -32,6 +32,9 @@ const formatTime = (value?: string | null) => {
 
 export default function Comite() {
   const { useMemo, useState } = React;
+  // §350 — Garde SSR/test (cf. Admin.tsx) : condition constante par
+  // environnement → ordre des hooks stable, pas de #310 réel.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((state) => state.role);
   const isComite = role === "comite" || role === "admin";
 

@@ -76,7 +76,9 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§349** — **Polish audit flux mésocycle (V7, UX1/UX2/UX3)** : V7 `SessionDetailPreview` masque le badge de cycle legacy en mode plan (plus de « Force » rouge trompeur) ; UX1 `RestSessionTab` centre anneau = exercices faits `(currentStep−1)/total` (cohérent anneau+rail) ; UX2 rail basé sur le total (ne sature plus au dernier exo) ; UX3 minuteur repos `RestScreen` `role="timer"`+`aria-label`+`aria-live="off"`. tsc 0, node:test 1501, vitest 67, build OK ; aucune migration. **Audit flux mésocycle : tous findings traités** (sauf lint rules-of-hooks = infra eslint). *(§348 édition ancien bilan ; §347 historique + évolution G/D ; §346 mobilité G/D Slice A.)*
+Dernier § livré : **§350** — **Infra eslint : garde-fou `react-hooks/rules-of-hooks` en CI** : eslint 9 flat config **minimal** (`eslint.config.js`, parser typescript-eslint sans type-aware + plugin react-hooks v5) — `rules-of-hooks: error` + `exhaustive-deps: warn` ; ignore stories/config/supabase ; script `npm run lint` ; **étape lint dans `pages.yml` avant le build** (un #310 bloque le déploiement). Le lint a attrapé 4 `useAuth` conditionnels (garde SSR/test légitime → `eslint-disable` justifié, pas un vrai #310). Lint 0 erreur (42 warnings non bloquants), node:test 1501, tsc 0, build OK ; aucune migration. **Audit flux mésocycle : 100 % traité + garde-fou #310 en place.** *(§349 polish V7/UX1-3 ; §348 édition ancien bilan ; §347 historique + évolution G/D ; §346 mobilité G/D.)*
+
+> Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

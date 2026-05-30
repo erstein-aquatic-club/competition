@@ -138,6 +138,11 @@ export function getAdminMutationFeedback(action: AdminMutationAction, status: Ad
 
 export default function Admin() {
   const { useMemo, useState } = React;
+  // §350 — Garde SSR/test : en node:test (sans `window`) on lit le rôle via
+  // `getState()` (non-réactif, requis pour rendre la page hors DOM) ; en
+  // navigateur, le hook réactif. La condition est CONSTANTE par environnement →
+  // l'ordre des hooks est stable, pas de #310 réel. eslint-disable justifié.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const role = typeof window === "undefined" ? useAuth.getState().role : useAuth((state) => state.role);
   const userId = useAuth((state) => state.userId);
   const queryClient = useQueryClient();

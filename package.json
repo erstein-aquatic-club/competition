@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "tsc",
+    "lint": "eslint .",
     "pretest": "node scripts/check-test-runner.mjs",
     "test": "node --test --experimental-test-module-mocks --import tsx \"src/**/*.test.ts\" \"src/**/*.test.tsx\" && vitest run --config vitest.config.unit.ts",
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
@@ -96,6 +97,9 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
     "drizzle-kit": "^0.31.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.6.0",
     "jsdom": "^28.0.0",
     "pg": "^8.20.0",
     "rollup-plugin-visualizer": "^6.0.5",
@@ -103,6 +107,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
+    "typescript-eslint": "^8.60.0",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.0.18"
   }
