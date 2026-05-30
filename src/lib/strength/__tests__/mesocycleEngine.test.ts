@@ -1399,8 +1399,17 @@ describe('generateMesocycle', () => {
     );
   });
 
-  it('mobility présente dans chaque session (échauffement systématique)', () => {
-    const meso = generateMesocycle(fullInput());
+  it('mobility présente dans chaque session quand une routine commune est fournie (§351)', () => {
+    // §351 — le warmup n'est plus une tranche générique du pool mobility ; il est
+    // piloté par `commonWarmupRoutine` (Bloc 1) + déficits (Bloc 2). On fournit
+    // donc une routine commune résolvant un exo mobility du catalogue. richCatalog
+    // expose `mobility_core_1` (id 17) : 1ᵉʳ exo du seau mobility.
+    const input = fullInput();
+    const firstMobility = input.exerciseCatalog.find((e) => e.bucket === 'mobility');
+    assert.ok(firstMobility, 'catalogue contient un exo mobility');
+    input.commonWarmupRoutine = [firstMobility.id];
+
+    const meso = generateMesocycle(input);
 
     for (const week of meso.weeks) {
       for (const session of week.sessions) {
@@ -2218,6 +2227,136 @@ describe('selectCorrectiveWarmup (§351 Bloc 2)', () => {
     const res = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, []);
     assert.equal(res[0].correctiveAxis, 'hip');
     assert.equal(res[0].correctiveSide, 'left');
+  });
+});
+
+// ── §351 T7 : câblage blocs 1+2 dans buildSession / buildPapSession ───────────
+
+/**
+ * Catalogue jour-aware ENRICHI pour le câblage warmup : reprend les seaux force/
+ * puissance + 2 mobilités communes (ids 9001/9002, taguées `correctiveAxes`) +
+ * 1 mobilité corrective hanche (9003). Permet de distinguer Bloc 1 (routine
+ * commune) du Bloc 2 (correctif déficit).
+ */
+function warmupWiringCatalog(): CatalogExercise[] {
+  return [
+    ...jourAwareCatalog().filter((e) => e.bucket !== 'mobility'),
+    makeExercise({ id: 9001, nomExercice: 'common_a', bucket: 'mobility', level: 'beginner', isCore: true, correctiveAxes: [] }),
+    makeExercise({ id: 9002, nomExercice: 'common_b', bucket: 'mobility', level: 'beginner', isCore: false, correctiveAxes: [] }),
+    makeExercise({ id: 9003, nomExercice: 'corrective_hip', bucket: 'mobility', level: 'beginner', isCore: false, correctiveAxes: ['hip'] }),
+  ];
+}
+
+/** physical_tests avec un déficit hanche (effective 1 → axe déficitaire). */
+const hipDeficitPhysical: StrengthPhysicalTests = {
+  mobility: { shoulder_flexion: 3, t_spine: 3, hip: 1 },
+  movement: { scapula_control: 3, trunk_neck_alignment: 3, hip_hinge: 3 },
+  filled_at: '2026-05-01T00:00:00Z',
+} as any;
+
+describe('generateMesocycle — câblage warmup blocs 1+2 (§351 T7)', () => {
+  it('séance dév : Bloc 1 (common) + Bloc 2 (corrective hip)', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: warmupWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        assessment: {
+          id: 'assess-ja',
+          athlete_id: 42,
+          questionnaire: greatQuestionnaire,
+          physical_tests: hipDeficitPhysical,
+        },
+      }),
+    );
+    const dev = meso.weeks[0].sessions.find((s) => s.role === 'developpement');
+    assert.ok(dev, 'séance de développement présente');
+    const common = dev.exercises.filter((e) => e.warmupKind === 'common');
+    const corrective = dev.exercises.filter((e) => e.warmupKind === 'corrective');
+    assert.ok(common.length >= 1, 'au moins 1 exo warmupKind=common');
+    assert.ok(corrective.length >= 1, 'au moins 1 exo warmupKind=corrective');
+    assert.ok(
+      corrective.some((e) => e.correctiveAxis === 'hip'),
+      'le correctif porte correctiveAxis=hip',
+    );
+  });
+
+  it('amorce PAP : Bloc 1 (common) présent', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: warmupWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        assessment: {
+          id: 'assess-ja',
+          athlete_id: 42,
+          questionnaire: greatQuestionnaire,
+          physical_tests: hipDeficitPhysical,
+        },
+      }),
+    );
+    const pap = meso.weeks[0].sessions.find((s) => s.role === 'amorce_pap');
+    assert.ok(pap, 'séance amorce PAP présente');
+    assert.ok(
+      pap.exercises.some((e) => e.warmupKind === 'common'),
+      'amorce PAP contient un exo warmupKind=common',
+    );
+  });
+
+  it('séance mobilité corrective (override douleur) : AUCUN warmupKind', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: warmupWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        assessment: {
+          id: 'assess-ja',
+          athlete_id: 42,
+          questionnaire: {
+            ...greatQuestionnaire,
+            pain: [{ body_zone: 'shoulder', intensity: 3 }],
+          },
+          physical_tests: hipDeficitPhysical,
+        },
+      }),
+    );
+    for (const session of meso.weeks[0].sessions) {
+      assert.equal(session.role, 'mobilite_corrective');
+      assert.ok(
+        session.exercises.every((e) => e.warmupKind === undefined),
+        'aucune entrée warmupKind dans une séance override',
+      );
+    }
+  });
+
+  it('aucun déficit (3/3 partout) + routine : common présent, pas de corrective', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: warmupWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        assessment: {
+          id: 'assess-ja',
+          athlete_id: 42,
+          questionnaire: greatQuestionnaire,
+          physical_tests: fullPhysicalTests,
+        },
+      }),
+    );
+    const dev = meso.weeks[0].sessions.find((s) => s.role === 'developpement');
+    assert.ok(dev, 'séance de développement présente');
+    assert.ok(
+      dev.exercises.some((e) => e.warmupKind === 'common'),
+      'common présent',
+    );
+    assert.ok(
+      dev.exercises.every((e) => e.warmupKind !== 'corrective'),
+      'aucun corrective sans déficit',
+    );
   });
 });
 

@@ -282,7 +282,10 @@ export function selectCorrectiveWarmup(
   for (const d of window) {
     const candidate = catalog.find(
       (e) =>
-        e.correctiveAxes.includes(d.axis) &&
+        // `?? []` défensif : la vraie donnée DB a toujours `correctiveAxes`, mais
+        // d'anciennes fixtures de test (tsx, *.test.ts hors tsc) construisent un
+        // CatalogExercise sans ce champ → `.includes` planterait sur `undefined`.
+        (e.correctiveAxes ?? []).includes(d.axis) &&
         !usedIds.has(e.id) &&
         (e.level === null || LEVEL_ORDER[e.level] <= levelNum) &&
         !e.contraindicationZones.some((z) => painSet.has(z)),
@@ -792,11 +795,11 @@ function classifyRole(
  *
  * Stratégie « multi-bucket à la McEvoy » (Vague C, §293) — chaque séance
  * combine désormais un bucket PRIMAIRE (le focus principal) + un bucket
- * COMPLEMENT (l'autre focus, ou le top focus si le primaire est en maintien)
- * + un warmup mobility, à l'image de « Lundi Tractions + Squat + Ab Wheel »
- * dans la prépa sprint de référence.
+ * COMPLEMENT (l'autre focus, ou le top focus si le primaire est en maintien),
+ * à l'image de « Lundi Tractions + Squat + Ab Wheel » dans la prépa sprint de
+ * référence. L'échauffement (Bloc 1 commun + Bloc 2 correctif, §351) est une
+ * section légère séparée en tête de séance, hors des blocs de travail.
  */
-const MOBILITY_WARMUP_COUNT = 2;
 const PRIMARY_BLOCK_COUNT = 2;
 const COMPLEMENT_BLOCK_COUNT = 1;
 /**
@@ -806,16 +809,6 @@ const COMPLEMENT_BLOCK_COUNT = 1;
  * en TODO coach (cf. design R5 §2 et §7).
  */
 const CORE_BLOCK_COUNT = 1;
-/**
- * §318 (#2) — plafond d'exercices par séance de développement. Retour terrain
- * (50 m crawl) : le bloc core §313 s'AJOUTAIT (warmup 2 + primary 2 + complement
- * 1 + core 1 = 6) → trop de volume vs la prépa McEvoy (qualité > volume). Le core
- * est désormais INCLUS dans le plafond : on rogne d'abord le warmup (mobilité
- * d'activation, le moins coûteux) jusqu'à `MIN_WARMUP_COUNT`, en préservant les
- * blocs de travail (primary + complement + core). Séance sans core inchangée (5).
- */
-const MAX_SESSION_ITEMS = 5;
-const MIN_WARMUP_COUNT = 1;
 /** §351 — plafond d'exos correctifs (Bloc 2) par séance. Rotation au-delà. */
 const MAX_CORRECTIVE = 2;
 /** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
@@ -891,6 +884,16 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
   // un bloc tronc systématique dans chaque séance de développement.
   const coreEmphasis = input.template.structure.bucket_emphasis.core ?? 0;
 
+  // §351 — échauffement intelligent. Bloc 1 (routine commune) résolu une seule
+  // fois ; axes déficitaires calculés une fois (le Bloc 2, correctif, est ensuite
+  // tiré par séance via `selectCorrectiveWarmup` sur l'index global de séance).
+  const commonWarmupPool = buildCommonWarmup(
+    input.commonWarmupRoutine ?? [],
+    input.exerciseCatalog,
+    painZones,
+  );
+  const deficient = deficientAxes(input.assessment.physical_tests);
+
   const periodizedWeeks = periodize(input.template, input.targetWeekCount, input.startPhase);
 
   // §307 — résolution jour-aware : jours muscu + jours amorce PAP.
@@ -931,12 +934,20 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
   // slots APRÈS `ensureFocusDevelopmentSession` (§327), car ce swap peut déplacer
   // un seau jambes d'un slot dév vers un slot amorce → un calcul pré-swap serait
   // périmé (E1). Source unique : `papPreferLegPowerFor`.
-  const weeks: MesocycleWeek[] = periodizedWeeks.map((pw) =>
+  const weeks: MesocycleWeek[] = periodizedWeeks.map((pw, weekIdx) =>
     buildWeek(pw, bucketAllocations, selected, weekdays, primerWeekdays, jourAware, {
       forceBiasRequired,
       mobilityOverrideActive,
       bucketPriorityOrder,
       coreEmphasis,
+      // §351 — index global de séance (déterministe, stable entre semaines) pour
+      // la rotation du Bloc 2 correctif.
+      sessionIndexBase: weekIdx * weekdays.length,
+      commonWarmupPool,
+      deficient,
+      catalog: input.exerciseCatalog,
+      painZones,
+      level: input.athlete.level,
     }),
   );
 
@@ -978,6 +989,18 @@ function buildWeek(
     bucketPriorityOrder: StrengthBucket[];
     /** §R5 — emphase core du template (0 = pas de bloc tronc, ex. DB pré-migration). */
     coreEmphasis: number;
+    /** §351 — index global de la 1ʳᵉ séance de cette semaine (w × weekdays.length). */
+    sessionIndexBase: number;
+    /** §351 — Bloc 1 (routine commune) résolu, identique à toutes les séances. */
+    commonWarmupPool: SelectedExercise[];
+    /** §351 — axes déficitaires (alimentent le Bloc 2 correctif par séance). */
+    deficient: DeficientAxis[];
+    /** §351 — catalogue (pour `selectCorrectiveWarmup`). */
+    catalog: CatalogExercise[];
+    /** §351 — zones de douleur (filtre les correctifs contre-indiqués). */
+    painZones: string[];
+    /** §351 — niveau de l'athlète (filtre les correctifs trop avancés). */
+    level: 'beginner' | 'intermediate' | 'advanced';
   },
 ): MesocycleWeek {
   let slots = distributeSessionSlots(allocations, weekdays.length);
@@ -998,7 +1021,12 @@ function buildWeek(
   // semaine (les jours d'amorce sont déterminés par `classifyRole`, comme dans
   // `buildSession`). `buildPapSession` dédupliquera (nage déjà jambes-dominante).
   let amorceRank = 0;
-  const sessions: MesocycleSession[] = slots.map((slot, idx) => {
+  // §351 — un ctx jour-aware PAR séance : le Bloc 1 (`commonWarmupPool`) est
+  // partagé, mais le Bloc 2 (`corrective`) dépend de l'index GLOBAL de séance
+  // (`sessionIndexBase + idx`) pour une rotation déterministe et stable entre
+  // semaines. On mémorise ces ctx pour que `ensureMaintienRepresentation`
+  // reconstruise une séance avec EXACTEMENT le même échauffement.
+  const ctxs: JourAwareContext[] = slots.map((slot, idx) => {
     const weekday = weekdays[idx];
     const isMobOverride =
       slot.primary === 'mobility' || (jourAware && flags.mobilityOverrideActive);
@@ -1009,7 +1037,16 @@ function buildWeek(
         ? 'lower_power'
         : 'lower_strength'
       : null;
-    return buildSession(idx + 1, weekday, slot.primary, slot.complement, pw.cycle, selected, {
+    const globalIdx = flags.sessionIndexBase + idx;
+    const corrective = selectCorrectiveWarmup(
+      flags.deficient,
+      flags.catalog,
+      flags.painZones,
+      flags.level,
+      globalIdx,
+      flags.commonWarmupPool,
+    );
+    return {
       primerWeekdays,
       jourAware,
       forceBiasRequired: flags.forceBiasRequired,
@@ -1018,8 +1055,12 @@ function buildWeek(
       coreEmphasis: flags.coreEmphasis,
       papPreferLegPower,
       papLegBucket,
-    });
+      warmup: { common: flags.commonWarmupPool, corrective },
+    };
   });
+  const sessions: MesocycleSession[] = slots.map((slot, idx) =>
+    buildSession(idx + 1, weekdays[idx], slot.primary, slot.complement, pw.cycle, selected, ctxs[idx]),
+  );
 
   // §335 — garantie « minimum haut du corps » (symétrique des §324/§325/§329, sens
   // inverse). Quand les 2 focus monopolisent un même segment (ex. brasse sprint =
@@ -1030,16 +1071,7 @@ function buildWeek(
   // si le seau est déjà couvert quelque part (cas focus-haut : les jambes remontent
   // via les amorces §329 → on ne dénature pas le plan crawl 50 validé).
   const finalSessions = jourAware
-    ? ensureMaintienRepresentation(sessions, slots, weekdays, pw.cycle, selected, allocations, {
-        primerWeekdays,
-        jourAware,
-        forceBiasRequired: flags.forceBiasRequired,
-        mobilityOverrideActive: flags.mobilityOverrideActive,
-        bucketPriorityOrder: flags.bucketPriorityOrder,
-        coreEmphasis: flags.coreEmphasis,
-        papPreferLegPower,
-        papLegBucket: null,
-      })
+    ? ensureMaintienRepresentation(sessions, slots, weekdays, pw.cycle, selected, allocations, ctxs)
     : sessions;
 
   return { weekNumber: pw.weekNumber, cycle: pw.cycle, sessions: finalSessions };
@@ -1069,7 +1101,7 @@ function ensureMaintienRepresentation(
   cycle: PeriodizationCycle,
   selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
   allocations: BucketAllocation[],
-  ctx: JourAwareContext,
+  ctxs: JourAwareContext[],
 ): MesocycleSession[] {
   const target = allocations.find(
     (a) => a.role === 'maintien' && a.bucket !== 'mobility',
@@ -1098,6 +1130,9 @@ function ensureMaintienRepresentation(
   if (idx < 0) return sessions;
 
   const out = sessions.slice();
+  // §351 — réutilise le ctx EXACT de la séance (donc son Bloc 2 correctif tiré sur
+  // son index global), mais `papLegBucket: null` (cette séance reconstruite est de
+  // développement, pas une amorce) — préserve le comportement §335 pré-§351.
   out[idx] = buildSession(
     sessions[idx].sessionNumber,
     weekdays[idx],
@@ -1105,7 +1140,7 @@ function ensureMaintienRepresentation(
     target,
     cycle,
     selected,
-    ctx,
+    { ...ctxs[idx], papLegBucket: null },
   );
   return out;
 }
@@ -1338,6 +1373,28 @@ interface JourAwareContext {
    * Dédupliqué dans `buildPapSession` (nage déjà jambes-dominante → pas d'ajout).
    */
   papLegBucket: StrengthBucket | null;
+  /**
+   * §351 — échauffement intelligent à 2 blocs, injecté en tête de chaque séance
+   * de développement et d'amorce PAP (jamais sur une séance override mobilité) :
+   * - `common` (Bloc 1) : routine articulaire commune, identique à toutes les
+   *   séances (résolue une fois dans `generateMesocycle`).
+   * - `corrective` (Bloc 2) : exos correctifs des axes déficitaires, par séance
+   *   (rotation déterministe sur l'index global de séance → couverture équitable).
+   */
+  warmup: { common: SelectedExercise[]; corrective: SelectedExercise[] };
+}
+
+/**
+ * §351 — taggue un exercice d'échauffement avec son bloc d'origine (common /
+ * corrective) et, pour un correctif, l'axe et le côté ciblés (pour l'UI).
+ */
+function tagWarmup(
+  ex: MesocycleExercise,
+  kind: 'common' | 'corrective',
+  axis?: string,
+  side?: 'left' | 'right' | 'both',
+): MesocycleExercise {
+  return { ...ex, warmupKind: kind, correctiveAxis: axis, correctiveSide: side };
 }
 
 /**
@@ -1376,7 +1433,7 @@ function buildSession(
 
   // §307 — Amorce PAP : chargement dédié, ignore primary/complement classiques.
   if (role === 'amorce_pap') {
-    return buildPapSession(sessionNumber, weekday, selected, mobilityPool, ctx.bucketPriorityOrder, ctx.papPreferLegPower, ctx.papLegBucket);
+    return buildPapSession(sessionNumber, weekday, selected, ctx.bucketPriorityOrder, ctx.papPreferLegPower, ctx.papLegBucket, ctx.warmup);
   }
 
   let exercises: MesocycleExercise[];
@@ -1420,21 +1477,20 @@ function buildSession(
         ? corePool.slice(0, CORE_BLOCK_COUNT).map((s) => buildCoreExercise(s))
         : [];
 
-    // §318 (#2) — le warmup est dimensionné pour que le total reste ≤
-    // MAX_SESSION_ITEMS : on rogne le warmup (le moins coûteux) avant les blocs
-    // de travail, tout en gardant ≥ MIN_WARMUP_COUNT activation mobilité. Sans
-    // bloc core, le total retombe au comportement historique (5).
-    const nonWarmupCount =
-      primaryBlock.length + complementBlock.length + coreBlock.length;
-    const warmupCount = Math.max(
-      MIN_WARMUP_COUNT,
-      Math.min(MOBILITY_WARMUP_COUNT, MAX_SESSION_ITEMS - nonWarmupCount),
-    );
-    // §297 — Warmup items reçoivent isWarmup=true → chargement endurance
-    // + intention activation, indépendamment du cycle de la semaine.
-    const warmup = mobilityPool
-      .slice(0, warmupCount)
-      .map((s) => toMesocycleExercise(s, cycle, true));
+    // §351 — échauffement intelligent à 2 blocs, en TÊTE de séance et SÉPARÉ des
+    // blocs de travail (primaire + complément + core). Le warmup ne rogne plus les
+    // blocs de travail (avant §351, un plafond §318 rabotait le warmup pour tenir
+    // sous 5 items ; il était la seule variable affectée → suppression du raboutage).
+    // §297 — items chargés avec isWarmup=true (chargement endurance + intention
+    // activation), indépendamment du cycle de la semaine.
+    const warmup = [
+      ...ctx.warmup.common.map((s) =>
+        tagWarmup(toMesocycleExercise(s, cycle, true), 'common'),
+      ),
+      ...ctx.warmup.corrective.map((s) =>
+        tagWarmup(toMesocycleExercise(s, cycle, true), 'corrective', s.correctiveAxis, s.correctiveSide),
+      ),
+    ];
 
     // Ordre chronologique : warmup → primary → complement → core (gainage en fin
     // de séance, n'entame pas la fraîcheur des blocs principaux).
@@ -1492,10 +1548,10 @@ function buildPapSession(
   sessionNumber: number,
   weekday: number,
   selected: Partial<Record<StrengthBucket, SelectedExercise[]>>,
-  mobilityPool: SelectedExercise[],
   bucketPriorityOrder: StrengthBucket[],
   papPreferLegPower: boolean,
-  papLegBucket: StrengthBucket | null = null,
+  papLegBucket: StrengthBucket | null,
+  warmupCtx: { common: SelectedExercise[]; corrective: SelectedExercise[] },
 ): MesocycleSession {
   const exercises: MesocycleExercise[] = [];
   const buckets: StrengthBucket[] = [];
@@ -1584,10 +1640,21 @@ function buildPapSession(
     }
   }
 
-  // 1 warmup mobilité (chargement endurance via le chemin existant).
-  const warmupSel = mobilityPool[0] ?? null;
-  if (warmupSel) {
-    exercises.push(toMesocycleExercise(warmupSel, 'prepa_generale', true));
+  // §351 — échauffement intelligent à 2 blocs, identique aux séances de dév
+  // (Bloc 1 commun + Bloc 2 correctif), en TÊTE de l'amorce. Remplace l'unique
+  // warmup mobilité historique. Chargé en endurance (isWarmup=true) ; le cycle
+  // `prepa_generale` est neutre ici (les paramètres warmup ignorent le cycle).
+  const warmup = [
+    ...warmupCtx.common.map((s) =>
+      tagWarmup(toMesocycleExercise(s, 'prepa_generale', true), 'common'),
+    ),
+    ...warmupCtx.corrective.map((s) =>
+      tagWarmup(toMesocycleExercise(s, 'prepa_generale', true), 'corrective', s.correctiveAxis, s.correctiveSide),
+    ),
+  ];
+  if (warmup.length > 0) {
+    // Warmup en tête (ordre chronologique), tag bucket mobility une fois.
+    exercises.unshift(...warmup);
     buckets.push('mobility');
   }
 
