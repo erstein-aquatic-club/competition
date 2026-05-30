@@ -132,6 +132,12 @@ export interface MesocycleExercise {
   originalExerciseId: number | null;
   /** URL de l'illustration GIF (propagée depuis le catalogue). */
   illustrationGif: string | null;
+  /** §351 — nature de l'item d'échauffement, pour le regroupement UI. */
+  warmupKind?: 'common' | 'corrective';
+  /** §351 — axe ciblé par un item correctif (Bloc 2), pour l'affichage. */
+  correctiveAxis?: string;
+  /** §351 — côté faible ciblé ('left' | 'right' | 'both'), pour l'affichage. */
+  correctiveSide?: 'left' | 'right' | 'both';
 }
 
 // ── Exercice sélectionné (intermédiaire) ──────────────────────────────────────
@@ -154,6 +160,10 @@ export interface SelectedExercise {
   substituted: boolean;
   /** Id de l'exercice qu'il remplace, ou `null`. */
   originalExerciseId: number | null;
+  /** §351 — axe ciblé quand cet exo est un correctif (Bloc 2). */
+  correctiveAxis?: string;
+  /** §351 — côté faible ciblé ('left' | 'right' | 'both'). */
+  correctiveSide?: 'left' | 'right' | 'both';
 }
 
 // ── Séance ─────────────────────────────────────────────────────────────────────
@@ -318,6 +328,12 @@ export interface CatalogExercise {
    * force. Ex : `['breaststroke']` pour les exos adducteurs.
    */
   strokePrehabAffinity: string[];
+  /**
+   * Axes de mobilité/mouvement que cet exo corrige (§351). Ex. `['hip','hip_hinge']`.
+   * Alimente le Bloc 2 (mobilité corrective) : un exo est candidat pour un axe
+   * déficitaire ssi `correctiveAxes` contient cet axe. Défaut `[]` (non correctif).
+   */
+  correctiveAxes: string[];
   /** `true` si exercice fondamental du seau (affiché en premier). */
   isCore: boolean;
   /**
@@ -380,6 +396,12 @@ export interface MesocycleInput {
    * Passé en paramètre pour que le moteur reste pur.
    */
   exerciseCatalog: CatalogExercise[];
+  /**
+   * §351 — routine articulaire commune (Bloc 1) : exercise_ids ordonnés issus de
+   * `warmup_common_routine`, résolus contre `exerciseCatalog`. Optionnel : absent
+   * ou `[]` → pas de Bloc 1 (rétrocompat fixtures de test).
+   */
+  commonWarmupRoutine?: number[];
   /**
    * Cycle à partir duquel démarrer la séquence du template, au lieu du 1ᵉʳ
    * cycle. Utilisé par l'ajustement mid-cycle : si le pivot tombe dans la
