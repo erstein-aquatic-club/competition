@@ -2047,7 +2047,27 @@ describe('generateMesocycle — jour-aware amorce PAP (§307)', () => {
   });
 });
 
+// ── mobilité G/D (§346) ──────────────────────────────────────────────────────
 
+import { scoreMobility, dysfunctionFlags } from '../mesocycleEngine.ts';
+
+describe('mobilité G/D (§346)', () => {
+  const v2 = (sf: [number, number]) => ({
+    mobility: { shoulder_flexion: { left: sf[0], right: sf[1] }, t_spine: { left: 3, right: 3 }, hip: { left: 3, right: 3 } },
+    movement: { scapula_control: { left: 3, right: 3 }, trunk_neck_alignment: { left: 3, right: 3 }, hip_hinge: { left: 3, right: 3 } },
+    filled_at: 'x',
+  }) as any;
+  it('scoreMobility utilise min(G,D) par axe', () => {
+    assert.equal(Math.round(scoreMobility(v2([3, 0]))!), Math.round((15 / 18) * 100));
+  });
+  it('dysfunctionFlags détecte une asymétrie unilatérale (un côté = 0)', () => {
+    assert.deepEqual(dysfunctionFlags(v2([3, 0])), ['shoulder_flexion']);
+  });
+  it('rétrocompat : ancienne forme number inchangée', () => {
+    const v1 = { mobility: { shoulder_flexion: 0, t_spine: 3, hip: 3 }, movement: { scapula_control: 3, trunk_neck_alignment: 3, hip_hinge: 3 }, filled_at: 'x' } as any;
+    assert.deepEqual(dysfunctionFlags(v1), ['shoulder_flexion']);
+  });
+});
 
 
 

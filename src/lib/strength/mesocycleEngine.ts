@@ -18,6 +18,7 @@ import type {
 } from '@/lib/api/types';
 import type { BaremeConfidence } from './kpiBaremes';
 import { getBareme, kpiScore, shiftAnchors } from './kpiBaremes';
+import { normalizePhysicalTests, effectiveAxisScore } from './physicalTests';
 import { PERIODIZATION_CYCLES } from './periodizationCycles';
 import type {
   AllBucket,
@@ -76,18 +77,16 @@ function meanScore(scores: (number | null)[]): number | null {
  * 6 sous-scores (mobility × 3 + movement × 3), chacun 0-3 → somme / 18 × 100.
  * `null` si le bilan est absent.
  */
-function scoreMobility(
+export function scoreMobility(
   physicalTests: MesocycleInput['assessment']['physical_tests'],
 ): number | null {
-  if (!physicalTests) return null;
-  const { mobility, movement } = physicalTests;
+  const pt = normalizePhysicalTests(physicalTests ?? null);
+  if (!pt) return null;
+  const { mobility, movement } = pt;
   const sum =
-    mobility.shoulder_flexion +
-    mobility.t_spine +
-    mobility.hip +
-    movement.scapula_control +
-    movement.trunk_neck_alignment +
-    movement.hip_hinge;
+    effectiveAxisScore(mobility.shoulder_flexion) + effectiveAxisScore(mobility.t_spine) +
+    effectiveAxisScore(mobility.hip) + effectiveAxisScore(movement.scapula_control) +
+    effectiveAxisScore(movement.trunk_neck_alignment) + effectiveAxisScore(movement.hip_hinge);
   return (sum / 18) * 100;
 }
 
@@ -192,16 +191,12 @@ function intensePainZones(painReports: ReadonlyArray<PainInput>): string[] {
 }
 
 /** Détecte une dysfonction de mouvement (sub-score = 0) dans physical_tests. */
-function dysfunctionFlags(physicalTests: StrengthPhysicalTests | null): string[] {
-  if (!physicalTests) return [];
+export function dysfunctionFlags(physicalTests: StrengthPhysicalTests | null): string[] {
+  const pt = normalizePhysicalTests(physicalTests);
+  if (!pt) return [];
   const flags: string[] = [];
-  const { mobility, movement } = physicalTests;
-  for (const [k, v] of Object.entries(mobility)) {
-    if (v === 0) flags.push(k);
-  }
-  for (const [k, v] of Object.entries(movement)) {
-    if (v === 0) flags.push(k);
-  }
+  for (const [k, v] of Object.entries(pt.mobility)) if (effectiveAxisScore(v) === 0) flags.push(k);
+  for (const [k, v] of Object.entries(pt.movement)) if (effectiveAxisScore(v) === 0) flags.push(k);
   return flags;
 }
 

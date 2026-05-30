@@ -928,18 +928,41 @@ export interface StrengthQuestionnaire {
   filled_at: string;             // ISO timestamp
 }
 
-/** Contenu JSONB de strength_assessments.physical_tests (saisi par le coach). */
+/** Score d'un axe de mobilité/mouvement : gauche/droite (0-3 chacun) + note libre.
+ *  §346 — pour les axes bilatéraux (trunk_neck_alignment), left === right. */
+export interface MobilityAxisScore {
+  left: number;   // 0-3
+  right: number;  // 0-3
+  note?: string;
+}
+
+/** Score brut d'un axe tel que stocké : ancienne forme (number) OU v2 (objet). */
+export type AxisScoreRaw = number | MobilityAxisScore;
+
+/** Contenu JSONB de strength_assessments.physical_tests (saisi par le coach).
+ *  Forme RAW : chaque axe peut être un number (bilans < §346) ou un
+ *  MobilityAxisScore (≥ §346). Passer par `normalizePhysicalTests` avant usage. */
 export interface StrengthPhysicalTests {
   mobility: {
-    shoulder_flexion: number;    // score 0-3
-    t_spine: number;             // score 0-3
-    hip: number;                 // score 0-3
+    shoulder_flexion: AxisScoreRaw;
+    t_spine: AxisScoreRaw;
+    hip: AxisScoreRaw;
   };
   movement: {
-    scapula_control: number;     // score 0-3
-    trunk_neck_alignment: number;// score 0-3
-    hip_hinge: number;           // score 0-3
+    scapula_control: AxisScoreRaw;
+    trunk_neck_alignment: AxisScoreRaw;
+    hip_hinge: AxisScoreRaw;
   };
+  /** Note de synthèse globale du bilan physique (§346). */
+  note?: string;
+  filled_at: string;
+}
+
+/** Forme CANONIQUE post-normalisation : chaque axe est un MobilityAxisScore. */
+export interface StrengthPhysicalTestsNormalized {
+  mobility: Record<'shoulder_flexion' | 't_spine' | 'hip', MobilityAxisScore>;
+  movement: Record<'scapula_control' | 'trunk_neck_alignment' | 'hip_hinge', MobilityAxisScore>;
+  note?: string;
   filled_at: string;
 }
 
