@@ -19240,3 +19240,24 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** Harness RLS : `schema.sql` mis à jour (colonne + INSERT de la RPC répliquée), test de régression « apply persiste start_week_monday » ajouté → `test:rls` strength-mesocycle-rpc **17→18** (les 2 échecs `coach_pace_zones`/`pace_share_links` sont **pré-existants**, drift de schéma, hors périmètre). **tsc 0 ; node:test 1456→1460 ; vitest unit 51/51 ; `npm run build` OK.**
 
 **Décisions / limites.** (a) `cycleAtWeek` couvre les plans générés frais (startPhase null) à l'identique de leur construction ; un méso déjà issu d'un ajustement (re-ajusté) garde la limite documentée (sa troncature `startPhase` n'est pas stockée) — strictement meilleur que `phaseAtWeek` dans tous les cas. (b) Migration additive (colonne nullable + RPC recréée) sans changement d'autorisation → pas de modification de policy ; `test:rls` lancé car `schema.sql` (harness) touché. **Lots suivants (à valider)** : Lot 3 guidage nageur (V5 « Semaine X/Y » désormais débloqué par C3/E2, V6 phaseName, V8), Lot 4 moteur & finitions (E1/E3/E4/R3-6), Lot 5 filet anti-régression.
+
+## §342 — Audit flux mésocycle, Lot 3 : guidage nageur (objectif · position · phases) (2026-05-30)
+
+**Contexte.** Suite des Lots 1-2 (§340/§341). Lot 3 = **frictions UX côté nageur** sur « Mon plan » muscu : le nageur ne voyait ni son objectif, ni où il en était dans le cycle, et les badges de phase affichaient une clé enum brute. S'appuie directement sur la fiabilisation Lot 2 (position de semaine exacte). UI via skill `frontend-design`.
+
+**V5 — bandeau « hero » objectif · Semaine X/Y · phase.**
+- *Cause racine.* `MyPlanTab` chargeait `activeMesocycle` (event_group, target_week_count, generated_at, start_week_monday) mais n'en affichait RIEN — aucune position dans le cycle, aucun objectif.
+- *Fix.* Helpers purs `src/lib/strength/mesocycleProgress.ts` : `formatEventGroupLabel('freestyle_50' → '50 m crawl')` (repli brut si nage/distance inconnue) + `mesocyclePosition(startMonday, totalWeeks, currentMonday)` → `{weekNumber (borné [1,total]), totalWeeks, status: upcoming|active|done}`. Nouveau composant présentationnel `MyPlanMesocycleBanner.tsx` (accent de phase, halo doux, objectif en hero, barre de progression `role=progressbar`, chip de phase). `MyPlanTab` calcule les props dans un `useMemo` **avant tout early return** (#310-safe), lundi de départ = `start_week_monday` §341 ?? 1re semaine matérialisée ; rendu seulement quand le mésocycle est la source affichée (`usePhase2`).
+- *V8 inclus.* Le bandeau porte « Généré le {date} » (`generated_at`) → le nageur voit quand le plan a été (re)généré.
+
+**V6 — badges de phase lisibles et distincts.**
+- *Cause racine.* `MyPlanWeekCard` affichait `instance.phase.toUpperCase()` (clé enum interne) → « TAPER » au lieu de « Affûtage », et **Maintien/Affûtage indiscernables** (tous deux « TAPER »).
+- *Fix.* Nouveau `shortPhaseLabel(phaseName)` (`strengthPhaseStyles.ts`) : raccourcit les 2 libellés longs du méso (« Préparation générale »→« Prépa », « Puissance / vitesse »→« Puissance »), passe le reste inchangé. Le badge affiche `shortPhaseLabel(instance.phaseName)` (le vrai `week_type`), tronqué + `title` complet, **masqué si la semaine n'a pas de phase** (plus de badge trompeur).
+
+**V3 — fin du badge « FORCE » rouge par défaut.**
+- *Cause racine.* `detectPhase("")` retournait `"force"` → les semaines sans `week_override` (slots de groupe) affichaient un point/badge rouge « FORCE » trompeur.
+- *Fix.* `detectPhase("")`/whitespace → `"reprise"` (gris neutre).
+
+**Tests / vérifs.** TDD : `mesocycleProgress.test.ts` (10 : libellé event_group, position active/upcoming/done/bornes), `strengthPhaseStyles.test.ts` (4 : `detectPhase` vide→reprise, libellés méso, `shortPhaseLabel`), `MyPlanMesocycleBanner.vitest.tsx` (4 : objectif/Semaine X-Y/phase/date, upcoming « Débute bientôt » + aria-valuenow 0, done « Cycle terminé », raccourci de libellé). **tsc 0 ; node:test 1460→1474 ; vitest unit 51→55 ; `npm run build` OK.** Aucune migration/RLS.
+
+**Limites / honnêteté.** Vérifié par tests de rendu (DOM) + tsc + build : **pas de screenshot live** (l'écran authentifié nécessite les credentials Supabase, présents seulement dans les GitHub Secrets — un build local affiche « Supabase not configured »). Le bandeau ne s'affiche que pour un mésocycle actif rendu en Phase 2 ; la phase courante vient du `week_type` matérialisé de la semaine en cours (null hors fenêtre → pas de chip, accent neutre). **Lots restants** : Lot 4 (E1 `papPreferLegPower`, E3 schémas génériques, E4 clamp psy, R3-R6 runner, V7 badge reader, V9 message d'erreur, V10 a11y), Lot 5 (smoke e2e + lints).

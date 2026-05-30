@@ -11,6 +11,9 @@ export const PHASE_STYLES: Record<StrengthPhase, {
 };
 
 export function detectPhase(name: string): StrengthPhase {
+  // V3 (§341) — un libellé vide (semaine sans week_override) ne doit PAS
+  // retomber sur "force" (badge/point rouge trompeur). Neutre = reprise (gris).
+  if (!name.trim()) return "reprise";
   const n = name.toLowerCase();
   if (n.includes("reprise") || n.includes("s0") || n.includes("préparation générale") || n.includes("prepa")) return "reprise";
   if (n.includes("force")) return "force";
@@ -19,4 +22,22 @@ export function detectPhase(name: string): StrengthPhase {
   if (n.includes("taper") || n.includes("maintien") || n.includes("affûtage") || n.includes("affutage")) return "taper";
   if (n.includes("compét") || n.includes("compet") || n.includes("pic")) return "compétition";
   return "force";
+}
+
+/**
+ * V6 (§341) — libellé COMPACT et DISTINCT pour le badge de phase, à partir du
+ * `week_type` matérialisé (`phaseName`). Évite (a) la clé enum brute (« TAPER »)
+ * et (b) la confusion Maintien/Affûtage (qui partageaient « TAPER »). Raccourcit
+ * uniquement les 2 libellés longs du mésocycle ; tout autre libellé (cycles
+ * legacy, plans coach) passe inchangé.
+ */
+export function shortPhaseLabel(phaseName: string): string {
+  switch (phaseName) {
+    case "Préparation générale":
+      return "Prépa";
+    case "Puissance / vitesse":
+      return "Puissance";
+    default:
+      return phaseName;
+  }
 }

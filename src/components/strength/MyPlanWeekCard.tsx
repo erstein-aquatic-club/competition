@@ -3,7 +3,7 @@ import { ChevronDown, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Competition, StrengthSessionTemplate } from "@/lib/api/types";
 import type { WeekInstance } from "@/lib/strength/strengthPlanWeeks";
-import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
+import { PHASE_STYLES, shortPhaseLabel } from "@/lib/strength/strengthPhaseStyles";
 import { fmtDD_MM } from "@/components/coach/swim/swimPlanningShared";
 import { MyPlanSessionRow } from "./MyPlanSessionRow";
 
@@ -76,15 +76,21 @@ export function MyPlanWeekCard({
           <span className="text-[11px] text-muted-foreground shrink-0">
             {fmtDD_MM(instance.week.monday)} – {fmtDD_MM(instance.week.sunday)}
           </span>
-          <span
-            className={cn(
-              "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold border-0 shrink-0",
-              style.bg,
-              style.text,
-            )}
-          >
-            {instance.phase.toUpperCase()}
-          </span>
+          {/* V6 (§341) — libellé métier compact (« Affûtage », « Pic »…) au lieu
+              de la clé enum brute (« TAPER »), Maintien/Affûtage enfin distincts.
+              Masqué si la semaine n'a pas de phase (pas de badge trompeur). */}
+          {instance.phaseName ? (
+            <span
+              className={cn(
+                "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold border-0 shrink-0 max-w-[7.5rem] truncate",
+                style.bg,
+                style.text,
+              )}
+              title={instance.phaseName}
+            >
+              {shortPhaseLabel(instance.phaseName)}
+            </span>
+          ) : null}
           {/* Session preview dots */}
           {instance.sessions.length > 0 && (
             <div className="flex items-center gap-0.5">

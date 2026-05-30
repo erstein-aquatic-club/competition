@@ -22,6 +22,11 @@ import { toISODate } from "@/lib/date";
 import { buildWeekInstances } from "@/lib/strength/strengthPlanWeeks";
 import type { WeekInstance } from "@/lib/strength/strengthPlanWeeks";
 import { MyPlanWeekCard } from "./MyPlanWeekCard";
+import { MyPlanMesocycleBanner } from "./MyPlanMesocycleBanner";
+import {
+  formatEventGroupLabel,
+  mesocyclePosition,
+} from "@/lib/strength/mesocycleProgress";
 import { useCompetitionsByWeek } from "@/hooks/useCompetitionsByWeek";
 import {
   Sheet,
@@ -380,6 +385,43 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     return null;
   }, [hasActiveMesocycle, athleteOverrides]);
 
+  // ── V5 (§341) — bandeau « hero » : objectif · Semaine X/Y · phase en cours.
+  // Hook AVANT tout early return (mémoire #310). Ne se matérialise que pour un
+  // mésocycle actif ; `start_week_monday` (§341 C3) sinon repli sur la 1re
+  // semaine matérialisée du méso.
+  const mesocycleBanner = useMemo(() => {
+    if (!hasActiveMesocycle || !activeMesocycle) return null;
+    const planStartMonday = activeMesocycle.start_week_monday ?? firstMesoWeekKey;
+    const totalWeeks = activeMesocycle.target_week_count;
+    if (!planStartMonday || !totalWeeks) return null;
+    const currentMonday = toISODate(getMonday(new Date()));
+    const position = mesocyclePosition(planStartMonday, totalWeeks, currentMonday);
+    const phaseLabel = weekTypeByStart.get(currentMonday) ?? null;
+    let generatedAtLabel: string | null = null;
+    if (activeMesocycle.generated_at) {
+      const d = new Date(activeMesocycle.generated_at);
+      if (!Number.isNaN(d.getTime())) {
+        generatedAtLabel = d.toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "short",
+        });
+      }
+    }
+    return {
+      objective: formatEventGroupLabel(activeMesocycle.event_group),
+      kindLabel:
+        activeMesocycle.kind === "season"
+          ? "Prépa de saison"
+          : "Inter-compétitions",
+      weekNumber: position.weekNumber,
+      totalWeeks: position.totalWeeks,
+      status: position.status,
+      phaseLabel,
+      phase: detectPhase(phaseLabel ?? ""),
+      generatedAtLabel,
+    };
+  }, [hasActiveMesocycle, activeMesocycle, firstMesoWeekKey, weekTypeByStart]);
+
   useEffect(() => {
     if (weekInstances.length > 0 && expandedWeekKey === null) {
       // 1) Si meso actif → première semaine du méso (si présente dans la timeline)
@@ -497,31 +539,39 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
 
   // ── Timeline ────────────────────────────────────────────────────────────────
   return (
-    <div className="relative pt-1 pb-4">
+    <div className="pt-1 pb-4">
       {recapButton}
-      {/* Vertical timeline rail */}
-      <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
+      {/* V5 (§341) — bandeau objectif/position du cycle, au-dessus de la timeline.
+          Affiché uniquement quand c'est bien le mésocycle qui est rendu. */}
+      {usePhase2 && mesocycleBanner && (
+        <MyPlanMesocycleBanner {...mesocycleBanner} />
+      )}
 
-      {weekInstances.map((inst) => {
-        const weekCompetitions = competitionsByWeek.get(inst.week.weekKey) ?? [];
-        return (
-          <MyPlanWeekCard
-            key={`${inst.cycleId}-${inst.week.weekKey}`}
-            instance={inst}
-            isCurrent={isCurrentWeek(inst.week.weekKey)}
-            isExpanded={expandedWeekKey === inst.week.weekKey}
-            onToggleExpand={() =>
-              setExpandedWeekKey((k) =>
-                k === inst.week.weekKey ? null : inst.week.weekKey,
-              )
-            }
-            competitions={weekCompetitions}
-            getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
-            onSelectSession={onSelectSession}
-            onSelectCompetition={setSelectedCompetition}
-          />
-        );
-      })}
+      {/* Timeline (rail décoratif scopé à la liste des semaines) */}
+      <div className="relative">
+        <div className="absolute left-[27px] top-8 bottom-8 w-px bg-border" />
+
+        {weekInstances.map((inst) => {
+          const weekCompetitions = competitionsByWeek.get(inst.week.weekKey) ?? [];
+          return (
+            <MyPlanWeekCard
+              key={`${inst.cycleId}-${inst.week.weekKey}`}
+              instance={inst}
+              isCurrent={isCurrentWeek(inst.week.weekKey)}
+              isExpanded={expandedWeekKey === inst.week.weekKey}
+              onToggleExpand={() =>
+                setExpandedWeekKey((k) =>
+                  k === inst.week.weekKey ? null : inst.week.weekKey,
+                )
+              }
+              competitions={weekCompetitions}
+              getDayCompetitions={(monday, dayIndex) => getDayCompetitions(monday, dayIndex)}
+              onSelectSession={onSelectSession}
+              onSelectCompetition={setSelectedCompetition}
+            />
+          );
+        })}
+      </div>
 
       {/* Competition info sheet */}
       {selectedCompetition && (
