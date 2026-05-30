@@ -64,6 +64,7 @@ import {
   Dumbbell,
   Hourglass,
   Send,
+  StickyNote,
   StretchHorizontal,
   Users,
   UserPlus,
@@ -75,6 +76,7 @@ import { KpiSwimmerPicker } from "@/components/strength/kpi/KpiSwimmerPicker";
 import { initials } from "@/components/strength/kpi/kpiHelpers";
 import { AssessmentContext } from "@/components/strength/assessment/AssessmentContext";
 import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
+import { AssessmentBilateralField } from "@/components/strength/assessment/AssessmentBilateralField";
 import { StrengthAthleteProfileCard } from "@/components/strength/assessment/StrengthAthleteProfileCard";
 import { BilanProgress } from "@/components/strength/assessment/BilanProgress";
 import { isProfileComplete } from "@/lib/strength/bilanProgress";
@@ -83,24 +85,23 @@ import {
   MOBILITY_SCORES,
   MOVEMENT_SCORES,
   SCORE_LEGEND,
-  SCORE_UNSET,
   type AssessmentScoreItem,
-  type MobilityScoreKey,
-  type MovementScoreKey,
 } from "@/components/strength/assessment/assessmentScores";
+import {
+  type ScoreState,
+  emptyScores,
+  allAxesScored,
+  scoredAxisCount,
+  buildPhysicalTestsPayload,
+  scoreStateFromNormalized,
+  BILATERAL_KEYS,
+} from "@/pages/coach/strengthAssessmentPayload";
+import {
+  normalizePhysicalTests,
+  effectiveAxisScore,
+} from "@/lib/strength/physicalTests";
 
 const ALL_SCORES: AssessmentScoreItem[] = [...MOBILITY_SCORES, ...MOVEMENT_SCORES];
-
-/** Every score key, mobility + movement. */
-type ScoreKey = MobilityScoreKey | MovementScoreKey;
-
-/** Per-score-key state. Sentinel SCORE_UNSET = not yet picked. */
-type ScoreState = Record<ScoreKey, number>;
-
-const emptyScores = (): ScoreState =>
-  Object.fromEntries(
-    ALL_SCORES.map((s) => [s.key, SCORE_UNSET]),
-  ) as ScoreState;
 
 /**
  * Centered single-message state (loading-free), reused by several screen
@@ -251,24 +252,37 @@ export default function StrengthAssessmentScreen() {
   const bilanSteps = useBilanSteps(selectedAthleteId, status, hasKpis, hasActiveMesocycle, "physical");
   const BilanProgressStrip = <BilanProgress steps={bilanSteps} />;
 
-  /** Note du bilan précédent pour un axe (null si aucun bilan antérieur). */
+  /** Bilan précédent normalisé (G/D + note) pour la comparaison §301 T5. */
+  const prevNormalized = useMemo(
+    () => normalizePhysicalTests(prevPhysical ?? null),
+    [prevPhysical],
+  );
+
+  /** Score effectif (min G/D) du bilan précédent pour un axe (null si aucun). */
   const prevScoreFor = (item: AssessmentScoreItem): number | null => {
-    if (!prevPhysical) return null;
-    const group = prevPhysical[item.group] as
-      | Record<string, number>
+    if (!prevNormalized) return null;
+    const group = prevNormalized[item.group] as
+      | Record<string, { left: number; right: number }>
       | undefined;
-    const v = group?.[item.key];
-    return typeof v === "number" ? v : null;
+    const axis = group?.[item.key];
+    return axis ? effectiveAxisScore(axis) : null;
   };
 
-  // Reset the form whenever the athlete or the assessment identity changes —
-  // a stale half-filled form must never leak across swimmers.
+  // Préremplit le formulaire depuis le bilan en cours (édition / reprise), en
+  // passant par `normalizePhysicalTests` : un ancien bilan (number par axe)
+  // remonte en G=D, un bilan v2 montre ses vrais G/D + notes. Reset si l'axe
+  // ou l'identité du bilan change — un formulaire à moitié rempli ne doit
+  // jamais fuiter d'un nageur à l'autre.
   useEffect(() => {
-    setScores(emptyScores());
+    setScores(
+      scoreStateFromNormalized(
+        normalizePhysicalTests(assessment?.physical_tests ?? null),
+      ),
+    );
     setSubmittedLocally(false);
-  }, [selectedAthleteId, assessment?.id]);
+  }, [selectedAthleteId, assessment?.id, assessment?.physical_tests]);
 
-  const allScored = ALL_SCORES.every((s) => scores[s.key] >= 0);
+  const allScored = allAxesScored(scores);
 
   // ── Mutations ──
   const createMutation = useMutation({
@@ -306,19 +320,10 @@ export default function StrengthAssessmentScreen() {
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (assessment == null) throw new Error("Bilan non résolu");
-      const physicalTests: StrengthPhysicalTests = {
-        mobility: {
-          shoulder_flexion: scores.shoulder_flexion,
-          t_spine: scores.t_spine,
-          hip: scores.hip,
-        },
-        movement: {
-          scapula_control: scores.scapula_control,
-          trunk_neck_alignment: scores.trunk_neck_alignment,
-          hip_hinge: scores.hip_hinge,
-        },
-        filled_at: new Date().toISOString(),
-      };
+      const physicalTests: StrengthPhysicalTests = buildPhysicalTestsPayload(
+        scores,
+        new Date().toISOString(),
+      );
       // §314 (#3) — le coach note la mobilité/mouvement au bord du bassin, où le
       // réseau est souvent instable/coupé. UPDATE idempotent → mise en file +
       // replay sûr hors-ligne (pas de doublon).
@@ -731,7 +736,7 @@ export default function StrengthAssessmentScreen() {
   /* ════════════════════════════════════════════════════════════
      Branch — bilan_pending → scoring form + read-only context
      ════════════════════════════════════════════════════════════ */
-  const scoredCount = ALL_SCORES.filter((s) => scores[s.key] >= 0).length;
+  const { done: scoredCount, total: totalAxes } = scoredAxisCount(scores);
 
   const renderScoreGroup = (
     title: string,
@@ -746,17 +751,44 @@ export default function StrengthAssessmentScreen() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {items.map((item) => (
-          <AssessmentScoreField
-            key={item.key}
-            item={item}
-            value={scores[item.key]}
-            previous={prevScoreFor(item)}
-            onChange={(v) =>
-              setScores((prev) => ({ ...prev, [item.key]: v }))
-            }
-          />
-        ))}
+        {items.map((item) => {
+          const axis = scores.axes[item.key];
+          // §346 — cinq axes saisis en bilatéral G/D + note ; l'alignement
+          // tronc/nuque reste un score unique (écrit left === right).
+          if (BILATERAL_KEYS.has(item.key)) {
+            return (
+              <AssessmentBilateralField
+                key={item.key}
+                item={item}
+                value={axis}
+                previous={prevScoreFor(item)}
+                onChange={(v) =>
+                  setScores((prev) => ({
+                    ...prev,
+                    axes: { ...prev.axes, [item.key]: v },
+                  }))
+                }
+              />
+            );
+          }
+          return (
+            <AssessmentScoreField
+              key={item.key}
+              item={item}
+              value={axis.left}
+              previous={prevScoreFor(item)}
+              onChange={(v) =>
+                setScores((prev) => ({
+                  ...prev,
+                  axes: {
+                    ...prev.axes,
+                    [item.key]: { ...prev.axes[item.key], left: v, right: v },
+                  },
+                }))
+              }
+            />
+          );
+        })}
       </CardContent>
     </Card>
   );
@@ -845,6 +877,35 @@ export default function StrengthAssessmentScreen() {
           <Dumbbell className="h-4 w-4 text-primary" />,
           MOVEMENT_SCORES,
         )}
+
+        {/* Note de synthèse globale (§346) — optionnelle */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <StickyNote className="h-4 w-4 text-primary" />
+              Note de synthèse
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <label
+              htmlFor="assessment-synthesis-note"
+              className="mb-1.5 block text-xs text-muted-foreground"
+            >
+              Impression d'ensemble, priorités, points de vigilance (optionnel).
+            </label>
+            <textarea
+              id="assessment-synthesis-note"
+              aria-label="Note de synthèse du bilan physique"
+              value={scores.note}
+              onChange={(e) =>
+                setScores((prev) => ({ ...prev, note: e.target.value }))
+              }
+              rows={3}
+              placeholder="Ex : bonne mobilité d'épaule, charnière de hanche à travailler en priorité…"
+              className="w-full resize-none rounded-xl border bg-muted/20 px-3 py-2 text-sm leading-snug text-foreground placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Sticky submit bar */}
@@ -867,7 +928,8 @@ export default function StrengthAssessmentScreen() {
               aria-live="polite"
               className="text-center text-[11px] text-muted-foreground"
             >
-              Note les 6 critères ({scoredCount}/6) pour enregistrer.
+              Note les {totalAxes} critères ({scoredCount}/{totalAxes}) pour
+              enregistrer — les deux côtés (G&nbsp;/&nbsp;D) pour chaque axe.
             </p>
           )}
         </div>
