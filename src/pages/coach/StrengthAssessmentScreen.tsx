@@ -41,6 +41,7 @@ import {
   getPreviousCompletedPhysicalTests,
   getActiveMesocycle,
   getProfile,
+  listAssessments,
 } from "@/lib/api";
 import { tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
 import { useAuth } from "@/lib/auth";
@@ -78,6 +79,7 @@ import { AssessmentContext } from "@/components/strength/assessment/AssessmentCo
 import { AssessmentScoreField } from "@/components/strength/assessment/AssessmentScoreField";
 import { AssessmentBilateralField } from "@/components/strength/assessment/AssessmentBilateralField";
 import { StrengthAthleteProfileCard } from "@/components/strength/assessment/StrengthAthleteProfileCard";
+import { BilanHistorySection } from "@/components/strength/assessment/BilanHistorySection";
 import { BilanProgress } from "@/components/strength/assessment/BilanProgress";
 import { isProfileComplete } from "@/lib/strength/bilanProgress";
 import { useBilanSteps } from "@/hooks/useBilanSteps";
@@ -227,6 +229,16 @@ export default function StrengthAssessmentScreen() {
     enabled: selectedAthleteId != null,
   });
 
+  // ── Historique complet des bilans (tous statuts, récent en premier) —
+  // alimente la section « Historique des bilans » + la courbe d'évolution
+  // mobilité G/D (§347). Aucune requête supplémentaire pour le chart : il
+  // dérive de cette même liste. Gated sur l'athlète sélectionné.
+  const { data: assessmentHistory = [] } = useQuery<StrengthAssessment[]>({
+    queryKey: ["assessment-history", selectedAthleteId],
+    queryFn: () => listAssessments(selectedAthleteId!),
+    enabled: selectedAthleteId != null,
+  });
+
   // ── Méso actif + profil nageur — pour la 4e étape du fil conducteur (§A) ──
   const { data: activeMesocycle } = useQuery({
     queryKey: ["active-mesocycle", selectedAthleteId],
@@ -309,6 +321,9 @@ export default function StrengthAssessmentScreen() {
       await queryClient.refetchQueries({
         queryKey: ["strength-assessment", selectedAthleteId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["assessment-history", selectedAthleteId],
+      });
     },
     onError: (err: Error) => {
       toast.error("Impossible de démarrer le bilan", {
@@ -347,6 +362,9 @@ export default function StrengthAssessmentScreen() {
       });
       await queryClient.invalidateQueries({
         queryKey: ["strength-assessment", selectedAthleteId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["assessment-history", selectedAthleteId],
       });
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
@@ -630,6 +648,11 @@ export default function StrengthAssessmentScreen() {
               </ol>
             </CardContent>
           </Card>
+
+          {/* Historique + courbe d'évolution mobilité (§347) */}
+          <div className="mt-4">
+            <BilanHistorySection assessments={assessmentHistory} />
+          </div>
         </div>
 
         <div className="sticky bottom-0 border-t bg-background/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
@@ -906,6 +929,9 @@ export default function StrengthAssessmentScreen() {
             />
           </CardContent>
         </Card>
+
+        {/* Historique des bilans passés + courbe d'évolution mobilité (§347) */}
+        <BilanHistorySection assessments={assessmentHistory} />
       </div>
 
       {/* Sticky submit bar */}

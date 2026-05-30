@@ -32,6 +32,7 @@ vi.mock("@/lib/api", () => ({
   getAthletes: vi.fn(async () => [{ id: 1, display_name: "Alice", avatar_url: null }]),
   getLatestAssessment: vi.fn(async () => null),
   createAssessment: vi.fn(async () => ({ id: "a1" })),
+  listAssessments: vi.fn(async () => []),
   updateAssessmentPhysicalTests: vi.fn(async () => undefined),
   getLatestKpiMeasurements: vi.fn(async () => ({})),
   getPreviousCompletedPhysicalTests: vi.fn(async () => null),

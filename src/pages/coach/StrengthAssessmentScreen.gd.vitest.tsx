@@ -81,6 +81,7 @@ vi.mock("@/lib/api", () => ({
     data_confidence: "high",
   })),
   createAssessment: vi.fn(async () => ({ id: "a1" })),
+  listAssessments: vi.fn(async () => []),
   updateAssessmentPhysicalTests: (...args: unknown[]) => updateSpy(...args),
   getLatestKpiMeasurements: vi.fn(async () => ({})),
   getPreviousCompletedPhysicalTests: vi.fn(async () => null),
