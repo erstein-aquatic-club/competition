@@ -1389,6 +1389,7 @@ CREATE TABLE public.strength_mesocycles (
                       CHECK (status IN ('active','reverted','superseded')),
   bucket_priorities JSONB,
   engine_version    TEXT NOT NULL,
+  start_week_monday DATE, -- §340 Lot 2 (C3) : lundi de la semaine 1, persisté par la RPC
   generated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   generated_by      INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1553,11 +1554,11 @@ BEGIN
   INSERT INTO strength_mesocycles (
     athlete_id, assessment_id, template_id, event_group, kind,
     target_week_count, sessions_per_week, status,
-    bucket_priorities, engine_version, generated_by
+    bucket_priorities, engine_version, generated_by, start_week_monday
   ) VALUES (
     p_athlete_id, p_assessment_id, p_template_id, p_event_group, p_kind,
     p_target_week_count, p_sessions_per_week, 'active',
-    p_bucket_priorities, p_engine_version, v_caller_id
+    p_bucket_priorities, p_engine_version, v_caller_id, p_start_week_monday
   ) RETURNING id INTO v_mesocycle_id;
   v_short_id := substring(v_mesocycle_id::text from 1 for 8);
   INSERT INTO strength_planning_snapshots (mesocycle_id, athlete_id, slot_overrides, week_overrides)

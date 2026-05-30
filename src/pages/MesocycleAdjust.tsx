@@ -216,15 +216,19 @@ export default function MesocycleAdjust() {
     [meso, signature, profile_],
   );
 
-  // ── Lundi de depart du meso (approximation documentee) ──────────────────────
-  // La ligne `strength_mesocycles` ne persiste PAS la date de depart reelle
-  // (choisie par le coach lors de la generation). On l'approxime par le lundi de la semaine de
-  // generation (`generated_at`). Acceptable pour l'apercu d'ajustement : le coach
-  // valide visuellement le pivot et la phase affichee. Limite connue a noter (B7).
-  const startMonday = useMemo(
-    () => (meso ? toISODate(getMonday(new Date(meso.generated_at))) : null),
-    [meso],
-  );
+  // ── Lundi de depart du meso ─────────────────────────────────────────────────
+  // §340 Lot 2 (C3) : on prefere la date EXACTE persistee par la RPC
+  // (`start_week_monday`). Repli pour les mesos anterieurs : lundi de la semaine
+  // de `generated_at`, TZ-safe — on tronque la composante horaire AVANT le parse
+  // local, sinon un timestamp UTC tardif (ex. jeudi 22:30Z = vendredi local)
+  // decalait le lundi d'une semaine → `weeksRemaining` faux en fin de cycle.
+  const startMonday = useMemo(() => {
+    if (!meso) return null;
+    if (meso.start_week_monday) return meso.start_week_monday;
+    return toISODate(
+      getMonday(new Date(`${meso.generated_at.slice(0, 10)}T00:00:00`)),
+    );
+  }, [meso]);
 
   // ── Etat du formulaire ──────────────────────────────────────────────────────
   const [pivotMonday, setPivotMonday] = useState<string>(() => nextMonday());

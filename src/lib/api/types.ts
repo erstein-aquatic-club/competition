@@ -1145,6 +1145,12 @@ export interface StrengthMesocycle {
   /** Snapshot du raisonnement du moteur (6 scores de seau, priorités, data_confidence). */
   bucket_priorities: Record<string, unknown> | null;
   engine_version: string;
+  /**
+   * Lundi de la semaine 1 du plan (ISO YYYY-MM-DD). Persisté par la RPC §340 ;
+   * `null` pour les mésos antérieurs (l'UI retombe alors sur l'approximation
+   * TZ-safe du lundi de `generated_at`).
+   */
+  start_week_monday?: string | null;
   generated_at: string;
   generated_by: number | null;
   created_at: string;

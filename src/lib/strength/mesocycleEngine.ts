@@ -577,6 +577,31 @@ export function periodize(
   return weeks;
 }
 
+/**
+ * Cycle de périodisation RÉELLEMENT alloué à un index de semaine 0-based, en
+ * rejouant `periodize` (le même algorithme que la construction du plan → fidèle
+ * à l'étirement/compression). Source unique de vérité « phase à la semaine N »
+ * pour un plan matérialisé — à préférer à `phaseAtWeek` (walk nominal) qui
+ * diverge dès que `totalWeeks ≠ Σ nominal_weeks` (§340 Lot 2, finding E2).
+ *
+ * `null` si l'index est hors plage ou si `periodize` rejette (totalWeeks hors
+ * [Σ min, Σ max]) — l'appelant retombe alors sur un libellé neutre.
+ */
+export function cycleAtWeek(
+  template: StrengthPeriodizationTemplate,
+  totalWeeks: number,
+  weekIndex0: number,
+): PeriodizationCycle | null {
+  if (weekIndex0 < 0) return null;
+  let weeks: PeriodizedWeek[];
+  try {
+    weeks = periodize(template, totalWeeks);
+  } catch {
+    return null;
+  }
+  return weeks[weekIndex0]?.cycle ?? null;
+}
+
 function buildOverrideRationale(painZones: string[], dysfns: string[]): string {
   const parts: string[] = [];
   if (painZones.length > 0) {

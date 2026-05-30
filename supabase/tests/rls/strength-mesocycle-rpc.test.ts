@@ -187,6 +187,20 @@ describe("apply_strength_mesocycle RLS", () => {
     });
   });
 
+  it("apply persiste start_week_monday (§340 Lot 2 C3)", async () => {
+    await asUser(ALICE, async (c) => {
+      const apply = await c.query<{ mesocycle_id: string }>(applySql, [
+        1, A_ASSESS, TEMPLATE, START_MONDAY, REASONING, PAYLOAD,
+      ]);
+      const mesoId = apply.rows[0].mesocycle_id;
+      const meso = await c.query<{ start_week_monday: string }>(
+        "SELECT start_week_monday::text FROM strength_mesocycles WHERE id = $1",
+        [mesoId],
+      );
+      expect(meso.rows[0].start_week_monday).toBe(START_MONDAY);
+    });
+  });
+
   it("apply supersede le mésocycle 'active' précédent du même nageur", async () => {
     await asUser(ALICE, async (c) => {
       const first = await c.query<{ mesocycle_id: string }>(applySql, [

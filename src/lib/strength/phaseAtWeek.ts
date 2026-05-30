@@ -5,10 +5,15 @@ import type {
 
 /**
  * Given a periodization template and a 0-based week index, return the cycle
- * at that week (walking nominal_weeks of each phase in order).
+ * at that week by walking **nominal_weeks** of each phase in order.
  *
- * Returns null if weekIndex is out of range. Used by the mid-cycle adjust
- * feature to preserve the phase sequence when re-rolling from a pivot.
+ * Returns null if weekIndex is out of range.
+ *
+ * ⚠️ Walk NOMINAL : ne reflète PAS l'étirement/compression appliqué par
+ * `periodize` quand `totalWeeks ≠ Σ nominal_weeks`. Pour la phase réelle d'un
+ * plan matérialisé, utiliser `cycleAtWeek(template, totalWeeks, idx)`
+ * (mesocycleEngine.ts) — source unique fidèle à `periodize` (§340 Lot 2, E2).
+ * Conservé pour ses tests et comme référence du mapping nominal.
  */
 export function phaseAtWeek(
   template: StrengthPeriodizationTemplate,

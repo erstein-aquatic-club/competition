@@ -1030,6 +1030,42 @@ describe('periodize', () => {
   });
 });
 
+// ── cycleAtWeek (phase réelle d'un plan, §340 Lot 2 E2) ──────────────────────
+
+import { cycleAtWeek } from '../mesocycleEngine.ts';
+
+describe('cycleAtWeek', () => {
+  function stretchTpl(): StrengthPeriodizationTemplate {
+    const t = makeTemplate({});
+    t.structure.phases = [
+      { cycle: 'prepa_generale', min_weeks: 1, nominal_weeks: 1, max_weeks: 3 },
+      { cycle: 'force_max', min_weeks: 1, nominal_weeks: 1, max_weeks: 3 },
+    ];
+    return t;
+  }
+
+  it('plan étiré : suit periodize, PAS nominal_weeks', () => {
+    // totalWeeks=4 → periodize étire prepa=2, force_max=2.
+    const t = stretchTpl();
+    assert.equal(cycleAtWeek(t, 4, 0), 'prepa_generale');
+    assert.equal(cycleAtWeek(t, 4, 1), 'prepa_generale'); // nominal dirait force_max
+    assert.equal(cycleAtWeek(t, 4, 2), 'force_max');
+    assert.equal(cycleAtWeek(t, 4, 3), 'force_max');
+  });
+
+  it('index hors plage → null', () => {
+    const t = stretchTpl();
+    assert.equal(cycleAtWeek(t, 4, -1), null);
+    assert.equal(cycleAtWeek(t, 4, 4), null);
+  });
+
+  it('totalWeeks hors [Σ min, Σ max] (periodize throw) → null, pas d’exception', () => {
+    const t = stretchTpl(); // Σ min = 2, Σ max = 6
+    assert.equal(cycleAtWeek(t, 99, 0), null);
+    assert.equal(cycleAtWeek(t, 1, 0), null);
+  });
+});
+
 // ── periodize startPhase (meso-adjust) ───────────────────────────────────────
 
 function makeT8Template(): StrengthPeriodizationTemplate {

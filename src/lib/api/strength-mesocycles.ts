@@ -33,7 +33,7 @@ import type {
   StrengthMesocycle,
   StrengthPeriodizationTemplate,
 } from './types';
-import { phaseAtWeek } from '@/lib/strength/phaseAtWeek';
+import { cycleAtWeek } from '@/lib/strength/mesocycleEngine';
 
 /**
  * Exécute le moteur de génération localement, sans aucun appel réseau.
@@ -564,8 +564,9 @@ export function getCurrentMesocyclePhaseInfo(args: {
   );
   const weekIndex = Math.min(Math.max(diffWeeks, 0), totalWeeks);
   const weeksRemaining = Math.max(0, totalWeeks - weekIndex);
+  // E2 — phase dérivée de l'allocation RÉELLE (periodize), pas du walk nominal.
   const phaseKey =
-    weeksRemaining > 0 ? phaseAtWeek(template, weekIndex) : null;
+    weeksRemaining > 0 ? cycleAtWeek(template, totalWeeks, weekIndex) : null;
   return { weekIndex, weeksRemaining, phaseKey };
 }
 

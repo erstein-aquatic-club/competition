@@ -39,6 +39,39 @@ const TEMPLATE: StrengthPeriodizationTemplate = {
 
 const START = '2026-01-05'; // un lundi
 
+// E2 — Template ÉTIRABLE : 2 phases nominales (Σ=2) mais étirables jusqu'à 6.
+// prepa_generale(min1,nom1,max3) | force_max(min1,nom1,max3).
+// Sur un plan de 4 semaines, `periodize` étire → prepa=2, force_max=2 :
+//   index 0-1 = prepa_generale, 2-3 = force_max.
+// Le walk NOMINAL (phaseAtWeek) dirait au contraire index 1 = force_max
+// (acc prepa nominal = 1) → divergence que ce test verrouille.
+const STRETCH_TEMPLATE: StrengthPeriodizationTemplate = {
+  ...TEMPLATE,
+  id: 'stretch-template',
+  name: 'Test étirable',
+  min_week_count: 2,
+  max_week_count: 6,
+  structure: {
+    ...TEMPLATE.structure,
+    phases: [
+      { cycle: 'prepa_generale', min_weeks: 1, nominal_weeks: 1, max_weeks: 3 },
+      { cycle: 'force_max', min_weeks: 1, nominal_weeks: 1, max_weeks: 3 },
+    ],
+  },
+};
+
+test('plan étiré : la phase suit periodize (réel), pas nominal_weeks — E2', () => {
+  const info = getCurrentMesocyclePhaseInfo({
+    startMonday: START,
+    totalWeeks: 4, // > Σ nominal (2) → periodize étire prepa=2, force_max=2
+    template: STRETCH_TEMPLATE,
+    pivotMonday: '2026-01-12', // +1 semaine → index 1, encore en prepa
+  });
+  assert.equal(info.weekIndex, 1);
+  assert.equal(info.weeksRemaining, 3);
+  assert.equal(info.phaseKey, 'prepa_generale');
+});
+
 test('pivot 2 semaines après le départ → index 2, 4 restantes, puissance', () => {
   const info = getCurrentMesocyclePhaseInfo({
     startMonday: START,

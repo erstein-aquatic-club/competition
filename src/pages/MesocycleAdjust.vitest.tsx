@@ -8,7 +8,7 @@
 //
 // Mocks : wouter (route athleteId=18 + navigate espionne) et @/lib/api (toutes
 // les fonctions importees par la page). getCurrentMesocyclePhaseInfo est PUR :
-// on le re-implemente dans le mock via le vrai phaseAtWeek (aucun I/O) pour que
+// on le re-implemente dans le mock via le vrai cycleAtWeek (aucun I/O) pour que
 // la phase et les semaines restantes soient calculees pour de vrai.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
@@ -30,7 +30,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as unknown as typeof ResizeObserver;
 }
 
-import { phaseAtWeek } from "@/lib/strength/phaseAtWeek";
+import { cycleAtWeek } from "@/lib/strength/mesocycleEngine";
 import type {
   StrengthPeriodizationTemplate,
   PeriodizationCycle,
@@ -115,7 +115,7 @@ vi.mock("@/lib/api", () => ({
   getLatestAssessment: vi.fn(async () => ({ updated_at: "2026-05-01T10:00:00Z" })),
   getAthletes: vi.fn(async () => [{ id: 18, display_name: "Nageur Test" }]),
   // PUR (aucun I/O dans l'original) : on reproduit la vraie logique avec le vrai
-  // phaseAtWeek pour que weeksRemaining / phaseKey soient calcules reellement.
+  // cycleAtWeek pour que weeksRemaining / phaseKey soient calcules reellement.
   getCurrentMesocyclePhaseInfo: (args: {
     startMonday: string;
     totalWeeks: number;
@@ -130,7 +130,9 @@ vi.mock("@/lib/api", () => ({
     const weekIndex = Math.min(Math.max(diff, 0), args.totalWeeks);
     const weeksRemaining = Math.max(0, args.totalWeeks - weekIndex);
     const phaseKey =
-      weeksRemaining > 0 ? phaseAtWeek(args.template, weekIndex) : null;
+      weeksRemaining > 0
+        ? cycleAtWeek(args.template, args.totalWeeks, weekIndex)
+        : null;
     return { weekIndex, weeksRemaining, phaseKey };
   },
 }));
