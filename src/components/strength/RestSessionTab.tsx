@@ -4,6 +4,7 @@ import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 import type { SetLogEntry } from "@/lib/types";
 import { isBodyweight } from "@/lib/api/client";
 import { formatIntensity } from "@/lib/strength/intensityMetrics";
+import { estimateRemainingStrengthSessionDurationSeconds } from "@/lib/strength/sessionDuration";
 import { cn } from "@/lib/utils";
 
 export interface RestSessionTabProps {
@@ -14,8 +15,6 @@ export interface RestSessionTabProps {
   progressPct: number;
   currentSetIndex: number;
   totalSets: number;
-  restSecondsPerSet: number;
-  restSecondsPerExercise: number;
 }
 
 const formatVolume = (v: number) =>
@@ -31,8 +30,6 @@ export function RestSessionTab({
   progressPct,
   currentSetIndex,
   totalSets,
-  restSecondsPerSet,
-  restSecondsPerExercise,
 }: RestSessionTabProps) {
   const exerciseMap = new Map<number, Exercise>(exercises.map((e) => [e.id, e]));
 
@@ -55,17 +52,15 @@ export function RestSessionTab({
 
   const totalSteps = items.length;
 
-  // Time estimate
+  // Temps restant — MÊME modèle que l'aperçu (repos par item + exec), décroissant.
   const estimatedMins = useMemo(() => {
-    const setsLeft = Math.max(0, totalSets - currentSetIndex);
-    const exercisesAfter = items.slice(currentStep);
-    const futureSets = exercisesAfter.reduce((acc, item) => acc + item.sets, 0);
-    const totalSecsLeft =
-      setsLeft * restSecondsPerSet +
-      futureSets * restSecondsPerSet +
-      exercisesAfter.length * restSecondsPerExercise;
-    return totalSecsLeft > 0 ? Math.ceil(totalSecsLeft / 60) : 0;
-  }, [totalSets, currentSetIndex, items, currentStep, restSecondsPerSet, restSecondsPerExercise]);
+    const secsLeft = estimateRemainingStrengthSessionDurationSeconds(
+      items,
+      currentStep,
+      currentSetIndex,
+    );
+    return secsLeft > 0 ? Math.ceil(secsLeft / 60) : 0;
+  }, [items, currentStep, currentSetIndex]);
 
   return (
     <div className="flex flex-col gap-3 pb-6">

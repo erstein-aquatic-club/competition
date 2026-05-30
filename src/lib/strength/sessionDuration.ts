@@ -28,6 +28,46 @@ export function estimateStrengthSessionDurationSeconds(items: StrengthSessionIte
 }
 
 /**
+ * Estime la durée **restante** d'une séance en cours, en secondes, avec le MÊME
+ * modèle que `estimateStrengthSessionDurationSeconds` (1 min exec + `rest_seconds`
+ * PROPRE à chaque exercice). Garantit que l'écran inter-séries est cohérent avec
+ * l'aperçu : `remaining ≤ total`, décroît de façon monotone, et n'explose jamais
+ * en changeant d'exercice (le repos n'est plus un scalaire global appliqué à tous).
+ *
+ * @param items          tous les items de la séance, dans l'ordre.
+ * @param currentStep    index 1-based de l'exercice en cours.
+ * @param currentSetIndex index 1-based de la série en cours / à venir (les
+ *                        `currentSetIndex - 1` premières séries comptent comme faites).
+ */
+export function estimateRemainingStrengthSessionDurationSeconds(
+  items: StrengthSessionItem[],
+  currentStep: number,
+  currentSetIndex: number,
+): number {
+  if (!Array.isArray(items) || items.length === 0) return 0;
+
+  const stepIdx =
+    Math.min(Math.max(1, Math.floor(currentStep) || 1), items.length) - 1;
+
+  // Exercice en cours : seules les séries non encore faites comptent.
+  const current = items[stepIdx];
+  let currentRemaining = 0;
+  const curSets = Number(current?.sets);
+  if (Number.isFinite(curSets) && curSets > 0) {
+    const done = Math.min(Math.max(0, Math.floor(currentSetIndex) - 1), curSets);
+    const remainingSets = curSets - done;
+    const rest = Number(current.rest_seconds);
+    const restSeconds = Number.isFinite(rest) && rest > 0 ? rest : 0;
+    currentRemaining = remainingSets * (EXEC_SECONDS_PER_SET + restSeconds);
+  }
+
+  // Exercices suivants : intégralité, via le modèle canonique (repos par item).
+  const future = estimateStrengthSessionDurationSeconds(items.slice(stepIdx + 1));
+
+  return currentRemaining + future;
+}
+
+/**
  * Formate une durée (secondes) en libellé court approximatif « ~X min ».
  * Arrondi à la minute la plus proche, plancher à 1 min pour toute durée positive.
  */

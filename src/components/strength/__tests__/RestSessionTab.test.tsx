@@ -32,8 +32,6 @@ test("renders progress count in ring", () => {
       progressPct={33}
       currentSetIndex={1}
       totalSets={4}
-      restSecondsPerSet={120}
-      restSecondsPerExercise={120}
     />,
   );
 
@@ -57,8 +55,6 @@ test("renders total volume", () => {
       progressPct={66}
       currentSetIndex={1}
       totalSets={3}
-      restSecondsPerSet={90}
-      restSecondsPerExercise={90}
     />,
   );
 
@@ -78,8 +74,6 @@ test("renders remaining exercise names", () => {
       progressPct={33}
       currentSetIndex={1}
       totalSets={4}
-      restSecondsPerSet={120}
-      restSecondsPerExercise={120}
     />,
   );
 
@@ -97,8 +91,6 @@ test("renders current exercise with set chips showing logged data", () => {
       progressPct={33}
       currentSetIndex={1}
       totalSets={4}
-      restSecondsPerSet={120}
-      restSecondsPerExercise={120}
     />,
   );
 
@@ -123,8 +115,6 @@ test("excludes bodyweight exercises from volume", () => {
       progressPct={66}
       currentSetIndex={1}
       totalSets={3}
-      restSecondsPerSet={90}
-      restSecondsPerExercise={90}
     />,
   );
 

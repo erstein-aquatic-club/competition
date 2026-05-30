@@ -32,8 +32,6 @@ export interface RestScreenProps {
   onUpdateNote?: (exerciseId: number, note: string | null) => void;
   currentSetIndex: number;
   totalSets: number;
-  restSecondsPerSet: number;
-  restSecondsPerExercise: number;
   userId: number;
   onClose: () => void;
   onSkip: () => void;
@@ -64,8 +62,6 @@ export function RestScreen({
   onUpdateNote,
   currentSetIndex,
   totalSets,
-  restSecondsPerSet,
-  restSecondsPerExercise,
   userId,
   onClose,
   onSkip,
@@ -232,8 +228,6 @@ export function RestScreen({
               progressPct={progressPct}
               currentSetIndex={currentSetIndex}
               totalSets={totalSets}
-              restSecondsPerSet={restSecondsPerSet}
-              restSecondsPerExercise={restSecondsPerExercise}
             />
           </div>
           <div className="w-full shrink-0 overflow-y-auto px-5 pt-1">

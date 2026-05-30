@@ -1321,8 +1321,6 @@ export function WorkoutRunner({
           percentOneRm={hasPercent ? percentValue : 0}
           currentSetIndex={currentSetIndex}
           totalSets={currentBlock?.sets ?? 0}
-          restSecondsPerSet={currentBlock?.rest_seconds ?? 0}
-          restSecondsPerExercise={currentBlock?.rest_seconds ?? 0}
           userId={userId}
           onClose={() => { setIsResting(false); setIsRestPaused(false); }}
           onSkip={() => {

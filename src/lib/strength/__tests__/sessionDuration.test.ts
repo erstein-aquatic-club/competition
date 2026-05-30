@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   EXEC_SECONDS_PER_SET,
   estimateStrengthSessionDurationSeconds,
+  estimateRemainingStrengthSessionDurationSeconds,
   formatApproxMinutes,
 } from "@/lib/strength/sessionDuration";
 import type { StrengthSessionItem } from "@/lib/api/types";
@@ -72,6 +73,70 @@ describe("estimateStrengthSessionDurationSeconds", () => {
       makeItem({ block: "main", sets: 4, rest_seconds: 90 }),
     ]);
     assert.equal(total, 780);
+  });
+});
+
+describe("estimateRemainingStrengthSessionDurationSeconds", () => {
+  it("au tout début (exo 1, série 1) = durée totale de la séance", () => {
+    const items = [
+      makeItem({ sets: 4, rest_seconds: 90 }),
+      makeItem({ sets: 3, rest_seconds: 60 }),
+    ];
+    // même modèle que l'aperçu → identique au total au démarrage
+    assert.equal(
+      estimateRemainingStrengthSessionDurationSeconds(items, 1, 1),
+      estimateStrengthSessionDurationSeconds(items),
+    );
+  });
+
+  it("en milieu d'exo : ne compte que les séries non faites de l'exo en cours", () => {
+    // exo 1 = 4 séries rest 90 ; on est sur la série 3 (2 faites) → 2×(60+90)=300
+    const items = [makeItem({ sets: 4, rest_seconds: 90 })];
+    assert.equal(estimateRemainingStrengthSessionDurationSeconds(items, 1, 3), 300);
+  });
+
+  it("décroît de façon monotone série après série", () => {
+    const items = [makeItem({ sets: 4, rest_seconds: 90 })];
+    const s1 = estimateRemainingStrengthSessionDurationSeconds(items, 1, 1);
+    const s2 = estimateRemainingStrengthSessionDurationSeconds(items, 1, 2);
+    const s3 = estimateRemainingStrengthSessionDurationSeconds(items, 1, 3);
+    assert.ok(s1 > s2 && s2 > s3, `attendu décroissant, reçu ${s1},${s2},${s3}`);
+  });
+
+  it("régression symptôme B : passer d'un exo faible-repos à un exo gros-repos FAIT BAISSER l'estimation (repos par item, pas global)", () => {
+    // échauffement repos 30s puis gros exo repos 300s
+    const items = [
+      makeItem({ sets: 4, rest_seconds: 30 }),
+      makeItem({ sets: 4, rest_seconds: 300 }),
+    ];
+    const atWarmupStart = estimateRemainingStrengthSessionDurationSeconds(items, 1, 1);
+    const atHeavyStart = estimateRemainingStrengthSessionDurationSeconds(items, 2, 1);
+    // total = 4×(60+30) + 4×(60+300) = 360 + 1440 = 1800
+    assert.equal(atWarmupStart, 1800);
+    // une fois sur le gros exo : seulement 4×(60+300) = 1440 — STRICTEMENT MOINS
+    assert.equal(atHeavyStart, 1440);
+    assert.ok(atHeavyStart < atWarmupStart, "l'estimation doit baisser, pas exploser");
+  });
+
+  it("dernière série du dernier exo → durée d'une seule série restante", () => {
+    const items = [
+      makeItem({ sets: 3, rest_seconds: 60 }),
+      makeItem({ sets: 3, rest_seconds: 120 }),
+    ];
+    // exo 2, série 3 (2 faites) → 1×(60+120)=180
+    assert.equal(estimateRemainingStrengthSessionDurationSeconds(items, 2, 3), 180);
+  });
+
+  it("currentSetIndex au-delà du nombre de séries → 0 pour l'exo en cours", () => {
+    const items = [makeItem({ sets: 3, rest_seconds: 60 })];
+    assert.equal(estimateRemainingStrengthSessionDurationSeconds(items, 1, 5), 0);
+  });
+
+  it("séance vide ou step hors bornes → 0 (jamais NaN)", () => {
+    assert.equal(estimateRemainingStrengthSessionDurationSeconds([], 1, 1), 0);
+    const items = [makeItem({ sets: 3, rest_seconds: 60 })];
+    const past = estimateRemainingStrengthSessionDurationSeconds(items, 99, 1);
+    assert.ok(Number.isFinite(past), "doit rester fini");
   });
 });
 

@@ -52,8 +52,6 @@ const defaultProps = {
   exerciseId: 1,
   currentSetIndex: 1,
   totalSets: 4,
-  restSecondsPerSet: 120,
-  restSecondsPerExercise: 120,
   userId: 1,
   onClose: () => undefined,
   onSkip: () => undefined,
