@@ -59,7 +59,9 @@ export function RestSessionTab({
       currentStep,
       currentSetIndex,
     );
-    return secsLeft > 0 ? Math.ceil(secsLeft / 60) : 0;
+    // R5 (§343) — MÊME arrondi que `formatApproxMinutes` de l'aperçu (Math.round,
+    // plancher 1 min) au lieu de Math.ceil → plus d'écart d'1 min aperçu/runner.
+    return secsLeft > 0 ? Math.max(1, Math.round(secsLeft / 60)) : 0;
   }, [items, currentStep, currentSetIndex]);
 
   return (
@@ -144,7 +146,6 @@ export function RestSessionTab({
           {items.map((item, idx) => {
             const isCompleted = idx < currentStep;
             const isCurrent = idx === currentStep - 1;
-            const isUpcoming = idx >= currentStep;
             const exName =
               exerciseMap.get(item.exercise_id)?.nom_exercice ??
               item.exercise_name ??

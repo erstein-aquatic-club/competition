@@ -19261,3 +19261,27 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** TDD : `mesocycleProgress.test.ts` (10 : libellé event_group, position active/upcoming/done/bornes), `strengthPhaseStyles.test.ts` (4 : `detectPhase` vide→reprise, libellés méso, `shortPhaseLabel`), `MyPlanMesocycleBanner.vitest.tsx` (4 : objectif/Semaine X-Y/phase/date, upcoming « Débute bientôt » + aria-valuenow 0, done « Cycle terminé », raccourci de libellé). **tsc 0 ; node:test 1460→1474 ; vitest unit 51→55 ; `npm run build` OK.** Aucune migration/RLS.
 
 **Limites / honnêteté.** Vérifié par tests de rendu (DOM) + tsc + build : **pas de screenshot live** (l'écran authentifié nécessite les credentials Supabase, présents seulement dans les GitHub Secrets — un build local affiche « Supabase not configured »). Le bandeau ne s'affiche que pour un mésocycle actif rendu en Phase 2 ; la phase courante vient du `week_type` matérialisé de la semaine en cours (null hors fenêtre → pas de chip, accent neutre). **Lots restants** : Lot 4 (E1 `papPreferLegPower`, E3 schémas génériques, E4 clamp psy, R3-R6 runner, V7 badge reader, V9 message d'erreur, V10 a11y), Lot 5 (smoke e2e + lints).
+
+## §343 — Audit flux mésocycle, Lot 4 : finitions moteur, runner & a11y (2026-05-30)
+
+**Contexte.** Suite des Lots 1-3. Lot 4 = batch de correctifs **moteur** (E1-E4) + **runner** (R3-R6) + **a11y/UX** (UX4/V9/V10) — surtout robustesse et finitions.
+
+**Moteur.**
+- **E1 (Majeur) — `papPreferLegPower` périmé après le swap §327.** Le flag (« l'amorce PAP doit-elle privilégier l'explosif jambes ? ») était calculé dans `generateMesocycle` sur les slots PRÉ-swap, puis consommé dans `buildWeek` APRÈS `ensureFocusDevelopmentSession` qui peut déplacer un seau jambes d'un slot dév vers un slot amorce → flag stale (faux négatif) → la PAP gagnait un exo `upper_power` superflu (4 items au lieu de 3) chez un sprinteur upper-dominant. Fix : extraction d'une fonction pure exportée `papPreferLegPowerFor(slots, weekdays, primerWeekdays, jourAware)` (source unique), appelée DANS `buildWeek` **après** le swap ; calcul pré-swap de `generateMesocycle` supprimé. TDD `mesocycleEngine.test.ts` (jambes en dév→false, jambes seulement en amorce→true, non-jour-aware→false).
+- **E4 (Mineur) — `scorePsychology` non borné.** Un input hors `[1,5]` (DB corrompue) produisait un score < 0 ou > 100 propagé au raisonnement. Fix : `Math.min(100, Math.max(0, …))` (fonction exportée + TDD : normal, hors-plage clampé, null).
+- **E3 (Mineur) — schémas génériques trompeurs.** `GenericLoadingScheme.sets/reps/intensityPct1rm` semblaient borner la sortie alors que seul `restSeconds` est appliqué (`toMesocycleExercise` Règle 3, décision coach §332). Fix documentaire : commentaires marquant ces 3 champs **DOCUMENTAIRES** (non appliqués), `restSeconds` seul champ clampé.
+
+**Runner.**
+- **R5 (Mineur) — incohérence d'arrondi durée restante.** `RestSessionTab` utilisait `Math.ceil(secsLeft/60)` vs `formatApproxMinutes`=`Math.round` (aperçu) → écart d'1 min sur la dernière minute. Fix : `Math.max(1, Math.round(secsLeft/60))` (même arrondi que l'aperçu).
+- **R3 (Mineur) — note de ressenti seule perdue au kill PWA.** `hasContent` (restore du brouillon) ignorait `difficulty`/`fatigue` ≠ 3. Fix : les incluts dans la condition.
+- **R4 (Mineur) — durée totale fausse après kill+reprise.** `elapsedStartRef` remis à `Date.now()` au remount → « Durée totale » ne comptait que la portion reprise. Fix : `startedAt` persisté dans le brouillon (2 sites de save) + restauré (`elapsedStartRef.current = payload.startedAt`).
+- **R6 (Mineur)** — suppression du dead code `isUpcoming` (`RestSessionTab`).
+
+**A11y / UX.**
+- **UX4 (Mineur)** — confettis de fin de séance (`element.animate`, hors framer-motion) désormais gardés par `prefers-reduced-motion`.
+- **V9 (Mineur)** — l'écran d'erreur de `Strength.tsx` affichait `(error as Error).message` brut (« Failed to fetch ») → message swim-friendly « Vérifie ta connexion, puis réessaie. ».
+- **V10 (Mineur)** — bouton d'expansion de `MyPlanWeekCard` : `aria-expanded`, `aria-label` descriptif, anneau `focus-visible`.
+
+**Tests / vérifs.** TDD moteur : `mesocycleEngine.test.ts` +6 (`papPreferLegPowerFor` 3, `scorePsychology` 3). **tsc 0 ; node:test 1474→1480 ; vitest unit 55/55 ; `npm run build` OK.** Aucune migration/RLS.
+
+**Différés (Mineurs, documentés).** **V7** (badge « Force » legacy du reader pour toutes les phases méso — nécessite de threader la phase de la semaine dans `SessionDetailPreview`, plus impliqué), **UX1/UX2** (label/remplissage de l'anneau et du rail de `RestSessionTab` — ajustements visuels subjectifs), **UX3** (timer de repos `aria-live`). → à traiter en finition ciblée si besoin. **Lot 5** (filet anti-régression : smoke e2e du parcours + lints `rules-of-hooks`/`withTimeout`) reste à faire.

@@ -369,6 +369,8 @@ export function WorkoutRunner({
       fatigue: number;
       comments: string;
       currentSetInputs: Record<number, SetInputValues>;
+      /** R4 (§343) — epoch ms du début de séance, pour une durée totale juste après kill+reprise. */
+      startedAt?: number;
     };
     const draft = loadDraft<WorkoutDraft>(draftKey);
     if (!draft) return;
@@ -377,7 +379,11 @@ export function WorkoutRunner({
     const hasContent =
       (payload.comments && payload.comments.length > 0) ||
       (payload.currentSetInputs &&
-        Object.keys(payload.currentSetInputs).length > 0);
+        Object.keys(payload.currentSetInputs).length > 0) ||
+      // R3 (§343) — une note de ressenti seule (difficulté/fatigue ≠ défaut 3)
+      // compte comme contenu à restaurer (sinon perdue au kill PWA).
+      (typeof payload.difficulty === "number" && payload.difficulty !== 3) ||
+      (typeof payload.fatigue === "number" && payload.fatigue !== 3);
     if (!hasContent) {
       clearDraft(draftKey);
       return;
@@ -388,6 +394,11 @@ export function WorkoutRunner({
     if (typeof payload.comments === "string") setComments(payload.comments);
     if (payload.currentSetInputs && typeof payload.currentSetInputs === "object") {
       setCurrentSetInputs(payload.currentSetInputs);
+    }
+    // R4 (§343) — reprend le chrono au vrai départ (sinon `elapsedStartRef` remis
+    // à `Date.now()` au remount → durée totale fausse, ~5 min au lieu de ~45).
+    if (typeof payload.startedAt === "number" && payload.startedAt > 0) {
+      elapsedStartRef.current = payload.startedAt;
     }
   }, [draftKey, toast]);
 
@@ -401,6 +412,7 @@ export function WorkoutRunner({
         fatigue,
         comments,
         currentSetInputs,
+        startedAt: elapsedStartRef.current, // R4 (§343)
       });
     }, 500);
     return () => clearTimeout(draftDebounceRef.current);
@@ -415,6 +427,7 @@ export function WorkoutRunner({
         fatigue,
         comments,
         currentSetInputs,
+        startedAt: elapsedStartRef.current, // R4 (§343)
       });
     };
     const onVisibility = () => {
@@ -452,6 +465,9 @@ export function WorkoutRunner({
 
   const launchConfetti = () => {
     if (typeof window === "undefined") return;
+    // UX4 (§343) — respecte `prefers-reduced-motion` (les autres animations le
+    // font déjà via framer-motion ; les confettis sont en `element.animate()`).
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const confettiColors = [
       colors.status.success,
       colors.chart[2],

@@ -42,15 +42,21 @@ export interface CatalogueLoading {
  * Issu de la littérature S&C (cf. doc § 3.3-3.6).
  */
 export interface GenericLoadingScheme {
-  /** Nombre de séries par exercice. */
+  // ⚠️ E3 (§343) — `sets`/`reps`/`intensityPct1rm` sont **DOCUMENTAIRES** (repères
+  // de doctrine), PAS appliqués par le moteur : `toMesocycleExercise` (Règle 3)
+  // conserve les séries/reps/%1RM portés par chaque exercice du catalogue et ne
+  // clampe QUE `restSeconds` (`clampToRange`). Décision coach validée §332 (la
+  // modulation catalogue prime ; l'option « schéma générique uniforme » a été
+  // proposée puis écartée). Ne pas présumer que ces 3 bandes bornent la sortie.
+  /** Repère doctrine — séries (NON appliqué, cf. ⚠️ ci-dessus). */
   sets: Range;
-  /** Nombre de répétitions par série. */
+  /** Repère doctrine — répétitions (NON appliqué). */
   reps: Range;
-  /** Charge en % du 1RM (0-100). */
+  /** Repère doctrine — charge % 1RM 0-100 (NON appliqué). */
   intensityPct1rm: Range;
-  /** Récupération entre séries, en secondes. */
+  /** Récupération entre séries (s) — **SEUL champ appliqué** (clamp `restSeconds`). */
   restSeconds: Range;
-  /** Intention d'exécution — ce qui prime sur la prescription. */
+  /** Intention d'exécution — ce qui prime sur la prescription (appliqué : `notes`). */
   intention: string;
 }
 

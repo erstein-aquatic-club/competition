@@ -65,8 +65,10 @@ export function MyPlanWeekCard({
         <button
           type="button"
           onClick={onToggleExpand}
+          aria-expanded={isExpanded}
+          aria-label={`Semaine ${instance.week.weekNumber}${instance.phaseName ? ` — ${instance.phaseName}` : ""}, ${isExpanded ? "réduire" : "développer"}`}
           className={cn(
-            "w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[48px] hover:bg-muted/40 active:bg-muted/60",
+            "w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[48px] hover:bg-muted/40 active:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
             isExpanded || hasCompetition ? "rounded-t-xl" : "rounded-xl",
           )}
         >

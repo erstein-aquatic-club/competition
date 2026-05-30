@@ -1066,6 +1066,62 @@ describe('cycleAtWeek', () => {
   });
 });
 
+// ── scorePsychology clamp (E4, §343) ─────────────────────────────────────────
+
+import { scorePsychology } from '../mesocycleEngine.ts';
+
+describe('scorePsychology', () => {
+  const q = (confidence: number, motivation: number, stress: number) =>
+    ({ psychology: { confidence, motivation, stress } }) as unknown as
+      NonNullable<MesocycleInput['assessment']['questionnaire']>;
+
+  it('valeurs normales [1,5] → score borné [0,100]', () => {
+    assert.equal(scorePsychology(q(5, 5, 1)), 100); // sum 15 → 100
+    assert.equal(scorePsychology(q(1, 1, 5)), 0); // sum 3 → 0
+  });
+
+  it('input hors plage (DB corrompue) → clampé, jamais négatif ni >100', () => {
+    assert.equal(scorePsychology(q(0, 0, 6)), 0); // brut -25 → 0
+    assert.equal(scorePsychology(q(5, 5, 0)), 100); // brut 108.3 → 100
+  });
+
+  it('questionnaire null → null', () => {
+    assert.equal(scorePsychology(null), null);
+  });
+});
+
+// ── papPreferLegPowerFor (E1, §343) ──────────────────────────────────────────
+
+import { papPreferLegPowerFor } from '../mesocycleEngine.ts';
+
+describe('papPreferLegPowerFor', () => {
+  const weekdays = [0, 2, 3]; // Lun, Mer, Jeu
+  const primers = new Set([0, 3]); // Lun & Jeu = amorces ; Mer = développement
+
+  it('jambes couvertes par une séance de DÉV → false', () => {
+    const slots = [
+      { primary: 'upper_strength' as StrengthBucket, complement: 'upper_power' as StrengthBucket | null },
+      { primary: 'lower_strength' as StrengthBucket, complement: 'upper_strength' as StrengthBucket | null }, // Mer dév jambes
+      { primary: 'upper_power' as StrengthBucket, complement: null as StrengthBucket | null },
+    ];
+    assert.equal(papPreferLegPowerFor(slots, weekdays, primers, true), false);
+  });
+
+  it('jambes seulement sur un jour d’amorce (post-swap) → true', () => {
+    const slots = [
+      { primary: 'lower_strength' as StrengthBucket, complement: 'upper_power' as StrengthBucket | null }, // Lun AMORCE (jambes ici, pas en dév)
+      { primary: 'upper_strength' as StrengthBucket, complement: 'upper_power' as StrengthBucket | null }, // Mer dév (haut)
+      { primary: 'upper_power' as StrengthBucket, complement: null as StrengthBucket | null },
+    ];
+    assert.equal(papPreferLegPowerFor(slots, weekdays, primers, true), true);
+  });
+
+  it('non jour-aware → toujours false', () => {
+    const slots = [{ primary: 'lower_power' as StrengthBucket, complement: null as StrengthBucket | null }];
+    assert.equal(papPreferLegPowerFor(slots, [0], new Set<number>(), false), false);
+  });
+});
+
 // ── periodize startPhase (meso-adjust) ───────────────────────────────────────
 
 function makeT8Template(): StrengthPeriodizationTemplate {

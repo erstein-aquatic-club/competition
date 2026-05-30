@@ -845,7 +845,12 @@ export default function Strength() {
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h3 className="font-semibold">Impossible de charger les données</h3>
-        <p className="text-sm text-muted-foreground mt-2">{(error as Error).message}</p>
+        {/* V9 (§343) — message clair pour le nageur au lieu du « .message » brut
+            (« Failed to fetch ») ; le détail réseau reste visible dans l'onglet
+            réseau / la console du navigateur pour le debug. */}
+        <p className="text-sm text-muted-foreground mt-2">
+          Vérifie ta connexion, puis réessaie.
+        </p>
         <Button variant="default" onClick={() => refetch()} className="mt-4 h-12 md:h-10">
           Réessayer
         </Button>

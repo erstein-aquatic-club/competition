@@ -98,13 +98,15 @@ function scoreMobility(
  * (stress 1-5, ↓=mieux) → somme ∈ [3, 15] → ((somme − 3) / 12) × 100.
  * `null` si le questionnaire est absent.
  */
-function scorePsychology(
+export function scorePsychology(
   questionnaire: MesocycleInput['assessment']['questionnaire'],
 ): number | null {
   if (!questionnaire) return null;
   const { confidence, motivation, stress } = questionnaire.psychology;
   const sum = confidence + motivation + (6 - stress);
-  return ((sum - 3) / 12) * 100;
+  // E4 (§343) — borne défensive : un input hors [1,5] (DB corrompue, futur form
+  // permissif) ne doit pas produire un score négatif ou > 100 dans le raisonnement.
+  return Math.min(100, Math.max(0, ((sum - 3) / 12) * 100));
 }
 
 /**
@@ -825,29 +827,18 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
   // utilisé pour choisir le seau force/puissance d'une amorce PAP.
   const bucketPriorityOrder = bucketAllocations.map((a) => a.bucket);
 
-  // §325 — amorce event-aware : si le seul créneau jambes tombe un jour primer
-  // (amorce PAP, codée haut du corps), les jambes disparaissent du plan (retour
-  // terrain Victoria, défaut [Lun, Mar, Jeu] = 2 amorces / 3 séances). On détecte
-  // ici si AUCUN seau jambes n'est couvert par une séance de DÉVELOPPEMENT ; si
-  // c'est le cas, l'explosif de l'amorce basculera sur `lower_power` (un saut)
-  // pour garantir un minimum de puissance jambes, même un jour amorce.
-  const isLegBucket = (b: StrengthBucket | null): boolean =>
-    b === 'lower_strength' || b === 'lower_power';
-  const coverageSlots = distributeSessionSlots(bucketAllocations, weekdays.length);
-  const legsCoveredInDev = coverageSlots.some(
-    (slot, idx) =>
-      !primerWeekdays.has(weekdays[idx]) &&
-      (isLegBucket(slot.primary) || isLegBucket(slot.complement)),
-  );
-  const papPreferLegPower = jourAware && !legsCoveredInDev;
-
+  // §325/§343 — amorce event-aware : si le seul créneau jambes tombe un jour
+  // primer (amorce PAP, codée haut du corps), les jambes disparaissent du plan.
+  // Le flag `papPreferLegPower` est désormais calculé DANS `buildWeek`, sur les
+  // slots APRÈS `ensureFocusDevelopmentSession` (§327), car ce swap peut déplacer
+  // un seau jambes d'un slot dév vers un slot amorce → un calcul pré-swap serait
+  // périmé (E1). Source unique : `papPreferLegPowerFor`.
   const weeks: MesocycleWeek[] = periodizedWeeks.map((pw) =>
     buildWeek(pw, bucketAllocations, selected, weekdays, primerWeekdays, jourAware, {
       forceBiasRequired,
       mobilityOverrideActive,
       bucketPriorityOrder,
       coreEmphasis,
-      papPreferLegPower,
     }),
   );
 
@@ -889,8 +880,6 @@ function buildWeek(
     bucketPriorityOrder: StrengthBucket[];
     /** §R5 — emphase core du template (0 = pas de bloc tronc, ex. DB pré-migration). */
     coreEmphasis: number;
-    /** §325 — l'amorce PAP bascule son explosif sur lower_power (jambes absentes ailleurs). */
-    papPreferLegPower: boolean;
   },
 ): MesocycleWeek {
   let slots = distributeSessionSlots(allocations, weekdays.length);
@@ -903,6 +892,8 @@ function buildWeek(
       .map((a) => a.bucket);
     slots = ensureFocusDevelopmentSession(slots, weekdays, primerWeekdays, focusBuckets);
   }
+  // §343 (E1) — calculé APRÈS le swap ci-dessus (sinon périmé). Source unique.
+  const papPreferLegPower = papPreferLegPowerFor(slots, weekdays, primerWeekdays, jourAware);
   // §329 — composante jambes PAP à l'amorce, ALTERNÉE entre jours d'amorce :
   // explosif (`lower_power`, box jump) le 1ᵉʳ jour d'amorce, lourd
   // (`lower_strength`, trap bar) le 2ᵉ, etc. On calcule le rang d'amorce par
@@ -927,7 +918,7 @@ function buildWeek(
       mobilityOverrideActive: flags.mobilityOverrideActive,
       bucketPriorityOrder: flags.bucketPriorityOrder,
       coreEmphasis: flags.coreEmphasis,
-      papPreferLegPower: flags.papPreferLegPower,
+      papPreferLegPower,
       papLegBucket,
     });
   });
@@ -948,7 +939,7 @@ function buildWeek(
         mobilityOverrideActive: flags.mobilityOverrideActive,
         bucketPriorityOrder: flags.bucketPriorityOrder,
         coreEmphasis: flags.coreEmphasis,
-        papPreferLegPower: flags.papPreferLegPower,
+        papPreferLegPower,
         papLegBucket: null,
       })
     : sessions;
@@ -1028,6 +1019,37 @@ interface SessionSlot {
    *  → primary=upper_strength, complement=lower_strength). `null` si moins
    *  de 2 focus entraînables ou si primary === 'mobility' (override). */
   complement: StrengthBucket | null;
+}
+
+/** §343 (E1) — un seau jambes ? */
+function isLegBucket(b: StrengthBucket | null): boolean {
+  return b === 'lower_strength' || b === 'lower_power';
+}
+
+/**
+ * §343 (E1) — décide si l'amorce PAP doit privilégier l'explosif jambes
+ * (`lower_power`). Vrai en mode jour-aware quand AUCUN seau jambes n'est couvert
+ * par une séance de DÉVELOPPEMENT (jour non-amorce).
+ *
+ * ⚠️ DOIT être évalué sur les slots APRÈS `ensureFocusDevelopmentSession` (§327) :
+ * le swap peut déplacer un seau jambes d'un slot dév vers un slot amorce →
+ * un flag calculé AVANT le swap est périmé (faux négatif) → la PAP gagne alors
+ * un exo `upper_power` superflu (4 items au lieu de 3) chez un sprinteur
+ * upper-dominant.
+ */
+export function papPreferLegPowerFor(
+  slots: SessionSlot[],
+  weekdays: number[],
+  primerWeekdays: Set<number>,
+  jourAware: boolean,
+): boolean {
+  if (!jourAware) return false;
+  const legsCoveredInDev = slots.some(
+    (slot, idx) =>
+      !primerWeekdays.has(weekdays[idx]) &&
+      (isLegBucket(slot.primary) || isLegBucket(slot.complement)),
+  );
+  return !legsCoveredInDev;
 }
 
 /**
