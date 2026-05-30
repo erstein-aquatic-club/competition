@@ -1473,6 +1473,40 @@ CREATE TABLE public.strength_session_items (
 );
 
 -- =============================================================================
+-- §351 — Échauffement intelligent : dim_exercices (minimal) + warmup_common_routine
+-- Migration prod 00214_warmup_intelligent.sql.
+--
+-- dim_exercices n'existait pas dans ce schéma de test (les exercise_id sont de
+-- simples INTEGER ailleurs). On crée ici un dim_exercices MINIMAL — juste assez
+-- pour satisfaire la FK warmup_common_routine.exercise_id et tester ses policies.
+-- (Pas de RLS sur dim_exercices ici : catalogue référentiel, hors scope §351.)
+--
+-- warmup_common_routine — policies IDENTIQUES à la migration :
+--   read  : SELECT pour tout rôle authentifié  → USING (app_user_role() IS NOT NULL)
+--   write : ALL pour coach/admin uniquement     → USING/CHECK app_user_role() IN ('coach','admin')
+-- =============================================================================
+CREATE TABLE public.dim_exercices (
+  id              SERIAL PRIMARY KEY,
+  name            TEXT,
+  corrective_axes TEXT[] NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE public.warmup_common_routine (
+  id          SERIAL PRIMARY KEY,
+  ordre       INTEGER NOT NULL,
+  exercise_id INTEGER NOT NULL REFERENCES public.dim_exercices(id)
+);
+
+ALTER TABLE public.warmup_common_routine ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY warmup_common_routine_read ON public.warmup_common_routine
+  FOR SELECT USING (app_user_role() IS NOT NULL);
+
+CREATE POLICY warmup_common_routine_write ON public.warmup_common_routine
+  FOR ALL USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
+
+-- =============================================================================
 -- §293 — RPC apply_strength_mesocycle + revert_strength_mesocycle
 -- Migrations prod 00172 + 00173. Tests RLS : un nageur applique pour lui-même
 -- (✓), pour un autre nageur (✗), revert par le coach (✓), snapshot

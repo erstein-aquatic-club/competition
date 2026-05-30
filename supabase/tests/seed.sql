@@ -237,3 +237,21 @@ INSERT INTO public.strength_periodization_templates
 -- ne sont PAS seedées ici : un mésocycle FK-pinne le template (ON DELETE
 -- RESTRICT), ce qui casserait les tests de suppression de template. Elles sont
 -- insérées dans le beforeAll de strength-mesocycles.test.ts (suite isolée).
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- §351 — Échauffement intelligent : dim_exercices (minimal) + warmup_common_routine
+-- Voir warmup_common_routine.test.ts. Les ids dim_exercices reprennent ceux
+-- seedés par la migration 00214 (Cat-Cow 87, Shoulder Dislocates 84, Y-T-W 24)
+-- pour que la routine commune référence des exos cohérents avec la prod.
+-- ═════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.dim_exercices (id, name, corrective_axes) VALUES
+  (24, 'Y-T-W épaules',       '{shoulder_flexion}'),
+  (84, 'Shoulder Dislocates', '{shoulder_flexion}'),
+  (87, 'Cat-Cow',             '{t_spine,trunk_neck_alignment}');
+SELECT setval('public.dim_exercices_id_seq', 100, false);
+
+INSERT INTO public.warmup_common_routine (id, ordre, exercise_id) VALUES
+  (1, 1, 87),  -- Cat-Cow
+  (2, 2, 84),  -- Shoulder Dislocates
+  (3, 3, 24);  -- Y-T-W épaules
+SELECT setval('public.warmup_common_routine_id_seq', 100, false);
