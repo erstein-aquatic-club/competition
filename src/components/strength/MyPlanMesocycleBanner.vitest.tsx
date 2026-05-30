@@ -1,6 +1,6 @@
 // Tests vitest jsdom du bandeau « hero » de Mon plan muscu (§341 Lot 3, V5/V8).
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 import { MyPlanMesocycleBanner } from "@/components/strength/MyPlanMesocycleBanner";
 
@@ -60,6 +60,43 @@ describe("MyPlanMesocycleBanner", () => {
       />,
     );
     expect(screen.getByText("Cycle terminé")).toBeTruthy();
+  });
+
+  it("bouton Récap intégré : visible si recapEnabled, déclenche onOpenRecap (§345)", () => {
+    const onOpenRecap = vi.fn();
+    render(
+      <MyPlanMesocycleBanner
+        objective="50 m crawl"
+        kindLabel="Prépa de saison"
+        weekNumber={3}
+        totalWeeks={8}
+        status="active"
+        phaseLabel="Force max"
+        phase="force"
+        generatedAtLabel="12 mai"
+        recapEnabled
+        onOpenRecap={onOpenRecap}
+      />,
+    );
+    const recap = screen.getByRole("button", { name: /Récap/ });
+    fireEvent.click(recap);
+    expect(onOpenRecap).toHaveBeenCalledTimes(1);
+  });
+
+  it("pas de bouton Récap si recapEnabled est absent", () => {
+    render(
+      <MyPlanMesocycleBanner
+        objective="50 m crawl"
+        kindLabel="Prépa de saison"
+        weekNumber={3}
+        totalWeeks={8}
+        status="active"
+        phaseLabel="Force max"
+        phase="force"
+        generatedAtLabel="12 mai"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /Récap/ })).toBeNull();
   });
 
   it("raccourcit les libellés longs dans la puce (Puissance / vitesse → Puissance)", () => {

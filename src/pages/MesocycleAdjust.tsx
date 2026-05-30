@@ -304,7 +304,11 @@ export default function MesocycleAdjust() {
     navigate(athleteId != null ? `/coach/swimmer/${athleteId}` : "/strength");
 
   // Bilan : refaire = navigation simple vers le questionnaire du nageur.
-  const handleRefaireBilan = () => navigate("/strength/questionnaire");
+  // Le coach refait le bilan de l'ATHLÈTE ciblé → écran bilan coach (qui sait
+  // créer/reprendre un bilan pour cet athlète), pas le questionnaire perso du
+  // coach (`/strength/questionnaire`) qui affichait « ton coach doit d'abord… ».
+  const handleRefaireBilan = () =>
+    athleteId != null && navigate(`/coach/strength-assessment/${athleteId}`);
 
   // ── Contexte d'affichage ────────────────────────────────────────────────────
   const athleteName =
@@ -421,7 +425,9 @@ export default function MesocycleAdjust() {
                 // autre jour dans le picker natif).
                 setPivotMonday(toISODate(getMonday(new Date(v + "T00:00:00"))));
               }}
-              className="w-full"
+              // min-w-0 + max-w-full : empêche le contrôle date natif (iOS) de
+              // déborder à droite de la carte (largeur intrinsèque > conteneur).
+              className="w-full min-w-0 max-w-full"
             />
             <p className="text-sm text-muted-foreground">
               Les semaines avant le pivot sont conservées ; les suivantes sont
@@ -512,40 +518,51 @@ export default function MesocycleAdjust() {
               unitSuffix="%1RM"
               onChange={setIntensityFactor}
             />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setVolumeFactor(0.8);
-                  setIntensityFactor(0.9);
-                }}
-              >
-                Allègement
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setVolumeFactor(1.0);
-                  setIntensityFactor(1.0);
-                }}
-              >
-                Standard
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setVolumeFactor(1.15);
-                  setIntensityFactor(1.05);
-                }}
-              >
-                Surcharge
-              </Button>
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                Préréglages
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex h-auto flex-col gap-0.5 py-1.5"
+                  onClick={() => {
+                    setVolumeFactor(0.8);
+                    setIntensityFactor(0.9);
+                  }}
+                >
+                  <span className="font-medium">Alléger</span>
+                  <span className="text-[10px] text-muted-foreground">−20 % vol.</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex h-auto flex-col gap-0.5 py-1.5"
+                  onClick={() => {
+                    setVolumeFactor(1.0);
+                    setIntensityFactor(1.0);
+                  }}
+                >
+                  <span className="font-medium">Standard</span>
+                  <span className="text-[10px] text-muted-foreground">inchangé</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex h-auto flex-col gap-0.5 py-1.5"
+                  onClick={() => {
+                    setVolumeFactor(1.15);
+                    setIntensityFactor(1.05);
+                  }}
+                >
+                  <span className="font-medium">Augmenter</span>
+                  <span className="text-[10px] text-muted-foreground">+15 % vol.</span>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

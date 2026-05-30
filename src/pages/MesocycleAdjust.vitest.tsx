@@ -270,8 +270,8 @@ describe("MesocycleAdjust — composant", () => {
     setMockMeso(makeMeso(new Date().toISOString()));
     renderPage();
 
-    // Attend le formulaire (presence du bouton Allegement).
-    const allegement = await screen.findByRole("button", { name: "Allègement" });
+    // Attend le formulaire (presence du preset « Alléger », §345).
+    const allegement = await screen.findByRole("button", { name: /Alléger/ });
     fireEvent.click(allegement);
 
     // Les deltas rendus refletent -20 % (volume x0.80) et -10 % (intensite x0.90).

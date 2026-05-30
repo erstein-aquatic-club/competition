@@ -19299,3 +19299,19 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Décision / limite (honnêteté).** Le volet **lint `rules-of-hooks`** (hooks après early return, #310) de la synthèse n'est PAS livré : le dépôt **n'a aucune config eslint** (`eslint.config.*` absent, pas de script `lint`, pas de dépendance `eslint-plugin-react-hooks`). Bolter eslint sur tout le codebase est un chantier infra à part (il ferait remonter des avertissements pré-existants à trier) et sort du périmètre d'un « filet ». Garde actuelle de #310 : les tests de régression composant existants (`StrengthAssessmentScreen.vitest`, `CoachSwimmerFullView.vitest`) + la discipline « tous les hooks avant early return ». **Recommandation de suivi** : ajouter eslint + `react-hooks/rules-of-hooks` en `error` bloquant dans la CI (`.github/workflows`), en tâche dédiée.
 
 **Audit flux mésocycle CLÔTURÉ** (Lots 1-5). Restent uniquement, documentés et non urgents : V7, UX1/UX2/UX3 (polish mineur) et le lint hooks (infra).
+
+## §345 — Retour terrain François : polish UI mésocycle + fix routing bilan coach (2026-05-30)
+
+**Contexte.** Retour terrain après déploiement des Lots 1-5. 5 correctifs UI + 1 bug de routing.
+
+- **(1) Bandeau « Mon plan » trop haut + bouton Récap séparé.** `MyPlanMesocycleBanner` condensé de 3 lignes (kicker / objectif / progression) + ligne Récap séparée → **2 lignes** : (objectif · chip phase · **Récap intégré**) puis (barre + Semaine X/Y), méta `kind · Généré le …` en ligne fine. `MyPlanTab` : quand le bandeau est rendu il **absorbe** le bouton Récap (props `recapEnabled`/`onOpenRecap`) ; sinon (Phase 3/fallback) bouton Récap autonome conservé. Hauteur ~−50 %.
+- **(2) Overflow des titres de séances.** `MyPlanSessionSheet` : le titre (`flex-1` sans `truncate`) débordait à droite → `min-w-0 truncate` (+ `min-w-0` sur le `SheetTitle`).
+- **(3) Overflow du sélecteur de date pivot (coach).** `MesocycleAdjust` : input `type=date` natif (iOS, largeur intrinsèque) débordait → `min-w-0 max-w-full`.
+- **(4) Presets de charge peu clairs.** « Allègement / Standard / Surcharge » (jargon) → **« Alléger / Standard / Augmenter »** sous un libellé « Préréglages », chacun avec son effet (`−20 % vol.` / `inchangé` / `+15 % vol.`), en grille 3 colonnes.
+- **(5) BUG — « Refaire le bilan » (coach) → écran incohérent.** `handleRefaireBilan` naviguait vers `/strength/questionnaire` (questionnaire PERSO du coach, qui n'a pas de bilan → message nageur « Ton coach doit d'abord initier… »). Fix : route vers `/coach/strength-assessment/${athleteId}` (écran bilan coach de l'athlète ciblé, qui sait créer/reprendre un bilan).
+
+**Tests / vérifs.** `MyPlanMesocycleBanner.vitest` 4→6 (bouton Récap présent+clic / absent sans `recapEnabled`), `MesocycleAdjust.vitest` mis à jour (preset « Alléger »). **tsc 0 ; node:test 1491 ; vitest unit 55→57 ; `npm run build` OK.** Aucune migration.
+
+**Limite (honnêteté).** Le fix (3) cible le bug iOS connu du `input[type=date]` (`min-width` intrinsèque) — non reproductible hors device ; à confirmer sur l'appareil de François. Si ça persiste → remplacer le contrôle natif.
+
+**Demandes terrain ouvertes (prochains chantiers, à concevoir — voir `docs/ROADMAP.md`).** (6) **Historique des bilans muscu** + initier un nouveau bilan depuis la vue Bilan ; (7) **mobilité gauche/droite dissociée + notes** dans le bilan (besoin coach : asymétries rotation thoracique / scapulaire) — implique un changement de modèle de données ; (8) [FUTUR] **routines d'échauffement** pilotées par les déficits de mobilité G/D/complets (séance muscu = 1. échauffement articulaire commun → 2. mobilité spécifique nageur → 3. échauffement musculaire spécifique à la séance → 4. séance principale).

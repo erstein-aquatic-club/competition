@@ -1,4 +1,4 @@
-import { Target } from "lucide-react";
+import { Sparkles, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   PHASE_STYLES,
@@ -21,14 +21,17 @@ interface MyPlanMesocycleBannerProps {
   phase: StrengthPhase;
   /** « Généré le … » (V8), ou null. */
   generatedAtLabel: string | null;
+  /** §345 — bouton « Récap » intégré au bandeau (sinon ligne séparée). */
+  recapEnabled?: boolean;
+  onOpenRecap?: () => void;
 }
 
 /**
- * Bandeau « hero » en tête de « Mon plan » muscu (§341 Lot 3, finding V5) :
- * donne au nageur, d'un coup d'œil, SON objectif, OÙ il en est dans le cycle
- * (Semaine X/Y + barre), la phase en cours, et quand le plan a été généré (V8).
- * Présentationnel — toutes les valeurs sont calculées par l'appelant.
- * UI via skill `frontend-design` (langage iOS-aligned de l'app, accent de phase).
+ * Bandeau « hero » COMPACT en tête de « Mon plan » muscu (§342 V5, condensé
+ * §345) : objectif + position du cycle (Semaine X/Y + barre) + phase, sur 2
+ * lignes seulement, avec le bouton « Récap » absorbé dans l'en-tête (au lieu
+ * d'une ligne dédiée au-dessus). Présentationnel — valeurs calculées par
+ * l'appelant. UI via skill `frontend-design`.
  */
 export function MyPlanMesocycleBanner({
   objective,
@@ -39,6 +42,8 @@ export function MyPlanMesocycleBanner({
   phaseLabel,
   phase,
   generatedAtLabel,
+  recapEnabled = false,
+  onOpenRecap,
 }: MyPlanMesocycleBannerProps) {
   const style = PHASE_STYLES[phase];
 
@@ -54,29 +59,34 @@ export function MyPlanMesocycleBanner({
         ? "Cycle terminé"
         : `Semaine ${weekNumber} / ${totalWeeks}`;
 
+  const metaLine = generatedAtLabel
+    ? `${kindLabel} · Généré le ${generatedAtLabel}`
+    : kindLabel;
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/40 mb-4">
+    <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/40 mb-3">
       {/* Accent de phase (barre gauche) */}
       <div className={cn("absolute inset-y-0 left-0 w-1", style.dot)} aria-hidden />
-      {/* Halo doux dans la couleur de phase (haut-droite) */}
+      {/* Halo doux dans la couleur de phase */}
       <div
         className={cn(
-          "pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-[0.18] blur-2xl",
+          "pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-[0.16] blur-2xl",
           style.dot,
         )}
         aria-hidden
       />
 
-      <div className="relative px-4 py-3.5 pl-5">
-        {/* Kicker + chip de phase */}
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {kindLabel}
-          </span>
+      <div className="relative px-3.5 py-2.5 pl-4">
+        {/* Ligne 1 — objectif · chip phase · Récap */}
+        <div className="flex items-center gap-2">
+          <Target className={cn("h-4 w-4 shrink-0", style.text)} aria-hidden />
+          <h3 className="min-w-0 flex-1 truncate text-[15px] font-bold leading-tight tracking-tight text-foreground first-letter:uppercase">
+            {objective}
+          </h3>
           {phaseLabel ? (
             <span
               className={cn(
-                "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold max-w-[8rem] truncate",
+                "inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
                 style.bg,
                 style.text,
               )}
@@ -85,30 +95,22 @@ export function MyPlanMesocycleBanner({
               {shortPhaseLabel(phaseLabel)}
             </span>
           ) : null}
+          {recapEnabled && onOpenRecap ? (
+            <button
+              type="button"
+              onClick={onOpenRecap}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Récap
+            </button>
+          ) : null}
         </div>
 
-        {/* Objectif (hero) */}
-        <div className="mt-1.5 flex items-center gap-2">
-          <Target className={cn("h-[18px] w-[18px] shrink-0", style.text)} aria-hidden />
-          <h3 className="text-[17px] font-bold leading-tight tracking-tight text-foreground first-letter:uppercase">
-            {objective}
-          </h3>
-        </div>
-
-        {/* Progression dans le cycle */}
-        <div className="mt-3">
-          <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
-            <span className="font-semibold tabular-nums text-foreground">
-              {progressText}
-            </span>
-            {generatedAtLabel ? (
-              <span className="text-muted-foreground/70">
-                Généré le {generatedAtLabel}
-              </span>
-            ) : null}
-          </div>
+        {/* Ligne 2 — barre de progression + position */}
+        <div className="mt-2 flex items-center gap-2.5">
           <div
-            className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={totalWeeks}
@@ -120,7 +122,15 @@ export function MyPlanMesocycleBanner({
               style={{ width: `${pct}%` }}
             />
           </div>
+          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-foreground">
+            {progressText}
+          </span>
         </div>
+
+        {/* Méta (famille + date de génération) — ligne fine */}
+        <p className="mt-1 truncate text-[10px] text-muted-foreground/70">
+          {metaLine}
+        </p>
       </div>
     </div>
   );

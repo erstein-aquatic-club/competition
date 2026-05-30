@@ -540,11 +540,17 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // ── Timeline ────────────────────────────────────────────────────────────────
   return (
     <div className="pt-1 pb-4">
-      {recapButton}
-      {/* V5 (§341) — bandeau objectif/position du cycle, au-dessus de la timeline.
-          Affiché uniquement quand c'est bien le mésocycle qui est rendu. */}
-      {usePhase2 && mesocycleBanner && (
-        <MyPlanMesocycleBanner {...mesocycleBanner} />
+      {/* V5 (§341/§345) — bandeau objectif/position du cycle. Quand il est rendu,
+          il ABSORBE le bouton « Récap » (pas de ligne séparée) ; sinon (Phase 3 /
+          fallback) on garde le bouton « Récap » autonome. */}
+      {usePhase2 && mesocycleBanner ? (
+        <MyPlanMesocycleBanner
+          {...mesocycleBanner}
+          recapEnabled={wrapped.enabled}
+          onOpenRecap={() => setRecapOpen(true)}
+        />
+      ) : (
+        recapButton
       )}
 
       {/* Timeline (rail décoratif scopé à la liste des semaines) */}

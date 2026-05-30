@@ -42,9 +42,9 @@ export function MyPlanSessionSheet({
         {session && (
           <>
             <SheetHeader className="pb-3">
-              <SheetTitle className="flex items-center gap-2 text-base text-left">
+              <SheetTitle className="flex items-center gap-2 text-base text-left min-w-0">
                 <Dumbbell className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1">{session.title ?? session.name}</span>
+                <span className="flex-1 min-w-0 truncate">{session.title ?? session.name}</span>
                 {style && phase && (
                   <span
                     className={cn(
