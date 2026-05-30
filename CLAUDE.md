@@ -76,7 +76,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§348** — **Bilan muscu : édition coach d'un ancien bilan (scores physiques G/D)** : depuis l'historique, bouton « Éditer » (lignes notées) → `BilanHistorySection.onEdit` + `StrengthAssessmentScreen` (`editingAssessmentId`, bandeau « Édition du bilan du {date} » + Annuler, effet de préremplissage gardé, save vise `editingAssessmentId ?? assessment.id`, invalide `assessment-history`). Scope = scores physiques uniquement. TDD ; tsc 0, node:test 1501, build OK ; aucune migration. *(§347 historique + courbe évolution G/D ; §346 mobilité G/D Slice A ; §345 polish UI mésocycle.)*
+Dernier § livré : **§349** — **Polish audit flux mésocycle (V7, UX1/UX2/UX3)** : V7 `SessionDetailPreview` masque le badge de cycle legacy en mode plan (plus de « Force » rouge trompeur) ; UX1 `RestSessionTab` centre anneau = exercices faits `(currentStep−1)/total` (cohérent anneau+rail) ; UX2 rail basé sur le total (ne sature plus au dernier exo) ; UX3 minuteur repos `RestScreen` `role="timer"`+`aria-label`+`aria-live="off"`. tsc 0, node:test 1501, vitest 67, build OK ; aucune migration. **Audit flux mésocycle : tous findings traités** (sauf lint rules-of-hooks = infra eslint). *(§348 édition ancien bilan ; §347 historique + évolution G/D ; §346 mobilité G/D Slice A.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

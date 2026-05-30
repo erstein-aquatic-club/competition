@@ -19355,3 +19355,14 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** TDD (RED→GREEN) : nouveau `StrengthAssessmentScreen.edit.vitest.tsx` (ouvre l'édition d'`old-1` depuis l'historique, préremplit G=3/D=3, met D=0, enregistre → `updateAssessmentPhysicalTests("old-1", …)` avec `shoulder_flexion.right === 0`, et NON le dernier id) ; `BilanHistorySection.vitest.tsx` +2 (bouton « Éditer » présent + `onEdit` appelé sans déplier ; absent sans `physical_tests`). **tsc 0 ; node:test 1501 (inchangé) ; vitest unit régressions OK (StrengthAssessmentScreen.vitest + gd.vitest + BilanHistorySection.vitest verts) ; `npm run build` OK.** Aucune migration → pas de `test:rls`.
 
 **Limites / suite.** Édition limitée aux scores physiques (par design). Pas d'historique d'édition / audit trail (l'UPDATE écrase). Édition hors-ligne réutilise la même file idempotente §314 (replay sûr).
+
+## §349 — Polish audit flux mésocycle : V7 + UX1/UX2/UX3 (2026-05-30)
+
+**Contexte.** Findings mineurs restants de l'audit `docs/audits/2026-05-30-audit-flux-mesocycle.md` (remédiations déjà validées). 4 correctifs cosmétiques/a11y, sans logique nouvelle (pas de test ajouté ; suite inchangée).
+
+- **V7** — `SessionDetailPreview` : en mode plan (mésocycle), `cycleOptions` est vide → `cycleLabel` retombait sur la clé legacy brute `cycle_type` (« force » rouge affiché pour TOUTES les phases méso sauf prépa, hérité de la RPC `00172`). Fix : `cycleBadgeLabel = find()?.label ?? null` → le **badge de cycle est masqué** quand aucun libellé convivial (mode plan), plus de « Force » trompeur ; titre + nombre d'exercices + durée conservés.
+- **UX1** — `RestSessionTab` : l'anneau se remplissait sur `progressPct` (= `(currentStep−1)/total`, exercices FAITS) mais le centre affichait `currentStep/total` (position) → « 2/5 » avec anneau à 20 % se lisait « 2 faits ». Fix : centre = `(currentStep−1)/total` → **cohérent avec l'anneau et le rail** (tous = exercices faits).
+- **UX2** — `RestSessionTab` : le rail vertical `((currentStep−1)/(total−1))×100` atteignait **100 % pendant le repos du DERNIER exercice** (séance non finie). Fix : base sur le **total** (`(currentStep−1)/total`) → le dernier exo ne sature plus le rail avant d'être terminé.
+- **UX3** — `RestScreen` : le minuteur de repos (`M:SS`) n'avait ni rôle ni libellé → invisible au lecteur d'écran. Fix : `role="timer"` + `aria-label` (« Repos : X min Y s restantes ») + `aria-live="off"` (pas d'annonce verbeuse à chaque seconde).
+
+**Tests / vérifs.** Changements visuels/a11y → pas de test neuf ; **tsc 0 ; node:test 1501 (inchangé) ; vitest unit 67 (inchangé) ; `npm run build` OK.** Aucune migration. **Audit flux mésocycle : tous les findings traités** (sauf le lint `rules-of-hooks` = chantier infra eslint, documenté §344).

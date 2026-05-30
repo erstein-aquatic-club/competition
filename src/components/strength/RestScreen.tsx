@@ -149,10 +149,18 @@ export function RestScreen({
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={cn(
-                "font-[var(--font-display)] text-4xl font-bold tabular-nums tracking-tight transition-colors duration-slow",
-                isLow && "text-destructive",
-              )}>
+              {/* UX3 (§349) — annonçable au lecteur d'écran. `aria-live="off"` :
+                  pas d'annonce à chaque seconde (verbeux) ; rôle timer +
+                  aria-label donnent le temps restant à la demande. */}
+              <span
+                role="timer"
+                aria-live="off"
+                aria-label={`Repos : ${Math.floor(restTimer / 60)} min ${restTimer % 60} s restantes`}
+                className={cn(
+                  "font-[var(--font-display)] text-4xl font-bold tabular-nums tracking-tight transition-colors duration-slow",
+                  isLow && "text-destructive",
+                )}
+              >
                 {Math.floor(restTimer / 60)}:{String(restTimer % 60).padStart(2, "0")}
               </span>
               <span className="text-[10px] text-muted-foreground/50 mt-0.5">

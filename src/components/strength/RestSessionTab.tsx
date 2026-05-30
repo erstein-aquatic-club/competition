@@ -82,8 +82,11 @@ export function RestSessionTab({
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
+            {/* UX1 (§349) — exercices FAITS / total, cohérent avec l'anneau et le
+                rail (= `progressPct` = (currentStep−1)/total). Plus de « 2/5 »
+                qui se lisait « 2 faits » alors que l'anneau n'en montrait qu'1. */}
             <span className="text-[11px] font-bold tabular-nums leading-none">
-              {currentStep}<span className="text-muted-foreground/50 font-normal">/{totalSteps}</span>
+              {Math.max(0, currentStep - 1)}<span className="text-muted-foreground/50 font-normal">/{totalSteps}</span>
             </span>
           </div>
         </div>
@@ -136,8 +139,10 @@ export function RestSessionTab({
         <div
           className="absolute left-[9px] top-0 w-[2px] bg-primary rounded-full transition-all duration-slow ease-out"
           style={{
-            height: totalSteps > 1
-              ? `${Math.min(100, ((currentStep - 1) / (totalSteps - 1)) * 100)}%`
+            // UX2 (§349) — base sur le TOTAL (pas total−1) → le rail n'atteint
+            // plus 100 % pendant le repos du DERNIER exercice (séance non finie).
+            height: totalSteps > 0
+              ? `${Math.min(100, ((currentStep - 1) / totalSteps) * 100)}%`
               : "0%",
           }}
         />

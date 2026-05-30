@@ -118,7 +118,10 @@ export function SessionDetailPreview({
 
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
-  const cycleLabel = cycleOptions.find((o) => o.value === cycleType)?.label ?? cycleType;
+  // V7 (§349) — en mode plan (mésocycle), `cycleOptions` est vide → pas de
+  // libellé convivial. On NE montre PAS la clé legacy brute (« force » rouge
+  // affiché pour toutes les phases méso sauf prépa) : badge masqué dans ce cas.
+  const cycleBadgeLabel = cycleOptions.find((o) => o.value === cycleType)?.label ?? null;
   const colors = cycleColors[cycleType] ?? cycleColors.endurance;
 
   return (
@@ -141,10 +144,12 @@ export function SessionDetailPreview({
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold tracking-tight truncate leading-tight">{session.title}</h1>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold", colors.bg, colors.text)}>
-              <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />
-              {cycleLabel}
-            </span>
+            {cycleBadgeLabel && (
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold", colors.bg, colors.text)}>
+                <span className={cn("h-1.5 w-1.5 rounded-full", colors.dot)} />
+                {cycleBadgeLabel}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground tabular-nums">
               {items.length} exercice{items.length > 1 ? "s" : ""}
             </span>
