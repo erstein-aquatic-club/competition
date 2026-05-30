@@ -200,6 +200,107 @@ export function dysfunctionFlags(physicalTests: StrengthPhysicalTests | null): s
   return flags;
 }
 
+/** Un axe déficitaire avec son côté faible, pour le Bloc 2 (§351). */
+export interface DeficientAxis {
+  axis: string;
+  /** Côté faible : 'left'/'right' si asymétrie, 'both' si G===D. */
+  side: 'left' | 'right' | 'both';
+  effective: number;
+  asymmetry: number;
+}
+
+/**
+ * §351 — axes de mobilité/mouvement déficitaires, triés par sévérité.
+ * Critère d'inclusion : `effective = min(G,D) ≤ 1` OU `|G−D| ≥ 2`.
+ * Tri : `effective` croissant, puis `|G−D|` décroissant (les pires d'abord).
+ */
+export function deficientAxes(physicalTests: StrengthPhysicalTests | null): DeficientAxis[] {
+  const pt = normalizePhysicalTests(physicalTests);
+  if (!pt) return [];
+  const out: DeficientAxis[] = [];
+  const all = { ...pt.mobility, ...pt.movement } as Record<string, { left: number; right: number }>;
+  for (const [axis, v] of Object.entries(all)) {
+    const effective = Math.min(v.left, v.right);
+    const asymmetry = Math.abs(v.left - v.right);
+    if (effective <= 1 || asymmetry >= 2) {
+      const side: DeficientAxis['side'] =
+        v.left === v.right ? 'both' : v.left < v.right ? 'left' : 'right';
+      out.push({ axis, side, effective, asymmetry });
+    }
+  }
+  out.sort((a, b) => (a.effective - b.effective) || (b.asymmetry - a.asymmetry));
+  return out;
+}
+
+/**
+ * §351 Bloc 1 — résout la routine articulaire commune (ids ordonnés) en exos,
+ * filtre les contre-indications (douleur épaule → saute Shoulder Dislocates).
+ */
+export function buildCommonWarmup(
+  routineIds: number[],
+  catalog: CatalogExercise[],
+  painZones: string[],
+): SelectedExercise[] {
+  const painSet = new Set(painZones);
+  const byId = new Map(catalog.map((e) => [e.id, e]));
+  const out: SelectedExercise[] = [];
+  for (const id of routineIds) {
+    const ex = byId.get(id);
+    if (!ex) continue;
+    if (ex.contraindicationZones.some((z) => painSet.has(z))) continue;
+    out.push({ exercise: ex, substituted: false, originalExerciseId: null });
+  }
+  return out;
+}
+
+/**
+ * §351 Bloc 2 — sélectionne les exos correctifs pour les axes déficitaires.
+ * Rotation déterministe : fenêtre glissante de taille MAX_CORRECTIVE sur la liste
+ * triée (pires d'abord), décalée par `sessionIndex` → couverture équitable sur la
+ * semaine. Dédupliqué vs le Bloc 1 (`commonPool`). Aucun `Date.now`/`random`.
+ */
+export function selectCorrectiveWarmup(
+  deficient: DeficientAxis[],
+  catalog: CatalogExercise[],
+  painZones: string[],
+  level: 'beginner' | 'intermediate' | 'advanced',
+  sessionIndex: number,
+  commonPool: SelectedExercise[],
+): SelectedExercise[] {
+  if (deficient.length === 0) return [];
+  const painSet = new Set(painZones);
+  const levelNum = LEVEL_ORDER[level];
+  const usedIds = new Set(commonPool.map((s) => s.exercise.id));
+
+  const n = deficient.length;
+  const take = Math.min(MAX_CORRECTIVE, n);
+  const start = (sessionIndex * MAX_CORRECTIVE) % n;
+  const window: DeficientAxis[] = [];
+  for (let i = 0; i < take; i++) window.push(deficient[(start + i) % n]);
+
+  const out: SelectedExercise[] = [];
+  for (const d of window) {
+    const candidate = catalog.find(
+      (e) =>
+        e.correctiveAxes.includes(d.axis) &&
+        !usedIds.has(e.id) &&
+        (e.level === null || LEVEL_ORDER[e.level] <= levelNum) &&
+        !e.contraindicationZones.some((z) => painSet.has(z)),
+    );
+    if (candidate) {
+      usedIds.add(candidate.id);
+      out.push({
+        exercise: candidate,
+        substituted: false,
+        originalExerciseId: null,
+        correctiveAxis: d.axis,
+        correctiveSide: d.side,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Priorise les 6 seaux pour la génération du mésocycle.
  *
@@ -715,6 +816,8 @@ const CORE_BLOCK_COUNT = 1;
  */
 const MAX_SESSION_ITEMS = 5;
 const MIN_WARMUP_COUNT = 1;
+/** §351 — plafond d'exos correctifs (Bloc 2) par séance. Rotation au-delà. */
+const MAX_CORRECTIVE = 2;
 /** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
  *  mobility), on cible jusqu'à 5 exercices mobility pour rester productive. */
 const MOBILITY_ONLY_COUNT = 5;

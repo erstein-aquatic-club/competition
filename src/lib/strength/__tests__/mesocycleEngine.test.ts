@@ -2069,5 +2069,157 @@ describe('mobilité G/D (§346)', () => {
   });
 });
 
+// ── échauffement intelligent (§351) ──────────────────────────────────────────
+
+import {
+  deficientAxes,
+  buildCommonWarmup,
+  selectCorrectiveWarmup,
+} from '../mesocycleEngine.ts';
+import type { CatalogExercise as WarmupCatalogExercise } from '../mesocycleEngine.types.ts';
+
+// Helper local : construit un physical_tests v2.
+const pt351 = (over: Partial<Record<string, { left: number; right: number }>>) =>
+  ({
+    mobility: {
+      shoulder_flexion: over.shoulder_flexion ?? { left: 3, right: 3 },
+      t_spine: over.t_spine ?? { left: 3, right: 3 },
+      hip: over.hip ?? { left: 3, right: 3 },
+    },
+    movement: {
+      scapula_control: over.scapula_control ?? { left: 3, right: 3 },
+      trunk_neck_alignment: over.trunk_neck_alignment ?? { left: 3, right: 3 },
+      hip_hinge: over.hip_hinge ?? { left: 3, right: 3 },
+    },
+  }) as any;
+
+// Helper local : CatalogExercise minimal (tous les champs requis, dont correctiveAxes).
+const cat = (over: Partial<WarmupCatalogExercise> & { id: number }): WarmupCatalogExercise => ({
+  id: over.id,
+  nomExercice: `ex${over.id}`,
+  bucket: 'mobility',
+  level: over.level ?? 'beginner',
+  contraindicationZones: over.contraindicationZones ?? [],
+  strokePrehabAffinity: [],
+  correctiveAxes: over.correctiveAxes ?? [],
+  isCore: false,
+  selectionPriority: over.selectionPriority ?? 0,
+  illustrationGif: null,
+  nbSeriesEndurance: 2,
+  nbRepsEndurance: 10,
+  pourcentageCharge1rmEndurance: 0,
+  recupSeriesEndurance: 30,
+  nbSeriesForce: null,
+  nbRepsForce: null,
+  pourcentageCharge1rmForce: null,
+  recupSeriesForce: null,
+});
+
+describe('deficientAxes (§351)', () => {
+  it('effective ≤ 1 retenu', () => {
+    const res = deficientAxes(pt351({ hip: { left: 1, right: 1 } }));
+    assert.deepEqual(res.map((a) => a.axis), ['hip']);
+    assert.equal(res[0].side, 'both');
+  });
+
+  it('asymétrie |G−D| ≥ 2 retenue même si effective ≥ 2', () => {
+    const res = deficientAxes(pt351({ shoulder_flexion: { left: 3, right: 1 } }));
+    assert.deepEqual(res.map((a) => a.axis), ['shoulder_flexion']);
+    assert.equal(res[0].side, 'right'); // côté faible = right
+  });
+
+  it('tri par sévérité (effective croissant puis asymétrie décroissante)', () => {
+    const res = deficientAxes(
+      pt351({
+        hip: { left: 0, right: 0 }, // effective 0
+        t_spine: { left: 1, right: 1 }, // effective 1, asym 0
+        shoulder_flexion: { left: 3, right: 1 }, // effective 1, asym 2
+      }),
+    );
+    assert.deepEqual(res.map((a) => a.axis), ['hip', 'shoulder_flexion', 't_spine']);
+  });
+
+  it('axe sain (3/3) exclu', () => {
+    assert.deepEqual(deficientAxes(pt351({})), []);
+  });
+
+  it('null → []', () => {
+    assert.deepEqual(deficientAxes(null), []);
+  });
+});
+
+describe('buildCommonWarmup (§351 Bloc 1)', () => {
+  it('résout les ids dans l\'ordre de la routine', () => {
+    const catalog = [cat({ id: 87 }), cat({ id: 84 }), cat({ id: 24 })];
+    const res = buildCommonWarmup([87, 84, 24], catalog, []);
+    assert.deepEqual(res.map((s) => s.exercise.id), [87, 84, 24]);
+  });
+
+  it('saute un exo contre-indiqué', () => {
+    const catalog = [cat({ id: 87 }), cat({ id: 84, contraindicationZones: ['left_shoulder'] })];
+    const res = buildCommonWarmup([87, 84], catalog, ['left_shoulder']);
+    assert.deepEqual(res.map((s) => s.exercise.id), [87]);
+  });
+
+  it('id absent du catalogue ignoré ; routine vide → []', () => {
+    assert.deepEqual(buildCommonWarmup([999], [cat({ id: 87 })], []).map((s) => s.exercise.id), []);
+    assert.deepEqual(buildCommonWarmup([], [cat({ id: 87 })], []), []);
+  });
+});
+
+describe('selectCorrectiveWarmup (§351 Bloc 2)', () => {
+  it('un exo par axe déficitaire, plafond MAX_CORRECTIVE', () => {
+    const deficient = [
+      { axis: 'hip', side: 'both', effective: 0, asymmetry: 0 },
+      { axis: 'scapula_control', side: 'left', effective: 1, asymmetry: 2 },
+    ] as any;
+    const catalog = [
+      cat({ id: 59, correctiveAxes: ['hip'] }),
+      cat({ id: 51, correctiveAxes: ['scapula_control'] }),
+    ];
+    const res = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, []);
+    assert.deepEqual(res.map((s) => s.exercise.id), [59, 51]);
+  });
+
+  it('rotation déterministe sur sessionIndex (4 axes, cap 2)', () => {
+    const deficient = ['A', 'B', 'C', 'D'].map((axis, i) => ({
+      axis,
+      side: 'both',
+      effective: i === 0 ? 0 : 1,
+      asymmetry: 0,
+    })) as any;
+    const catalog = ['A', 'B', 'C', 'D'].map((a, i) => cat({ id: 10 + i, correctiveAxes: [a] }));
+    const s0 = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, []).map((s) => s.exercise.id);
+    const s1 = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 1, []).map((s) => s.exercise.id);
+    const s2 = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 2, []).map((s) => s.exercise.id);
+    assert.deepEqual(s0, [10, 11]); // A,B (pires d'abord)
+    assert.deepEqual(s1, [12, 13]); // C,D
+    assert.deepEqual(s2, [10, 11]); // wrap → A,B
+  });
+
+  it('contre-indication exclut l\'exo de l\'axe', () => {
+    const deficient = [{ axis: 'hip', side: 'both', effective: 0, asymmetry: 0 }] as any;
+    const catalog = [cat({ id: 59, correctiveAxes: ['hip'], contraindicationZones: ['left_hip'] })];
+    const res = selectCorrectiveWarmup(deficient, catalog, ['left_hip'], 'beginner', 0, []);
+    assert.deepEqual(res, []);
+  });
+
+  it('dédup vs Bloc 1 (exo déjà dans la routine commune)', () => {
+    const deficient = [{ axis: 't_spine', side: 'both', effective: 1, asymmetry: 0 }] as any;
+    const catalog = [cat({ id: 87, correctiveAxes: ['t_spine', 'trunk_neck_alignment'] })];
+    const common = [{ exercise: catalog[0], substituted: false, originalExerciseId: null }] as any;
+    const res = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, common);
+    assert.deepEqual(res, []); // 87 déjà dans le bloc commun → pas de doublon
+  });
+
+  it('porte axe + côté pour l\'UI', () => {
+    const deficient = [{ axis: 'hip', side: 'left', effective: 1, asymmetry: 2 }] as any;
+    const catalog = [cat({ id: 59, correctiveAxes: ['hip'] })];
+    const res = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, []);
+    assert.equal(res[0].correctiveAxis, 'hip');
+    assert.equal(res[0].correctiveSide, 'left');
+  });
+});
+
 
 
