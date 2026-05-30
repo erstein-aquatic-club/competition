@@ -12,6 +12,7 @@ import {
   getExercises,
   get1RM,
   update1RM,
+  withTimeout,
   startStrengthRun as startStrengthRunApi,
   logStrengthSet as logStrengthSetApi,
   updateStrengthRun,
@@ -643,11 +644,16 @@ export default function Strength() {
   const handleEstimationComplete = useCallback(
     async (exerciseId: number, estimatedOneRm: number) => {
       if (!userId) return;
-      await update1RM({
-        athlete_id: userId,
-        exercise_id: exerciseId,
-        one_rm: estimatedOneRm,
-      });
+      // R2 — borné : évite l'UI figée si le réseau traîne pendant l'estimation.
+      await withTimeout(
+        update1RM({
+          athlete_id: userId,
+          exercise_id: exerciseId,
+          one_rm: estimatedOneRm,
+        }),
+        8000,
+        "update-1rm",
+      );
       await queryClient.invalidateQueries({ queryKey: ["1rm"] });
       setInlineEstimationExercises((prev) => {
         const next = new Set(prev);

@@ -76,7 +76,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§339** — **Durée séance muscu : aperçu et écran inter-séries cohérents** (bug terrain) : `RestSessionTab` réinventait le calcul de durée → (A) aperçu ≠ inter-séries, (B) estimation qui explosait mi-séance (repos de l'exo en cours ×toutes les séries des autres exos). Fix : nouvelle fonction pure `estimateRemainingStrengthSessionDurationSeconds` (même modèle que l'aperçu §331, repos par item, restant uniquement → décroissance monotone) ; props scalaires `restSecondsPerSet`/`restSecondsPerExercise` supprimées. TDD `sessionDuration.test.ts` 9→16, tsc 0, build OK ; pas de migration/RLS. *(§338 ajustement méso mid-cycle ; §337 robustesse fiche nageur ; §336 récap Wrapped.)*
+Dernier § livré : **§340** — **Audit flux mésocycle + Lot 1 (sécu & robustesse rapides)** : audit complet (`docs/audits/2026-05-30-audit-flux-mesocycle.md`, 37 findings, 0 #310 actif, 0 corruption RPC) ; Lot 1 livré : C1 garde de rôle `MesocycleAdjust`, C4 synchro séances↔jours, C2/C5 retour mode-ajustement + purge payload, A1/A3 reads méso `withTimeout`, R2 `update1RM` borné, R1 anti double-tap, A2 toast description. TDD ; tsc 0, node:test 1456, vitest 51, build OK ; pas de migration/RLS. *(§339 durée séance ; §338 ajustement méso mid-cycle ; §337 robustesse fiche nageur.)*
 
 §308 (précédent) : remplacement propre d'un plan mésocycle en cours (RPC `apply` purge à partir de la date de départ, anti-orphelins, mig 00201 + 4 tests RLS). §307 Phase 4 : picker jours + date de départ, aperçu jour-aware. Différé : badges `MyPlanTab` (Task 4.3).
 

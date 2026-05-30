@@ -105,6 +105,22 @@ interface PendingParams {
   intensityFactor?: number;
 }
 
+/**
+ * C2 — cible de navigation « Retour » / « Modifier les paramètres » depuis
+ * l'aperçu. En mode ajustement mid-cycle (§338), on revient à l'écran
+ * d'ajustement du nageur ciblé (pour ne pas perdre la config pivot/facteurs du
+ * coach) ; sinon à l'écran de génération. Repli sûr sur génération si l'athlète
+ * cible manque.
+ */
+export function mesocyclePreviewBackTarget(
+  params: Pick<PendingParams, "adjust" | "athleteId"> | null,
+): string {
+  if (params?.adjust && params.athleteId != null) {
+    return `/strength/mesocycle-adjust/${params.athleteId}`;
+  }
+  return "/strength/mesocycle-generate";
+}
+
 const BUCKET_LABEL_FR: Record<AllBucket, string> = {
   lower_strength: "Force bas du corps",
   lower_power: "Puissance bas du corps",
@@ -587,6 +603,17 @@ export default function MesocyclePreview() {
     return <PageSkeleton />;
   }
 
+  // C2 + C5 — quitter l'aperçu (retour/annuler) : purge le payload (abandon
+  // explicite) puis revient à l'écran amont correct (ajustement vs génération).
+  const handleLeavePreview = () => {
+    try {
+      window.sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Ignore : sessionStorage peut être bloqué (private mode).
+    }
+    navigate(mesocyclePreviewBackTarget(params));
+  };
+
   return (
     <div className="min-h-dvh bg-muted/30 pb-36">
       <Header
@@ -594,7 +621,7 @@ export default function MesocyclePreview() {
         totalWeeks={generated.totalWeeks}
         sessionsPerWeek={generated.sessionsPerWeek}
         engineVersion={generated.engineVersion}
-        onBack={() => navigate("/strength/mesocycle-generate")}
+        onBack={handleLeavePreview}
       />
 
       <div className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
@@ -660,7 +687,7 @@ export default function MesocyclePreview() {
         totalWeeks={generated.totalWeeks}
         pending={applyMutation.isPending}
         onConfirm={() => applyMutation.mutate()}
-        onCancel={() => navigate("/strength/mesocycle-generate")}
+        onCancel={handleLeavePreview}
       />
     </div>
   );

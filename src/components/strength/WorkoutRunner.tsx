@@ -605,6 +605,10 @@ export function WorkoutRunner({
 
   const handleReferenceSet = async () => {
     if (!currentBlock || !onEstimationComplete) return;
+    // R1 — anti double-tap concurrent : sans cette garde, un 2ᵉ tap pendant
+    // l'await onEstimationComplete déclenchait un double upsert 1RM + un double
+    // log set_number:1. Même pattern que handleValidateSet.
+    if (isLoggingRef.current) return;
     const weight = Number(currentSetInputs[0]?.weight ?? 0);
     const reps = Number(currentSetInputs[0]?.reps ?? 0);
     const difficulty = currentSetInputs[0]?.difficulty ?? null;
@@ -619,39 +623,41 @@ export function WorkoutRunner({
       return;
     }
 
-    // Persist le 1RM côté parent (Strength.tsx → update1RM + invalidate query)
-    try {
-      await onEstimationComplete(currentBlock.exercise_id, estimated);
-    } catch {
-      toast.error("Erreur", {
-        description: "1RM non sauvegardé. Réessaye.",
-      });
-      return;
-    }
-
-    // Log la série de référence comme série 1 standard
-    const newLog: SetLogEntry = {
-      exercise_id: currentBlock.exercise_id,
-      set_number: 1,
-      reps,
-      weight,
-      difficulty,
-    };
-    setLogs((prev) => [...prev, newLog]);
+    // Garde tenue sur TOUTE la section critique (estimation + log), libérée une
+    // seule fois en finally.
     isLoggingRef.current = true;
     try {
+      // Persist le 1RM côté parent (Strength.tsx → update1RM + invalidate query)
+      try {
+        await onEstimationComplete(currentBlock.exercise_id, estimated);
+      } catch {
+        toast.error("Erreur", {
+          description: "1RM non sauvegardé. Réessaye.",
+        });
+        return;
+      }
+
+      // Log la série de référence comme série 1 standard
+      const newLog: SetLogEntry = {
+        exercise_id: currentBlock.exercise_id,
+        set_number: 1,
+        reps,
+        weight,
+        difficulty,
+      };
+      setLogs((prev) => [...prev, newLog]);
       await onLogSets?.([newLog]);
+
+      // Reset warmupHistory + avance à série 2
+      setWarmupHistory([]);
+      setCurrentSetInputs({});
+      setCurrentSetIndex(2);
+
+      if (autoRest && currentBlock.rest_seconds > 0) {
+        startRestTimer(currentBlock.rest_seconds, "set");
+      }
     } finally {
       isLoggingRef.current = false;
-    }
-
-    // Reset warmupHistory + avance à série 2
-    setWarmupHistory([]);
-    setCurrentSetInputs({});
-    setCurrentSetIndex(2);
-
-    if (autoRest && currentBlock.rest_seconds > 0) {
-      startRestTimer(currentBlock.rest_seconds, "set");
     }
   };
 

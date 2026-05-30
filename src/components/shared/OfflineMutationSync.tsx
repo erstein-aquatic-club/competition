@@ -458,7 +458,10 @@ export function OfflineMutationSync() {
       if (poisonedCount > 0) {
         toast.error("Synchronisation partielle", { description: `${poisonedCount} séance(s) n'ont pas pu être synchronisées après plusieurs tentatives et ont été abandonnées.` });
       } else if (lastError && syncedCount === 0) {
-        toast.error("Synchronisation en attente", { description: lastError instanceof Error });
+        // A2 — afficher le VRAI message (pas un booléen, invisible en ReactNode).
+        toast.error("Synchronisation en attente", {
+          description: lastError instanceof Error ? lastError.message : String(lastError),
+        });
       }
 
       if (unsupportedCount > 0) {

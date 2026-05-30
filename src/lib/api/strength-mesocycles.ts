@@ -208,12 +208,18 @@ export async function getMesocycle(
   mesocycleId: string,
 ): Promise<StrengthMesocycle | null> {
   if (!canUseSupabase()) return null;
+  // A3 — read borné (invariant §298) : une connexion dégradée ne doit pas
+  // suspendre indéfiniment les écrans coach.
   const data = assertSupabase(
-    await supabase
-      .from('strength_mesocycles')
-      .select('*')
-      .eq('id', mesocycleId)
-      .maybeSingle(),
+    await withTimeout(
+      supabase
+        .from('strength_mesocycles')
+        .select('*')
+        .eq('id', mesocycleId)
+        .maybeSingle(),
+      10_000,
+      'get-mesocycle',
+    ),
   );
   return (data as StrengthMesocycle | null) ?? null;
 }
@@ -227,14 +233,19 @@ export async function getActiveMesocycle(
   athleteId: number,
 ): Promise<StrengthMesocycle | null> {
   if (!canUseSupabase()) return null;
+  // A3 — read borné (invariant §298).
   const data = assertSupabase(
-    await supabase
-      .from('strength_mesocycles')
-      .select('*')
-      .eq('athlete_id', athleteId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1),
+    await withTimeout(
+      supabase
+        .from('strength_mesocycles')
+        .select('*')
+        .eq('athlete_id', athleteId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1),
+      10_000,
+      'get-active-mesocycle',
+    ),
   );
   const rows = (data ?? []) as StrengthMesocycle[];
   return rows[0] ?? null;
@@ -248,12 +259,17 @@ export async function listMesocycles(
   athleteId: number,
 ): Promise<StrengthMesocycle[]> {
   if (!canUseSupabase()) return [];
+  // A3 — read borné (invariant §298).
   const data = assertSupabase(
-    await supabase
-      .from('strength_mesocycles')
-      .select('*')
-      .eq('athlete_id', athleteId)
-      .order('created_at', { ascending: false }),
+    await withTimeout(
+      supabase
+        .from('strength_mesocycles')
+        .select('*')
+        .eq('athlete_id', athleteId)
+        .order('created_at', { ascending: false }),
+      10_000,
+      'list-mesocycles',
+    ),
   );
   return (data ?? []) as StrengthMesocycle[];
 }
@@ -382,16 +398,21 @@ export async function getMesocycleSessionsContent(
 ): Promise<MesocycleSessionContent[]> {
   if (!canUseSupabase()) return [];
 
+  // A3 — read borné (invariant §298).
   const data = assertSupabase(
-    await supabase
-      .from('strength_session_items')
-      .select(
-        'session_id, ordre, exercise_id, sets, reps, pct_1rm, rest_series_s, notes, raw_payload,' +
-          ' dim_exercices ( nom_exercice, illustration_gif )',
-      )
-      // Filtre via la clé JSON — pose par apply_strength_mesocycle.
-      .eq('raw_payload->>mesocycle_id', mesocycleId)
-      .order('id'),
+    await withTimeout(
+      supabase
+        .from('strength_session_items')
+        .select(
+          'session_id, ordre, exercise_id, sets, reps, pct_1rm, rest_series_s, notes, raw_payload,' +
+            ' dim_exercices ( nom_exercice, illustration_gif )',
+        )
+        // Filtre via la clé JSON — pose par apply_strength_mesocycle.
+        .eq('raw_payload->>mesocycle_id', mesocycleId)
+        .order('id'),
+      10_000,
+      'get-mesocycle-sessions-content',
+    ),
   );
 
   // Rows arrivent à plat. Regroupe par (week_number, session_number).

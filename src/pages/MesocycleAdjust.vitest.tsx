@@ -48,6 +48,17 @@ vi.mock("wouter", () => ({
   useLocation: () => ["/strength/mesocycle-adjust/18", navigateSpy],
 }));
 
+// Rôle de l'utilisateur courant : pilotable par test via setMockRole.
+// MesocycleAdjust est un écran COACH → un nageur doit être refusé (C1).
+let mockRole: string | null = "coach";
+function setMockRole(r: string | null) {
+  mockRole = r;
+}
+vi.mock("@/lib/auth", () => ({
+  useAuth: (selector: (s: { role: string | null }) => unknown) =>
+    selector({ role: mockRole }),
+}));
+
 // Le meso renvoye par getActiveMesocycle : pilotable par test via setMockMeso.
 let mockMeso: Record<string, unknown> | null = null;
 function setMockMeso(m: Record<string, unknown> | null) {
@@ -168,6 +179,7 @@ function renderPage() {
 beforeEach(() => {
   navigateSpy.mockClear();
   setMockMeso(null);
+  setMockRole("coach");
   cleanup();
 });
 
@@ -211,6 +223,34 @@ describe("MesocycleAdjust — helpers purs", () => {
 // ── Composant ──────────────────────────────────────────────────────────────────
 
 describe("MesocycleAdjust — composant", () => {
+  it("refuse l'accès à un nageur (écran réservé au coach) — C1", async () => {
+    setMockRole("athlete");
+    setMockMeso(makeMeso(new Date().toISOString()));
+    renderPage();
+
+    // Le garde-fou de rôle s'affiche…
+    await screen.findByText(/réservé aux entraîneurs/i);
+    // …et le formulaire d'ajustement n'est JAMAIS rendu (pas de champ date pivot).
+    expect(screen.queryByDisplayValue(nextMonday())).toBeNull();
+  });
+
+  it("change de séances/sem → resynchronise les jours cochés — C4", async () => {
+    // meso = 4 séances/sem → 4 jours cochés au départ (defaultWeekdays(4)).
+    setMockMeso(makeMeso(new Date().toISOString()));
+    renderPage();
+    await screen.findByDisplayValue(nextMonday());
+
+    const checkedCount = () =>
+      screen
+        .getAllByRole("checkbox")
+        .filter((el) => el.getAttribute("aria-checked") === "true").length;
+    expect(checkedCount()).toBe(4);
+
+    // Passer à 5 séances doit recocher defaultWeekdays(5) = [Lun..Ven] = 5 jours.
+    fireEvent.click(screen.getByRole("radio", { name: "5" }));
+    await waitFor(() => expect(checkedCount()).toBe(5));
+  });
+
   it("pivot par defaut = lundi suivant (meso recent)", async () => {
     // generated_at = aujourd'hui -> weeksRemaining > 0, formulaire visible.
     setMockMeso(makeMeso(new Date().toISOString()));

@@ -27,6 +27,7 @@ import type {
 } from "@/lib/strength/mesocycleEngine.types";
 import type { PeriodizationCycle } from "@/lib/api/types";
 import { composeTemplate } from "@/lib/strength/composeTemplate";
+import { useAuth } from "@/lib/auth";
 import { getMonday, toISODate } from "@/lib/date";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
 import { cn } from "@/lib/utils";
@@ -140,6 +141,12 @@ export default function MesocycleAdjust() {
     "/strength/mesocycle-adjust/:athleteId",
   );
   const [, navigate] = useLocation();
+
+  // C1 — écran réservé au coach/admin : l'ajustement mid-cycle est une décision
+  // d'entraîneur (doctrine). Le RPC + la RLS bloquent déjà toute action sur un
+  // AUTRE athlète ; ce garde-fou empêche un nageur d'auto-ajuster son propre plan.
+  const role = useAuth((s) => s.role);
+  const isCoach = role === "coach" || role === "admin";
 
   const athleteId = params?.athleteId ? Number(params.athleteId) : null;
 
@@ -312,7 +319,14 @@ export default function MesocycleAdjust() {
 
   // ── Rendu (PAS d'early return avant ce point : tous les hooks sont au-dessus) ─
   let body: React.ReactNode;
-  if (athleteId == null) {
+  if (!isCoach) {
+    body = (
+      <EmptyState
+        message="Réservé aux entraîneurs."
+        onBack={handleBack}
+      />
+    );
+  } else if (athleteId == null) {
     body = <EmptyState message="Nageur introuvable." onBack={handleBack} />;
   } else if (loading) {
     body = (
@@ -421,7 +435,13 @@ export default function MesocycleAdjust() {
             <RadioGroup
               className="flex flex-wrap gap-4"
               value={String(sessionsPerWeek)}
-              onValueChange={(v) => setSessionsPerWeek(Number(v))}
+              onValueChange={(v) => {
+                // C4 — changer le nombre de séances resynchronise les jours cochés
+                // (sinon RadioGroup et cases divergent ; le moteur lit weekdays.length).
+                const n = Number(v);
+                setSessionsPerWeek(n);
+                setWeekdays(defaultWeekdays(n));
+              }}
             >
               {[2, 3, 4, 5].map((n) => (
                 <div key={n} className="flex items-center gap-2">
@@ -459,6 +479,14 @@ export default function MesocycleAdjust() {
                 );
               })}
             </div>
+
+            {weekdays.length !== sessionsPerWeek && (
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                {weekdays.length} jour{weekdays.length > 1 ? "s" : ""} coché
+                {weekdays.length > 1 ? "s" : ""} — c'est ce nombre qui sera
+                utilisé pour générer les séances.
+              </p>
+            )}
           </CardContent>
         </Card>
 
