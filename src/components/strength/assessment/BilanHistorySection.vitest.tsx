@@ -94,6 +94,41 @@ describe("BilanHistorySection (§347)", () => {
     fireEvent.click(screen.getByText(/Démarrer un nouveau bilan/i));
     expect(onStartNew).toHaveBeenCalledTimes(1);
   });
+
+  // §348 — bouton « Éditer » sur les lignes notées uniquement.
+  it("affiche « Éditer » sur un bilan noté et appelle onEdit sans déplier", () => {
+    const onEdit = vi.fn();
+    const scored = makeAssessment({
+      id: "scored",
+      physical_tests: {
+        mobility: {
+          shoulder_flexion: { left: 3, right: 1, note: "" },
+          t_spine: 2,
+          hip: 2,
+        },
+        movement: { scapula_control: 2, trunk_neck_alignment: 2, hip_hinge: 2 },
+        filled_at: "2026-03-01T00:00:00.000Z",
+      },
+    });
+    render(<BilanHistorySection assessments={[scored]} onEdit={onEdit} />);
+    const editBtn = screen.getByRole("button", {
+      name: /Éditer les scores du bilan/i,
+    });
+    fireEvent.click(editBtn);
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit.mock.calls[0][0].id).toBe("scored");
+    // Le clic « Éditer » ne déplie pas la ligne (stopPropagation).
+    expect(screen.queryByText("G 3")).toBeNull();
+  });
+
+  it("n'affiche pas « Éditer » sur un bilan sans physical_tests", () => {
+    const onEdit = vi.fn();
+    const unscored = makeAssessment({ id: "unscored", physical_tests: null });
+    render(<BilanHistorySection assessments={[unscored]} onEdit={onEdit} />);
+    expect(
+      screen.queryByRole("button", { name: /Éditer les scores du bilan/i }),
+    ).toBeNull();
+  });
 });
 
 describe("MobilityEvolutionChart (§347)", () => {

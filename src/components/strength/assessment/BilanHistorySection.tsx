@@ -17,6 +17,7 @@ import {
   History,
   ChevronDown,
   Plus,
+  Pencil,
   StickyNote,
   StretchHorizontal,
   Dumbbell,
@@ -39,6 +40,8 @@ interface BilanHistorySectionProps {
   onStartNew?: () => void;
   /** Désactive le CTA (mutation en cours, ou bilan déjà en cours). */
   startDisabled?: boolean;
+  /** Éditer les scores physiques d'un bilan passé noté (§348). */
+  onEdit?: (assessment: StrengthAssessment) => void;
 }
 
 const STATUS_META: Record<
@@ -116,7 +119,13 @@ function ReadOnlyScores({
   );
 }
 
-function BilanRow({ assessment }: { assessment: StrengthAssessment }) {
+function BilanRow({
+  assessment,
+  onEdit,
+}: {
+  assessment: StrengthAssessment;
+  onEdit?: (assessment: StrengthAssessment) => void;
+}) {
   const [open, setOpen] = useState(false);
   const normalized = useMemo(
     () => normalizePhysicalTests(assessment.physical_tests ?? null),
@@ -158,6 +167,30 @@ function BilanRow({ assessment }: { assessment: StrengthAssessment }) {
         <Badge variant={meta.variant} className="shrink-0 text-[10px]">
           {meta.label}
         </Badge>
+        {/* §348 — éditer les scores physiques d'un bilan noté. Rendu dans le
+            <button> de la ligne : stopPropagation pour ne pas (dé)plier. */}
+        {expandable && onEdit && (
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label="Éditer les scores du bilan"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(assessment);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onEdit(assessment);
+              }
+            }}
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10 active:scale-95"
+          >
+            <Pencil className="h-3 w-3" />
+            Éditer
+          </span>
+        )}
         {expandable && (
           <ChevronDown
             className={cn(
@@ -180,6 +213,7 @@ export function BilanHistorySection({
   assessments,
   onStartNew,
   startDisabled,
+  onEdit,
 }: BilanHistorySectionProps) {
   const scoredCount = useMemo(
     () =>
@@ -216,7 +250,7 @@ export function BilanHistorySection({
         ) : (
           <div className="space-y-2">
             {assessments.map((a) => (
-              <BilanRow key={a.id} assessment={a} />
+              <BilanRow key={a.id} assessment={a} onEdit={onEdit} />
             ))}
           </div>
         )}

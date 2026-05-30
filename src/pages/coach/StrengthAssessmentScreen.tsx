@@ -31,6 +31,8 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "wouter";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getAthletes,
@@ -64,11 +66,13 @@ import {
   ClipboardCheck,
   Dumbbell,
   Hourglass,
+  Pencil,
   Send,
   StickyNote,
   StretchHorizontal,
   Users,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -185,6 +189,11 @@ export default function StrengthAssessmentScreen() {
   // Set true on a successful submit so the done-state shows immediately,
   // even before the assessment query refetch settles.
   const [submittedLocally, setSubmittedLocally] = useState(false);
+  // §348 — édition coach des scores physiques d'un ANCIEN bilan, ouvert depuis
+  // l'historique. Quand non-null, le formulaire vise cet id (≠ dernier bilan).
+  const [editingAssessmentId, setEditingAssessmentId] = useState<string | null>(
+    null,
+  );
 
   const selectedAthlete = useMemo<AthleteSummary | null>(
     () => athletes.find((a) => a.id === selectedAthleteId) ?? null,
@@ -204,9 +213,14 @@ export default function StrengthAssessmentScreen() {
   });
 
   const status = assessment?.status ?? null;
+  // §348 — édition d'un ancien bilan en cours : le formulaire prend le pas sur
+  // les branches d'état du dernier bilan (start / done / questionnaire).
+  const isEditing = editingAssessmentId != null;
   // A `completed` (or absent) assessment means "start a new bilan".
-  const canStartNew = assessment == null || status === "completed";
-  const isScoring = status === "bilan_pending" && !submittedLocally;
+  const canStartNew =
+    !isEditing && (assessment == null || status === "completed");
+  const isScoring =
+    isEditing || (status === "bilan_pending" && !submittedLocally);
 
   // ── Latest KPIs — read-only context shown in the scoring branch ──
   // Gated purely on the athlete being selected, NOT on `isScoring`: gating
@@ -286,13 +300,44 @@ export default function StrengthAssessmentScreen() {
   // ou l'identité du bilan change — un formulaire à moitié rempli ne doit
   // jamais fuiter d'un nageur à l'autre.
   useEffect(() => {
+    // §348 — en cours d'édition d'un ancien bilan, ne pas écraser le
+    // formulaire avec les scores du DERNIER bilan : `handleEditPast` a déjà
+    // préchargé les scores de l'ancien. Sortie de l'édition (« Annuler ») →
+    // `editingAssessmentId` redevient null → cet effet ré-aligne sur le dernier.
+    if (editingAssessmentId != null) return;
     setScores(
       scoreStateFromNormalized(
         normalizePhysicalTests(assessment?.physical_tests ?? null),
       ),
     );
     setSubmittedLocally(false);
-  }, [selectedAthleteId, assessment?.id, assessment?.physical_tests]);
+  }, [
+    selectedAthleteId,
+    assessment?.id,
+    assessment?.physical_tests,
+    editingAssessmentId,
+  ]);
+
+  /** §348 — ouvre l'édition d'un bilan passé depuis l'historique. */
+  const handleEditPast = (a: StrengthAssessment) => {
+    setEditingAssessmentId(a.id);
+    setScores(
+      scoreStateFromNormalized(normalizePhysicalTests(a.physical_tests ?? null)),
+    );
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** §348 — bilan en cours d'édition (retrouvé dans l'historique) + sa date. */
+  const editingAssessment = useMemo(
+    () =>
+      editingAssessmentId == null
+        ? null
+        : assessmentHistory.find((a) => a.id === editingAssessmentId) ?? null,
+    [editingAssessmentId, assessmentHistory],
+  );
+  const editingDateLabel = editingAssessment
+    ? format(new Date(editingAssessment.created_at), "d MMM yyyy", { locale: fr })
+    : null;
 
   const allScored = allAxesScored(scores);
 
@@ -334,7 +379,11 @@ export default function StrengthAssessmentScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (assessment == null) throw new Error("Bilan non résolu");
+      // §348 — cible = le bilan EN ÉDITION s'il y en a un, sinon le bilan
+      // courant (dernier). En édition, `assessment` peut être le dernier bilan
+      // (≠ celui édité) : on n'en dépend que pour le fallback d'id.
+      const targetId = editingAssessmentId ?? assessment?.id ?? null;
+      if (targetId == null) throw new Error("Bilan non résolu");
       const physicalTests: StrengthPhysicalTests = buildPhysicalTestsPayload(
         scores,
         new Date().toISOString(),
@@ -344,12 +393,17 @@ export default function StrengthAssessmentScreen() {
       // replay sûr hors-ligne (pas de doublon).
       return tryWithOfflineQueue(
         "assessment-physical-tests",
-        { assessmentId: assessment.id, physicalTests } as unknown as Record<string, unknown>,
-        () => updateAssessmentPhysicalTests(assessment.id, physicalTests),
+        { assessmentId: targetId, physicalTests } as unknown as Record<string, unknown>,
+        () => updateAssessmentPhysicalTests(targetId, physicalTests),
       );
     },
     onSuccess: async (result) => {
-      setSubmittedLocally(true);
+      const wasEditing = editingAssessmentId != null;
+      setEditingAssessmentId(null);
+      // §348 — l'édition d'un ancien bilan ne déclenche PAS l'écran « complété »
+      // (pas de génération de méso à enchaîner) : on reste sur place, l'effet de
+      // préremplissage ré-aligne le formulaire sur le dernier bilan.
+      if (!wasEditing) setSubmittedLocally(true);
       if (isOfflineQueuedResult(result)) {
         toast.success("Bilan enregistré hors-ligne", {
           description: "Il sera synchronisé automatiquement au retour du réseau.",
@@ -357,8 +411,10 @@ export default function StrengthAssessmentScreen() {
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-      toast.success("Bilan enregistré", {
-        description: `Le bilan muscu de ${athleteName} est complété.`,
+      toast.success(wasEditing ? "Bilan mis à jour" : "Bilan enregistré", {
+        description: wasEditing
+          ? `Le bilan de ${athleteName} a été modifié.`
+          : `Le bilan muscu de ${athleteName} est complété.`,
       });
       await queryClient.invalidateQueries({
         queryKey: ["strength-assessment", selectedAthleteId],
@@ -562,7 +618,7 @@ export default function StrengthAssessmentScreen() {
   /* ════════════════════════════════════════════════════════════
      Done — bilan just submitted (read-only confirmation)
      ════════════════════════════════════════════════════════════ */
-  if (submittedLocally) {
+  if (submittedLocally && !isEditing) {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background">
         {TopBar}
@@ -651,7 +707,10 @@ export default function StrengthAssessmentScreen() {
 
           {/* Historique + courbe d'évolution mobilité (§347) */}
           <div className="mt-4">
-            <BilanHistorySection assessments={assessmentHistory} />
+            <BilanHistorySection
+              assessments={assessmentHistory}
+              onEdit={handleEditPast}
+            />
           </div>
         </div>
 
@@ -680,7 +739,7 @@ export default function StrengthAssessmentScreen() {
   /* ════════════════════════════════════════════════════════════
      Branch — questionnaire_pending → waiting on the swimmer
      ════════════════════════════════════════════════════════════ */
-  if (status === "questionnaire_pending") {
+  if (status === "questionnaire_pending" && !isEditing) {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background">
         {TopBar}
@@ -822,7 +881,34 @@ export default function StrengthAssessmentScreen() {
 
       <div className="mx-auto w-full max-w-md flex-1 space-y-4 px-4 py-5 pb-32">
         {AthleteStrip}
-        {BilanProgressStrip}
+
+        {/* §348 — bandeau d'édition d'un ancien bilan + bouton Annuler. */}
+        {isEditing ? (
+          <div className="flex items-center gap-2.5 rounded-2xl border border-primary/30 bg-primary/5 px-3.5 py-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Pencil className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="text-sm font-semibold text-foreground">
+                Édition du bilan{editingDateLabel ? ` du ${editingDateLabel}` : ""}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Tu modifies les scores physiques d'un bilan passé.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 rounded-full text-muted-foreground"
+              onClick={() => setEditingAssessmentId(null)}
+            >
+              <X className="mr-1 h-4 w-4" />
+              Annuler
+            </Button>
+          </div>
+        ) : (
+          BilanProgressStrip
+        )}
 
         {!profileComplete && athleteProfile !== undefined && (
           <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/8 px-3 py-2.5">
@@ -931,7 +1017,10 @@ export default function StrengthAssessmentScreen() {
         </Card>
 
         {/* Historique des bilans passés + courbe d'évolution mobilité (§347) */}
-        <BilanHistorySection assessments={assessmentHistory} />
+        <BilanHistorySection
+          assessments={assessmentHistory}
+          onEdit={handleEditPast}
+        />
       </div>
 
       {/* Sticky submit bar */}
