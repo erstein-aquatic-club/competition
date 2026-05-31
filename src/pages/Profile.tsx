@@ -427,6 +427,9 @@ export default function Profile() {
       hardReload();
     } catch (error) {
       console.error("[update] check failed", error);
+      // Même en cas d'erreur (réseau/SW), on purge le cache avant le reload pour
+      // garantir « Mettre à jour » = toujours repartir d'un cache propre.
+      await clearAllCaches();
       hardReload();
     } finally {
       // Only reached if hardReload() didn't fire (shouldn't happen, but safe).
