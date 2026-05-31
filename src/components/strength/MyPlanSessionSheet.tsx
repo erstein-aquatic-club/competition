@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +13,7 @@ import type { StrengthSessionItem, StrengthSessionTemplate } from "@/lib/api/typ
 import type { StrengthPhase } from "@/lib/strength/strengthPhaseStyles";
 import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 
 interface MyPlanSessionSheetProps {
   session: StrengthSessionTemplate | null;
@@ -106,9 +108,15 @@ export function MyPlanSessionSheet({
  * que du main, on rend sans header (= comportement historique).
  * §296 — distinction visuelle sky pour le warmup.
  */
+/** §353 — un item est échauffement si son `warmup_kind` est posé (prioritaire,
+ *  couvre l'activation à bucket non-mobility) ou, à défaut (legacy), via `block`. */
+function isWarmupItem(i: StrengthSessionItem): boolean {
+  return warmupMetaFromItem(i).kind != null || i.block === "warmup";
+}
+
 function ItemsList({ items }: { items: StrengthSessionItem[] }) {
-  const warmupItems = items.filter((i) => i.block === "warmup");
-  const mainItems = items.filter((i) => i.block !== "warmup");
+  const warmupItems = items.filter(isWarmupItem);
+  const mainItems = items.filter((i) => !isWarmupItem(i));
   const hasGroups = warmupItems.length > 0 && mainItems.length > 0;
   const renderLimit = 10;
   // Limite globale = renderLimit items affichés, tous blocs confondus.
@@ -143,6 +151,23 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
       <span className="text-[12px] font-medium flex-1 truncate">
         {item.exercise_name ?? `Exercice ${displayIdx + 1}`}
       </span>
+      {(() => {
+        const meta = warmupMetaFromItem(item);
+        const chip =
+          meta.kind === "corrective"
+            ? correctiveChipLabel(meta.correctiveAxis, meta.correctiveSide)
+            : null;
+        return chip ? (
+          <span
+            className={cn(
+              "text-[9px] font-bold normal-case shrink-0 rounded px-1 py-0.5",
+              BLOCK_STYLES.warmup.badge,
+            )}
+          >
+            {chip}
+          </span>
+        ) : null;
+      })()}
       <span
         className={cn(
           "text-[11px] tabular-nums shrink-0",
@@ -161,19 +186,38 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
     <div className="pb-4">
       {warmupShown.length > 0 && (
         <div className="space-y-1 mb-3">
-          {/* Eyebrow label warmup — pas d'icône, juste typo */}
-          <div className="flex items-center gap-2 px-1 pb-1">
-            <span
-              className={cn(
-                "text-[9px] font-bold uppercase tracking-[0.18em]",
-                BLOCK_STYLES.warmup.textMuted,
-              )}
-            >
-              Échauffement · Mobilité
-            </span>
-            <div className={cn("h-px flex-1", BLOCK_STYLES.warmup.divider)} />
-          </div>
-          {warmupShown.map((item, i) => renderItem(item, i, true))}
+          {/* §353 — sous-sections par warmup_kind (articulaire / correctif /
+              activation) ; legacy sans kind → en-tête unique « Échauffement · Mobilité ». */}
+          {warmupShown.map((item, i) => {
+            const meta = warmupMetaFromItem(item);
+            const label = meta.kind
+              ? warmupSectionLabel(meta.kind)
+              : "Échauffement · Mobilité";
+            const prevMeta = i > 0 ? warmupMetaFromItem(warmupShown[i - 1]) : null;
+            const prevLabel = !prevMeta
+              ? null
+              : prevMeta.kind
+                ? warmupSectionLabel(prevMeta.kind)
+                : "Échauffement · Mobilité";
+            return (
+              <Fragment key={`w-${item.exercise_id}-${i}`}>
+                {label !== prevLabel && (
+                  <div className="flex items-center gap-2 px-1 pb-1 pt-1">
+                    <span
+                      className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.18em]",
+                        BLOCK_STYLES.warmup.textMuted,
+                      )}
+                    >
+                      {label}
+                    </span>
+                    <div className={cn("h-px flex-1", BLOCK_STYLES.warmup.divider)} />
+                  </div>
+                )}
+                {renderItem(item, i, true)}
+              </Fragment>
+            );
+          })}
         </div>
       )}
 
