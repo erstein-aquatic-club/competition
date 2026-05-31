@@ -1174,6 +1174,12 @@ export interface StrengthMesocycle {
    * TZ-safe du lundi de `generated_at`).
    */
   start_week_monday?: string | null;
+  /**
+   * §358 — semaines déjà entraînées AVANT `start_week_monday` (offset de
+   * progression globale, posé à l'ajustement mi-cycle). Défaut 0 = méso neuf →
+   * la bannière affiche la position locale. >0 → « Semaine (offset+pos)/(offset+total) ».
+   */
+  week_offset?: number;
   generated_at: string;
   generated_by: number | null;
   created_at: string;

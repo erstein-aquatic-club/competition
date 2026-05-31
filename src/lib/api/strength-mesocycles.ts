@@ -207,6 +207,25 @@ export async function revertMesocycle(mesocycleId: string): Promise<void> {
 }
 
 /**
+ * §358 — pose l'offset de progression (semaines déjà entraînées avant le pivot)
+ * sur un mésocycle ajusté. UPDATE ciblé (policy RLS écriture coach/admin de
+ * `strength_mesocycles`). No-op si Supabase indisponible. Échec toléré côté
+ * appelant (offset reste 0 → la bannière retombe sur la numérotation locale).
+ */
+export async function setMesocycleWeekOffset(
+  mesocycleId: string,
+  weekOffset: number,
+): Promise<void> {
+  if (!canUseSupabase()) return;
+  assertSupabase(
+    await supabase
+      .from('strength_mesocycles')
+      .update({ week_offset: weekOffset })
+      .eq('id', mesocycleId),
+  );
+}
+
+/**
  * Récupère un mésocycle par id, ou `null` si introuvable / RLS refuse.
  */
 export async function getMesocycle(

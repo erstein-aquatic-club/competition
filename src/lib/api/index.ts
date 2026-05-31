@@ -394,6 +394,7 @@ export {
   generateMesocyclePreview,
   applyMesocycle,
   revertMesocycle,
+  setMesocycleWeekOffset,
   getMesocycle,
   getActiveMesocycle,
   listMesocycles,

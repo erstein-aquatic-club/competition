@@ -667,6 +667,33 @@ describe('getDistanceProfiles', () => {
   });
 });
 
+describe('setMesocycleWeekOffset', () => {
+  it("UPDATE week_offset sur l'id ciblé (§358)", async () => {
+    const { setMesocycleWeekOffset } = await import('../strength-mesocycles.ts');
+    let updatePayload: unknown;
+    const eqCalls: Array<{ col: string; value: unknown }> = [];
+    fromImpl = (...args: unknown[]) => {
+      assert.equal(args[0], 'strength_mesocycles');
+      return {
+        update: (payload: unknown) => {
+          updatePayload = payload;
+          return {
+            eq: (col: string, value: unknown) => {
+              eqCalls.push({ col, value });
+              return Promise.resolve({ data: null, error: null });
+            },
+          };
+        },
+      };
+    };
+
+    await setMesocycleWeekOffset('meso-1', 2);
+
+    assert.deepEqual(updatePayload, { week_offset: 2 });
+    assert.deepEqual(eqCalls, [{ col: 'id', value: 'meso-1' }]);
+  });
+});
+
 // ── Sentinels TypeScript ──────────────────────────────────────────────────
 
 const _typeCheckGenerated: GeneratedMesocycle | null = null;
