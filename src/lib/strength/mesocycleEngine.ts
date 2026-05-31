@@ -1390,7 +1390,7 @@ interface JourAwareContext {
  */
 function tagWarmup(
   ex: MesocycleExercise,
-  kind: 'common' | 'corrective',
+  kind: 'common' | 'corrective' | 'activation',
   axis?: string,
   side?: 'left' | 'right' | 'both',
 ): MesocycleExercise {

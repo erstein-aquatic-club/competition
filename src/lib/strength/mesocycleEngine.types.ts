@@ -133,7 +133,7 @@ export interface MesocycleExercise {
   /** URL de l'illustration GIF (propagée depuis le catalogue). */
   illustrationGif: string | null;
   /** §351 — nature de l'item d'échauffement, pour le regroupement UI. */
-  warmupKind?: 'common' | 'corrective';
+  warmupKind?: 'common' | 'corrective' | 'activation';
   /** §351 — axe ciblé par un item correctif (Bloc 2), pour l'affichage. */
   correctiveAxis?: string;
   /** §351 — côté faible ciblé ('left' | 'right' | 'both'), pour l'affichage. */
@@ -334,6 +334,11 @@ export interface CatalogExercise {
    * déficitaire ssi `correctiveAxes` contient cet axe. Défaut `[]` (non correctif).
    */
   correctiveAxes: string[];
+  /**
+   * §352 — `true` si l'exo peut/doit se faire par côté (unilatéral). Le moteur le
+   * privilégie pour corriger un axe asymétrique (ciblage du côté faible). Défaut `false`.
+   */
+  supportsUnilateral: boolean;
   /** `true` si exercice fondamental du seau (affiché en premier). */
   isCore: boolean;
   /**
@@ -402,6 +407,12 @@ export interface MesocycleInput {
    * ou `[]` → pas de Bloc 1 (rétrocompat fixtures de test).
    */
   commonWarmupRoutine?: number[];
+  /**
+   * §352 — routine d'activation (Bloc 3) par seau : `bucket → exercise_ids ordonnés`
+   * issus de `warmup_activation_routine`. Absent ou seau absent → pas d'activation
+   * pour ce seau (rétrocompat fixtures de test).
+   */
+  activationRoutine?: Partial<Record<StrengthBucket, number[]>>;
   /**
    * Cycle à partir duquel démarrer la séquence du template, au lieu du 1ᵉʳ
    * cycle. Utilisé par l'ajustement mid-cycle : si le pivot tombe dans la

@@ -10,11 +10,13 @@
  */
 import { MOBILITY_EVOLUTION_AXES } from "./mobilityEvolution";
 
-export type WarmupKind = "common" | "corrective";
+export type WarmupKind = "common" | "corrective" | "activation";
 
 /** En-tête FR d'une sous-section d'échauffement. */
 export function warmupSectionLabel(kind: WarmupKind): string {
-  return kind === "common" ? "Échauffement articulaire" : "Mobilité corrective";
+  if (kind === "common") return "Échauffement articulaire";
+  if (kind === "corrective") return "Mobilité corrective";
+  return "Activation musculaire";
 }
 
 /** Map axe → label FR (dérivée de MOBILITY_EVOLUTION_AXES, source unique). */
