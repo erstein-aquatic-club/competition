@@ -76,7 +76,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§350** — **Infra eslint : garde-fou `react-hooks/rules-of-hooks` en CI** : eslint 9 flat config **minimal** (`eslint.config.js`, parser typescript-eslint sans type-aware + plugin react-hooks v5) — `rules-of-hooks: error` + `exhaustive-deps: warn` ; ignore stories/config/supabase ; script `npm run lint` ; **étape lint dans `pages.yml` avant le build** (un #310 bloque le déploiement). Le lint a attrapé 4 `useAuth` conditionnels (garde SSR/test légitime → `eslint-disable` justifié, pas un vrai #310). Lint 0 erreur (42 warnings non bloquants), node:test 1501, tsc 0, build OK ; aucune migration. **Audit flux mésocycle : 100 % traité + garde-fou #310 en place.** *(§349 polish V7/UX1-3 ; §348 édition ancien bilan ; §347 historique + évolution G/D ; §346 mobilité G/D.)*
+Dernier § livré : **§351** — **Échauffement intelligent (Blocs 1+2) piloté par les déficits de mobilité G/D** : chaque séance muscu (dév + amorce PAP) s'ouvre par un **échauffement articulaire commun** (Bloc 1, table `warmup_common_routine` seedée) + une **mobilité corrective** (Bloc 2) générée des déficits G/D du bilan (`min(G,D)≤1` OU `|G−D|≥2`, plafond 2 + rotation déterministe des axes). Tags `dim_exercices.corrective_axes` + table `warmup_common_routine` (mig **00214**, RLS lecture authentifié/écriture coach-admin). Matérialisé à la génération (moteur pur, remplace le warmup générique, hors `MAX_SESSION_ITEMS`). Marquage à l'aperçu (`SessionCard` : sous-sections articulaire/correctif + pastille axe·côté). node:test 1525, vitest 67, tsc 0, lint 0, build OK, RLS 9/9 nouveaux. **Suite §352** : édition routine commune + per-séance, sous-labels vue exécution nageur (`warmupKind` persisté `raw_payload` mais pas threadé dans `StrengthSessionItem`), Bloc 3 (activation musculaire). *(§350 infra eslint react-hooks ; §349 polish V7/UX1-3 ; §348 édition ancien bilan ; §347 historique + évolution G/D ; §346 mobilité G/D.)*
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
@@ -235,3 +235,13 @@ Coûts mesurés — chaque token gaspillé est un token en moins pour le raisonn
 - **`.claudeignore`** en place — ignore `dist`, `node_modules`, `public`, `.git`. Ne pas supprimer. Ajouter tout dossier lourd temporaire.
 - Compacter après chaque jalon majeur (`/compact` ou équivalent).
 - Modèle `haiku` pour refactoring simple 1 fichier ; `sonnet`/`opus` pour tâches multi-fichiers ou architectural.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
