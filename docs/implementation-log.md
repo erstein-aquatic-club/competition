@@ -19470,3 +19470,21 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Contexte.** Retour terrain (plan de François affiché « vide » après un ajustement = vue cliente périmée, données correctes en base). Le bouton **Profil → « Mettre à jour l'app »** (`handleCheckUpdate`, `Profile.tsx`) purge déjà tout le Cache Storage (`caches.delete`) + hard reload dans toutes les branches (no-reg / waiting SW / no-update) — SAUF le `catch` d'erreur qui faisait un `hardReload()` **sans** purger. Fix : ajout de `await clearAllCaches()` avant le reload dans le `catch` → « Mettre à jour » repart **toujours** d'un cache propre. tsc 0, lint 0 ; UI behavior-only (pas de test neuf).
 
 **Note (non-bug)** : la bannière « Commence bientôt » après un ajustement est **correcte** — l'ajustement (§338) crée un nouveau méso démarrant à la **date pivot** (lundi prochain) ; tant que le pivot n'est pas atteint, le statut est `upcoming`. Les semaines pré-pivot déjà entraînées appartiennent au méso superseded. Pas de perte (cf. diagnostic : 4 semaines matérialisées en base à partir du pivot). Limite UX connue : l'ajustement ne « reporte » pas la progression globale dans la bannière (un méso ajusté repart à « Semaine 1/N » au pivot) — amélioration de design possible si souhaité.
+
+## §358 — Bannière : report de la progression globale après ajustement (2026-05-31)
+
+**Contexte.** Suite §357 : l'ajustement mi-cycle (§338) crée un nouveau méso démarrant au pivot avec `target_week_count` = semaines restantes → la bannière (`MyPlanMesocycleBanner`) repartait à « Semaine 1/4 » / « Commence bientôt », perdant les semaines déjà faites (François : 2 → devrait être « Semaine 3/6 »). Design : `docs/plans/2026-05-31-banniere-progression-globale-design.md`.
+
+**Décisions.** Afficher « Semaine globale X/Total » ; offset = colonne `strength_mesocycles.week_offset` (défaut 0, rétrocompat) posée à l'ajustement ; `week_offset>0` → **continuation** (jamais « Commence bientôt »).
+
+**Data (mig 00220, MCP).** `ALTER TABLE strength_mesocycles ADD COLUMN week_offset int NOT NULL DEFAULT 0` ; backfill one-off du méso ajusté actif de François (`c9c42226` → 2). Pas de modif de la RPC apply.
+
+**API.** `setMesocycleWeekOffset(mesocycleId, weekOffset)` (UPDATE ciblé, RLS écriture coach/admin existante, no-op offline) ; `StrengthMesocycle.week_offset` typé (`.select('*')` le remonte déjà).
+
+**Moteur d'affichage (pur, TDD).** `mesocyclePosition(start, total, current, weekOffset=0)` : `globalTotal=total+offset`, `weekNumber=clamp((elapsed+1)+offset,1,globalTotal)`, statut = si offset>0 → `active`/`done` (jamais `upcoming`) sinon logique §341. 4ᵉ param optionnel → rétrocompat (appels §341/§342/§344 inchangés).
+
+**Câblage.** `MyPlanTab` passe `activeMesocycle.week_offset ?? 0` à `mesocyclePosition`. Écriture : `MesocycleAdjust` ajoute `weekOffset: phaseInfo.weekIndex` au payload ; `MesocyclePreview.applyMutation.onSuccess(newMesoId)` appelle `setMesocycleWeekOffset(newMesoId, offset)` **avant** `finishApplied` (qui invalide `strength-mesocycle-active` → bannière à jour), échec toléré.
+
+**Tests / vérifs.** `mesocycleProgress.test.ts` +4 (offset 0 inchangé ; offset>0 avant pivot = 2/6 active ; au pivot = 3/6 ; après fin = done) ; `strength-mesocycles.test.ts` +1 (`setMesocycleWeekOffset` UPDATE/eq). node:test **1548→1553**, vitest 71 (MesocycleAdjust/Preview 13/13 inchangés), tsc 0, lint 0, build OK. Pas de `test:rls` (UPDATE sous policy `strength_mesocycles` existante). **Limite UX §357 résolue.**
+
+**Limites.** Offset cumulatif : un 2ᵉ ajustement repart de `phaseInfo.weekIndex` du méso alors actif (raisonne sur son `start_week_monday`/total locaux — l'offset du méso précédent n'est pas re-cumulé ; acceptable car chaque ajustement recalcule depuis le méso actif courant). UI bannière = présentationnelle (rend `weekNumber/total/status`), pas de test neuf dédié (couvert par `mesocyclePosition`).
