@@ -280,16 +280,21 @@ export function selectCorrectiveWarmup(
 
   const out: SelectedExercise[] = [];
   for (const d of window) {
-    const candidate = catalog.find(
-      (e) =>
-        // `?? []` défensif : la vraie donnée DB a toujours `correctiveAxes`, mais
-        // d'anciennes fixtures de test (tsx, *.test.ts hors tsc) construisent un
-        // CatalogExercise sans ce champ → `.includes` planterait sur `undefined`.
-        (e.correctiveAxes ?? []).includes(d.axis) &&
-        !usedIds.has(e.id) &&
-        (e.level === null || LEVEL_ORDER[e.level] <= levelNum) &&
-        !e.contraindicationZones.some((z) => painSet.has(z)),
-    );
+    const matches = (e: CatalogExercise) =>
+      // `?? []` défensif : la vraie donnée DB a toujours `correctiveAxes`, mais
+      // d'anciennes fixtures de test (tsx, *.test.ts hors tsc) construisent un
+      // CatalogExercise sans ce champ → `.includes` planterait sur `undefined`.
+      (e.correctiveAxes ?? []).includes(d.axis) &&
+      !usedIds.has(e.id) &&
+      (e.level === null || LEVEL_ORDER[e.level] <= levelNum) &&
+      !e.contraindicationZones.some((z) => painSet.has(z));
+    // §352 — pour un axe asymétrique (côté faible identifié), on privilégie un exo
+    // unilatéral (ciblage du côté faible) ; à défaut, repli sur le 1ᵉʳ admissible
+    // (ordre catalogue). Pour un déficit bilatéral (`both`), ordre catalogue direct.
+    const isAsym = d.side !== 'both';
+    const candidate =
+      (isAsym ? catalog.find((e) => matches(e) && e.supportsUnilateral) : undefined) ??
+      catalog.find(matches);
     if (candidate) {
       usedIds.add(candidate.id);
       out.push({
@@ -299,6 +304,39 @@ export function selectCorrectiveWarmup(
         correctiveAxis: d.axis,
         correctiveSide: d.side,
       });
+    }
+  }
+  return out;
+}
+
+/**
+ * §352 Bloc 3 — exos d'activation pour les seaux de travail de la séance.
+ * 1 exo/seau (1er admissible de la routine du seau), plafond MAX_ACTIVATION,
+ * dédup vs Blocs 1+2 (`usedIds`), fits-level + contre-indication. Déterministe.
+ */
+export function selectActivation(
+  workBuckets: StrengthBucket[],
+  activationRoutine: Partial<Record<StrengthBucket, number[]>>,
+  catalog: CatalogExercise[],
+  painZones: string[],
+  level: 'beginner' | 'intermediate' | 'advanced',
+  usedIds: Set<number>,
+): SelectedExercise[] {
+  const painSet = new Set(painZones);
+  const levelNum = LEVEL_ORDER[level];
+  const byId = new Map(catalog.map((e) => [e.id, e]));
+  const out: SelectedExercise[] = [];
+  const used = new Set(usedIds);
+  for (const bucket of workBuckets) {
+    if (out.length >= MAX_ACTIVATION) break;
+    for (const id of activationRoutine[bucket] ?? []) {
+      const ex = byId.get(id);
+      if (!ex || used.has(id)) continue;
+      if (ex.level !== null && LEVEL_ORDER[ex.level] > levelNum) continue;
+      if (ex.contraindicationZones.some((z) => painSet.has(z))) continue;
+      used.add(id);
+      out.push({ exercise: ex, substituted: false, originalExerciseId: null });
+      break;
     }
   }
   return out;
@@ -811,6 +849,8 @@ const COMPLEMENT_BLOCK_COUNT = 1;
 const CORE_BLOCK_COUNT = 1;
 /** §351 — plafond d'exos correctifs (Bloc 2) par séance. Rotation au-delà. */
 const MAX_CORRECTIVE = 2;
+/** §352 — plafond d'exos d'activation (Bloc 3) par séance. */
+const MAX_ACTIVATION = 2;
 /** Compromis : si une séance n'a aucun exercice main (pool vide ou bucket
  *  mobility), on cible jusqu'à 5 exercices mobility pour rester productive. */
 const MOBILITY_ONLY_COUNT = 5;
@@ -948,6 +988,7 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
       catalog: input.exerciseCatalog,
       painZones,
       level: input.athlete.level,
+      activationRoutine: input.activationRoutine ?? {},
     }),
   );
 
@@ -1001,6 +1042,8 @@ function buildWeek(
     painZones: string[];
     /** §351 — niveau de l'athlète (filtre les correctifs trop avancés). */
     level: 'beginner' | 'intermediate' | 'advanced';
+    /** §352 — routine d'activation (Bloc 3) par seau de travail. */
+    activationRoutine: Partial<Record<StrengthBucket, number[]>>;
   },
 ): MesocycleWeek {
   let slots = distributeSessionSlots(allocations, weekdays.length);
@@ -1046,6 +1089,27 @@ function buildWeek(
       globalIdx,
       flags.commonWarmupPool,
     );
+    // §352 Bloc 3 — activation des seaux de TRAVAIL de la séance (primaire +
+    // complément, hors mobility/core). UNIQUEMENT sur les séances de
+    // développement : pas d'amorce PAP (chargement dédié) ni d'override mobilité.
+    // Dédup vs Blocs 1+2 (un exo déjà en common/corrective n'est pas répété).
+    const workBuckets = [slot.primary, slot.complement].filter(
+      (b): b is StrengthBucket => b != null && b !== 'mobility' && b !== 'core',
+    );
+    const usedIds = new Set(
+      [...flags.commonWarmupPool, ...corrective].map((s) => s.exercise.id),
+    );
+    const activation =
+      !isAmorce && !isMobOverride
+        ? selectActivation(
+            workBuckets,
+            flags.activationRoutine,
+            flags.catalog,
+            flags.painZones,
+            flags.level,
+            usedIds,
+          )
+        : [];
     return {
       primerWeekdays,
       jourAware,
@@ -1055,7 +1119,7 @@ function buildWeek(
       coreEmphasis: flags.coreEmphasis,
       papPreferLegPower,
       papLegBucket,
-      warmup: { common: flags.commonWarmupPool, corrective },
+      warmup: { common: flags.commonWarmupPool, corrective, activation },
     };
   });
   const sessions: MesocycleSession[] = slots.map((slot, idx) =>
@@ -1380,8 +1444,15 @@ interface JourAwareContext {
    *   séances (résolue une fois dans `generateMesocycle`).
    * - `corrective` (Bloc 2) : exos correctifs des axes déficitaires, par séance
    *   (rotation déterministe sur l'index global de séance → couverture équitable).
+   * - `activation` (Bloc 3 §352) : exos d'activation des seaux de travail de la
+   *   séance (1/seau, plafond 2). UNIQUEMENT sur les séances de développement
+   *   (jamais amorce PAP ni override mobilité → `[]` dans ces cas).
    */
-  warmup: { common: SelectedExercise[]; corrective: SelectedExercise[] };
+  warmup: {
+    common: SelectedExercise[];
+    corrective: SelectedExercise[];
+    activation: SelectedExercise[];
+  };
 }
 
 /**
@@ -1489,6 +1560,11 @@ function buildSession(
       ),
       ...ctx.warmup.corrective.map((s) =>
         tagWarmup(toMesocycleExercise(s, cycle, true), 'corrective', s.correctiveAxis, s.correctiveSide),
+      ),
+      // §352 Bloc 3 — activation des seaux de travail (séance de dév uniquement ;
+      // `ctx.warmup.activation` est `[]` pour amorce/override → rien ajouté).
+      ...ctx.warmup.activation.map((s) =>
+        tagWarmup(toMesocycleExercise(s, cycle, true), 'activation'),
       ),
     ];
 

@@ -2084,6 +2084,7 @@ import {
   deficientAxes,
   buildCommonWarmup,
   selectCorrectiveWarmup,
+  selectActivation,
 } from '../mesocycleEngine.ts';
 import type { CatalogExercise as WarmupCatalogExercise } from '../mesocycleEngine.types.ts';
 
@@ -2111,6 +2112,7 @@ const cat = (over: Partial<WarmupCatalogExercise> & { id: number }): WarmupCatal
   contraindicationZones: over.contraindicationZones ?? [],
   strokePrehabAffinity: [],
   correctiveAxes: over.correctiveAxes ?? [],
+  supportsUnilateral: over.supportsUnilateral ?? false,
   isCore: false,
   selectionPriority: over.selectionPriority ?? 0,
   illustrationGif: null,
@@ -2227,6 +2229,66 @@ describe('selectCorrectiveWarmup (§351 Bloc 2)', () => {
     const res = selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, []);
     assert.equal(res[0].correctiveAxis, 'hip');
     assert.equal(res[0].correctiveSide, 'left');
+  });
+
+  // §352 T5 — ciblage unilatéral pour un axe asymétrique. NB l'exo bilatéral (86)
+  // est listé EN PREMIER : la préférence unilatérale doit le doubler (sinon
+  // `catalog.find(matches)` retournerait 86 → garde réelle).
+  it('axe asymétrique préfère un exo unilatéral', () => {
+    const deficient = [{ axis: 'hip', side: 'left', effective: 1, asymmetry: 2 }] as any;
+    const catalog = [
+      cat({ id: 86, correctiveAxes: ['hip'], supportsUnilateral: false }),
+      cat({ id: 59, correctiveAxes: ['hip'], supportsUnilateral: true }),
+    ];
+    assert.equal(selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, [])[0].exercise.id, 59);
+  });
+
+  it('déficit bilatéral (both) garde l\'ordre catalogue', () => {
+    const deficient = [{ axis: 'hip', side: 'both', effective: 1, asymmetry: 0 }] as any;
+    const catalog = [
+      cat({ id: 86, correctiveAxes: ['hip'], supportsUnilateral: false }),
+      cat({ id: 59, correctiveAxes: ['hip'], supportsUnilateral: true }),
+    ];
+    assert.equal(selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, [])[0].exercise.id, 86);
+  });
+
+  it('asymétrie sans unilatéral dispo → repli bilatéral', () => {
+    const deficient = [{ axis: 't_spine', side: 'right', effective: 1, asymmetry: 2 }] as any;
+    const catalog = [cat({ id: 87, correctiveAxes: ['t_spine'], supportsUnilateral: false })];
+    assert.equal(selectCorrectiveWarmup(deficient, catalog, [], 'beginner', 0, [])[0].exercise.id, 87);
+  });
+});
+
+describe('selectActivation (§352 Bloc 3)', () => {
+  it('1 exo par seau de travail, plafond 2', () => {
+    const routine = { upper_strength: [74, 49], lower_power: [93] } as any;
+    const catalog = [cat({ id: 74 }), cat({ id: 49 }), cat({ id: 93 })];
+    const res = selectActivation(['upper_strength', 'lower_power'], routine, catalog, [], 'beginner', new Set());
+    assert.deepEqual(res.map((s) => s.exercise.id), [74, 93]);
+  });
+
+  it('dédup vs usedIds (Blocs 1+2)', () => {
+    const routine = { upper_strength: [74, 49] } as any;
+    const catalog = [cat({ id: 74 }), cat({ id: 49 })];
+    const res = selectActivation(['upper_strength'], routine, catalog, [], 'beginner', new Set([74]));
+    assert.deepEqual(res.map((s) => s.exercise.id), [49]);
+  });
+
+  it('contre-indication exclut + plafond global 2', () => {
+    const routine = { upper_strength: [49], upper_power: [51], lower_strength: [93] } as any;
+    const catalog = [cat({ id: 49 }), cat({ id: 51, contraindicationZones: ['left_shoulder'] }), cat({ id: 93 })];
+    const res = selectActivation(['upper_strength', 'upper_power', 'lower_strength'], routine, catalog, ['left_shoulder'], 'beginner', new Set());
+    assert.deepEqual(res.map((s) => s.exercise.id), [49, 93]);
+  });
+
+  it('seau sans routine → ignoré ; rien → []', () => {
+    assert.deepEqual(selectActivation(['lower_power'], {} as any, [cat({ id: 1 })], [], 'beginner', new Set()), []);
+  });
+
+  it('fits-level (exo trop avancé exclu)', () => {
+    const routine = { upper_strength: [49] } as any;
+    const catalog = [cat({ id: 49, level: 'advanced' })];
+    assert.deepEqual(selectActivation(['upper_strength'], routine, catalog, [], 'beginner', new Set()), []);
   });
 });
 
@@ -2360,5 +2422,125 @@ describe('generateMesocycle — câblage warmup blocs 1+2 (§351 T7)', () => {
   });
 });
 
+// ── §352 T6 : câblage Bloc 3 (activation) dans buildSession (dév only, dédup) ──
+
+/**
+ * Catalogue pour le câblage activation : reprend les seaux de travail jour-aware
+ * + 2 mobilités communes (9001/9002) + des exos d'activation dédiés (9101/9102),
+ * eux-mêmes mobilité (pour ne pas concurrencer les blocs de travail).
+ */
+function activationWiringCatalog(): CatalogExercise[] {
+  return [
+    ...jourAwareCatalog().filter((e) => e.bucket !== 'mobility'),
+    makeExercise({ id: 9001, nomExercice: 'common_a', bucket: 'mobility', level: 'beginner', isCore: true, correctiveAxes: [] }),
+    makeExercise({ id: 9002, nomExercice: 'common_b', bucket: 'mobility', level: 'beginner', isCore: false, correctiveAxes: [] }),
+    makeExercise({ id: 9101, nomExercice: 'activ_upper', bucket: 'mobility', level: 'beginner', isCore: false, correctiveAxes: [] }),
+    makeExercise({ id: 9102, nomExercice: 'activ_lower', bucket: 'mobility', level: 'beginner', isCore: false, correctiveAxes: [] }),
+  ];
+}
+
+describe('generateMesocycle — câblage Bloc 3 activation (§352 T6)', () => {
+  it('séance dév porte un Bloc 3 activation sur ses seaux de travail', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: activationWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        activationRoutine: {
+          upper_strength: [9101],
+          lower_strength: [9102],
+          lower_power: [9102],
+          upper_power: [9101],
+        },
+      }),
+    );
+    const dev = meso.weeks[0].sessions.find((s) => s.role === 'developpement');
+    assert.ok(dev, 'séance de développement présente');
+    assert.ok(
+      dev.exercises.some((e) => e.warmupKind === 'activation'),
+      'au moins 1 exo warmupKind=activation',
+    );
+  });
+
+  it('amorce PAP ne porte PAS de Bloc 3 activation', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: activationWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        activationRoutine: {
+          upper_strength: [9101],
+          lower_strength: [9102],
+          lower_power: [9102],
+          upper_power: [9101],
+        },
+      }),
+    );
+    const pap = meso.weeks[0].sessions.find((s) => s.role === 'amorce_pap');
+    assert.ok(pap, 'séance amorce PAP présente');
+    assert.equal(
+      pap.exercises.some((e) => e.warmupKind === 'activation'),
+      false,
+      'aucune activation dans une amorce PAP',
+    );
+  });
+
+  it('séance override mobilité ne porte PAS de Bloc 3 activation', () => {
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: activationWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        activationRoutine: { upper_strength: [9101], lower_strength: [9102] },
+        assessment: {
+          id: 'assess-ja',
+          athlete_id: 42,
+          questionnaire: {
+            ...greatQuestionnaire,
+            pain: [{ body_zone: 'shoulder', intensity: 3 }],
+          },
+          physical_tests: fullPhysicalTests,
+        },
+      }),
+    );
+    for (const session of meso.weeks[0].sessions) {
+      assert.equal(
+        session.exercises.some((e) => e.warmupKind === 'activation'),
+        false,
+        'aucune activation dans une séance override mobilité',
+      );
+    }
+  });
+
+  it('un exo déjà en Bloc 1 n\'est pas répété en activation (dédup)', () => {
+    // 9001 est dans commonWarmupRoutine (Bloc 1) ET pointé par l'activationRoutine →
+    // ne doit pas réapparaître. Aucune séance dév ne doit porter 9001 deux fois
+    // parmi ses items d'échauffement.
+    const meso = generateMesocycle(
+      jourAwareInput({
+        weekdays: [0, 1, 3],
+        primerWeekdays: [0, 3],
+        exerciseCatalog: activationWiringCatalog(),
+        commonWarmupRoutine: [9001, 9002],
+        activationRoutine: {
+          upper_strength: [9001, 9101],
+          lower_strength: [9102],
+          lower_power: [9102],
+          upper_power: [9101],
+        },
+      }),
+    );
+    const dev = meso.weeks[0].sessions.find((s) => s.role === 'developpement');
+    assert.ok(dev, 'séance de développement présente');
+    const warmupIds = dev.exercises
+      .filter((e) => e.warmupKind !== undefined)
+      .map((e) => e.exerciseId);
+    const dupes = warmupIds.filter((id, i) => warmupIds.indexOf(id) !== i);
+    assert.deepEqual(dupes, [], `aucun doublon parmi les warmups : ${warmupIds.join(',')}`);
+  });
+});
 
 
