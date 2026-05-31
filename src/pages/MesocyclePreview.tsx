@@ -36,6 +36,7 @@ import {
   getStrokeSignatures,
   getDistanceProfiles,
   listCatalogExercisesTagged,
+  getCommonWarmupRoutine,
 } from "@/lib/api";
 import type {
   StrengthBucket,
@@ -422,6 +423,13 @@ export default function MesocyclePreview() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // §351 — routine articulaire commune (Bloc 1) injectée dans le MesocycleInput.
+  const { data: commonWarmupRoutine = [], isLoading: warmupLoading } = useQuery({
+    queryKey: ["strength-warmup-common"],
+    queryFn: () => getCommonWarmupRoutine(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const allLoading =
     profileLoading ||
     assessLoading ||
@@ -429,7 +437,8 @@ export default function MesocyclePreview() {
     settingsLoading ||
     signaturesLoading ||
     profilesLoading ||
-    catLoading;
+    catLoading ||
+    warmupLoading;
 
   // ── Composition de MesocycleInput + run du moteur ────────────────────────
   const input = useMemo<MesocycleInput | null>(() => {
@@ -463,8 +472,9 @@ export default function MesocyclePreview() {
       weekdays: params.weekdays,
       primerWeekdays: params.weekdays.filter((d) => d === 0 || d === 3),
       exerciseCatalog: catalog,
+      commonWarmupRoutine,
     };
-  }, [params, profile, assessment, template, kpiLatest, settings, catalog, allLoading]);
+  }, [params, profile, assessment, template, kpiLatest, settings, catalog, commonWarmupRoutine, allLoading]);
 
   const { generated, engineError } = useMemo<{
     generated: GeneratedMesocycle | null;
