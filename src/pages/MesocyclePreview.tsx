@@ -26,6 +26,7 @@ import { toast } from "sonner";
 
 import {
   applyMesocycle,
+  setMesocycleWeekOffset,
   getActiveMesocycle,
   getAthletes,
   generateMesocyclePreview,
@@ -107,6 +108,8 @@ interface PendingParams {
   startPhase?: PeriodizationCycle | null;
   volumeFactor?: number;
   intensityFactor?: number;
+  /** §358 — semaines déjà faites avant le pivot, posées sur le méso après l'apply. */
+  weekOffset?: number;
 }
 
 /**
@@ -542,7 +545,19 @@ export default function MesocyclePreview() {
       // gère la 1re semaine partielle).
       return applyMesocycle(input, generated, params.startDate);
     },
-    onSuccess: () => {
+    onSuccess: async (newMesoId: string) => {
+      // §358 — ajustement mi-cycle : pose l'offset de progression globale sur le
+      // nouveau méso (semaines déjà faites avant le pivot). Posé AVANT finishApplied
+      // (qui invalide la query du méso actif → la bannière lit l'offset à jour).
+      // Échec toléré : offset reste 0 → numérotation locale (dégradation gracieuse).
+      const offset = params?.weekOffset ?? 0;
+      if (params?.adjust && offset > 0 && typeof newMesoId === "string") {
+        try {
+          await setMesocycleWeekOffset(newMesoId, offset);
+        } catch {
+          /* best-effort */
+        }
+      }
       finishApplied(
         // §326 — plus de notification émise (broadcast supprimé) : on ne promet
         // donc plus « a été notifié ».

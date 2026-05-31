@@ -288,6 +288,9 @@ export default function MesocycleAdjust() {
       startPhase: phaseInfo.phaseKey,
       volumeFactor,
       intensityFactor,
+      // §358 — semaines deja entrainees avant le pivot → offset de progression
+      // globale, pose sur le nouveau meso apres l'apply (bannière « Semaine X/Total »).
+      weekOffset: phaseInfo.weekIndex,
     };
     try {
       window.sessionStorage.setItem(
