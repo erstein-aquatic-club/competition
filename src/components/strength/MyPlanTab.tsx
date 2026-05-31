@@ -395,7 +395,13 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     const totalWeeks = activeMesocycle.target_week_count;
     if (!planStartMonday || !totalWeeks) return null;
     const currentMonday = toISODate(getMonday(new Date()));
-    const position = mesocyclePosition(planStartMonday, totalWeeks, currentMonday);
+    // §358 — report de la progression globale après un ajustement mi-cycle.
+    const position = mesocyclePosition(
+      planStartMonday,
+      totalWeeks,
+      currentMonday,
+      activeMesocycle.week_offset ?? 0,
+    );
     const phaseLabel = weekTypeByStart.get(currentMonday) ?? null;
     let generatedAtLabel: string | null = null;
     if (activeMesocycle.generated_at) {
