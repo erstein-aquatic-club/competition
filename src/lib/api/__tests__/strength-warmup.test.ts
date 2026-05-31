@@ -18,6 +18,7 @@ type ChainScript = {
 
 const scripts: ChainScript[] = [];
 const fromCalls: string[] = [];
+const rpcCalls: { name: string; args: unknown }[] = [];
 let canUse = true;
 
 before(async () => {
@@ -52,6 +53,10 @@ before(async () => {
             );
           }
           return makeChain(script);
+        },
+        rpc: (name: string, args: unknown) => {
+          rpcCalls.push({ name, args });
+          return Promise.resolve({ data: null, error: null });
         },
       },
     },
@@ -132,5 +137,36 @@ describe("getActivationRoutine — §352", () => {
 
     assert.deepEqual(map, {});
     assert.deepEqual(fromCalls, []);
+  });
+});
+
+describe("setters de routine — §354", () => {
+  beforeEach(() => {
+    rpcCalls.length = 0;
+    canUse = true;
+  });
+
+  it("setCommonWarmupRoutine — appelle la RPC avec p_ids", async () => {
+    const { setCommonWarmupRoutine } = await import("../strength-warmup.ts");
+    await setCommonWarmupRoutine([97, 87, 84]);
+    assert.deepEqual(rpcCalls, [
+      { name: "set_warmup_common_routine", args: { p_ids: [97, 87, 84] } },
+    ]);
+  });
+
+  it("setActivationRoutine — appelle la RPC avec p_bucket + p_ids", async () => {
+    const { setActivationRoutine } = await import("../strength-warmup.ts");
+    await setActivationRoutine("upper_strength", [74, 49]);
+    assert.deepEqual(rpcCalls, [
+      { name: "set_warmup_activation_routine", args: { p_bucket: "upper_strength", p_ids: [74, 49] } },
+    ]);
+  });
+
+  it("no-op si Supabase indisponible", async () => {
+    canUse = false;
+    const { setCommonWarmupRoutine, setActivationRoutine } = await import("../strength-warmup.ts");
+    await setCommonWarmupRoutine([1]);
+    await setActivationRoutine("upper_power", [2]);
+    assert.deepEqual(rpcCalls, []);
   });
 });

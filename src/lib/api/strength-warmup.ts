@@ -40,3 +40,23 @@ export async function getActivationRoutine(): Promise<Record<string, number[]>> 
   }
   return out;
 }
+
+/**
+ * §354 — remplace la routine articulaire commune (Bloc 1) par la liste ordonnée
+ * `ids` (RPC atomique delete+insert ; RLS écriture coach/admin). No-op si Supabase
+ * indisponible.
+ */
+export async function setCommonWarmupRoutine(ids: number[]): Promise<void> {
+  if (!canUseSupabase()) return;
+  assertSupabase(await supabase.rpc('set_warmup_common_routine', { p_ids: ids }));
+}
+
+/**
+ * §354 — remplace la routine d'activation (Bloc 3) d'un seau par la liste ordonnée
+ * `ids` (RPC atomique delete+insert ; RLS écriture coach/admin). No-op si Supabase
+ * indisponible.
+ */
+export async function setActivationRoutine(bucket: string, ids: number[]): Promise<void> {
+  if (!canUseSupabase()) return;
+  assertSupabase(await supabase.rpc('set_warmup_activation_routine', { p_bucket: bucket, p_ids: ids }));
+}
