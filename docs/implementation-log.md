@@ -19444,3 +19444,15 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** API node:test +3 (`setCommonWarmupRoutine`/`setActivationRoutine` appellent la bonne RPC + args ; no-op offline) ; vitest `WarmupRoutinesEditor.vitest.tsx` +2 (résolution noms + réordonne + enregistre la liste à jour ; retirer) ; RLS 5/5. node:test **1545→1548**, vitest **69→71**, tsc 0, lint 0 erreur, build OK.
 
 **Limites / suite.** **Chantier (8) « échauffement intelligent » CLOS** : génération (Blocs 1+2+3) + marquage (coach aperçu + nageur exécution) + édition coach des routines. Reliquat optionnel non urgent : édition per-séance des warmups d'un plan déjà matérialisé ; édition des tags Bloc 2 (`corrective_axes`/`supports_unilateral`, faisable dans le dialog d'édition d'exo). Seeds ajustables désormais via l'onglet (plus besoin de SQL).
+
+## §355 — Comble 2 trous de seed correctif (rotation thoracique + scapulaire unilatéral) (2026-05-31)
+
+**Contexte.** Vérification terrain (cas nageuse : déficit scapulaire droit + rotation de torse) → deux trous de couverture du Bloc 2 correctif (§351/§352) identifiés : **(1)** l'axe `t_spine` n'avait qu'un seul exo taggé (Cat-Cow), **déjà dans la routine commune** → dédupliqué → 0 correctif dédié à la rotation thoracique ; **(2)** les 4 exos `scapula_control` taggés (Face Pull/Serratus/Scap Push-Up/Scapula Pull-Up) sont tous **bilatéraux** (`supports_unilateral=false`) → le raffinement unilatéral §352 retombait sur du bilatéral pour une asymétrie scapulaire.
+
+**Décision (validée coach).** Ne PAS cocher « unilatéral » des exos bilatéraux (faux), mais **ajouter 2 exos correctifs réellement par-côté**.
+
+**Migration 00218 (MCP, data-only).** Deux nouveaux exos d'échauffement légers (`exercise_type='warmup'`, bucket `mobility`, beginner → hors sélection principale, comme §352), idempotents : **id 99** « Rotation thoracique (open book) » → `corrective_axes={t_spine}`, `supports_unilateral=true` (couvre la rotation de torse, par côté, ≠ Cat-Cow donc non dédupliqué) ; **id 100** « Rowing scapulaire unilatéral (élastique) » → `corrective_axes={scapula_control}`, `supports_unilateral=true` (correctif scapulaire réellement unilatéral).
+
+**Effet.** Déficit `t_spine` → Open Book sélectionné ; asymétrie scapulaire (G≠D) → la passe unilatérale §352 prend le rowing scapulaire unilatéral côté faible. **Aucun changement moteur** (`selectCorrectiveWarmup` lit déjà `corrective_axes`/`supports_unilateral`) → pas de test/build à relancer (data-only sur `dim_exercices`, pas de RLS) ; vérifié en base (ids 99/100 taggés + unilatéral). S'applique aux prochains mésocycles générés.
+
+**Limites.** Les exos restent les seuls correctifs unilatéraux de leur axe ; les 4 scapulaires historiques restent bilatéraux (fallback). Valeurs de chargement (2×8-10/côté) indicatives, ajustables.
