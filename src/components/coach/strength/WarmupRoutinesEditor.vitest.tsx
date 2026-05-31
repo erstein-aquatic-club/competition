@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const setCommon = vi.fn(async () => {});
-const setActivation = vi.fn(async () => {});
+const setCommon = vi.fn(async (_ids: number[]) => {});
+const setActivation = vi.fn(async (_bucket: string, _ids: number[]) => {});
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
