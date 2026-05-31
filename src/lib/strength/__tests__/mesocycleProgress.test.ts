@@ -59,3 +59,25 @@ test('mesocyclePosition: après la fin → done, semaine = total', () => {
   assert.equal(p.status, 'done');
   assert.equal(p.weekNumber, 8);
 });
+
+// ── §358 — weekOffset (progression globale après ajustement) ─────────────────
+
+test('mesocyclePosition: offset 0 (4ᵉ arg omis) inchangé', () => {
+  const p = mesocyclePosition('2026-06-01', 4, '2026-06-08'); // +1 sem → 2/4 active
+  assert.deepEqual(p, { weekNumber: 2, totalWeeks: 4, status: 'active' });
+});
+
+test('mesocyclePosition: offset 2 AVANT le pivot → continuation (jamais upcoming), 2/6', () => {
+  const p = mesocyclePosition('2026-06-01', 4, '2026-05-25', 2); // elapsed -1 → local 0 → global 2
+  assert.deepEqual(p, { weekNumber: 2, totalWeeks: 6, status: 'active' });
+});
+
+test('mesocyclePosition: offset 2 au pivot (semaine locale 1) → 3/6 active', () => {
+  const p = mesocyclePosition('2026-06-01', 4, '2026-06-01', 2);
+  assert.deepEqual(p, { weekNumber: 3, totalWeeks: 6, status: 'active' });
+});
+
+test('mesocyclePosition: offset 2 après la fin du bloc → done, 6/6', () => {
+  const p = mesocyclePosition('2026-06-01', 4, '2026-07-20', 2); // bien après la 4ᵉ sem
+  assert.deepEqual(p, { weekNumber: 6, totalWeeks: 6, status: 'done' });
+});

@@ -60,15 +60,24 @@ export function mesocyclePosition(
   startMonday: string,
   totalWeeks: number,
   currentMonday: string,
+  weekOffset = 0,
 ): MesocyclePosition {
   const elapsed = Math.round(
     (parseISOUtc(currentMonday) - parseISOUtc(startMonday)) / MS_PER_WEEK,
   );
-  const raw = elapsed + 1; // semaine 1-based
+  const rawLocal = elapsed + 1; // semaine 1-based dans le bloc courant
+  // §358 — progression GLOBALE : un méso ajusté porte `weekOffset` (semaines déjà
+  // entraînées avant le pivot). On décale numéro + total ; et tant qu'il y a un
+  // offset, le plan est une CONTINUATION → jamais 'upcoming' (le nageur est
+  // mi-parcours même si le nouveau bloc reprend au pivot).
+  const globalTotal = totalWeeks + weekOffset;
+  const globalRaw = rawLocal + weekOffset;
   let status: MesocycleStatus;
-  if (raw < 1) status = 'upcoming';
-  else if (raw > totalWeeks) status = 'done';
-  else status = 'active';
-  const weekNumber = Math.min(Math.max(raw, 1), totalWeeks);
-  return { weekNumber, totalWeeks, status };
+  if (weekOffset > 0) {
+    status = globalRaw > globalTotal ? 'done' : 'active';
+  } else {
+    status = rawLocal < 1 ? 'upcoming' : rawLocal > totalWeeks ? 'done' : 'active';
+  }
+  const weekNumber = Math.min(Math.max(globalRaw, 1), globalTotal);
+  return { weekNumber, totalWeeks: globalTotal, status };
 }
