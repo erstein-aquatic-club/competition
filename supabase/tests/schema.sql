@@ -1506,6 +1506,26 @@ CREATE POLICY warmup_common_routine_write ON public.warmup_common_routine
   FOR ALL USING (app_user_role() IN ('coach','admin'))
   WITH CHECK (app_user_role() IN ('coach','admin'));
 
+-- §352 — Échauffement intelligent : warmup_activation_routine.
+-- Migration prod 00215_warmup_activation_routine.sql. Policies IDENTIQUES à
+-- warmup_common_routine ci-dessus (read authentifié / write coach-admin).
+-- Colonne `bucket` text en plus (routine d'activation par seau musculaire).
+CREATE TABLE public.warmup_activation_routine (
+  id          SERIAL PRIMARY KEY,
+  bucket      TEXT NOT NULL,
+  ordre       INTEGER NOT NULL,
+  exercise_id INTEGER NOT NULL REFERENCES public.dim_exercices(id)
+);
+
+ALTER TABLE public.warmup_activation_routine ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY warmup_activation_routine_read ON public.warmup_activation_routine
+  FOR SELECT USING (app_user_role() IS NOT NULL);
+
+CREATE POLICY warmup_activation_routine_write ON public.warmup_activation_routine
+  FOR ALL USING (app_user_role() IN ('coach','admin'))
+  WITH CHECK (app_user_role() IN ('coach','admin'));
+
 -- =============================================================================
 -- §293 — RPC apply_strength_mesocycle + revert_strength_mesocycle
 -- Migrations prod 00172 + 00173. Tests RLS : un nageur applique pour lui-même

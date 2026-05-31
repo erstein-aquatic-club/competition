@@ -255,3 +255,10 @@ INSERT INTO public.warmup_common_routine (id, ordre, exercise_id) VALUES
   (2, 2, 84),  -- Shoulder Dislocates
   (3, 3, 24);  -- Y-T-W épaules
 SELECT setval('public.warmup_common_routine_id_seq', 100, false);
+
+-- §352 — Routine d'activation par seau (warmup_activation_routine).
+-- Réutilise les mêmes ids dim_exercices que la routine commune.
+INSERT INTO public.warmup_activation_routine (id, bucket, ordre, exercise_id) VALUES
+  (1, 'upper_strength', 1, 87),  -- Cat-Cow
+  (2, 'upper_strength', 2, 84);  -- Shoulder Dislocates
+SELECT setval('public.warmup_activation_routine_id_seq', 100, false);
