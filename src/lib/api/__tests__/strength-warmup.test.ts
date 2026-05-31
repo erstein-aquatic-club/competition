@@ -96,3 +96,41 @@ describe("getCommonWarmupRoutine — §351", () => {
     assert.deepEqual(fromCalls, []);
   });
 });
+
+describe("getActivationRoutine — §352", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+    canUse = true;
+  });
+
+  it("regroupe les exercise_id par seau, ordonnés", async () => {
+    scripts.push({
+      expect: "warmup_activation_routine",
+      result: {
+        data: [
+          { bucket: "upper_strength", exercise_id: 74, ordre: 1 },
+          { bucket: "upper_strength", exercise_id: 49, ordre: 2 },
+          { bucket: "lower_power", exercise_id: 96, ordre: 1 },
+        ],
+        error: null,
+      },
+    });
+
+    const { getActivationRoutine } = await import("../strength-warmup.ts");
+    const map = await getActivationRoutine();
+
+    assert.deepEqual(map, { upper_strength: [74, 49], lower_power: [96] });
+    assert.deepEqual(fromCalls, ["warmup_activation_routine"]);
+  });
+
+  it("renvoie {} quand Supabase est indisponible", async () => {
+    canUse = false;
+
+    const { getActivationRoutine } = await import("../strength-warmup.ts");
+    const map = await getActivationRoutine();
+
+    assert.deepEqual(map, {});
+    assert.deepEqual(fromCalls, []);
+  });
+});

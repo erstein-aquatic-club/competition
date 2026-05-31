@@ -426,8 +426,8 @@ export {
   getExerciseGifs,
 } from './strength-catalog';
 
-// Bilan Muscu — Routine d'échauffement articulaire commune (Bloc 1, §351)
-export { getCommonWarmupRoutine } from './strength-warmup';
+// Bilan Muscu — Routines d'échauffement : articulaire commune (Bloc 1, §351) + activation (Bloc 3, §352)
+export { getCommonWarmupRoutine, getActivationRoutine } from './strength-warmup';
 
 // Swim planning
 export {

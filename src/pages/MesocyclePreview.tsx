@@ -37,6 +37,7 @@ import {
   getDistanceProfiles,
   listCatalogExercisesTagged,
   getCommonWarmupRoutine,
+  getActivationRoutine,
 } from "@/lib/api";
 import type {
   StrengthBucket,
@@ -432,6 +433,13 @@ export default function MesocyclePreview() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // §352 — routine d'activation (Bloc 3) injectée dans le MesocycleInput.
+  const { data: activationRoutine = {}, isLoading: activationLoading } = useQuery({
+    queryKey: ["strength-warmup-activation"],
+    queryFn: () => getActivationRoutine(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const allLoading =
     profileLoading ||
     assessLoading ||
@@ -440,7 +448,8 @@ export default function MesocyclePreview() {
     signaturesLoading ||
     profilesLoading ||
     catLoading ||
-    warmupLoading;
+    warmupLoading ||
+    activationLoading;
 
   // ── Composition de MesocycleInput + run du moteur ────────────────────────
   const input = useMemo<MesocycleInput | null>(() => {
@@ -475,8 +484,9 @@ export default function MesocyclePreview() {
       primerWeekdays: params.weekdays.filter((d) => d === 0 || d === 3),
       exerciseCatalog: catalog,
       commonWarmupRoutine,
+      activationRoutine,
     };
-  }, [params, profile, assessment, template, kpiLatest, settings, catalog, commonWarmupRoutine, allLoading]);
+  }, [params, profile, assessment, template, kpiLatest, settings, catalog, commonWarmupRoutine, activationRoutine, allLoading]);
 
   const { generated, engineError } = useMemo<{
     generated: GeneratedMesocycle | null;
