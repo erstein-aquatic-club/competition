@@ -61,6 +61,11 @@ function serializeExercise(ex: MesocycleExercise): Record<string, unknown> {
     intention: ex.intention,
     substituted: ex.substituted,
     original_exercise_id: ex.originalExerciseId,
+    // §351 — métadonnées d'échauffement (Bloc 1 commun / Bloc 2 correctif) pour
+    // le marquage UI (sous-en-têtes + axe·côté), persistées dans raw_payload.
+    warmup_kind: ex.warmupKind ?? null,
+    corrective_axis: ex.correctiveAxis ?? null,
+    corrective_side: ex.correctiveSide ?? null,
   };
 }
 
@@ -365,6 +370,12 @@ export interface MesocycleSessionExerciseContent {
   substituted: boolean;
   originalExerciseId: number | null;
   illustrationGif: string | null;
+  /** §351 — nature de l'item d'échauffement, pour le regroupement UI. */
+  warmupKind?: 'common' | 'corrective' | null;
+  /** §351 — axe ciblé par un item correctif (Bloc 2). */
+  correctiveAxis?: string | null;
+  /** §351 — côté faible ciblé ('left' | 'right' | 'both'). */
+  correctiveSide?: 'left' | 'right' | 'both' | null;
 }
 
 /** Une séance d'un mésocycle persisté (groupement d'items + métadonnées
@@ -477,6 +488,18 @@ export async function getMesocycleSessionsContent(
       originalExerciseId:
         p.original_exercise_id != null ? Number(p.original_exercise_id) : null,
       illustrationGif,
+      // §351 — métadonnées d'échauffement (null si plan pré-§351).
+      warmupKind:
+        p.warmup_kind === 'common' || p.warmup_kind === 'corrective'
+          ? p.warmup_kind
+          : null,
+      correctiveAxis: p.corrective_axis != null ? String(p.corrective_axis) : null,
+      correctiveSide:
+        p.corrective_side === 'left' ||
+        p.corrective_side === 'right' ||
+        p.corrective_side === 'both'
+          ? p.corrective_side
+          : null,
     });
   }
 
