@@ -370,8 +370,8 @@ export interface MesocycleSessionExerciseContent {
   substituted: boolean;
   originalExerciseId: number | null;
   illustrationGif: string | null;
-  /** §351 — nature de l'item d'échauffement, pour le regroupement UI. */
-  warmupKind?: 'common' | 'corrective' | null;
+  /** §351/§352 — nature de l'item d'échauffement, pour le regroupement UI. */
+  warmupKind?: 'common' | 'corrective' | 'activation' | null;
   /** §351 — axe ciblé par un item correctif (Bloc 2). */
   correctiveAxis?: string | null;
   /** §351 — côté faible ciblé ('left' | 'right' | 'both'). */
@@ -488,9 +488,11 @@ export async function getMesocycleSessionsContent(
       originalExerciseId:
         p.original_exercise_id != null ? Number(p.original_exercise_id) : null,
       illustrationGif,
-      // §351 — métadonnées d'échauffement (null si plan pré-§351).
+      // §351/§352 — métadonnées d'échauffement (null si plan pré-§351).
       warmupKind:
-        p.warmup_kind === 'common' || p.warmup_kind === 'corrective'
+        p.warmup_kind === 'common' ||
+        p.warmup_kind === 'corrective' ||
+        p.warmup_kind === 'activation'
           ? p.warmup_kind
           : null,
       correctiveAxis: p.corrective_axis != null ? String(p.corrective_axis) : null,

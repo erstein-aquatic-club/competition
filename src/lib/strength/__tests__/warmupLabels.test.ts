@@ -7,9 +7,10 @@ import {
 } from "../warmupLabels";
 
 describe("warmupLabels — §351", () => {
-  it("warmupSectionLabel — common vs corrective", () => {
+  it("warmupSectionLabel — common / corrective / activation", () => {
     assert.equal(warmupSectionLabel("common"), "Échauffement articulaire");
     assert.equal(warmupSectionLabel("corrective"), "Mobilité corrective");
+    assert.equal(warmupSectionLabel("activation"), "Activation musculaire");
   });
 
   it("correctiveSideLabel — gauche/droite, null si bilatéral/absent", () => {
