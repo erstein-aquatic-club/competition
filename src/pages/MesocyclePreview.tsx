@@ -56,6 +56,8 @@ import { getMonday, toISODate } from "@/lib/date";
 import { ageBandFor } from "@/lib/strength/kpiBaremes";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
 import { ZONE_LABEL_FR } from "@/lib/strength/zones";
+import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 import type { PeriodizationCycle } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
@@ -1236,9 +1238,51 @@ function SessionCard({
       </div>
 
       <ul className="divide-y divide-border/60">
-        {session.exercises.map((ex, idx) => (
-          <li key={idx} className="flex items-start gap-3 py-2">
-            <span className="mt-0.5 w-5 shrink-0 font-mono text-[10px] font-black tabular-nums text-muted-foreground">
+        {session.exercises.map((ex, idx) => {
+          // §351 — eyebrow de sous-section quand on change de bloc d'échauffement
+          // (common → corrective) ou qu'on passe au travail principal.
+          const prevKind = idx > 0 ? session.exercises[idx - 1].warmupKind : undefined;
+          const sectionLabel =
+            ex.warmupKind && ex.warmupKind !== prevKind
+              ? warmupSectionLabel(ex.warmupKind)
+              : !ex.warmupKind && prevKind
+                ? "Séance"
+                : null;
+          const isWarmupItem = !!ex.warmupKind;
+          const chip =
+            ex.warmupKind === "corrective"
+              ? correctiveChipLabel(ex.correctiveAxis, ex.correctiveSide)
+              : null;
+          return (
+          <li key={idx} className="block py-0">
+          {sectionLabel && (
+            <div className="flex items-center gap-2 pt-2.5 pb-1">
+              <span
+                className={cn(
+                  "text-[9px] font-black uppercase tracking-wider",
+                  isWarmupItem ? BLOCK_STYLES.warmup.text : "text-muted-foreground",
+                )}
+              >
+                {sectionLabel}
+              </span>
+              <div
+                className={cn(
+                  "h-px flex-1",
+                  isWarmupItem ? BLOCK_STYLES.warmup.divider : "bg-border/60",
+                )}
+              />
+            </div>
+          )}
+          <div
+            className={cn(
+              "flex items-start gap-3 py-2 rounded-lg",
+              isWarmupItem && cn(BLOCK_STYLES.warmup.bg, "px-2"),
+            )}
+          >
+            <span className={cn(
+              "mt-0.5 w-5 shrink-0 font-mono text-[10px] font-black tabular-nums",
+              isWarmupItem ? BLOCK_STYLES.warmup.textMuted : "text-muted-foreground",
+            )}>
               {String(idx + 1).padStart(2, "0")}
             </span>
             <ExerciseGifLightbox
@@ -1256,6 +1300,17 @@ function SessionCard({
                 >
                   {BUCKET_SHORT_FR[ex.bucket as AllBucket]}
                 </Badge>
+                {chip && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "h-4 px-1 text-[9px] font-bold tracking-wide normal-case",
+                      BLOCK_STYLES.warmup.badge,
+                    )}
+                  >
+                    {chip}
+                  </Badge>
+                )}
                 {ex.isCore && (
                   <Badge
                     variant="outline"
@@ -1293,8 +1348,10 @@ function SessionCard({
                 {ex.restSeconds}s
               </p>
             </div>
+          </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );
