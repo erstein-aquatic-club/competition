@@ -12,6 +12,35 @@ import { MOBILITY_EVOLUTION_AXES } from "./mobilityEvolution";
 
 export type WarmupKind = "common" | "corrective" | "activation";
 
+/** Métadonnées d'échauffement (§353) lues depuis le `raw_payload` d'un item de séance. */
+export interface WarmupMeta {
+  kind: WarmupKind | null;
+  correctiveAxis: string | null;
+  correctiveSide: "left" | "right" | "both" | null;
+}
+
+/**
+ * §353 — lit `warmup_kind`/`corrective_axis`/`corrective_side` depuis le
+ * `raw_payload` d'un `StrengthSessionItem` (persisté par §351/§352), avec le même
+ * garde de validation que `getMesocycleSessionsContent`. Tout `null` si le payload
+ * est absent/invalide ; l'axe correctif n'est lu que pour `kind === 'corrective'`.
+ */
+export function warmupMetaFromItem(item: {
+  raw_payload?: Record<string, unknown> | null;
+}): WarmupMeta {
+  const p = item.raw_payload ?? null;
+  if (!p) return { kind: null, correctiveAxis: null, correctiveSide: null };
+  const k = p.warmup_kind;
+  const kind: WarmupKind | null =
+    k === "common" || k === "corrective" || k === "activation" ? k : null;
+  const s = p.corrective_side;
+  const correctiveSide: WarmupMeta["correctiveSide"] =
+    s === "left" || s === "right" || s === "both" ? s : null;
+  const correctiveAxis =
+    kind === "corrective" && p.corrective_axis != null ? String(p.corrective_axis) : null;
+  return { kind, correctiveAxis, correctiveSide };
+}
+
 /** En-tête FR d'une sous-section d'échauffement. */
 export function warmupSectionLabel(kind: WarmupKind): string {
   if (kind === "common") return "Échauffement articulaire";

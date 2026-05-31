@@ -4,6 +4,7 @@ import {
   warmupSectionLabel,
   correctiveSideLabel,
   correctiveChipLabel,
+  warmupMetaFromItem,
 } from "../warmupLabels";
 
 describe("warmupLabels — §351", () => {
@@ -34,5 +35,48 @@ describe("warmupLabels — §351", () => {
     assert.equal(correctiveChipLabel("unknown_axis", "left"), "unknown_axis · côté gauche");
     assert.equal(correctiveChipLabel(null, "left"), null);
     assert.equal(correctiveChipLabel(undefined, undefined), null);
+  });
+});
+
+describe("warmupMetaFromItem — §353", () => {
+  it("common", () => {
+    assert.deepEqual(warmupMetaFromItem({ raw_payload: { warmup_kind: "common" } }), {
+      kind: "common",
+      correctiveAxis: null,
+      correctiveSide: null,
+    });
+  });
+
+  it("corrective + axe/côté", () => {
+    assert.deepEqual(
+      warmupMetaFromItem({
+        raw_payload: { warmup_kind: "corrective", corrective_axis: "hip", corrective_side: "left" },
+      }),
+      { kind: "corrective", correctiveAxis: "hip", correctiveSide: "left" },
+    );
+  });
+
+  it("activation", () => {
+    assert.equal(warmupMetaFromItem({ raw_payload: { warmup_kind: "activation" } }).kind, "activation");
+  });
+
+  it("valeurs invalides → null", () => {
+    assert.deepEqual(
+      warmupMetaFromItem({ raw_payload: { warmup_kind: "bogus", corrective_side: "up" } }),
+      { kind: null, correctiveAxis: null, correctiveSide: null },
+    );
+  });
+
+  it("axe correctif ignoré si kind != corrective", () => {
+    // warmup_kind activation ne doit pas porter d'axe correctif
+    assert.equal(
+      warmupMetaFromItem({ raw_payload: { warmup_kind: "activation", corrective_axis: "hip" } }).correctiveAxis,
+      null,
+    );
+  });
+
+  it("raw_payload absent/null → tout null", () => {
+    assert.equal(warmupMetaFromItem({}).kind, null);
+    assert.equal(warmupMetaFromItem({ raw_payload: null }).kind, null);
   });
 });
