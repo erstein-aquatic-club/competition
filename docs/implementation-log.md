@@ -19416,3 +19416,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** node:test **1525→1539** (+14 : selectActivation 5, correctif unilatéral 3, intégration 4, getActivationRoutine +1, warmupLabels +1 ; RLS 9). vitest 67 (MesocyclePreview 3/3). tsc 0 ; lint 0 erreur ; build OK ; `test:rls` 9/9 nouveaux (2 échecs pré-existants `coach_pace_zones`/`pace_share_links`).
 
 **Limites / suite.** Marquage activation livré **à l'aperçu** uniquement (comme §351) ; vue exécution nageur (`StrengthSessionItem`) toujours sans sous-labels (donnée persistée, mapper non threadé). Restent : écrans d'édition coach des tables (`warmup_common_routine`/`warmup_activation_routine`), édition per-séance, sous-labels vue exécution nageur. Edge connu (documenté) : `ensureMaintienRepresentation` reconstruit avec le ctx pré-swap → activation reflète les seaux d'origine si le complément est échangé (rare, sans régression). Seeds (ids activation, `supports_unilateral`, Raise) **validés coach** au moment du seed.
+
+## §353 — Marquage de l'échauffement dans la vue exécution nageur (2026-05-31)
+
+**Contexte.** Reliquat §351/§352 : le marquage des blocs d'échauffement (articulaire / mobilité corrective / activation) était livré **à l'aperçu coach** mais pas dans les vues nageur. Design : `docs/plans/2026-05-31-echauffement-marquage-vue-execution-design.md`. Exécuté en subagent-driven (TDD).
+
+**Découverte (zéro migration).** Les métadonnées sont déjà persistées dans `strength_session_items.raw_payload` (`warmup_kind`/`corrective_axis`/`corrective_side`, écrites par `serializeExercise` §351/§352) ; le fetch nageur (`strength_session_items(*)`) ramène `raw_payload` → `StrengthSessionItem.raw_payload` le porte. L'UI lit directement → aucune migration. ⚠️ La RPC dérive `block` via heuristique « mobility en tête » (§296) → classerait à tort un item activation à bucket non-mobility ; lire `warmup_kind` (prioritaire) **corrige** ce cas sans toucher la RPC.
+
+**Helper pur (TDD).** `warmupMetaFromItem(item)` (`warmupLabels.ts`) → `{ kind, correctiveAxis, correctiveSide }`, lit `raw_payload` avec le même garde de validation que `getMesocycleSessionsContent` (valeurs hors-liste → null ; axe lu seulement si `kind==='corrective'`). 6 tests node:test.
+
+**UI (`/frontend-design`, réutilise le pattern aperçu §351).** `MyPlanSessionSheet` (`ItemsList`) + `SessionDetailPreview` : `isWarmupItem = meta.kind != null || block === 'warmup'` (warmup_kind prioritaire) ; dans le groupe échauffement, eyebrow par changement de `warmupSectionLabel(kind)` (« Échauffement articulaire » / « Mobilité corrective » / « Activation musculaire ») ; pastille `correctiveChipLabel` (« Hanche · côté gauche ») sur les correctifs ; réutilise `BLOCK_STYLES` (sky). Legacy (sans `warmup_kind`) → en-tête unique « Échauffement · Mobilité » (comportement §296 inchangé). `WorkoutRunner` **hors scope** (style warmup actuel conservé).
+
+**Tests / vérifs.** `warmupLabels.test.ts` +6 (`warmupMetaFromItem`) ; `MyPlanSessionSheet.vitest.tsx` neuf (2 : 3 sous-sections + pastille ; legacy = en-tête unique). node:test **1539→1545**, vitest **67→69**, tsc 0, lint 0 erreur, build OK. Aucune migration → pas de `test:rls`.
+
+**Limites / suite.** Reste du chantier (8) : **écrans d'édition coach** des tables warmup (`warmup_common_routine`/`warmup_activation_routine` — réordonner/changer les exos) + édition per-séance. La vision 4 blocs est complète et marquée côté coach (aperçu) ET nageur (Mon plan / détail).
