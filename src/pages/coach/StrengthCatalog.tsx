@@ -68,6 +68,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
 import { ExercisePrioritySelector } from "@/components/coach/strength/ExercisePrioritySelector";
+import { WarmupRoutinesEditor } from "@/components/coach/strength/WarmupRoutinesEditor";
 // Lazy-loaded children : ne sont rendus qu'à l'ouverture de modals/sheets
 // ou via un onglet (TabsContent). Évite ~1100 LOC dans le bundle initial du wrapper.
 const CopyToAthleteDialog = lazyWithRetry(
@@ -411,7 +412,7 @@ export default function StrengthCatalog() {
   const [gifUploading, setGifUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
-  const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises">("sessions");
+  const [catalogTab, setCatalogTab] = useState<"sessions" | "plans" | "exercises" | "warmup">("sessions");
   const [planSelectedAthleteId, setPlanSelectedAthleteId] = useState<number | null>(null);
   const [enlargedGif, setEnlargedGif] = useState<{ url: string; name: string } | null>(null);
   const [mediaSheetTarget, setMediaSheetTarget] = useState<"edit" | "create" | null>(null);
@@ -1555,7 +1556,7 @@ export default function StrengthCatalog() {
           <div className="text-xs text-muted-foreground">Catalogue</div>
         </div>
         <div className="flex items-center gap-2">
-          {catalogTab !== "plans" && (
+          {catalogTab !== "plans" && catalogTab !== "warmup" && (
             <button
               type="button"
               onClick={() => setShowCreateFolderDialog(true)}
@@ -1590,11 +1591,12 @@ export default function StrengthCatalog() {
 
       <div className="p-4 space-y-4">
         {/* Tabs */}
-        <Tabs value={catalogTab} onValueChange={(v) => setCatalogTab(v as "sessions" | "plans" | "exercises")}>
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={catalogTab} onValueChange={(v) => setCatalogTab(v as "sessions" | "plans" | "exercises" | "warmup")}>
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="sessions" className="text-xs sm:text-sm px-1">S&eacute;ances</TabsTrigger>
             <TabsTrigger value="plans" className="text-xs sm:text-sm px-1">Plans</TabsTrigger>
             <TabsTrigger value="exercises" className="text-xs sm:text-sm px-1">Exercices</TabsTrigger>
+            <TabsTrigger value="warmup" className="text-xs sm:text-sm px-1">&Eacute;chauff.</TabsTrigger>
           </TabsList>
 
           {/* === SESSIONS TAB (common library only) === */}
@@ -1751,6 +1753,11 @@ export default function StrengthCatalog() {
                 </FolderCard>
               );
             })}
+          </TabsContent>
+
+          {/* === ÉCHAUFFEMENT TAB (§354 — routines warmup) === */}
+          <TabsContent value="warmup" className="mt-4">
+            <WarmupRoutinesEditor />
           </TabsContent>
         </Tabs>
       </div>
