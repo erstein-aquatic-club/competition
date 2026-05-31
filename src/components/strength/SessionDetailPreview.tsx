@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment, StrengthCycleType } from "@/lib/api";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -202,11 +203,28 @@ export function SessionDetailPreview({
           const restVal = formatStrengthSeconds(item.rest_seconds);
           const isExpanded = expandedIndex === index;
           const hasGif = !!exercise?.illustration_gif;
-          // §296 — distinction visuelle warmup vs main + eyebrow headers
-          const isWarmup = item.block === "warmup";
-          const prevBlock = index > 0 ? items[index - 1].block : undefined;
-          const showWarmupHeader = index === 0 && isWarmup;
-          const showMainDivider = prevBlock === "warmup" && !isWarmup;
+          // §296/§353 — distinction warmup/main + sous-sections par warmup_kind.
+          const meta = warmupMetaFromItem(item);
+          const isWarmup = meta.kind != null || item.block === "warmup";
+          const prevItem = index > 0 ? items[index - 1] : null;
+          const prevMeta = prevItem ? warmupMetaFromItem(prevItem) : null;
+          const prevIsWarmup = prevItem
+            ? prevMeta!.kind != null || prevItem.block === "warmup"
+            : false;
+          const sectionLabel = meta.kind
+            ? warmupSectionLabel(meta.kind)
+            : "Échauffement · Mobilité";
+          const prevSectionLabel = !prevIsWarmup
+            ? null
+            : prevMeta!.kind
+              ? warmupSectionLabel(prevMeta!.kind)
+              : "Échauffement · Mobilité";
+          const showWarmupHeader = isWarmup && sectionLabel !== prevSectionLabel;
+          const showMainDivider = prevIsWarmup && !isWarmup;
+          const correctiveChip =
+            meta.kind === "corrective"
+              ? correctiveChipLabel(meta.correctiveAxis, meta.correctiveSide)
+              : null;
 
           return (
             <Fragment key={`${item.exercise_id}-${index}`}>
@@ -218,7 +236,7 @@ export function SessionDetailPreview({
                       BLOCK_STYLES.warmup.textMuted,
                     )}
                   >
-                    Échauffement · Mobilité
+                    {sectionLabel}
                   </span>
                   <div className={cn("h-px flex-1", BLOCK_STYLES.warmup.divider)} />
                 </div>
@@ -283,6 +301,16 @@ export function SessionDetailPreview({
                         )}
                         {originalItemCount !== undefined && index >= originalItemCount && (
                           <span className="shrink-0 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1 py-px text-[9px] font-bold">Ajouté</span>
+                        )}
+                        {correctiveChip && (
+                          <span
+                            className={cn(
+                              "shrink-0 rounded px-1 py-px text-[9px] font-bold normal-case",
+                              BLOCK_STYLES.warmup.badge,
+                            )}
+                          >
+                            {correctiveChip}
+                          </span>
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground font-medium mt-0.5 tabular-nums">

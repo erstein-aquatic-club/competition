@@ -19,7 +19,7 @@ function item(
 }
 
 function sessionOf(items: StrengthSessionItem[]): StrengthSessionTemplate {
-  return { id: "s1", name: "Séance test", items } as StrengthSessionTemplate;
+  return { id: "s1", name: "Séance test", items } as unknown as StrengthSessionTemplate;
 }
 
 describe("MyPlanSessionSheet — marquage échauffement §353", () => {
