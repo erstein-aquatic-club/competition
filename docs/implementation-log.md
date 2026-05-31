@@ -19430,3 +19430,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** `warmupLabels.test.ts` +6 (`warmupMetaFromItem`) ; `MyPlanSessionSheet.vitest.tsx` neuf (2 : 3 sous-sections + pastille ; legacy = en-tête unique). node:test **1539→1545**, vitest **67→69**, tsc 0, lint 0 erreur, build OK. Aucune migration → pas de `test:rls`.
 
 **Limites / suite.** Reste du chantier (8) : **écrans d'édition coach** des tables warmup (`warmup_common_routine`/`warmup_activation_routine` — réordonner/changer les exos) + édition per-séance. La vision 4 blocs est complète et marquée côté coach (aperçu) ET nageur (Mon plan / détail).
+
+## §354 — Écrans coach d'édition des routines d'échauffement (2026-05-31)
+
+**Contexte.** Dernier reliquat du chantier (8) : les routines warmup (Bloc 1 `warmup_common_routine`, Bloc 3 `warmup_activation_routine`) étaient seedées mais non éditables dans l'app. Design : `docs/plans/2026-05-31-echauffement-edition-coach-routines-design.md`. Exécuté en subagent-driven (TDD).
+
+**Décisions.** Périmètre = éditeurs Bloc 1 + Bloc 3 (tags Bloc 2 hors scope) ; emplacement = nouvel onglet « Échauffement » dans `StrengthCatalog` ; interactions = ↑↓ + ajouter (sélecteur catalogue complet) + retirer ; sauvegarde = **RPC atomique** + bouton **« Enregistrer » par section** ; effet = prochains mésocycles générés (matérialisés inchangés).
+
+**Data / API — migration 00217 (MCP).** Deux RPC **`SECURITY INVOKER`** atomiques (delete+insert dans une transaction de fonction) : `set_warmup_common_routine(p_ids int[])` (ordre 0-based) et `set_warmup_activation_routine(p_bucket text, p_ids int[])` (ordre 1-based, par seau). `SECURITY INVOKER` → les policies RLS écriture coach/admin (§351/§352) s'appliquent : un athlète déclenche une erreur RLS sur l'INSERT. API JS `setCommonWarmupRoutine(ids)` / `setActivationRoutine(bucket, ids)` (`supabase.rpc`, no-op si Supabase indispo). Test RLS dédié (5 cas, coach autorisé / athlète refusé + re-check service-role anti-§113 ; piège validé).
+
+**UI (`/frontend-design`).** Nouveau composant `WarmupRoutinesEditor` (sous-composant réutilisable `RoutineListEditor` : une liste ↑↓/×/ajouter + « Enregistrer » dirty-aware) — section Bloc 1 (routine commune) + 4 sous-sections d'activation par seau (Force/Puissance × haut/bas). Charge `getCommonWarmupRoutine`/`getActivationRoutine`/`listCatalogExercisesTagged` ; état d'édition local par liste ; sauvegarde via `useMutation` + invalidation des queries warmup + toast ; bandeau « S'applique aux prochains mésocycles générés ». Tous les hooks avant tout early return (#310). Onglet ajouté à `StrengthCatalog` (`catalogTab` += 'warmup', `TabsList` grid-cols-3→4 ; bouton « Dossier » masqué sur cet onglet).
+
+**Tests / vérifs.** API node:test +3 (`setCommonWarmupRoutine`/`setActivationRoutine` appellent la bonne RPC + args ; no-op offline) ; vitest `WarmupRoutinesEditor.vitest.tsx` +2 (résolution noms + réordonne + enregistre la liste à jour ; retirer) ; RLS 5/5. node:test **1545→1548**, vitest **69→71**, tsc 0, lint 0 erreur, build OK.
+
+**Limites / suite.** **Chantier (8) « échauffement intelligent » CLOS** : génération (Blocs 1+2+3) + marquage (coach aperçu + nageur exécution) + édition coach des routines. Reliquat optionnel non urgent : édition per-séance des warmups d'un plan déjà matérialisé ; édition des tags Bloc 2 (`corrective_axes`/`supports_unilateral`, faisable dans le dialog d'édition d'exo). Seeds ajustables désormais via l'onglet (plus besoin de SQL).
