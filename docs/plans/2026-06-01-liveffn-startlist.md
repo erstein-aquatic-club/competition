@@ -486,7 +486,7 @@ Fix anything red before docs. (No `test:rls` — no RLS change.)
 
 **Files:** `docs/implementation-log.md`, `docs/ROADMAP.md`, `docs/FEATURES_STATUS.md`, `CLAUDE.md`, `docs/claude/files-map.md`.
 
-- **implementation-log.md**: new `§361` entry — context (coach pastes liveffn startlist per competition), changes (mig 00214, edge proxy `liveffn-startlist`, `src/lib/liveffn/*`, `CompetitionStartlist`), files, tests, decisions (live re-fetch; objectiveHelpers code system; edge=proxy), limits (no birthdate tiebreak yet; weak-network robustness = future).
+- **implementation-log.md**: new `§361` entry — context (coach pastes liveffn startlist per competition), changes (mig 00221, edge proxy `liveffn-startlist`, `src/lib/liveffn/*`, `CompetitionStartlist`), files, tests, decisions (live re-fetch; objectiveHelpers code system; edge=proxy), limits (no birthdate tiebreak yet; weak-network robustness = future).
 - **ROADMAP.md**: add the `§361` line + update the top `*Dernière mise à jour*`.
 - **FEATURES_STATUS.md**: add "Liste de départ liveffn par compétition" → ✅.
 - **CLAUDE.md**: update "Dernier § livré" (≤15 words); add `liveffn-startlist` to the Edge Functions table.
