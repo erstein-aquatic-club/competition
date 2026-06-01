@@ -92,6 +92,8 @@ function parseInteger(text: string | null): number | null {
 
 export function parseStartlist(html: string): StartlistResult {
   // Club name + structure code — best-effort, non-critical.
+  // NOTE: this only recognizes the "* AQUATIC CLUB" pattern (sufficient for this
+  // app's home club); any other club label yields null.
   const clubMatch = html.match(/([A-ZÀ-Ÿ][A-ZÀ-Ÿ' -]*AQUATIC CLUB)/);
   const clubName = clubMatch ? clean(clubMatch[1]) : null;
   const structMatch = html.match(/structure\s*:?\s*(\d+)/i);
@@ -110,7 +112,10 @@ export function parseStartlist(html: string): StartlistResult {
     if (m[1] !== undefined) {
       // Swimmer heading: "NAME Firstname (YYYY) FRA"
       const text = clean(m[1]);
-      const hm = text.match(/^([A-ZÀ-Ÿ][A-ZÀ-Ÿ' -]*?)\s+(\S.*?)\s*\((\d{4})\)/);
+      // FFN renders the WHOLE last name UPPERCASE and the first name Title-case.
+      // Case-aware split keeps compound last names intact ("LE GALL Marie-Hélène"
+      // → "LE GALL" / "Marie-Hélène", not "LE" / "GALL Marie-Hélène").
+      const hm = text.match(/^([A-ZÀ-Ÿ][A-ZÀ-Ÿ'\- ]*?[A-ZÀ-Ÿ])\s+([A-ZÀ-Ÿ][a-zà-ÿ].*?)\s*\((\d{4})\)/);
       let lastName = "";
       let firstName = "";
       let birthYear: number | null = null;
@@ -133,7 +138,7 @@ export function parseStartlist(html: string): StartlistResult {
       const tempsRaw = extractCell(rowHtml, "temps") ?? "";
       const entryTimeSeconds = parseTime(tempsRaw);
       const entryTimeDisplay =
-        entryTimeSeconds !== null ? formatTimeDisplay(entryTimeSeconds) : clean(tempsRaw);
+        entryTimeSeconds !== null ? formatTimeDisplay(entryTimeSeconds) : tempsRaw;
       const day = extractCell(rowHtml, "startlist_date") ?? "";
       const time = extractCell(rowHtml, "startlist_horaire") ?? "";
       current.races.push({
