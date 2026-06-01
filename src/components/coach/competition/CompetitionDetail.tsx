@@ -95,6 +95,12 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "jourj", label: "Jour J" },
 ];
 
+const POOL_OPTIONS: Array<{ value: number | null; label: string }> = [
+  { value: 25, label: "25 m" },
+  { value: 50, label: "50 m" },
+  { value: null, label: "—" },
+];
+
 // ── Component ───────────────────────────────────────────────────
 
 export default function CompetitionDetail({
@@ -149,6 +155,7 @@ export default function CompetitionDetail({
   const [location, setLocation] = useState(competition.location ?? "");
   const [description, setDescription] = useState(competition.description ?? "");
   const [liveffnUrl, setLiveffnUrl] = useState(url);
+  const [poolLength, setPoolLength] = useState<number | null>(competition.pool_length ?? null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // ── Derived: assignment ids (server) merged with optimistic local set ──
@@ -282,6 +289,7 @@ export default function CompetitionDetail({
       location: location.trim() || null,
       description: description.trim() || null,
       liveffn_startlist_url: liveffnUrl.trim() || null,
+      pool_length: poolLength,
     });
   };
 
@@ -482,113 +490,160 @@ export default function CompetitionDetail({
 
         {/* ── Tab 2 — Paramètres ── */}
         {tab === "parametres" && (
-          <div className="space-y-5">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="comp-name"
-                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Nom
-              </Label>
-              <Input
-                id="comp-name"
-                placeholder="Ex : Championnats Régionaux"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="text-[15px] font-medium"
-                maxLength={200}
-              />
-            </div>
+          <div className="space-y-7">
+            {/* ── Section : Infos ── */}
+            <section className="space-y-4">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Infos
+              </h2>
 
-            {/* Dates */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Dates
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label htmlFor="comp-date" className="pl-0.5 text-[10px] text-muted-foreground/60">
-                    Début
-                  </label>
-                  <input
-                    id="comp-date"
-                    type="date"
-                    value={date}
-                    onChange={(e) => handleStartChange(e.target.value)}
-                    className={dateCls}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="comp-end-date" className="pl-0.5 text-[10px] text-muted-foreground/60">
-                    Fin
-                  </label>
-                  <input
-                    id="comp-end-date"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    min={date || undefined}
-                    className={dateCls}
-                  />
+              {/* Name */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="comp-name"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                >
+                  Nom
+                </Label>
+                <Input
+                  id="comp-name"
+                  placeholder="Ex : Championnats Régionaux"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="text-[15px] font-medium"
+                  maxLength={200}
+                />
+              </div>
+
+              {/* Dates */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                  Dates
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label htmlFor="comp-date" className="pl-0.5 text-[10px] text-muted-foreground/60">
+                      Début
+                    </label>
+                    <input
+                      id="comp-date"
+                      type="date"
+                      value={date}
+                      onChange={(e) => handleStartChange(e.target.value)}
+                      className={cn(dateCls, "tabular-nums")}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="comp-end-date" className="pl-0.5 text-[10px] text-muted-foreground/60">
+                      Fin
+                    </label>
+                    <input
+                      id="comp-end-date"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={date || undefined}
+                      className={cn(dateCls, "tabular-nums")}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Location */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="comp-location"
-                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Lieu
-              </Label>
-              <Input
-                id="comp-location"
-                placeholder="Ex : Piscine de Strasbourg"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </div>
+              {/* Location */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="comp-location"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                >
+                  Lieu
+                </Label>
+                <Input
+                  id="comp-location"
+                  placeholder="Ex : Piscine de Strasbourg"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
+              </div>
 
-            {/* Notes */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="comp-description"
-                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Notes
-              </Label>
-              <Textarea
-                id="comp-description"
-                placeholder="Informations complémentaires..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                maxLength={2000}
-                className="resize-none"
-              />
-            </div>
+              {/* Bassin */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                  Bassin
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-label="Longueur du bassin"
+                  className="inline-flex w-full rounded-xl border border-border/60 bg-muted/40 p-0.5 text-[13px]"
+                >
+                  {POOL_OPTIONS.map((opt) => {
+                    const active = poolLength === opt.value;
+                    return (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setPoolLength(opt.value)}
+                        className={cn(
+                          "flex-1 rounded-lg px-3 py-2 font-medium tabular-nums transition-colors",
+                          active
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            {/* liveffn URL (single source) */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="comp-liveffn"
-                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Lien liveffn (liste de départ)
-              </Label>
-              <Input
-                id="comp-liveffn"
-                placeholder="https://…liveffn.com/…/startlist.php"
-                value={liveffnUrl}
-                onChange={(e) => setLiveffnUrl(e.target.value)}
-                className="text-[13px]"
-              />
-              <p className="text-[10px] text-muted-foreground/60">
-                Utilisé par l&apos;onglet « Jour J » pour générer la liste de départ.
-              </p>
-            </div>
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="comp-description"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                >
+                  Notes
+                </Label>
+                <Textarea
+                  id="comp-description"
+                  placeholder="Informations complémentaires..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  className="resize-none"
+                />
+              </div>
+            </section>
+
+            {/* ── Section : Liste de départ ── */}
+            <section className="space-y-4 border-t border-border/40 pt-6">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Liste de départ
+              </h2>
+
+              {/* liveffn URL (single source) */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="comp-liveffn"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                >
+                  Lien liveffn
+                </Label>
+                <Input
+                  id="comp-liveffn"
+                  placeholder="https://…liveffn.com/…/startlist.php"
+                  value={liveffnUrl}
+                  onChange={(e) => setLiveffnUrl(e.target.value)}
+                  className="text-[13px]"
+                />
+                <p className="text-[10px] text-muted-foreground/60">
+                  Utilisé par l&apos;onglet « Jour J » pour générer la liste de départ.
+                </p>
+              </div>
+            </section>
 
             {/* Save */}
             <Button
@@ -599,16 +654,21 @@ export default function CompetitionDetail({
               {updateMutation.isPending ? "Enregistrement..." : "Enregistrer"}
             </Button>
 
-            {/* Delete */}
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-1.5 py-1.5 text-center text-[11px] text-destructive/50 transition-colors hover:text-destructive"
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Supprimer cette compétition
-            </button>
+            {/* ── Section : Zone danger ── */}
+            <section className="space-y-3 border-t border-border/40 pt-6">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-destructive/60">
+                Zone danger
+              </h2>
+              <button
+                type="button"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-destructive/20 py-2.5 text-center text-[12px] font-medium text-destructive/70 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Supprimer cette compétition
+              </button>
+            </section>
           </div>
         )}
 
