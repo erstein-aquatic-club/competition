@@ -106,7 +106,6 @@ type CoachHomeProps = {
   onOpenMyRecords: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   onOpenWeekAt: (weekDate: string) => void;
-  onOpenCompetition?: (id: string) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
   kpiLoading: boolean;
@@ -231,7 +230,6 @@ const CoachHome = ({
   onOpenMyRecords,
   onOpenAthlete,
   onOpenWeekAt,
-  onOpenCompetition,
   athletes,
   athletesLoading,
   kpiLoading,
@@ -490,10 +488,10 @@ const CoachHome = ({
       {
         label: "Echéances",
         icon: CalendarDays,
-        action:
-          nextComp && onOpenCompetition
-            ? () => onOpenCompetition(nextComp.id)
-            : () => onNavigate("competitions"),
+        // Always open the full timeline (where the hero surfaces the next
+        // competition); the subtitle/badge below just preview it. Tapping the
+        // tile must NOT deep-link straight into a single competition.
+        action: () => onNavigate("competitions"),
         color: "text-orange-500",
         bg: "bg-orange-100 dark:bg-orange-900/30",
         subtitle: nextComp ? nextComp.name : undefined,
@@ -508,7 +506,7 @@ const CoachHome = ({
       { label: "Chronos", icon: Timer, action: () => onNavigate("chrono-history"), color: "text-rose-500", bg: "bg-rose-100 dark:bg-rose-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
-    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment, onOpenCompetition, nextComp, nextCompDaysUntil],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment, nextComp, nextCompDaysUntil],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -1293,7 +1291,6 @@ export default function Coach() {
           onOpenMyRecords={() => navigate("/records?tab=1rm")}
           onOpenAthlete={handleOpenAthlete}
           onOpenWeekAt={(weekDate) => setRouteState({ section: "week", weekDate })}
-          onOpenCompetition={openCompetition}
           athletes={myAthletes}
           athletesLoading={athletesLoading}
           kpiLoading={coachKpisQuery.isLoading}
