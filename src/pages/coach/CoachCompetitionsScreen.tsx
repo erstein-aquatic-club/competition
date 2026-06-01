@@ -44,8 +44,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CalendarDays, Plus, Trophy, Users, ChevronDown } from "lucide-react";
+import { CalendarDays, Plus, Trophy, Users, ChevronDown, ListOrdered } from "lucide-react";
 import { getTimelineEventEndDate, isTimelineEventPast } from "./competitionTimeline";
+import CompetitionStartlist from "@/components/coach/CompetitionStartlist";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -89,12 +90,14 @@ type CompetitionFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   competition?: Competition | null;
+  onOpenStartlist?: (c: Competition) => void;
 };
 
 const CompetitionFormSheet = ({
   open,
   onOpenChange,
   competition,
+  onOpenStartlist,
 }: CompetitionFormProps) => {
   const queryClient = useQueryClient();
   const isEdit = !!competition;
@@ -409,6 +412,20 @@ const CompetitionFormSheet = ({
               </Button>
 
               {isEdit && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    onOpenStartlist?.(competition!);
+                    onOpenChange(false);
+                  }}
+                >
+                  <ListOrdered className="mr-1.5 h-3.5 w-3.5" />
+                  Liste de départ liveffn
+                </Button>
+              )}
+
+              {isEdit && (
                 <button
                   type="button"
                   className="w-full text-center text-[11px] text-destructive/50 hover:text-destructive py-1.5 transition-colors"
@@ -705,6 +722,7 @@ type CoachCompetitionsScreenProps = {
 const CoachCompetitionsScreen = ({ onBack }: CoachCompetitionsScreenProps) => {
   const [showForm, setShowForm] = useState(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
+  const [startlistComp, setStartlistComp] = useState<Competition | null>(null);
 
   const { data: competitions = [], isLoading: compLoading } = useQuery({
     queryKey: ["competitions"],
@@ -815,7 +833,21 @@ const CoachCompetitionsScreen = ({ onBack }: CoachCompetitionsScreenProps) => {
         open={showForm}
         onOpenChange={setShowForm}
         competition={editingComp}
+        onOpenStartlist={(c) => {
+          setShowForm(false);
+          setStartlistComp(c);
+        }}
       />
+
+      {startlistComp && (
+        <CompetitionStartlist
+          competition={startlistComp}
+          open={!!startlistComp}
+          onOpenChange={(o) => {
+            if (!o) setStartlistComp(null);
+          }}
+        />
+      )}
     </div>
   );
 };
