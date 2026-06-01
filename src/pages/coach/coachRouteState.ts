@@ -24,6 +24,7 @@ export type CoachRouteState = {
   tab?: CoachCommsTab;
   athleteId?: number | null;
   weekDate?: string; // YYYY-MM-DD, only for section="week"
+  competitionId?: string; // only for section="competitions"
 };
 
 function isCoachSection(value: string | null): value is CoachSection {
@@ -56,6 +57,7 @@ export function parseCoachHashLocation(hash: string): CoachRouteState {
         ? parsedAthleteId
         : null,
     weekDate: section === "week" && weekDateValid ? rawWeekDate! : undefined,
+    competitionId: section === "competitions" && params.get("competitionId") ? params.get("competitionId")! : undefined,
   };
 }
 
@@ -93,6 +95,12 @@ export function buildCoachHash(nextState: CoachRouteState, currentHash = "#/coac
     }
   } else {
     params.delete("weekDate");
+  }
+
+  if (nextState.section === "competitions" && nextState.competitionId) {
+    params.set("competitionId", nextState.competitionId);
+  } else {
+    params.delete("competitionId");
   }
 
   const query = params.toString();
