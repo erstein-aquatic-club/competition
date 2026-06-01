@@ -248,6 +248,7 @@ export {
   getCompetitionAssignments,
   setCompetitionAssignments,
   getMyCompetitionIds,
+  fetchStartlistHtml,
 } from './competitions';
 
 export {

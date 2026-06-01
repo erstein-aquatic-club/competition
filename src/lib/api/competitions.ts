@@ -96,3 +96,11 @@ export async function getMyCompetitionIds(athleteId?: number | null): Promise<st
   const data = assertSupabase(await query);
   return (data ?? []).map((r: any) => r.competition_id);
 }
+
+export async function fetchStartlistHtml(url: string): Promise<string> {
+  if (!canUseSupabase()) throw new Error("Supabase non configuré");
+  const { data, error } = await supabase.functions.invoke("liveffn-startlist", { body: { url } });
+  if (error) throw new Error(String(data?.error ?? error.message));
+  if (!data?.html) throw new Error(data?.error ?? "Réponse vide");
+  return data.html as string;
+}
