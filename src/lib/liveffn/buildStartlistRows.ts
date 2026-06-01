@@ -21,6 +21,7 @@ export interface StartlistRow {
   key: string; // `${startlistKey}::${rawEvent}` — unique per race
   swimmerName: string; // matched athlete display_name, or "LASTNAME Firstname" if unlinked
   linked: boolean;
+  userId: number | null; // matched numeric user id, null when unlinked
   rawEvent: string;
   eventLabel: string;
   eventCode: string | null; // compact (eventCodeFromFfnName(stripGender(rawEvent)))
@@ -143,6 +144,7 @@ export function buildStartlistRows(input: BuildStartlistInput): StartlistRow[] {
         key: `${key}::${race.rawEvent}`,
         swimmerName,
         linked,
+        userId: linked ? (userId as number) : null,
         rawEvent: race.rawEvent,
         eventLabel: eventCode ? eventLabel(eventCode) : stripped,
         eventCode,

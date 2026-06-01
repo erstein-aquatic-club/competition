@@ -90,3 +90,12 @@ test("unknown event → eventCode null, eventLabel falls back to stripped name",
   assert.equal(rows[0].bestPerf, null);
   assert.equal(rows[0].objectiveTarget, null);
 });
+
+test("row carries the matched numeric userId (null when unlinked)", () => {
+  const swimmers = [{ lastName: "WAGNER", firstName: "Francois", birthYear: 1999,
+    races: [{ rawEvent: "50 Nage Libre Messieurs", heat: 1, lane: 4, entryTimeSeconds: 23.64, entryTimeDisplay: "23.64", day: "Dimanche 24 Mai", time: "10h59" }] }];
+  const linked = buildStartlistRows({ swimmers, matches: { "wagner-francois-1999": 7 }, athleteName: { 7: "F W" }, perfsByUser: {}, objectivesByUser: {} });
+  assert.equal(linked[0].userId, 7);
+  const unlinked = buildStartlistRows({ swimmers, matches: { "wagner-francois-1999": null }, athleteName: {}, perfsByUser: {}, objectivesByUser: {} });
+  assert.equal(unlinked[0].userId, null);
+});
