@@ -517,6 +517,8 @@ export interface Competition {
   description?: string | null;
   created_by?: string | null;
   created_at?: string | null;
+  liveffn_startlist_url?: string | null;
+  startlist_athlete_map?: Record<string, number | null> | null;
 }
 
 export interface CompetitionInput {
@@ -525,6 +527,8 @@ export interface CompetitionInput {
   end_date?: string | null;
   location?: string | null;
   description?: string | null;
+  liveffn_startlist_url?: string | null;
+  startlist_athlete_map?: Record<string, number | null> | null;
 }
 
 export interface CompetitionAssignment {
