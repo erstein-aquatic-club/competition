@@ -4,6 +4,60 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §361 — Liste de départ liveffn par compétition (2026-06-01)
+
+### Contexte
+
+Retour terrain François. Le coach colle l'URL d'une « liste de départ par structure » liveffn sur une compétition et obtient, dans une vue coach dédiée, un planning enrichi indiquant **quand chaque nageur du club court** — relié à ses objectifs et à sa meilleure performance récente (les MÊMES données que les fiches objectifs, pour la cohérence des chiffres affichés). liveffn n'expose pas d'API ni de CORS : le HTML est récupéré via un proxy authentifié, puis parsé côté client.
+
+### Changements
+
+1. **Migration `00221`** (`competitions.liveffn_startlist_url` text + `startlist_athlete_map` jsonb default `'{}'`) — l'URL collée + les corrections manuelles de l'appariement nom→`user.id` persistées. **Aucun changement RLS** (la table `competitions` est déjà écrivable coach/admin) → pas de `test:rls`.
+
+2. **Edge function `liveffn-startlist`** (v1, ACTIVE, `verify_jwt`) — proxy de fetch authentifié mince : garde coach/admin + validation de l'URL (host `liveffn.com`, path `startlist.php`) → renvoie le HTML brut. Le parsing est délibérément côté client (liveffn n'a pas de CORS, et garder le parser en JS = MÊME code testé en `node:test` et exécuté en navigateur, pas de split Deno/node).
+
+3. **`src/lib/liveffn/parseStartlist.ts`** (157 l) — parser regex (hooks de classes `resStructureIndividu1`/`startlist_serie`/`couloir`/`temps`/`date`/`horaire`) : html → nageurs + courses ; gère les noms composés (`LE GALL …`).
+
+4. **`src/lib/liveffn/matchSwimmers.ts`** (33 l) — appariement nom token-set, indépendant de l'ordre (« WAGNER Francois » ↔ « Francois Wagner ») + résolution des overrides persistés ; **ambigu → null** (jamais de faux match).
+
+5. **`src/lib/liveffn/buildStartlistRows.ts`** (209 l) — assemblage enrichi : meilleure perf via `objectiveHelpers.findBestPerformance` + temps objectif, regroupement par nageur / chronologique.
+
+6. **`src/lib/api/competitions.ts`** — wrapper `fetchStartlistHtml(url)` (invoke de l'edge function).
+
+7. **`src/components/coach/CompetitionStartlist.tsx`** (571 l) — UI coach : champ URL + validation, auto-match + dropdowns de correction persistés dans une map fusionnée, bascule 2 vues (par nageur / chronologique), lignes enrichies, états loading / erreur+retry / vide. Montée via un bouton « Liste de départ liveffn » dans `CompetitionFormSheet` (`CoachCompetitionsScreen.tsx`).
+
+8. **Pont objectifs UUID → numérique** via la rpc `get_auth_uids_for_users` (les objectifs portent un `athlete_id` UUID, les perfs/match sont sur `users.id` numérique).
+
+### Fichiers
+
+- `supabase/migrations/00221_*.sql` (nouveau)
+- `supabase/functions/liveffn-startlist/index.ts` (nouveau, 43 l)
+- `src/lib/liveffn/parseStartlist.ts` (nouveau, 157 l)
+- `src/lib/liveffn/matchSwimmers.ts` (nouveau, 33 l)
+- `src/lib/liveffn/buildStartlistRows.ts` (nouveau, 209 l)
+- `src/components/coach/CompetitionStartlist.tsx` (nouveau, 571 l)
+- `src/lib/api/competitions.ts` (wrapper `fetchStartlistHtml`)
+- `src/pages/coach/CoachCompetitionsScreen.tsx` (bouton « Liste de départ liveffn » dans `CompetitionFormSheet`)
+
+### Tests / vérifs
+
+- **19 nouveaux `node:test`** : `parseStartlist` 5, `matchSwimmers` 8, `buildStartlistRows` 6.
+- Suite complète : node:test **1572** pass, vitest **71** pass, tsc **0**, lint **0 erreur** (42 warnings exhaustive-deps tolérés).
+- **Pas de `test:rls`** (aucune policy ni table sous RLS touchée).
+
+### Décisions clés
+
+- **Edge = proxy mince** : la garde coach/admin + la validation d'URL côté serveur, mais le parsing reste en JS partagé (testé `node:test` + exécuté navigateur) → pas de duplication Deno/node.
+- **Réutilise les codes d'`objectiveHelpers`** (50NL, 50PAP…) pour que les chiffres affichés soient **IDENTIQUES** aux fiches objectifs.
+- **Re-fetch live à chaque ouverture** (pas de cache du listing parsé) ; seuls l'URL + les overrides sont persistés sur la compétition.
+
+### Limites / ouvert
+
+- **Vérification end-to-end live en attente du déploiement** sur github.io (CORS de l'edge verrouillé sur l'origine github.io + builds locaux sans creds Supabase — contrainte commune à toutes les features Supabase).
+- **Pas de départage par date de naissance** (match sur le nom seul, `AthleteSummary` n'expose pas la naissance ; ambigu → null).
+- **Robustesse réseau faible** (cache local du dernier listing parsé) = évolution future notée par le coach.
+- Design doc : `docs/plans/2026-06-01-liveffn-startlist-design.md` ; plan : `docs/plans/2026-06-01-liveffn-startlist.md`.
+
 ## §360 — Remplacement YTW échauffement par « Mobilisation épaules 3 axes (nageur) » (id=102) (2026-06-01)
 
 ### Contexte

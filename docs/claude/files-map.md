@@ -63,6 +63,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/MesocycleAdjust.vitest.tsx` | Tests vitest jsdom de `MesocycleAdjust` (4 helpers purs + composant : pivot défaut, préset Allègement, Aperçu désactivé si `weeksRemaining<1`, bannière rouge pivot passé, **garde de rôle C1**, **synchro séances↔jours C4**) — §338/§340 | 271 lignes |
 | `src/pages/MesocyclePreview.vitest.tsx` | Tests vitest jsdom du helper pur `mesocyclePreviewBackTarget` (navigation retour aperçu : ajustement vs génération) — §340 | 31 lignes |
 | `src/components/strength/MesocycleEntry.tsx` | Tuile d'entrée sur `/strength` (onglet S'entraîner) — variante violette « action attendue » si pas de mésocycle actif, neutre « Régénérer » sinon. Conditionnée par `canGenerateMesocycle` (`bilan_pending`\|`completed`) — §293, verrou abaissé §299 | ~115 lignes |
+| `src/components/coach/CompetitionStartlist.tsx` | UI coach liste de départ liveffn (champ URL + validation, auto-match + dropdowns de correction persistés en map fusionnée, bascule 2 vues nageur/chrono, lignes enrichies perf+objectif, états loading/erreur+retry/vide) — montée par `CompetitionFormSheet` — §361 | 571 lignes |
 | `src/components/coach/CoachMesocyclePanel.tsx` | **Panneau coach** dans l'onglet Planning de `CoachSwimmerFullView` — visibilité du mésocycle actif + raisonnement parsé du `bucket_priorities` jsonb (6 score bars + top 3 priorités + flags) + bouton Rejeter avec `AlertDialog` → `revertMesocycle` + historique compact — §293 Phase 6 | 538 lignes |
 | `src/lib/api/training-plans.ts` | CRUD training_plans + sessions + applications (§275.2) — 14 fonctions + helper `getActiveTrainingPlanApplicationsForUser` pour timeline derivation | 357 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
@@ -87,7 +88,10 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/SharedSwimSession.tsx` | Page publique séance partagée (token UUID) | ~130 lignes |
 | `src/lib/api/swim-logs.ts` | Notes techniques exercices natation | ~90 lignes |
 | `src/lib/api/temporary-groups.ts` | CRUD groupes temporaires (stages) | ~300 lignes |
-| `src/lib/api/competitions.ts` | CRUD compétitions + assignations nageurs | ~105 lignes |
+| `src/lib/api/competitions.ts` | CRUD compétitions + assignations nageurs + wrapper `fetchStartlistHtml` (invoke edge `liveffn-startlist`, §361) | ~105 lignes |
+| `src/lib/liveffn/parseStartlist.ts` | Parser regex de la liste de départ liveffn (html→nageurs+courses, hooks de classes, noms composés) — §361 | 157 lignes |
+| `src/lib/liveffn/matchSwimmers.ts` | Appariement nom startlist→user (token-set order-independent, overrides persistés, ambigu→null) — §361 | 33 lignes |
+| `src/lib/liveffn/buildStartlistRows.ts` | Assemblage enrichi des lignes (meilleure perf + temps objectif via `objectiveHelpers`), vues par nageur / chronologique — §361 | 209 lignes |
 | `src/lib/api/absences.ts` | CRUD absences planifiées nageur | ~90 lignes |
 | `src/lib/api/objectives.ts` | CRUD objectifs par nageur | ~90 lignes |
 | `src/lib/api/training-slots.ts` | CRUD créneaux d'entraînement récurrents | ~200 lignes |
@@ -178,6 +182,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/shared/PWAInstallGate.tsx` | Gate installation PWA mobile | ~130 lignes |
 | `src/components/shared/PushPermissionBanner.tsx` | Banner permission push post-login | ~70 lignes |
 | `public/push-handler.js` | Service Worker push event handler — gate `focused` désormais contextuel (suppression OS uniquement si client focused sur la même page que `data.url` via `pushTargetMatchesClient`), tag par notif respecté (envoyé par push-send) (§194 Vague C) | 100 lignes |
+| `supabase/functions/liveffn-startlist/index.ts` | Edge Function proxy de fetch de la liste de départ liveffn (`verify_jwt`, garde coach/admin + validation host `liveffn.com`/path `startlist.php`, renvoie le HTML brut — parsing côté client) — §361 | 43 lignes |
 | `supabase/functions/push-send/index.ts` | Edge Function envoi push (web-push VAPID) — auth gate refactor : décode JWT payload + check `role === 'service_role'` au lieu de comparer le token à l'env (résout les 401 silencieux du trigger pg_net après divergence vault/env) ; tag unique `eac-notif-{id}` ou `eac-manual-{ts}` envoyé au SW (§194 Vague C) | ~256 lignes |
 | `src/pages/Suivi.tsx` | Hub Mon suivi (4 cartes aperçu → drill-down) | ~310 lignes |
 | `src/pages/SuiviSemaine.tsx` | Vue semaine drill-down (timeline jour/créneau : nage + muscu + absences + wellness) | ~1240 lignes |

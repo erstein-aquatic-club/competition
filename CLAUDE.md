@@ -60,6 +60,7 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 | `ffn-performances` | Fonctionnelle (ACTIVE, v64) — capte `club_name` depuis cellule club FFN | `supabase/functions/ffn-performances/` |
 | `import-club-records` | Fonctionnelle (ACTIVE, v74) — recalc filtré sur `app_settings.home_club_name` | `supabase/functions/import-club-records/` |
 | `push-send` | Fonctionnelle (ACTIVE, v33) | `supabase/functions/push-send/` |
+| `liveffn-startlist` | Fonctionnelle (ACTIVE, v1) — proxy fetch liste de départ liveffn (coach/admin) | `supabase/functions/liveffn-startlist/` |
 
 ## Documentation
 
@@ -76,7 +77,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§360** — remplacement YTW échauffement par Mobilisation épaules 3 axes (nageur) (id=102).
+Dernier § livré : **§361** — liste de départ liveffn par compétition (parse + appariement + perf/objectif).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
