@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -15,8 +15,11 @@ import {
   getAssignments,
   getGroups,
   getCoachKpis,
+  getCompetitions,
   withTimeout,
 } from "@/lib/api";
+import type { Competition } from "@/lib/api";
+import { nextCompetition } from "@/lib/competitions/competitionSelectors";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { useMySwimmerIds, filterByAssignment } from "@/hooks/useMySwimmerIds";
@@ -103,6 +106,7 @@ type CoachHomeProps = {
   onOpenMyRecords: () => void;
   onOpenAthlete: (athlete: CoachAthleteOption) => void;
   onOpenWeekAt: (weekDate: string) => void;
+  onOpenCompetition?: (id: string) => void;
   athletes: Array<{ id: number | null; display_name: string; group_label?: string | null; avatar_url?: string | null }>;
   athletesLoading: boolean;
   kpiLoading: boolean;
@@ -227,6 +231,7 @@ const CoachHome = ({
   onOpenMyRecords,
   onOpenAthlete,
   onOpenWeekAt,
+  onOpenCompetition,
   athletes,
   athletesLoading,
   kpiLoading,
@@ -458,13 +463,43 @@ const CoachHome = ({
     staleTime: 2 * 60 * 1000,
   });
 
+  // ── Section C-ter: Prochaine compétition (tuile "Echéances" live) ──
+  const { data: competitions = [] } = useQuery<Competition[]>({
+    queryKey: ["competitions"],
+    queryFn: () => getCompetitions(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const nextComp = useMemo(
+    () => nextCompetition(competitions, todayIso),
+    [competitions, todayIso],
+  );
+  // J-X : nombre de jours d'ici le départ de la compétition (0 = aujourd'hui).
+  const nextCompDaysUntil = useMemo(() => {
+    if (!nextComp) return null;
+    const todayMidnight = new Date(todayIso + "T00:00:00").getTime();
+    const compMidnight = new Date(nextComp.date + "T00:00:00").getTime();
+    return Math.max(0, Math.ceil((compMidnight - todayMidnight) / 86_400_000));
+  }, [nextComp, todayIso]);
+
   // ── Section D: Quick access ────────────────────────────────
   const quickAccess = useMemo(
     () => [
       { label: "Planif. Nage", icon: Waves, action: onOpenSwimPlanning, color: "text-cyan-500", bg: "bg-cyan-100 dark:bg-cyan-900/30" },
       { label: "Planif. Muscu", icon: Dumbbell, action: onOpenStrengthPlanning, color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
       { label: "Bilan muscu", icon: ClipboardCheck, action: onOpenStrengthAssessment, color: "text-fuchsia-500", bg: "bg-fuchsia-100 dark:bg-fuchsia-900/30" },
-      { label: "Echéances", icon: CalendarDays, action: () => onNavigate("competitions"), color: "text-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30" },
+      {
+        label: "Echéances",
+        icon: CalendarDays,
+        action:
+          nextComp && onOpenCompetition
+            ? () => onOpenCompetition(nextComp.id)
+            : () => onNavigate("competitions"),
+        color: "text-orange-500",
+        bg: "bg-orange-100 dark:bg-orange-900/30",
+        subtitle: nextComp ? nextComp.name : undefined,
+        badge:
+          nextComp && nextCompDaysUntil != null ? `J-${nextCompDaysUntil}` : undefined,
+      },
       { label: "Groupes", icon: UsersRound, action: () => onNavigate("groups"), color: "text-emerald-500", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
       { label: "Mes nageurs", icon: UserCheck, action: () => onNavigate("my-swimmers"), color: "text-violet-500", bg: "bg-violet-100 dark:bg-violet-900/30" },
       { label: "Allures équipe", icon: Gauge, action: () => onNavigate("pace-calculator"), color: "text-cyan-600", bg: "bg-cyan-100 dark:bg-cyan-900/30" },
@@ -473,7 +508,7 @@ const CoachHome = ({
       { label: "Chronos", icon: Timer, action: () => onNavigate("chrono-history"), color: "text-rose-500", bg: "bg-rose-100 dark:bg-rose-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
     ],
-    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment, onOpenCompetition, nextComp, nextCompDaysUntil],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -826,19 +861,33 @@ const CoachHome = ({
         <SectionLabel>Accès rapides</SectionLabel>
 
         <div className="grid grid-cols-3 gap-2">
-          {quickAccess.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.action}
-              className="flex flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-3.5 text-center transition-colors active:bg-muted"
-            >
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.bg}`}>
-                <item.icon className={`h-5 w-5 ${item.color}`} />
-              </div>
-              <span className="text-[11px] font-semibold leading-tight">{item.label}</span>
-            </button>
-          ))}
+          {quickAccess.map((item) => {
+            const subtitle = "subtitle" in item ? item.subtitle : undefined;
+            const badge = "badge" in item ? item.badge : undefined;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.action}
+                className="relative flex flex-col items-center gap-2 rounded-2xl border bg-card px-2 py-3.5 text-center transition-colors active:bg-muted"
+              >
+                {badge ? (
+                  <span className="absolute right-1.5 top-1.5 rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold leading-none tabular-nums text-orange-600 dark:bg-orange-900/40 dark:text-orange-300">
+                    {badge}
+                  </span>
+                ) : null}
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.bg}`}>
+                  <item.icon className={`h-5 w-5 ${item.color}`} />
+                </div>
+                <span className="text-[11px] font-semibold leading-tight">{item.label}</span>
+                {subtitle ? (
+                  <span className="line-clamp-2 max-w-full text-[9.5px] font-medium leading-tight text-muted-foreground">
+                    {subtitle}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -999,6 +1048,14 @@ export default function Coach() {
   const [, navigate] = useLocation();
   const [routeState, setRouteState] = useState(() => parseCoachHashLocation(window.location.hash));
   const activeSection = routeState.section;
+  // Deep-link helper: open a specific competition's full-screen detail (or the
+  // list when id is null). Stable identity (setRouteState is a stable setter) so
+  // CoachCompetitionsScreen's deep-link effect (UX-6) doesn't re-fire.
+  const openCompetition = useCallback(
+    (id: string | null) =>
+      setRouteState({ section: "competitions", competitionId: id ?? undefined }),
+    [],
+  );
   const kpiPeriod: KpiLookbackPeriod = 7;
   const [selectedCoachAthlete, setSelectedCoachAthlete] = useState<CoachAthleteOption | null>(null);
 
@@ -1236,6 +1293,7 @@ export default function Coach() {
           onOpenMyRecords={() => navigate("/records?tab=1rm")}
           onOpenAthlete={handleOpenAthlete}
           onOpenWeekAt={(weekDate) => setRouteState({ section: "week", weekDate })}
+          onOpenCompetition={openCompetition}
           athletes={myAthletes}
           athletesLoading={athletesLoading}
           kpiLoading={coachKpisQuery.isLoading}
@@ -1297,6 +1355,8 @@ export default function Coach() {
         <Suspense fallback={<ListSkeleton />}>
           <CoachCompetitionsScreen
             onBack={() => setRouteState({ section: "home" })}
+            initialCompetitionId={routeState.competitionId ?? null}
+            onOpenCompetition={openCompetition}
           />
         </Suspense>
       ) : null}
