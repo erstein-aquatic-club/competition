@@ -47,6 +47,7 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 | `src/pages/MesocycleGeneration.tsx` | Écran nageur de génération du mésocycle — §293 |
 | `src/pages/MesocyclePreview.tsx` | Écran nageur d'aperçu + confirmation (mode ajustement mid-cycle §338) — §293 |
 | `src/pages/MesocycleAdjust.tsx` | Écran coach d'ajustement d'un méso actif mid-cycle (`/strength/mesocycle-adjust/:athleteId`) — §338 |
+| `src/components/coach/competition/CompetitionDetail.tsx` | Détail compétition plein écran 3 onglets (Nageurs/Paramètres/Jour J) — §362 |
 | `supabase/tests/rls/` | Tests RLS intégration (voir `docs/rls-testing.md`) |
 
 **Pour tout autre fichier**, lire `docs/claude/files-map.md` (annuaire complet).
@@ -77,7 +78,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§361** — liste de départ liveffn par compétition (parse + appariement + perf/objectif).
+Dernier § livré : **§362** — refonte UX module compétitions (détail 3 onglets, timeline hero, tuile hub).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

@@ -63,7 +63,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/MesocycleAdjust.vitest.tsx` | Tests vitest jsdom de `MesocycleAdjust` (4 helpers purs + composant : pivot défaut, préset Allègement, Aperçu désactivé si `weeksRemaining<1`, bannière rouge pivot passé, **garde de rôle C1**, **synchro séances↔jours C4**) — §338/§340 | 271 lignes |
 | `src/pages/MesocyclePreview.vitest.tsx` | Tests vitest jsdom du helper pur `mesocyclePreviewBackTarget` (navigation retour aperçu : ajustement vs génération) — §340 | 31 lignes |
 | `src/components/strength/MesocycleEntry.tsx` | Tuile d'entrée sur `/strength` (onglet S'entraîner) — variante violette « action attendue » si pas de mésocycle actif, neutre « Régénérer » sinon. Conditionnée par `canGenerateMesocycle` (`bilan_pending`\|`completed`) — §293, verrou abaissé §299 | ~115 lignes |
-| `src/components/coach/CompetitionStartlist.tsx` | UI coach liste de départ liveffn (champ URL + validation, auto-match + dropdowns de correction persistés en map fusionnée, bascule 2 vues nageur/chrono, lignes enrichies perf+objectif, états loading/erreur+retry/vide) — montée par `CompetitionFormSheet` — §361 | 571 lignes |
+| `src/components/coach/CompetitionStartlist.tsx` | UI coach liste de départ liveffn — exporte `CompetitionStartlistPanel` (panneau Jour J embarquable sans Sheet, monté dans l'onglet Jour J de `CompetitionDetail` §362) : auto-match + dropdowns de correction persistés en map fusionnée, bascule 2 vues nageur/chrono, lignes enrichies perf+objectif, états loading/erreur+retry/vide ; l'URL liveffn est déplacée dans l'onglet Paramètres (source unique) — §361, refactor §362 | 547 lignes |
 | `src/components/coach/CoachMesocyclePanel.tsx` | **Panneau coach** dans l'onglet Planning de `CoachSwimmerFullView` — visibilité du mésocycle actif + raisonnement parsé du `bucket_priorities` jsonb (6 score bars + top 3 priorités + flags) + bouton Rejeter avec `AlertDialog` → `revertMesocycle` + historique compact — §293 Phase 6 | 538 lignes |
 | `src/lib/api/training-plans.ts` | CRUD training_plans + sessions + applications (§275.2) — 14 fonctions + helper `getActiveTrainingPlanApplicationsForUser` pour timeline derivation | 357 lignes |
 | `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
@@ -92,6 +92,9 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/liveffn/parseStartlist.ts` | Parser regex de la liste de départ liveffn (html→nageurs+courses, hooks de classes, noms composés) — §361 | 157 lignes |
 | `src/lib/liveffn/matchSwimmers.ts` | Appariement nom startlist→user (token-set order-independent, overrides persistés, ambigu→null) — §361 | 33 lignes |
 | `src/lib/liveffn/buildStartlistRows.ts` | Assemblage enrichi des lignes (meilleure perf + temps objectif via `objectiveHelpers`), vues par nageur / chronologique — §361 | 209 lignes |
+| `src/lib/liveffn/suggestParticipants.ts` | `suggestedParticipants` — diff des nageurs engagés liveffn vs déjà assignés (bandeau de suggestion de l'onglet Nageurs de `CompetitionDetail`) — §362 | 7 lignes |
+| `src/lib/competitions/competitionSelectors.ts` | `nextCompetition` — prochaine compétition à venir (hero timeline + tuile hub coach) — §362 | 9 lignes |
+| `src/components/coach/competition/CompetitionDetail.tsx` | Vue détail compétition coach plein écran, 3 onglets : **Nageurs** (sélection participants + recherche + ajout par groupe + bandeau suggestion liveffn), **Paramètres** (nom/dates/lieu/notes + lien liveffn source unique + suppression), **Jour J** (`CompetitionStartlistPanel` embarqué) ; clé React Query commune `["startlist", id, url]` (un seul fetch suggestion+Jour J) — §362 | 663 lignes |
 | `src/lib/api/absences.ts` | CRUD absences planifiées nageur | ~90 lignes |
 | `src/lib/api/objectives.ts` | CRUD objectifs par nageur | ~90 lignes |
 | `src/lib/api/training-slots.ts` | CRUD créneaux d'entraînement récurrents | ~200 lignes |
@@ -138,7 +141,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/SwimmerObjectivesTab.tsx` | Onglet objectifs CRUD (chrono + texte) — export `handlePaceLinkClick` (handoff sessionStorage, §188) | ~574 lignes |
 | `src/pages/coach/CoachPaceCalculatorScreen.tsx` | Calculateur d'allures coach — sélecteur coach, accordéon nageurs, upsert/delete cibles, export PDF, prefill depuis objectif via `selectAccordionTargetForPrefill` + `useEffect` (§186-§188) | 405 lignes |
 | `src/pages/coach/CoachGroupsScreen.tsx` | UI gestion groupes temporaires (stages) | ~1012 lignes |
-| `src/pages/coach/CoachCompetitionsScreen.tsx` | UI compétitions coach + assignations + SMS | ~834 lignes |
+| `src/pages/coach/CoachCompetitionsScreen.tsx` | UI compétitions coach — timeline hero (« prochaine compétition » J-X/lieu/nb nageurs/bouton Jour J) + cartes scannables (liste mixte compétitions/entretiens/fins de cycle, couleur par type), ouvre `CompetitionDetail` plein écran ; création slim (nom+dates+lieu) → onglet Paramètres ; assignations + SMS — §362 | 687 lignes |
 | `src/pages/coach/CoachWeekView.tsx` | Wrapper toggle semaine/mois (calendrier unifié) (§92), prop `initialWeekDate` pour deep-link (§145) | ~130 lignes |
 | `src/pages/coach/CoachLibrary.tsx` | Wrapper tabs bibliothèque nage/muscu (§92) | ~60 lignes |
 | `src/pages/coach/CoachComms.tsx` | Wrapper tabs notifications/SMS (§92) | ~60 lignes |

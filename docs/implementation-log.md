@@ -4,6 +4,57 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §362 — Refonte UX module Compétitions (3 workflows coach) (2026-06-01)
+
+### Contexte
+
+Retour terrain François. La timeline « Échéances » était peu visuelle et mal optimisée pour mobile, et le menu d'édition d'une compétition (panneau latéral étroit) était moche. Refonte en **3 workflows coach** distincts (timeline d'aperçu → détail plein écran → Jour J liveffn) avec un accès plus rapide depuis le hub.
+
+### Changements
+
+1. **`CompetitionDetail`** (nouveau, `src/components/coach/competition/CompetitionDetail.tsx`, 663 l) — vue détail **plein écran, 3 onglets** : **Nageurs** (sélection des participants + recherche + ajout par groupe + bandeau de suggestion liveffn), **Paramètres** (nom/dates/lieu/notes + **lien liveffn source unique** + suppression), **Jour J** (listing liveffn enrichi embarqué).
+
+2. **Timeline refondue** (`src/pages/coach/CoachCompetitionsScreen.tsx`, 687 l) — **hero « prochaine compétition »** (J-X, lieu, nb de nageurs, bouton Jour J) + **cartes scannables** (liste mixte compétitions + entretiens + fins de cycle, couleur par type) ; un tap sur une compétition ouvre son détail plein écran. Création **slim** (nom + dates + lieu) → atterrit sur l'onglet Paramètres. Ancien panneau latéral + rail vertical supprimés.
+
+3. **Tuile hub coach vivante** (`src/pages/Coach.tsx`) — la tuile « Echéances » affiche la prochaine compétition + J-X et **deep-link** directement vers son détail.
+
+4. **Route `competitionId`** (`coachRouteState.ts`) — deep-link 1-tap vers le détail d'une compétition.
+
+5. **`CompetitionStartlistPanel`** (refactor, `src/components/coach/CompetitionStartlist.tsx`, 547 l) — le corps de §361 extrait en **panneau embarquable** (sans Sheet) pour l'onglet Jour J ; l'URL liveffn est déplacée dans l'onglet Paramètres (source unique).
+
+6. **2 helpers purs testés** : `nextCompetition` (`src/lib/competitions/competitionSelectors.ts`, 9 l), `suggestedParticipants` (`src/lib/liveffn/suggestParticipants.ts`, 7 l).
+
+7. **Pont objectifs UUID → numérique** partagé via une **clé React Query commune** (`["startlist", id, url]`) → un seul fetch pour la suggestion de l'onglet Nageurs ET le panneau Jour J.
+
+### Fichiers
+
+- `src/components/coach/competition/CompetitionDetail.tsx` (nouveau, 663 l)
+- `src/pages/coach/CoachCompetitionsScreen.tsx` (687 l) — timeline hero + cartes, ouvre `CompetitionDetail` plein écran
+- `src/components/coach/CompetitionStartlist.tsx` (547 l) — exporte `CompetitionStartlistPanel` (panneau Jour J embarquable), URL liveffn déplacée en Paramètres
+- `src/pages/Coach.tsx` — tuile « Echéances » vivante (prochaine compétition + J-X + deep-link)
+- `src/lib/coach/coachRouteState.ts` — route `competitionId`
+- `src/lib/competitions/competitionSelectors.ts` (nouveau, 9 l)
+- `src/lib/liveffn/suggestParticipants.ts` (nouveau, 7 l)
+
+### Tests / vérifs
+
+- **10 nouveaux `node:test`** : `nextCompetition` 4, `suggestedParticipants` 3, `coachRouteState` 3.
+- Suite complète : node:test **1582** pass, vitest **71** pass, tsc **0**, lint **0 erreur** (42 warnings exhaustive-deps tolérés).
+- **Pas de migration ni RLS** (réutilise `competition_assignments` + les colonnes §361) → pas de `test:rls`.
+
+### Décisions clés
+
+- Nageurs ↔ Jour J **liés avec suggestion** : bandeau « N nageurs engagés liveffn détectés — les ajouter ? », ajout en un tap, la sélection = assignation manuelle.
+- **URL liveffn source unique en Paramètres** (plus de saisie redondante dans le panneau).
+- Hero = prochaine compétition, liste mixte conservée.
+
+### Limites / ouvert
+
+- Vérification end-to-end live en attente du déploiement github.io (Supabase indispo en local).
+- Pas de notification/partage du Jour J aux nageurs (futur).
+- Cache offline du listing parsé (robustesse réseau faible) reste l'évolution future notée en §361.
+- Design : `docs/plans/2026-06-01-competition-ux-redesign-design.md` ; plan : `docs/plans/2026-06-01-competition-ux-redesign.md`.
+
 ## §361 — Liste de départ liveffn par compétition (2026-06-01)
 
 ### Contexte
