@@ -48,19 +48,27 @@ Une migration additive (via Supabase MCP), sur `competitions` :
 Pas de changement de policy RLS : `competitions` est déjà inscriptible coach/admin,
 lisible par tous → **pas de `test:rls` requis**.
 
-## 3. Backend — edge function `liveffn-startlist`
+## 3. Backend — edge function `liveffn-startlist` (proxy fetch)
 
-Nouvelle fonction sur le modèle de `ffn-performances` (CORS, JWT, coach/admin only).
+liveffn.com ne renvoie pas de CORS → un navigateur ne peut pas le fetch directement.
+La fonction sert **uniquement de proxy de récupération authentifié** : elle valide
+l'URL, récupère la page et **renvoie le HTML brut**. Tout le parsing + l'appariement
+vivent côté client dans des modules `src/lib/liveffn/` couverts par `node:test` — ainsi
+le **même code (regex, pas de DOM)** tourne en test et en prod, sans duplication
+Deno/node ni parser non testé.
 
-- **Entrée** : `{ url }` — validée (doit être une URL `liveffn.com/.../startlist.php`).
-- **Traitement** : fetch de la page + nouveau parser partagé `_shared/liveffn-parser.ts`.
-- **Sortie** :
-  - méta : nom du club, code structure ;
-  - par nageur : `lastName, firstName, birthYear` + courses
-    `{ rawEvent, eventCode, heat, lane, entryTimeSeconds, entryTimeDisplay, day, time }`.
-- Mapping nom d'épreuve (« 50 Nage Libre Messieurs ») → `event_code` interne via
-  `_shared/ffn-event-map.ts` existant (étendu si un libellé manque).
-- `{ swimmers: [] }` + message clair si le parse ne trouve rien.
+- **Entrée** : `{ url }` — validée (host `liveffn.com`/`www.liveffn.com`, path `startlist.php`).
+- **Sortie** : `{ html }` (ou `{ error }` + status). Gate coach/admin (JWT), CORS partagé.
+
+Parsing client (`src/lib/liveffn/parseStartlist.ts`, regex, testé) → structure :
+- par nageur : `lastName, firstName, birthYear` + courses
+  `{ rawEvent, heat, lane, entryTimeSeconds, entryTimeDisplay, day, time }`.
+
+Mapping nom d'épreuve → `event_code` objectif : on **réutilise `objectiveHelpers`**
+(`eventCodeFromFfnName` après strip du genre « Messieurs/Dames »), **pas**
+`ffn-event-map.ts` — car `swimmer_performances.event_code` et `objectives.event_code`
+utilisent le système compact d'`objectiveHelpers` (`50NL`, `50PAP`…), garantissant des
+chiffres identiques aux fiches objectifs.
 
 ## 4. Frontend
 
@@ -92,8 +100,11 @@ Monté dans la **vue détail compétition** (`CoachCompetitionsScreen`), section
 
 ## 6. Tests
 
-- **node:test** — parser sur une fixture HTML construite depuis la page exemple
-  (séries/couloirs/temps/jours) + mapping nom d'épreuve → `event_code`.
-- **node:test** — normalisation + logique d'auto-match (NOM majuscule, accents,
-  départage par année de naissance).
+- **node:test** — `parseStartlist` sur une **fixture HTML réelle** (capturée via curl
+  depuis l'URL exemple, sauvegardée dans le repo) : séries/couloirs/temps/jours/heures.
+- **node:test** — strip genre + `eventCodeFromFfnName` (mapping nom → code compact).
+- **node:test** — normalisation token-set order-independent (« WAGNER Francois » ↔
+  « Francois Wagner », accents, casse) + auto-match (départage année si dispo).
+- **node:test** — `buildStartlistRows` (assemblage courses + perfs + objectifs → lignes
+  enrichies, regroupement par nageur / chronologique).
 - Réutilisation de `findBestPerformance` → logique de perf déjà couverte par les tests.
