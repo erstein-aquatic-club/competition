@@ -100,7 +100,17 @@ export async function getMyCompetitionIds(athleteId?: number | null): Promise<st
 export async function fetchStartlistHtml(url: string): Promise<string> {
   if (!canUseSupabase()) throw new Error("Supabase non configuré");
   const { data, error } = await supabase.functions.invoke("liveffn-startlist", { body: { url } });
-  if (error) throw new Error(String(data?.error ?? error.message));
+  if (error) {
+    // On a non-2xx, supabase-js returns a FunctionsHttpError whose body lives in
+    // `error.context` (a Response) — `data` is null. Read it so the user sees the
+    // function's real French message instead of the generic "non-2xx status code".
+    let detail: string | null = null;
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      try { detail = ((await ctx.clone().json()) as { error?: string })?.error ?? null; } catch { /* not JSON */ }
+    }
+    throw new Error(detail ?? error.message);
+  }
   if (!data?.html) throw new Error(data?.error ?? "Réponse vide");
   return data.html as string;
 }
