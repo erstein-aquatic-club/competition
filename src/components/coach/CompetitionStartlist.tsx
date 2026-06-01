@@ -45,8 +45,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -213,7 +211,8 @@ export function CompetitionStartlistPanel({
   const queryClient = useQueryClient();
 
   // ── State (all hooks above any early return) ──
-  const [url, setUrl] = useState(competition.liveffn_startlist_url ?? "");
+  // The liveffn URL is OWNED by the Paramètres tab (CompetitionDetail) — this
+  // panel only reads it from the competition record.
   const [overrides, setOverrides] = useState<Record<string, number | null>>(
     competition.startlist_athlete_map ?? {},
   );
@@ -222,8 +221,8 @@ export function CompetitionStartlistPanel({
     !!competition.liveffn_startlist_url,
   );
 
-  const urlValid = isValidStartlistUrl(url);
   const savedUrl = competition.liveffn_startlist_url ?? "";
+  const urlValid = isValidStartlistUrl(savedUrl);
 
   // ── Athletes (match candidates) ──
   const { data: athletes = [] } = useQuery({
@@ -238,17 +237,6 @@ export function CompetitionStartlistPanel({
         .map((a) => ({ id: a.id as number, display_name: a.display_name })),
     [athletes],
   );
-
-  // ── Save URL ──
-  const saveUrlMutation = useMutation({
-    mutationFn: (liveffn_startlist_url: string) =>
-      updateCompetition(competition.id, { liveffn_startlist_url }),
-    onSuccess: () => {
-      toast("Lien enregistré");
-      void queryClient.invalidateQueries({ queryKey: ["competitions"] });
-    },
-    onError: (err: Error) => toast.error("Erreur", { description: err.message }),
-  });
 
   // ── Persist a single mapping (merged) ──
   const saveMapMutation = useMutation({
@@ -362,25 +350,11 @@ export function CompetitionStartlistPanel({
   const chrono = useMemo(() => chronological(rows), [rows]);
 
   // ── Handlers ──
-  const handleSaveUrl = () => {
-    if (!urlValid) return;
-    saveUrlMutation.mutate(url.trim());
-  };
-
+  // The URL is saved by the Paramètres tab; here we only trigger the fetch.
   const handleGenerate = () => {
-    // Save the URL first if it changed, then enable the fetch.
-    const trimmed = url.trim();
-    if (trimmed !== savedUrl) {
-      saveUrlMutation.mutate(trimmed, {
-        onSuccess: () => {
-          setShouldFetch(true);
-          void startlistQuery.refetch();
-        },
-      });
-    } else {
-      setShouldFetch(true);
-      void startlistQuery.refetch();
-    }
+    if (!urlValid) return;
+    setShouldFetch(true);
+    void startlistQuery.refetch();
   };
 
   const handleMatchChange = (key: string, value: number | null) => {
@@ -398,38 +372,18 @@ export function CompetitionStartlistPanel({
   // ── Render ──
   return (
     <div className="space-y-5">
-          {/* ── URL field ── */}
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="startlist-url"
-              className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-            >
-              Lien liveffn (liste de départ par structure)
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="startlist-url"
-                placeholder="https://…liveffn.com/…/startlist.php"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="text-[13px]"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSaveUrl}
-                disabled={!urlValid || saveUrlMutation.isPending}
-              >
-                Enregistrer
-              </Button>
-            </div>
-            {url.trim() !== "" && !urlValid && (
-              <p className="text-[10px] text-destructive/70">
-                Lien invalide — attendu un lien liveffn.com terminant par startlist.php
+          {/* ── Générer (URL owned by Paramètres) ── */}
+          {!savedUrl ? (
+            <div className="rounded-xl border border-border/60 bg-muted/30 p-4 text-center">
+              <p className="text-[13px] text-muted-foreground">
+                Ajoute le lien liveffn dans l&apos;onglet{" "}
+                <span className="font-semibold text-foreground">Paramètres</span> pour
+                générer la liste de départ.
               </p>
-            )}
+            </div>
+          ) : (
             <Button
-              className="w-full mt-1"
+              className="w-full"
               onClick={handleGenerate}
               disabled={!urlValid || isFetching}
             >
@@ -442,7 +396,7 @@ export function CompetitionStartlistPanel({
                 "Générer le listing"
               )}
             </Button>
-          </div>
+          )}
 
           {/* ── States ── */}
           {isFetching && (
