@@ -14,7 +14,7 @@
  * This file only fetches, wires the maps, and renders.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Target, AlertTriangle, RefreshCw, Link2Off } from "lucide-react";
@@ -201,15 +201,15 @@ function RaceRow({
 
 // ── Component ───────────────────────────────────────────────────
 
-type Props = {
-  competition: Competition;
-  open: boolean;
-  onOpenChange: (b: boolean) => void;
-};
-
 type View = "swimmer" | "chrono";
 
-export default function CompetitionStartlist({ competition, open, onOpenChange }: Props) {
+export function CompetitionStartlistPanel({
+  competition,
+  onMatchedIdsChange,
+}: {
+  competition: Competition;
+  onMatchedIdsChange?: (ids: Array<number | null>) => void;
+}) {
   const queryClient = useQueryClient();
 
   // ── State (all hooks above any early return) ──
@@ -263,7 +263,7 @@ export default function CompetitionStartlist({ competition, open, onOpenChange }
   // ── Fetch + parse the startlist HTML ──
   const startlistQuery = useQuery({
     queryKey: ["startlist", competition.id, savedUrl],
-    enabled: open && shouldFetch && !!savedUrl,
+    enabled: shouldFetch && !!savedUrl,
     staleTime: 5 * 60 * 1000,
     retry: false,
     queryFn: async () => {
@@ -281,6 +281,11 @@ export default function CompetitionStartlist({ competition, open, onOpenChange }
     [swimmers, candidates, overrides],
   );
 
+  // Report matched user ids (nulls for unmatched lines) to the parent.
+  useEffect(() => {
+    onMatchedIdsChange?.(Object.values(matches));
+  }, [matches, onMatchedIdsChange]);
+
   // numeric ids that ended up matched
   const matchedIds = useMemo(
     () => Array.from(new Set(Object.values(matches).filter((v): v is number => typeof v === "number"))),
@@ -291,7 +296,7 @@ export default function CompetitionStartlist({ competition, open, onOpenChange }
   // ── Enrichment: perfs per matched id + objectives (UUID→numeric bridge) ──
   const enrichmentQuery = useQuery({
     queryKey: ["startlist-enrichment", competition.id, matchedKey],
-    enabled: open && matchedIds.length > 0,
+    enabled: matchedIds.length > 0,
     staleTime: 60 * 1000,
     queryFn: async () => {
       const [perfPairs, objectives, authRes] = await Promise.all([
@@ -392,13 +397,7 @@ export default function CompetitionStartlist({ competition, open, onOpenChange }
 
   // ── Render ──
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Liste de départ liveffn</SheetTitle>
-        </SheetHeader>
-
-        <div className="mt-5 space-y-5">
+    <div className="space-y-5">
           {/* ── URL field ── */}
           <div className="space-y-1.5">
             <Label
@@ -563,7 +562,30 @@ export default function CompetitionStartlist({ competition, open, onOpenChange }
                 </div>
               )}
             </div>
-          )}
+      )}
+    </div>
+  );
+}
+
+// ── Sheet wrapper (existing default export, unchanged signature) ──
+
+export default function CompetitionStartlist({
+  competition,
+  open,
+  onOpenChange,
+}: {
+  competition: Competition;
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Liste de départ liveffn</SheetTitle>
+        </SheetHeader>
+        <div className="mt-5">
+          <CompetitionStartlistPanel competition={competition} />
         </div>
       </SheetContent>
     </Sheet>
