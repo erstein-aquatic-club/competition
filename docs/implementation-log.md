@@ -4,6 +4,37 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §360 — Remplacement YTW échauffement par « Mobilisation épaules 3 axes (nageur) » (id=102) (2026-06-01)
+
+### Contexte
+
+La routine d'échauffement articulaire commune (Bloc 1, table `warmup_common_routine`) référençait en ordre=3 l'exercice **Y-T-W** (id=24). Retour terrain : le YTW est techniquement difficile à réaliser à l'échauffement sans accompagnement coach — il nécessite une attention motrice élevée et une maîtrise des 3 phases distinctes (Y/T/W). Le remplacer par un exercice plus accessible mais couvrant les mêmes axes (rétraction scapulaire + rotation externe épaule + stabilisation sus-épineux) améliore la qualité de l'échauffement, notamment en autonomie nageur.
+
+### Changements
+
+1. **Nouvel exercice créé** : « Mobilisation épaules 3 axes (nageur) » — `dim_exercices` id=102, `exercise_type='warmup'`, `corrective_axes=['shoulder']`, `supports_unilateral=false`. Couvre les 3 mouvements fondamentaux dans une séquence fluide adaptée aux nageurs.
+
+2. **Migration `00222`** (`supabase/migrations/00222_mobilisation_epaules_3axes.sql`) appliquée via MCP :
+   - INSERT `dim_exercices` id=102 (exercice de remplacement)
+   - UPDATE `warmup_common_routine` ordre=3 : `exercise_id` 24 → 102
+   - UPDATE `strength_session_items` : 18 lignes `exercise_id=24` → 102 (séances matérialisées existantes)
+   - `strength_set_logs` : **intentionnellement conservés** avec l'ancien id=24 (historique réel des exécutions)
+
+3. **Test mock mis à jour** : `src/lib/api/__tests__/strength-warmup.test.ts` — mocks lignes 80 et 89 : `exercise_id: 24` → `exercise_id: 102`.
+
+4. **YTW (id=24) conservé dans le catalogue** — disponible pour édition manuelle coach, non supprimé.
+
+### Fichiers modifiés
+
+- `supabase/migrations/00222_mobilisation_epaules_3axes.sql` (nouveau)
+- `src/lib/api/__tests__/strength-warmup.test.ts` (mock id 24 → 102, lignes 80+89)
+
+### Décisions clés
+
+- **`strength_set_logs` non migré** : les logs font partie de l'historique d'exécution réel ; réécrire l'`exercise_id` des logs fausserait la traçabilité. Les prochaines exécutions loggueront id=102.
+- **YTW catalogue intact** : pas de suppression — le coach peut le réassigner manuellement si voulu (ex. séance spécialisée).
+- **Data-only** : aucun code moteur modifié, aucune migration de schéma — seul le seed de la routine commune change.
+
 ## R5 — Seau « tronc / core » (DESIGN + DRAFT TDD, non déployé) (2026-05-26)
 
 **Branche** : `feat/coach-bilan-unifie` (worktree isolé). **Lève R5** des audits matrice (`2026-05-25-…-matrice-complete-vs-elite.md` §4-E) et robustesse (`2026-05-26-…-robustesse-perf-elite-edition.md` §3). **Aucune migration appliquée en prod, rien poussé.**

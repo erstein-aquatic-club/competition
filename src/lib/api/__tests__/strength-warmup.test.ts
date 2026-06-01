@@ -77,7 +77,7 @@ describe("getCommonWarmupRoutine — §351", () => {
         data: [
           { exercise_id: 87, ordre: 1 },
           { exercise_id: 84, ordre: 2 },
-          { exercise_id: 24, ordre: 3 },
+          { exercise_id: 102, ordre: 3 },
         ],
         error: null,
       },
@@ -86,7 +86,7 @@ describe("getCommonWarmupRoutine — §351", () => {
     const { getCommonWarmupRoutine } = await import("../strength-warmup.ts");
     const ids = await getCommonWarmupRoutine();
 
-    assert.deepEqual(ids, [87, 84, 24]);
+    assert.deepEqual(ids, [87, 84, 102]);
     assert.deepEqual(fromCalls, ["warmup_common_routine"]);
   });
 

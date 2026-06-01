@@ -76,7 +76,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§359** — clôture ROADMAP §6 (timers PWA iOS) : fix déjà livré (§343), alerte de fin de repos écran verrouillé écartée (contraintes iOS), doc-only.
+Dernier § livré : **§360** — remplacement YTW échauffement par Mobilisation épaules 3 axes (nageur) (id=102).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
