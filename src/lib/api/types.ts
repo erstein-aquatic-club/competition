@@ -519,6 +519,7 @@ export interface Competition {
   created_at?: string | null;
   liveffn_startlist_url?: string | null;
   startlist_athlete_map?: Record<string, number | null> | null;
+  pool_length?: number | null;
 }
 
 export interface CompetitionInput {
@@ -529,6 +530,7 @@ export interface CompetitionInput {
   description?: string | null;
   liveffn_startlist_url?: string | null;
   startlist_athlete_map?: Record<string, number | null> | null;
+  pool_length?: number | null;
 }
 
 export interface CompetitionAssignment {
