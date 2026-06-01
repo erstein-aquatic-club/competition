@@ -25,13 +25,13 @@
 ## Task 1: Data-model migration + types
 
 **Files:**
-- Create: `supabase/migrations/00214_competition_startlist.sql` (verify next free number with `ls supabase/migrations | tail`)
+- Create: `supabase/migrations/00221_competition_startlist.sql` (verify next free number with `ls supabase/migrations | tail`)
 - Modify: `src/lib/api/types.ts:511-528` (`Competition`, `CompetitionInput`)
 
 **Step 1: Write the migration SQL**
 
 ```sql
--- 00214_competition_startlist.sql
+-- 00221_competition_startlist.sql
 -- liveffn startlist URL + persisted manual name→user match overrides on competitions.
 alter table public.competitions
   add column if not exists liveffn_startlist_url text,
@@ -45,7 +45,7 @@ comment on column public.competitions.startlist_athlete_map is
 
 **Step 2: Apply via MCP**
 
-Use `mcp__plugin_supabase_supabase__apply_migration` with name `00214_competition_startlist` and the SQL above. (No RLS change — `competitions` already coach/admin-writable.)
+Use `mcp__plugin_supabase_supabase__apply_migration` with name `00221_competition_startlist` and the SQL above. (No RLS change — `competitions` already coach/admin-writable.)
 
 **Step 3: Verify columns exist**
 
@@ -70,8 +70,8 @@ and to `CompetitionInput`:
 
 Run: `npx tsc --noEmit` → Expected: exit 0.
 ```bash
-git add supabase/migrations/00214_competition_startlist.sql src/lib/api/types.ts
-git commit -m "feat(startlist): competitions.liveffn_startlist_url + startlist_athlete_map (mig 00214)"
+git add supabase/migrations/00221_competition_startlist.sql src/lib/api/types.ts
+git commit -m "feat(startlist): competitions.liveffn_startlist_url + startlist_athlete_map (mig 00221)"
 ```
 
 ---
@@ -85,20 +85,27 @@ git commit -m "feat(startlist): competitions.liveffn_startlist_url + startlist_a
 - Create: `src/lib/liveffn/parseStartlist.ts`
 - Create: `src/lib/liveffn/parseStartlist.test.ts`
 
-**Step 1: Capture the fixture**
+**Step 1: Fixture is ALREADY captured** (committed at `src/lib/liveffn/__fixtures__/startlist-93727-118.html`, 13139 bytes, real liveffn HTML for competition 93727 / structure 118 = EAC). Do NOT re-fetch; parse this committed file. **Do not hand-fabricate HTML.**
 
-Run (public GET, read-only):
-```bash
-mkdir -p src/lib/liveffn/__fixtures__
-curl -sL 'https://www.liveffn.com/cgi-bin/startlist.php?competition=93727&langue=fra&go=detail&action=structure&structure=118' \
-  -o src/lib/liveffn/__fixtures__/startlist-93727-118.html
-wc -c src/lib/liveffn/__fixtures__/startlist-93727-118.html
+**Step 2: Real markup (verified from the fixture)**
+
+The page is a `<table>`. Each swimmer is a heading row, followed by one `<tr class="survol">` per race:
+
+```html
+<td colspan="7" class="resStructureIndividu1">WAGNER Francois (1999) FRA </td>
+...
+<tr class="survol">
+    <td>50 Nage Libre Messieurs  </td>
+    <td class="resStructureRelayeur"></td>
+    <td class="startlist_serie">série 1</td>
+    <td class="startlist_couloir">couloir 4</td>
+    <td class="temps">00:23.64</td>
+    <td class="startlist_date">Dimanche 24 Mai</td>
+    <td class="startlist_horaire">10h59</td>
+</tr>
 ```
-If the file is empty/blocked, fall back to invoking the edge function from Task 5 once it exists, or ask the user to paste the page source. **Do not hand-fabricate the HTML** — the parser regex must match real markup.
 
-**Step 2: Inspect the real structure**
-
-`grep` the fixture for one swimmer name (e.g. `WAGNER`) and the surrounding tags to learn the actual markup (rows vs divs, how name/year/event/heat/lane/time/day/hour are delimited). The screenshot shows, per swimmer: a heading `LASTNAME Firstname (YYYY) FRA`, then lines `<Event Sexe> · série N · couloir N · MM:SS.CC · <Jour DD Mois> · HHhMM`.
+Parse via these class hooks (robust): heading = `class="resStructureIndividu1"` → `NAME Firstname (YYYY) FRA`; race cells = first `<td>` (event), `.startlist_serie` ("série N"), `.startlist_couloir` ("couloir N"), `.temps` ("00:23.64"), `.startlist_date`, `.startlist_horaire`. Skip the empty `.resStructureRelayeur` cell. Races belong to the most recent preceding heading. `entryTimeDisplay`: normalize "00:23.64" via `formatTimeDisplay` → "23.64" (matches objective-card formatting); `entryTimeSeconds` via a `parseTime` helper (mm:ss.cc / ss.cc). The three swimmers in the fixture: HASAPIS Stellio (2007), NONNENMACHER Samuel (2004), WAGNER Francois (1999) — assertions in Step 3 already match the real data.
 
 **Step 3: Write the failing test** (`parseStartlist.test.ts`)
 
