@@ -19488,3 +19488,17 @@ Les 3 écritures sont **idempotentes** (UPSERT pain + UPDATE ligne assessment) �
 **Tests / vérifs.** `mesocycleProgress.test.ts` +4 (offset 0 inchangé ; offset>0 avant pivot = 2/6 active ; au pivot = 3/6 ; après fin = done) ; `strength-mesocycles.test.ts` +1 (`setMesocycleWeekOffset` UPDATE/eq). node:test **1548→1553**, vitest 71 (MesocycleAdjust/Preview 13/13 inchangés), tsc 0, lint 0, build OK. Pas de `test:rls` (UPDATE sous policy `strength_mesocycles` existante). **Limite UX §357 résolue.**
 
 **Limites.** Offset cumulatif : un 2ᵉ ajustement repart de `phaseInfo.weekIndex` du méso alors actif (raisonne sur son `start_week_monday`/total locaux — l'offset du méso précédent n'est pas re-cumulé ; acceptable car chaque ajustement recalcule depuis le méso actif courant). UI bannière = présentationnelle (rend `weekNumber/total/status`), pas de test neuf dédié (couvert par `mesocyclePosition`).
+
+## §359 — Clôture ROADMAP §6 (timers PWA iOS) : fix déjà livré + alerte arrière-plan écartée (2026-06-01)
+
+**Doc-only, aucun code modifié.** Arbitrage terrain (François) sur le chantier ROADMAP §6 « Fix timers mode focus (PWA iOS background) », resté « proposé non livré » dans la roadmap.
+
+**Constat code.** Le fix proposé par §6 (remplacer les `setInterval` relatifs par des timestamps absolus + listener `visibilitychange`) **est déjà intégralement implémenté** dans `WorkoutRunner.tsx` (posé lors de §343) :
+- Timer elapsed : `elapsedStartRef = useRef(Date.now())` (L196) → `elapsed = Math.floor((Date.now() - elapsedStartRef.current)/1000) + elapsedPausedRef.current` (L250), pause via accumulateur `elapsedPausedRef`.
+- Timer repos : `restEndRef.current = Date.now() + duration*1000` (L586) → `remaining = Math.max(0, Math.ceil((restEndRef.current - Date.now())/1000))` (L275).
+- `document.addEventListener('visibilitychange', …)` force un `tick()` immédiat au retour premier plan sur les 2 timers (L256, L287).
+- Bonus §343 : persistance `startedAt` au remount (le chrono ne se réinitialise pas). L'affichage est donc déjà fiable après backgrounding iOS. Le ROADMAP §6 pointait des lignes obsolètes (`:149`/`:168`) de l'ancienne implémentation relative supprimée.
+
+**Vrai trou restant — écarté.** Ce qui n'était PAS couvert : l'**alerte sonore/vibration de fin de repos quand l'écran est verrouillé**. `notifyRestEnd()` (bip Web Audio + `navigator.vibrate`, L48) est déclenché depuis le `tick()` du `setInterval`, suspendu par iOS en arrière-plan → aucun bip à l'instant exact de la fin du repos écran verrouillé (rejoué belatedly au retour via `visibilitychange`). Pistes envisagées et leurs contraintes iOS : (a) **bip Web Audio pré-programmé** sur l'horloge matérielle audio + contexte maintenu vivant = marche écran verrouillé mais **silencé par l'interrupteur Silencieux physique** ; `navigator.vibrate` **non supporté** sur Safari/PWA iOS ; (b) **Web Push** (la fonction `push-send` existe) = silencieux-proof mais timing à la seconde sur 90 s peu fiable + serveur + permission, disproportionné ; (c) **Wake Lock** = garde l'écran allumé (coût batterie). **Décision coach : abandon de la feature, état actuel jugé OK.** L'affichage juste au retour + le bip belated suffisent en pratique (entraînement son activé). Chantier §6 marqué **Clos (sans suite)** dans le ROADMAP.
+
+**Tests / vérifs.** Aucun (zéro code touché). Pas de `test:rls`.
