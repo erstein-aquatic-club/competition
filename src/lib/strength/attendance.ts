@@ -27,7 +27,9 @@ export interface AttendanceRun {
   athleteId: number;
   sessionId: number | null;
   status: "in_progress" | "completed" | "abandoned";
+  /** UTC ISO timestamp (must end with "Z"); the calendar day is derived UTC-side. */
   startedAt: string | null;
+  /** UTC ISO timestamp (must end with "Z"); the calendar day is derived UTC-side. */
   completedAt: string | null;
 }
 
@@ -116,6 +118,11 @@ function mondayOf(date: string, periodWeekStarts: string[]): string {
   return periodWeekStarts[0] ?? date;
 }
 
+/** The UTC calendar day ("YYYY-MM-DD") on which a run lands: completedAt for done runs, else startedAt. */
+function runDay(r: AttendanceRun): string {
+  return ((r.status === "completed" ? (r.completedAt ?? r.startedAt) : r.startedAt) ?? "").slice(0, 10);
+}
+
 export function computeAttendance(
   input: ComputeAttendanceInput,
 ): AttendanceAthlete[] {
@@ -127,15 +134,17 @@ export function computeAttendance(
       (s) => s.athleteId === athleteId && s.sessionTemplateId != null,
     );
     const aRuns = runs.filter((r) => r.athleteId === athleteId);
-    const templateIds = new Set(aSlots.map((s) => s.sessionTemplateId));
+    const templateIds = new Set(
+      aSlots.map((s) => s.sessionTemplateId).filter((id): id is number => id != null),
+    );
 
     const weeks: AttendanceWeek[] = periodWeekStarts.map((weekStart) => {
       const weekEnd = addDaysISO(weekStart, 6);
       const planned = aSlots.filter((s) => s.weekStart === weekStart).length;
       const completedRuns = aRuns.filter((r) => {
         if (r.status !== "completed") return false;
-        if (!templateIds.has(r.sessionId)) return false;
-        const day = (r.completedAt ?? r.startedAt ?? "").slice(0, 10);
+        if (r.sessionId == null || !templateIds.has(r.sessionId)) return false;
+        const day = runDay(r);
         return day >= weekStart && day <= weekEnd;
       }).length;
       const completed = Math.min(completedRuns, planned);
@@ -150,12 +159,9 @@ export function computeAttendance(
     const days: AttendanceDay[] = allDays.map((date) => {
       const weekStart = mondayOf(date, periodWeekStarts);
       const dayRuns = aRuns.filter((r) => {
-        if (!templateIds.has(r.sessionId)) return false;
-        if (r.status === "completed") {
-          return (r.completedAt ?? r.startedAt ?? "").slice(0, 10) === date;
-        }
-        if (r.status === "in_progress") {
-          return (r.startedAt ?? "").slice(0, 10) === date;
+        if (r.sessionId == null || !templateIds.has(r.sessionId)) return false;
+        if (r.status === "completed" || r.status === "in_progress") {
+          return runDay(r) === date;
         }
         return false;
       });
@@ -172,6 +178,8 @@ export function computeAttendance(
         if (date >= today) {
           status = "planned";
         } else {
+          // "shifted": the week target was met, so this planned slot's work happened
+          // on another day (heuristic — not a tracked per-session displacement).
           status = (pctByWeek.get(weekStart) ?? 0) === 100 ? "shifted" : "todo";
         }
       } else {

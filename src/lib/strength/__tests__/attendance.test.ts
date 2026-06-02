@@ -157,3 +157,57 @@ test("computeAttendance 8: empty athlete", () => {
   assert.equal(res[0].weeks[0].planned, 0);
   assert.equal(res[0].weeks[0].pct, null);
 });
+
+test("computeAttendance 9: run with sessionId null is ignored", () => {
+  const res = computeAttendance({
+    ...baseInput,
+    plannedSlots: [slot(0, 100)],
+    runs: [run("2026-06-01", "completed", null)],
+  });
+  assert.equal(res[0].weeks[0].completed, 0);
+});
+
+test("computeAttendance 10: multi-week isolation", () => {
+  const res = computeAttendance({
+    athleteIds: [1],
+    periodWeekStarts: ["2026-06-01", "2026-06-08"],
+    today: "2026-06-20",
+    // only a week-1 slot; week 2 has none
+    plannedSlots: [slot(0, 100)],
+    // one run completes the week-1 slot in week 1;
+    // a second completed run lands in week 2 with no week-2 slot -> counts nowhere
+    runs: [run("2026-06-01", "completed", 100), run("2026-06-09", "completed", 100)],
+  });
+  const w1 = res[0].weeks.find((w) => w.weekStart === "2026-06-01")!;
+  const w2 = res[0].weeks.find((w) => w.weekStart === "2026-06-08")!;
+  assert.equal(w1.planned, 1);
+  assert.equal(w1.completed, 1);
+  assert.equal(w1.pct, 100);
+  assert.equal(w2.planned, 0);
+  assert.equal(w2.completed, 0);
+  assert.equal(w2.pct, null);
+});
+
+test("computeAttendance 11: per-athlete isolation", () => {
+  const res = computeAttendance({
+    athleteIds: [1, 2],
+    periodWeekStarts: ["2026-06-01"],
+    today: "2026-06-10",
+    plannedSlots: [
+      { athleteId: 1, weekStart: "2026-06-01", dayOfWeek: 0, sessionTemplateId: 100 },
+      { athleteId: 2, weekStart: "2026-06-01", dayOfWeek: 0, sessionTemplateId: 200 },
+    ],
+    runs: [
+      // athlete 1 completes their session; athlete 2 does nothing
+      { athleteId: 1, sessionId: 100, status: "completed", startedAt: "2026-06-01T07:00:00Z", completedAt: "2026-06-01T08:00:00Z" },
+    ],
+  });
+  const a1 = res.find((a) => a.athleteId === 1)!;
+  const a2 = res.find((a) => a.athleteId === 2)!;
+  assert.equal(a1.weeks[0].completed, 1);
+  assert.equal(a1.weeks[0].pct, 100);
+  // athlete 1's run must NOT fill athlete 2's week
+  assert.equal(a2.weeks[0].planned, 1);
+  assert.equal(a2.weeks[0].completed, 0);
+  assert.equal(a2.weeks[0].pct, 0);
+});
