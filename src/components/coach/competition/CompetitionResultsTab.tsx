@@ -115,6 +115,16 @@ function NewBestBadge({ delta }: { delta: number | null }) {
   );
 }
 
+/** Temps qui ÉGALE le record perso (rang historique 1 sans amélioration stricte). */
+function TiedBestBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 dark:text-sky-400">
+      <Trophy className="h-3 w-3" aria-hidden />
+      Record égalé
+    </span>
+  );
+}
+
 function ObjectiveBadge({
   objective,
 }: {
@@ -220,15 +230,18 @@ function EventRow({
           {/* Verdict line */}
           <div className="flex flex-wrap items-center gap-1">
             {verdict?.isNewBest ? (
-              // Précédence : record perso masque le rang historique.
+              // Précédence : record perso (amélioration stricte) d'abord.
               <NewBestBadge delta={verdict.bestDelta} />
             ) : verdict?.isFirstEver ? (
               <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                1ʳᵉ perf
+                1ʳᵉ perf sur l&apos;épreuve
               </span>
+            ) : verdict?.historyRank === 1 ? (
+              // rang 1 sans amélioration stricte ⟺ temps égal au record perso.
+              <TiedBestBadge />
             ) : verdict?.historyRank != null ? (
               <span className="text-[10px] text-muted-foreground/60">
-                {verdict.historyRank}ᵉ perf all-time
+                {verdict.historyRank}ᵉ meilleur temps
               </span>
             ) : null}
 

@@ -48,6 +48,11 @@ Créés : `src/lib/liveffn/parseResults.ts` (142 l) + tests, `src/lib/competitio
 - **Nageurs non appariés** listés (pas écartés) → le coach voit qui n'a pas été lié.
 - Pas de rafraîchissement live ; un nouveau résultat liveffn nécessite un réimport.
 
+### Suivi terrain (2026-06-02)
+
+- **Détail compétition re-dérivé du query** (`CoachCompetitionsScreen`) : `detailComp` n'était qu'une capture → après enregistrement de l'URL / import, l'onglet Résultats (et Jour J) affichait l'état périmé. Corrigé en relisant la compétition courante depuis `["competitions"]`.
+- **Badge « Record égalé »** : un temps **égal** au record perso n'était pas une amélioration stricte (`<`) → il retombait sur le rang historique affiché « 1ᵉ perf all-time » (déroutant). Le rang 1 sans amélioration stricte ⟺ temps égal au record → badge dédié bleu « Record égalé » ; le rang ≥ 2 est reformulé « Nᵉ meilleur temps » ; « 1ʳᵉ perf » → « 1ʳᵉ perf sur l'épreuve ».
+
 ## §365 — Assiduité muscu + mésocycles dans « Planif Muscu » (2026-06-02)
 
 ### Contexte
