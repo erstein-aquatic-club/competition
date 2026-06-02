@@ -30,7 +30,7 @@ import {
   periodDays,
   type AttendanceDayStatus,
 } from '@/lib/strength/attendance';
-import { getMonday, toISODate } from '@/lib/date';
+import { addDaysIso, getMonday, toISODate } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -268,11 +268,11 @@ export default function StrengthAttendanceBoard() {
 
                   <div className="mt-2 space-y-3">
                     {row.weeks.map((wk) => {
+                      const end = addDaysIso(wk.weekStart, 6);
                       const weekDays = row.days
-                        .filter((d) => {
-                          const end = periodDays([wk.weekStart])[6];
-                          return d.date >= wk.weekStart && d.date <= end;
-                        })
+                        .filter(
+                          (d) => d.date >= wk.weekStart && d.date <= end,
+                        )
                         .sort((a, b) => a.date.localeCompare(b.date));
                       const hasPlan = wk.planned > 0;
                       const pct = wk.pct ?? 0;
