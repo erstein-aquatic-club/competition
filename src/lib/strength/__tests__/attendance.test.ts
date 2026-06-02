@@ -188,6 +188,35 @@ test("computeAttendance 10: multi-week isolation", () => {
   assert.equal(w2.pct, null);
 });
 
+test("computeAttendance 12: run straddling period start counts via completedAt", () => {
+  // Séance démarrée le dimanche AVANT la 1ère semaine mais terminée le lundi
+  // (dans la semaine). L'agrégateur bucketise un completed par completed_at,
+  // donc ce run doit compter pour la semaine et le jour de complétion.
+  // (Documente la sémantique que le fix API .or(started_at|completed_at) nourrit.)
+  const res = computeAttendance({
+    athleteIds: [1],
+    periodWeekStarts: ["2026-06-08"],
+    today: "2026-06-15",
+    plannedSlots: [
+      { athleteId: 1, weekStart: "2026-06-08", dayOfWeek: 0, sessionTemplateId: 100 },
+    ],
+    runs: [
+      {
+        athleteId: 1,
+        sessionId: 100,
+        status: "completed",
+        startedAt: "2026-06-07T22:00:00Z", // dimanche, avant fromISO
+        completedAt: "2026-06-08T06:00:00Z", // lundi, dans la semaine
+      },
+    ],
+  });
+  assert.equal(res[0].weeks[0].planned, 1);
+  assert.equal(res[0].weeks[0].completed, 1);
+  assert.equal(res[0].weeks[0].pct, 100);
+  const day = res[0].days.find((d) => d.date === "2026-06-08");
+  assert.equal(day?.status, "completed");
+});
+
 test("computeAttendance 11: per-athlete isolation", () => {
   const res = computeAttendance({
     athleteIds: [1, 2],

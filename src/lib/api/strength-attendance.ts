@@ -29,13 +29,28 @@ export async function getStrengthAttendanceData(
       .in("athlete_id", athleteIds)
       .in("week_start", weekStarts),
   );
+  // Fenêtre runs : on garde les runs qui chevauchent la période sur l'UNE OU
+  // l'AUTRE borne. L'agrégateur pur (src/lib/strength/attendance.ts, runDay)
+  // bucketise un run COMPLETED par completed_at — donc une séance démarrée le
+  // dimanche AVANT fromISO mais terminée sur fromISO doit être ramenée. La
+  // clause started_at couvre les runs in_progress (completed_at null), la
+  // clause completed_at rattrape les séances à cheval sur la borne. Sur-
+  // récupérer un peu est sans effet : l'agrégateur cape/filtre correctement.
+  //
+  // Convention de fenêtre : fromISO/toISO viennent du board via getMonday/
+  // toISODate en heure LOCALE, tandis que l'agrégateur bucketise par jour
+  // calendaire UTC du timestamp → une séance faite à ~1-2h de minuit local
+  // peut tomber un jour à côté dans la bande (accepté pour v1, documenté).
+  const upper = toISO + "T23:59:59";
   const runsRaw = assertSupabase(
     await supabase
       .from("strength_session_runs")
       .select("athlete_id, session_id, status, started_at, completed_at")
       .in("athlete_id", athleteIds)
-      .gte("started_at", fromISO)
-      .lte("started_at", toISO + "T23:59:59"),
+      .or(
+        `and(started_at.gte.${fromISO},started_at.lte.${upper}),` +
+        `and(completed_at.gte.${fromISO},completed_at.lte.${upper})`,
+      ),
   );
   const plannedSlots: AttendancePlannedSlot[] = ((slotsRaw ?? []) as any[]).map((s) => ({
     athleteId: s.athlete_id,
