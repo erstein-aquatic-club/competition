@@ -347,7 +347,7 @@ export function CompetitionStartlistPanel({
 
       const objectivesByUser: Record<
         number,
-        Array<{ event_code: string; target_time_seconds?: number | null }>
+        Array<{ event_code: string; pool_length?: number | null; target_time_seconds?: number | null }>
       > = {};
       for (const obj of objectives) {
         const numericId = uidToNumeric.get(obj.athlete_id);
@@ -355,6 +355,7 @@ export function CompetitionStartlistPanel({
         if (!obj.event_code) continue;
         (objectivesByUser[numericId] ??= []).push({
           event_code: obj.event_code,
+          pool_length: obj.pool_length ?? null,
           target_time_seconds: obj.target_time_seconds ?? null,
         });
       }

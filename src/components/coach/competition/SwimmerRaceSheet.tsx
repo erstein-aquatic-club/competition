@@ -4,7 +4,7 @@
  * Opened by tapping a LINKED swimmer's race row in the Jour J startlist. Shows,
  * for that swimmer + event:
  *   - their best time THIS SEASON (with date)
- *   - their best time ALL-TIME (with date)
+ *   - their record perso / best time ALL-TIME (with date)
  *   - the pace table (PaceMatrixInline) for their objective on that event.
  *
  * Pure presentational: all data (perfs, objectives, competition pool) is passed
@@ -153,7 +153,7 @@ export default function SwimmerRaceSheet({
 
                 <div className="rounded-lg bg-muted/40 p-3">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                    Best all-time
+                    Record perso
                   </p>
                   {allTimeBest ? (
                     <p className="mt-1 text-[15px] font-semibold tabular-nums leading-tight">
