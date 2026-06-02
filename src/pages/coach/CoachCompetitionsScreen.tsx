@@ -604,6 +604,7 @@ const CoachCompetitionsScreen = ({
   if (detailComp) {
     return (
       <CompetitionDetail
+        key={detailComp.id}
         competition={detailComp}
         initialTab={detailTab}
         onBack={closeDetail}

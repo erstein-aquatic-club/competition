@@ -366,9 +366,14 @@ export default function CompetitionResultsTab({
     return m;
   }, [candidates]);
 
-  // ── Active snapshot (prop, or the just-imported local copy) ──
-  const snapshot = competition.results_snapshot ?? localSnapshot;
-  const importedAt = competition.results_imported_at ?? localImportedAt;
+  // ── Active snapshot: the just-imported local copy wins over the prop. ──
+  // The prop only refreshes after the parent re-fetches ["competitions"]; on a
+  // re-import the (stale, still-truthy) prop would otherwise shadow the fresh
+  // local snapshot until that lands. Local-first is safe because this component
+  // is remounted per competition (CoachCompetitionsScreen keys it by id), so
+  // localSnapshot is never carried across competitions.
+  const snapshot = localSnapshot ?? competition.results_snapshot ?? null;
+  const importedAt = localImportedAt ?? competition.results_imported_at ?? null;
 
   // matched ids = distinct non-null values of the snapshot's athleteMap
   const matchedIds = useMemo(
