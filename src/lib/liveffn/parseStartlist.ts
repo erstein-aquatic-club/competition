@@ -64,7 +64,7 @@ export function parseTime(s: string): number | null {
 }
 
 /** Local copy of supabase/functions/_shared/ffn-parser.ts formatTimeDisplay (Deno code — do not import). */
-function formatTimeDisplay(seconds: number): string {
+export function formatTimeDisplay(seconds: number): string {
   const min = Math.floor(seconds / 60);
   const sec = Math.floor(seconds % 60);
   const cs = Math.round((seconds % 1) * 100);
