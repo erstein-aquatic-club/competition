@@ -4,6 +4,42 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §365 — Assiduité muscu + mésocycles dans « Planif Muscu » (2026-06-02)
+
+### Contexte
+
+Demande François : la fonction de génération des mésocycles muscu est mûre ; on veut (1) un **contrôle d'assiduité** très visible pour le coach (séances prévues vs réellement terminées, avec un état intermédiaire « débutée »), et (2) **sortir la liste des mésocycles du home coach** pour l'intégrer dans la vue « Planif Muscu », avec la même section que depuis le home. Objectif métier : **volume de la semaine toujours 100% réalisé**, même si l'emploi du temps impose un décalage (séance prévue lundi faite mardi). Scénario type : voir « Victoria, lundi vide → tu la fais mardi pour compenser ? ».
+
+Brainstorming + plan : `docs/plans/2026-06-01-assiduite-muscu-planif-design.md` et `…-assiduite-muscu-planif.md`.
+
+### Changements
+
+1. **Agrégateur pur `attendance.ts`** (`src/lib/strength/attendance.ts`, 193 l, **testé node:test**) : `computeAttendance` calcule, par nageur, des stats **par semaine ISO** (prévu/terminé/%) **tolérantes au décalage** (un slot lundi raté mais une séance faite mardi = semaine 100%) + un statut **par jour** (`completed`/`started`/`planned`/`shifted`/`todo`/`none`) pour la bande visuelle. Prévu = `strength_planning_slot_overrides` (semaine + jour + template) ; réalisé = `strength_session_runs` `completed` (filtré aux templates du méso, plafonné au prévu) ; débuté = runs `in_progress` (n'incrémente pas le %). Helpers `slotDate`/`periodDays`/`derivePeriodWeekStarts` (UTC-safe, période 1/2/4 semaines navigable). Invariant documenté : timestamps en UTC ISO.
+
+2. **Helper API batché** (`src/lib/api/strength-attendance.ts`, 54 l) : `getStrengthAttendanceData(athleteIds, weekStarts, fromISO, toISO)` — 2 `select` groupés `.in(athlete_id)` (lecture seule ; RLS coach/admin déjà permissive sur runs + slot_overrides → **aucune migration, aucun test RLS**).
+
+3. **`StrengthAttendanceBoard`** (`src/components/coach/strength/StrengthAttendanceBoard.tsx`, 357 l) : toggle **1/2/4 sem** (`ToggleGroup`) + flèches ◀ ▶ (droite désactivée à `offset ≥ 0`) + libellé période fr. Une carte par nageur : **jauge `terminées/prévues` par semaine** + **bande 7 pastilles Lun→Dim** (🟢 terminé / 🟠 débuté / ⭕ rose à faire / ◌ pointillé déplacée / violet prévu), tooltip date+statut, légende inline. États skeleton + vide « Aucun mésocycle actif ».
+
+4. **`CoachMesocyclesAccordion`** (`src/components/coach/strength/CoachMesocyclesAccordion.tsx`, 142 l) : liste accordéon des mésocycles actifs (réutilise le vocabulaire visuel carte violette) ; single-open ; **lazy mount** du `CoachMesocyclePanel` (monté seulement quand l'item est ouvert → évite N requêtes).
+
+5. **Refonte `StrengthPlanningScreen`** (721 → 47 l) : corps = `<StrengthAttendanceBoard/>` + `<CoachMesocyclesAccordion/>` ; ancien aperçu hebdo read-only (sélecteurs groupe/nageur, timeline `training_plan_applications`, `MyPlanTab`) retiré (modules partagés conservés, utilisés ailleurs).
+
+6. **Home coach allégé** : `<CoachActiveMesocyclesSection />` retiré de `Coach.tsx` et **fichier supprimé** ; sa constante `COACH_SWIMMER_INITIAL_TAB_KEY` relocalisée dans `src/lib/coachNav.ts` (2 l) et `CoachSwimmerFullView` recâblé pour l'importer (au lieu de littéraux en dur).
+
+### Fichiers
+
+Créés : `src/lib/strength/attendance.ts` (193 l) + `__tests__/attendance.test.ts` (18 tests), `src/lib/api/strength-attendance.ts` (54 l), `src/components/coach/strength/StrengthAttendanceBoard.tsx` (357 l), `src/components/coach/strength/CoachMesocyclesAccordion.tsx` (142 l), `src/lib/coachNav.ts` (2 l). Modifiés : `src/pages/coach/StrengthPlanningScreen.tsx` (721→47 l), `src/lib/api/index.ts` (re-export), `src/pages/Coach.tsx` (retrait section), `src/pages/coach/CoachSwimmerFullView.tsx` (import constante). Supprimé : `src/components/coach/CoachActiveMesocyclesSection.tsx`.
+
+### Tests / vérifs
+
+`attendance` 18 node:test (helpers + matching + décalage + plafonnement + multi-semaine/multi-athlète + sessionId null) ; suite complète : **vitest 71/71**, node:test verts, `tsc --noEmit` 0, `npm run lint` 0 erreur, `npm run build` OK. **Pas de `test:rls`** (lecture seule, RLS déjà permissive). Exécution subagent-driven (implémenteur + revues spec/qualité par tâche).
+
+### Décisions / limites
+
+- % calculé **à la semaine** (décalage toléré) ; « débutée » ne compte pas dans le % (état intermédiaire orange) ; périmètre = **nageurs à mésocycle actif** uniquement ; v1 **lecture seule** (le coach relance le nageur de vive voix — pas de notif/excused). Différé documenté : relance push, marquage « excusée », nageurs sans méso.
+- Le statut jour `shifted` est une heuristique « semaine atteinte → ce slot a été travaillé un autre jour », pas un suivi de déplacement par séance.
+- ⚠️ Working tree partagé : chantier livré sur branche `feat/assiduite-muscu-planif` ; § renuméroté §364→**§365** (§364 réservé par le terminal liveffn « Résultats club »).
+
 ## §363 — Jour J détail nageur (allures + meilleurs temps) + Paramètres v2 (bassin) (2026-06-01)
 
 ### Contexte
