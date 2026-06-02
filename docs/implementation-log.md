@@ -4,6 +4,50 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §364 — Synthèse Résultats club (liveffn) (2026-06-02)
+
+### Contexte
+
+Demande François : après le Jour J (liste de départ liveffn, §361-§363), exploiter la page liveffn **« Résultats par structure »** d'une compétition pour produire une **synthèse résultats club** par nageur : classement/place, finale A/B/C qualifiée, nouveau record perso, atteinte de l'objectif, et un rang historique en repli. Décision d'architecture : on **importe** la page Résultats dans un **snapshot par compétition** (affichage figé, pas de refetch live), et les **verdicts sont calculés au rendu** depuis notre propre base (perfs + objectifs), bassin-aware. Le snapshot est **display-only** : il **n'écrit pas** `swimmer_performances` (pas de mélange avec le flux FFN officiel).
+
+Brainstorming + plan : `docs/plans/2026-06-02-competition-results-synthesis-design.md` et `…-competition-results-synthesis.md`.
+
+### Changements
+
+1. **Migration 00224** : `competitions` += `liveffn_results_url` (text), `results_snapshot` (jsonb), `results_imported_at` (timestamptz). Colonnes **additives**, aucune policy modifiée. Types : `ResultsSnapshot` / `ResultsSnapshotSwimmer` / `ResultsSnapshotRace` + helpers API `fetchResultsHtml` / `saveResultsSnapshot`.
+
+2. **DRY parseStartlist** : `clean` / `extractCell` / `parseInteger` / `parseSwimmerHeading` exportés depuis `parseStartlist.ts` pour réutilisation par le parseur Résultats.
+
+3. **Parseur `parseResults.ts`** (DOM-free, regex) — html→nageurs+courses : place, phase (finale A/B/C ou série), temps, points, splits. Durci : bornage de ligne (`row-bounding`), garde temps (`time-guard`), `timeDisplay` normalisé via `formatTimeDisplay`, gestion du label « Finale » nu. Fixture de test `resultats-93727-118.html`.
+
+4. **Verdicts purs `resultVerdicts.ts`** — `collapseByEvent` (repli des phases d'une même épreuve, place de finale prioritaire) + `eventVerdict` (record perso / atteinte objectif / rang historique en repli ; **bassin-aware**). Pont de normalisation **event_code** : `swimmer_performances` stocke les libellés d'affichage FFN (« 50 NL ») alors que `parseResults` produit la forme compacte (« 50NL ») → normalisation via `eventCodeFromFfnName`.
+
+5. **Synthèse `resultsSynthesis.ts`** — `buildResultsSynthesis` pur → totaux (records / podiums / finales A / objectifs) + résultats par nageur (events + verdicts). **Stats de place comptées sur TOUS les nageurs** du snapshot, **stats base (record/objectif) sur les nageurs LIÉS** uniquement.
+
+6. **Réutilisation Edge Function** : `liveffn-startlist` étend son allowlist pour accepter aussi `resultats.php` (Résultats club) — **aucune nouvelle fonction** ; `verify_jwt=false` conservé, accès coach/admin. Déployée **v5**.
+
+7. **UI `CompetitionResultsTab.tsx`** — onglet « Résultats » : import du snapshot (« Importer / Réimporter »), en-tête de tuiles de stats, cartes par nageur avec badges verdict (record / objectif / finale / rang) + splits dépliables inline. Réutilise `matchSwimmers` / `startlist_athlete_map` (liaison nageur) et `seasonBest`.
+
+8. **`CompetitionDetail.tsx`** : ajout d'un **4ᵉ onglet « Résultats »** + champ « Lien liveffn Résultats » dans l'onglet Paramètres.
+
+### Fichiers
+
+Créés : `src/lib/liveffn/parseResults.ts` (142 l) + tests, `src/lib/competitions/resultVerdicts.ts` (135 l) + tests, `src/components/coach/competition/resultsSynthesis.ts` (125 l) + tests, `src/components/coach/competition/CompetitionResultsTab.tsx` (620 l), fixture `resultats-93727-118.html`. Modifiés : `src/components/coach/competition/CompetitionDetail.tsx` (723→752 l, 4 onglets), `src/lib/liveffn/parseStartlist.ts` (154 l, helpers exportés), `src/lib/api/*` (types `ResultsSnapshot…` + `fetchResultsHtml` / `saveResultsSnapshot`), edge fn `liveffn-startlist` (allowlist `resultats.php`), mig **00224**.
+
+### Tests / vérifs
+
+`parseResults` 10/10, `resultVerdicts` 10/10, `resultsSynthesis` 9/9, frère `parseStartlist` 5/5 ; suite complète **node:test 1636 + vitest 71** (0 échec), `tsc --noEmit` 0, `npm run lint` clean, `npm run build` OK. **Pas de `test:rls`** (migration = colonnes additives, policies inchangées).
+
+### Décisions / limites
+
+- **Snapshot vs live** : import figé (pas de rafraîchissement live) — réimport manuel pour mettre à jour.
+- **Display-only** : le snapshot **n'écrit jamais** `swimmer_performances` (pas de pollution du flux FFN officiel).
+- **Verdicts au rendu** : calculés à partir de notre base (perfs + objectifs), bassin-aware → reflètent toujours l'état courant de la base.
+- `clubName` reconnu uniquement « \* AQUATIC CLUB ».
+- Détection des finales dépend du **label liveffn** (si liveffn change son libellé, repli sur série).
+- **Nageurs non appariés** listés (pas écartés) → le coach voit qui n'a pas été lié.
+- Pas de rafraîchissement live ; un nouveau résultat liveffn nécessite un réimport.
+
 ## §365 — Assiduité muscu + mésocycles dans « Planif Muscu » (2026-06-02)
 
 ### Contexte
