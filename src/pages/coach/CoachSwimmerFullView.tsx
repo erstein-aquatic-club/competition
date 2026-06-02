@@ -14,6 +14,7 @@ import {
   getActiveMesocycle,
 } from "@/lib/api";
 import { nextBilanStep } from "@/lib/strength/bilanProgress";
+import { COACH_SWIMMER_INITIAL_TAB_KEY } from "@/lib/coachNav";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -81,9 +82,9 @@ export default function CoachSwimmerFullView({
     if (typeof window === "undefined") return "resume";
     try {
       const initial = window.sessionStorage.getItem(
-        "eac_coach_swimmer_initial_tab",
+        COACH_SWIMMER_INITIAL_TAB_KEY,
       );
-      window.sessionStorage.removeItem("eac_coach_swimmer_initial_tab");
+      window.sessionStorage.removeItem(COACH_SWIMMER_INITIAL_TAB_KEY);
       if (
         initial === "planning" ||
         initial === "echanges" ||
