@@ -392,7 +392,7 @@ export interface MesocycleInput {
   targetWeekCount: number;
   /** Nombre de séances par semaine (relu de l'évaluation, ajustable). */
   sessionsPerWeek: number;
-  /** Jours muscu cochés (0=Lun…6=Dim), triés, sans samedi(5). Si absent → mode legacy. */
+  /** Jours muscu cochés (0=Lun…6=Dim), triés. Si absent → mode legacy. */
   weekdays?: number[];
   /** Sous-ensemble de weekdays en amorce PAP. Défaut: {0,3} ∩ weekdays. */
   primerWeekdays?: number[];
