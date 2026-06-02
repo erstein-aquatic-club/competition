@@ -521,7 +521,7 @@ export default function CompetitionDetail({
                   Dates
                 </span>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <label htmlFor="comp-date" className="pl-0.5 text-[10px] text-muted-foreground/60">
                       Début
                     </label>
@@ -530,10 +530,10 @@ export default function CompetitionDetail({
                       type="date"
                       value={date}
                       onChange={(e) => handleStartChange(e.target.value)}
-                      className={cn(dateCls, "tabular-nums")}
+                      className={cn(dateCls, "min-w-0 tabular-nums")}
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <label htmlFor="comp-end-date" className="pl-0.5 text-[10px] text-muted-foreground/60">
                       Fin
                     </label>
@@ -543,7 +543,7 @@ export default function CompetitionDetail({
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       min={date || undefined}
-                      className={cn(dateCls, "tabular-nums")}
+                      className={cn(dateCls, "min-w-0 tabular-nums")}
                     />
                   </div>
                 </div>

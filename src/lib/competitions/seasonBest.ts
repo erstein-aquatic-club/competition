@@ -15,14 +15,19 @@ type Perf = {
   competition_date?: string | null;
 };
 
-/** Best perf for a compact event code, optionally within a date window (>= fromDate). */
+/**
+ * Best perf for a compact event code, optionally within a date window (>= fromDate)
+ * and/or restricted to a basin (poolLength = 25 or 50). When poolLength is given,
+ * performances swum in another basin are ignored — so a 50 m competition shows the
+ * swimmer's 50 m best, not a faster 25 m time.
+ */
 export function bestForEvent(
   perfs: Perf[],
   eventCode: string,
-  opts?: { fromDate?: string },
+  opts?: { fromDate?: string; poolLength?: number | null },
 ): { time: number; date: string | null } | null {
   const scoped = opts?.fromDate
     ? perfs.filter((p) => (p.competition_date ?? "") >= opts.fromDate!)
     : perfs;
-  return findBestPerformance(scoped, eventCode);
+  return findBestPerformance(scoped, eventCode, opts?.poolLength ?? undefined);
 }

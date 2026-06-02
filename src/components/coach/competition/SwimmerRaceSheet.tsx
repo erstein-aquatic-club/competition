@@ -72,17 +72,25 @@ export default function SwimmerRaceSheet({
   const todayIso = new Date().toISOString().slice(0, 10);
 
   // ── Times (all hooks unconditional, defensive on row?.) ──
+  // Restrict the bests to the competition basin so a 50 m meet shows 50 m times
+  // (not a faster 25 m PB). When the basin is unset, show the all-basin best.
   const seasonBest = useMemo(
     () =>
       row?.eventCode
-        ? bestForEvent(perfs, row.eventCode, { fromDate: currentSeasonStart(todayIso) })
+        ? bestForEvent(perfs, row.eventCode, {
+            fromDate: currentSeasonStart(todayIso),
+            poolLength: competitionPoolLength,
+          })
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [perfs, row?.eventCode],
+    [perfs, row?.eventCode, competitionPoolLength],
   );
   const allTimeBest = useMemo(
-    () => (row?.eventCode ? bestForEvent(perfs, row.eventCode) : null),
-    [perfs, row?.eventCode],
+    () =>
+      row?.eventCode
+        ? bestForEvent(perfs, row.eventCode, { poolLength: competitionPoolLength })
+        : null,
+    [perfs, row?.eventCode, competitionPoolLength],
   );
 
   // ── Pace target (competition bassin wins over the objective pool) ──
@@ -132,7 +140,14 @@ export default function SwimmerRaceSheet({
             </SheetHeader>
 
             {row.eventCode && (
-              <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <>
+              <p className="mt-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                Meilleurs temps{" "}
+                {competitionPoolLength != null
+                  ? `· bassin ${competitionPoolLength} m`
+                  : "· toutes piscines"}
+              </p>
+              <div className="mt-1.5 grid grid-cols-2 gap-2.5">
                 <div className="rounded-lg bg-muted/40 p-3">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                     Meilleur temps saison
@@ -169,6 +184,7 @@ export default function SwimmerRaceSheet({
                   )}
                 </div>
               </div>
+              </>
             )}
 
             <div className="mt-5">
