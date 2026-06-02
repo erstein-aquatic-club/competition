@@ -2,15 +2,14 @@
  * CoachMesocyclesAccordion — liste accordéon des mésocycles muscu actifs du
  * club (Task 6, refonte écran "Planif Muscu").
  *
- * Contrairement à `CoachActiveMesocyclesSection` (hub coach) qui navigue vers
- * la fiche nageur au tap, cet accordéon DÉPLIE le panel coach en place. Un
- * seul item ouvert à la fois (single-open) pour éviter de monter N panels
- * lourds simultanément — le `CoachMesocyclePanel` n'est monté que quand son
- * item est ouvert (lazy mount, évite N requêtes au montage).
+ * Cet accordéon DÉPLIE le panel coach en place (au lieu de naviguer vers la
+ * fiche nageur). Un seul item ouvert à la fois (single-open) pour éviter de
+ * monter N panels lourds simultanément — le `CoachMesocyclePanel` n'est monté
+ * que quand son item est ouvert (lazy mount, évite N requêtes au montage).
  *
- * Réutilise le vocabulaire visuel de `CoachActiveMesocyclesSection` :
- * carte violette, icône Activity, méta mono ligne "event · saison/mini-prépa
- * · N sem · N/sem · généré le dd mois".
+ * Carte violette, icône Activity, méta mono ligne "event · saison/mini-prépa
+ * · N sem · N/sem · généré le dd mois" (l'ancienne section du hub coach a été
+ * retirée au profit de cet écran — §364).
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
