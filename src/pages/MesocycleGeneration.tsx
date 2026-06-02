@@ -475,9 +475,8 @@ export default function MesocycleGeneration() {
     navigate("/strength/mesocycle-preview");
   }
 
-  /** Coche/décoche un jour muscu (samedi ignoré). §307. */
+  /** Coche/décoche un jour muscu. §307. */
   function toggleWeekday(d: number) {
-    if (d === SATURDAY) return;
     setWeekdays((prev) => {
       const base = prev ?? [];
       const next = base.includes(d)
@@ -757,7 +756,7 @@ export default function MesocycleGeneration() {
         <SectionCard
           number="05"
           title="Jours de muscu"
-          subtitle="Coche tes jours. Lun & Jeu = amorce avant le sprint bassin ; les autres développent la force. Pas de muscu le samedi."
+          subtitle="Coche tes jours. Lun & Jeu = amorce avant le sprint bassin ; les autres développent la force."
           enabled={stroke != null && distance != null && kind != null && weeks != null}
           active={
             stroke != null &&
@@ -1066,7 +1065,6 @@ interface WeekdayPickerProps {
 
 /**
  * Rangée de 7 boutons jour (Lun…Dim). §307.
- *  - Samedi (5) désactivé (pas de muscu le samedi).
  *  - Jour d'amorce coché (Lun/Jeu) → ambre ; jour de dev coché → violet.
  *  - Légende des rôles présents + avertissement sprint sans jour de dev.
  */
@@ -1082,7 +1080,6 @@ function WeekdayPicker({
     <div className="space-y-3">
       <div className="grid grid-cols-7 gap-1.5">
         {WEEKDAY_LABELS.map((label, d) => {
-          const isSaturday = d === SATURDAY;
           const selected = set.has(d);
           const primer = isPrimerWeekday(d);
           return (
@@ -1091,30 +1088,21 @@ function WeekdayPicker({
               type="button"
               role="checkbox"
               aria-checked={selected}
-              aria-disabled={isSaturday}
               aria-label={
-                isSaturday
-                  ? `${label} — pas de muscu le samedi`
-                  : primer
-                    ? `${label} — jour d'amorce`
-                    : `${label} — jour de développement`
+                primer
+                  ? `${label} — jour d'amorce`
+                  : `${label} — jour de développement`
               }
-              disabled={isSaturday}
               onClick={() => onToggle(d)}
               className={cn(
                 "flex min-h-[48px] flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-xs font-semibold transition-colors",
-                isSaturday &&
-                  "cursor-not-allowed border-dashed border-border bg-muted/30 text-muted-foreground/50 line-through opacity-50",
-                !isSaturday &&
-                  selected &&
+                selected &&
                   primer &&
                   "border-amber-500 bg-amber-500 text-white shadow-sm dark:border-amber-400 dark:bg-amber-400",
-                !isSaturday &&
-                  selected &&
+                selected &&
                   !primer &&
                   "border-violet-600 bg-violet-600 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500",
-                !isSaturday &&
-                  !selected &&
+                !selected &&
                   "border-border bg-card hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30",
               )}
             >
