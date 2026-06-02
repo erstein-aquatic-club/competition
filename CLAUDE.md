@@ -78,7 +78,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§362** — refonte UX module compétitions (détail 3 onglets, timeline hero, tuile hub).
+Dernier § livré : **§363** — Jour J détail nageur (allures + temps saison/record) + Paramètres v2 (bassin).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

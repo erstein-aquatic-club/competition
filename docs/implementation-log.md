@@ -4,6 +4,52 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §363 — Jour J détail nageur (allures + meilleurs temps) + Paramètres v2 (bassin) (2026-06-01)
+
+### Contexte
+
+Retour terrain François, 3 retours après §362 (refonte UX Compétitions).
+
+### Changements
+
+1. **Fix tuile « Échéances »** (`src/pages/Coach.tsx`) — elle ouvrait directement une compétition au lieu de la timeline ; désormais elle ouvre la **timeline complète** (le hero y met la prochaine compé en avant), tout en gardant l'aperçu nom + J-X ; deep-link direct retiré de la tuile (les cartes de la timeline gardent le leur).
+
+2. Migration **00223** `competitions.pool_length` (bassin 25/50 m, nullable) + types.
+
+3. **Onglet Paramètres v2** (`src/components/coach/competition/CompetitionDetail.tsx`, 723 l) — re-layout en 3 sections (Infos / Liste de départ / Zone danger) + **sélecteur bassin** (25 m / 50 m / —) persisté en `pool_length`.
+
+4. **`SwimmerRaceSheet`** (nouveau, `src/components/coach/competition/SwimmerRaceSheet.tsx`, 199 l) — **bottom sheet** au clic d'un nageur LIÉ en Jour J : **meilleur temps saison** (depuis 1er sept FFN) + **record perso** (best all-time), avec dates, + **tableau d'allures** (`PaceMatrixInline` réutilisé) pour l'objectif du nageur ; bassin des allures = **bassin de la compétition** (fallback objectif). Lignes Jour J rendues **tactiles** (`src/components/coach/CompetitionStartlist.tsx`, 616 l). Aucun fetch supplémentaire (réutilise les données déjà chargées dans le panneau).
+
+5. **2 helpers purs testés** : `currentSeasonStart` + `bestForEvent` (`src/lib/competitions/seasonBest.ts`, 28 l) ; `userId` exposé sur `StartlistRow`.
+
+### Fichiers
+
+- `src/pages/Coach.tsx` — tuile « Échéances » ouvre la timeline (deep-link direct retiré, aperçu nom + J-X conservé)
+- `src/components/coach/competition/CompetitionDetail.tsx` (723 l) — onglet Paramètres v2 (3 sections) + sélecteur bassin `pool_length`
+- `src/components/coach/competition/SwimmerRaceSheet.tsx` (nouveau, 199 l) — bottom sheet détail nageur Jour J (best saison/record perso + tableau d'allures)
+- `src/components/coach/CompetitionStartlist.tsx` (616 l) — lignes Jour J tactiles → `SwimmerRaceSheet`, `userId` exposé sur `StartlistRow`
+- `src/lib/competitions/seasonBest.ts` (nouveau, 28 l) — `currentSeasonStart` + `bestForEvent`
+- mig **00223** `competitions.pool_length`
+
+### Tests / vérifs
+
+- **5 nouveaux `node:test`** : `seasonBest` 4 (`currentSeasonStart` + `bestForEvent`) + `userId`-row 1.
+- Suite complète : node:test **1587** pass, vitest **71** pass, tsc **0**, lint **0 erreur**.
+- Migration via MCP. **Pas de `test:rls`** (pas de RLS).
+
+### Décisions clés
+
+- Best **saison** vs **record perso** (all-time).
+- Le **bassin de la compétition** pilote le bassin du tableau d'allures (fallback bassin de l'objectif).
+- Réutilise `PaceMatrixInline` / `parseObjectiveForPace` / `findBestPerformance` ; aucun fetch ajouté.
+
+### Limites / ouvert
+
+- `swimmerSex` passé `null` (non exposé dans `AthleteSummary`) → matrice non sexo-spécifique.
+- Best par bassin (25 vs 50) écarté (saison vs all-time).
+- Vérif end-to-end live post-déploiement github.io.
+- Design : `docs/plans/2026-06-01-jourj-detail-params-v2-design.md` ; plan : `docs/plans/2026-06-01-jourj-detail-params-v2.md`.
+
 ## §362 — Refonte UX module Compétitions (3 workflows coach) (2026-06-01)
 
 ### Contexte
