@@ -3,7 +3,7 @@
  */
 
 import { supabase, canUseSupabase, assertSupabase } from "./client";
-import type { Competition, CompetitionInput, CompetitionAssignment } from "./types";
+import type { Competition, CompetitionInput, CompetitionAssignment, ResultsSnapshot } from "./types";
 
 export async function getCompetitions(): Promise<Competition[]> {
   if (!canUseSupabase()) return [];
@@ -113,4 +113,34 @@ export async function fetchStartlistHtml(url: string): Promise<string> {
   }
   if (!data?.html) throw new Error(data?.error ?? "Réponse vide");
   return data.html as string;
+}
+
+export async function fetchResultsHtml(url: string): Promise<string> {
+  // Identique à fetchStartlistHtml : même edge fn générique (une tâche ultérieure élargit l'allowlist).
+  if (!canUseSupabase()) throw new Error("Supabase non configuré");
+  const { data, error } = await supabase.functions.invoke("liveffn-startlist", { body: { url } });
+  if (error) {
+    let detail: string | null = null;
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      try { detail = ((await ctx.clone().json()) as { error?: string })?.error ?? null; } catch { /* not JSON */ }
+    }
+    throw new Error(detail ?? error.message);
+  }
+  if (!data?.html) throw new Error(data?.error ?? "Réponse vide");
+  return data.html as string;
+}
+
+export async function saveResultsSnapshot(
+  competitionId: string,
+  url: string,
+  snapshot: ResultsSnapshot,
+  importedAtIso: string,
+): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase non configuré");
+  assertSupabase(
+    await supabase.from("competitions")
+      .update({ liveffn_results_url: url, results_snapshot: snapshot, results_imported_at: importedAtIso })
+      .eq("id", competitionId),
+  );
 }

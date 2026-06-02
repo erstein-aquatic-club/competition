@@ -520,6 +520,9 @@ export interface Competition {
   liveffn_startlist_url?: string | null;
   startlist_athlete_map?: Record<string, number | null> | null;
   pool_length?: number | null;
+  liveffn_results_url?: string | null;
+  results_snapshot?: ResultsSnapshot | null;
+  results_imported_at?: string | null;
 }
 
 export interface CompetitionInput {
@@ -531,6 +534,33 @@ export interface CompetitionInput {
   liveffn_startlist_url?: string | null;
   startlist_athlete_map?: Record<string, number | null> | null;
   pool_length?: number | null;
+  liveffn_results_url?: string | null;
+}
+
+/** Snapshot BRUT des résultats liveffn (display-only — voir §364). */
+export interface ResultsSnapshot {
+  structureCode: string | null;
+  clubName: string | null;
+  /** Carte clé-nageur (startlistKey) → user_id app, figée à l'import. */
+  athleteMap: Record<string, number | null>;
+  swimmers: ResultsSnapshotSwimmer[];
+}
+export interface ResultsSnapshotSwimmer {
+  key: string;        // startlistKey
+  lastName: string;
+  firstName: string;
+  birthYear: number | null;
+  races: ResultsSnapshotRace[];
+}
+export interface ResultsSnapshotRace {
+  rawEvent: string;                 // "50 Nage Libre Messieurs Séries"
+  eventCode: string | null;         // compact, base sans genre/phase
+  phase: "series" | "finaleA" | "finaleB" | "finaleC" | "demi" | "unknown";
+  place: number | null;
+  timeSeconds: number | null;
+  timeDisplay: string;
+  points: number | null;
+  splits: { distance: string; cumulative: string; lap: string }[];
 }
 
 export interface CompetitionAssignment {
