@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Target, AlertTriangle, RefreshCw, Link2Off } from "lucide-react";
+import { Loader2, Target, AlertTriangle, RefreshCw, Link2Off, ChevronRight } from "lucide-react";
 
 import {
   fetchStartlistHtml,
@@ -38,6 +38,7 @@ import {
   type StartlistRow,
 } from "@/lib/liveffn/buildStartlistRows";
 import { formatTime, strokeFromCode, STROKE_COLORS } from "@/lib/objectiveHelpers";
+import SwimmerRaceSheet from "@/components/coach/competition/SwimmerRaceSheet";
 
 import {
   Sheet,
@@ -124,23 +125,19 @@ function RaceRow({
   row,
   index,
   showSwimmer,
+  onOpen,
 }: {
   row: StartlistRow;
   index: number;
   showSwimmer: boolean;
+  onOpen?: (row: StartlistRow) => void;
 }) {
   const stroke = row.eventCode ? strokeFromCode(row.eventCode) : null;
   const accent = stroke ? STROKE_COLORS[stroke] ?? "border-l-muted-foreground/20" : "border-l-muted-foreground/20";
+  const tappable = row.userId != null;
 
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-2.5 rounded-lg border border-border/60 border-l-4 bg-card px-2.5 py-1.5",
-        "animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none fill-mode-both",
-        accent,
-      )}
-      style={{ animationDelay: `${Math.min(index, 12) * 25}ms` }}
-    >
+  const inner = (
+    <>
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-baseline gap-1.5 min-w-0">
           <span className="text-[13px] font-semibold truncate leading-tight">
@@ -193,6 +190,43 @@ function RaceRow({
           <p className="text-[10px] text-muted-foreground/30 leading-tight">—</p>
         ) : null}
       </div>
+
+      {tappable && (
+        <ChevronRight
+          className="h-4 w-4 shrink-0 self-center text-muted-foreground/40"
+          aria-hidden
+        />
+      )}
+    </>
+  );
+
+  const rowClass = cn(
+    "flex w-full items-start gap-2.5 rounded-lg border border-border/60 border-l-4 bg-card px-2.5 py-1.5 text-left",
+    "animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none fill-mode-both",
+    accent,
+  );
+  const rowStyle = { animationDelay: `${Math.min(index, 12) * 25}ms` };
+
+  if (tappable) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen?.(row)}
+        className={cn(
+          rowClass,
+          "min-h-[44px] transition-colors hover:bg-accent/40 active:bg-accent/60",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        )}
+        style={rowStyle}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div className={rowClass} style={rowStyle}>
+      {inner}
     </div>
   );
 }
@@ -220,6 +254,8 @@ export function CompetitionStartlistPanel({
   const [shouldFetch, setShouldFetch] = useState<boolean>(
     !!competition.liveffn_startlist_url,
   );
+  // Selected row for the Jour J detail bottom sheet (null = closed).
+  const [sheetRow, setSheetRow] = useState<StartlistRow | null>(null);
 
   const savedUrl = competition.liveffn_startlist_url ?? "";
   const urlValid = isValidStartlistUrl(savedUrl);
@@ -498,7 +534,13 @@ export function CompetitionStartlistPanel({
                         </div>
                         <div className="space-y-1">
                           {group.rows.map((row, i) => (
-                            <RaceRow key={row.key} row={row} index={i} showSwimmer={false} />
+                            <RaceRow
+                              key={row.key}
+                              row={row}
+                              index={i}
+                              showSwimmer={false}
+                              onOpen={setSheetRow}
+                            />
                           ))}
                         </div>
                       </div>
@@ -511,12 +553,38 @@ export function CompetitionStartlistPanel({
               {view === "chrono" && (
                 <div className="space-y-1">
                   {chrono.map((row, i) => (
-                    <RaceRow key={row.key} row={row} index={i} showSwimmer />
+                    <RaceRow
+                      key={row.key}
+                      row={row}
+                      index={i}
+                      showSwimmer
+                      onOpen={setSheetRow}
+                    />
                   ))}
                 </div>
               )}
             </div>
       )}
+
+      {/* ── Jour J race detail bottom sheet (data already loaded above) ── */}
+      <SwimmerRaceSheet
+        open={!!sheetRow}
+        onOpenChange={(o) => {
+          if (!o) setSheetRow(null);
+        }}
+        row={sheetRow}
+        perfs={
+          sheetRow?.userId != null
+            ? (enrichmentQuery.data?.perfsByUser[sheetRow.userId] ?? [])
+            : []
+        }
+        objectives={
+          sheetRow?.userId != null
+            ? (enrichmentQuery.data?.objectivesByUser[sheetRow.userId] ?? [])
+            : []
+        }
+        competitionPoolLength={competition.pool_length ?? null}
+      />
     </div>
   );
 }
