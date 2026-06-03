@@ -12,6 +12,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { estimateOneRM } from "@/lib/prDetection";
 import { suggestNextLoad } from "@/lib/strength/oneRmCalibration";
 import type { ReloadAppetite } from "@/lib/strength/oneRmCalibration";
 
@@ -44,6 +45,16 @@ const APPETITE_OPTIONS: Array<{ value: ReloadAppetite; label: string }> = [
   { value: "little", label: "un peu" },
   { value: "medium", label: "moyen" },
   { value: "lot", label: "beaucoup" },
+];
+
+// Reps en réserve (RIR) de la série de travail. « 4+ » plafonne à rir=4
+// (cohérent avec le cap de difficultyToRIR / estimateOneRM).
+const RIR_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 0, label: "0" },
+  { value: 1, label: "1" },
+  { value: 2, label: "2" },
+  { value: 3, label: "3" },
+  { value: 4, label: "4+" },
 ];
 
 /** Bouton rond sélectionnable, tap-friendly (mains mouillées au bord du bassin). */
@@ -97,8 +108,13 @@ export function OneRmDiscoveryWizard({
   // Historique des paliers validés (chips), uniquement à des fins d'affichage.
   const [warmupHistory, setWarmupHistory] = useState<number[]>([]);
 
-  // Réfère onComputed (utilisé en étape C / Task 7) sans le laisser inutilisé.
-  void onComputed;
+  // ── Série de travail (étape C / Task 7). ──
+  // Charge effective de la série (éditable, peut être pré-remplie depuis le dernier palier).
+  const [workWeight, setWorkWeight] = useState<string>("");
+  // Reps effectuées sur la série de travail.
+  const [workReps, setWorkReps] = useState<string>("");
+  // Reps en réserve (RIR) déclarées par le nageur. null = pas encore choisi.
+  const [workRir, setWorkRir] = useState<number | null>(null);
 
   // CTA bloqué tant que la douleur n'est pas répondue, ou si douleur=oui (branche sécurité).
   const blockAdvance = pain == null || pain === true;
@@ -129,17 +145,108 @@ export function OneRmDiscoveryWizard({
     computeSuggestionInto(recorded ?? lastPalierLoad);
   }
 
-  // ── Étape série de travail (placeholder — calcul 1RM = Task 7). ──
+  // ── Étape série de travail : charge + reps + RIR → calcul 1RM (Task 7). ──
   if (step === "working") {
+    const weightNum = Number.parseFloat(workWeight);
+    const repsNum = Number.parseFloat(workReps);
+    const weightOk = Number.isFinite(weightNum) && weightNum > 0;
+    const repsOk = Number.isFinite(repsNum) && repsNum > 0;
+    const canCompute = weightOk && repsOk && workRir != null;
+
+    function computeOneRm() {
+      if (!weightOk || !repsOk || workRir == null) return;
+      const oneRm = estimateOneRM(weightNum, repsNum, { rir: workRir });
+      onComputed(oneRm, {
+        weight: weightNum,
+        reps: repsNum,
+        rir: workRir,
+        pain: pain === true,
+      });
+    }
+
     return (
       <Card className="space-y-4 p-4">
         <div className="space-y-1">
           <h3 className="text-base font-semibold tracking-tight">{exerciseName}</h3>
           <p className="text-sm text-muted-foreground">
-            Série de travail : exécute la série effective, puis renseigne reps et RIR
-            (calcul de la 1RM à venir).
+            Série de travail : exécute une série propre sans chercher l'échec, puis
+            renseigne la charge, les reps réalisées et tes reps en réserve.
           </p>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <label htmlFor="working-charge" className="text-sm font-medium">
+              Charge (kg)
+            </label>
+            <Input
+              id="working-charge"
+              aria-label="Charge (kg)"
+              type="number"
+              inputMode="decimal"
+              step="2.5"
+              className="h-11"
+              value={workWeight}
+              onChange={(e) => setWorkWeight(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="working-reps" className="text-sm font-medium">
+              Reps effectuées
+            </label>
+            <Input
+              id="working-reps"
+              aria-label="Reps effectuées"
+              type="number"
+              inputMode="numeric"
+              step="1"
+              className="h-11"
+              value={workReps}
+              onChange={(e) => setWorkReps(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-sm font-medium">Reps en réserve (RIR)</span>
+          <div className="flex gap-2">
+            {RIR_OPTIONS.map((opt) => (
+              <PillButton
+                key={opt.value}
+                ariaLabel={`Reps en réserve : ${opt.label}`}
+                selected={workRir === opt.value}
+                onClick={() => setWorkRir(opt.value)}
+              >
+                {opt.label}
+              </PillButton>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Garde plusieurs reps en réserve : on ne cherche pas l'échec, juste une série
+            propre et représentative.
+          </p>
+        </div>
+
+        {workRir === 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              RIR 0 = série menée à l'échec. Pour estimer en sécurité, garde idéalement
+              quelques reps en réserve. Le calcul reste possible.
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={!canCompute}
+          onClick={computeOneRm}
+          className={cn(
+            "h-11 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-opacity",
+            !canCompute && "opacity-40",
+          )}
+        >
+          Calculer ma 1RM
+        </button>
       </Card>
     );
   }
