@@ -129,7 +129,7 @@ function ThemeSelector() {
                 aria-label={opt.label}
                 className="rounded-lg px-3 min-h-11 data-[state=on]:bg-background data-[state=on]:shadow-sm"
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 text-foreground" />
                 <span className="sr-only sm:not-sr-only sm:ml-1.5 text-xs">{opt.label}</span>
               </ToggleGroupItem>
             );
