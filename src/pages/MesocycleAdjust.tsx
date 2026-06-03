@@ -265,10 +265,14 @@ export default function MesocycleAdjust() {
   const thisMonday = useMemo(() => toISODate(getMonday(new Date())), []);
   const pivotState = pivotStateOf(pivotMonday, thisMonday);
   const weeksRemaining = phaseInfo?.weeksRemaining ?? 0;
+  // phaseKey null avec weeksRemaining > 0 = periodize() a lancé une exception
+  // (target_week_count du méso hors plage [Σmin, Σmax] du template actuel).
+  const mesoTemplateIncompat =
+    phaseInfo !== null && phaseInfo.weeksRemaining > 0 && phaseInfo.phaseKey === null;
 
   const ready = athleteId != null && !mesoLoading && !!meso && !!template;
   const apercuDisabled =
-    pivotState === "past" || weeksRemaining < 1 || !template || !ready;
+    pivotState === "past" || weeksRemaining < 1 || mesoTemplateIncompat || !template || !ready;
 
   // Reutilise le flux d'apercu existant (MesocyclePreview) en ETENDANT le payload
   // sessionStorage avec les champs d'ajustement (adjust/startPhase/facteurs).
@@ -396,9 +400,13 @@ export default function MesocycleAdjust() {
           </CardContent>
         </Card>
 
-        {/* Banniere — « aucune semaine a recalculer » est prioritaire et seule
-            (sinon elle empilerait avec la banniere past/current). */}
-        {weeksRemaining < 1 ? (
+        {/* Banniere — priorité : incompat > aucune semaine > pivot passé > pivot courant. */}
+        {mesoTemplateIncompat ? (
+          <Banner tone="rose" icon={<AlertTriangle className="h-4 w-4" />}>
+            Ce mésocycle ({meso.target_week_count} sem.) est incompatible avec le
+            template actuel — régénère-en un nouveau depuis le profil du nageur.
+          </Banner>
+        ) : weeksRemaining < 1 ? (
           <Banner tone="slate" icon={<Info className="h-4 w-4" />}>
             Il ne reste aucune semaine à recalculer.
           </Banner>
