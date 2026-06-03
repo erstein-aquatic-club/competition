@@ -234,6 +234,7 @@ export default function MesocycleAdjust() {
   const [pivotMonday, setPivotMonday] = useState<string>(() => nextMonday());
   const [sessionsPerWeek, setSessionsPerWeek] = useState<number>(3);
   const [weekdays, setWeekdays] = useState<number[]>(() => defaultWeekdays(3));
+  const [primerWeekdays, setPrimerWeekdays] = useState<number[]>([0, 3]);
   const [volumeFactor, setVolumeFactor] = useState<number>(1.0);
   const [intensityFactor, setIntensityFactor] = useState<number>(1.0);
 
@@ -245,8 +246,10 @@ export default function MesocycleAdjust() {
     if (meso && !initedFromMeso.current) {
       initedFromMeso.current = true;
       const n = meso.sessions_per_week ?? 3;
+      const wd = defaultWeekdays(n);
       setSessionsPerWeek(n);
-      setWeekdays(defaultWeekdays(n));
+      setWeekdays(wd);
+      setPrimerWeekdays(wd.filter((d) => d === 0 || d === 3));
     }
   }, [meso]);
 
@@ -285,6 +288,7 @@ export default function MesocycleAdjust() {
       kind: meso.kind,
       targetWeekCount: phaseInfo.weeksRemaining,
       weekdays,
+      primerWeekdays,
       startDate: pivotMonday,
       athleteId,
       // --- extension ajustement (consommee par MesocyclePreview) ---
@@ -463,8 +467,10 @@ export default function MesocycleAdjust() {
                 // C4 — changer le nombre de séances resynchronise les jours cochés
                 // (sinon RadioGroup et cases divergent ; le moteur lit weekdays.length).
                 const n = Number(v);
+                const wd = defaultWeekdays(n);
                 setSessionsPerWeek(n);
-                setWeekdays(defaultWeekdays(n));
+                setWeekdays(wd);
+                setPrimerWeekdays(wd.filter((d) => d === 0 || d === 3));
               }}
             >
               {[2, 3, 4, 5].map((n) => (
@@ -492,8 +498,15 @@ export default function MesocycleAdjust() {
                       onCheckedChange={(c) => {
                         setWeekdays((prev) => {
                           const has = prev.includes(idx);
-                          if (c && !has) return [...prev, idx].sort((a, b) => a - b);
-                          if (!c && has) return prev.filter((d) => d !== idx);
+                          if (c && !has) {
+                            if (idx === 0 || idx === 3)
+                              setPrimerWeekdays((p) => [...p, idx].sort((a, b) => a - b));
+                            return [...prev, idx].sort((a, b) => a - b);
+                          }
+                          if (!c && has) {
+                            setPrimerWeekdays((p) => p.filter((d) => d !== idx));
+                            return prev.filter((d) => d !== idx);
+                          }
                           return prev;
                         });
                       }}
@@ -503,6 +516,46 @@ export default function MesocycleAdjust() {
                 );
               })}
             </div>
+
+            {/* Rôle par séance — toggle amorce SNC ↔ développement. */}
+            {weekdays.length > 0 && (
+              <div className="space-y-1.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+                <p className="text-[11px] font-medium text-muted-foreground">Rôle des séances</p>
+                <div className="flex flex-col gap-1.5">
+                  {[...weekdays].sort((a, b) => a - b).map((d) => {
+                    const isP = primerWeekdays.includes(d);
+                    return (
+                      <div key={d} className="flex items-center gap-2.5">
+                        <span className="w-7 shrink-0 text-xs font-semibold text-foreground">
+                          {WEEKDAY_LABELS[d]}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPrimerWeekdays((prev) =>
+                              prev.includes(d)
+                                ? prev.filter((x) => x !== d)
+                                : [...prev, d].sort((a, b) => a - b),
+                            )
+                          }
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                            isP
+                              ? "border-amber-500 bg-amber-500 text-white dark:border-amber-400 dark:bg-amber-400"
+                              : "border-violet-600 bg-violet-600 text-white dark:border-violet-500 dark:bg-violet-500",
+                          )}
+                        >
+                          {isP ? "Amorce SNC" : "Dév. force"}
+                        </button>
+                        <span className="text-[11px] text-muted-foreground">
+                          {isP ? "volume réduit · potentiation" : "volume plein · progression"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {weekdays.length !== sessionsPerWeek && (
               <p className="text-xs text-amber-600 dark:text-amber-500">

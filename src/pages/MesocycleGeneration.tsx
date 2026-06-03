@@ -301,8 +301,10 @@ export default function MesocycleGeneration() {
   const [distance, setDistance] = useState<DistanceKey | null>(null);
   const [kind, setKind] = useState<"season" | "inter_competition" | null>(null);
   const [weeks, setWeeks] = useState<number | null>(null);
-  // §307 — jours muscu cochés (0=Lun…6=Dim, sans samedi) ; sessions/sem dérivé.
+  // §307 — jours muscu cochés (0=Lun…6=Dim) ; sessions/sem dérivé.
   const [weekdays, setWeekdays] = useState<number[] | null>(null);
+  // Sous-ensemble de weekdays en amorce SNC (volume réduit). Défaut : {Lun,Jeu} ∩ weekdays.
+  const [primerWeekdays, setPrimerWeekdays] = useState<number[]>([]);
   // §307 — date de départ réelle (ISO YYYY-MM-DD), 1re semaine partielle si en
   // milieu de semaine.
   const [startDate, setStartDate] = useState<string>("");
@@ -373,7 +375,9 @@ export default function MesocycleGeneration() {
   // ── weekdays — par défaut depuis l'évaluation (favorise Lun/Jeu) §307 ─────
   useEffect(() => {
     if (assessment && weekdays == null) {
-      setWeekdays(defaultWeekdaysFor(assessment.sessions_per_week ?? 3));
+      const wd = defaultWeekdaysFor(assessment.sessions_per_week ?? 3);
+      setWeekdays(wd);
+      setPrimerWeekdays(wd.filter(isPrimerWeekday));
     }
   }, [assessment, weekdays]);
 
@@ -418,14 +422,11 @@ export default function MesocycleGeneration() {
     [upcomingComps, startMonday],
   );
 
-  // §307 — jours d'amorce (Lun/Jeu) et de développement parmi les jours cochés.
-  const primerDaysChosen = useMemo(
-    () => (weekdays ?? []).filter(isPrimerWeekday),
-    [weekdays],
-  );
+  // §307 — jours d'amorce et de développement parmi les jours cochés (pilotés par primerWeekdays).
+  const primerDaysChosen = primerWeekdays;
   const devDaysChosen = useMemo(
-    () => (weekdays ?? []).filter((d) => !isPrimerWeekday(d)),
-    [weekdays],
+    () => (weekdays ?? []).filter((d) => !primerWeekdays.includes(d)),
+    [weekdays, primerWeekdays],
   );
   /** Sprint (50/100) avec uniquement des jours d'amorce → pas de jour de dev force. */
   const sprintNoDevDay =
@@ -463,6 +464,7 @@ export default function MesocycleGeneration() {
       kind,
       targetWeekCount: weeks,
       weekdays: [...weekdays].sort((a, b) => a - b),
+      primerWeekdays: [...primerWeekdays].sort((a, b) => a - b),
       startDate,
       athleteId: effectiveAthleteId,
     };
@@ -479,11 +481,21 @@ export default function MesocycleGeneration() {
   function toggleWeekday(d: number) {
     setWeekdays((prev) => {
       const base = prev ?? [];
-      const next = base.includes(d)
-        ? base.filter((x) => x !== d)
-        : [...base, d];
-      return next.sort((a, b) => a - b);
+      const removing = base.includes(d);
+      if (removing) {
+        setPrimerWeekdays((p) => p.filter((x) => x !== d));
+      } else if (isPrimerWeekday(d)) {
+        setPrimerWeekdays((p) => [...p, d].sort((a, b) => a - b));
+      }
+      return (removing ? base.filter((x) => x !== d) : [...base, d]).sort((a, b) => a - b);
     });
+  }
+
+  /** Bascule le rôle d'un jour sélectionné entre amorce SNC et développement. */
+  function togglePrimer(d: number) {
+    setPrimerWeekdays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b),
+    );
   }
 
   // ── États écran ──────────────────────────────────────────────────────────
@@ -770,6 +782,8 @@ export default function MesocycleGeneration() {
             <WeekdayPicker
               weekdays={weekdays}
               onToggle={toggleWeekday}
+              primerSet={new Set(primerWeekdays)}
+              onTogglePrimer={togglePrimer}
               primerCount={primerDaysChosen.length}
               devCount={devDaysChosen.length}
               sprintNoDevDay={sprintNoDevDay}
@@ -1055,7 +1069,11 @@ interface WeekdayPickerProps {
   weekdays: number[];
   /** Coche/décoche un jour. */
   onToggle: (d: number) => void;
-  /** Nb de jours d'amorce (Lun/Jeu) cochés — pilote la légende. */
+  /** Jours désignés amorce SNC parmi les jours cochés. */
+  primerSet: Set<number>;
+  /** Bascule le rôle d'un jour coché entre amorce et développement. */
+  onTogglePrimer: (d: number) => void;
+  /** Nb de jours d'amorce cochés — pilote la légende. */
   primerCount: number;
   /** Nb de jours de développement cochés — pilote la légende. */
   devCount: number;
@@ -1071,6 +1089,8 @@ interface WeekdayPickerProps {
 function WeekdayPicker({
   weekdays,
   onToggle,
+  primerSet,
+  onTogglePrimer,
   primerCount,
   devCount,
   sprintNoDevDay,
@@ -1081,7 +1101,7 @@ function WeekdayPicker({
       <div className="grid grid-cols-7 gap-1.5">
         {WEEKDAY_LABELS.map((label, d) => {
           const selected = set.has(d);
-          const primer = isPrimerWeekday(d);
+          const primer = primerSet.has(d);
           return (
             <button
               key={d}
@@ -1089,18 +1109,16 @@ function WeekdayPicker({
               role="checkbox"
               aria-checked={selected}
               aria-label={
-                primer
-                  ? `${label} — jour d'amorce`
-                  : `${label} — jour de développement`
+                selected
+                  ? primer ? `${label} — amorce SNC` : `${label} — développement`
+                  : label
               }
               onClick={() => onToggle(d)}
               className={cn(
                 "flex min-h-[48px] flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-xs font-semibold transition-colors",
-                selected &&
-                  primer &&
+                selected && primer &&
                   "border-amber-500 bg-amber-500 text-white shadow-sm dark:border-amber-400 dark:bg-amber-400",
-                selected &&
-                  !primer &&
+                selected && !primer &&
                   "border-violet-600 bg-violet-600 text-white shadow-sm dark:border-violet-500 dark:bg-violet-500",
                 !selected &&
                   "border-border bg-card hover:border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30",
@@ -1112,13 +1130,47 @@ function WeekdayPicker({
         })}
       </div>
 
+      {/* Rôle par séance — toggle amorce ↔ développement pour chaque jour coché. */}
+      {weekdays.length > 0 && (
+        <div className="space-y-1.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+          <p className="text-[11px] font-medium text-muted-foreground">Rôle des séances</p>
+          <div className="flex flex-col gap-1.5">
+            {weekdays.map((d) => {
+              const isP = primerSet.has(d);
+              return (
+                <div key={d} className="flex items-center gap-2.5">
+                  <span className="w-7 shrink-0 text-xs font-semibold text-foreground">
+                    {WEEKDAY_LABELS[d]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onTogglePrimer(d)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+                      isP
+                        ? "border-amber-500 bg-amber-500 text-white dark:border-amber-400 dark:bg-amber-400"
+                        : "border-violet-600 bg-violet-600 text-white dark:border-violet-500 dark:bg-violet-500",
+                    )}
+                  >
+                    {isP ? "Amorce SNC" : "Dév. force"}
+                  </button>
+                  <span className="text-[11px] text-muted-foreground">
+                    {isP ? "volume réduit · potentiation" : "volume plein · progression"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Légende — uniquement les rôles présents. */}
       {(primerCount > 0 || devCount > 0) && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
           {primerCount > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />
-              Amorce SNC (Lun/Jeu)
+              Amorce SNC
             </span>
           )}
           {devCount > 0 && (
