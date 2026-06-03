@@ -1178,46 +1178,86 @@ function ensureMaintienRepresentation(
   allocations: BucketAllocation[],
   ctxs: JourAwareContext[],
 ): MesocycleSession[] {
-  const target = allocations.find(
+  // §335 — top seau maintien (hors mobility). §366 (B) — ET la force bas du corps
+  // (`lower_strength`) spécifiquement : la doctrine coach impose, quand l'événement
+  // force un focus 100 % haut du corps (ex. 100 dos = forced_focus
+  // [upper_strength, upper_power]), de garder AU MOINS un bloc d'ENTRETIEN de la
+  // force basse dans le microcycle (1×/microcycle suffit), sans pour autant la
+  // promouvoir en focus. Le top maintien peut être `lower_power` (déjà couvert par
+  // l'amorce §329) → `lower_strength` n'apparaîtrait nulle part. On garantit donc
+  // les deux cibles, dans l'ordre, chaque injection voyant les précédentes.
+  const topMaintien = allocations.find(
     (a) => a.role === 'maintien' && a.bucket !== 'mobility',
   )?.bucket;
-  if (!target) return sessions;
-  if ((selected[target]?.length ?? 0) === 0) return sessions;
-  // Déjà présent quelque part (primaire/complément dév OU potentiateur/explosif/
-  // jambes d'une amorce) → rien à garantir.
-  if (sessions.some((s) => s.buckets.includes(target))) return sessions;
-
-  // Seaux primaires d'une séance de dév → un complément dont le seau est là-dedans
-  // est « redondant » (le remplacer ne supprime pas son unique occurrence).
-  const devPrimaries = new Set(
-    sessions.filter((s) => s.role === 'developpement').map((s) => s.buckets[0]),
+  const targets: StrengthBucket[] = [];
+  if (topMaintien) targets.push(topMaintien);
+  // `lower_strength` n'est garanti que s'il est bien un seau de MAINTIEN
+  // entraînable (pas un focus, pas absent du catalogue) et pas déjà dans la liste.
+  const lowerStrengthIsMaintien = allocations.some(
+    (a) => a.role === 'maintien' && a.bucket === 'lower_strength',
   );
+  if (lowerStrengthIsMaintien && !targets.includes('lower_strength')) {
+    targets.push('lower_strength');
+  }
+  if (targets.length === 0) return sessions;
+
   const complementBucketOf = (s: MesocycleSession): StrengthBucket | null =>
     s.buckets.length > 1 && s.buckets[1] !== 'mobility' && s.buckets[1] !== 'core'
       ? s.buckets[1]
       : null;
 
-  const idx = sessions.findIndex((s) => {
-    if (s.role !== 'developpement') return false;
-    const comp = complementBucketOf(s);
-    return comp != null && comp !== s.buckets[0] && devPrimaries.has(comp);
-  });
-  if (idx < 0) return sessions;
+  let out = sessions;
+  for (const target of targets) {
+    if ((selected[target]?.length ?? 0) === 0) continue;
+    // Déjà présent quelque part (primaire/complément dév OU potentiateur/explosif/
+    // jambes d'une amorce) → rien à garantir.
+    if (out.some((s) => s.buckets.includes(target))) continue;
 
-  const out = sessions.slice();
-  // §351 — réutilise le ctx EXACT de la séance (donc son Bloc 2 correctif tiré sur
-  // son index global), mais `papLegBucket: null` (cette séance reconstruite est de
-  // développement, pas une amorce) — préserve le comportement §335 pré-§351.
-  out[idx] = buildSession(
-    sessions[idx].sessionNumber,
-    weekdays[idx],
-    slots[idx].primary,
-    target,
-    cycle,
-    selected,
-    { ...ctxs[idx], papLegBucket: null },
-  );
-  return out;
+    // Seaux primaires d'une séance de dév → un complément dont le seau est là-dedans
+    // est « redondant » (le remplacer ne supprime pas son unique occurrence).
+    const devPrimaries = new Set(
+      out.filter((s) => s.role === 'developpement').map((s) => s.buckets[0]),
+    );
+
+    // Préférence 1 (§335) — remplacer un complément REDONDANT (son seau est déjà
+    // primaire d'une autre séance de dév : aucun seau ne perd son unique bloc).
+    let idx = out.findIndex((s) => {
+      if (s.role !== 'developpement') return false;
+      const comp = complementBucketOf(s);
+      return comp != null && comp !== s.buckets[0] && devPrimaries.has(comp);
+    });
+    // Préférence 2 (§366 B) — si aucun complément redondant n'existe (microcycle
+    // resserré : les 2 séances de dév portent les 2 focus haut du corps, aucun
+    // complément à recycler), injecter la cible comme complément d'une séance de
+    // dév dont le complément actuel est VIDE ou seulement de la mobilité — donc
+    // sans priver aucun seau de travail de son unique occurrence ni toucher aux
+    // 2 focus (qui restent primaires).
+    if (idx < 0) {
+      idx = out.findIndex(
+        (s) => s.role === 'developpement' && complementBucketOf(s) == null,
+      );
+    }
+    if (idx < 0) continue;
+
+    const next = out.slice();
+    // §351 — réutilise le ctx EXACT de la séance (donc son Bloc 2 correctif tiré sur
+    // son index global), mais `papLegBucket: null` (cette séance reconstruite est de
+    // développement, pas une amorce) — préserve le comportement §335 pré-§351.
+    // `buildSession` borne intrinsèquement les blocs de travail (primaire ≤
+    // PRIMARY_BLOCK_COUNT, complément ≤ COMPLEMENT_BLOCK_COUNT) et garde le primaire
+    // focus de la séance intact (seul le complément est réécrit).
+    next[idx] = buildSession(
+      out[idx].sessionNumber,
+      weekdays[idx],
+      slots[idx].primary,
+      target,
+      cycle,
+      selected,
+      { ...ctxs[idx], papLegBucket: null },
+    );
+    out = next;
+  }
+  return out === sessions ? sessions : out;
 }
 
 /** Une séance = un bucket primaire + (optionnellement) un bucket complément. */

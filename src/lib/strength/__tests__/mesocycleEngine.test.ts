@@ -1777,6 +1777,54 @@ describe('generateMesocycle', () => {
     );
   });
 
+  it("§366 invariant — focus 100% haut: ≥1 bloc lower_strength dans le microcycle (entretien)", () => {
+    // Terrain Victoria (100 dos, forced_focus 100% haut du corps). Doctrine coach :
+    // l'événement dicte le focus (on ne promeut PAS lower_strength en focus), mais le
+    // microcycle doit garder AU MOINS un bloc d'entretien de la force bas du corps
+    // (1×/microcycle suffit). On vérifie la présence de lower_strength dans n'importe
+    // quelle séance (dév OU amorce PAP) — cf. §329 qui pose un trap bar (lower_strength)
+    // à la 2ᵉ amorce d'une nage haut-dominante.
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 3; // Victoria : 3 séances/semaine
+    input.weekdays = [0, 2, 4]; // Lun, Mer, Ven
+    input.primerWeekdays = [0]; // 1 seule amorce (Lun) → 2 séances de dév
+
+    const meso = generateMesocycle(input);
+
+    for (const week of meso.weeks) {
+      const sessions = week.sessions;
+      const hasLowerStrength = sessions.some((s) => s.buckets.includes('lower_strength'));
+      assert.ok(
+        hasLowerStrength,
+        `§366 B — au moins une séance doit porter lower_strength (entretien force basse), semaine ${week.weekNumber}`,
+      );
+    }
+
+    // Doctrine : on ne PROMEUT pas lower_strength en focus — les 2 focus haut du
+    // corps restent les primaires des séances de développement (on ne réécrit qu'un
+    // complément redondant). lower_strength n'est jamais un primaire dév.
+    const devPrimaries = new Set(
+      meso.weeks
+        .flatMap((w) => w.sessions)
+        .filter((s) => s.role === 'developpement')
+        .map((s) => s.buckets[0]),
+    );
+    assert.ok(devPrimaries.has('upper_strength'), 'force haut reste un primaire dév (focus)');
+    assert.ok(devPrimaries.has('upper_power'), 'puissance haut reste un primaire dév (focus)');
+    assert.ok(
+      !devPrimaries.has('lower_strength'),
+      'lower_strength reste un ENTRETIEN (complément), jamais promu primaire/focus',
+    );
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {
