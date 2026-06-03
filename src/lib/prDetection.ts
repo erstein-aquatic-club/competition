@@ -23,9 +23,16 @@ function difficultyToRIR(difficulty: number | null | undefined): number {
  * When difficulty < 5, adds estimated RIR to reps so the 1RM reflects true
  * strength rather than the effort of a submaximal set.
  */
-export function estimateOneRM(weight: number, reps: number, difficulty?: number | null): number {
+export function estimateOneRM(
+  weight: number,
+  reps: number,
+  effort?: number | null | { rir: number },
+): number {
   if (reps <= 0 || weight <= 0) return 0;
-  const rir = difficultyToRIR(difficulty);
+  const rir =
+    effort != null && typeof effort === "object"
+      ? Math.max(0, Math.round(effort.rir))
+      : difficultyToRIR(effort);
   const effectiveReps = reps + rir;
   if (effectiveReps <= 0) return 0;
   if (effectiveReps === 1) return weight;
