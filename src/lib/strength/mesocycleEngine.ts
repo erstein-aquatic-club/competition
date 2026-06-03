@@ -594,13 +594,24 @@ export function selectExercises(
     // Tri : core d'abord (force préservée) ; puis (§306 P2) affinité préhab nage
     // avant les autres non-cores ; puis niveau décroissant (intermediate >
     // beginner > null). L'affinité ne déloge jamais un core.
+    // §366 — priorité effective stroke-aware. Un exo « signature » (affinité
+    // non-vide) est épinglé staple pour ses nages, rétrogradé neutre pour les
+    // autres. Affinité vide OU strokeKey legacy (null) ⇒ aucune modification.
+    const STROKE_STAPLE = 90;
+    const effPriority = (e: CatalogExercise): number => {
+      const aff = e.strokeMainAffinity ?? [];
+      if (aff.length === 0 || strokeKey === null) return e.selectionPriority;
+      if (aff.includes(strokeKey)) return Math.max(e.selectionPriority, STROKE_STAPLE);
+      return Math.min(e.selectionPriority, 0);
+    };
+
     const ordered = safe.slice().sort((a, b) => {
       // §319 — priorité coach d'abord : impose les staples (tractions lestées,
       // box jump, roue abdos…) et démote les exotiques (Front Lever) sans les
       // retirer du catalogue. Défaut 0 → départage par is_core/niveau (historique).
-      if (a.selectionPriority !== b.selectionPriority) {
-        return b.selectionPriority - a.selectionPriority;
-      }
+      const ap = effPriority(a);
+      const bp = effPriority(b);
+      if (ap !== bp) return bp - ap;
       if (a.isCore !== b.isCore) return a.isCore ? -1 : 1;
       const am = matchesStroke(a);
       const bm = matchesStroke(b);
