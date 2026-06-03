@@ -30,7 +30,23 @@ describe("OneRmDiscoveryWizard — étape mouvement à vide", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /douleur.*oui/i }));
-    expect(screen.getByText(/qualité|sécurité|allég/i)).toBeTruthy();
+    // Cible une phrase distinctive du paragraphe sécurité (indépendante d'un label de bouton).
+    expect(screen.getByText(/montée en charge|série lourde|gêne/i)).toBeTruthy();
+  });
+
+  it("une pastille de retex bascule son aria-pressed à la sélection", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={null}
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    const moyen = screen.getByRole("button", { name: /recharger.*moyen/i });
+    expect(moyen.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(moyen);
+    expect(moyen.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("la branche sécurité câble les 3 actions onPainAbort (alléger/substituer/passer)", () => {

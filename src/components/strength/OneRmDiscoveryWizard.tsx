@@ -84,14 +84,19 @@ export function OneRmDiscoveryWizard({
   // Machine à états extensible : seul "empty" est rendu pour l'instant.
   const [step, setStep] = useState<WizardStep>("empty");
   const [pain, setPain] = useState<boolean | null>(null);
+  // retex capturé ici, consommé en étape C (Task 7) — ne pas supprimer comme "unused"
   const [ease, setEase] = useState<Ease | null>(null);
+  // retex capturé ici, consommé en étape C (Task 7) — ne pas supprimer comme "unused"
   const [appetite, setAppetite] = useState<ReloadAppetite | null>(null);
 
   // Réfère known1rm/shortMode/onComputed (utilisés aux étapes B/C) sans les laisser inutilisés.
   void known1rm;
   void shortMode;
   void onComputed;
-  void step;
+  void step; // lu uniquement pour le stub ci-dessous : le rendu de l'étape warmup arrive en Task 6.
+
+  // CTA bloqué tant que la douleur n'est pas répondue, ou si douleur=oui (branche sécurité).
+  const blockAdvance = pain == null || pain === true;
 
   return (
     <Card className="space-y-4 p-4">
@@ -197,11 +202,12 @@ export function OneRmDiscoveryWizard({
       {/* Avancer vers les paliers (étape B — implémentée plus tard). */}
       <button
         type="button"
-        disabled={pain == null || pain === true}
+        disabled={blockAdvance}
+        // setStep("warmup") câblé ; le rendu de l'étape warmup arrive en Task 6.
         onClick={() => setStep("warmup")}
         className={cn(
           "h-11 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-opacity",
-          (pain == null || pain === true) && "opacity-40",
+          blockAdvance && "opacity-40",
         )}
       >
         Palier suivant
