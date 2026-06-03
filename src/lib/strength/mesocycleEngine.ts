@@ -597,6 +597,11 @@ export function selectExercises(
     // §366 — priorité effective stroke-aware. Un exo « signature » (affinité
     // non-vide) est épinglé staple pour ses nages, rétrogradé neutre pour les
     // autres. Affinité vide OU strokeKey legacy (null) ⇒ aucune modification.
+    // NB : `STROKE_STAPLE` vaut volontairement le palier « Préféré » de §319 (90)
+    // — un exo signature se hisse au niveau d'un staple coach, sans dépasser un
+    // « Prioritaire » (100, ex. tractions lestées). Si un jour un exo est À LA FOIS
+    // tagué signature ET noté 90 par le coach, les deux paliers se confondent (sans
+    // bug : le `max` est idempotent) — relever cette constante pour les distinguer.
     const STROKE_STAPLE = 90;
     const effPriority = (e: CatalogExercise): number => {
       const aff = e.strokeMainAffinity ?? [];
