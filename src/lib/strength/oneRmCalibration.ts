@@ -57,9 +57,11 @@ export function isNegativeValidation(v: ValidationInput): boolean {
 }
 
 /**
- * Propose une 1RM revue à la baisse (−10 % par défaut), arrondie au pas de 2,5 kg.
+ * Propose une 1RM revue à la baisse (−10 % par défaut), arrondie VERS LE BAS au pas de 2,5 kg.
+ * Réduction de sécurité (après douleur/échec) : le résultat ne dépasse jamais la cible −10 %.
  */
 export function adjustOneRmDown(oneRm: number, factor = 0.9, step = 2.5): number {
-  if (oneRm <= 0) return 0;
-  return roundToStep(oneRm * factor, step);
+  if (!Number.isFinite(oneRm) || oneRm <= 0) return 0;
+  // Arrondi VERS LE BAS (sécurité) : jamais au-dessus de la cible -10%.
+  return Math.floor((oneRm * factor) / step) * step;
 }
