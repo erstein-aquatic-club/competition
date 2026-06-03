@@ -134,14 +134,14 @@ export const detectBlockChapter = (
   if (!items || items.length === 0 || toStep < 1 || toStep > items.length) {
     return null;
   }
-  const toBlock = (items[toStep - 1].block ?? "main") as "warmup" | "main";
+  const toBlock = items[toStep - 1].block ?? "main";
   if (fromStep === 0) {
     return toBlock;
   }
   if (fromStep < 1 || fromStep > items.length) {
     return null;
   }
-  const fromBlock = (items[fromStep - 1].block ?? "main") as "warmup" | "main";
+  const fromBlock = items[fromStep - 1].block ?? "main";
   return fromBlock !== toBlock ? toBlock : null;
 };
 

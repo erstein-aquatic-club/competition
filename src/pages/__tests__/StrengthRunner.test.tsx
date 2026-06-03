@@ -181,6 +181,11 @@ describe("detectBlockChapter", () => {
   it("retourne null si la liste est vide", () => {
     assert.strictEqual(detectBlockChapter([], 0, 1), null);
   });
+
+  it("retourne null si fromStep est hors bornes", () => {
+    const items = [warmupItem, mainItem];
+    assert.strictEqual(detectBlockChapter(items, 5, 2), null);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -207,5 +212,9 @@ describe("findFirstMainStep", () => {
 
   it("traite block=null comme main", () => {
     assert.strictEqual(findFirstMainStep([warmupItem, nullBlockItem]), 2);
+  });
+
+  it("retourne 1 sur liste vide (length+1 = 1)", () => {
+    assert.strictEqual(findFirstMainStep([]), 1);
   });
 });
