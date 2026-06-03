@@ -1434,7 +1434,7 @@ export function WorkoutRunner({
             if (hasLogsForCurrent) {
               setSkipExerciseConfirmOpen(true);
             } else {
-              void advanceExercise();
+              void advanceExercise(true);
             }
           }}
         >
@@ -1835,7 +1835,7 @@ export function WorkoutRunner({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setSkipExerciseConfirmOpen(false); advanceExercise(); }}>
+            <AlertDialogAction onClick={() => { setSkipExerciseConfirmOpen(false); void advanceExercise(true); }}>
               Passer
             </AlertDialogAction>
           </AlertDialogFooter>
