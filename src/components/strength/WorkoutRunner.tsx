@@ -42,9 +42,9 @@ import type { Exercise, StrengthSessionTemplate } from "@/lib/api";
 import { BODYWEIGHT_SENTINEL, isBodyweight } from "@/lib/api/client";
 import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensityMetrics";
 import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from "@/lib/types";
-import { detectPR, estimateOneRM } from "@/lib/prDetection";
-import type { PrDetection } from "@/lib/prDetection";
+import { detectPR } from "@/lib/prDetection";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
+import { OneRmDiscoveryWizard } from "@/components/strength/OneRmDiscoveryWizard";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -188,6 +188,7 @@ export function WorkoutRunner({
   userId,
   runId,
   inlineEstimationExercises,
+  firstTimeExercises,
   onRequestRecalc,
   onEstimationComplete,
 }: {
@@ -217,6 +218,11 @@ export function WorkoutRunner({
    *  ramp-up (calcul 1RM à partir d'une série de référence). Le runner retire
    *  l'exo du Set parent via onEstimationComplete. */
   inlineEstimationExercises?: Set<number>;
+  /** Task 8 — exercise_ids jamais réalisés par ce nageur : la série 1 ouvre le
+   *  wizard de calibration COMPLET (mouvement à vide → paliers → série de travail).
+   *  Si l'exo est seulement en recalc (1RM manquante mais déjà réalisé), il passe
+   *  par `inlineEstimationExercises` → wizard en mode court (série de travail seule). */
+  firstTimeExercises?: Set<number>;
   onRequestRecalc?: (exerciseId: number) => void;
   onEstimationComplete?: (exerciseId: number, estimatedOneRm: number) => Promise<void>;
 }) {
@@ -274,6 +280,15 @@ export function WorkoutRunner({
 
   // Task 13: Continue from completion
   const [continuePickerOpen, setContinuePickerOpen] = useState(false);
+
+  // Task 8 — calibration 1RM (wizard).
+  // `calibrationDismissed` : exos pour lesquels le nageur a choisi « Alléger »
+  //   dans la branche douleur → on masque le wizard pour CE run et on le laisse
+  //   logger normalement à une charge auto-choisie (aucune 1RM calculée).
+  const [calibrationDismissed, setCalibrationDismissed] = useState<Set<number>>(new Set());
+  // `calibratedThisRun` : exos passés par le wizard pendant CE run → déclenche la
+  //   carte de validation post-série-2 (qualité > charge) — voir Task 8 Commit 2.
+  const [calibratedThisRun, setCalibratedThisRun] = useState<Set<number>>(new Set());
 
   // Task 14: Substitution in focus mode
   const [substitutePickerOpen, setSubstitutePickerOpen] = useState(false);
@@ -348,18 +363,19 @@ export function WorkoutRunner({
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
   const tracksWeight = metric === "weight_kg";
-  const isEstimationMode =
-    !isBodyweightExercise &&
+  // Task 8 — le wizard de calibration remplace l'ancien mode estimation §297.
+  //   isFirstTime           : jamais réalisé → wizard COMPLET (à vide → paliers → travail).
+  //   needsShortCalibration : 1RM manquante / recalc demandé mais déjà réalisé → wizard COURT.
+  //   showWizard            : série 1, exo chargé, pas encore allégé (branche douleur) ce run.
+  const currentExerciseId = currentBlock?.exercise_id ?? -1;
+  const isFirstTime = firstTimeExercises?.has(currentExerciseId) ?? false;
+  const needsShortCalibration = inlineEstimationExercises?.has(currentExerciseId) ?? false;
+  const showWizard =
     currentSetIndex === 1 &&
-    (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false);
+    !isBodyweightExercise &&
+    (isFirstTime || needsShortCalibration) &&
+    !calibrationDismissed.has(currentExerciseId);
 
-  const [warmupHistory, setWarmupHistory] = useState<
-    Array<{ weight: number; reps: number; difficulty: number | null }>
-  >([]);
-
-  useEffect(() => {
-    setWarmupHistory([]);
-  }, [currentBlock?.exercise_id]);
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
     ? exercises.find((e) => e.id === nextBlock.exercise_id)
@@ -689,63 +705,57 @@ export function WorkoutRunner({
     }
   };
 
-  const handleAddWarmupSet = () => {
+  // Task 8 — fin du wizard de calibration : persiste la 1RM calculée puis logge la
+  // série de travail comme série 1. Reprend EXACTEMENT la séquence de l'ancien
+  // §297 handleReferenceSet (garde isLoggingRef, log set_number:1, avance série 2,
+  // démarrage repos), wizard en source de la charge/reps au lieu du numpad.
+  const handleWizardComputed = async (
+    oneRm: number,
+    workingSet: { weight: number; reps: number; rir: number; pain: boolean },
+  ) => {
     if (!currentBlock) return;
-    const weight = Number(currentSetInputs[0]?.weight ?? 0);
-    const reps = Number(currentSetInputs[0]?.reps ?? 0);
-    const difficulty = currentSetInputs[0]?.difficulty ?? null;
-    if (weight <= 0 || reps <= 0) return;
-    setWarmupHistory((prev) => [...prev, { weight, reps, difficulty }]);
-    setCurrentSetInputs({});
-  };
-
-  const handleReferenceSet = async () => {
-    if (!currentBlock || !onEstimationComplete) return;
-    // R1 — anti double-tap concurrent : sans cette garde, un 2ᵉ tap pendant
-    // l'await onEstimationComplete déclenchait un double upsert 1RM + un double
-    // log set_number:1. Même pattern que handleValidateSet.
+    // R1 — anti double-tap concurrent (même garde que handleValidateSet).
     if (isLoggingRef.current) return;
-    const weight = Number(currentSetInputs[0]?.weight ?? 0);
-    const reps = Number(currentSetInputs[0]?.reps ?? 0);
-    const difficulty = currentSetInputs[0]?.difficulty ?? null;
-    if (weight <= 0 || reps <= 0 || difficulty == null) return;
+    const exerciseId = currentBlock.exercise_id;
 
-    // Calcul Epley+RIR via la fonction existante de prDetection.ts
-    const estimated = estimateOneRM(weight, reps, difficulty);
-    if (estimated <= 0) {
-      toast.error("Estimation impossible", {
-        description: "Vérifie la charge et le nombre de répétitions.",
-      });
-      return;
-    }
-
-    // Garde tenue sur TOUTE la section critique (estimation + log), libérée une
-    // seule fois en finally.
     isLoggingRef.current = true;
     try {
-      // Persist le 1RM côté parent (Strength.tsx → update1RM + invalidate query)
+      // Persiste le 1RM côté parent (Strength.tsx → update1RM + invalidate query).
       try {
-        await onEstimationComplete(currentBlock.exercise_id, estimated);
+        await onEstimationComplete?.(exerciseId, oneRm);
       } catch {
-        toast.error("Erreur", {
-          description: "1RM non sauvegardé. Réessaye.",
-        });
+        toast.error("Erreur", { description: "1RM non sauvegardé. Réessaye." });
         return;
       }
 
-      // Log la série de référence comme série 1 standard
+      // Douleur signalée pendant la calibration → marqueur dans la note de l'exo
+      // (sans écraser la note existante).
+      if (workingSet.pain) {
+        const existing = exerciseNotes?.[exerciseId] ?? "";
+        const marker = "⚠️ douleur signalée (calibration)";
+        const merged = existing ? `${existing}\n${marker}` : marker;
+        onUpdateNote?.(exerciseId, merged);
+      }
+
+      // Logge la série de travail comme série 1 standard (difficulty null : le
+      // wizard capte le RIR, pas l'échelle 1-5).
       const newLog: SetLogEntry = {
-        exercise_id: currentBlock.exercise_id,
+        exercise_id: exerciseId,
         set_number: 1,
-        reps,
-        weight,
-        difficulty,
+        reps: workingSet.reps,
+        weight: workingSet.weight,
+        difficulty: null,
       };
       setLogs((prev) => [...prev, newLog]);
       await onLogSets?.([newLog]);
 
-      // Reset warmupHistory + avance à série 2
-      setWarmupHistory([]);
+      // Marque l'exo comme calibré ce run → déclenche la validation post-série-2.
+      setCalibratedThisRun((prev) => {
+        const next = new Set(prev);
+        next.add(exerciseId);
+        return next;
+      });
+
       setCurrentSetInputs({});
       setCurrentSetIndex(2);
 
@@ -755,6 +765,26 @@ export function WorkoutRunner({
     } finally {
       isLoggingRef.current = false;
     }
+  };
+
+  // Task 8 — branche sécurité du wizard (douleur signalée).
+  const handlePainAbort = (action: "lighten" | "substitute" | "skip") => {
+    const exerciseId = currentBlock?.exercise_id ?? -1;
+    if (action === "substitute") {
+      if (onSubstitute) setSubstitutePickerOpen(true);
+      return;
+    }
+    if (action === "skip") {
+      void advanceExercise();
+      return;
+    }
+    // "lighten" : on masque le wizard pour cet exo ce run → carte de série normale,
+    // le nageur choisit lui-même une charge légère. Aucune 1RM calculée.
+    setCalibrationDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(exerciseId);
+      return next;
+    });
   };
 
   const handleValidateSet = async () => {
@@ -1277,27 +1307,21 @@ export function WorkoutRunner({
         )}
       </div>
 
-      {isEstimationMode && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-          <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
-            🎯 Estimation 1RM en cours
-          </div>
-          <p className="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">
-            Charge légère, monte progressivement. Marque ta dernière série
-            comme référence pour calculer ton 1RM.
-          </p>
-          {warmupHistory.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-amber-900/90 dark:text-amber-200/90">
-              {warmupHistory.map((w, i) => (
-                <span key={i} className="rounded-full bg-amber-500/20 px-2 py-0.5">
-                  {w.weight}kg × {w.reps}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Task 8 — wizard de calibration 1RM (remplace l'ancien mode estimation §297).
+          Affiché à la place de la carte de série quand l'exo doit être calibré. */}
+      {showWizard && currentBlock && (
+        <OneRmDiscoveryWizard
+          exerciseName={currentExerciseDef?.nom_exercice ?? "Exercice"}
+          known1rm={
+            oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight ?? null
+          }
+          shortMode={!isFirstTime}
+          onComputed={handleWizardComputed}
+          onPainAbort={handlePainAbort}
+        />
       )}
 
+      {!showWizard && (
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
@@ -1394,6 +1418,7 @@ export function WorkoutRunner({
           </div>
         </div>
       </Card>
+      )}
 
       {currentExerciseDef?.description && (
         <div className="rounded-2xl border bg-muted/10 px-4 py-3">
@@ -1403,10 +1428,10 @@ export function WorkoutRunner({
           </p>
         </div>
       )}
-      {/* §297 — Recalculer 1RM : visible uniquement sur série 1 d'exos chargés non en
-          mode estimation, et avant que la série 1 ne soit loggée. */}
+      {/* §297 — Recalculer 1RM : visible uniquement sur série 1 d'exos chargés hors
+          wizard de calibration, et avant que la série 1 ne soit loggée. */}
       {!isBodyweightExercise &&
-        !isEstimationMode &&
+        !showWizard &&
         currentSetIndex === 1 &&
         !currentLoggedSet &&
         onRequestRecalc &&
@@ -1421,7 +1446,7 @@ export function WorkoutRunner({
             Recalculer ma 1RM
           </Button>
         )}
-      {!isEstimationMode && (
+      {!showWizard && (
         <Button
           variant="ghost"
           className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
@@ -1443,47 +1468,20 @@ export function WorkoutRunner({
         Voir les séries
       </Button>
 
-      {!inputSheetOpen && !isResting ? (
+      {/* Task 8 — pendant le wizard de calibration, la barre d'action standard est
+          masquée : le wizard porte son propre CTA (« Calculer ma 1RM »). */}
+      {!inputSheetOpen && !isResting && !showWizard ? (
         <BottomActionBar
           className="bottom-0 z-modal"
           containerClassName="flex-col gap-2 py-4"
         >
-          {isEstimationMode ? (
-            <>
-              <Button
-                variant="outline"
-                className="w-full h-12 rounded-2xl text-sm font-semibold"
-                onClick={handleAddWarmupSet}
-                disabled={
-                  !currentSetInputs[0]?.weight || !currentSetInputs[0]?.reps
-                }
-              >
-                + Chauffe suivante
-              </Button>
-              <Button
-                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg"
-                onClick={handleReferenceSet}
-                disabled={
-                  !currentSetInputs[0]?.weight ||
-                  !currentSetInputs[0]?.reps ||
-                  currentSetInputs[0]?.difficulty == null
-                }
-              >
-                <Check className="mr-2 h-5 w-5" />
-                C'est ma série de référence → calculer 1RM
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
-                onClick={handleValidateSet}
-              >
-                <Check className="mr-2 h-5 w-5" />
-                {currentLoggedSet ? "Série suivante" : "Valider série"}
-              </Button>
-            </>
-          )}
+          <Button
+            className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
+            onClick={handleValidateSet}
+          >
+            <Check className="mr-2 h-5 w-5" />
+            {currentLoggedSet ? "Série suivante" : "Valider série"}
+          </Button>
         </BottomActionBar>
       ) : null}
         </>
