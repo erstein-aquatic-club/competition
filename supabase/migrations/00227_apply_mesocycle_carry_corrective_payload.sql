@@ -1,4 +1,4 @@
--- 00218_apply_mesocycle_carry_corrective_payload.sql
+-- 00227_apply_mesocycle_carry_corrective_payload.sql
 -- §366 (A) — la RPC `apply_strength_mesocycle` matérialisait le `raw_payload`
 -- des items SANS recopier les métadonnées d'échauffement intelligent (§351/§352)
 -- `warmup_kind` / `corrective_axis` / `corrective_side`, pourtant fournies par

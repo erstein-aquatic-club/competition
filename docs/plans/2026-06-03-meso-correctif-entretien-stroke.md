@@ -143,7 +143,7 @@ git commit -m "feat(§366): selectExercises stroke-aware — tirage signature pa
 ## Task 3 — C: migration colonne + tags catalogue
 
 **Files:**
-- Create: `supabase/migrations/00217_stroke_main_affinity.sql`
+- Create: `supabase/migrations/00226_stroke_main_affinity.sql`
 
 **Step 1 — Écrire la migration** :
 ```sql
@@ -157,7 +157,7 @@ UPDATE dim_exercices SET stroke_main_affinity = ARRAY['backstroke'] WHERE id = 1
 UPDATE dim_exercices SET stroke_main_affinity = ARRAY['freestyle','butterfly','breaststroke','medley'] WHERE id = 12;
 ```
 
-**Step 2 — Appliquer via MCP** : `mcp__plugin_supabase_supabase__apply_migration` (name `00217_stroke_main_affinity`, projet `fscnobivsgornxdwqwlk`). NE PAS utiliser `supabase db push`.
+**Step 2 — Appliquer via MCP** : `mcp__plugin_supabase_supabase__apply_migration` (name `00226_stroke_main_affinity`, projet `fscnobivsgornxdwqwlk`). NE PAS utiliser `supabase db push`.
 
 **Step 3 — Vérifier** : `execute_sql` →
 ```sql
@@ -167,8 +167,8 @@ Attendu : id 11 = `{backstroke}`, id 12 = `{freestyle,butterfly,breaststroke,med
 
 **Step 4 — Regénérer les types** (si le projet versionne les types Supabase) puis commit :
 ```bash
-git add supabase/migrations/00217_stroke_main_affinity.sql
-git commit -m "feat(§366): mig 00217 — stroke_main_affinity + tags dos/pap (C)"
+git add supabase/migrations/00226_stroke_main_affinity.sql
+git commit -m "feat(§366): mig 00226 — stroke_main_affinity + tags dos/pap (C)"
 ```
 
 ---
@@ -209,7 +209,7 @@ git commit -m "feat(§366): invariant entretien force basse garanti (B)"
 ## Task 5 — A: la RPC apply matérialise les champs correctifs
 
 **Files:**
-- Create: `supabase/migrations/00218_apply_mesocycle_carry_corrective_payload.sql`
+- Create: `supabase/migrations/00227_apply_mesocycle_carry_corrective_payload.sql`
 
 **Contexte :** la chaîne de LECTURE/affichage existe déjà (`warmupLabels.ts`, `getMesocycleSessions:511-523`, `MyPlanSessionSheet`/`SessionDetailPreview`/`MesocyclePreview`). Le seul maillon cassé : la RPC `apply_strength_mesocycle` (dernière def : `00216`) ne recopie pas `warmup_kind`/`corrective_axis`/`corrective_side` dans `raw_payload` (lignes 282-293). `serializeExercise` (`strength-mesocycles.ts:52`) les fournit déjà dans `p_weeks`.
 
@@ -222,13 +222,13 @@ git commit -m "feat(§366): invariant entretien force basse garanti (B)"
 ```
 > Aucun autre changement : même signature, mêmes GRANT, même logique §308/§328 (table rase), même nommage de séance. Vérifier la virgule après `v_session_number`.
 
-**Step 2 — Appliquer via MCP** `apply_migration` (name `00218_apply_mesocycle_carry_corrective_payload`).
+**Step 2 — Appliquer via MCP** `apply_migration` (name `00227_apply_mesocycle_carry_corrective_payload`).
 
 **Step 3 — Tester RLS** (on recrée la RPC apply qui matérialise sous RLS). Vérifier Docker (`docker ps`), puis `npm run test:rls` — cible `strength-mesocycle-rpc` (attendu 17/17, le changement est additif au payload, n'affecte pas l'autorisation). Si Docker absent → demander à l'utilisateur de le lancer (cf. CLAUDE.md), ne pas forcer.
 
 **Step 4 — Commit** :
 ```bash
-git add supabase/migrations/00218_apply_mesocycle_carry_corrective_payload.sql
+git add supabase/migrations/00227_apply_mesocycle_carry_corrective_payload.sql
 git commit -m "fix(§366): apply RPC matérialise warmup_kind/corrective_axis/side (A)"
 ```
 
@@ -257,7 +257,7 @@ where si.session_id = <nouvelle séance J1> and si.block='warmup' order by si.or
 
 ## Task 7 — Documentation (obligatoire, cf. CLAUDE.md)
 
-**Step 1 — `docs/implementation-log.md`** : entrée §366 (contexte terrain Victoria, A/B/C, fichiers, migrations 00217/00218, tests, limites : régén manuelle requise).
+**Step 1 — `docs/implementation-log.md`** : entrée §366 (contexte terrain Victoria, A/B/C, fichiers, migrations 00226/00227, tests, limites : régén manuelle requise).
 
 **Step 2 — `docs/ROADMAP.md`** : ligne §366 + `*Dernière mise à jour*` en tête.
 
