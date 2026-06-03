@@ -317,6 +317,9 @@ export default function MesocycleAdjust() {
   const handleRefaireBilan = () =>
     athleteId != null && navigate(`/coach/strength-assessment/${athleteId}`);
 
+  const handleRegenerate = () =>
+    athleteId != null && navigate(`/coach/mesocycle-generate/${athleteId}`);
+
   // ── Contexte d'affichage ────────────────────────────────────────────────────
   const athleteName =
     athletes?.find((a) => a.id === athleteId)?.display_name ??
@@ -588,14 +591,24 @@ export default function MesocycleAdjust() {
               Réalisé le{" "}
               <span className="font-medium text-foreground">{assessmentDate}</span>
             </p>
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto p-0"
-              onClick={handleRefaireBilan}
-            >
-              Refaire le bilan
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0"
+                onClick={handleRegenerate}
+              >
+                Régénérer le mésocycle
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0 text-muted-foreground"
+                onClick={handleRefaireBilan}
+              >
+                Refaire le bilan
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
