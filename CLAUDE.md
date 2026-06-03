@@ -47,7 +47,8 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 | `src/pages/MesocycleGeneration.tsx` | Écran nageur de génération du mésocycle — §293 |
 | `src/pages/MesocyclePreview.tsx` | Écran nageur d'aperçu + confirmation (mode ajustement mid-cycle §338) — §293 |
 | `src/pages/MesocycleAdjust.tsx` | Écran coach d'ajustement d'un méso actif mid-cycle (`/strength/mesocycle-adjust/:athleteId`) — §338 |
-| `src/components/coach/competition/CompetitionDetail.tsx` | Détail compétition plein écran 3 onglets (Nageurs/Paramètres/Jour J) — §362 |
+| `src/components/coach/competition/CompetitionDetail.tsx` | Détail compétition plein écran 4 onglets (Nageurs/Paramètres/Jour J/Résultats) — §362, §364 |
+| `src/components/coach/competition/CompetitionResultsTab.tsx` | Onglet synthèse Résultats club (import liveffn + verdicts) — §364 |
 | `supabase/tests/rls/` | Tests RLS intégration (voir `docs/rls-testing.md`) |
 
 **Pour tout autre fichier**, lire `docs/claude/files-map.md` (annuaire complet).
@@ -61,7 +62,7 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 | `ffn-performances` | Fonctionnelle (ACTIVE, v64) — capte `club_name` depuis cellule club FFN | `supabase/functions/ffn-performances/` |
 | `import-club-records` | Fonctionnelle (ACTIVE, v74) — recalc filtré sur `app_settings.home_club_name` | `supabase/functions/import-club-records/` |
 | `push-send` | Fonctionnelle (ACTIVE, v33) | `supabase/functions/push-send/` |
-| `liveffn-startlist` | Fonctionnelle (ACTIVE, v1) — proxy fetch liste de départ liveffn (coach/admin) | `supabase/functions/liveffn-startlist/` |
+| `liveffn-startlist` | Fonctionnelle (ACTIVE, v5) — proxy fetch liveffn (coach/admin) : liste de départ `startlist.php` + Résultats club `resultats.php` (§364) | `supabase/functions/liveffn-startlist/` |
 
 ## Documentation
 

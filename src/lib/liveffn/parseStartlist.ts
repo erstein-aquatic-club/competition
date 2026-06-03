@@ -39,7 +39,7 @@ export interface StartlistResult {
 }
 
 /** Decode the few HTML entities we care about + collapse/trim whitespace. */
-function clean(raw: string): string {
+export function clean(raw: string): string {
   return raw
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -64,7 +64,7 @@ export function parseTime(s: string): number | null {
 }
 
 /** Local copy of supabase/functions/_shared/ffn-parser.ts formatTimeDisplay (Deno code — do not import). */
-function formatTimeDisplay(seconds: number): string {
+export function formatTimeDisplay(seconds: number): string {
   const min = Math.floor(seconds / 60);
   const sec = Math.floor(seconds % 60);
   const cs = Math.round((seconds % 1) * 100);
@@ -72,7 +72,7 @@ function formatTimeDisplay(seconds: number): string {
   return min > 0 ? `${min}:${pad2(sec)}.${pad2(cs)}` : `${sec}.${pad2(cs)}`;
 }
 
-function extractCell(rowHtml: string, className: string): string | null {
+export function extractCell(rowHtml: string, className: string): string | null {
   const re = new RegExp(`<td[^>]*class="[^"]*\\b${className}\\b[^"]*"[^>]*>([\\s\\S]*?)</td>`, "i");
   const m = rowHtml.match(re);
   return m ? clean(m[1]) : null;
@@ -84,10 +84,22 @@ function parseFirstCell(rowHtml: string): string {
   return m ? clean(m[1]) : "";
 }
 
-function parseInteger(text: string | null): number | null {
+export function parseInteger(text: string | null): number | null {
   if (!text) return null;
   const m = text.match(/(\d+)/);
   return m ? parseInt(m[1], 10) : null;
+}
+
+/** Parse "NAME Firstname (YYYY) FRA" → identité nageur. Fallback : lastName=texte brut. */
+export function parseSwimmerHeading(headingHtml: string): { lastName: string; firstName: string; birthYear: number | null } {
+  // FFN renders the WHOLE last name UPPERCASE and the first name Title-case.
+  // Case-aware split keeps compound last names intact ("LE GALL Marie-Hélène"
+  // → "LE GALL" / "Marie-Hélène", not "LE" / "GALL Marie-Hélène").
+  const text = clean(headingHtml);
+  const hm = text.match(/^([A-ZÀ-Ÿ][A-ZÀ-Ÿ'\- ]*?[A-ZÀ-Ÿ])\s+([A-ZÀ-Ÿ][a-zà-ÿ].*?)\s*\((\d{4})\)/);
+  if (hm) return { lastName: hm[1].trim(), firstName: hm[2].trim(), birthYear: parseInt(hm[3], 10) };
+  // Fallback: keep whatever text we have so the swimmer isn't dropped.
+  return { lastName: text, firstName: "", birthYear: null };
 }
 
 export function parseStartlist(html: string): StartlistResult {
@@ -111,22 +123,7 @@ export function parseStartlist(html: string): StartlistResult {
   while ((m = tokenRe.exec(html)) !== null) {
     if (m[1] !== undefined) {
       // Swimmer heading: "NAME Firstname (YYYY) FRA"
-      const text = clean(m[1]);
-      // FFN renders the WHOLE last name UPPERCASE and the first name Title-case.
-      // Case-aware split keeps compound last names intact ("LE GALL Marie-Hélène"
-      // → "LE GALL" / "Marie-Hélène", not "LE" / "GALL Marie-Hélène").
-      const hm = text.match(/^([A-ZÀ-Ÿ][A-ZÀ-Ÿ'\- ]*?[A-ZÀ-Ÿ])\s+([A-ZÀ-Ÿ][a-zà-ÿ].*?)\s*\((\d{4})\)/);
-      let lastName = "";
-      let firstName = "";
-      let birthYear: number | null = null;
-      if (hm) {
-        lastName = hm[1].trim();
-        firstName = hm[2].trim();
-        birthYear = parseInt(hm[3], 10);
-      } else {
-        // Fallback: keep whatever text we have so the swimmer isn't dropped.
-        lastName = text;
-      }
+      const { lastName, firstName, birthYear } = parseSwimmerHeading(m[1]);
       current = { lastName, firstName, birthYear, races: [] };
       swimmers.push(current);
     } else if (m[2] !== undefined && current) {

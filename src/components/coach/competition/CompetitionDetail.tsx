@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { CompetitionStartlistPanel } from "@/components/coach/CompetitionStartlist";
+import CompetitionResultsTab from "@/components/coach/competition/CompetitionResultsTab";
 
 // ── Helpers (mirrors CoachCompetitionsScreen) ──────────────────────
 
@@ -87,12 +88,13 @@ function daysUntil(dateStr: string): number {
 const dateCls =
   "flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-type Tab = "nageurs" | "parametres" | "jourj";
+type Tab = "nageurs" | "parametres" | "jourj" | "resultats";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "nageurs", label: "Nageurs" },
   { id: "parametres", label: "Paramètres" },
   { id: "jourj", label: "Jour J" },
+  { id: "resultats", label: "Résultats" },
 ];
 
 const POOL_OPTIONS: Array<{ value: number | null; label: string }> = [
@@ -155,6 +157,9 @@ export default function CompetitionDetail({
   const [location, setLocation] = useState(competition.location ?? "");
   const [description, setDescription] = useState(competition.description ?? "");
   const [liveffnUrl, setLiveffnUrl] = useState(url);
+  const [liveffnResultsUrl, setLiveffnResultsUrl] = useState(
+    competition.liveffn_results_url ?? "",
+  );
   const [poolLength, setPoolLength] = useState<number | null>(competition.pool_length ?? null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -289,6 +294,7 @@ export default function CompetitionDetail({
       location: location.trim() || null,
       description: description.trim() || null,
       liveffn_startlist_url: liveffnUrl.trim() || null,
+      liveffn_results_url: liveffnResultsUrl.trim() || null,
       pool_length: poolLength,
     });
   };
@@ -643,6 +649,26 @@ export default function CompetitionDetail({
                   Utilisé par l&apos;onglet « Jour J » pour générer la liste de départ.
                 </p>
               </div>
+
+              {/* liveffn Résultats URL (single source for the Résultats tab) */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="comp-liveffn-results"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                >
+                  Lien liveffn Résultats
+                </Label>
+                <Input
+                  id="comp-liveffn-results"
+                  placeholder="https://…liveffn.com/…/resultats.php?…&action=structure&structure=…"
+                  value={liveffnResultsUrl}
+                  onChange={(e) => setLiveffnResultsUrl(e.target.value)}
+                  className="text-[13px]"
+                />
+                <p className="text-[10px] text-muted-foreground/60">
+                  Utilisé par l&apos;onglet « Résultats » pour importer la synthèse du club.
+                </p>
+              </div>
             </section>
 
             {/* Save */}
@@ -692,6 +718,9 @@ export default function CompetitionDetail({
             )}
           </div>
         )}
+
+        {/* ── Tab 4 — Résultats ── */}
+        {tab === "resultats" && <CompetitionResultsTab competition={competition} />}
       </div>
 
       {/* ── Delete confirm ── */}

@@ -601,10 +601,20 @@ const CoachCompetitionsScreen = ({
   }, [initialCompetitionId, appliedInitialId, competitions, onOpenCompetition]);
 
   // ── Full-screen takeover (AFTER all hooks above) ──
-  if (detailComp) {
+  // `detailComp` is only the competition captured when the detail view opened.
+  // Re-derive the live record from the query so edits/imports made inside the
+  // detail (Paramètres URL, Résultats import — both invalidate ["competitions"])
+  // reflect WITHOUT closing and reopening. Falls back to the captured object
+  // until the refetch lands.
+  const liveDetailComp = detailComp
+    ? competitions.find((c) => c.id === detailComp.id) ?? detailComp
+    : null;
+
+  if (liveDetailComp) {
     return (
       <CompetitionDetail
-        competition={detailComp}
+        key={liveDetailComp.id}
+        competition={liveDetailComp}
         initialTab={detailTab}
         onBack={closeDetail}
         onDeleted={() => {

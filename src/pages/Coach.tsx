@@ -85,7 +85,6 @@ const CoachMySwimmersScreen = lazyWithRetry(() => import("./coach/CoachMySwimmer
 const CoachCommentsScreen = lazyWithRetry(() => import("./coach/CoachCommentsScreen"));
 const CoachPaceCalculatorScreen = lazyWithRetry(() => import("./coach/CoachPaceCalculatorScreen"));
 import CoachChallengesSection from "@/components/coach/CoachChallengesSection";
-import CoachActiveMesocyclesSection from "@/components/coach/CoachActiveMesocyclesSection";
 type KpiLookbackPeriod = 7 | 30 | 365;
 
 type CoachAthleteOption = {
@@ -850,9 +849,6 @@ const CoachHome = ({
           </button>
         </section>
       )}
-
-      {/* §296 — Mésocycles muscu actifs (s'efface si aucun) */}
-      <CoachActiveMesocyclesSection />
 
       {/* ── Section D: Accès rapides ── */}
       <section className="space-y-2.5">

@@ -28,7 +28,7 @@ async function resolveRole(req: Request): Promise<{ role: string | null; authErr
 function isAllowedUrl(raw: string): boolean {
   try {
     const u = new URL(raw);
-    return /(^|\.)liveffn\.com$/.test(u.hostname) && /startlist\.php$/.test(u.pathname);
+    return /(^|\.)liveffn\.com$/.test(u.hostname) && /(startlist|resultats)\.php$/.test(u.pathname);
   } catch { return false; }
 }
 
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
   let url = "";
   try { ({ url } = await req.json()); } catch { return json({ error: "Corps de requête invalide." }, 400); }
-  if (!isAllowedUrl(url)) return json({ error: "URL liveffn invalide (attendu …liveffn.com/…/startlist.php)." }, 400);
+  if (!isAllowedUrl(url)) return json({ error: "URL liveffn invalide (attendu …liveffn.com/…/startlist.php ou resultats.php)." }, 400);
 
   let html = "";
   try {

@@ -472,6 +472,10 @@ export {
   upsertStrengthPlanningWeekOverride,
 } from './strength-planning';
 
+// Strength attendance (assiduité — read-only batched coach helper)
+export { getStrengthAttendanceData } from './strength-attendance';
+export type { StrengthAttendanceData } from './strength-attendance';
+
 // Training plans (§275)
 export {
   getTrainingPlans,
