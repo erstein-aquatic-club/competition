@@ -20,8 +20,9 @@ function difficultyToRIR(difficulty: number | null | undefined): number {
 
 /**
  * Epley formula: 1RM = weight * (1 + effectiveReps / 30)
- * When difficulty < 5, adds estimated RIR to reps so the 1RM reflects true
- * strength rather than the effort of a submaximal set.
+ * `effort` accepts EITHER a difficulty number (1–5, mapped to estimated RIR) OR
+ * an explicit `{ rir }` object; the resulting RIR is added to reps so the 1RM
+ * reflects true strength rather than the effort of a submaximal set.
  */
 export function estimateOneRM(
   weight: number,
