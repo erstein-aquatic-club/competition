@@ -61,6 +61,21 @@ describe("estimateOneRM", () => {
   it("null difficulty falls back to RIR 0 (conservative)", () => {
     close(estimateOneRM(100, 5, null), estimateOneRM(100, 5), 1);
   });
+
+  it("RIR explicite prime sur la difficulté", () => {
+    // 60 kg × 5 reps, RIR 2 → effectiveReps 7 → 60*(1+7/30)=74
+    assert.equal(estimateOneRM(60, 5, { rir: 2 }), 74);
+  });
+
+  it("RIR explicite 0 = à l'échec (effectiveReps = reps)", () => {
+    // 100 kg × 1 rep, RIR 0 → 100
+    assert.equal(estimateOneRM(100, 1, { rir: 0 }), 100);
+  });
+
+  it("rétrocompat — 3e arg numérique reste interprété comme difficulté", () => {
+    // difficulté 3 → RIR 3 ; 60×5 → effectiveReps 8 → 60*(1+8/30)=76
+    assert.equal(estimateOneRM(60, 5, 3), 76);
+  });
 });
 
 describe("detectPR", () => {
