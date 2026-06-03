@@ -384,6 +384,7 @@ export function WorkoutRunner({
   const progressPct = workoutPlan.length
     ? Math.min(100, Math.max(0, Math.round(((currentStep - 1) / workoutPlan.length) * 100)))
     : 0;
+  const firstMainStep = useMemo(() => findFirstMainStep(workoutPlan), [workoutPlan]);
 
   const percentValue = Number(currentBlock?.percent_1rm);
   const hasPercent = Number.isFinite(percentValue) && percentValue > 0;
@@ -1100,29 +1101,26 @@ export function WorkoutRunner({
                   >
                     Commencer l'échauffement
                   </Button>
-                  {findFirstMainStep(workoutPlan) <= workoutPlan.length && (
+                  {firstMainStep <= workoutPlan.length && (
                     <Button
                       variant="ghost"
                       className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
                       onClick={async () => {
                         setChapterBlock(null);
-                        const firstMainStep = findFirstMainStep(workoutPlan);
-                        if (firstMainStep <= workoutPlan.length) {
-                          setCurrentSetIndex(1);
-                          setCurrentSetInputs({});
-                          updateStep(firstMainStep);
-                          setChapterBlock("main");
-                          const progressPct = Math.round(
-                            (Math.min(firstMainStep - 1, workoutPlan.length) / workoutPlan.length) * 100,
-                          );
-                          try {
-                            await onProgress?.(progressPct);
-                          } catch (_err) {
-                            toast.error("Erreur de sauvegarde", {
-                              description: "Progression non enregistrée. Réseau instable.",
-                              action: { label: "Réessayer", onClick: () => void onProgress?.(progressPct) },
-                            });
-                          }
+                        setCurrentSetIndex(1);
+                        setCurrentSetInputs({});
+                        updateStep(firstMainStep);
+                        setChapterBlock("main");
+                        const progressPct = Math.round(
+                          (Math.min(firstMainStep - 1, workoutPlan.length) / workoutPlan.length) * 100,
+                        );
+                        try {
+                          await onProgress?.(progressPct);
+                        } catch (_err) {
+                          toast.error("Erreur de sauvegarde", {
+                            description: "Progression non enregistrée. Réseau instable.",
+                            action: { label: "Réessayer", onClick: () => void onProgress?.(progressPct) },
+                          });
                         }
                       }}
                     >
