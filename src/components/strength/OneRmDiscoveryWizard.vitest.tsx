@@ -71,3 +71,77 @@ describe("OneRmDiscoveryWizard — étape mouvement à vide", () => {
     expect(onPainAbort).toHaveBeenCalledWith("skip");
   });
 });
+
+describe("OneRmDiscoveryWizard — paliers de chauffe suggérés (Task 6)", () => {
+  function advanceToWarmup(appetite: RegExp) {
+    fireEvent.click(screen.getByRole("button", { name: /douleur.*non/i }));
+    fireEvent.click(screen.getByRole("button", { name: appetite }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /palier|suivant|continuer/i }),
+    );
+  }
+
+  it("propose une charge suggérée au 1er palier quand une 1RM est connue", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={100}
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    advanceToWarmup(/recharger.*un peu/i);
+    // 45% de 100 = 45 kg suggéré, pré-rempli dans un champ éditable
+    expect(screen.getByDisplayValue("45")).toBeTruthy();
+  });
+
+  it("« + palier suivant » incrémente la suggestion selon l'appétit (45 → 47,5 en 'un peu')", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={100}
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    advanceToWarmup(/recharger.*un peu/i);
+    // 1er palier suggéré à 45
+    expect(screen.getByDisplayValue("45")).toBeTruthy();
+    // recharge "un peu" (+2.5) au palier de chauffe
+    fireEvent.click(screen.getByRole("button", { name: /recharger.*un peu/i }));
+    fireEvent.click(screen.getByRole("button", { name: /\+ palier suivant/i }));
+    // 45 + 2.5 = 47.5
+    expect(screen.getByDisplayValue("47.5")).toBeTruthy();
+  });
+
+  it("la charge suggérée est éditable (le nageur peut corriger)", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={100}
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    advanceToWarmup(/recharger.*un peu/i);
+    const chargeInput = screen.getByDisplayValue("45") as HTMLInputElement;
+    fireEvent.change(chargeInput, { target: { value: "50" } });
+    expect(chargeInput.value).toBe("50");
+  });
+
+  it("shortMode démarre directement à la série de travail (saute à vide + chauffe)", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={100}
+        shortMode
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    // pas d'étape à vide
+    expect(screen.queryByText(/à vide/i)).toBeNull();
+    // étape de travail visible
+    expect(screen.getByText(/série de travail/i)).toBeTruthy();
+  });
+});
