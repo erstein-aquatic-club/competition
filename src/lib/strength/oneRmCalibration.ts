@@ -32,3 +32,34 @@ export function suggestNextLoad(opts: {
   }
   return null;
 }
+
+/**
+ * Retour du nageur après la série de validation (série 2 de calibration).
+ */
+export interface ValidationInput {
+  pain: boolean;
+  repsDone: number;
+  repsTarget: number;
+  rir: number;
+  difficulty: number | null;
+}
+
+/**
+ * Détecte un « retour négatif » après la série de validation :
+ * douleur, reps cibles non atteintes, échec (RIR 0) ou difficulté maximale (5).
+ */
+export function isNegativeValidation(v: ValidationInput): boolean {
+  if (v.pain) return true;
+  if (v.repsTarget > 0 && v.repsDone < v.repsTarget) return true;
+  if (v.rir <= 0) return true;
+  if (v.difficulty != null && v.difficulty >= 5) return true;
+  return false;
+}
+
+/**
+ * Propose une 1RM revue à la baisse (−10 % par défaut), arrondie au pas de 2,5 kg.
+ */
+export function adjustOneRmDown(oneRm: number, factor = 0.9, step = 2.5): number {
+  if (oneRm <= 0) return 0;
+  return roundToStep(oneRm * factor, step);
+}
