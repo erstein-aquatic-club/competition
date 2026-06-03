@@ -145,3 +145,82 @@ describe("OneRmDiscoveryWizard — paliers de chauffe suggérés (Task 6)", () =
     expect(screen.getByText(/série de travail/i)).toBeTruthy();
   });
 });
+
+describe("OneRmDiscoveryWizard — série de travail + RIR → calcul 1RM (Task 7)", () => {
+  it("calcule la 1RM depuis la série de travail (charge + reps + RIR explicite)", () => {
+    const onComputed = vi.fn();
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={null}
+        shortMode
+        onComputed={onComputed}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/charge/i), { target: { value: "60" } });
+    fireEvent.change(screen.getByLabelText(/reps effectuées/i), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: /reps en réserve\s*:\s*2/i }));
+    fireEvent.click(screen.getByRole("button", { name: /calculer.*1rm|valider/i }));
+    // estimateOneRM(60,5,{rir:2}) = 74
+    expect(onComputed).toHaveBeenCalledWith(
+      74,
+      expect.objectContaining({ weight: 60, reps: 5, rir: 2 }),
+    );
+  });
+
+  it("avertit (sans bloquer) si RIR 0 sélectionné", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={null}
+        shortMode
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /reps en réserve\s*:\s*0/i }));
+    // Le warning RIR 0 mentionne explicitement la série « à l'échec » (texte distinctif).
+    expect(screen.getByText(/à l'échec/i)).toBeTruthy();
+  });
+
+  it("« 4+ » mappe sur RIR 4 dans le calcul de la 1RM", () => {
+    const onComputed = vi.fn();
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={null}
+        shortMode
+        onComputed={onComputed}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/charge/i), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(/reps effectuées/i), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: /reps en réserve\s*:\s*4\+/i }));
+    fireEvent.click(screen.getByRole("button", { name: /calculer.*1rm|valider/i }));
+    // estimateOneRM(100,3,{rir:4}) = 100*(1+7/30) = 123.3
+    expect(onComputed).toHaveBeenCalledWith(
+      123.3,
+      expect.objectContaining({ weight: 100, reps: 3, rir: 4 }),
+    );
+  });
+
+  it("ne calcule pas si la charge ou les reps sont absentes (garde-fou)", () => {
+    const onComputed = vi.fn();
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={null}
+        shortMode
+        onComputed={onComputed}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/charge/i), { target: { value: "60" } });
+    // pas de reps
+    fireEvent.click(screen.getByRole("button", { name: /reps en réserve\s*:\s*2/i }));
+    fireEvent.click(screen.getByRole("button", { name: /calculer.*1rm|valider/i }));
+    expect(onComputed).not.toHaveBeenCalled();
+  });
+});
