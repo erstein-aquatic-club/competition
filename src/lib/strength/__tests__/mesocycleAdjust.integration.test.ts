@@ -22,6 +22,7 @@ function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     level: 'intermediate',
     contraindicationZones: [],
     strokePrehabAffinity: [],
+    strokeMainAffinity: [],
     isCore: false,
     selectionPriority: 0,
     illustrationGif: null,

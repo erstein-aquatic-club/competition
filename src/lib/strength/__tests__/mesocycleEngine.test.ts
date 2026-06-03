@@ -724,6 +724,7 @@ function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     level: 'intermediate',
     contraindicationZones: [],
     strokePrehabAffinity: [],
+    strokeMainAffinity: [],
     isCore: false,
     selectionPriority: 0,
     illustrationGif: null,
@@ -863,6 +864,42 @@ describe('selectExercises', () => {
     // Le staple (2) sort en tête malgré non-core ; l'exotique core+advanced (1)
     // ensuite (priorité 0) ; le démoté (3) en dernier.
     assert.deepEqual(ordered, [2, 1, 3]);
+  });
+
+  it('§366 selectExercises — dos: tirage uni supi épinglé, pulldown pap rétrogradé', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 13, bucket: 'upper_strength', isCore: true, selectionPriority: 100, strokeMainAffinity: [] }),
+      makeExercise({ id: 12, bucket: 'upper_strength', isCore: false, selectionPriority: 90, strokeMainAffinity: ['freestyle', 'butterfly', 'breaststroke', 'medley'] }),
+      makeExercise({ id: 11, bucket: 'upper_strength', isCore: false, selectionPriority: 0, strokeMainAffinity: ['backstroke'] }),
+    ];
+    const allocs: BucketAllocation[] = [{ bucket: 'upper_strength', sessionsPerWeek: 1, role: 'focus' }];
+    const ids = selectExercises(allocs, catalog, 'advanced', [], 'backstroke').upper_strength!.map((s) => s.exercise.id);
+    assert.equal(ids[0], 13); // tractions lestées 1er (pri 100)
+    assert.equal(ids[1], 11); // tirage uni supi épinglé 2e (dos)
+    assert.ok(ids.indexOf(12) > ids.indexOf(11)); // pulldown pap rétrogradé sous id 11
+  });
+
+  it('§366 selectExercises — crawl: pulldown pap reste staple, uni supi rétrogradé', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 13, bucket: 'upper_strength', isCore: true, selectionPriority: 100, strokeMainAffinity: [] }),
+      makeExercise({ id: 12, bucket: 'upper_strength', isCore: false, selectionPriority: 90, strokeMainAffinity: ['freestyle', 'butterfly', 'breaststroke', 'medley'] }),
+      makeExercise({ id: 11, bucket: 'upper_strength', isCore: false, selectionPriority: 0, strokeMainAffinity: ['backstroke'] }),
+    ];
+    const allocs: BucketAllocation[] = [{ bucket: 'upper_strength', sessionsPerWeek: 1, role: 'focus' }];
+    const ids = selectExercises(allocs, catalog, 'advanced', [], 'freestyle').upper_strength!.map((s) => s.exercise.id);
+    assert.equal(ids[0], 13);
+    assert.equal(ids[1], 12); // pulldown pap staple pour crawl
+    assert.ok(ids.indexOf(11) > ids.indexOf(12));
+  });
+
+  it('§366 selectExercises — strokeKey null (legacy): ordre inchangé', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 12, bucket: 'upper_strength', isCore: false, selectionPriority: 90, strokeMainAffinity: ['freestyle', 'butterfly', 'breaststroke', 'medley'] }),
+      makeExercise({ id: 11, bucket: 'upper_strength', isCore: false, selectionPriority: 0, strokeMainAffinity: ['backstroke'] }),
+    ];
+    const allocs: BucketAllocation[] = [{ bucket: 'upper_strength', sessionsPerWeek: 1, role: 'focus' }];
+    const ids = selectExercises(allocs, catalog, 'advanced', [], null).upper_strength!.map((s) => s.exercise.id);
+    assert.equal(ids[0], 12); // pas de gating quand strokeKey null
   });
 
   it('substitution : un core exclu → un remplaçant marqué substituted', () => {
@@ -1740,6 +1777,106 @@ describe('generateMesocycle', () => {
     );
   });
 
+  it("§366 invariant — focus 100% haut: ≥1 bloc lower_strength dans le microcycle (entretien)", () => {
+    // Terrain Victoria (100 dos, forced_focus 100% haut du corps). Doctrine coach :
+    // l'événement dicte le focus (on ne promeut PAS lower_strength en focus), mais le
+    // microcycle doit garder AU MOINS un bloc d'entretien de la force bas du corps
+    // (1×/microcycle suffit). On vérifie la présence de lower_strength dans n'importe
+    // quelle séance (dév OU amorce PAP) — cf. §329 qui pose un trap bar (lower_strength)
+    // à la 2ᵉ amorce d'une nage haut-dominante.
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    input.sessionsPerWeek = 3; // Victoria : 3 séances/semaine
+    input.weekdays = [0, 2, 4]; // Lun, Mer, Ven
+    input.primerWeekdays = [0]; // 1 seule amorce (Lun) → 2 séances de dév
+
+    const meso = generateMesocycle(input);
+
+    for (const week of meso.weeks) {
+      const sessions = week.sessions;
+      const hasLowerStrength = sessions.some((s) => s.buckets.includes('lower_strength'));
+      assert.ok(
+        hasLowerStrength,
+        `§366 B — au moins une séance doit porter lower_strength (entretien force basse), semaine ${week.weekNumber}`,
+      );
+    }
+
+    // Doctrine : on ne PROMEUT pas lower_strength en focus — les 2 focus haut du
+    // corps restent les primaires des séances de développement (on ne réécrit qu'un
+    // complément redondant). lower_strength n'est jamais un primaire dév.
+    const devPrimaries = new Set(
+      meso.weeks
+        .flatMap((w) => w.sessions)
+        .filter((s) => s.role === 'developpement')
+        .map((s) => s.buckets[0]),
+    );
+    assert.ok(devPrimaries.has('upper_strength'), 'force haut reste un primaire dév (focus)');
+    assert.ok(devPrimaries.has('upper_power'), 'puissance haut reste un primaire dév (focus)');
+    assert.ok(
+      !devPrimaries.has('lower_strength'),
+      'lower_strength reste un ENTRETIEN (complément), jamais promu primaire/focus',
+    );
+  });
+
+  it("§366 invariant — fallback Préférence-2 : aucun complément redondant, mais un complément mobility → lower_strength injecté", () => {
+    // Cible LE chemin Préférence-2 spécifiquement. On force un microcycle où la
+    // Préférence-1 §335 ne peut PAS s'amorcer (aucun complément « redondant » =
+    // dont le seau est déjà primaire d'une autre séance de dév) tout en laissant une
+    // séance de dév avec un complément null/mobility à recycler. Recette : focus#2
+    // (upper_power) SANS exercices au catalogue → son bloc complément est vide →
+    // `buckets[1]` retombe sur 'mobility' (warmup) → `complementBucketOf == null`,
+    // donc pas un complément redondant mais bien une cible Préférence-2.
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    // Catalogue privé d'upper_power → ce focus#2 n'a aucun exo → le complément
+    // (upper_power) de l'UNIQUE séance de dév est vide → `buckets[1]` retombe sur
+    // 'mobility' → `complementBucketOf == null`. Aucune autre séance de dév n'existe,
+    // donc upper_power n'est primaire d'aucune séance de dév → la Préférence-1 ne
+    // trouve aucun complément redondant (microcycle 1 amorce + 1 dév).
+    input.exerciseCatalog = input.exerciseCatalog.filter((e) => e.bucket !== 'upper_power');
+    input.sessionsPerWeek = 2; // Lun amorce + 1 SEULE séance de dév (Mer)
+    input.weekdays = [0, 2]; // Lun, Mer
+    input.primerWeekdays = [0];
+
+    const meso = generateMesocycle(input);
+
+    for (const week of meso.weeks) {
+      const hasLowerStrength = week.sessions.some((s) => s.buckets.includes('lower_strength'));
+      assert.ok(
+        hasLowerStrength,
+        `§366 B (Préférence-2) — lower_strength doit être injecté via le fallback complément vide/mobility, semaine ${week.weekNumber}`,
+      );
+    }
+
+    // upper_strength (focus#1, seul focus avec des exos) reste un primaire dév ;
+    // lower_strength n'est jamais promu primaire.
+    const devPrimaries = new Set(
+      meso.weeks
+        .flatMap((w) => w.sessions)
+        .filter((s) => s.role === 'developpement')
+        .map((s) => s.buckets[0]),
+    );
+    assert.ok(devPrimaries.has('upper_strength'), 'force haut reste un primaire dév (focus#1)');
+    assert.ok(
+      !devPrimaries.has('lower_strength'),
+      'lower_strength reste un ENTRETIEN (complément), jamais promu primaire/focus',
+    );
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {
@@ -2111,6 +2248,7 @@ const cat = (over: Partial<WarmupCatalogExercise> & { id: number }): WarmupCatal
   level: over.level ?? 'beginner',
   contraindicationZones: over.contraindicationZones ?? [],
   strokePrehabAffinity: [],
+  strokeMainAffinity: over.strokeMainAffinity ?? [],
   correctiveAxes: over.correctiveAxes ?? [],
   supportsUnilateral: over.supportsUnilateral ?? false,
   isCore: false,

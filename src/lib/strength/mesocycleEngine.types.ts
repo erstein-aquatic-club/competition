@@ -348,6 +348,14 @@ export interface CatalogExercise {
    * démoter les exotiques (Front Lever) sans les retirer du catalogue.
    */
   selectionPriority: number;
+  /**
+   * §366 — affinité de nage des exos *principaux* (distincte de
+   * `strokePrehabAffinity`, qui est préhab). Non-vide ⇒ exo « signature »
+   * conditionnel : épinglé staple pour les nages listées, rétrogradé neutre pour
+   * les autres. `[]`/absent ⇒ sélection inchangée (rétrocompat).
+   * Source : `dim_exercices.stroke_main_affinity`.
+   */
+  strokeMainAffinity: string[];
   /** URL de l'illustration GIF (ou null si l'exercice n'en a pas). */
   illustrationGif: string | null;
   // Paramètres de charge catalogue (stratégie `catalogue` des cycles).
