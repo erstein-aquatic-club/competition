@@ -1100,28 +1100,35 @@ export function WorkoutRunner({
                   >
                     Commencer l'échauffement
                   </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
-                    onClick={async () => {
-                      setChapterBlock(null);
-                      const firstMainStep = findFirstMainStep(workoutPlan);
-                      if (firstMainStep <= workoutPlan.length) {
-                        setCurrentSetIndex(1);
-                        setCurrentSetInputs({});
-                        updateStep(firstMainStep);
-                        setChapterBlock("main");
-                        const progressPct = Math.round(
-                          (Math.min(firstMainStep - 1, workoutPlan.length) / workoutPlan.length) * 100,
-                        );
-                        try {
-                          await onProgress?.(progressPct);
-                        } catch { /* toast géré par advanceExercise */ }
-                      }
-                    }}
-                  >
-                    Passer l'échauffement →
-                  </Button>
+                  {findFirstMainStep(workoutPlan) <= workoutPlan.length && (
+                    <Button
+                      variant="ghost"
+                      className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
+                      onClick={async () => {
+                        setChapterBlock(null);
+                        const firstMainStep = findFirstMainStep(workoutPlan);
+                        if (firstMainStep <= workoutPlan.length) {
+                          setCurrentSetIndex(1);
+                          setCurrentSetInputs({});
+                          updateStep(firstMainStep);
+                          setChapterBlock("main");
+                          const progressPct = Math.round(
+                            (Math.min(firstMainStep - 1, workoutPlan.length) / workoutPlan.length) * 100,
+                          );
+                          try {
+                            await onProgress?.(progressPct);
+                          } catch (_err) {
+                            toast.error("Erreur de sauvegarde", {
+                              description: "Progression non enregistrée. Réseau instable.",
+                              action: { label: "Réessayer", onClick: () => void onProgress?.(progressPct) },
+                            });
+                          }
+                        }
+                      }}
+                    >
+                      Passer l'échauffement →
+                    </Button>
+                  )}
                 </CardFooter>
               </>
             ) : (
