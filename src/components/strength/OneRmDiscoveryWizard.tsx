@@ -87,6 +87,123 @@ function PillButton({
   );
 }
 
+/**
+ * Bloc retex partagé entre l'étape « à vide » et chaque palier de chauffe.
+ * Rend les TROIS cases demandées par le coach (douleur, aisance technique, appétit de
+ * recharge) + la branche sécurité (Alléger/Substituer/Passer) quand douleur=oui.
+ * Sans état propre : piloté entièrement par props (valeurs + setters), donc aucun hook
+ * ici (rules-of-hooks préservées côté parent).
+ */
+function RetexCard({
+  pain,
+  setPain,
+  ease,
+  setEase,
+  appetite,
+  setAppetite,
+  onPainAbort,
+}: {
+  pain: boolean | null;
+  setPain: (value: boolean) => void;
+  ease: Ease | null;
+  setEase: (value: Ease) => void;
+  appetite: ReloadAppetite | null;
+  setAppetite: (value: ReloadAppetite) => void;
+  onPainAbort: (action: "lighten" | "substitute" | "skip") => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* 1) Douleur oui/non */}
+      <div className="space-y-2">
+        <span className="text-sm font-medium">Douleur ?</span>
+        <div className="flex gap-2">
+          <PillButton
+            ariaLabel="Douleur : oui"
+            selected={pain === true}
+            onClick={() => setPain(true)}
+          >
+            oui
+          </PillButton>
+          <PillButton
+            ariaLabel="Douleur : non"
+            selected={pain === false}
+            onClick={() => setPain(false)}
+          >
+            non
+          </PillButton>
+        </div>
+      </div>
+
+      {/* Branche sécurité affichée quand douleur = oui */}
+      {pain === true && (
+        <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+          <p className="text-sm font-medium text-destructive">
+            On arrête la montée en charge : pas de série lourde sur une gêne. Choisis comment
+            poursuivre.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onPainAbort("lighten")}
+              className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
+            >
+              Alléger
+            </button>
+            <button
+              type="button"
+              onClick={() => onPainAbort("substitute")}
+              className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
+            >
+              Substituer
+            </button>
+            <button
+              type="button"
+              onClick={() => onPainAbort("skip")}
+              className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
+            >
+              Passer l'exercice
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2) Aisance technique */}
+      <div className="space-y-2">
+        <span className="text-sm font-medium">Aisance technique</span>
+        <div className="flex gap-2">
+          {EASE_OPTIONS.map((opt) => (
+            <PillButton
+              key={opt.value}
+              ariaLabel={`Aisance : ${opt.label}`}
+              selected={ease === opt.value}
+              onClick={() => setEase(opt.value)}
+            >
+              {opt.label}
+            </PillButton>
+          ))}
+        </div>
+      </div>
+
+      {/* 3) Appétit de recharge */}
+      <div className="space-y-2">
+        <span className="text-sm font-medium">Je peux recharger :</span>
+        <div className="flex gap-2">
+          {APPETITE_OPTIONS.map((opt) => (
+            <PillButton
+              key={opt.value}
+              ariaLabel={`Recharger : ${opt.label}`}
+              selected={appetite === opt.value}
+              onClick={() => setAppetite(opt.value)}
+            >
+              {opt.label}
+            </PillButton>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OneRmDiscoveryWizard({
   exerciseName,
   known1rm,
@@ -97,7 +214,7 @@ export function OneRmDiscoveryWizard({
   // Machine à états extensible. shortMode saute à vide + chauffe → série de travail (Task 7).
   const [step, setStep] = useState<WizardStep>(shortMode ? "working" : "empty");
   const [pain, setPain] = useState<boolean | null>(null);
-  // retex capturé ici, consommé en étape C (Task 7) — ne pas supprimer comme "unused"
+  // aisance technique : retex guidé (sélection affichée) ; volontairement non persisté/non injecté dans le calcul (design)
   const [ease, setEase] = useState<Ease | null>(null);
   const [appetite, setAppetite] = useState<ReloadAppetite | null>(null);
 
@@ -109,7 +226,7 @@ export function OneRmDiscoveryWizard({
   const [warmupHistory, setWarmupHistory] = useState<number[]>([]);
 
   // ── Série de travail (étape C / Task 7). ──
-  // Charge effective de la série (éditable, peut être pré-remplie depuis le dernier palier).
+  // charge de travail saisie à neuf : volontairement PAS pré-remplie depuis le dernier palier de chauffe (charge de travail = plus lourde ; un pré-remplissage induirait une charge trop légère)
   const [workWeight, setWorkWeight] = useState<string>("");
   // Reps effectuées sur la série de travail.
   const [workReps, setWorkReps] = useState<string>("");
@@ -291,76 +408,16 @@ export function OneRmDiscoveryWizard({
           />
         </div>
 
-        {/* Retex du palier : douleur + appétit de recharge (pilote la suggestion suivante). */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Douleur ?</span>
-            <div className="flex gap-2">
-              <PillButton
-                ariaLabel="Douleur : oui"
-                selected={pain === true}
-                onClick={() => setPain(true)}
-              >
-                oui
-              </PillButton>
-              <PillButton
-                ariaLabel="Douleur : non"
-                selected={pain === false}
-                onClick={() => setPain(false)}
-              >
-                non
-              </PillButton>
-            </div>
-          </div>
-
-          {pain === true && (
-            <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-              <p className="text-sm font-medium text-destructive">
-                On arrête la montée en charge : pas de série lourde sur une gêne. Choisis
-                comment poursuivre.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => onPainAbort("lighten")}
-                  className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
-                >
-                  Alléger
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onPainAbort("substitute")}
-                  className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
-                >
-                  Substituer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onPainAbort("skip")}
-                  className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
-                >
-                  Passer l'exercice
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Je peux recharger :</span>
-            <div className="flex gap-2">
-              {APPETITE_OPTIONS.map((opt) => (
-                <PillButton
-                  key={opt.value}
-                  ariaLabel={`Recharger : ${opt.label}`}
-                  selected={appetite === opt.value}
-                  onClick={() => setAppetite(opt.value)}
-                >
-                  {opt.label}
-                </PillButton>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Retex du palier (3 cases) : douleur + aisance + appétit (pilote la suggestion suivante). */}
+        <RetexCard
+          pain={pain}
+          setPain={setPain}
+          ease={ease}
+          setEase={setEase}
+          appetite={appetite}
+          setAppetite={setAppetite}
+          onPainAbort={onPainAbort}
+        />
 
         <div className="flex flex-col gap-2">
           <button
@@ -401,96 +458,16 @@ export function OneRmDiscoveryWizard({
         </p>
       </div>
 
-      {/* Carte retex : douleur / aisance / appétit de recharge */}
-      <div className="space-y-4">
-        {/* 1) Douleur oui/non */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium">Douleur ?</span>
-          <div className="flex gap-2">
-            <PillButton
-              ariaLabel="Douleur : oui"
-              selected={pain === true}
-              onClick={() => setPain(true)}
-            >
-              oui
-            </PillButton>
-            <PillButton
-              ariaLabel="Douleur : non"
-              selected={pain === false}
-              onClick={() => setPain(false)}
-            >
-              non
-            </PillButton>
-          </div>
-        </div>
-
-        {/* Branche sécurité affichée quand douleur = oui */}
-        {pain === true && (
-          <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-            <p className="text-sm font-medium text-destructive">
-              On arrête la montée en charge : pas de série lourde sur une gêne. Choisis comment
-              poursuivre.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onPainAbort("lighten")}
-                className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
-              >
-                Alléger
-              </button>
-              <button
-                type="button"
-                onClick={() => onPainAbort("substitute")}
-                className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
-              >
-                Substituer
-              </button>
-              <button
-                type="button"
-                onClick={() => onPainAbort("skip")}
-                className="h-11 rounded-full border border-input bg-background px-4 text-sm font-semibold"
-              >
-                Passer l'exercice
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 2) Aisance technique */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium">Aisance technique</span>
-          <div className="flex gap-2">
-            {EASE_OPTIONS.map((opt) => (
-              <PillButton
-                key={opt.value}
-                ariaLabel={`Aisance : ${opt.label}`}
-                selected={ease === opt.value}
-                onClick={() => setEase(opt.value)}
-              >
-                {opt.label}
-              </PillButton>
-            ))}
-          </div>
-        </div>
-
-        {/* 3) Appétit de recharge */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium">Je peux recharger :</span>
-          <div className="flex gap-2">
-            {APPETITE_OPTIONS.map((opt) => (
-              <PillButton
-                key={opt.value}
-                ariaLabel={`Recharger : ${opt.label}`}
-                selected={appetite === opt.value}
-                onClick={() => setAppetite(opt.value)}
-              >
-                {opt.label}
-              </PillButton>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Carte retex partagée (3 cases) : douleur / aisance / appétit de recharge */}
+      <RetexCard
+        pain={pain}
+        setPain={setPain}
+        ease={ease}
+        setEase={setEase}
+        appetite={appetite}
+        setAppetite={setAppetite}
+        onPainAbort={onPainAbort}
+      />
 
       {/* Avancer vers les paliers de chauffe : calcule la 1ʳᵉ suggestion puis entre en chauffe. */}
       <button

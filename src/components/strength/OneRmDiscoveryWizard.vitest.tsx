@@ -144,6 +144,24 @@ describe("OneRmDiscoveryWizard — paliers de chauffe suggérés (Task 6)", () =
     // étape de travail visible
     expect(screen.getByText(/série de travail/i)).toBeTruthy();
   });
+
+  it("le palier de chauffe affiche aussi les 3 cases de retex (dont l'aisance technique)", () => {
+    render(
+      <OneRmDiscoveryWizard
+        exerciseName="Squat"
+        known1rm={100}
+        onComputed={vi.fn()}
+        onPainAbort={vi.fn()}
+      />,
+    );
+    advanceToWarmup(/recharger.*un peu/i);
+    // le bloc retex partagé apporte l'aisance technique sur le palier de chauffe
+    expect(screen.getByText(/aisance technique/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /aisance.*hésitant/i })).toBeTruthy();
+    // douleur + recharger restent présents
+    expect(screen.getByRole("button", { name: /douleur.*non/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /recharger.*moyen/i })).toBeTruthy();
+  });
 });
 
 describe("OneRmDiscoveryWizard — série de travail + RIR → calcul 1RM (Task 7)", () => {
