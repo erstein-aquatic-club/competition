@@ -19,12 +19,14 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  Flame,
   RefreshCw,
   RotateCcw,
   StickyNote,
   Trophy,
   WifiOff,
   X,
+  Zap,
 } from "lucide-react";
 import { BottomActionBar } from "@/components/shared/BottomActionBar";
 import { ScaleSelector5 } from "@/components/shared/ScaleSelector5";
@@ -1067,6 +1069,91 @@ export function WorkoutRunner({
           </span>
         </div>
       )}
+      {/* §367 — Carte de chapitre (warmup / main) */}
+      {chapterBlock && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <Card className="rounded-3xl border-2 shadow-lg overflow-hidden">
+            {chapterBlock === "warmup" ? (
+              <>
+                <CardHeader className="pb-3 bg-sky-50/60 dark:bg-sky-950/30">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 dark:bg-sky-900/50">
+                      <Flame className="h-6 w-6 text-sky-600 dark:text-sky-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">Échauffement</CardTitle>
+                      <CardDescription>
+                        {workoutPlan.filter((i) => (i.block ?? "main") === "warmup").length} exercices · intensité légère
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-3 pb-1">
+                  <p className="text-sm text-muted-foreground">
+                    Prépare le corps avant le bloc principal. Ne pas sauter si tu ressens une tension.
+                  </p>
+                </CardContent>
+                <CardFooter className="flex-col gap-2 pt-2 pb-4">
+                  <Button
+                    className="w-full h-12 rounded-2xl font-semibold"
+                    onClick={() => setChapterBlock(null)}
+                  >
+                    Commencer l'échauffement
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
+                    onClick={async () => {
+                      setChapterBlock(null);
+                      const firstMainStep = findFirstMainStep(workoutPlan);
+                      if (firstMainStep <= workoutPlan.length) {
+                        setCurrentSetIndex(1);
+                        setCurrentSetInputs({});
+                        updateStep(firstMainStep);
+                        setChapterBlock("main");
+                        const progressPct = Math.round(
+                          (Math.min(firstMainStep - 1, workoutPlan.length) / workoutPlan.length) * 100,
+                        );
+                        try {
+                          await onProgress?.(progressPct);
+                        } catch { /* toast géré par advanceExercise */ }
+                      }
+                    }}
+                  >
+                    Passer l'échauffement →
+                  </Button>
+                </CardFooter>
+              </>
+            ) : (
+              <>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                      <Zap className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">Bloc principal</CardTitle>
+                      <CardDescription>
+                        {workoutPlan.filter((i) => (i.block ?? "main") === "main").length} exercices
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardFooter className="pt-0 pb-4">
+                  <Button
+                    className="w-full h-12 rounded-2xl font-semibold"
+                    onClick={() => setChapterBlock(null)}
+                  >
+                    On y va !
+                  </Button>
+                </CardFooter>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
+      {!chapterBlock && (
+        <>
       <div className="space-y-3">
         {/* §296 — Badge "Échauffement" si l'exo en cours est un warmup */}
         {currentBlock?.block === "warmup" && (
@@ -1396,6 +1483,8 @@ export function WorkoutRunner({
           )}
         </BottomActionBar>
       ) : null}
+        </>
+      )}
 
       {isResting && (
         <RestScreen
