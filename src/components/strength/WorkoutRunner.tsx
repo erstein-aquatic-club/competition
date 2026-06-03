@@ -160,6 +160,11 @@ export const findFirstMainStep = (
   return idx === -1 ? items.length + 1 : idx + 1;
 };
 
+// Task 8 — RIR neutre injecté dans la validation post-série-2 : la série 2 ne
+// capte pas le RIR (≠ le wizard), donc on passe une valeur neutre pour que SEULS
+// la douleur, le déficit de reps et la difficulté pilotent la négativité.
+const NEUTRAL_RIR = 3;
+
 const formatStrengthValue = (value?: number | null, suffix?: string) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -287,9 +292,11 @@ export function WorkoutRunner({
   //   dans la branche douleur → on masque le wizard pour CE run et on le laisse
   //   logger normalement à une charge auto-choisie (aucune 1RM calculée).
   const [calibrationDismissed, setCalibrationDismissed] = useState<Set<number>>(new Set());
-  // `calibratedThisRun` : exos passés par le wizard pendant CE run → déclenche la
-  //   carte de validation post-série-2 (qualité > charge) — Task 8 Commit 2.
-  const [calibratedThisRun, setCalibratedThisRun] = useState<Set<number>>(new Set());
+  // `calibratedThisRun` : exos passés par le wizard pendant CE run → 1RM calculée à
+  //   la série 1 (Map exerciseId → oneRm). Déclenche la carte de validation
+  //   post-série-2 (qualité > charge) ET fournit la 1RM LOCALE fraîche pour le −10 %
+  //   (le prop `oneRMs` peut être périmé/non propagé à la fin de la série 2).
+  const [calibratedThisRun, setCalibratedThisRun] = useState<Map<number, number>>(new Map());
   // Validation post-série-2 (Task 8 Commit 2). Capture la série 2 d'un exo calibré
   // (reps réalisées / cible / 1RM courante) pour piloter isNegativeValidation, +
   // état de la carte (douleur, ressenti charge). Non bloquante, une fois par exo/run.
@@ -764,12 +771,10 @@ export function WorkoutRunner({
       setLogs((prev) => [...prev, newLog]);
       await onLogSets?.([newLog]);
 
-      // Marque l'exo comme calibré ce run → déclenche la validation post-série-2.
-      setCalibratedThisRun((prev) => {
-        const next = new Set(prev);
-        next.add(exerciseId);
-        return next;
-      });
+      // Mémorise la 1RM LOCALE fraîche (exerciseId → oneRm) → déclenche la
+      // validation post-série-2 ET sert d'ancrage au −10 % (sans dépendre du
+      // prop `oneRMs` qui peut ne pas être encore propagé).
+      setCalibratedThisRun((prev) => new Map(prev).set(exerciseId, oneRm));
 
       setCurrentSetInputs({});
       setCurrentSetIndex(2);
@@ -846,7 +851,9 @@ export function WorkoutRunner({
         repsDone: Number(newLog.reps) || 0,
         repsTarget: Number(currentBlock.reps) || 0,
         difficulty: setDifficultyValue,
-        currentOneRm: oneRMs.find((r) => r.exercise_id === exerciseId)?.weight ?? 0,
+        // 1RM LOCALE fraîche calculée à la série 1 (≠ prop oneRMs potentiellement
+        // périmé/non propagé) → ancrage fiable du −10 %.
+        currentOneRm: calibratedThisRun.get(exerciseId) ?? 0,
       });
       setValidationPain(null);
       setValidationLoadFeel(null);
@@ -1937,16 +1944,19 @@ export function WorkoutRunner({
             <SheetTitle>Comment était cette série ?</SheetTitle>
           </SheetHeader>
           {validation && (() => {
-            // RIR neutre = 3 : la série 2 ne capte pas le RIR (≠ wizard) → on passe
-            // une valeur neutre pour que seuls douleur / reps manquées / difficulté≥5
-            // pilotent la négativité (cf. isNegativeValidation).
-            const negative = isNegativeValidation({
-              pain: validationPain === true,
-              repsDone: validation.repsDone,
-              repsTarget: validation.repsTarget,
-              rir: 3,
-              difficulty: validation.difficulty,
-            });
+            // Verdict négatif = signaux objectifs (douleur / reps manquées /
+            // difficulté≥5 via isNegativeValidation, RIR neutre car non capté en
+            // série 2) OU ressenti subjectif « trop lourde » → contrôle de
+            // cohérence de la charge voulu par le coach. « juste »/« trop légère »
+            // ne déclenchent pas le −10 %.
+            const negative =
+              isNegativeValidation({
+                pain: validationPain === true,
+                repsDone: validation.repsDone,
+                repsTarget: validation.repsTarget,
+                rir: NEUTRAL_RIR,
+                difficulty: validation.difficulty,
+              }) || validationLoadFeel === "heavy";
             const adjusted = adjustOneRmDown(validation.currentOneRm);
             return (
               <div className="mt-4 space-y-5 pb-8">
