@@ -724,6 +724,7 @@ function makeExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     level: 'intermediate',
     contraindicationZones: [],
     strokePrehabAffinity: [],
+    strokeMainAffinity: [],
     isCore: false,
     selectionPriority: 0,
     illustrationGif: null,
@@ -863,6 +864,42 @@ describe('selectExercises', () => {
     // Le staple (2) sort en tête malgré non-core ; l'exotique core+advanced (1)
     // ensuite (priorité 0) ; le démoté (3) en dernier.
     assert.deepEqual(ordered, [2, 1, 3]);
+  });
+
+  it('§366 selectExercises — dos: tirage uni supi épinglé, pulldown pap rétrogradé', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 13, bucket: 'upper_strength', isCore: true, selectionPriority: 100, strokeMainAffinity: [] }),
+      makeExercise({ id: 12, bucket: 'upper_strength', isCore: false, selectionPriority: 90, strokeMainAffinity: ['freestyle', 'butterfly', 'breaststroke', 'medley'] }),
+      makeExercise({ id: 11, bucket: 'upper_strength', isCore: false, selectionPriority: 0, strokeMainAffinity: ['backstroke'] }),
+    ];
+    const allocs: BucketAllocation[] = [{ bucket: 'upper_strength', sessionsPerWeek: 1, role: 'focus' }];
+    const ids = selectExercises(allocs, catalog, 'advanced', [], 'backstroke').upper_strength!.map((s) => s.exercise.id);
+    assert.equal(ids[0], 13); // tractions lestées 1er (pri 100)
+    assert.equal(ids[1], 11); // tirage uni supi épinglé 2e (dos)
+    assert.ok(ids.indexOf(12) > ids.indexOf(11)); // pulldown pap rétrogradé sous id 11
+  });
+
+  it('§366 selectExercises — crawl: pulldown pap reste staple, uni supi rétrogradé', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 13, bucket: 'upper_strength', isCore: true, selectionPriority: 100, strokeMainAffinity: [] }),
+      makeExercise({ id: 12, bucket: 'upper_strength', isCore: false, selectionPriority: 90, strokeMainAffinity: ['freestyle', 'butterfly', 'breaststroke', 'medley'] }),
+      makeExercise({ id: 11, bucket: 'upper_strength', isCore: false, selectionPriority: 0, strokeMainAffinity: ['backstroke'] }),
+    ];
+    const allocs: BucketAllocation[] = [{ bucket: 'upper_strength', sessionsPerWeek: 1, role: 'focus' }];
+    const ids = selectExercises(allocs, catalog, 'advanced', [], 'freestyle').upper_strength!.map((s) => s.exercise.id);
+    assert.equal(ids[0], 13);
+    assert.equal(ids[1], 12); // pulldown pap staple pour crawl
+    assert.ok(ids.indexOf(11) > ids.indexOf(12));
+  });
+
+  it('§366 selectExercises — strokeKey null (legacy): ordre inchangé', () => {
+    const catalog: CatalogExercise[] = [
+      makeExercise({ id: 12, bucket: 'upper_strength', isCore: false, selectionPriority: 90, strokeMainAffinity: ['freestyle', 'butterfly', 'breaststroke', 'medley'] }),
+      makeExercise({ id: 11, bucket: 'upper_strength', isCore: false, selectionPriority: 0, strokeMainAffinity: ['backstroke'] }),
+    ];
+    const allocs: BucketAllocation[] = [{ bucket: 'upper_strength', sessionsPerWeek: 1, role: 'focus' }];
+    const ids = selectExercises(allocs, catalog, 'advanced', [], null).upper_strength!.map((s) => s.exercise.id);
+    assert.equal(ids[0], 12); // pas de gating quand strokeKey null
   });
 
   it('substitution : un core exclu → un remplaçant marqué substituted', () => {
@@ -2111,6 +2148,7 @@ const cat = (over: Partial<WarmupCatalogExercise> & { id: number }): WarmupCatal
   level: over.level ?? 'beginner',
   contraindicationZones: over.contraindicationZones ?? [],
   strokePrehabAffinity: [],
+  strokeMainAffinity: over.strokeMainAffinity ?? [],
   correctiveAxes: over.correctiveAxes ?? [],
   supportsUnilateral: over.supportsUnilateral ?? false,
   isCore: false,
