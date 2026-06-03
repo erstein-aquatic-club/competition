@@ -97,8 +97,10 @@ interface PendingParams {
   distance: DistanceKey;
   kind: "season" | "inter_competition";
   targetWeekCount: number;
-  /** Jours muscu cochés (0=Lun…6=Dim, sans samedi). sessions/sem = length. §307. */
+  /** Jours muscu cochés (0=Lun…6=Dim). sessions/sem = length. §307. */
   weekdays: number[];
+  /** Sous-ensemble de weekdays désignés amorce SNC (volume réduit). Absent → {0,3} ∩ weekdays. */
+  primerWeekdays?: number[];
   /** Date de départ réelle (ISO YYYY-MM-DD), 1re semaine partielle possible. §307. */
   startDate: string;
   /** Nageur ciblé (mode coach). Absent/égal à la session → mode nageur. */
@@ -484,7 +486,7 @@ export default function MesocyclePreview() {
       // §307 — sessions/sem dérivé des jours cochés ; jour-aware via weekdays.
       sessionsPerWeek: params.weekdays.length,
       weekdays: params.weekdays,
-      primerWeekdays: params.weekdays.filter((d) => d === 0 || d === 3),
+      primerWeekdays: params.primerWeekdays ?? params.weekdays.filter((d) => d === 0 || d === 3),
       exerciseCatalog: catalog,
       commonWarmupRoutine,
       activationRoutine,
