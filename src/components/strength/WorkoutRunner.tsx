@@ -117,6 +117,46 @@ export const resolveNextStep = (
   return Math.min(items.length, completedBlocks + 1);
 };
 
+/**
+ * §367 — Détecte le changement de chapitre (warmup → main) entre deux pas
+ * successifs du runner.
+ *
+ * Retourne le nouveau bloc si on change de chapitre, `null` sinon.
+ * `fromStep === 0` signifie le tout début de séance : on retourne directement
+ * le bloc du pas de destination (utile pour afficher l'en-tête dès le premier
+ * item, qu'il soit warmup ou main).
+ */
+export const detectBlockChapter = (
+  items: StrengthSessionTemplate["items"],
+  fromStep: number,
+  toStep: number,
+): "warmup" | "main" | null => {
+  if (!items || items.length === 0 || toStep < 1 || toStep > items.length) {
+    return null;
+  }
+  const toBlock = (items[toStep - 1].block ?? "main") as "warmup" | "main";
+  if (fromStep === 0) {
+    return toBlock;
+  }
+  if (fromStep < 1 || fromStep > items.length) {
+    return null;
+  }
+  const fromBlock = (items[fromStep - 1].block ?? "main") as "warmup" | "main";
+  return fromBlock !== toBlock ? toBlock : null;
+};
+
+/**
+ * §367 — Retourne le numéro de pas (1-based) du premier item appartenant au
+ * bloc `main`. Si aucun item n'est `main`, retourne `items.length + 1`.
+ */
+export const findFirstMainStep = (
+  items: StrengthSessionTemplate["items"],
+): number => {
+  if (!items || items.length === 0) return 1;
+  const idx = items.findIndex((item) => (item.block ?? "main") === "main");
+  return idx === -1 ? items.length + 1 : idx + 1;
+};
+
 const formatStrengthValue = (value?: number | null, suffix?: string) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) {

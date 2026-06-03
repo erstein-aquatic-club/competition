@@ -1,11 +1,13 @@
 import React from "react";
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   WorkoutRunner,
   resolveNextStep,
   resolveSetNumber,
+  detectBlockChapter,
+  findFirstMainStep,
 } from "@/components/strength/WorkoutRunner";
 import type { StrengthSessionTemplate, Exercise } from "@/lib/api";
 
@@ -145,4 +147,65 @@ test("resolveNextStep returns items.length+1 once every block is complete", () =
   ];
   // step = items.length + 1 signals the runner's "completion" view.
   assert.strictEqual(resolveNextStep(items, logs), items.length + 1);
+});
+
+// ---------------------------------------------------------------------------
+// detectBlockChapter
+// ---------------------------------------------------------------------------
+
+describe("detectBlockChapter", () => {
+  const warmupItem = { exercise_id: 1, exercise_name: "Mob épaule", sets: 1, reps: 10, rest_seconds: 0, percent_1rm: 0, order_index: 0, block: "warmup" as const };
+  const mainItem   = { exercise_id: 2, exercise_name: "Tractions", sets: 4, reps: 6, rest_seconds: 90, percent_1rm: 0, order_index: 1, block: "main" as const };
+
+  it("retourne 'warmup' au démarrage (fromStep=0) si 1er item est warmup", () => {
+    const items = [warmupItem, mainItem];
+    assert.strictEqual(detectBlockChapter(items, 0, 1), "warmup");
+  });
+
+  it("retourne 'main' au démarrage (fromStep=0) si 1er item est main", () => {
+    const items = [mainItem];
+    assert.strictEqual(detectBlockChapter(items, 0, 1), "main");
+  });
+
+  it("retourne null si fromStep et toStep sont dans le même bloc warmup", () => {
+    const warmupItem2 = { ...warmupItem, exercise_id: 3, order_index: 1 };
+    const items = [warmupItem, warmupItem2, mainItem];
+    assert.strictEqual(detectBlockChapter(items, 1, 2), null);
+  });
+
+  it("retourne 'main' lors de la transition warmup → main", () => {
+    const items = [warmupItem, mainItem];
+    assert.strictEqual(detectBlockChapter(items, 1, 2), "main");
+  });
+
+  it("retourne null si la liste est vide", () => {
+    assert.strictEqual(detectBlockChapter([], 0, 1), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findFirstMainStep
+// ---------------------------------------------------------------------------
+
+describe("findFirstMainStep", () => {
+  const warmupItem = { exercise_id: 1, exercise_name: "Mob épaule", sets: 1, reps: 10, rest_seconds: 0, percent_1rm: 0, order_index: 0, block: "warmup" as const };
+  const mainItem   = { exercise_id: 2, exercise_name: "Tractions", sets: 4, reps: 6, rest_seconds: 90, percent_1rm: 0, order_index: 1, block: "main" as const };
+  const nullBlockItem = { exercise_id: 3, exercise_name: "Legacy", sets: 3, reps: 8, rest_seconds: 60, percent_1rm: 0, order_index: 2 };
+
+  it("retourne 2 quand 1 warmup + 1 main", () => {
+    assert.strictEqual(findFirstMainStep([warmupItem, mainItem]), 2);
+  });
+
+  it("retourne 1 quand le 1er item est main", () => {
+    assert.strictEqual(findFirstMainStep([mainItem, warmupItem]), 1);
+  });
+
+  it("retourne items.length+1 si tout est warmup", () => {
+    const allWarmup = [warmupItem, { ...warmupItem, exercise_id: 99, order_index: 1 }];
+    assert.strictEqual(findFirstMainStep(allWarmup), allWarmup.length + 1);
+  });
+
+  it("traite block=null comme main", () => {
+    assert.strictEqual(findFirstMainStep([warmupItem, nullBlockItem]), 2);
+  });
 });
