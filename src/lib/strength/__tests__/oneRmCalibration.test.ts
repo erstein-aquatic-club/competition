@@ -35,7 +35,15 @@ test('isNegativeValidation: difficulté 5', () => {
 test('isNegativeValidation: tout va bien = false', () => {
   assert.equal(isNegativeValidation({ pain: false, repsDone: 8, repsTarget: 8, rir: 2, difficulty: 3 }), false);
 });
-test('adjustOneRmDown: -10% arrondi au pas de 2.5', () => {
-  assert.equal(adjustOneRmDown(100), 90);  // 90
-  assert.equal(adjustOneRmDown(77), 70);   // 69.3 → 70
+test('adjustOneRmDown: arrondi VERS LE BAS au pas de 2.5 (sécurité, jamais au-dessus de -10%)', () => {
+  assert.equal(adjustOneRmDown(100), 90);    // 90 → 90
+  assert.equal(adjustOneRmDown(77), 67.5);   // 69.3 → floor → 67.5 (≤ -10%)
+  assert.equal(adjustOneRmDown(57), 50);     // 51.3 → floor → 50
+});
+test('adjustOneRmDown: entrée non finie ou <=0 → 0', () => {
+  assert.equal(adjustOneRmDown(0), 0);
+  assert.equal(adjustOneRmDown(Number.NaN), 0);
+});
+test('isNegativeValidation: difficulté null + reste OK = false (branche !=null exercée)', () => {
+  assert.equal(isNegativeValidation({ pain: false, repsDone: 8, repsTarget: 8, rir: 2, difficulty: null }), false);
 });
