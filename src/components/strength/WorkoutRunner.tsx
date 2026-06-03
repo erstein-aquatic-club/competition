@@ -1423,6 +1423,24 @@ export function WorkoutRunner({
             Recalculer ma 1RM
           </Button>
         )}
+      {!isEstimationMode && (
+        <Button
+          variant="ghost"
+          className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
+          onClick={() => {
+            const hasLogsForCurrent = currentBlock
+              ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
+              : false;
+            if (hasLogsForCurrent) {
+              setSkipExerciseConfirmOpen(true);
+            } else {
+              void advanceExercise();
+            }
+          }}
+        >
+          Passer cet exercice
+        </Button>
+      )}
       <Button variant="outline" className="w-full rounded-2xl" onClick={() => setSeriesSheetOpen(true)}>
         Voir les séries
       </Button>
@@ -1466,26 +1484,6 @@ export function WorkoutRunner({
                 <Check className="mr-2 h-5 w-5" />
                 {currentLoggedSet ? "Série suivante" : "Valider série"}
               </Button>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground font-medium py-1 active:text-foreground transition-colors"
-                onClick={() => {
-                  // Confirm only when there's already partial work on the current
-                  // exercise — otherwise skipping a fresh block is a normal flow
-                  // (e.g. swimmer realises an exercise isn't relevant today) and
-                  // a confirm dialog adds friction without benefit.
-                  const hasLogsForCurrent = currentBlock
-                    ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
-                    : false;
-                  if (hasLogsForCurrent) {
-                    setSkipExerciseConfirmOpen(true);
-                  } else {
-                    advanceExercise();
-                  }
-                }}
-              >
-                Passer cet exercice
-              </button>
             </>
           )}
         </BottomActionBar>
