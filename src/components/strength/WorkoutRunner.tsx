@@ -45,6 +45,7 @@ import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from 
 import { detectPR } from "@/lib/prDetection";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 import { OneRmDiscoveryWizard } from "@/components/strength/OneRmDiscoveryWizard";
+import { isNegativeValidation, adjustOneRmDown } from "@/lib/strength/oneRmCalibration";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -287,8 +288,22 @@ export function WorkoutRunner({
   //   logger normalement à une charge auto-choisie (aucune 1RM calculée).
   const [calibrationDismissed, setCalibrationDismissed] = useState<Set<number>>(new Set());
   // `calibratedThisRun` : exos passés par le wizard pendant CE run → déclenche la
-  //   carte de validation post-série-2 (qualité > charge) — voir Task 8 Commit 2.
+  //   carte de validation post-série-2 (qualité > charge) — Task 8 Commit 2.
   const [calibratedThisRun, setCalibratedThisRun] = useState<Set<number>>(new Set());
+  // Validation post-série-2 (Task 8 Commit 2). Capture la série 2 d'un exo calibré
+  // (reps réalisées / cible / 1RM courante) pour piloter isNegativeValidation, +
+  // état de la carte (douleur, ressenti charge). Non bloquante, une fois par exo/run.
+  const [validation, setValidation] = useState<{
+    exerciseId: number;
+    repsDone: number;
+    repsTarget: number;
+    difficulty: number | null;
+    currentOneRm: number;
+  } | null>(null);
+  const [validationPain, setValidationPain] = useState<boolean | null>(null);
+  const [validationLoadFeel, setValidationLoadFeel] = useState<"light" | "right" | "heavy" | null>(null);
+  // Exos dont la carte de validation a déjà été montrée ce run (évite la réapparition).
+  const [validationShownFor, setValidationShownFor] = useState<Set<number>>(new Set());
 
   // Task 14: Substitution in focus mode
   const [substitutePickerOpen, setSubstitutePickerOpen] = useState(false);
@@ -816,6 +831,31 @@ export function WorkoutRunner({
       difficulty: setDifficultyValue,
     };
     setLogs((prev) => [...prev, newLog]);
+
+    // Task 8 — validation post-série-2 : si la série qu'on vient de logger est la
+    // série 2 d'un exo passé par le wizard ce run (et pas encore validé), capture
+    // les entrées de isNegativeValidation et ouvre la carte (non bloquante, 1×/run).
+    if (
+      currentSetIndex === 2 &&
+      calibratedThisRun.has(currentBlock.exercise_id) &&
+      !validationShownFor.has(currentBlock.exercise_id)
+    ) {
+      const exerciseId = currentBlock.exercise_id;
+      setValidation({
+        exerciseId,
+        repsDone: Number(newLog.reps) || 0,
+        repsTarget: Number(currentBlock.reps) || 0,
+        difficulty: setDifficultyValue,
+        currentOneRm: oneRMs.find((r) => r.exercise_id === exerciseId)?.weight ?? 0,
+      });
+      setValidationPain(null);
+      setValidationLoadFeel(null);
+      setValidationShownFor((prev) => {
+        const next = new Set(prev);
+        next.add(exerciseId);
+        return next;
+      });
+    }
 
     // --- Live PR detection (before async save so toast shows immediately) ---
     const logWeight = Number(newLog.weight);
@@ -1885,6 +1925,123 @@ export function WorkoutRunner({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Task 8 Commit 2 — validation post-série-2 d'un exo calibré.
+          Non bloquante (dismissable), une fois par exo/run. */}
+      <Sheet
+        open={validation != null && !isResting}
+        onOpenChange={(open) => { if (!open) setValidation(null); }}
+      >
+        <SheetContent side="bottom" className="rounded-t-3xl">
+          <SheetHeader>
+            <SheetTitle>Comment était cette série ?</SheetTitle>
+          </SheetHeader>
+          {validation && (() => {
+            // RIR neutre = 3 : la série 2 ne capte pas le RIR (≠ wizard) → on passe
+            // une valeur neutre pour que seuls douleur / reps manquées / difficulté≥5
+            // pilotent la négativité (cf. isNegativeValidation).
+            const negative = isNegativeValidation({
+              pain: validationPain === true,
+              repsDone: validation.repsDone,
+              repsTarget: validation.repsTarget,
+              rir: 3,
+              difficulty: validation.difficulty,
+            });
+            const adjusted = adjustOneRmDown(validation.currentOneRm);
+            return (
+              <div className="mt-4 space-y-5 pb-8">
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Douleur ?</span>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={validationPain === true ? "default" : "outline"}
+                      className="h-11 flex-1 rounded-full"
+                      onClick={() => setValidationPain(true)}
+                    >
+                      oui
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={validationPain === false ? "default" : "outline"}
+                      className="h-11 flex-1 rounded-full"
+                      onClick={() => setValidationPain(false)}
+                    >
+                      non
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Cette charge me semble :</span>
+                  <div className="flex gap-2">
+                    {([
+                      { value: "light", label: "trop légère" },
+                      { value: "right", label: "juste" },
+                      { value: "heavy", label: "trop lourde" },
+                    ] as const).map((opt) => (
+                      <Button
+                        key={opt.value}
+                        type="button"
+                        variant={validationLoadFeel === opt.value ? "default" : "outline"}
+                        className="h-11 flex-1 rounded-full text-xs"
+                        onClick={() => setValidationLoadFeel(opt.value)}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {negative ? (
+                  <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                      Qualité de mouvement {">"} charge : mieux vaut une série propre qu'une
+                      charge trop lourde. Tu peux revoir ta 1RM à la baisse.
+                    </p>
+                    {validation.currentOneRm > 0 && adjusted > 0 && (
+                      <Button
+                        className="w-full h-12 rounded-2xl font-semibold"
+                        onClick={async () => {
+                          const exerciseId = validation.exerciseId;
+                          setValidation(null);
+                          try {
+                            await onEstimationComplete?.(exerciseId, adjusted);
+                            toast("1RM ajustée", { description: `Nouvelle 1RM : ${adjusted} kg (−10 %)` });
+                          } catch {
+                            toast.error("Erreur", { description: "1RM non ajustée. Réessaye." });
+                          }
+                        }}
+                      >
+                        Ajuster ma 1RM (−10 %) → {adjusted} kg
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
+                      onClick={() => setValidation(null)}
+                    >
+                      Garder ma 1RM
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                    <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+                      Série validée — charge cohérente. On garde le cap.
+                    </p>
+                    <Button
+                      className="w-full h-11 rounded-2xl font-semibold"
+                      onClick={() => setValidation(null)}
+                    >
+                      Continuer
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
