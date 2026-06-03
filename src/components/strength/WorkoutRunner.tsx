@@ -255,6 +255,7 @@ export function WorkoutRunner({
   const [isGifOpen, setIsGifOpen] = useState(false);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [skipExerciseConfirmOpen, setSkipExerciseConfirmOpen] = useState(false);
+  const [chapterBlock, setChapterBlock] = useState<"warmup" | "main" | null>(null);
   // Track which set keys triggered a PR for trophy display
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
 
@@ -277,6 +278,8 @@ export function WorkoutRunner({
   const [focusDisclaimerShown, setFocusDisclaimerShown] = useState(false);
   const [focusDisclaimerOpen, setFocusDisclaimerOpen] = useState(false);
   const [focusPendingAction, setFocusPendingAction] = useState<(() => void) | null>(null);
+
+  const chapterShownRef = useRef(false);
 
   const withFocusDisclaimer = (action: () => void) => {
     if (focusDisclaimerShown) { action(); return; }
@@ -602,6 +605,17 @@ export function WorkoutRunner({
     setCurrentStep((prev) => (prev === resolvedStep ? prev : resolvedStep));
   }, [initialLogs, session.items]);
 
+  useEffect(() => {
+    if (chapterShownRef.current) return;
+    if (!workoutPlan.length) return;
+    if (currentStep !== 1 || (Array.isArray(initialLogs) && initialLogs.length > 0)) return;
+    const chapter = detectBlockChapter(workoutPlan, 0, 1);
+    if (chapter) {
+      chapterShownRef.current = true;
+      setChapterBlock(chapter);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Task 15: preload next exercise GIF
   useEffect(() => {
     if (nextExerciseDef?.illustration_gif) {
@@ -630,9 +644,32 @@ export function WorkoutRunner({
     setIsRestPaused(false);
   };
 
-  const advanceExercise = async () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const advanceExercise = async (skipChapter?: boolean) => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
     const nextStep = currentStep + 1;
+
+    if (!skipChapter && nextStep <= workoutPlan.length) {
+      const chapter = detectBlockChapter(workoutPlan, currentStep, nextStep);
+      if (chapter) {
+        setCurrentSetIndex(1);
+        setCurrentSetInputs({});
+        updateStep(nextStep);
+        setChapterBlock(chapter);
+        const progressPct = Math.round(
+          (Math.min(nextStep - 1, workoutPlan.length) / workoutPlan.length) * 100,
+        );
+        try {
+          await onProgress?.(progressPct);
+        } catch (_err) {
+          toast.error("Erreur de sauvegarde", {
+            description: "Progression non enregistrée. Réseau instable.",
+            action: { label: "Réessayer", onClick: () => void onProgress?.(progressPct) },
+          });
+        }
+        return;
+      }
+    }
+
     setCurrentSetIndex(1);
     setCurrentSetInputs({});
     updateStep(nextStep);
