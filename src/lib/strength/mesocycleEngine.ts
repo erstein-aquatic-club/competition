@@ -1233,6 +1233,10 @@ function ensureMaintienRepresentation(
     // sans priver aucun seau de travail de son unique occurrence ni toucher aux
     // 2 focus (qui restent primaires).
     if (idx < 0) {
+      // `complementBucketOf(s) == null` cible volontairement DEUX cas : un
+      // complément réellement vide ET un complément `mobility`/`core` (tier
+      // échauffement/gainage, hors blocs de travail) — tous deux sûrs à écraser,
+      // car aucun seau de TRAVAIL ne perd alors son unique occurrence.
       idx = out.findIndex(
         (s) => s.role === 'developpement' && complementBucketOf(s) == null,
       );

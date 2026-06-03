@@ -1825,6 +1825,58 @@ describe('generateMesocycle', () => {
     );
   });
 
+  it("§366 invariant — fallback Préférence-2 : aucun complément redondant, mais un complément mobility → lower_strength injecté", () => {
+    // Cible LE chemin Préférence-2 spécifiquement. On force un microcycle où la
+    // Préférence-1 §335 ne peut PAS s'amorcer (aucun complément « redondant » =
+    // dont le seau est déjà primaire d'une autre séance de dév) tout en laissant une
+    // séance de dév avec un complément null/mobility à recycler. Recette : focus#2
+    // (upper_power) SANS exercices au catalogue → son bloc complément est vide →
+    // `buckets[1]` retombe sur 'mobility' (warmup) → `complementBucketOf == null`,
+    // donc pas un complément redondant mais bien une cible Préférence-2.
+    const input = fullInput();
+    input.template = makeTemplate({
+      lower_strength: 0.45,
+      lower_power: 0.5,
+      upper_strength: 0.95,
+      upper_power: 0.9,
+      mobility: 0.5,
+    });
+    input.template.structure.forced_focus = ['upper_strength', 'upper_power'];
+    // Catalogue privé d'upper_power → ce focus#2 n'a aucun exo → le complément
+    // (upper_power) de l'UNIQUE séance de dév est vide → `buckets[1]` retombe sur
+    // 'mobility' → `complementBucketOf == null`. Aucune autre séance de dév n'existe,
+    // donc upper_power n'est primaire d'aucune séance de dév → la Préférence-1 ne
+    // trouve aucun complément redondant (microcycle 1 amorce + 1 dév).
+    input.exerciseCatalog = input.exerciseCatalog.filter((e) => e.bucket !== 'upper_power');
+    input.sessionsPerWeek = 2; // Lun amorce + 1 SEULE séance de dév (Mer)
+    input.weekdays = [0, 2]; // Lun, Mer
+    input.primerWeekdays = [0];
+
+    const meso = generateMesocycle(input);
+
+    for (const week of meso.weeks) {
+      const hasLowerStrength = week.sessions.some((s) => s.buckets.includes('lower_strength'));
+      assert.ok(
+        hasLowerStrength,
+        `§366 B (Préférence-2) — lower_strength doit être injecté via le fallback complément vide/mobility, semaine ${week.weekNumber}`,
+      );
+    }
+
+    // upper_strength (focus#1, seul focus avec des exos) reste un primaire dév ;
+    // lower_strength n'est jamais promu primaire.
+    const devPrimaries = new Set(
+      meso.weeks
+        .flatMap((w) => w.sessions)
+        .filter((s) => s.role === 'developpement')
+        .map((s) => s.buckets[0]),
+    );
+    assert.ok(devPrimaries.has('upper_strength'), 'force haut reste un primaire dév (focus#1)');
+    assert.ok(
+      !devPrimaries.has('lower_strength'),
+      'lower_strength reste un ENTRETIEN (complément), jamais promu primaire/focus',
+    );
+  });
+
   it('contraindication active reportée dans reasoning.activeContraindications', () => {
     const input = fullInput();
     input.assessment.questionnaire = {
