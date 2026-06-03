@@ -4,6 +4,28 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §367 — Mode focus : chapitres warmup/main + fix skip iOS
+
+**Contexte :** Mode focus WorkoutRunner — pas de transition entre blocs, bouton skip en zone home indicator iOS.
+
+**Changements :**
+- `src/components/strength/WorkoutRunner.tsx` : helpers purs exportés `detectBlockChapter` + `findFirstMainStep`
+- État `chapterBlock: 'warmup' | 'main' | null` — carte intro inline entre blocs
+- Carte "Échauffement" (sky styles) avec "Passer l'échauffement" conditionnel (masqué si session warmup-only)
+- Carte "Bloc principal" (Zap, primary) avec "On y va !"
+- Bouton "Passer cet exercice" déplacé dans le contenu scrollable (h-10, variant ghost, hors zone home indicator iOS)
+- Tests unitaires : `detectBlockChapter` (6 cas) + `findFirstMainStep` (5 cas)
+
+**Décisions :**
+- Pas d'intro screen global (hors scope)
+- Pas de skip sur le bloc principal (irréversible)
+- `chapterShownRef` + guard `currentStep !== 1` évite le re-déclenchement sur reprises de séance
+- `{!isEstimationMode}` masque skip en mode ramp-up 1RM
+
+**Limites :** Sessions sans block taggé (`block=null`) → traité comme `main` (comportement historique).
+
+---
+
 ## §364 — Synthèse Résultats club (liveffn) (2026-06-02)
 
 ### Contexte
