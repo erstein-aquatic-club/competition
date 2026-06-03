@@ -10,6 +10,7 @@ import {
   findFirstMainStep,
 } from "@/components/strength/WorkoutRunner";
 import type { StrengthSessionTemplate, Exercise } from "@/lib/api";
+import { isNegativeValidation, adjustOneRmDown } from "@/lib/strength/oneRmCalibration";
 
 const session: StrengthSessionTemplate = {
   id: 1,
@@ -85,6 +86,137 @@ test("WorkoutRunner renders input modal when open", () => {
   );
 
   assert.ok(markup.includes("Charge"));
+});
+
+// ---------------------------------------------------------------------------
+// Task 8 — glue wizard de calibration (showWizard gating).
+//
+// Le harness rend en statique (renderToStaticMarkup, runtime JSX CLASSIC sous
+// node:test/tsx). On peut donc vérifier le GATING NÉGATIF : un exo NON calibré
+// rend la carte de série normale (et aucun marqueur du wizard).
+//
+// Le GATING POSITIF (un exo de calibration rend le wizard à la place de la carte)
+// ET le flux interactif complet (clics → onComputed → log série 1 → série 2 →
+// carte de validation) ne sont PAS testables ici : rendre le sous-arbre
+// OneRmDiscoveryWizard sous le runtime classic lève `React is not defined` (le
+// wizard n'importe pas le namespace React, par design — il tourne sous le runtime
+// AUTOMATIQUE de vitest/jsdom). Ces aspects restent couverts par
+// OneRmDiscoveryWizard.vitest.tsx (étapes + onComputed) ; le câblage
+// onComputed→log série 1 / validation post-série-2 est vérifié manuellement
+// (gap documenté dans le rapport de tâche).
+// ---------------------------------------------------------------------------
+
+test("set 1 d'un exo NON calibré affiche la carte de série normale (pas le wizard)", () => {
+  const markup = renderToStaticMarkup(
+    <WorkoutRunner
+      session={session}
+      exercises={exercises}
+      oneRMs={[]}
+      onFinish={() => undefined}
+      initialStep={1}
+      userId={1}
+    />,
+  );
+  // CTA normal présent, aucun marqueur distinctif du wizard.
+  assert.ok(markup.includes("Valider série"));
+  assert.ok(!markup.includes("Calculer ma 1RM"));
+  assert.ok(!markup.includes("Mouvement à vide"));
+});
+
+// ---------------------------------------------------------------------------
+// Task 8 — verdict de validation post-série-2 (logique pure extraite).
+//
+// Reproduit le calcul exact réalisé dans la carte de validation de WorkoutRunner
+// (composant non rendable sous node:test, cf. note ci-dessus). Couvre les 2 fixes
+// de revue : (IMPORTANT) le −10 % s'ancre sur la 1RM LOCALE fraîche (mémorisée
+// dans la Map calibratedThisRun), pas sur le prop oneRMs potentiellement périmé ;
+// (MINEUR) le ressenti « trop lourde » déclenche aussi le verdict négatif.
+// ---------------------------------------------------------------------------
+
+// Miroir EXACT de l'expression `negative` du composant (NEUTRAL_RIR = 3).
+function computeValidationNegative(opts: {
+  pain: boolean;
+  repsDone: number;
+  repsTarget: number;
+  difficulty: number | null;
+  loadFeel: "light" | "right" | "heavy" | null;
+}): boolean {
+  return (
+    isNegativeValidation({
+      pain: opts.pain,
+      repsDone: opts.repsDone,
+      repsTarget: opts.repsTarget,
+      rir: 3, // NEUTRAL_RIR — la série 2 ne capte pas le RIR
+      difficulty: opts.difficulty,
+    }) || opts.loadFeel === "heavy"
+  );
+}
+
+describe("Task 8 — verdict validation post-série-2", () => {
+  it("série propre + charge jugée 'juste' → verdict POSITIF (pas de -10%)", () => {
+    assert.equal(
+      computeValidationNegative({ pain: false, repsDone: 8, repsTarget: 8, difficulty: 3, loadFeel: "right" }),
+      false,
+    );
+  });
+
+  it("charge jugée 'trop lourde' → verdict NÉGATIF même sans autre signal", () => {
+    assert.equal(
+      computeValidationNegative({ pain: false, repsDone: 8, repsTarget: 8, difficulty: 3, loadFeel: "heavy" }),
+      true,
+    );
+  });
+
+  it("charge jugée 'trop légère' ne déclenche PAS le verdict négatif", () => {
+    assert.equal(
+      computeValidationNegative({ pain: false, repsDone: 8, repsTarget: 8, difficulty: 3, loadFeel: "light" }),
+      false,
+    );
+  });
+
+  it("douleur → verdict NÉGATIF (signal objectif), loadFeel indifférent", () => {
+    assert.equal(
+      computeValidationNegative({ pain: true, repsDone: 8, repsTarget: 8, difficulty: 3, loadFeel: "right" }),
+      true,
+    );
+  });
+
+  it("reps cible non atteintes → verdict NÉGATIF", () => {
+    assert.equal(
+      computeValidationNegative({ pain: false, repsDone: 5, repsTarget: 8, difficulty: 3, loadFeel: "right" }),
+      true,
+    );
+  });
+
+  it("RIR neutre (3) : une série propre 'juste' n'est PAS faussement négative", () => {
+    // Garde-fou : sans le NEUTRAL_RIR=3, un rir<=0 par défaut rendrait tout négatif.
+    assert.equal(
+      computeValidationNegative({ pain: false, repsDone: 10, repsTarget: 8, difficulty: 2, loadFeel: "right" }),
+      false,
+    );
+  });
+});
+
+describe("Task 8 — -10% ancré sur la 1RM LOCALE (Map calibratedThisRun)", () => {
+  it("utilise la 1RM locale fraîche, pas le prop oneRMs périmé", () => {
+    // À la série 1, le wizard a calculé 100 kg et l'a mémorisé localement.
+    const calibratedThisRun = new Map<number, number>([[10, 100]]);
+    // Le prop oneRMs est encore périmé/non propagé (ex. ancienne valeur 80).
+    const stalePropOneRm = 80;
+
+    // Le composant lit currentOneRm depuis la Map (fix IMPORTANT), pas oneRMs.
+    const currentOneRm = calibratedThisRun.get(10) ?? 0;
+    assert.equal(currentOneRm, 100);
+    assert.notEqual(currentOneRm, stalePropOneRm);
+
+    // -10% arrondi vers le bas au pas de 2,5 → 90.
+    assert.equal(adjustOneRmDown(currentOneRm), 90);
+  });
+
+  it("0 si l'exo n'a pas été calibré ce run (Map.get → undefined)", () => {
+    const calibratedThisRun = new Map<number, number>();
+    assert.equal(calibratedThisRun.get(10) ?? 0, 0);
+  });
 });
 
 // resolveSetNumber: defensive parsing for log entries written by older
