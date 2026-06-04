@@ -3,7 +3,7 @@ export type IntensityMetric = "weight_kg" | "height_cm" | "distance_cm" | "time_
 interface MetricConfig {
   label: string;        // libellé tile runner / champ
   unit: string;         // suffixe affiché
-  tracksOneRm: boolean; // déclenche la calibration 1RM (wizard en séance) ?
+  tracksOneRm: boolean; // déclenche estimation 1RM + OneRmGate ?
   hasBodyweight: boolean; // propose le bouton PDC ?
   selectLabel: string;  // libellé dans le Select coach
   max: number;          // borne haute de saisie (numpad)

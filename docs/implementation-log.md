@@ -4,37 +4,18 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
-## §368 — Wizard de calibration 1RM guidé en séance (remplace gate §297) (2026-06-03)
+## §368 — Wizard calibration 1RM : LIVRÉ PUIS REVERTÉ (incident terrain) (2026-06-04)
 
-**Contexte :** Remplace l'ancien `OneRmGate` pré-séance (§297) par un **wizard de calibration 1RM guidé**, joué directement dans la séance sur la série 1 d'un exercice à calibrer. La séance se lance désormais en un tap (plus de gate bloquant), et le calcul de 1RM est encadré (mouvement à vide → retex douleur/aisance → paliers de chauffe suggérés → série de travail avec RIR explicite), avec une validation de sécurité après la série 2.
+**Statut : annulé en prod.** §368 (wizard de calibration 1RM guidé en séance, remplaçant le gate §297) a été mergé sur `main` puis **reverté le jour même** suite à un incident terrain : les nageurs ne pouvaient plus utiliser l'app.
 
-**Changements :**
-- **Helpers purs :**
-  - `estimateOneRM(w, r, { rir })` dans `src/lib/prDetection.ts` — RIR explicite.
-  - Nouveau `src/lib/strength/oneRmCalibration.ts` : `suggestNextLoad` (paliers +2.5/+5/+10 kg ou ancrage ~45 % d'une 1RM connue), `isNegativeValidation`, `adjustOneRmDown` (−10 % planché, sécurité).
-- **API :** `getPerformedExerciseIds(athleteId, ids)` dans `src/lib/api/strength.ts` — détecte les exos jamais réalisés (via `strength_set_logs` → `strength_session_runs`).
-- **Composant :** `src/components/strength/OneRmDiscoveryWizard.tsx` — wizard guidé (étape mouvement à vide + retex 3 cases douleur/aisance/recharger + branche douleur sécurité → paliers de chauffe suggérés → série de travail avec RIR explicite → calcul 1RM).
-- **Intégration `WorkoutRunner.tsx` :** le wizard se joue sur la série 1 d'un exo de calibration (wizard complet la 1ʳᵉ fois via `firstTimeExercises`, recalcul court sinon) ; `onComputed` persiste la 1RM + logge la série de travail comme série 1 + douleur→note ; carte de validation post-série-2 (douleur + « charge me semble ») → si négatif (douleur OU série trop dure OU « trop lourde ») → message « qualité > charge » + bouton « Ajuster ma 1RM (−10 %) ».
-- **Parent `Strength.tsx` :** `OneRmGate` **SUPPRIMÉ** (séance lancée en un tap) ; `firstTimeExercises` calculé depuis `getPerformedExerciseIds`, gardé sur `isSuccess` de la requête.
-- **Nettoyage :** `src/lib/strength/missing1rmFilter.ts` (orphelin du gate supprimé) + son test retirés ; commentaires `OneRmGate` périmés reformulés (`intensityMetrics.ts`, `useStrengthState.ts`).
+**Causes racines identifiées (avant revert) :**
+- En remplaçant le gate `computeMissing1RmExercises` (4 filtres : `percent_1rm>0` + non-PDC + `weight_kg` + 1RM manquante) par un simple `firstTimeExercises` (« jamais réalisé »), on a **perdu le filtre `percent_1rm` et le filtre 1RM-manquante**. → exos **élastique / PDC / accessoires (reps)** réclamaient un 1RM (`showWizard` ne vérifiait jamais `hasPercent`).
+- `firstTimeExercises` = **tous** les exos jamais faits → sur un nouveau mésocycle le wizard multi-étapes se lançait sur **chaque** exo → submersion ; impression de « boucles ».
+- Suspect additionnel non confirmé : `invalidateQueries(["1rm"])` en pleine séance → re-render parent + réconciliation `resolveNextStep` → resets de position possibles (skips / retours arrière).
 
-**Fichiers :** Créés : `src/components/strength/OneRmDiscoveryWizard.tsx` (486 l), `src/lib/strength/oneRmCalibration.ts` (67 l). Modifiés : `src/lib/prDetection.ts`, `src/lib/api/strength.ts`, `src/components/strength/WorkoutRunner.tsx`, `src/pages/Strength.tsx`, `src/hooks/useStrengthState.ts`, `src/lib/strength/intensityMetrics.ts`. Supprimés : `src/lib/strength/missing1rmFilter.ts` + `src/pages/__tests__/strength_missing1rm_filter.test.ts`. Docs : design + plan `docs/plans/2026-06-03-wizard-calibration-1rm-design.md` / `…-wizard-calibration-1rm.md`.
+**Revert :** restauration des 23 fichiers §368 à l'état `341024c5e` (gate `OneRmGate` + `missing1rmFilter` revenus). `tsc` 0, `npm test` 1652/0. Le code §368 reste dans l'historique git (branche `feat/muscu-368-wizard-calibration-1rm`, PR #80 mergée puis revertée).
 
-**Tests / vérifs :** helpers en `node:test` ; wizard en vitest (13 cas) + tests de glue `WorkoutRunner` (dont régression SSR du gate métrique). Suite complète verte : `npm test` (node:test, fail=0) + vitest (84 pass). `tsc --noEmit` clean.
-
-**Décisions :**
-- RIR explicite plutôt qu'une difficulté implicite (saisie directe par le nageur).
-- `adjustOneRmDown` plancher pour la sécurité (−10 % borné).
-- Le ressenti de charge « trop lourde » alimente le verdict négatif (en plus de la douleur / série trop dure).
-- `firstTimeExercises` gardé sur `isSuccess` → pas de faux wizard découverte tant que la requête n'a pas abouti.
-
-**Fixes revue finale (commit `gate tracksWeight + sets==1`) :**
-- **I1** — `showWizard` exigeait `!is_bodyweight` mais **pas** `weight_kg` : un exo jamais réalisé à métrique non-poids (`height_cm`/`time_s`, ex. Box Jump §298) déclenchait le wizard kg et persistait une 1RM Epley parasite. Ajout du gate `tracksWeight` + **test de régression SSR** (rouge sans le gate : le sous-arbre wizard lève `React is not defined`).
-- **M2** — `handleWizardComputed` forçait `setCurrentSetIndex(2)` : un exo de calibration à 1 série (phase d'affûtage, `sets = max(1, …)`) bloquait sur une « Série 2/1 » fantôme. Avance l'exo si `sets ≤ 1` (la validation post-série-2 ne s'applique alors pas).
-
-**Limites :** Le click-through interactif complet du wizard **dans `WorkoutRunner`** n'est pas couvert sous le harness SSR `node:test` (le wizard tourne en runtime JSX automatique → `React is not defined` en classic) ; couvert au niveau logique + en vitest isolé. Douleur non captable sur la série de travail elle-même (mode court : `pain=null` à la série 1 → pas de marqueur note ; mitigé par la carte post-série-2). `getPerformedExerciseIds` non couvert par test auto (requête Supabase ; jointure vérifiée contre le schéma). `missing1rmFilter` supprimé.
-
----
+**Suite :** redesign minimal ciblé nageurs (gate strict %1RM + calibration légère et optionnelle, pas de prise d'otage multi-étapes, pas d'invalidation 1RM en séance). Voir nouveau § à venir.
 
 ## §367 — Mode focus : chapitres warmup/main + fix skip iOS
 

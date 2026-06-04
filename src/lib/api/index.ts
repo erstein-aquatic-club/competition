@@ -531,7 +531,6 @@ export {
   deleteStrengthRun,
   saveStrengthRun,
   getStrengthHistory,
-  getPerformedExerciseIds,
   getStrengthHistoryAggregate,
   get1RM,
   update1RM,

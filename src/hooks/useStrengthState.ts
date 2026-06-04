@@ -27,8 +27,8 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
   const [activeRunLogs, setActiveRunLogs] = useState<SetLogEntry[] | null>(null);
   const [activeRunnerStep, setActiveRunnerStep] = useState(0);
-  // Exos en attente de calibration 1RM via le wizard en séance (§368, remplace
-  // l'ancien gate §297) ou le recalcul court "Recalculer ma 1RM".
+  // §297 — Exos en attente d'estimation 1RM via ramp-up inline (déclenché par
+  // le OneRmGate "Estimer pendant la séance" ou le bouton "Recalculer ma 1RM").
   // Persisté dans le focus snapshot pour survivre à un reload PWA.
   const [inlineEstimationExercises, setInlineEstimationExercises] = useState<Set<number>>(new Set());
   const [screenMode, setScreenMode] = useState<"list" | "reader" | "focus" | "settings" | "summary">("list");

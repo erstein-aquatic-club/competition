@@ -12,7 +12,6 @@ import {
   getExercises,
   get1RM,
   update1RM,
-  getPerformedExerciseIds,
   withTimeout,
   startStrengthRun as startStrengthRunApi,
   logStrengthSet as logStrengthSetApi,
@@ -39,10 +38,12 @@ import { STORAGE_KEYS } from "@/lib/api/client";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
+import { OneRmGate } from "@/components/strength/OneRmGate";
 import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/components/strength/StrengthBilanEntry";
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
+import { computeMissing1RmExercises } from "@/lib/strength/missing1rmFilter";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -546,39 +547,12 @@ export default function Strength() {
   };
 
   const [isPlanMode, setIsPlanMode] = useState(false);
+  const [showOneRmGate, setShowOneRmGate] = useState(false);
 
-  // Task 9 — exercices jamais réalisés par l'athlète dans la séance active.
-  // Le WorkoutRunner déclenche le wizard de calibration 1RM "1ère fois" pour
-  // ces exercices. Dérivé via getPerformedExerciseIds (sous-ensemble déjà loggé)
-  // → complément = jamais réalisés.
-  const sessionExerciseIds = useMemo(
-    () => Array.from(new Set(activeFilteredItems.map((item) => item.exercise_id))),
-    [activeFilteredItems],
+  const missing1RmExercises = useMemo(
+    () => computeMissing1RmExercises(activeFilteredItems, oneRMs, exerciseLookup),
+    [activeFilteredItems, oneRMs, exerciseLookup],
   );
-
-  const { data: performedExerciseIds, isSuccess } = useQuery({
-    queryKey: ["performed-exercise-ids", userId, sessionExerciseIds],
-    queryFn: () =>
-      withTimeout(
-        getPerformedExerciseIds(userId!, sessionExerciseIds),
-        8000,
-        "performed-exercise-ids",
-      ),
-    enabled: !!userId && sessionExerciseIds.length > 0,
-  });
-
-  const firstTimeExercises = useMemo(() => {
-    // On gate sur isSuccess (PAS !isLoading : une requête `disabled` n'est pas
-    // "loading"). Tant que la donnée n'a pas abouti, on renvoie un Set vide →
-    // "pas 1ère fois jusqu'à preuve du contraire". Un exo réellement nouveau peut
-    // ainsi rater le wizard pendant quelques centaines de ms le temps que la
-    // requête réponde, puis il apparaît — bien moins nocif que d'afficher le
-    // wizard de découverte complet (et risquer une 1RM erronée) à un athlète
-    // expérimenté pendant que la requête est encore non résolue/désactivée.
-    if (!isSuccess) return new Set<number>();
-    const performed = new Set(performedExerciseIds);
-    return new Set(sessionExerciseIds.filter((id) => !performed.has(id)));
-  }, [sessionExerciseIds, performedExerciseIds, isSuccess]);
 
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
@@ -691,7 +665,7 @@ export default function Strength() {
     [userId, queryClient],
   );
 
-  const handleLaunchFocus = async () => {
+  const handleLaunchFocus = async (options?: { bypassMissing1RmGate?: boolean }) => {
     if (!activeSession) return;
     if (startRun.isPending) return;
     const lockedCycle = activeSession.cycle ?? cycleType;
@@ -700,9 +674,20 @@ export default function Strength() {
       return;
     }
 
-    // Task 9 — plus de gate pré-séance : on démarre toujours directement.
-    // Le wizard de calibration 1RM "1ère fois" est désormais déclenché in-run
-    // par le WorkoutRunner via firstTimeExercises.
+    // §297 — Check for missing 1RMs before entering focus mode.
+    // bypassMissing1RmGate: passed by `onEstimateInline` callback so the
+    // re-trigger after `setInlineEstimationExercises(...)` doesn't re-open
+    // the gate due to a stale closure reading inlineEstimationExercises.size === 0
+    // (setState is queued; setTimeout(fn, 0) fires with the previous render's
+    // closure values).
+    if (
+      !options?.bypassMissing1RmGate &&
+      missing1RmExercises.length > 0 &&
+      inlineEstimationExercises.size === 0
+    ) {
+      setShowOneRmGate(true);
+      return;
+    }
 
     // Auto-start the run so WorkoutRunner skips step 0
     if (!activeRunId) {
@@ -890,7 +875,6 @@ export default function Strength() {
               isFinishing={isFinishing}
               runId={activeRunId ?? undefined}
               inlineEstimationExercises={inlineEstimationExercises}
-              firstTimeExercises={firstTimeExercises}
               onRequestRecalc={handleRequestRecalc}
               onEstimationComplete={handleEstimationComplete}
               onStepChange={(step) => setActiveRunnerStep(step)}
@@ -1197,6 +1181,27 @@ export default function Strength() {
         </>
       )}
 
+      <OneRmGate
+        open={showOneRmGate}
+        onOpenChange={setShowOneRmGate}
+        missingExercises={missing1RmExercises}
+        athleteId={userId}
+        onSaveAndContinue={() => {
+          setShowOneRmGate(false);
+          queryClient.invalidateQueries({ queryKey: ["1rm"] });
+          handleLaunchFocus();
+        }}
+        onEstimateInline={(skippedIds) => {
+          setShowOneRmGate(false);
+          setInlineEstimationExercises(new Set(skippedIds));
+          // §297 — bypassMissing1RmGate explicite : setInlineEstimationExercises
+          // est une mutation async (queued), donc une lecture immédiate dans
+          // handleLaunchFocus via setTimeout(0) verrait encore size === 0 dans
+          // la closure capturée → le gate se rouvrirait. Le flag explicite
+          // contourne ce piège sans dépendre du timing React.
+          setTimeout(() => handleLaunchFocus({ bypassMissing1RmGate: true }), 0);
+        }}
+      />
     </div>
   );
 }

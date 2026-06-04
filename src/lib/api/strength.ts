@@ -954,28 +954,6 @@ export async function saveStrengthRun(run: any) {
 
 // --- History ---
 
-/**
- * Renvoie le sous-ensemble d'exercise_ids que l'athlète a déjà réalisés
- * (au moins une série loggée). Sert à déclencher le wizard de calibration
- * 1RM à la PREMIÈRE réalisation d'un exo.
- *
- * Schéma : `strength_set_logs.run_id` → `strength_session_runs.athlete_id`.
- * On embed la run en `!inner` pour filtrer par athlète serveur-side.
- */
-export async function getPerformedExerciseIds(
-  athleteId: number | string,
-  exerciseIds: number[],
-): Promise<number[]> {
-  if (!canUseSupabase() || exerciseIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from("strength_set_logs")
-    .select("exercise_id, strength_session_runs!inner(athlete_id)")
-    .in("exercise_id", exerciseIds)
-    .eq("strength_session_runs.athlete_id", Number(athleteId));
-  if (error || !data) return [];
-  return Array.from(new Set(data.map((r) => Number(r.exercise_id))));
-}
-
 export async function getStrengthHistory(
   athleteName: string,
   options?: {
