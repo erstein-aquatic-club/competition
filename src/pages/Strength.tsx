@@ -556,7 +556,7 @@ export default function Strength() {
     [activeFilteredItems],
   );
 
-  const { data: performedExerciseIds } = useQuery({
+  const { data: performedExerciseIds, isSuccess } = useQuery({
     queryKey: ["performed-exercise-ids", userId, sessionExerciseIds],
     queryFn: () =>
       withTimeout(
@@ -568,9 +568,17 @@ export default function Strength() {
   });
 
   const firstTimeExercises = useMemo(() => {
-    const performed = new Set(performedExerciseIds ?? []);
+    // On gate sur isSuccess (PAS !isLoading : une requête `disabled` n'est pas
+    // "loading"). Tant que la donnée n'a pas abouti, on renvoie un Set vide →
+    // "pas 1ère fois jusqu'à preuve du contraire". Un exo réellement nouveau peut
+    // ainsi rater le wizard pendant quelques centaines de ms le temps que la
+    // requête réponde, puis il apparaît — bien moins nocif que d'afficher le
+    // wizard de découverte complet (et risquer une 1RM erronée) à un athlète
+    // expérimenté pendant que la requête est encore non résolue/désactivée.
+    if (!isSuccess) return new Set<number>();
+    const performed = new Set(performedExerciseIds);
     return new Set(sessionExerciseIds.filter((id) => !performed.has(id)));
-  }, [sessionExerciseIds, performedExerciseIds]);
+  }, [sessionExerciseIds, performedExerciseIds, isSuccess]);
 
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
