@@ -123,6 +123,52 @@ test("set 1 d'un exo NON calibré affiche la carte de série normale (pas le wiz
   assert.ok(!markup.includes("Mouvement à vide"));
 });
 
+// Régression I1 (revue finale §368) — un exo JAMAIS réalisé mais à métrique
+// NON-poids (height_cm / time_s, ex. Box Jump §298) ne doit PAS déclencher le
+// wizard de calibration kg (sinon : 1RM Epley parasite). Le gate `tracksWeight`
+// l'exclut. Sans le fix, showWizard serait vrai et le sous-arbre wizard lèverait
+// « React is not defined » sous le runtime classic → ce render throw = test rouge.
+test("set 1 d'un exo jamais réalisé à métrique non-poids n'affiche PAS le wizard", () => {
+  const jumpSession: StrengthSessionTemplate = {
+    ...session,
+    items: [
+      {
+        exercise_id: 20,
+        exercise_name: "Box Jump",
+        sets: 3,
+        reps: 5,
+        rest_seconds: 90,
+        percent_1rm: 0,
+        order_index: 0,
+      },
+    ],
+  };
+  const jumpExercises: Exercise[] = [
+    {
+      id: 20,
+      nom_exercice: "Box Jump",
+      description: "Saut sur boîte",
+      exercise_type: "strength",
+      intensity_metric: "height_cm",
+      is_bodyweight: false,
+    } as Exercise,
+  ];
+  const markup = renderToStaticMarkup(
+    <WorkoutRunner
+      session={jumpSession}
+      exercises={jumpExercises}
+      oneRMs={[]}
+      onFinish={() => undefined}
+      initialStep={1}
+      userId={1}
+      firstTimeExercises={new Set([20])}
+    />,
+  );
+  assert.ok(markup.includes("Valider série"));
+  assert.ok(!markup.includes("Calculer ma 1RM"));
+  assert.ok(!markup.includes("Mouvement à vide"));
+});
+
 // ---------------------------------------------------------------------------
 // Task 8 — verdict de validation post-série-2 (logique pure extraite).
 //

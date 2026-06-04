@@ -389,12 +389,18 @@ export function WorkoutRunner({
   //   isFirstTime           : jamais réalisé → wizard COMPLET (à vide → paliers → travail).
   //   needsShortCalibration : 1RM manquante / recalc demandé mais déjà réalisé → wizard COURT.
   //   showWizard            : série 1, exo chargé, pas encore allégé (branche douleur) ce run.
+  // Gate `tracksWeight` (métrique = weight_kg) : un exo à métrique non-poids
+  // (height_cm / distance_cm / time_s, ex. Box Jump §298) n'a PAS de 1RM en kg ;
+  // sans ce garde, un exo jamais réalisé à métrique non-poids déclencherait le
+  // wizard kg et persisterait une 1RM Epley parasite (≠ is_bodyweight donc il
+  // échappait à l'exclusion poids-de-corps).
   const currentExerciseId = currentBlock?.exercise_id ?? -1;
   const isFirstTime = firstTimeExercises?.has(currentExerciseId) ?? false;
   const needsShortCalibration = inlineEstimationExercises?.has(currentExerciseId) ?? false;
   const showWizard =
     currentSetIndex === 1 &&
     !isBodyweightExercise &&
+    tracksWeight &&
     (isFirstTime || needsShortCalibration) &&
     !calibrationDismissed.has(currentExerciseId);
 
@@ -777,10 +783,20 @@ export function WorkoutRunner({
       setCalibratedThisRun((prev) => new Map(prev).set(exerciseId, oneRm));
 
       setCurrentSetInputs({});
-      setCurrentSetIndex(2);
-
-      if (autoRest && currentBlock.rest_seconds > 0) {
-        startRestTimer(currentBlock.rest_seconds, "set");
+      // M2 — un exo de calibration à 1 seule série (phase d'affûtage : sets =
+      // max(1, …)) n'a pas de série 2 : avancer l'exo plutôt que de bloquer sur
+      // une « Série 2/1 » fantôme (handleValidateSet bail-out → utilisateur coincé).
+      // La validation post-série-2 ne s'applique alors pas (rien à valider sur 1 série).
+      if ((currentBlock.sets ?? 1) <= 1) {
+        await advanceExercise();
+        if (autoRest && currentBlock.rest_seconds > 0) {
+          startRestTimer(currentBlock.rest_seconds, "exercise");
+        }
+      } else {
+        setCurrentSetIndex(2);
+        if (autoRest && currentBlock.rest_seconds > 0) {
+          startRestTimer(currentBlock.rest_seconds, "set");
+        }
       }
     } finally {
       isLoggingRef.current = false;
