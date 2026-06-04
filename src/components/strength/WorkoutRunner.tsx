@@ -44,6 +44,7 @@ import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensit
 import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from "@/lib/types";
 import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
+import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 
 /** Emit a short beep + vibration when the rest timer ends */
@@ -261,6 +262,15 @@ export function WorkoutRunner({
   // Track which set keys triggered a PR for trophy display
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
 
+  // §369 — Calibration 1RM inline (carte série 1 augmentée). `runOneRms` =
+  // 1RM estimés en séance, utilisés comme cible IMMÉDIATE pour les séries 2+
+  // (avant que la persistance parent ne se répercute). `calibRir` = reps en
+  // réserve saisies pour la série 1 calibrée. Déclarés ici (inconditionnel,
+  // haut du composant) — ce fichier a un historique de React #310 : aucun hook
+  // après un early return.
+  const [runOneRms, setRunOneRms] = useState<Map<number, number>>(new Map());
+  const [calibRir, setCalibRir] = useState<number | null>(null);
+
   // Inline note state (refs only - effects defined after currentBlock)
   const [localNote, setLocalNote] = useState("");
   const noteTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -348,17 +358,11 @@ export function WorkoutRunner({
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
   const tracksWeight = metric === "weight_kg";
-  const isEstimationMode =
-    !isBodyweightExercise &&
-    currentSetIndex === 1 &&
-    (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false);
 
-  const [warmupHistory, setWarmupHistory] = useState<
-    Array<{ weight: number; reps: number; difficulty: number | null }>
-  >([]);
-
+  // §369 — reset du RIR de calibration à chaque changement d'exercice (l'ancien
+  // reset de `warmupHistory` du ramp-up §297 vivait ici).
   useEffect(() => {
-    setWarmupHistory([]);
+    setCalibRir(null);
   }, [currentBlock?.exercise_id]);
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
@@ -389,8 +393,37 @@ export function WorkoutRunner({
   const percentValue = Number(currentBlock?.percent_1rm);
   const hasPercent = Number.isFinite(percentValue) && percentValue > 0;
   const rm = hasPercent
-    ? oneRMs.find((r) => r.exercise_id === currentBlock?.exercise_id)?.weight || 0
+    ? (runOneRms.get(currentBlock?.exercise_id ?? -1)
+        ?? oneRMs.find((r) => r.exercise_id === currentBlock?.exercise_id)?.weight
+        ?? 0)
     : 0;
+
+  // §369 — Gate strict de calibration 1RM inline (carte série 1 augmentée).
+  // `needsCalibration` = vrai UNIQUEMENT série 1 + %1RM>0 + weight_kg + non-PDC
+  // + aucun 1RM connu (helper testé `needsOneRmCalibration`, restaure les
+  // 4 filtres de l'incident §368). `showCalibration` ajoute le recalcul
+  // explicite (bouton "Recalculer ma 1RM" → `inlineEstimationExercises`).
+  const hasOneRmForCurrent =
+    Number(
+      runOneRms.get(currentBlock?.exercise_id ?? -1) ??
+        oneRMs.find((r) => r.exercise_id === currentBlock?.exercise_id)?.weight ??
+        0,
+    ) > 0;
+  const needsCalibration =
+    currentBlock != null &&
+    needsOneRmCalibration({
+      setIndex: currentSetIndex,
+      percent1rm: percentValue,
+      metric,
+      isBodyweight: isBodyweightExercise,
+      hasOneRm: hasOneRmForCurrent,
+    });
+  const showCalibration =
+    currentSetIndex === 1 &&
+    !isBodyweightExercise &&
+    tracksWeight &&
+    (needsCalibration ||
+      (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false));
   const targetWeight = hasPercent ? Math.round(rm * (percentValue / 100)) : 0;
   // §298 — métriques non-poids : cible depuis l'item (target_intensity), pas le 1RM
   const targetValue = tracksWeight ? targetWeight : Number(currentBlock?.target_intensity ?? 0);
@@ -689,74 +722,6 @@ export function WorkoutRunner({
     }
   };
 
-  const handleAddWarmupSet = () => {
-    if (!currentBlock) return;
-    const weight = Number(currentSetInputs[0]?.weight ?? 0);
-    const reps = Number(currentSetInputs[0]?.reps ?? 0);
-    const difficulty = currentSetInputs[0]?.difficulty ?? null;
-    if (weight <= 0 || reps <= 0) return;
-    setWarmupHistory((prev) => [...prev, { weight, reps, difficulty }]);
-    setCurrentSetInputs({});
-  };
-
-  const handleReferenceSet = async () => {
-    if (!currentBlock || !onEstimationComplete) return;
-    // R1 — anti double-tap concurrent : sans cette garde, un 2ᵉ tap pendant
-    // l'await onEstimationComplete déclenchait un double upsert 1RM + un double
-    // log set_number:1. Même pattern que handleValidateSet.
-    if (isLoggingRef.current) return;
-    const weight = Number(currentSetInputs[0]?.weight ?? 0);
-    const reps = Number(currentSetInputs[0]?.reps ?? 0);
-    const difficulty = currentSetInputs[0]?.difficulty ?? null;
-    if (weight <= 0 || reps <= 0 || difficulty == null) return;
-
-    // Calcul Epley+RIR via la fonction existante de prDetection.ts
-    const estimated = estimateOneRM(weight, reps, difficulty);
-    if (estimated <= 0) {
-      toast.error("Estimation impossible", {
-        description: "Vérifie la charge et le nombre de répétitions.",
-      });
-      return;
-    }
-
-    // Garde tenue sur TOUTE la section critique (estimation + log), libérée une
-    // seule fois en finally.
-    isLoggingRef.current = true;
-    try {
-      // Persist le 1RM côté parent (Strength.tsx → update1RM + invalidate query)
-      try {
-        await onEstimationComplete(currentBlock.exercise_id, estimated);
-      } catch {
-        toast.error("Erreur", {
-          description: "1RM non sauvegardé. Réessaye.",
-        });
-        return;
-      }
-
-      // Log la série de référence comme série 1 standard
-      const newLog: SetLogEntry = {
-        exercise_id: currentBlock.exercise_id,
-        set_number: 1,
-        reps,
-        weight,
-        difficulty,
-      };
-      setLogs((prev) => [...prev, newLog]);
-      await onLogSets?.([newLog]);
-
-      // Reset warmupHistory + avance à série 2
-      setWarmupHistory([]);
-      setCurrentSetInputs({});
-      setCurrentSetIndex(2);
-
-      if (autoRest && currentBlock.rest_seconds > 0) {
-        startRestTimer(currentBlock.rest_seconds, "set");
-      }
-    } finally {
-      isLoggingRef.current = false;
-    }
-  };
-
   const handleValidateSet = async () => {
     if (!currentBlock) return;
     if (isLoggingRef.current) return;
@@ -800,6 +765,26 @@ export function WorkoutRunner({
         setPrSets((prev) => new Set(prev).add(setKey));
         toast("🏆 Nouveau record !", { description: `1RM estimé : ${pr.newValue}kg (+${pr.improvement}%)` });
       }
+    }
+
+    // --- §369 — Calibration 1RM inline (carte série 1 augmentée) ---------------
+    // Quand on valide la série 1 d'un exo en mode calibration, on estime le 1RM
+    // (Epley + reps en réserve) et on le persiste SANS invalidation de query
+    // (Task 4 retire l'invalidation en séance). `runOneRms` fournit la cible
+    // locale immédiate aux séries 2+. La série est ensuite loggée et avancée
+    // par le flux normal ci-dessous — pas de saut d'index spécial.
+    if (showCalibration && currentSetIndex === 1 && tracksWeight && logWeight > 0 && logReps > 0) {
+      const oneRm = estimateOneRM(logWeight, logReps, calibRir != null ? { rir: calibRir } : undefined);
+      if (oneRm > 0) {
+        setRunOneRms((prev) => new Map(prev).set(currentBlock.exercise_id, oneRm));
+        void onEstimationComplete?.(currentBlock.exercise_id, oneRm);
+      }
+      if (calibRir === 0 || setDifficultyValue === 5) {
+        toast("Garde des reps en réserve", {
+          description: "Tu es allé près de l'échec — garde 2-3 reps, on progresse mieux en qualité.",
+        });
+      }
+      setCalibRir(null);
     }
 
     // --- Advance UI state BEFORE async save to avoid intermediate "Série suivante" flash ---
@@ -1277,24 +1262,43 @@ export function WorkoutRunner({
         )}
       </div>
 
-      {isEstimationMode && (
+      {/* §369 — Carte série 1 AUGMENTÉE (gate strict `showCalibration`) : un
+          indice + un sélecteur "reps en réserve". PAS d'écran séparé, pas de
+          paliers d'échauffement — la carte poids/reps normale rend toujours. */}
+      {showCalibration && (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-          <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
-            🎯 Estimation 1RM en cours
-          </div>
-          <p className="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">
-            Charge légère, monte progressivement. Marque ta dernière série
-            comme référence pour calculer ton 1RM.
+          <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
+            On ne connaît pas ton max — échauffe-toi, fais une vraie série de
+            travail, garde des reps en réserve.
           </p>
-          {warmupHistory.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-amber-900/90 dark:text-amber-200/90">
-              {warmupHistory.map((w, i) => (
-                <span key={i} className="rounded-full bg-amber-500/20 px-2 py-0.5">
-                  {w.weight}kg × {w.reps}
-                </span>
-              ))}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80 dark:text-amber-200/80">
+              Reps en réserve
+            </span>
+            <div className="flex gap-1.5">
+              {([0, 1, 2, 3, 4] as const).map((level) => {
+                const selected = calibRir === level;
+                const label = level === 4 ? "4+" : String(level);
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    aria-label={`Reps en réserve : ${label}`}
+                    aria-pressed={selected}
+                    className={cn(
+                      "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-all",
+                      selected
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : "border-muted-foreground/25 bg-muted/30 text-muted-foreground/60",
+                    )}
+                    onClick={() => setCalibRir(selected ? null : level)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -1403,10 +1407,11 @@ export function WorkoutRunner({
           </p>
         </div>
       )}
-      {/* §297 — Recalculer 1RM : visible uniquement sur série 1 d'exos chargés non en
-          mode estimation, et avant que la série 1 ne soit loggée. */}
+      {/* §297/§369 — Recalculer 1RM : série 1 d'exos chargés, avant que la série 1
+          ne soit loggée. Masqué si la carte de calibration est déjà affichée
+          (`showCalibration` couvre déjà le cas sans 1RM connu). */}
       {!isBodyweightExercise &&
-        !isEstimationMode &&
+        !showCalibration &&
         currentSetIndex === 1 &&
         !currentLoggedSet &&
         onRequestRecalc &&
@@ -1421,24 +1426,22 @@ export function WorkoutRunner({
             Recalculer ma 1RM
           </Button>
         )}
-      {!isEstimationMode && (
-        <Button
-          variant="ghost"
-          className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
-          onClick={() => {
-            const hasLogsForCurrent = currentBlock
-              ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
-              : false;
-            if (hasLogsForCurrent) {
-              setSkipExerciseConfirmOpen(true);
-            } else {
-              void advanceExercise(true);
-            }
-          }}
-        >
-          Passer cet exercice
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        className="w-full h-10 rounded-2xl text-sm text-muted-foreground"
+        onClick={() => {
+          const hasLogsForCurrent = currentBlock
+            ? logs.some((l) => l.exercise_id === currentBlock.exercise_id)
+            : false;
+          if (hasLogsForCurrent) {
+            setSkipExerciseConfirmOpen(true);
+          } else {
+            void advanceExercise(true);
+          }
+        }}
+      >
+        Passer cet exercice
+      </Button>
       <Button variant="outline" className="w-full rounded-2xl" onClick={() => setSeriesSheetOpen(true)}>
         Voir les séries
       </Button>
@@ -1448,42 +1451,13 @@ export function WorkoutRunner({
           className="bottom-0 z-modal"
           containerClassName="flex-col gap-2 py-4"
         >
-          {isEstimationMode ? (
-            <>
-              <Button
-                variant="outline"
-                className="w-full h-12 rounded-2xl text-sm font-semibold"
-                onClick={handleAddWarmupSet}
-                disabled={
-                  !currentSetInputs[0]?.weight || !currentSetInputs[0]?.reps
-                }
-              >
-                + Chauffe suivante
-              </Button>
-              <Button
-                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg"
-                onClick={handleReferenceSet}
-                disabled={
-                  !currentSetInputs[0]?.weight ||
-                  !currentSetInputs[0]?.reps ||
-                  currentSetInputs[0]?.difficulty == null
-                }
-              >
-                <Check className="mr-2 h-5 w-5" />
-                C'est ma série de référence → calculer 1RM
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
-                onClick={handleValidateSet}
-              >
-                <Check className="mr-2 h-5 w-5" />
-                {currentLoggedSet ? "Série suivante" : "Valider série"}
-              </Button>
-            </>
-          )}
+          <Button
+            className="w-full h-14 rounded-2xl text-base font-bold shadow-lg active:scale-[0.97] transition-transform"
+            onClick={handleValidateSet}
+          >
+            <Check className="mr-2 h-5 w-5" />
+            {currentLoggedSet ? "Série suivante" : "Valider série"}
+          </Button>
         </BottomActionBar>
       ) : null}
         </>

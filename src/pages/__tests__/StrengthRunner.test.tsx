@@ -87,6 +87,84 @@ test("WorkoutRunner renders input modal when open", () => {
   assert.ok(markup.includes("Charge"));
 });
 
+// ---------------------------------------------------------------------------
+// §369 — Carte série 1 augmentée : gate strict de calibration 1RM inline.
+// Tests SSR (renderToStaticMarkup) = garde de l'incident §368 : la calibration
+// ne doit s'afficher QUE pour série 1 + %1RM>0 + weight_kg + non-PDC + sans 1RM.
+// ---------------------------------------------------------------------------
+
+const HINT = /reps en réserve/i;
+
+const calibSession = (overrides: Partial<StrengthSessionTemplate["items"][number]> = {}): StrengthSessionTemplate => ({
+  id: 2,
+  title: "Séance calibration",
+  description: "Force",
+  cycle: "force",
+  items: [
+    {
+      exercise_id: 10,
+      exercise_name: "Développé couché",
+      sets: 3,
+      reps: 8,
+      rest_seconds: 90,
+      percent_1rm: 80,
+      order_index: 0,
+      ...overrides,
+    },
+  ],
+});
+
+const renderRunner = (
+  s: StrengthSessionTemplate,
+  exos: Exercise[],
+  oneRMs: { exercise_id: number; weight: number }[] = [],
+) =>
+  renderToStaticMarkup(
+    <WorkoutRunner
+      session={s}
+      exercises={exos}
+      oneRMs={oneRMs as any}
+      onFinish={() => undefined}
+      initialStep={1}
+      userId={1}
+    />,
+  );
+
+describe("§369 calibration gate (SSR)", () => {
+  it("POSITIF : exo %1RM>0, weight_kg, non-PDC, sans 1RM → carte série 1 augmentée affichée", () => {
+    const markup = renderRunner(calibSession(), exercises, []);
+    assert.ok(HINT.test(markup), "le hint 'reps en réserve' doit apparaître");
+    assert.ok(markup.includes("On ne connaît pas ton max"));
+  });
+
+  it("NÉGATIF (a) accessoire %1RM=0 → pas de calibration", () => {
+    const markup = renderRunner(calibSession({ percent_1rm: 0 }), exercises, []);
+    assert.ok(!HINT.test(markup));
+    assert.ok(!markup.includes("On ne connaît pas ton max"));
+  });
+
+  it("NÉGATIF (b) is_bodyweight=true → pas de calibration", () => {
+    const pdcExos: Exercise[] = [
+      { id: 10, nom_exercice: "Tractions", exercise_type: "strength", is_bodyweight: true },
+    ];
+    const markup = renderRunner(calibSession(), pdcExos, []);
+    assert.ok(!HINT.test(markup));
+  });
+
+  it("NÉGATIF (c) intensity_metric=height_cm (élastique) → pas de calibration", () => {
+    const elasticExos: Exercise[] = [
+      { id: 10, nom_exercice: "Bande élastique", exercise_type: "strength", intensity_metric: "height_cm" },
+    ];
+    const markup = renderRunner(calibSession(), elasticExos, []);
+    assert.ok(!HINT.test(markup));
+  });
+
+  it("NÉGATIF (d) exo avec 1RM connu → pas de calibration", () => {
+    const markup = renderRunner(calibSession(), exercises, [{ exercise_id: 10, weight: 100 }]);
+    assert.ok(!HINT.test(markup));
+  });
+});
+
 // resolveSetNumber: defensive parsing for log entries written by older
 // versions where the set index could come from any of three keys.
 test("resolveSetNumber falls back to fallbackIndex for missing/invalid values", () => {
