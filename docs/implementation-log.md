@@ -20,7 +20,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Fichiers :** Créés : `src/components/strength/OneRmDiscoveryWizard.tsx` (486 l), `src/lib/strength/oneRmCalibration.ts` (67 l). Modifiés : `src/lib/prDetection.ts`, `src/lib/api/strength.ts`, `src/components/strength/WorkoutRunner.tsx`, `src/pages/Strength.tsx`, `src/hooks/useStrengthState.ts`, `src/lib/strength/intensityMetrics.ts`. Supprimés : `src/lib/strength/missing1rmFilter.ts` + `src/pages/__tests__/strength_missing1rm_filter.test.ts`. Docs : design + plan `docs/plans/2026-06-03-wizard-calibration-1rm-design.md` / `…-wizard-calibration-1rm.md`.
 
-**Tests / vérifs :** helpers en `node:test` ; wizard en vitest (13 cas) + tests de glue `WorkoutRunner`. Suite complète verte : `npm test` (node:test, fail=0) + vitest (84 pass). `tsc --noEmit` clean.
+**Tests / vérifs :** helpers en `node:test` ; wizard en vitest (13 cas) + tests de glue `WorkoutRunner` (dont régression SSR du gate métrique). Suite complète verte : `npm test` (node:test, fail=0) + vitest (84 pass). `tsc --noEmit` clean.
 
 **Décisions :**
 - RIR explicite plutôt qu'une difficulté implicite (saisie directe par le nageur).
@@ -28,7 +28,11 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 - Le ressenti de charge « trop lourde » alimente le verdict négatif (en plus de la douleur / série trop dure).
 - `firstTimeExercises` gardé sur `isSuccess` → pas de faux wizard découverte tant que la requête n'a pas abouti.
 
-**Limites :** Le click-through complet du wizard n'est pas couvert sous le harness SSR `node:test` (couvert au niveau logique + en vitest). `missing1rmFilter` supprimé.
+**Fixes revue finale (commit `gate tracksWeight + sets==1`) :**
+- **I1** — `showWizard` exigeait `!is_bodyweight` mais **pas** `weight_kg` : un exo jamais réalisé à métrique non-poids (`height_cm`/`time_s`, ex. Box Jump §298) déclenchait le wizard kg et persistait une 1RM Epley parasite. Ajout du gate `tracksWeight` + **test de régression SSR** (rouge sans le gate : le sous-arbre wizard lève `React is not defined`).
+- **M2** — `handleWizardComputed` forçait `setCurrentSetIndex(2)` : un exo de calibration à 1 série (phase d'affûtage, `sets = max(1, …)`) bloquait sur une « Série 2/1 » fantôme. Avance l'exo si `sets ≤ 1` (la validation post-série-2 ne s'applique alors pas).
+
+**Limites :** Le click-through interactif complet du wizard **dans `WorkoutRunner`** n'est pas couvert sous le harness SSR `node:test` (le wizard tourne en runtime JSX automatique → `React is not defined` en classic) ; couvert au niveau logique + en vitest isolé. Douleur non captable sur la série de travail elle-même (mode court : `pain=null` à la série 1 → pas de marqueur note ; mitigé par la carte post-série-2). `getPerformedExerciseIds` non couvert par test auto (requête Supabase ; jointure vérifiée contre le schéma). `missing1rmFilter` supprimé.
 
 ---
 
