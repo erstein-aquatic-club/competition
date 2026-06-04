@@ -38,12 +38,10 @@ import { STORAGE_KEYS } from "@/lib/api/client";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MyPlanTab } from "@/components/strength/MyPlanTab";
-import { OneRmGate } from "@/components/strength/OneRmGate";
 import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/components/strength/StrengthBilanEntry";
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
-import { computeMissing1RmExercises } from "@/lib/strength/missing1rmFilter";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -547,12 +545,6 @@ export default function Strength() {
   };
 
   const [isPlanMode, setIsPlanMode] = useState(false);
-  const [showOneRmGate, setShowOneRmGate] = useState(false);
-
-  const missing1RmExercises = useMemo(
-    () => computeMissing1RmExercises(activeFilteredItems, oneRMs, exerciseLookup),
-    [activeFilteredItems, oneRMs, exerciseLookup],
-  );
 
   const startCatalogSession = (session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
@@ -637,7 +629,7 @@ export default function Strength() {
       return next;
     });
     toast("Mode estimation activé", {
-      description: "Fais ta chauffe et marque ta série de référence.",
+      description: "Renseigne ta série de travail (charge + reps en réserve) pour recalculer ta 1RM.",
     });
   }, []);
 
@@ -654,7 +646,12 @@ export default function Strength() {
         8000,
         "update-1rm",
       );
-      await queryClient.invalidateQueries({ queryKey: ["1rm"] });
+      // §369 — PAS d'invalidation de ["1rm"] ici (cause #3 de l'incident §368).
+      // En séance, les charges cibles sont pilotées par la map locale `runOneRms`
+      // du WorkoutRunner ; invalider ["1rm"] mid-séance force un re-render parent
+      // + l'effet de réconciliation du runner (`resolveNextStep`), soupçonné de
+      // provoquer les resets de position / « boucles ». La 1RM fraîche est
+      // re-lue naturellement au rechargement de l'écran muscu, hors séance active.
       setInlineEstimationExercises((prev) => {
         const next = new Set(prev);
         next.delete(exerciseId);
@@ -662,10 +659,10 @@ export default function Strength() {
       });
       toast(`🎯 1RM estimé : ${estimatedOneRm} kg`);
     },
-    [userId, queryClient],
+    [userId],
   );
 
-  const handleLaunchFocus = async (options?: { bypassMissing1RmGate?: boolean }) => {
+  const handleLaunchFocus = async () => {
     if (!activeSession) return;
     if (startRun.isPending) return;
     const lockedCycle = activeSession.cycle ?? cycleType;
@@ -674,20 +671,9 @@ export default function Strength() {
       return;
     }
 
-    // §297 — Check for missing 1RMs before entering focus mode.
-    // bypassMissing1RmGate: passed by `onEstimateInline` callback so the
-    // re-trigger after `setInlineEstimationExercises(...)` doesn't re-open
-    // the gate due to a stale closure reading inlineEstimationExercises.size === 0
-    // (setState is queued; setTimeout(fn, 0) fires with the previous render's
-    // closure values).
-    if (
-      !options?.bypassMissing1RmGate &&
-      missing1RmExercises.length > 0 &&
-      inlineEstimationExercises.size === 0
-    ) {
-      setShowOneRmGate(true);
-      return;
-    }
+    // §369 — Plus de gate pré-séance : la calibration 1RM manquante est gérée
+    // inline dans WorkoutRunner (carte « série de travail »). Le lancement de la
+    // séance est désormais en un tap, sans dialogue bloquant.
 
     // Auto-start the run so WorkoutRunner skips step 0
     if (!activeRunId) {
@@ -1180,28 +1166,6 @@ export default function Strength() {
           </Tabs>
         </>
       )}
-
-      <OneRmGate
-        open={showOneRmGate}
-        onOpenChange={setShowOneRmGate}
-        missingExercises={missing1RmExercises}
-        athleteId={userId}
-        onSaveAndContinue={() => {
-          setShowOneRmGate(false);
-          queryClient.invalidateQueries({ queryKey: ["1rm"] });
-          handleLaunchFocus();
-        }}
-        onEstimateInline={(skippedIds) => {
-          setShowOneRmGate(false);
-          setInlineEstimationExercises(new Set(skippedIds));
-          // §297 — bypassMissing1RmGate explicite : setInlineEstimationExercises
-          // est une mutation async (queued), donc une lecture immédiate dans
-          // handleLaunchFocus via setTimeout(0) verrait encore size === 0 dans
-          // la closure capturée → le gate se rouvrirait. Le flag explicite
-          // contourne ce piège sans dépendre du timing React.
-          setTimeout(() => handleLaunchFocus({ bypassMissing1RmGate: true }), 0);
-        }}
-      />
     </div>
   );
 }
