@@ -214,9 +214,10 @@ export function WorkoutRunner({
    *  is persisted to localStorage so the swimmer can recover after an iOS
    *  PWA background-kill or accidental tab close. */
   runId?: string | number | null;
-  /** §297 — Set d'exercise_ids dont la série 1 doit ouvrir le mode estimation
-   *  ramp-up (calcul 1RM à partir d'une série de référence). Le runner retire
-   *  l'exo du Set parent via onEstimationComplete. */
+  /** §369 — Set d'exercise_ids pour lesquels la carte série 1 augmentée
+   *  (hint + reps en réserve) doit être RÉ-affichée même si une 1RM est déjà
+   *  connue : OR'é dans `showCalibration` pour permettre le recalcul explicite
+   *  d'une 1RM (bouton « Recalculer ma 1RM »). */
   inlineEstimationExercises?: Set<number>;
   onRequestRecalc?: (exerciseId: number) => void;
   onEstimationComplete?: (exerciseId: number, estimatedOneRm: number) => Promise<void>;
@@ -265,11 +266,13 @@ export function WorkoutRunner({
   // §369 — Calibration 1RM inline (carte série 1 augmentée). `runOneRms` =
   // 1RM estimés en séance, utilisés comme cible IMMÉDIATE pour les séries 2+
   // (avant que la persistance parent ne se répercute). `calibRir` = reps en
-  // réserve saisies pour la série 1 calibrée. Déclarés ici (inconditionnel,
+  // réserve de la série 1 calibrée. Défaut 2 (cohérent avec l'instruction
+  // « garde 2-3 reps ») : si le nageur ne touche pas le sélecteur, on n'estime
+  // PAS à l'échec (RIR 0 sous-estimerait la 1RM). Déclarés ici (inconditionnel,
   // haut du composant) — ce fichier a un historique de React #310 : aucun hook
   // après un early return.
   const [runOneRms, setRunOneRms] = useState<Map<number, number>>(new Map());
-  const [calibRir, setCalibRir] = useState<number | null>(null);
+  const [calibRir, setCalibRir] = useState<number>(2);
 
   // Inline note state (refs only - effects defined after currentBlock)
   const [localNote, setLocalNote] = useState("");
@@ -359,10 +362,10 @@ export function WorkoutRunner({
   const metricCfg = INTENSITY_METRICS[metric];
   const tracksWeight = metric === "weight_kg";
 
-  // §369 — reset du RIR de calibration à chaque changement d'exercice (l'ancien
-  // reset de `warmupHistory` du ramp-up §297 vivait ici).
+  // §369 — reset du RIR de calibration au défaut (2) à chaque changement
+  // d'exercice (l'ancien reset de `warmupHistory` du ramp-up §297 vivait ici).
   useEffect(() => {
-    setCalibRir(null);
+    setCalibRir(2);
   }, [currentBlock?.exercise_id]);
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
@@ -757,7 +760,12 @@ export function WorkoutRunner({
     const logReps = Number(newLog.reps);
     // §298 — pas de détection PR / estimation 1RM hors métrique weight_kg.
     if (tracksWeight && logWeight > 0 && logReps > 0 && !isBodyweight(logWeight)) {
-      const currentBest1rm = oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight || 0;
+      // §369 — lit la 1RM calibrée en séance (runOneRms) avant le prop oneRMs,
+      // sinon une série 2+ comparerait contre 0 (pas d'invalidation en séance).
+      const currentBest1rm =
+        runOneRms.get(currentBlock.exercise_id) ??
+        oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight ??
+        0;
       const exName = currentExerciseDef?.nom_exercice ?? "Exercice";
       const pr = detectPR({ weight: logWeight, reps: logReps, difficulty: newLog.difficulty }, currentBest1rm, exName);
       if (pr) {
@@ -769,10 +777,11 @@ export function WorkoutRunner({
 
     // --- §369 — Calibration 1RM inline (carte série 1 augmentée) ---------------
     // Quand on valide la série 1 d'un exo en mode calibration, on estime le 1RM
-    // (Epley + reps en réserve) et on le persiste SANS invalidation de query
-    // (Task 4 retire l'invalidation en séance). `runOneRms` fournit la cible
-    // locale immédiate aux séries 2+. La série est ensuite loggée et avancée
-    // par le flux normal ci-dessous — pas de saut d'index spécial.
+    // (Epley + reps en réserve, RIR par défaut 2 — cohérent avec l'instruction
+    // « garde 2-3 reps », ajustable par le nageur) et on le persiste SANS
+    // invalidation de query (Task 4 retire l'invalidation en séance). `runOneRms`
+    // fournit la cible locale immédiate aux séries 2+. La série est ensuite
+    // loggée et avancée par le flux normal ci-dessous — pas de saut d'index.
     if (showCalibration && currentSetIndex === 1 && tracksWeight && logWeight > 0 && logReps > 0) {
       const oneRm = estimateOneRM(logWeight, logReps, calibRir != null ? { rir: calibRir } : undefined);
       if (oneRm > 0) {
@@ -784,7 +793,7 @@ export function WorkoutRunner({
           description: "Tu es allé près de l'échec — garde 2-3 reps, on progresse mieux en qualité.",
         });
       }
-      setCalibRir(null);
+      setCalibRir(2);
     }
 
     // --- Advance UI state BEFORE async save to avoid intermediate "Série suivante" flash ---
@@ -1291,7 +1300,7 @@ export function WorkoutRunner({
                         ? "bg-amber-500 text-white border-amber-500"
                         : "border-muted-foreground/25 bg-muted/30 text-muted-foreground/60",
                     )}
-                    onClick={() => setCalibRir(selected ? null : level)}
+                    onClick={() => setCalibRir(level)}
                   >
                     {label}
                   </button>
