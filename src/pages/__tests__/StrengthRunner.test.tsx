@@ -9,7 +9,7 @@ import {
   detectBlockChapter,
   findFirstMainStep,
 } from "@/components/strength/WorkoutRunner";
-import type { StrengthSessionTemplate, Exercise } from "@/lib/api";
+import type { StrengthSessionTemplate, StrengthSessionItem, Exercise } from "@/lib/api";
 
 const session: StrengthSessionTemplate = {
   id: 1,
@@ -95,7 +95,7 @@ test("WorkoutRunner renders input modal when open", () => {
 
 const HINT = /reps en réserve/i;
 
-const calibSession = (overrides: Partial<StrengthSessionTemplate["items"][number]> = {}): StrengthSessionTemplate => ({
+const calibSession = (overrides: Partial<StrengthSessionItem> = {}): StrengthSessionTemplate => ({
   id: 2,
   title: "Séance calibration",
   description: "Force",
