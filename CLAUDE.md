@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§371** — Calibration 1RM : Difficulté masquée sur calibration (F2) + 1RM calibrée persistée au draft + toast si échec sauvegarde (F4).
+Dernier § livré : **§373** — Calibration 1RM : toast 1RM estimé enrichi (« prochaines séances calées sur ce max », friction F3).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

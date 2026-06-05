@@ -4,6 +4,14 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §373 — Calibration 1RM : feedback de valeur différée (friction F3) (2026-06-05)
+
+**Contexte :** dernière friction de l'audit. F3 = « la 1RM calculée ne change pas visiblement la séance en cours ». Vérification : un toast « 🎯 1RM estimé : X kg » existe déjà au validate de la calibration (`Strength.tsx`), et le carry-forward des séries 2+ (charge de série 1 conservée) est **délibéré** (§297). Option A (séries 2+ visent la cible %) écartée — risque de friction inverse (série 2 plus légère). Retenu : **option B**, clarifier que le bénéfice est pour la suite.
+
+**Changement :** le toast `🎯 1RM estimé : X kg` gagne une description « Tes prochaines séances seront calées sur ce max. » (`Strength.tsx` `handleEstimationComplete`). 1 ligne, zéro risque, aucun changement de charge.
+
+**Fichiers :** `src/pages/Strength.tsx`. **Tests :** tsc 0, node:test 1661/0, vitest 74/0, lint 0. Pas de migration. **Frictions audit : toutes traitées sauf F5 (cosmétique, jargon « reps en réserve »).**
+
 ## §371 — Calibration 1RM : clarté (F2) + robustesse (F4) (2026-06-05)
 
 **Contexte :** suite de l'audit post-§369 (frictions). Deux corrections groupées dans `WorkoutRunner.tsx`.

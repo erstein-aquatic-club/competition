@@ -657,7 +657,11 @@ export default function Strength() {
         next.delete(exerciseId);
         return next;
       });
-      toast(`🎯 1RM estimé : ${estimatedOneRm} kg`);
+      // §373 (F3) — feedback explicite : le bénéfice de la calibration est
+      // surtout pour la suite (les prochaines séances se calent sur ce max).
+      toast(`🎯 1RM estimé : ${estimatedOneRm} kg`, {
+        description: "Tes prochaines séances seront calées sur ce max.",
+      });
     },
     [userId],
   );
