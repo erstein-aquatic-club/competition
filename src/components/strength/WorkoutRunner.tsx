@@ -1277,8 +1277,10 @@ export function WorkoutRunner({
       {showCalibration && (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
-            On ne connaît pas ton max — échauffe-toi, fais une vraie série de
-            travail, garde des reps en réserve.
+            On ne connaît pas encore ton max. Prends une charge que tu peux faire{" "}
+            {currentBlock?.reps ? `~${currentBlock.reps} reps` : "tes reps"} en
+            gardant 2-3 reps en réserve (sans aller à l'échec). Dans le doute,
+            commence léger — tu ajusteras aux séries suivantes.
           </p>
           <div className="mt-3 flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80 dark:text-amber-200/80">

@@ -4,6 +4,14 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §370 — Calibration 1RM : guidage de charge concret (friction F1) (2026-06-05)
+
+**Contexte :** audit post-§369 — sur un exo %1RM sans 1RM, la tuile Charge affichait « — » et l'indice était vague (« fais une vraie série de travail ») : le nageur devait choisir une charge **sans aucun repère**. Friction la plus bloquante du flux (les paliers de suggestion du §368 avaient été retirés). On n'a pas de donnée de force fiable pour suggérer un kg (poids de corps coach-only) → on remplace le repère numérique par un **guidage par les reps**, auto-applicable.
+
+**Changement :** l'indice de la carte de calibration (`WorkoutRunner.tsx`) devient concret et utilise les **reps prescrites** en dynamique : « Prends une charge que tu peux faire ~{reps} reps en gardant 2-3 reps en réserve (sans aller à l'échec). Dans le doute, commence léger — tu ajusteras aux séries suivantes. » Pas de chiffre inventé, pas de nouvel écran. Assertion SSR mise à jour (`commence léger`).
+
+**Fichiers :** `src/components/strength/WorkoutRunner.tsx` (copie de l'indice), `src/pages/__tests__/StrengthRunner.test.tsx` (assertions). **Tests :** tsc 0, node:test 1661/0, vitest 74/0, lint 0 erreur. **Limite :** changement de copie ; smoke terrain recommandé pour valider le rendu (reps dynamiques).
+
 ## §369 — Calibration 1RM inline minimale (refonte post-revert §368) (2026-06-05)
 
 **Contexte :** §368 (wizard de calibration 1RM multi-étapes) a été livré puis **reverté le jour même** (incident terrain : les nageurs ne pouvaient plus utiliser l'app — le gate était trop large, des exos élastique/PDC/accessoires réclamaient un 1RM et le wizard se lançait sur chaque exo). §369 refait l'intention de façon **minimale et correcte**, inline en séance, sans wizard ni écran séparé.

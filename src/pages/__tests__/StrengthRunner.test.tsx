@@ -134,13 +134,13 @@ describe("§369 calibration gate (SSR)", () => {
   it("POSITIF : exo %1RM>0, weight_kg, non-PDC, sans 1RM → carte série 1 augmentée affichée", () => {
     const markup = renderRunner(calibSession(), exercises, []);
     assert.ok(HINT.test(markup), "le hint 'reps en réserve' doit apparaître");
-    assert.ok(markup.includes("On ne connaît pas ton max"));
+    assert.ok(markup.includes("commence léger"), "le guidage 'commence léger' doit apparaître");
   });
 
   it("NÉGATIF (a) accessoire %1RM=0 → pas de calibration", () => {
     const markup = renderRunner(calibSession({ percent_1rm: 0 }), exercises, []);
     assert.ok(!HINT.test(markup));
-    assert.ok(!markup.includes("On ne connaît pas ton max"));
+    assert.ok(!markup.includes("commence léger"));
   });
 
   it("NÉGATIF (b) is_bodyweight=true → pas de calibration", () => {

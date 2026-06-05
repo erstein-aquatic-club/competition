@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§369** — Calibration 1RM inline minimale (carte série 1 augmentée, gate strict) — remplace §368 reverté.
+Dernier § livré : **§370** — Calibration 1RM : guidage de charge concret par les reps (friction F1, copie de l'indice).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
