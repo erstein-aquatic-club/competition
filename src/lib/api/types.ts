@@ -57,7 +57,7 @@ export interface Exercise {
   recup_force?: number | null;
   recup_exercices_force?: number | null;
   folder_id?: number | null;
-  /** §297 — Si TRUE, exo au poids de corps : OneRmGate l'ignore, runner masque Charge. */
+  /** §369 — Si TRUE, exo au poids de corps : la calibration 1RM l.ignore, runner masque Charge. */
   is_bodyweight?: boolean;
   /** §298 — Métrique d'intensité. Défaut 'weight_kg'. Pilote runner UI + gating 1RM. */
   intensity_metric?: IntensityMetric;
