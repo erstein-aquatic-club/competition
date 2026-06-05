@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §369 — Calibration 1RM inline minimale (refonte post-revert §368) (2026-06-05)
+
+**Contexte :** §368 (wizard de calibration 1RM multi-étapes) a été livré puis **reverté le jour même** (incident terrain : les nageurs ne pouvaient plus utiliser l'app — le gate était trop large, des exos élastique/PDC/accessoires réclamaient un 1RM et le wizard se lançait sur chaque exo). §369 refait l'intention de façon **minimale et correcte**, inline en séance, sans wizard ni écran séparé.
+
+**Changements :**
+- **Gate pur strict `needsOneRmCalibration`** (nouveau `src/lib/strength/oneRmCalibration.ts`, 23 LOC) : la calibration n'apparaît QUE pour un exo en **série 1** + **prescrit en %1RM** (`percent_1rm > 0`) + **métrique `weight_kg`** + **non poids-de-corps** + **sans 1RM connu**. Restaure les 4 filtres de l'ancien §297 `computeMissing1RmExercises`, évalués **inline** → c'est l'anti-régression directe de l'incident §368.
+- **`estimateOneRM`** (`src/lib/prDetection.ts`) gagne une **surcharge explicite `{ rir }`** (reps en réserve passées sans bricoler les reps).
+- **`WorkoutRunner.tsx`** : remplacement de la rampe d'estimation §297 par une **carte de série 1 augmentée** = la carte poids/reps normale + une ligne d'indice + un sélecteur **« reps en réserve » (RIR 0/1/2/3/4+, défaut 2)**. Valider la série 1 : calcule le 1RM (**Epley + RIR**), le stocke dans une **`Map runOneRms` locale à la séance** (qui pilote les cibles des séries 2+), persiste côté serveur en **fire-and-forget**, et affiche un **toast de sécurité** si RIR 0 / difficulté 5.
+- **`Strength.tsx`** : suppression du **`OneRmGate` pré-séance** (la séance se lance désormais **en un tap**) ET du **`invalidateQueries(["1rm"])` mid-séance** dans `handleEstimationComplete` (cause suspectée des resets de position / boucles §368 — les cibles en séance proviennent maintenant de `runOneRms`, pas d'un refetch).
+
+**Fichiers :**
+- Créé : `src/lib/strength/oneRmCalibration.ts` (23 LOC — gate pur `needsOneRmCalibration` + interface `CalibrationGateInput`).
+- Modifié : `src/lib/prDetection.ts` (surcharge `{ rir }`), `src/components/strength/WorkoutRunner.tsx` (carte série 1 augmentée, `runOneRms`), `src/pages/Strength.tsx` (retrait gate + invalidation).
+- Supprimé : `src/components/strength/OneRmGate.tsx`, `src/lib/strength/missing1rmFilter.ts`, `src/lib/strength/__tests__/strength_missing1rm_filter.test.ts`.
+- Nouveau test : `src/components/strength/WorkoutRunner.vitest.tsx`.
+
+**Tests :**
+- Helpers en `node:test` : `oneRmCalibration.test.ts` (gate `needsOneRmCalibration` = **test anti-incident** : élastique/PDC/accessoire/série>1/1RM-présent rejetés, seul le cas strict %1RM weight_kg série 1 sans 1RM passe), `prDetection.test.ts` (surcharge `{ rir }`).
+- Gate SSR dans `StrengthRunner.test.tsx`.
+- Interaction jsdom dans `WorkoutRunner.vitest.tsx`.
+- Suite complète verte : **1661 tests `node:test` (290 suites) / 0 fail**, **74 vitest (19 fichiers) / 0 fail** ; `tsc --noEmit` 0 ; `npm run lint` 0 erreurs (43 warnings exhaustive-deps tolérés).
+
+**Décisions :**
+- **RIR explicite, défaut 2** (anti sous-estimation du 1RM).
+- **Gate strict inline** (pas de recalcul d'une liste « missing » côté écran ; chaque exo décide seul à la série 1).
+- **Cibles en séance via `runOneRms`** (Map locale) — pas d'invalidation/refetch `["1rm"]` pendant la séance.
+- Persistance serveur en **fire-and-forget** (l'UX ne bloque pas sur le réseau).
+
+**Limites :** le **click-through complet de validation** (valider la série 1 → cibles série 2 mises à jour) n'est **pas testable sous jsdom** : le `Drawer` vaul ne démonte pas proprement → **smoke terrain obligatoire avant merge** (vérifier sur appareil que la carte série 1 augmentée s'affiche, que valider met à jour les cibles, et que les exos élastique/PDC/accessoires ne réclament jamais de 1RM).
+
 ## §368 — Wizard calibration 1RM : LIVRÉ PUIS REVERTÉ (incident terrain) (2026-06-04)
 
 **Statut : annulé en prod.** §368 (wizard de calibration 1RM guidé en séance, remplaçant le gate §297) a été mergé sur `main` puis **reverté le jour même** suite à un incident terrain : les nageurs ne pouvaient plus utiliser l'app.
