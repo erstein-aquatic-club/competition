@@ -112,20 +112,25 @@ interface PendingParams {
   intensityFactor?: number;
   /** §358 — semaines déjà faites avant le pivot, posées sur le méso après l'apply. */
   weekOffset?: number;
+  /** Mode coach : génération pour le compte d'un nageur (route /coach/mesocycle-generate/:id). */
+  coachMode?: boolean;
 }
 
 /**
  * C2 — cible de navigation « Retour » / « Modifier les paramètres » depuis
  * l'aperçu. En mode ajustement mid-cycle (§338), on revient à l'écran
- * d'ajustement du nageur ciblé (pour ne pas perdre la config pivot/facteurs du
- * coach) ; sinon à l'écran de génération. Repli sûr sur génération si l'athlète
- * cible manque.
+ * d'ajustement du nageur ciblé ; en mode coach (§371), à l'écran de génération
+ * coach pour ne pas perdre le contexte ; sinon à l'écran de génération nageur.
+ * Repli sûr sur génération nageur si l'athlète cible manque.
  */
 export function mesocyclePreviewBackTarget(
-  params: Pick<PendingParams, "adjust" | "athleteId"> | null,
+  params: Pick<PendingParams, "adjust" | "athleteId" | "coachMode"> | null,
 ): string {
   if (params?.adjust && params.athleteId != null) {
     return `/strength/mesocycle-adjust/${params.athleteId}`;
+  }
+  if (params?.coachMode && params.athleteId != null) {
+    return `/coach/mesocycle-generate/${params.athleteId}`;
   }
   return "/strength/mesocycle-generate";
 }

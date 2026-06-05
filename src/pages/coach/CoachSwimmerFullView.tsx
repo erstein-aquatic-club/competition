@@ -595,7 +595,7 @@ export default function CoachSwimmerFullView({
                           : bilanStep === "physical"
                           ? `Reprendre — Bilan physique`
                           : bilanStep === "generate"
-                          ? `Reprendre — Génération`
+                          ? `Générer le mésocycle de ${displayName}`
                           : `Voir le bilan de ${displayName}`}
                       </span>
                       <ArrowRight className="h-4 w-4 shrink-0" />

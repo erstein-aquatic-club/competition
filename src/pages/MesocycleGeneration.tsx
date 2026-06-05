@@ -467,6 +467,7 @@ export default function MesocycleGeneration() {
       primerWeekdays: [...primerWeekdays].sort((a, b) => a - b),
       startDate,
       athleteId: effectiveAthleteId,
+      coachMode: isCoachMode,
     };
     try {
       window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
