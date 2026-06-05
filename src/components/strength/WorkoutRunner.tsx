@@ -453,6 +453,8 @@ export function WorkoutRunner({
       currentSetInputs: Record<number, SetInputValues>;
       /** R4 (§343) — epoch ms du début de séance, pour une durée totale juste après kill+reprise. */
       startedAt?: number;
+      /** §371 (F4) — 1RM calibrées en séance (exerciseId → 1RM), pour survivre à un kill PWA. */
+      runOneRms?: Array<[number, number]>;
     };
     const draft = loadDraft<WorkoutDraft>(draftKey);
     if (!draft) return;
@@ -465,7 +467,10 @@ export function WorkoutRunner({
       // R3 (§343) — une note de ressenti seule (difficulté/fatigue ≠ défaut 3)
       // compte comme contenu à restaurer (sinon perdue au kill PWA).
       (typeof payload.difficulty === "number" && payload.difficulty !== 3) ||
-      (typeof payload.fatigue === "number" && payload.fatigue !== 3);
+      (typeof payload.fatigue === "number" && payload.fatigue !== 3) ||
+      // §371 (F4) — une 1RM calibrée en séance seule compte comme contenu :
+      // sinon un kill PWA juste après la série de calibration la perdrait.
+      (Array.isArray(payload.runOneRms) && payload.runOneRms.length > 0);
     if (!hasContent) {
       clearDraft(draftKey);
       return;
@@ -476,6 +481,10 @@ export function WorkoutRunner({
     if (typeof payload.comments === "string") setComments(payload.comments);
     if (payload.currentSetInputs && typeof payload.currentSetInputs === "object") {
       setCurrentSetInputs(payload.currentSetInputs);
+    }
+    // §371 (F4) — restaure les 1RM calibrées en séance (cibles des séries 2+).
+    if (Array.isArray(payload.runOneRms)) {
+      setRunOneRms(new Map(payload.runOneRms));
     }
     // R4 (§343) — reprend le chrono au vrai départ (sinon `elapsedStartRef` remis
     // à `Date.now()` au remount → durée totale fausse, ~5 min au lieu de ~45).
@@ -495,10 +504,11 @@ export function WorkoutRunner({
         comments,
         currentSetInputs,
         startedAt: elapsedStartRef.current, // R4 (§343)
+        runOneRms: Array.from(runOneRms.entries()), // §371 (F4)
       });
     }, 500);
     return () => clearTimeout(draftDebounceRef.current);
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms]);
 
   // Synchronous flush on tab hide / pagehide / beforeunload.
   useEffect(() => {
@@ -510,6 +520,7 @@ export function WorkoutRunner({
         comments,
         currentSetInputs,
         startedAt: elapsedStartRef.current, // R4 (§343)
+        runOneRms: Array.from(runOneRms.entries()), // §371 (F4)
       });
     };
     const onVisibility = () => {
@@ -523,7 +534,7 @@ export function WorkoutRunner({
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms]);
 
   const logLookup = useMemo(() => {
     const map = new Map<string, SetLogEntry>();
@@ -786,7 +797,14 @@ export function WorkoutRunner({
       const oneRm = estimateOneRM(logWeight, logReps, calibRir != null ? { rir: calibRir } : undefined);
       if (oneRm > 0) {
         setRunOneRms((prev) => new Map(prev).set(currentBlock.exercise_id, oneRm));
-        void onEstimationComplete?.(currentBlock.exercise_id, oneRm);
+        // §371 (F4) — persistance serveur fire-and-forget : on garde la 1RM en
+        // local (runOneRms) quoi qu'il arrive ; si la sauvegarde réseau échoue,
+        // on prévient (sinon échec silencieux → re-calibration la séance suivante).
+        void onEstimationComplete?.(currentBlock.exercise_id, oneRm)?.catch(() => {
+          toast("1RM non sauvegardée", {
+            description: "Estimée et appliquée à ta séance ; la sauvegarde serveur a échoué (réseau ?).",
+          });
+        });
       }
       if (calibRir === 0 || setDifficultyValue === 5) {
         toast("Garde des reps en réserve", {
@@ -1365,7 +1383,10 @@ export function WorkoutRunner({
             </div>
           </button>
         </div>
-        {/* Optional difficulty selector (1-5) */}
+        {/* §371 (F2) — Difficulté 1-5 masquée sur la carte de calibration : le
+            sélecteur "reps en réserve" (RIR) y est l'unique mesure d'effort,
+            éviter le double contrôle qui embrouillait les nageurs. */}
+        {!showCalibration && (
         <div className="mt-3 flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Difficulté</span>
           <div className="flex gap-1.5">
@@ -1408,6 +1429,7 @@ export function WorkoutRunner({
             })}
           </div>
         </div>
+        )}
       </Card>
 
       {currentExerciseDef?.description && (

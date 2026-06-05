@@ -4,6 +4,16 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §371 — Calibration 1RM : clarté (F2) + robustesse (F4) (2026-06-05)
+
+**Contexte :** suite de l'audit post-§369 (frictions). Deux corrections groupées dans `WorkoutRunner.tsx`.
+
+**F2 — double saisie d'effort.** Sur la carte de calibration, le nageur voyait DEUX contrôles d'effort : le sélecteur « Reps en réserve » (RIR) ET le sélecteur « Difficulté 1-5 » standard. Confus. → le sélecteur Difficulté est désormais **masqué quand `showCalibration`** (le RIR est l'unique mesure d'effort là ; il pilote le calcul + le toast sécurité). Sur une carte normale, Difficulté reste affichée.
+
+**F4 — robustesse de la 1RM calibrée.** (a) `runOneRms` (Map des 1RM calibrées en séance) est désormais **sérialisé dans le draft** (`saveDraft`/`loadDraft`, `Array<[id,1RM]>`) + compté dans `hasContent` → survit à un kill PWA (avant : perdue → re-calibration la séance suivante). (b) la persistance serveur `onEstimationComplete` passe d'un `void` silencieux à un **`.catch` avec toast** (« 1RM non sauvegardée… réseau ? ») → plus d'échec silencieux ; la valeur reste appliquée localement via `runOneRms`.
+
+**Fichiers :** `src/components/strength/WorkoutRunner.tsx`, `src/pages/__tests__/StrengthRunner.test.tsx` (assertions F2 : Difficulté masquée sur calibration / présente sinon). **Tests :** tsc 0, node:test 1661/0, vitest 74/0, lint 0. **Limite :** le round-trip draft de `runOneRms` (F4a) n'est pas couvert par un test auto (logique embarquée dans les effets + localStorage) → smoke terrain. Pas de migration.
+
 ## §370 — Calibration 1RM : guidage de charge concret (friction F1) (2026-06-05)
 
 **Contexte :** audit post-§369 — sur un exo %1RM sans 1RM, la tuile Charge affichait « — » et l'indice était vague (« fais une vraie série de travail ») : le nageur devait choisir une charge **sans aucun repère**. Friction la plus bloquante du flux (les paliers de suggestion du §368 avaient été retirés). On n'a pas de donnée de force fiable pour suggérer un kg (poids de corps coach-only) → on remplace le repère numérique par un **guidage par les reps**, auto-applicable.

@@ -135,12 +135,17 @@ describe("§369 calibration gate (SSR)", () => {
     const markup = renderRunner(calibSession(), exercises, []);
     assert.ok(HINT.test(markup), "le hint 'reps en réserve' doit apparaître");
     assert.ok(markup.includes("commence léger"), "le guidage 'commence léger' doit apparaître");
+    // §371 (F2) — sur la carte de calibration, le sélecteur Difficulté 1-5 est masqué
+    // (le RIR est l'unique mesure d'effort) → pas de double contrôle.
+    assert.ok(!markup.includes("Difficulté"), "F2 : Difficulté masquée sur la carte de calibration");
   });
 
   it("NÉGATIF (a) accessoire %1RM=0 → pas de calibration", () => {
     const markup = renderRunner(calibSession({ percent_1rm: 0 }), exercises, []);
     assert.ok(!HINT.test(markup));
     assert.ok(!markup.includes("commence léger"));
+    // §371 (F2) — sur une carte NORMALE, le sélecteur Difficulté reste affiché.
+    assert.ok(markup.includes("Difficulté"), "F2 : Difficulté présente sur une carte normale");
   });
 
   it("NÉGATIF (b) is_bodyweight=true → pas de calibration", () => {
