@@ -1823,6 +1823,47 @@ function buildCoreExercise(selectedEx: SelectedExercise): MesocycleExercise {
   };
 }
 
+/**
+ * §375 — paliers d'affûtage progressifs. Multiplicateur de SÉRIES de la semaine
+ * `phaseWeekIndex` (0-based) d'une phase `affutage` longue de `phaseWeekCount`
+ * semaines. Doc validé coach (`bilan-muscu-templates-sources.md`, T1) : volume
+ * −25 % → −40 % → −50 %. Remplace le ×0.4 plat historique (−60 % dès la 1ʳᵉ
+ * semaine), incohérent avec le doc et avec la littérature taper (progressif >
+ * marche d'escalier).
+ *  - 1 sem. → [0.50] ; 2 sem. → [0.75, 0.50] ; 3 sem. → [0.75, 0.60, 0.50].
+ *  - count > 3 : impossible avec les templates seedés (max_weeks affutage = 3) ;
+ *    défensif → table 3 semaines, dernier palier tenu.
+ */
+export function taperSetFactor(phaseWeekIndex: number, phaseWeekCount: number): number {
+  const TABLES: Record<number, readonly number[]> = {
+    1: [0.5],
+    2: [0.75, 0.5],
+    3: [0.75, 0.6, 0.5],
+  };
+  const table = TABLES[phaseWeekCount] ?? TABLES[3];
+  return table[Math.min(Math.max(0, phaseWeekIndex), table.length - 1)];
+}
+
+/**
+ * §375 — position d'une semaine dans sa course CONTIGUË de même cycle (la
+ * « phase » telle que matérialisée par `periodize`, après étirement/compression
+ * et éventuel `startPhase`). Sert à dériver le palier d'affûtage de la semaine.
+ * NB : les templates seedés n'ont jamais deux phases adjacentes de même cycle —
+ * si ça arrivait, elles seraient vues comme UNE course (acceptable : le taper
+ * progresserait sur l'ensemble).
+ */
+export function phasePositionFor(
+  weeks: readonly PeriodizedWeek[],
+  idx: number,
+): { index: number; count: number } {
+  const cycle = weeks[idx].cycle;
+  let start = idx;
+  while (start > 0 && weeks[start - 1].cycle === cycle) start--;
+  let end = idx;
+  while (end < weeks.length - 1 && weeks[end + 1].cycle === cycle) end++;
+  return { index: idx - start, count: end - start + 1 };
+}
+
 /** Centre d'un intervalle, arrondi à l'entier. */
 function midRange(range: readonly [number, number]): number {
   return Math.round((range[0] + range[1]) / 2);
