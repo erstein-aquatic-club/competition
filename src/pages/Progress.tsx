@@ -43,7 +43,7 @@ import { getContrastTextColor } from "@/lib/design-tokens";
 import type { LocalStrengthRun, SetLogEntry } from "@/lib/types";
 import { motion, useReducedMotion } from "framer-motion";
 import { slideUp } from "@/lib/animations";
-import { ChevronDown, TrendingUp, TrendingDown, BarChart3, Trophy, Waves, Dumbbell, HeartPulse } from "lucide-react";
+import { AlertCircle, ChevronDown, TrendingUp, TrendingDown, BarChart3, Trophy, Waves, Dumbbell, HeartPulse } from "lucide-react";
 import { InlineBanner } from "@/components/shared/InlineBanner";
 import { PageHeader } from "@/components/shared/PageHeader";
 
@@ -241,7 +241,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
     return new Set(myAbsences.map((a: any) => a.date));
   }, [myAbsences]);
 
-  const { data: sessions, isLoading: isSwimLoading } = useQuery({
+  const { data: sessions, isLoading: isSwimLoading, isError: isSwimError, refetch: refetchSessions } = useQuery({
     queryKey: ["sessions", athleteKey],
     queryFn: () => getSessions(athleteName!, athleteId),
     enabled: !!athleteName,
@@ -273,7 +273,7 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   const strengthPrevFrom = startOfDay(subDays(new Date(), strengthPeriodDays * 2)).toISOString();
   const strengthPrevTo = startOfDay(subDays(new Date(), strengthPeriodDays)).toISOString();
 
-  const { data: strengthHistorySummary, isLoading: isStrengthSummaryLoading } = useQuery({
+  const { data: strengthHistorySummary, isLoading: isStrengthSummaryLoading, isError: isStrengthSummaryError, refetch: refetchStrengthSummary } = useQuery({
     queryKey: ["strength_history_summary", athleteKey, "progress", strengthPeriodDays, strengthRangeFrom, strengthRangeTo],
     queryFn: () =>
       getStrengthHistory(athleteName!, {
@@ -319,11 +319,26 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
   // ─── Wellness (Santé) query ───────────────────────────────────────────────
   const healthFromISO = format(subDays(new Date(), healthPeriodDays), "yyyy-MM-dd");
   const healthToISO = format(new Date(), "yyyy-MM-dd");
-  const { data: wellnessChecks = [], isLoading: isHealthLoading } = useQuery<WellnessCheck[]>({
+  const { data: wellnessChecks = [], isLoading: isHealthLoading, isError: isHealthError, refetch: refetchWellness } = useQuery<WellnessCheck[]>({
     queryKey: ["wellness_range", athleteKey, healthFromISO, healthToISO],
     queryFn: () => getWellnessRange(athleteId!, healthFromISO, healthToISO),
     enabled: !!athleteId,
   });
+
+  // Toutes les queries principales sont en erreur et aucune donnée en cache.
+  const allPrimaryError =
+    isSwimError &&
+    isStrengthSummaryError &&
+    isHealthError &&
+    !sessions &&
+    !strengthHistorySummary;
+
+  const refetchAll = () => {
+    void refetchSessions();
+    void refetchStrengthSummary();
+    void refetchWellness();
+  };
+
   const strengthRunsPeriod = strengthHistorySummary?.runs ?? [];
   const exerciseSummary = strengthHistorySummary?.exercise_summary ?? [];
   const strengthAggregatePeriods = strengthAggregate?.periods ?? [];
@@ -641,6 +656,23 @@ function ProgressInner({ embedded = false }: { embedded?: boolean }) {
 
   const content = (
     <>
+      {allPrimaryError && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 dark:border-rose-800/60 dark:bg-rose-950/40 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
+          <p className="flex-1 text-sm text-rose-700 dark:text-rose-300">
+            Impossible de charger les données. Vérifie ta connexion.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={refetchAll}
+            className="shrink-0 border-rose-300 text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-900/40"
+          >
+            Réessayer
+          </Button>
+        </div>
+      )}
       <Tabs defaultValue="swim" className="w-full">
         <TabsList className="grid h-auto w-full grid-cols-3 gap-1.5 bg-transparent p-0">
           <TabsTrigger

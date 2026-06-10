@@ -174,12 +174,16 @@ export async function createSwimSession(session: any) {
 
 export async function deleteSwimSession(sessionId: number) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("swim_sessions_catalog")
         .delete()
         .eq("id", sessionId)
+        .select("id")
     );
+    if (!data || data.length === 0) {
+      throw new Error("Suppression refusée ou séance introuvable");
+    }
     return { status: "deleted" };
   }
   const sessions = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];
@@ -192,12 +196,16 @@ export async function deleteSwimSession(sessionId: number) {
 
 export async function archiveSwimSession(sessionId: number, archived: boolean) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("swim_sessions_catalog")
         .update({ is_archived: archived })
         .eq("id", sessionId)
+        .select("id")
     );
+    if (!data || data.length === 0) {
+      throw new Error("Modification refusée ou séance introuvable");
+    }
     return { status: archived ? "archived" : "restored" };
   }
   const sessions = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];
@@ -210,12 +218,16 @@ export async function archiveSwimSession(sessionId: number, archived: boolean) {
 
 export async function moveSwimSession(sessionId: number, folder: string | null) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("swim_sessions_catalog")
         .update({ folder })
         .eq("id", sessionId)
+        .select("id")
     );
+    if (!data || data.length === 0) {
+      throw new Error("Déplacement refusé ou séance introuvable");
+    }
     return { status: "moved" };
   }
   const sessions = (localStorageGet(STORAGE_KEYS.SWIM_SESSIONS) || []) as any[];

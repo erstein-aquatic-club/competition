@@ -102,7 +102,17 @@ export async function fetchAllPerformances(iuf: string): Promise<RecFull[]> {
   const results: RecFull[] = [];
   for (const poolSize of [25, 50] as const) {
     const url = `https://ffn.extranat.fr/webffn/nat_recherche.php?idrch_id=${iuf}&idopt=prf&idbas=${poolSize}`;
-    const res = await fetch(url, { headers: { "User-Agent": "suivi-natation/1.0" } });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "User-Agent": "suivi-natation/1.0" },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      console.error(`[ffn-parser] Fetch timeout/error pool=${poolSize} for IUF=${iuf}: ${reason}`);
+      throw new Error(`FFN request timed out or failed (pool ${poolSize}m): ${reason}`);
+    }
     if (!res.ok) {
       console.error(`[ffn-parser] Failed to fetch pool=${poolSize} for IUF=${iuf}: HTTP ${res.status}`);
       continue;

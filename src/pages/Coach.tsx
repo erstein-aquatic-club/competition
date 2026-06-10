@@ -273,6 +273,7 @@ const CoachHome = ({
   const { data: unassignedSlots = [], isLoading: unassignedLoading } = useQuery({
     queryKey: ["unassigned-slots-30d"],
     queryFn: () => getUnassignedSlots30d(),
+    staleTime: 5 * 60 * 1000,
   });
 
   const [unassignedExpanded, setUnassignedExpanded] = useState(false);
@@ -308,6 +309,7 @@ const CoachHome = ({
   const { data: slots = [] } = useQuery({
     queryKey: ["training-slots"],
     queryFn: () => getTrainingSlots(),
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: slotAssignments = [] } = useQuery({
@@ -318,6 +320,7 @@ const CoachHome = ({
         to: formatDateIso(sunday),
         includeCompleted: true,
       }),
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: slotOverrides = [] } = useQuery({
@@ -1123,11 +1126,13 @@ export default function Coach() {
     queryKey: ["swim_catalog"],
     queryFn: () => getSwimCatalog(),
     enabled: coachAccess && shouldLoadCatalogs,
+    staleTime: 30 * 60 * 1000,
   });
   const { data: strengthSessions } = useQuery({
     queryKey: ["strength_catalog"],
     queryFn: () => getStrengthSessions(),
     enabled: coachAccess && shouldLoadCatalogs,
+    staleTime: 30 * 60 * 1000,
   });
   const { data: athletes = [], isLoading: athletesLoading } = useQuery({
     queryKey: ["athletes"],
@@ -1234,6 +1239,7 @@ export default function Coach() {
 
       return { fatigueAlerts };
     },
+    staleTime: 15 * 60 * 1000,
   });
 
   const handleOpenAthlete = (athlete: CoachAthleteOption) => {

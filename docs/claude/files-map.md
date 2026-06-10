@@ -204,7 +204,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/hooks/useCoachEventsTimeline.ts` | Hook timeline échéances coach (fetch + normalisation) | ~130 lignes |
 | `src/components/coach/CoachEventsTimeline.tsx` | Timeline verticale échéances coach (compétitions, entretiens, cycles) | ~260 lignes |
 | `src/lib/api/competition-prep.ts` | API compétition nageur (races, routines, checklists) | ~325 lignes |
-| `src/pages/CompetitionDetail.tsx` | **Vue info compétition** (header J-X + section adaptée au rôle InfoMyObjectives/InfoParticipants + CTA Préparer sticky). Landing par défaut sur `/competition/:id`. | 150 lignes |
+| `src/pages/CompetitionDetail.tsx` | **Vue info compétition** (header J-X + section adaptée au rôle InfoMyObjectives/InfoParticipants + CTA Préparer sticky ; skeleton/erreur/introuvable distincts §374). Landing par défaut sur `/competition/:id`. | 204 lignes |
 | `src/pages/CompetitionPrep.tsx` | Page préparation compétition (4 onglets Check/Courses/Routines/Jour J). Mountée sur `/competition/:id/prep`. Ancien `CompetitionDetail` renommé §191. | 324 lignes |
 | `src/components/competition/info-helpers.ts` | Helpers purs `computeObjectivePerfRow` (utilise `findBestTime` pour bridger format compact ↔ FFN, §193 fix) + `groupAndSortAssignments` (§191) + `selectLinkableForCompetition` (§193, remplace `selectLinkableObjectives` §192). | 98 lignes |
 | `src/components/competition/InfoMyObjectives.tsx` | Section nageur de la vue info compétition (table objectifs + PB 12 mois glissants + delta cible). Bouton "+ Objectif" + empty state CTA ouvrent `AddObjectiveSheet` inline (§192). | 173 lignes |

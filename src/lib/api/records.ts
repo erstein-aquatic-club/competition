@@ -8,6 +8,7 @@ import {
   delay,
   STORAGE_KEYS,
   assertSupabase,
+  withTimeout,
 } from './client';
 import type {
   Session,
@@ -23,8 +24,12 @@ export async function getHallOfFame(fromDate?: string | null) {
     const rpcParams = fromDate ? { from_date: fromDate } : {};
     const strengthParams = fromDate ? { from_date: fromDate } : {};
     const [swimResult, strengthResult] = await Promise.all([
-      supabase.rpc("get_hall_of_fame", rpcParams),
-      supabase.rpc("get_hall_of_fame_strength", strengthParams),
+      withTimeout(supabase.rpc("get_hall_of_fame", rpcParams), 10_000, "get_hall_of_fame").catch(
+        (e) => ({ data: null, error: e as Error })
+      ),
+      withTimeout(supabase.rpc("get_hall_of_fame_strength", strengthParams), 10_000, "get_hall_of_fame_strength").catch(
+        (e) => ({ data: null, error: e as Error })
+      ),
     ]);
     const { data: rpcData, error: rpcError } = swimResult;
     if (!rpcError && rpcData) {

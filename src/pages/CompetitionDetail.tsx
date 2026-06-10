@@ -7,8 +7,9 @@ import InfoMyObjectives from "@/components/competition/InfoMyObjectives";
 import InfoParticipants from "@/components/competition/InfoParticipants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Trophy, MapPin, CalendarDays } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Trophy, MapPin, CalendarDays } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 
 function formatDate(iso: string): string {
   const d = new Date(iso + "T00:00:00");
@@ -50,7 +51,12 @@ export default function CompetitionDetail() {
   // race that an async useQuery(supabase.auth.getUser) would have.
   const authUid = useAuth((s) => s.authUid);
 
-  const { data: competitions = [] } = useQuery({
+  const {
+    data: competitions = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["competitions"],
     queryFn: () => getCompetitions(),
   });
@@ -63,6 +69,47 @@ export default function CompetitionDetail() {
   const days = competition ? daysUntil(competition.date) : null;
   const badge = days != null ? countdownBadge(days) : null;
 
+  // Skeleton pendant le chargement initial — évite un flash « introuvable »
+  // trompeur avant que les données arrivent.
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-4">
+        <PageSkeleton />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-4 space-y-4">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="h-11 w-11 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted transition"
+          aria-label="Retour"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 p-6 text-center dark:border-rose-800/60 dark:bg-rose-950/40">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-600 text-white dark:bg-rose-500">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <p className="text-sm text-rose-700 dark:text-rose-300">
+            Impossible de charger la compétition. Vérifie ta connexion.
+          </p>
+          <Button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-4 bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-400"
+          >
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Le fetch a réussi mais l'id est absent → vraiment introuvable.
   if (!competition) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-4">

@@ -132,12 +132,16 @@ export async function createTimesheetLocation(payload: { name: string }) {
 
 export async function deleteTimesheetLocation(payload: { id: number }) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("timesheet_locations")
         .delete()
         .eq("id", payload.id)
+        .select("id")
     );
+    if (!data || data.length === 0) {
+      throw new Error("Suppression refusée ou lieu introuvable");
+    }
     return { status: "deleted" };
   }
 
@@ -194,7 +198,12 @@ export async function updateTimesheetShift(
 ) {
   if (canUseSupabase()) {
     const { id, group_names, ...rest } = payload;
-    assertSupabase(await supabase.from("timesheet_shifts").update(rest).eq("id", id));
+    const data = assertSupabase(
+      await supabase.from("timesheet_shifts").update(rest).eq("id", id).select("id")
+    );
+    if (!data || data.length === 0) {
+      throw new Error("Mise à jour refusée ou créneau introuvable");
+    }
     if (group_names !== undefined) {
       await setShiftGroupNames(id, group_names ?? []);
     }
@@ -213,12 +222,16 @@ export async function updateTimesheetShift(
 
 export async function deleteTimesheetShift(payload: { id: number }) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("timesheet_shifts")
         .delete()
         .eq("id", payload.id)
+        .select("id")
     );
+    if (!data || data.length === 0) {
+      throw new Error("Suppression refusée ou créneau introuvable");
+    }
     return { status: "deleted" };
   }
 
@@ -267,12 +280,16 @@ export async function createTimesheetGroupLabel(payload: { name: string }) {
 
 export async function deleteTimesheetGroupLabel(payload: { id: number }) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("timesheet_group_labels")
         .delete()
         .eq("id", payload.id)
+        .select("id")
     );
+    if (!data || data.length === 0) {
+      throw new Error("Suppression refusée ou étiquette introuvable");
+    }
     return { status: "deleted" };
   }
   await delay(120);

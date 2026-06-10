@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
     }));
 
     let newImported = 0;
+    const upsertErrors: string[] = [];
     if (rows.length > 0) {
       for (let i = 0; i < rows.length; i += 100) {
         const chunk = rows.slice(i, i + 100);
@@ -130,8 +131,12 @@ Deno.serve(async (req) => {
           .from("swimmer_performances")
           .upsert(chunk, { onConflict: "swimmer_iuf,event_code,pool_length,competition_date,time_seconds" })
           .select("id");
-        if (error) console.error("[ffn-performances] upsert error:", error.message);
-        else newImported += (data?.length ?? 0);
+        if (error) {
+          console.error("[ffn-performances] upsert error:", error.message);
+          upsertErrors.push(`chunk ${Math.floor(i / 100) + 1}: ${error.message}`);
+        } else {
+          newImported += (data?.length ?? 0);
+        }
       }
     }
 
@@ -151,7 +156,18 @@ Deno.serve(async (req) => {
       }).eq("id", logId);
     }
 
-    return new Response(JSON.stringify({ status: "ok", total_found: totalFound, new_imported: newImported, already_existed: totalFound - newImported }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const allChunksFailed = upsertErrors.length > 0 && rows.length > 0 && newImported === 0;
+    const responseBody: Record<string, unknown> = {
+      status: allChunksFailed ? "error" : "ok",
+      total_found: totalFound,
+      new_imported: newImported,
+      already_existed: totalFound - newImported,
+    };
+    if (upsertErrors.length > 0) responseBody.upsert_errors = upsertErrors;
+    return new Response(JSON.stringify(responseBody), {
+      status: allChunksFailed ? 207 : 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     // Update import log with error
     if (logId) {
