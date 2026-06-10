@@ -59,8 +59,8 @@ Annuaire détaillé (140+ fichiers) : **`docs/claude/files-map.md`** — à lire
 |----------|--------|--------|
 | `admin-user` | Fonctionnelle (ACTIVE, v97) | `supabase/functions/admin-user/` |
 | `ffn-sync` | Fonctionnelle (ACTIVE, v53) — cron sync FFN | `supabase/functions/ffn-sync/` |
-| `ffn-performances` | Fonctionnelle (ACTIVE, v64) — capte `club_name` depuis cellule club FFN | `supabase/functions/ffn-performances/` |
-| `import-club-records` | Fonctionnelle (ACTIVE, v74) — recalc filtré sur `app_settings.home_club_name` | `supabase/functions/import-club-records/` |
+| `ffn-performances` | Fonctionnelle (ACTIVE, v65) — capte `club_name` depuis cellule club FFN ; timeout FFN 10 s + `upsert_errors` (§374) | `supabase/functions/ffn-performances/` |
+| `import-club-records` | Fonctionnelle (ACTIVE, v77) — recalc filtré sur `app_settings.home_club_name` ; timeout FFN 10 s (§374) | `supabase/functions/import-club-records/` |
 | `push-send` | Fonctionnelle (ACTIVE, v33) | `supabase/functions/push-send/` |
 | `liveffn-startlist` | Fonctionnelle (ACTIVE, v5) — proxy fetch liveffn (coach/admin) : liste de départ `startlist.php` + Résultats club `resultats.php` (§364) | `supabase/functions/liveffn-startlist/` |
 
