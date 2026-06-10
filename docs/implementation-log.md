@@ -4,6 +4,14 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §374 — Backfill Box Jump → métrique hauteur (cm) (2026-06-10)
+
+**Contexte :** retour utilisateur — « enregistrer un exercice avec métrique cm ne fonctionne pas » (cas Box Jump : on veut indiquer la hauteur de box sautée). Investigation : tout le pipeline §298 (colonne `dim_exercices.intensity_metric`, mappers `mapApiExerciseToDb`/`mapDbExerciseToApi`, UI catalogue coach `StrengthCatalog`, UI runner `WorkoutRunner`, gating 1RM) est **complet et fonctionnel**, RLS `exercices_write` autorise bien coach/admin à écrire. La vraie cause : la limite V1 du §298 (« pas de backfill, le coach coche manuellement ») n'avait jamais été appliquée → **aucun exercice** n'était assigné à une métrique non-poids ; Box Jump (id 8) restait `weight_kg`, donc le runner affichait « Charge (kg) ».
+
+**Changement :** migration `00228_box_jump_height_metric.sql` — `UPDATE dim_exercices SET intensity_metric = 'height_cm'` (+ reset `is_bodyweight=false` et `pourcentage_charge_1rm_*=NULL` pour cohérence catalogue) sur `nom_exercice = 'Box Jump'`. Aucun changement de code : le runner lit désormais `height_cm` → tuile « Hauteur (cm) », numpad borné à 300, gating 1RM/PR désactivé.
+
+**Fichiers :** `supabase/migrations/00228_box_jump_height_metric.sql` (nouveau). **Tests :** migration data-only (pas de policy/RLS touchée) → pas de `test:rls`, pas de changement JS. Appliquée via MCP, vérifiée (`intensity_metric = height_cm`). **Note :** les autres exos non-poids (Saut en longueur → distance_cm, gainages → time_s, Drop Jump → height_cm) restent à basculer par le coach via le catalogue (Select « Métrique d'intensité ») ou un backfill ultérieur.
+
 ## §373 — Calibration 1RM : feedback de valeur différée (friction F3) (2026-06-05)
 
 **Contexte :** dernière friction de l'audit. F3 = « la 1RM calculée ne change pas visiblement la séance en cours ». Vérification : un toast « 🎯 1RM estimé : X kg » existe déjà au validate de la calibration (`Strength.tsx`), et le carry-forward des séries 2+ (charge de série 1 conservée) est **délibéré** (§297). Option A (séries 2+ visent la cible %) écartée — risque de friction inverse (série 2 plus légère). Retenu : **option B**, clarifier que le bénéfice est pour la suite.

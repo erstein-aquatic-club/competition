@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§373** — Calibration 1RM : toast 1RM estimé enrichi (« prochaines séances calées sur ce max », friction F3).
+Dernier § livré : **§374** — Backfill Box Jump → métrique hauteur (cm) : le runner affiche « Hauteur (cm) ».
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
