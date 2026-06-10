@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§374** — Backfill Box Jump → métrique hauteur (cm) : le runner affiche « Hauteur (cm) ».
+Dernier § livré : **§375** — Réglage métrique non-poids : séries/reps/récup restent éditables (seul le % 1RM est grisé).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

@@ -105,11 +105,13 @@ const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
 const ExerciseCycleTabs = ({
   exercise,
   onChange,
-  disabled = false,
+  disablePercent = false,
 }: {
   exercise: ExerciseDraft;
   onChange: (updates: Partial<ExerciseDraft>) => void;
-  disabled?: boolean;
+  /** §375 — métriques non-poids : seul le champ % 1RM est désactivé ;
+   *  séries / reps / récup restent éditables (un box jump a bien 3×5 + récup). */
+  disablePercent?: boolean;
 }) => (
   <Tabs defaultValue="endurance" className="w-full">
     <TabsList className="grid w-full grid-cols-3">
@@ -129,16 +131,17 @@ const ExerciseCycleTabs = ({
         <TabsContent
           key={tab.key}
           value={tab.key}
-          className={`space-y-3 rounded-lg border p-3 ${disabled ? "opacity-60" : ""}`}
+          className="space-y-3 rounded-lg border p-3"
         >
           <p className="text-sm font-semibold">{tab.label}</p>
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2">
+            <div className={`space-y-2 ${disablePercent ? "opacity-60" : ""}`}>
               <Label>% 1RM</Label>
               <Input
                 type="number"
-                value={(exercise[pctField] as number | null | undefined) ?? ""}
-                disabled={disabled}
+                value={disablePercent ? "" : ((exercise[pctField] as number | null | undefined) ?? "")}
+                disabled={disablePercent}
+                placeholder={disablePercent ? "n/a" : undefined}
                 onChange={(e) =>
                   onChange({ [pctField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
                 }
@@ -149,7 +152,6 @@ const ExerciseCycleTabs = ({
               <Input
                 type="number"
                 value={(exercise[seriesField] as number | null | undefined) ?? ""}
-                disabled={disabled}
                 onChange={(e) =>
                   onChange({ [seriesField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
                 }
@@ -160,7 +162,6 @@ const ExerciseCycleTabs = ({
               <Input
                 type="number"
                 value={(exercise[repsField] as number | null | undefined) ?? ""}
-                disabled={disabled}
                 onChange={(e) =>
                   onChange({ [repsField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
                 }
@@ -171,7 +172,6 @@ const ExerciseCycleTabs = ({
               <Input
                 type="number"
                 value={(exercise[recupField] as number | null | undefined) ?? ""}
-                disabled={disabled}
                 onChange={(e) =>
                   onChange({ [recupField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
                 }
@@ -182,7 +182,6 @@ const ExerciseCycleTabs = ({
               <Input
                 type="number"
                 value={(exercise[recupExField] as number | null | undefined) ?? ""}
-                disabled={disabled}
                 onChange={(e) =>
                   onChange({ [recupExField]: e.target.value === "" ? null : Number(e.target.value) } as Partial<ExerciseDraft>)
                 }
@@ -1028,24 +1027,20 @@ export default function StrengthCatalog() {
               }
             />
             {editingExercise.exercise_type !== "warmup" ? (
-              <fieldset
-                disabled={(editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
-                className={
-                  (editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg" ? "opacity-50" : ""
-                }
-              >
+              <div>
                 <ExerciseCycleTabs
                   exercise={editingExercise}
+                  disablePercent={(editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
                   onChange={(updates) =>
                     setEditingExercise((prev) => (prev ? { ...prev, ...updates } : prev))
                   }
                 />
                 {(editingExercise.intensity_metric ?? "weight_kg") !== "weight_kg" && (
                   <p className="text-xs text-muted-foreground">
-                    Les % 1RM ne s'appliquent pas à cette métrique.
+                    Les % 1RM ne s'appliquent pas à cette métrique : renseigne séries, reps et récup.
                   </p>
                 )}
-              </fieldset>
+              </div>
             ) : null}
             <div className="flex items-center gap-2">
               <Checkbox
@@ -1225,22 +1220,18 @@ export default function StrengthCatalog() {
             onChange={(v) => setNewExercise((prev) => ({ ...prev, selection_priority: v }))}
           />
           {newExercise.exercise_type !== "warmup" ? (
-            <fieldset
-              disabled={(newExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
-              className={
-                (newExercise.intensity_metric ?? "weight_kg") !== "weight_kg" ? "opacity-50" : ""
-              }
-            >
+            <div>
               <ExerciseCycleTabs
                 exercise={newExercise}
+                disablePercent={(newExercise.intensity_metric ?? "weight_kg") !== "weight_kg"}
                 onChange={(updates) => setNewExercise((prev) => ({ ...prev, ...updates }))}
               />
               {(newExercise.intensity_metric ?? "weight_kg") !== "weight_kg" && (
                 <p className="text-xs text-muted-foreground">
-                  Les % 1RM ne s'appliquent pas à cette métrique.
+                  Les % 1RM ne s'appliquent pas à cette métrique : renseigne séries, reps et récup.
                 </p>
               )}
-            </fieldset>
+            </div>
           ) : null}
           <div className="flex items-center gap-2">
             <Checkbox

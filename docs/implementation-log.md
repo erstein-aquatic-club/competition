@@ -4,6 +4,18 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §375 — Réglage métrique non-poids : séries/reps/récup éditables (bibliothèque) (2026-06-10)
+
+**Contexte :** suite du §374. Retour utilisateur — « la fonction de réglage des métriques ne fonctionne pas dans la bibliothèque ». Reproduction : le pipeline §298 enregistre bien `intensity_metric` (façade → `strength.ts` → `mapApiExerciseToDb`, RLS `exercices_write` + grants colonne OK), MAIS dans `StrengthCatalog`, choisir une métrique non-poids enveloppait **tout** le bloc `ExerciseCycleTabs` dans un `<fieldset disabled>`. Or ce bloc porte non seulement le **% 1RM** mais aussi **Nb séries / Nb reps / Récup séries / Récup exercices**. Conséquence : régler Box Jump → « Hauteur (cm) » grisait toute la prescription → impossible de définir 3×5 box jumps + récup → l'exercice devenait inconfigurable (« ne fonctionne pas »).
+
+**Cause :** sur-désactivation. Seul le **% 1RM** est inapplicable à une métrique non-poids ; séries/reps/récup restent pertinents.
+
+**Changement (`StrengthCatalog.tsx`) :**
+- `ExerciseCycleTabs` : remplacement de la prop `disabled` (globale, jamais passée — le parent désactivait via `<fieldset>`) par `disablePercent` qui ne désactive **que** le champ % 1RM (grisé + vidé + placeholder « n/a »). Séries / reps / récup toujours éditables.
+- Les 2 dialogues (édition + création) : suppression du `<fieldset disabled>` ; rendu direct de `ExerciseCycleTabs` avec `disablePercent={metric !== 'weight_kg'}`. Note reformulée : « Les % 1RM ne s'appliquent pas à cette métrique : renseigne séries, reps et récup. »
+
+**Fichiers :** `src/pages/coach/StrengthCatalog.tsx`. **Tests :** tsc 0, lint 0 erreur, `npm test` 1661 node:test + 76 vitest / 0 fail. Pas de migration, pas de RLS (UI pure). **Limite :** le runner stocke la valeur cm dans la colonne `weight` (inchangé §298) ; pas de test auto dédié au rendu du dialogue (logique de désactivation triviale).
+
 ## §374 — Backfill Box Jump → métrique hauteur (cm) (2026-06-10)
 
 **Contexte :** retour utilisateur — « enregistrer un exercice avec métrique cm ne fonctionne pas » (cas Box Jump : on veut indiquer la hauteur de box sautée). Investigation : tout le pipeline §298 (colonne `dim_exercices.intensity_metric`, mappers `mapApiExerciseToDb`/`mapDbExerciseToApi`, UI catalogue coach `StrengthCatalog`, UI runner `WorkoutRunner`, gating 1RM) est **complet et fonctionnel**, RLS `exercices_write` autorise bien coach/admin à écrire. La vraie cause : la limite V1 du §298 (« pas de backfill, le coach coche manuellement ») n'avait jamais été appliquée → **aucun exercice** n'était assigné à une métrique non-poids ; Box Jump (id 8) restait `weight_kg`, donc le runner affichait « Charge (kg) ».
