@@ -1916,6 +1916,149 @@ describe('generateMesocycle', () => {
 const _generatedMesocycleTypeCheck: GeneratedMesocycle | null = null;
 void _generatedMesocycleTypeCheck;
 
+// ── §375 — affûtage progressif par paliers ───────────────────────────────────
+
+/**
+ * Catalogue minimal pour les tests §375 : un seul exo de travail lower_strength
+ * avec nbSeriesForce = 8, pour obtenir des paliers strictement décroissants :
+ * round(8×0.75)=6, round(8×0.6)=5, round(8×0.5)=4.
+ * Pas de mobility ni de core → pas de warmup automatique en legacy mode.
+ */
+function taperCatalog(): CatalogExercise[] {
+  return [
+    makeExercise({
+      id: 3001,
+      nomExercice: 'work_lower_strength',
+      bucket: 'lower_strength',
+      level: 'beginner',
+      isCore: true,
+      nbSeriesForce: 8,
+      nbRepsForce: 3,
+      pourcentageCharge1rmForce: 85,
+      recupSeriesForce: 180,
+    }),
+  ];
+}
+
+/** Template force_max ×1 → affutage ×3 → pic ×1 = 5 semaines rigides. */
+function taperTemplate5Weeks(): StrengthPeriodizationTemplate {
+  return {
+    id: 'tpl-taper-5w',
+    event_group: 'freestyle_50',
+    kind: 'inter_competition',
+    name: 'Taper test 5 semaines',
+    min_week_count: 5,
+    max_week_count: 5,
+    structure: {
+      phases: [
+        { cycle: 'force_max', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+        { cycle: 'affutage', min_weeks: 3, nominal_weeks: 3, max_weeks: 3 },
+        { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      ],
+      bucket_emphasis: {
+        lower_strength: 1.0,
+        lower_power: 0.0,
+        upper_strength: 0.0,
+        upper_power: 0.0,
+        mobility: 0.0,
+      },
+    },
+    created_at: '2026-05-01T00:00:00Z',
+    updated_at: '2026-05-01T00:00:00Z',
+  };
+}
+
+/** Template force_max ×1 → affutage ×1 → pic ×1 = 3 semaines rigides. */
+function taperTemplate3Weeks(): StrengthPeriodizationTemplate {
+  return {
+    id: 'tpl-taper-3w',
+    event_group: 'freestyle_50',
+    kind: 'inter_competition',
+    name: 'Taper test 3 semaines',
+    min_week_count: 3,
+    max_week_count: 3,
+    structure: {
+      phases: [
+        { cycle: 'force_max', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+        { cycle: 'affutage', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+        { cycle: 'pic', min_weeks: 1, nominal_weeks: 1, max_weeks: 1 },
+      ],
+      bucket_emphasis: {
+        lower_strength: 1.0,
+        lower_power: 0.0,
+        upper_strength: 0.0,
+        upper_power: 0.0,
+        mobility: 0.0,
+      },
+    },
+    created_at: '2026-05-01T00:00:00Z',
+    updated_at: '2026-05-01T00:00:00Z',
+  };
+}
+
+/** Input legacy (sans weekdays) : athlète minimal, catalogue ciblé §375. */
+function taperInput(template: StrengthPeriodizationTemplate): MesocycleInput {
+  return {
+    assessment: makeAssessment(),
+    kpiMeasurements: [],
+    athlete: makeAthlete({ level: 'beginner' }),
+    template,
+    targetWeekCount: template.min_week_count,
+    sessionsPerWeek: 2,
+    exerciseCatalog: taperCatalog(),
+    // Pas de weekdays → mode legacy : toutes les séances en développement,
+    // aucune amorce PAP, aucun warmup automatique.
+  };
+}
+
+describe('§375 — affûtage progressif par paliers', () => {
+  it("les semaines d'affûtage déclinent 0.75 → 0.60 → 0.50 sur les blocs de travail", () => {
+    const result = generateMesocycle(taperInput(taperTemplate5Weeks()));
+    const affutageWeeks = result.weeks.filter((w) => w.cycle === 'affutage');
+    assert.equal(affutageWeeks.length, 3);
+
+    const setsByWeek = affutageWeeks.map((w) => {
+      // En mode legacy sans commonWarmupRoutine, les exercices de travail sont
+      // les seuls présents (warmupKind == null).
+      const exo = w.sessions[0].exercises.find((e) => e.warmupKind == null);
+      assert.ok(exo, `séance 0 de la semaine ${w.weekNumber} doit avoir un exo de travail`);
+      return exo.sets;
+    });
+
+    // nbSeriesForce = 8 → round(8×0.75)=6, round(8×0.6)=5, round(8×0.5)=4.
+    assert.deepEqual(setsByWeek, [6, 5, 4]);
+  });
+
+  it("une phase affûtage d'1 semaine reçoit directement le palier 0.50", () => {
+    const result = generateMesocycle(taperInput(taperTemplate3Weeks()));
+    const affutageWeeks = result.weeks.filter((w) => w.cycle === 'affutage');
+    assert.equal(affutageWeeks.length, 1);
+
+    const exo = affutageWeeks[0].sessions[0].exercises.find((e) => e.warmupKind == null);
+    assert.ok(exo, 'séance doit avoir un exo de travail');
+    // round(8 × 0.5) = 4.
+    assert.equal(exo.sets, 4);
+  });
+
+  it('le pic et la force_max ne changent pas (non-régression)', () => {
+    const result = generateMesocycle(taperInput(taperTemplate5Weeks()));
+
+    const forceMaxWeek = result.weeks.find((w) => w.cycle === 'force_max');
+    assert.ok(forceMaxWeek, 'semaine force_max présente');
+    const forceExo = forceMaxWeek.sessions[0].exercises.find((e) => e.warmupKind == null);
+    assert.ok(forceExo, 'séance force_max a un exo de travail');
+    // force_max lit directement nbSeriesForce (Règle 2, colonne force) → 8.
+    assert.equal(forceExo.sets, 8, `force_max sets attendu=8, obtenu=${forceExo.sets}`);
+
+    const picWeek = result.weeks.find((w) => w.cycle === 'pic');
+    assert.ok(picWeek, 'semaine pic présente');
+    const picExo = picWeek.sessions[0].exercises.find((e) => e.warmupKind == null);
+    assert.ok(picExo, 'séance pic a un exo de travail');
+    // pic : sets fixé à 2 (activation SNC).
+    assert.equal(picExo.sets, 2, `pic sets attendu=2, obtenu=${picExo.sets}`);
+  });
+});
+
 // ── jour-aware amorce PAP (§307) ─────────────────────────────────────────────
 
 /**

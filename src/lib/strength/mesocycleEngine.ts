@@ -771,7 +771,7 @@ function buildOverrideRationale(painZones: string[], dysfns: string[]): string {
 // ── generateMesocycle ────────────────────────────────────────────────────────
 
 /** Version sémantique du moteur — incrémentée à chaque modification de logique. */
-export const ENGINE_VERSION = '1.1.0';
+export const ENGINE_VERSION = '1.2.0';
 
 /** Seaux de force pure (potentiateur lourd-court d'une amorce PAP). §307. */
 const STRENGTH_BUCKETS: StrengthBucket[] = ['upper_strength', 'lower_strength'];
@@ -990,12 +990,17 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
   // slots APRÈS `ensureFocusDevelopmentSession` (§327), car ce swap peut déplacer
   // un seau jambes d'un slot dév vers un slot amorce → un calcul pré-swap serait
   // périmé (E1). Source unique : `papPreferLegPowerFor`.
-  const weeks: MesocycleWeek[] = periodizedWeeks.map((pw, weekIdx) =>
-    buildWeek(pw, bucketAllocations, selected, weekdays, primerWeekdays, jourAware, {
+  const weeks: MesocycleWeek[] = periodizedWeeks.map((pw, weekIdx) => {
+    // §375 — palier d'affûtage de CETTE semaine (null hors affutage).
+    const pos = phasePositionFor(periodizedWeeks, weekIdx);
+    const weekTaperFactor =
+      pw.cycle === 'affutage' ? taperSetFactor(pos.index, pos.count) : null;
+    return buildWeek(pw, bucketAllocations, selected, weekdays, primerWeekdays, jourAware, {
       forceBiasRequired,
       mobilityOverrideActive,
       bucketPriorityOrder,
       coreEmphasis,
+      taperSetFactor: weekTaperFactor,
       // §351 — index global de séance (déterministe, stable entre semaines) pour
       // la rotation du Bloc 2 correctif.
       sessionIndexBase: weekIdx * weekdays.length,
@@ -1005,8 +1010,8 @@ export function generateMesocycle(input: MesocycleInput): GeneratedMesocycle {
       painZones,
       level: input.athlete.level,
       activationRoutine: input.activationRoutine ?? {},
-    }),
-  );
+    });
+  });
 
   const reasoning = buildReasoning({
     bucketScores,
@@ -1060,6 +1065,8 @@ function buildWeek(
     level: 'beginner' | 'intermediate' | 'advanced';
     /** §352 — routine d'activation (Bloc 3) par seau de travail. */
     activationRoutine: Partial<Record<StrengthBucket, number[]>>;
+    /** §375 — palier d'affûtage de la semaine (null hors cycle affutage). */
+    taperSetFactor: number | null;
   },
 ): MesocycleWeek {
   let slots = distributeSessionSlots(allocations, weekdays.length);
@@ -1135,6 +1142,7 @@ function buildWeek(
       coreEmphasis: flags.coreEmphasis,
       papPreferLegPower,
       papLegBucket,
+      taperSetFactor: flags.taperSetFactor,
       warmup: { common: flags.commonWarmupPool, corrective, activation },
     };
   });
@@ -1498,6 +1506,12 @@ interface JourAwareContext {
    */
   papLegBucket: StrengthBucket | null;
   /**
+   * §375 — palier d'affûtage de la semaine (null hors affutage). Appliqué aux
+   *  blocs de TRAVAIL (primaire/complément) par `toMesocycleExercise` ; warmup,
+   *  core et amorces PAP non concernés (doses propres).
+   */
+  taperSetFactor: number | null;
+  /**
    * §351 — échauffement intelligent à 2 blocs, injecté en tête de chaque séance
    * de développement et d'amorce PAP (jamais sur une séance override mobilité) :
    * - `common` (Bloc 1) : routine articulaire commune, identique à toutes les
@@ -1592,10 +1606,10 @@ function buildSession(
 
     const primaryBlock = primaryPool
       .slice(0, PRIMARY_BLOCK_COUNT)
-      .map((s) => toMesocycleExercise(s, effectiveCycle, false));
+      .map((s) => toMesocycleExercise(s, effectiveCycle, false, ctx.taperSetFactor));
     const complementBlock = complementPool
       .slice(0, COMPLEMENT_BLOCK_COUNT)
-      .map((s) => toMesocycleExercise(s, effectiveCycle, false));
+      .map((s) => toMesocycleExercise(s, effectiveCycle, false, ctx.taperSetFactor));
 
     // §R5 (DRAFT) — bloc tronc systématique : inséré si le template porte une
     // emphase core > 0 ET qu'un exo core admissible existe (pool non vide après
@@ -1834,14 +1848,15 @@ function buildCoreExercise(selectedEx: SelectedExercise): MesocycleExercise {
  *  - count > 3 : impossible avec les templates seedés (max_weeks affutage = 3) ;
  *    défensif → table 3 semaines, dernier palier tenu.
  */
+const TAPER_SET_TABLES: Record<number, readonly number[]> = {
+  1: [0.5],
+  2: [0.75, 0.5],
+  3: [0.75, 0.6, 0.5],
+};
+
 export function taperSetFactor(phaseWeekIndex: number, phaseWeekCount: number): number {
-  const TABLES: Record<number, readonly number[]> = {
-    1: [0.5],
-    2: [0.75, 0.5],
-    3: [0.75, 0.6, 0.5],
-  };
-  const table = TABLES[phaseWeekCount] ?? TABLES[3];
-  return table[Math.min(Math.max(0, phaseWeekIndex), table.length - 1)];
+  const table = TAPER_SET_TABLES[phaseWeekCount] ?? TAPER_SET_TABLES[3];
+  return table[Math.min(Math.max(0, Math.floor(phaseWeekIndex)), table.length - 1)];
 }
 
 /**
@@ -1851,6 +1866,8 @@ export function taperSetFactor(phaseWeekIndex: number, phaseWeekCount: number): 
  * NB : les templates seedés n'ont jamais deux phases adjacentes de même cycle —
  * si ça arrivait, elles seraient vues comme UNE course (acceptable : le taper
  * progresserait sur l'ensemble).
+ *
+ * @param idx — index 0-based dans le tableau `weeks` (≠ `weekNumber` 1-based).
  */
 export function phasePositionFor(
   weeks: readonly PeriodizedWeek[],
@@ -1891,7 +1908,9 @@ function clampToRange(value: number, range: readonly [number, number]): number {
  *     - `puissance` : %1RM = max(0, force - 15) — charges modérées déplacées
  *       vite. Box Jump (force=0%) reste 0%, Tractions lestées (force=85%) → 70%.
  *     - `maintien`  : sets × 0.5 (volume réduit), %1RM tenu.
- *     - `affutage`  : sets × 0.4 (volume décroissant), %1RM tenu.
+ *     - `affutage`  : paliers progressifs 0.75 → 0.60 → 0.50 par semaine d'affûtage
+ *       (§375 ; doc T1 : −25 % → −40 % → −50 %) via le paramètre `taperFactor`.
+ *       `%1RM` tenu, seul le volume décroît.
  *     - `pic`       : 2 séries × 2-4 reps, %1RM × 0.6 (charges légères explosives).
  *   L'intention vient du `scheme.intention` du cycle.
  *
@@ -1901,6 +1920,7 @@ function toMesocycleExercise(
   selectedEx: SelectedExercise,
   cycle: PeriodizationCycle,
   isWarmup: boolean,
+  taperFactor: number | null = null,
 ): MesocycleExercise {
   const ex = selectedEx.exercise;
   const cycleConfig = PERIODIZATION_CYCLES[cycle];
@@ -1968,7 +1988,10 @@ function toMesocycleExercise(
       intensityPct1rm = baseIntensity; // intensité tenue
       restSeconds = baseRest;
     } else if (cycle === 'affutage') {
-      sets = Math.max(1, Math.round(baseSets * 0.4));
+      // §375 — paliers progressifs (doc T1 : −25 % → −40 % → −50 %) au lieu du
+      // ×0.4 plat. `?? 0.5` défensif : un appel sans facteur (ne devrait pas
+      // exister) reçoit le palier le plus profond, proche de l'ancien 0.4.
+      sets = Math.max(1, Math.round(baseSets * (taperFactor ?? 0.5)));
       reps = baseReps;
       intensityPct1rm = baseIntensity; // intensité tenue, volume décroissant
       restSeconds = baseRest;

@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { taperSetFactor } from '../mesocycleEngine.ts';
-import { phasePositionFor } from '../mesocycleEngine.ts';
+import { taperSetFactor, phasePositionFor } from '../mesocycleEngine.ts';
 import type { PeriodizedWeek } from '../mesocycleEngine.types.ts';
 
 // §375 — paliers doc validé coach (templates-sources T1) :
@@ -33,7 +32,7 @@ test('défensif : index négatif clampé à 0', () => {
 
 const W = (weekNumber: number, cycle: PeriodizedWeek['cycle']): PeriodizedWeek => ({ weekNumber, cycle });
 
-// Forme T1 étirée : force_max ×2 → maintien ×1 → affutage ×3 → pic ×1.
+// T1 simplifié (sans puissance) : force_max ×2 → maintien ×1 → affutage ×3 → pic ×1.
 const T1_LIKE: PeriodizedWeek[] = [
   W(1, 'force_max'), W(2, 'force_max'),
   W(3, 'maintien'),
