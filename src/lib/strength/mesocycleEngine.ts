@@ -1837,6 +1837,13 @@ function buildCoreExercise(selectedEx: SelectedExercise): MesocycleExercise {
   };
 }
 
+/** §375 — paliers par durée de phase : 1 sem.→[0.50] ; 2→[0.75,0.50] ; 3→[0.75,0.60,0.50]. */
+const TAPER_SET_TABLES: Record<number, readonly number[]> = {
+  1: [0.5],
+  2: [0.75, 0.5],
+  3: [0.75, 0.6, 0.5],
+};
+
 /**
  * §375 — paliers d'affûtage progressifs. Multiplicateur de SÉRIES de la semaine
  * `phaseWeekIndex` (0-based) d'une phase `affutage` longue de `phaseWeekCount`
@@ -1844,16 +1851,9 @@ function buildCoreExercise(selectedEx: SelectedExercise): MesocycleExercise {
  * −25 % → −40 % → −50 %. Remplace le ×0.4 plat historique (−60 % dès la 1ʳᵉ
  * semaine), incohérent avec le doc et avec la littérature taper (progressif >
  * marche d'escalier).
- *  - 1 sem. → [0.50] ; 2 sem. → [0.75, 0.50] ; 3 sem. → [0.75, 0.60, 0.50].
  *  - count > 3 : impossible avec les templates seedés (max_weeks affutage = 3) ;
  *    défensif → table 3 semaines, dernier palier tenu.
  */
-const TAPER_SET_TABLES: Record<number, readonly number[]> = {
-  1: [0.5],
-  2: [0.75, 0.5],
-  3: [0.75, 0.6, 0.5],
-};
-
 export function taperSetFactor(phaseWeekIndex: number, phaseWeekCount: number): number {
   const table = TAPER_SET_TABLES[phaseWeekCount] ?? TAPER_SET_TABLES[3];
   return table[Math.min(Math.max(0, Math.floor(phaseWeekIndex)), table.length - 1)];
