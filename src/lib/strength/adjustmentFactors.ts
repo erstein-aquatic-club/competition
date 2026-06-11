@@ -33,12 +33,9 @@ export function applyAdjustmentFactors(
     weeks: plan.weeks.map((week) => ({
       ...week,
       sessions: week.sessions.map((session) => {
-        // §375 — hors scope du scaling coach :
-        //  - amorce_pap : dose PAP fixe par doctrine (2×2 lourd + 2×3 explosif,
-        //    fraîcheur avant le sprint bassin) — la moduler casserait l'intention ;
-        //  - mobilite_corrective : prescription de sécurité (override douleur/
-        //    dysfonction), pas une charge d'entraînement à doser.
-        if (session.role === 'amorce_pap' || session.role === 'mobilite_corrective') {
+        // §375 — hors scope du scaling coach, cf. JSDoc en tête de fichier.
+        // Allowlist (plutôt que denylist) : future-proof si un nouveau SessionRole apparaît.
+        if (session.role !== 'developpement') {
           return session;
         }
         return {

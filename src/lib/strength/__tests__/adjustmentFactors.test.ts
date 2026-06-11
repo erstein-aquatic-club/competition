@@ -21,7 +21,6 @@ function makeExercise(overrides: Partial<MesocycleExercise>): MesocycleExercise 
   };
 }
 
-
 function makePlan(exercises: MesocycleExercise[]): GeneratedMesocycle {
   return {
     weeks: [{
@@ -132,4 +131,41 @@ test("§375: les exos d'échauffement (warmupKind) gardent leur dose, les exos d
   const out = applyAdjustmentFactors(plan, 1.5, 1.0);
   const exos = out.weeks[0].sessions[0].exercises;
   assert.deepEqual(exos.map((e) => e.sets), [2, 2, 2, 6]);
+});
+
+test('§375: semaine mixte — amorce_pap intacte ET developpement scalée dans la même semaine', () => {
+  const plan: GeneratedMesocycle = {
+    weeks: [{
+      weekNumber: 1,
+      cycle: 'puissance',
+      sessions: [
+        {
+          sessionNumber: 1,
+          weekday: 1,
+          role: 'amorce_pap',
+          buckets: ['upper_power'],
+          exercises: [makeExercise({ sets: 2, intensityPct1rm: 85 })],
+        },
+        {
+          sessionNumber: 2,
+          weekday: 3,
+          role: 'developpement',
+          buckets: ['upper_strength'],
+          exercises: [makeExercise({ sets: 4, intensityPct1rm: 80 })],
+        },
+      ],
+    }],
+    totalWeeks: 1,
+    sessionsPerWeek: 2,
+    templateId: 'test',
+    reasoning: {} as GeneratedMesocycle['reasoning'],
+    engineVersion: 'test',
+  };
+  const out = applyAdjustmentFactors(plan, 1.5, 1.0);
+  // amorce_pap : inchangée
+  assert.equal(out.weeks[0].sessions[0].exercises[0].sets, 2);
+  assert.equal(out.weeks[0].sessions[0].exercises[0].intensityPct1rm, 85);
+  // developpement : sets scalés (4 × 1.5 = 6)
+  assert.equal(out.weeks[0].sessions[1].exercises[0].sets, 6);
+  assert.equal(out.weeks[0].sessions[1].exercises[0].intensityPct1rm, 80);
 });
