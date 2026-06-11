@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§374** — Quick wins audit : timeouts HoF/FFN, staleTime coach, anti-§113 swim/timesheet, états UI (edge fns à redéployer).
+Dernier § livré : **§375** — affûtage progressif par paliers + ajustement mid-cycle scoped (PAP/warmup exclus).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

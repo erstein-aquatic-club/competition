@@ -4,6 +4,36 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §375 — Affûtage progressif par paliers + ajustement mid-cycle scoped (2026-06-11)
+
+**Contexte** : audit moteur muscu vs pratiques élite (2026-06-10). 3 écarts identifiés : (a) le multiplicateur d'affûtage `×0.4` plat contredit le doc validé coach (`bilan-muscu-templates-sources.md`, T1 : paliers −25 %→−40 %→−50 %) et la littérature taper (progressif > marche d'escalier) ; (b) `applyAdjustmentFactors` scalait aussi les amorces PAP, la mobilité corrective et les échauffements — dose fixe et sécurité ne sont pas des charges d'entraînement ; (c) progression intra-bloc `force_max` identique chaque semaine — **non traité**, question coach ci-dessous.
+
+**Changements** :
+1. **`taperSetFactor` + `phasePositionFor`** (helpers purs, `mesocycleEngine.ts`) : `taperSetFactor(phaseWeekIndex, phaseWeekCount)` retourne 0.75/0.60/0.50 selon la position dans la phase d'affûtage (1 sem. → [0.50] directement) ; `phasePositionFor` dérive l'index et la longueur de la course contiguë de même cycle dans le tableau `weeks`. `ENGINE_VERSION` 1.1.0 → **1.2.0**.
+2. **Threading** (`generateMesocycle → buildWeek → JourAwareContext → buildSession → toMesocycleExercise`) : `taperSetFactor` remplace le `sets × 0.4` plat ; le facteur est calculé via `phasePositionFor` sur le tableau de semaines périodisées.
+3. **Scope `applyAdjustmentFactors`** (`adjustmentFactors.ts`) : allowlist `role !== 'developpement'` — seules les séances de développement et leurs exos de travail (`warmupKind == null`) sont scalées. Amorces PAP (dose fixe par doctrine), mobilité corrective (sécurité ≠ charge) et échauffements exclus.
+4. **JSDoc** (`mesocycleEngine.ts`) : contrat de `taperSetFactor` repositionné sur la fonction exportée (revue qualité — nit).
+
+**Fichiers modifiés** :
+- `src/lib/strength/mesocycleEngine.ts` (1712 → 2099 lignes)
+- `src/lib/strength/adjustmentFactors.ts` (39 → 61 lignes)
+- `src/lib/strength/__tests__/taperSetFactor.test.ts` (nouveau, 57 lignes — 8 tests)
+- `src/lib/strength/__tests__/mesocycleEngine.test.ts` (1961 → 2827 lignes — +3 tests d'intégration affûtage)
+- `src/lib/strength/__tests__/adjustmentFactors.test.ts` (→ 171 lignes — +4 tests scope allowlist)
+
+**Tests** : 8 `taperSetFactor.test.ts` + 2827 lignes `mesocycleEngine.test.ts` (132 tests dont les 3 nouveaux : affûtage 3 sem. [6,5,4], palier 0.50 direct 1 sem., non-régression pic/force_max) + 171 lignes `adjustmentFactors.test.ts` (13 tests dont 4 nouveaux : semaine mixte, PAP exclu, mobilité corrective exclue, warmup exclu) + 2 tests d'intégration ajustement. Suite complète : **node:test 1682/1682 / 0 fail ; vitest 80/80 / 0 fail ; `tsc --noEmit` exit 0**.
+
+**Décisions** :
+- Palier 1 semaine d'affûtage = **0.50 directement** (le palier le plus profond — le doc ne définit pas de progression sur 1 sem., et −50 % est le plancher validé).
+- `mobilite_corrective` exclue du scaling par `applyAdjustmentFactors` (sécurité ≠ charge d'entraînement) — décision d'implémentation, véto coach possible.
+- Aucun changement UI : `MesocyclePreview.tsx:510` est le seul appelant de `applyAdjustmentFactors`, aucun libellé trompeur détecté.
+
+**Limites** :
+- Effet visible **uniquement après régénération** d'un mésocycle (plans matérialisés jamais réécrits en place — règle invariante §299).
+- Écart #3 de l'audit (progression intra-bloc `force_max`) **non traité** — question ouverte ci-dessous.
+
+**Question coach (à transmettre)** : « Progression intra-bloc force_max : aujourd'hui chaque semaine d'un bloc force est identique (séries/reps/%1RM catalogue). Proposition : rampe d'intensité approchant la charge catalogue sans jamais la dépasser — bloc 2 sem. : [−5 pts, catalogue] ; 3 sem. : [−7.5, −2.5, catalogue] ; 4 sem. : [−7.5, −5, −2.5, catalogue]. Le mécanisme (`phasePositionFor`) est en place, l'implémentation est triviale une fois le schéma validé. Valides-tu ces paliers, en veux-tu d'autres, ou préfères-tu garder le chargement plat ? »
+
 ## §374 — Quick wins audit transversal : timeouts HoF/FFN, staleTime coach, anti-§113 swim/timesheet, états UI (2026-06-10)
 
 **Contexte** : audit transversal 2026-06-10 (robustesse / perf / offline / UX, hors muscu déjà audité §311-§344) → lot « quick wins » exécuté par une équipe de 4 agents parallèles (fichiers disjoints), revue + vérification globale en session principale.
