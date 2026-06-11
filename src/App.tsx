@@ -6,14 +6,10 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth, handlePasswordReset } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { getGroups } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import {
@@ -22,11 +18,8 @@ import {
   CalendarSkeleton,
   ListSkeleton,
 } from "@/components/shared/skeletons";
-import { UpdateNotification } from "@/components/shared/UpdateNotification";
 import { PWAInstallGate } from "@/components/shared/PWAInstallGate";
-import { PushPermissionBanner } from "@/components/shared/PushPermissionBanner";
 import { requiresApprovalForRole } from "@/lib/authRules";
-import { OfflineMutationSync } from "@/components/shared/OfflineMutationSync";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useInAppPushBridge } from "@/hooks/useInAppPushBridge";
 import { usePushSubscriptionRefresh } from "@/hooks/usePushSubscriptionRefresh";
@@ -143,6 +136,43 @@ const SwimmerHome = lazyWithRetry(() => import("@/pages/SwimmerHome"));
 const ComingSoon = lazyWithRetry(() => import("@/pages/ComingSoon"));
 const AwaitingApproval = lazyWithRetry(() => import("@/pages/AwaitingApproval"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
+const ResetPassword = lazyWithRetry(() => import("@/pages/ResetPassword"));
+
+// §377 — bannières/sync non critiques au premier rendu, lazy-loadées pour
+// sortir leurs dépendances du chunk principal (UpdateNotification tire
+// useStrengthState, OfflineMutationSync tire offlineSync + l'API).
+const UpdateNotification = lazyWithRetry(() =>
+  import("@/components/shared/UpdateNotification").then((m) => ({ default: m.UpdateNotification })),
+);
+const OfflineMutationSync = lazyWithRetry(() =>
+  import("@/components/shared/OfflineMutationSync").then((m) => ({ default: m.OfflineMutationSync })),
+);
+const PushPermissionBanner = lazyWithRetry(() =>
+  import("@/components/shared/PushPermissionBanner").then((m) => ({ default: m.PushPermissionBanner })),
+);
+
+/**
+ * §377 — monte les bannières/sync APRÈS le premier paint (1 s) : leur chunk ne
+ * concurrence pas le chargement de la route initiale. Le différé ne change pas
+ * leur comportement : check SW périodique (UpdateNotification), cooldown 7 j
+ * (PushPermissionBanner), replay de la queue offline déclenché au mount ou au
+ * retour réseau (OfflineMutationSync).
+ */
+function DeferredBootExtras() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setReady(true), 1_000);
+    return () => window.clearTimeout(id);
+  }, []);
+  if (!ready) return null;
+  return (
+    <Suspense fallback={null}>
+      <UpdateNotification />
+      <OfflineMutationSync />
+      <PushPermissionBanner />
+    </Suspense>
+  );
+}
 
 // Loading fallback for lazy components (kept for backward compatibility)
 function PageLoader() {
@@ -179,98 +209,6 @@ const useHashLocation = (): [string, (to: string, options?: { replace?: boolean 
 
   return [path, navigate];
 };
-
-function ResetPassword() {
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    const result = await handlePasswordReset(newPassword);
-    if (result.error) {
-      setError(result.error);
-      setLoading(false);
-    } else {
-      setSuccess(true);
-      setLoading(false);
-      setTimeout(() => {
-        window.location.hash = "#/";
-      }, 2000);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-sm shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Nouveau mot de passe</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {success ? (
-            <div className="text-center space-y-4">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                <span className="text-3xl text-primary">&#10003;</span>
-              </div>
-              <p className="text-sm font-medium">Mot de passe modifié avec succès</p>
-              <p className="text-xs text-muted-foreground">Redirection en cours...</p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Nouveau mot de passe</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Nouveau mot de passe"
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirmer le mot de passe"
-                  required
-                />
-              </div>
-              {error ? (
-                <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive text-center">
-                  {error}
-                </div>
-              ) : null}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={!newPassword || !confirmPassword || loading}
-              >
-                {loading ? "Modification..." : "Modifier le mot de passe"}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 function AppRouter() {
   const user = useAuth((s) => s.user);
@@ -580,9 +518,7 @@ function App() {
       <CacheWarmer />
       <PushBridge />
       <TooltipProvider>
-        <UpdateNotification />
-        <OfflineMutationSync />
-        <PushPermissionBanner />
+        <DeferredBootExtras />
         <Toaster />
         <Router hook={useHashLocation}>
           <AppRouter />

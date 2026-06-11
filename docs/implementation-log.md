@@ -4,6 +4,23 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §377 — Perf lot 1 : allègement du chunk principal + fonts non bloquantes (2026-06-11)
+
+**Contexte.** Audit de performance transversal (2026-06-11, 3 agents : couche données / rendu React / chemin de boot + build mesuré). Lot 1 = quick wins bundle/boot sans risque fonctionnel. Le chunk principal `index-*.js` pesait **467.91 kB (143.93 kB gzip)** : il embarquait l'écran `ResetPassword` (défini inline dans `App.tsx` avec ses imports Card/Button/Input/Label) et les 3 bannières/sync montées au boot (`UpdateNotification` → tire `useStrengthState` ; `OfflineMutationSync` → tire `offlineSync` + API ; `PushPermissionBanner`). Le CSS Google Fonts était en `<link rel="stylesheet">` bloquant.
+
+**Changements.**
+1. `ResetPassword` extrait de `App.tsx` vers `src/pages/ResetPassword.tsx` (export default) et chargé via `lazyWithRetry` comme les 41 autres routes. Imports `Card/Button/Input/Label` + `handlePasswordReset` retirés d'`App.tsx`.
+2. Nouveau composant `DeferredBootExtras` dans `App.tsx` : monte `UpdateNotification`, `OfflineMutationSync` et `PushPermissionBanner` en lazy (`lazyWithRetry` + `Suspense fallback null`) **1 s après le premier rendu**. Le différé ne change pas leur comportement (check SW périodique, replay queue offline au mount/retour réseau, cooldown push 7 j) ; leurs chunks sont précachés par le SW donc OK offline.
+3. `index.html` : CSS Google Fonts en `media="print"` + `onload="this.media='all'"` (non bloquant, `display=swap` déjà présent) + fallback `<noscript>`.
+
+**Mesures (build prod avant/après).** `index-*.js` : 467.91 → **398.78 kB** (gzip 143.93 → **126.77 kB**, **−12 %**). Nouveaux chunks différés : UpdateNotification 1.93 kB, PushPermissionBanner 2.18 kB, ResetPassword 2.38 kB, OfflineMutationSync 6.20 kB (gzip ~1–2 kB chacun).
+
+**Fichiers.** `src/App.tsx` (617 → 552 lignes), `src/pages/ResetPassword.tsx` (nouveau, 100 lignes), `index.html`.
+
+**Tests.** `tsc --noEmit` exit 0 ; suite complète verte (node:test OK + vitest 82/82, dont `UpdateNotification.test.tsx` qui importe le composant directement — insensible au passage en lazy). Pas de `test:rls` (aucun changement RLS/API).
+
+**Limites / suite.** Lots 2-4 de l'audit non traités : bornage des requêtes Supabase (`getSwimCatalog`, `getStrengthHistory`, Hall of Fame sans `fromDate`), boot auth non bloquant (rendu depuis le cache persisté §248 + revalidation en fond), mémoïsation `WorkoutRunner`/`Coach.tsx` + virtualisation des listes longues. Le différé d'1 s des bannières retarde d'autant le replay offline au boot (négligeable : le replay re-tourne au retour réseau et à chaque `QUEUE_UPDATED_EVENT`).
+
 ## §376 — Mode focus : substitution sans téléport à l'échauffement + picker stable iOS (2026-06-11)
 
 **Contexte** : retour terrain François — en remplaçant un exercice pendant une séance en mode focus muscu : (1) la recherche du picker « débordait de partout autour de l'écran » (iOS PWA) ; (2) après validation, retour forcé au début de la séance, section échauffement.

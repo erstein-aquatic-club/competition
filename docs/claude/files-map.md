@@ -131,6 +131,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/RecordsClub.tsx` | Records club (sections nage, drill-down progressif) | ~840 lignes |
 | `src/pages/RecordsAdmin.tsx` | Admin records + gestion nageurs | ~300 lignes |
 | `src/pages/Login.tsx` | Login + inscription | ~340 lignes |
+| `src/pages/ResetPassword.tsx` | Écran nouveau mot de passe (recovery Supabase) — extrait d'App.tsx en route lazy (§377) | 100 lignes |
 | `src/pages/coach/CoachCalendar.tsx` | Calendrier coach (vue mensuelle assignations) | ~266 lignes |
 | `src/hooks/useCoachCalendarState.ts` | Hook état calendrier coach (grille, query, slots) | ~187 lignes |
 | `src/pages/coach/CoachSwimmersOverview.tsx` | Dashboard synthétique nageurs (grille cards, KPIs) | ~648 lignes |
