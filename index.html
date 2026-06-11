@@ -41,8 +41,14 @@
     <link rel="preconnect" href="https://fscnobivsgornxdwqwlk.supabase.co" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/competition/assets/index-mNFQquz-.js"></script>
+    <!-- §377 — fonts non bloquantes : media="print" charge le CSS sans bloquer le
+         premier rendu, puis onload le bascule en "all". display=swap garantit du
+         texte visible (police système) pendant le chargement. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    </noscript>
+    <script type="module" crossorigin src="/competition/assets/index-BJ19Lx-w.js"></script>
     <link rel="modulepreload" crossorigin href="/competition/assets/vendor-react-BzrpNAyj.js">
     <link rel="modulepreload" crossorigin href="/competition/assets/vendor-query-kdOL9ykq.js">
     <link rel="modulepreload" crossorigin href="/competition/assets/vendor-charts-BXZZI_qg.js">
