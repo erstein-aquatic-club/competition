@@ -159,7 +159,12 @@ export async function notifications_list(options: {
       .from("notification_targets")
       .select("*, notifications!inner(*)")
       .or(orFilters.join(","))
-      .order("notifications(created_at)", { ascending: order === "asc" });
+      .order("notifications(created_at)", { ascending: order === "asc" })
+      // §378 — borne serveur : la table grossit d'1 ligne par notif×cible depuis
+      // toujours, et la pagination se fait côté client (slice après filtrage
+      // dismissed/expirées). 500 >> offset+limit max consommé par l'UI (clamp
+      // 200) ; seul `total` devient "total sur la fenêtre", sans impact UX.
+      .limit(500);
     if (options.status === "read") {
       query = query.not("read_at", "is", null);
     } else if (options.status === "unread") {

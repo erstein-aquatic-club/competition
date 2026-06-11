@@ -323,7 +323,9 @@ export async function getImportLogs(filters?: {
     .select("*")
     .order("started_at", { ascending: false });
   if (filters?.swimmerIuf) query = query.eq("swimmer_iuf", filters.swimmerIuf);
-  if (filters?.limit) query = query.limit(filters.limit);
+  // §378 — défaut borné : sans limite explicite, la table des logs d'import
+  // (1 ligne par sync FFN, cron inclus) finirait par être chargée entière.
+  query = query.limit(filters?.limit ?? 50);
   const data = assertSupabase(await query);
   return data ?? [];
 }

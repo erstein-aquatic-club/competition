@@ -193,6 +193,9 @@ export async function getStrengthSessions(): Promise<StrengthSessionTemplate[]> 
           "*, strength_session_items(*, dim_exercices(nom_exercice, exercise_type))",
         )
         .order("created_at", { ascending: false })
+        // §378 — filet anti-vieillissement (même logique que getSwimCatalog) :
+        // templates + items + join exos, borné aux 500 plus récents.
+        .limit(500)
     );
     return (sessions ?? []).map((session: any) => {
       const rawItems = Array.isArray(session.strength_session_items)

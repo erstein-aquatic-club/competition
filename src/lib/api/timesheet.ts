@@ -23,7 +23,10 @@ export async function listTimesheetShifts(options?: {
     let query = supabase
       .from("timesheet_shifts")
       .select("*")
-      .order("shift_date", { ascending: false });
+      .order("shift_date", { ascending: false })
+      // §378 — garde-fou : sans fenêtre from/to, la table des pointages
+      // (1 ligne par créneau encadré) serait chargée entière au fil des saisons.
+      .limit(1000);
     if (options?.coachId) query = query.eq("coach_id", options.coachId);
     if (options?.from) query = query.gte("shift_date", options.from);
     if (options?.to) query = query.lte("shift_date", options.to);

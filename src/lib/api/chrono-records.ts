@@ -8,6 +8,9 @@ export async function getChronoRecords(): Promise<ChronoRecord[]> {
       .from("chrono_records")
       .select("*")
       .order("created_at", { ascending: false })
+      // §378 — filet anti-vieillissement : 1 ligne par chrono sauvegardé,
+      // l'UI n'affiche que les récents ; bornés aux 200 derniers.
+      .limit(200)
   );
   return (data ?? []) as ChronoRecord[];
 }

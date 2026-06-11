@@ -4,6 +4,24 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §378 — Perf lot 2 : bornage serveur des requêtes de liste sur tables croissantes (2026-06-11)
+
+**Contexte.** Lot 2 de l'audit perf (2026-06-11) : « l'assurance anti-vieillissement » — les requêtes de liste sans `.limit()` sur des tables qui grossissent avec l'usage ralentissent l'app silencieusement au fil des saisons. **Vérification systématique avant édition** (scan des ~120 chaînes `.select()` de `src/lib/api/` + lecture manuelle des candidats) : la plupart des findings « haute sévérité » de l'agent d'audit données étaient **faux ou périmés** — `getStrengthHistory` déjà clampé 1–200 + `.range()`, `getSwimmerPerformances` déjà `.limit(?? 500)`, `getSessions` déjà `.limit(200)`, notifications clampées 1–200, RPC Hall of Fame = agrégats par athlète (pas de lignes brutes), `assignments`/`strength-attendance`/`users.getRecentClubSessions` déjà fenêtrés par dates ou `.in()`.
+
+**6 vraies requêtes non bornées corrigées** (filets de sécurité serveur, zéro changement de contrat) :
+1. `swim.ts getSwimCatalog` — catalogue + `swim_session_items(*)` imbriqués, chemin chaud coach → `.limit(500)` (plus récents d'abord, ordre existant).
+2. `strength.ts getStrengthSessions` — même motif (templates + items + join `dim_exercices`) → `.limit(500)`.
+3. `notifications.ts notifications_list` — chargeait TOUTES les `notification_targets` de l'utilisateur (1 ligne/notif×cible depuis toujours) puis paginait côté client (`slice` après filtrage dismissed/expirées) → `.limit(500)` serveur ; 500 >> offset+limit max UI (clamp 200) ; seule la sémantique de `total` devient « total sur la fenêtre ».
+4. `chrono-records.ts getChronoRecords` → `.limit(200)`.
+5. `records.ts getImportLogs` — limit optionnel = illimité par défaut (1 ligne par sync FFN, cron horaire inclus !) → défaut `.limit(?? 50)`.
+6. `timesheet.ts listTimesheetShifts` — sans fenêtre from/to chargeait tous les pointages → garde-fou `.limit(1000)`.
+
+**Hors scope assumé** : `get1RM` sans `athleteId` fetch tout le club, mais les 2 seuls callers passent toujours `athleteId` — changer le contrat = risque de régression sans gain réel. `getAllPendingInterviews` borné par nature (`neq status signed`).
+
+**Tests.** Nouveau `src/lib/api/__tests__/boundedQueries.test.ts` (6 tests, TDD rouge→vert) : harnais query-builder espion (Proxy chaînable + awaitable) qui asserte la borne par table. Suite complète : **node:test 1688/1688**, vitest 20 fichiers OK, tsc 0. Pas de `test:rls` : aucun changement de logique d'autorisation (ajout de `.limit` uniquement).
+
+**Limites.** Les bornes sont des filets (l'UI actuelle ne consomme jamais autant) ; si un usage futur dépasse 500 entrées de catalogue actives, prévoir pagination/archivage plutôt que relever la borne. Lots restants de l'audit : boot auth non bloquant (lot 3), mémoïsation `WorkoutRunner`/`Coach.tsx` + virtualisation (lot 4).
+
 ## §377 — Perf lot 1 : allègement du chunk principal + fonts non bloquantes (2026-06-11)
 
 **Contexte.** Audit de performance transversal (2026-06-11, 3 agents : couche données / rendu React / chemin de boot + build mesuré). Lot 1 = quick wins bundle/boot sans risque fonctionnel. Le chunk principal `index-*.js` pesait **467.91 kB (143.93 kB gzip)** : il embarquait l'écran `ResetPassword` (défini inline dans `App.tsx` avec ses imports Card/Button/Input/Label) et les 3 bannières/sync montées au boot (`UpdateNotification` → tire `useStrengthState` ; `OfflineMutationSync` → tire `offlineSync` + API ; `PushPermissionBanner`). Le CSS Google Fonts était en `<link rel="stylesheet">` bloquant.

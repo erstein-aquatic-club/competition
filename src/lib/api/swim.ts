@@ -21,6 +21,9 @@ export async function getSwimCatalog(): Promise<SwimSessionTemplate[]> {
         .from("swim_sessions_catalog")
         .select("*, swim_session_items(*)")
         .order("created_at", { ascending: false })
+        // §378 — filet anti-vieillissement : le catalogue + items imbriqués est
+        // chargé entier sur le chemin chaud coach ; on garde les 500 plus récents.
+        .limit(500)
     );
     return (catalogs ?? []).map((catalog: any) => ({
       id: safeInt(catalog.id, Date.now()),
