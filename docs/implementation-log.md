@@ -4,6 +4,20 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §382 — Perf lot 4 : fin des re-renders par seconde du WorkoutRunner (2026-06-12)
+
+**Contexte.** Lot 4 de l'audit perf. `WorkoutRunner` (~1900 lignes, l'écran le plus utilisé par les nageurs en salle) re-rendait son arbre ENTIER une fois par seconde pendant TOUTE la séance : (1) `setElapsedTime` tickait à 1 Hz du mount au unmount (`isActive` n'est jamais remis à false) alors que `elapsedTime` n'est affiché que sur l'écran de fin (ligne « Durée totale ») et lu par `onFinish` ; (2) `setRestTimer` tickait à 1 Hz pendant chaque repos, derrière l'overlay opaque `RestScreen`. Vérifications préalables : findings agent sur `Coach.tsx` majoritairement invalidés (`unassignedByWeek` déjà `useMemo`, `monday`/`sunday` déjà mémoïsés ; reste un `.find()` négligeable ~3×50) ; états `isRestPaused`/`elapsedPausedRef` vestigiaux (jamais activés).
+
+**Changements.**
+1. **`WorkoutRunner.tsx`** : le tick `elapsedTime` est gaté sur `isComplete` (`currentStep > items.length`) — il ne tourne plus que sur l'écran de fin (affichage live conservé, durée enregistrée identique). Le state `restTimer` + son effet tick sont remplacés par un timestamp `restEndAt` + `handleRestExpire` (`useCallback` stable : notif + toast + fermeture, identique à l'ancien tick). `onSkip`/`onAdd30s` manipulent `restEndAt` (le `restEndRef` disparaît).
+2. **`RestScreen.tsx`** : nouvelles props `restEndAt`/`onExpire` (remplacent `restTimer`) ; le décompte vit dans le composant (state local, tick 1 s + resync `visibilitychange` — même résilience iOS que §343), `onExpire` appelé une seule fois à zéro, garde anti-skip (`restEndAt <= 0` ne déclenche rien). Pendant le repos, seul l'overlay (~260 lignes) re-rend, plus le runner.
+
+**Effet** : zéro re-render périodique du runner pendant la séance (avant : 1/s en continu + 1/s pendant les repos). Restent les re-renders pilotés par les actions utilisateur (saisie numpad), bornés et non continus.
+
+**Tests.** Nouveau `RestScreen.vitest.tsx` (4 tests TDD rouge→vert, fake timers) : affichage dérivé de `restEndAt`, décompte autonome, `onExpire` une seule fois, extension +30 s. `__tests__/RestScreen.test.tsx` (SSR) migré vers les nouvelles props (`ceil` absorbe la dérive <1 s). Suite complète : node:test 1695/1695, vitest 21 fichiers/86 OK, tsc 0. NB : un run combiné a flaké une fois (fichier vitest), re-run propre 2×.
+
+**Limites / hors scope assumé.** Virtualisation des listes longues (startlists, historique muscu) différée : gain moyen, risque de régression scroll iOS sans smoke device — à traiter avec un passage terrain. Isolation du state de saisie numpad (re-render par frappe) non faite : coût borné par l'action utilisateur. ⚠️ Smoke terrain recommandé sur le chrono de repos (iPhone, app en arrière-plan pendant un repos) avant de considérer le lot clos.
+
 ## §381 — Parcours du cycle : page coach plein écran en timeline verticale (2026-06-12)
 
 **Contexte.** Retour immédiat sur §380 (François) : plutôt qu'un dépliage inline compact dans la carte d'assiduité, une **vue plein écran enrichie en timeline verticale**. Le dépliage §380 est remplacé par une navigation.

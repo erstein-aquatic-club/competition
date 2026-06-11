@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,11 @@ import type { Exercise, StrengthSessionItem } from "@/lib/api/types";
 import type { SetLogEntry } from "@/lib/types";
 
 export interface RestScreenProps {
-  restTimer: number;
+  /** §380 — timestamp (ms epoch) de fin de repos ; le décompte est LOCAL au
+   * composant (avant : state du parent → ~1900 lignes re-rendues par seconde). */
+  restEndAt: number;
+  /** Appelé une seule fois quand le décompte atteint zéro (notif/toast/fermeture). */
+  onExpire: () => void;
   restDuration: number;
   restType: "set" | "exercise";
   exercise: Exercise | null;
@@ -41,7 +45,8 @@ export interface RestScreenProps {
 const TAB_LABELS = ["Exercice", "Séance", "Perfs"] as const;
 
 export function RestScreen({
-  restTimer,
+  restEndAt,
+  onExpire,
   restDuration,
   restType,
   exercise,
@@ -69,6 +74,39 @@ export function RestScreen({
 }: RestScreenProps) {
   const reduce = useReducedMotion();
   const [activeTab, setActiveTab] = useState(0);
+
+  // §380 — décompte local : remaining dérivé de restEndAt, tick 1 s + resync au
+  // retour au premier plan (même résilience iOS que l'ancien tick parent §343).
+  const computeRemaining = () =>
+    Math.max(0, Math.ceil((restEndAt - Date.now()) / 1000));
+  const [restTimer, setRestTimer] = useState(computeRemaining);
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
+
+  useEffect(() => {
+    // Garde anti-skip : un restEndAt nul/passé au mount ne déclenche pas la
+    // séquence de fin (notif + toast) — le parent ferme l'écran lui-même.
+    if (restEndAt <= 0) return;
+    let expired = false;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((restEndAt - Date.now()) / 1000));
+      setRestTimer(remaining);
+      if (remaining <= 0 && !expired) {
+        expired = true;
+        onExpireRef.current();
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [restEndAt]);
 
   const goTo = (next: number) => {
     if (next < 0 || next >= TAB_LABELS.length || next === activeTab) return;

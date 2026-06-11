@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
@@ -245,10 +245,11 @@ export function WorkoutRunner({
   const elapsedStartRef = useRef(Date.now());
   const elapsedPausedRef = useRef(0);
 
-  const [restTimer, setRestTimer] = useState(0);
+  // §380 — fin de repos en timestamp ; le décompte par seconde vit dans
+  // RestScreen (avant : setRestTimer ici re-rendait tout le runner chaque seconde).
+  const [restEndAt, setRestEndAt] = useState(0);
   const [isResting, setIsResting] = useState(false);
   const [isRestPaused, setIsRestPaused] = useState(false);
-  const restEndRef = useRef(0);
   const [restType, setRestType] = useState<"set" | "exercise">("set");
   const [autoRest, setAutoRest] = useState(true);
   const [difficulty, setDifficulty] = useState(3);
@@ -307,8 +308,13 @@ export function WorkoutRunner({
     setFocusDisclaimerOpen(true);
   };
 
+  // §380 — elapsedTime n'est affiché QUE sur l'écran de fin (et lu par
+  // onFinish) : ticker pendant toute la séance re-rendait inutilement les
+  // ~1900 lignes du runner chaque seconde. Le tick ne tourne plus que sur
+  // l'écran de fin (affichage live conservé, durée enregistrée identique).
+  const isComplete = currentStep > (session.items?.length ?? 0);
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || !isComplete) return;
     const tick = () => {
       const elapsed = Math.floor((Date.now() - elapsedStartRef.current) / 1000) + elapsedPausedRef.current;
       setElapsedTime(elapsed);
@@ -318,7 +324,7 @@ export function WorkoutRunner({
     const handleVisibility = () => { if (document.visibilityState === 'visible') tick(); };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', handleVisibility); };
-  }, [isActive]);
+  }, [isActive, isComplete]);
 
   useEffect(() => {
     if (!isGifOpen) return;
@@ -331,28 +337,15 @@ export function WorkoutRunner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isGifOpen]);
 
-  useEffect(() => {
-    if (!isResting || isRestPaused) return;
-    const tick = () => {
-      if (restEndRef.current <= 0) return;
-      const remaining = Math.max(0, Math.ceil((restEndRef.current - Date.now()) / 1000));
-      setRestTimer(remaining);
-      if (remaining <= 0) {
-        notifyRestEnd();
-        toast("Temps de récupération terminé");
-        setIsResting(false);
-        setIsRestPaused(false);
-      }
-    };
-    tick();
-    const interval = setInterval(tick, 1000);
-    const handleVisibility = () => { if (document.visibilityState === 'visible') tick(); };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [isResting, isRestPaused]);
+  // §380 — fin de repos signalée par RestScreen (décompte local) ; mêmes effets
+  // de bord que l'ancien tick parent. useCallback stable → pas de redémarrage
+  // du tick enfant à chaque render du runner.
+  const handleRestExpire = useCallback(() => {
+    notifyRestEnd();
+    toast("Temps de récupération terminé");
+    setIsResting(false);
+    setIsRestPaused(false);
+  }, []);
 
   const workoutPlan = session.items || [];
   const currentExerciseIndex = currentStep - 1;
@@ -699,8 +692,7 @@ export function WorkoutRunner({
 
   const startRestTimer = (duration: number, type: "set" | "exercise" = "set") => {
     if (duration <= 0) return;
-    restEndRef.current = Date.now() + duration * 1000;
-    setRestTimer(duration);
+    setRestEndAt(Date.now() + duration * 1000);
     setRestType(type);
     setIsResting(true);
     setIsRestPaused(false);
@@ -1510,7 +1502,8 @@ export function WorkoutRunner({
 
       {isResting && (
         <RestScreen
-          restTimer={restTimer}
+          restEndAt={restEndAt}
+          onExpire={handleRestExpire}
           restDuration={restDuration}
           restType={restType}
           exercise={currentExerciseDef ?? null}
@@ -1534,14 +1527,12 @@ export function WorkoutRunner({
           userId={userId}
           onClose={() => { setIsResting(false); setIsRestPaused(false); }}
           onSkip={() => {
-            restEndRef.current = 0;
             setIsResting(false);
-            setRestTimer(0);
+            setRestEndAt(0);
             setIsRestPaused(false);
           }}
           onAdd30s={() => {
-            restEndRef.current += 30 * 1000;
-            setRestTimer((prev) => prev + 30);
+            setRestEndAt((prev) => prev + 30 * 1000);
           }}
         />
       )}

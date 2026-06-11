@@ -32,7 +32,11 @@ const block: StrengthSessionItem = {
 const logs: SetLogEntry[] = [];
 
 const defaultProps = {
-  restTimer: 85,
+  // §380 — le décompte est local : on passe le timestamp de fin ; le state
+  // initial (useState initializer) rend la même valeur en SSR. ceil() absorbe
+  // la dérive <1 s entre ce Date.now() et celui du composant.
+  restEndAt: Date.now() + 85_000,
+  onExpire: () => undefined,
   restDuration: 120,
   restType: "set" as const,
   exercise,
@@ -58,7 +62,7 @@ const defaultProps = {
   onAdd30s: () => undefined,
 };
 
-test("renders timer text correctly (1:25 for restTimer=85)", () => {
+test("renders timer text correctly (1:25 for restEndAt=now+85s)", () => {
   const markup = wrap(<RestScreen {...defaultProps} />);
   // 85s = 1 min 25s → "1:25"
   assert.ok(markup.includes("1:25"), `expected '1:25' in markup`);
@@ -94,7 +98,7 @@ test("renders tap pour passer and +30s button", () => {
   assert.ok(markup.includes("+30s"), "should show +30s button");
 });
 
-test("renders timer as 0:00 when restTimer=0", () => {
-  const markup = wrap(<RestScreen {...defaultProps} restTimer={0} />);
-  assert.ok(markup.includes("0:00"), "should show 0:00 when restTimer is 0");
+test("renders timer as 0:00 when restEndAt=0", () => {
+  const markup = wrap(<RestScreen {...defaultProps} restEndAt={0} />);
+  assert.ok(markup.includes("0:00"), "should show 0:00 when restEndAt is 0");
 });

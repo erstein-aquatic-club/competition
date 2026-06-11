@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§381** — parcours du cycle : page coach plein écran, timeline verticale par phases + assiduité.
+Dernier § livré : **§382** — perf : WorkoutRunner sans re-render par seconde (decompte repos local à RestScreen).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
