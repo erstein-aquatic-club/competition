@@ -21,7 +21,7 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 - `src/lib/strength/__tests__/mesocycleEngine.test.ts` (1961 → 2827 lignes — +3 tests d'intégration affûtage)
 - `src/lib/strength/__tests__/adjustmentFactors.test.ts` (→ 171 lignes — +4 tests scope allowlist)
 
-**Tests** : 8 `taperSetFactor.test.ts` + 2827 lignes `mesocycleEngine.test.ts` (132 tests dont les 3 nouveaux : affûtage 3 sem. [6,5,4], palier 0.50 direct 1 sem., non-régression pic/force_max) + 171 lignes `adjustmentFactors.test.ts` (13 tests dont 4 nouveaux : semaine mixte, PAP exclu, mobilité corrective exclue, warmup exclu) + 2 tests d'intégration ajustement. Suite complète : **node:test 1682/1682 / 0 fail ; vitest 80/80 / 0 fail ; `tsc --noEmit` exit 0**.
+**Tests** : 8 `taperSetFactor.test.ts` + 2827 lignes `mesocycleEngine.test.ts` (129 tests dont les 3 nouveaux : affûtage 3 sem. [6,5,4], palier 0.50 direct 1 sem., non-régression pic/force_max) + 171 lignes `adjustmentFactors.test.ts` (13 tests dont 4 nouveaux : semaine mixte, PAP exclu, mobilité corrective exclue, warmup exclu) + 2 tests d'intégration ajustement. Suite complète : **node:test 1682/1682 / 0 fail ; vitest 80/80 / 0 fail ; `tsc --noEmit` exit 0**.
 
 **Décisions** :
 - Palier 1 semaine d'affûtage = **0.50 directement** (le palier le plus profond — le doc ne définit pas de progression sur 1 sem., et −50 % est le plancher validé).
