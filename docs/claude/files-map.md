@@ -110,7 +110,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/swimTextParser.ts` | Parser texte → SwimBlock[], normaliseurs partagés | ~400 lignes |
 | `src/lib/swimConsultationUtils.ts` | Helpers partagés consultation séance (BlockGroup, groupItemsByBlock) | ~197 lignes |
 | `src/components/swim/SwimSessionTimeline.tsx` | Timeline verticale colorée, rail intensité, toggle 3 niveaux | ~555 lignes |
-| `src/lib/auth.ts` | Gestion auth, session, rôles | ~444 lignes |
+| `src/lib/auth.ts` | Gestion auth, session, rôles ; boot non bloquant via snapshot `eac-auth-context` + revalidation en fond (§379) | 747 lignes |
 | `src/lib/supabase.ts` | Client Supabase | ~70 lignes |
 | `src/lib/systemBanners.ts` | Queue système pour les 4 bandeaux (§210 Chantier D) — hook `useSystemBanner(key, isActive)` + module state ; priorité fixe `offline > update > push > install` → 1 seul banner visible à la fois | ~95 lignes |
 | `src/lib/offlineQueue.ts` | Queue localStorage pour mutations offline — `enqueue`, `getQueue`, `markRetry`, dispatche `eac-offline-queue-updated` (§162) | 113 lignes |

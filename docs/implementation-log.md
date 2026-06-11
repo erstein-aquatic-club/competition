@@ -4,6 +4,23 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §379 — Perf lot 3 : boot auth non bloquant (snapshot + revalidation en fond) (2026-06-11)
+
+**Contexte.** Lot 3 de l'audit perf (2026-06-11). `loadUser()` attendait la vérification autoritaire rôle+approbation (RPC `get_user_auth_context`, timeout 8 s, fallback 2 selects) avant `isLoaded: true` — qui gate TOUT le routeur derrière `PageSkeleton`. Coût payé à chaque démarrage par tous les utilisateurs, alors que seul le rôle `coach` requiert l'approbation (`APPROVAL_REQUIRED_ROLES`) et qu'un changement de rôle est rarissime. Bug offline au passage : RPC + fallback échouent → `approvalStatus: "unknown"` → un coach en démarrage offline tombait sur l'écran « verification-error » au lieu de l'app en cache (contredisait la persistance §248).
+
+**Changements (`src/lib/auth.ts`).**
+1. **Snapshot `eac-auth-context`** (localStorage) : `{userId, role, isApproved, approvalStatus}` écrit après chaque vérification serveur **autoritaire** (RPC OK ou legacy selects sans erreur). Purgé dans `logout()` ET le handler `SIGNED_OUT`.
+2. **`verifyAuthContext(userId, jwtRole)`** : vérification RPC/legacy extraite de `loadUser` (verbatim) + flag `authoritative` (false si réseau/serveur indisponible → ne jamais écraser l'état optimiste ni persister).
+3. **`loadUser` non bloquant** : si snapshot match `userId` OU rôle effectif sans approbation (athlete/comite/admin) → publication immédiate (`isLoaded: true` depuis snapshot ou claims JWT) + `verifyAuthContext` en arrière-plan (applique + persiste seulement si autoritaire). Sinon (coach sans snapshot = 1er boot appareil) → chemin bloquant historique conservé, porte d'approbation fermée tant que non vérifiée.
+
+**Sémantique sécurité** : gating UI uniquement — les données restent protégées par RLS. Un coach révoqué voit l'UI coach quelques secondes (jusqu'à la revalidation) ; un coach jamais approuvé n'a jamais de snapshot « approved » → toujours gated. Boot offline coach connu = app en cache (fix du bug ci-dessus).
+
+**Effet attendu** : time-to-content = `getSession()` local (~ms) au lieu de +1 RTT RPC (200 ms–8 s selon réseau) pour 100 % des boots récurrents.
+
+**Tests.** Nouveau `src/lib/__tests__/auth-boot.test.ts` (7 tests, TDD 5 rouges→verts) : athlète non bloquant, revalidation en fond (changement de rôle appliqué + snapshot écrit), coach sans snapshot reste bloquant, coach avec snapshot immédiat, snapshot d'un autre userId ignoré, échec réseau ne dégrade pas l'optimiste, SIGNED_OUT purge. Harnais : mock.module supabase (RPC différable) + StorageStub. Suite complète : **node:test 1695/1695**, vitest 20 fichiers OK, tsc 0. Pas de `test:rls` (aucun changement SQL/policy).
+
+**Limites.** Le snapshot n'est pas chiffré (même niveau de confiance que le token Supabase déjà en localStorage). Une révocation d'approbation se propage à la revalidation suivante (boot/login), pas en push. Lot 4 restant : mémoïsation `WorkoutRunner`/`Coach.tsx` + virtualisation des listes longues.
+
 ## §378 — Perf lot 2 : bornage serveur des requêtes de liste sur tables croissantes (2026-06-11)
 
 **Contexte.** Lot 2 de l'audit perf (2026-06-11) : « l'assurance anti-vieillissement » — les requêtes de liste sans `.limit()` sur des tables qui grossissent avec l'usage ralentissent l'app silencieusement au fil des saisons. **Vérification systématique avant édition** (scan des ~120 chaînes `.select()` de `src/lib/api/` + lecture manuelle des candidats) : la plupart des findings « haute sévérité » de l'agent d'audit données étaient **faux ou périmés** — `getStrengthHistory` déjà clampé 1–200 + `.range()`, `getSwimmerPerformances` déjà `.limit(?? 500)`, `getSessions` déjà `.limit(200)`, notifications clampées 1–200, RPC Hall of Fame = agrégats par athlète (pas de lignes brutes), `assignments`/`strength-attendance`/`users.getRecentClubSessions` déjà fenêtrés par dates ou `.in()`.

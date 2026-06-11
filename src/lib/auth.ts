@@ -47,6 +47,171 @@ const readStoredSelectedAthleteName = () => {
 };
 
 // ---------------------------------------------------------------------------
+// §379 — Snapshot localStorage du contexte auth autoritaire (rôle + approbation
+// vérifiés en base). Écrit après chaque vérification serveur réussie, il permet
+// au boot suivant de publier l'état immédiatement (isLoaded: true) et de
+// revalider en arrière-plan, au lieu de bloquer le routeur derrière le RPC
+// (jusqu'à 8 s sur réseau lent ; écran "verification-error" en offline).
+// Gating UI uniquement : les données restent protégées par RLS côté serveur.
+// ---------------------------------------------------------------------------
+
+const AUTH_CONTEXT_SNAPSHOT_KEY = "eac-auth-context";
+
+type ApprovalStatus = "not_required" | "approved" | "pending" | "unknown";
+
+interface AuthContextSnapshot {
+  userId: number;
+  role: string | null;
+  isApproved: boolean | null;
+  approvalStatus: ApprovalStatus;
+}
+
+const readAuthContextSnapshot = (): AuthContextSnapshot | null => {
+  const raw = readStorageValue(AUTH_CONTEXT_SNAPSHOT_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as AuthContextSnapshot;
+    if (!parsed || typeof parsed !== "object" || !Number.isFinite(parsed.userId)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeAuthContextSnapshot = (snapshot: AuthContextSnapshot | null) => {
+  setStorageValue(
+    AUTH_CONTEXT_SNAPSHOT_KEY,
+    snapshot ? JSON.stringify(snapshot) : null,
+  );
+};
+
+// ---------------------------------------------------------------------------
+// §379 — Vérification autoritaire du rôle + approbation (extraite de loadUser).
+// `authoritative` = la réponse vient bien de la base (RPC OK, ou legacy selects
+// sans erreur) ; false = réseau/serveur indisponible → l'appelant ne doit ni
+// écraser un état optimiste ni persister le résultat.
+// ---------------------------------------------------------------------------
+
+interface VerifiedAuthContext {
+  role: string | null;
+  isApproved: boolean | null;
+  approvalStatus: ApprovalStatus;
+  authoritative: boolean;
+}
+
+async function verifyAuthContext(
+  userId: number,
+  jwtRole: string | null,
+): Promise<VerifiedAuthContext> {
+  let role = jwtRole;
+  let isApproved: boolean | null = requiresApprovalForRole(role) ? null : true;
+  let approvalStatus: ApprovalStatus = requiresApprovalForRole(role)
+    ? "unknown"
+    : "not_required";
+
+  // §247 — Try the unified RPC `get_user_auth_context` first (1 round-trip).
+  // Falls back to the legacy 2-select sequential path if the RPC is missing
+  // (migration 00158 not yet applied) or returns an error. -1 RTT login Slow 3G
+  // when the RPC is available, no regression otherwise.
+  let rpcRole: string | null = null;
+  let rpcApproved: boolean | null = null;
+  let rpcOk = false;
+  try {
+    // §260 — withTimeout 8s pour éviter blocage indéfini login Slow 3G/EDGE.
+    // Le fallback 2-select ci-dessous prend le relais en cas de timeout.
+    const { data: ctxData, error: ctxError } = await withTimeout(
+      supabase.rpc("get_user_auth_context"),
+      8_000,
+      "auth.get_user_auth_context",
+    );
+    if (!ctxError && ctxData && typeof ctxData === "object") {
+      const ctx = ctxData as { role?: string | null; is_approved?: boolean | null };
+      rpcRole = ctx.role ?? null;
+      rpcApproved = ctx.is_approved ?? null;
+      rpcOk = true;
+    }
+  } catch {
+    // Fall through to legacy path below
+  }
+
+  if (rpcOk) {
+    if (rpcRole) {
+      role = rpcRole;
+    }
+    const requiresApproval = requiresApprovalForRole(role);
+    if (!requiresApproval) {
+      isApproved = true;
+      approvalStatus = "not_required";
+    } else if (rpcApproved === true) {
+      isApproved = true;
+      approvalStatus = "approved";
+    } else if (rpcApproved === false) {
+      isApproved = false;
+      approvalStatus = "pending";
+    } else {
+      isApproved = null;
+      approvalStatus = "unknown";
+    }
+    return { role, isApproved, approvalStatus, authoritative: true };
+  }
+
+  // Legacy path: 2 sequential selects (preserved verbatim for back-compat).
+  let legacyAuthoritative = true;
+  try {
+    const { data: dbUser, error: usersError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+    if (usersError) {
+      legacyAuthoritative = false;
+    }
+    if (dbUser?.role) {
+      role = dbUser.role;
+    }
+  } catch {
+    // Fall back to JWT claim if DB query fails
+    legacyAuthoritative = false;
+  }
+
+  const requiresApproval = requiresApprovalForRole(role);
+  isApproved = requiresApproval ? null : true;
+  approvalStatus = requiresApproval ? "unknown" : "not_required";
+
+  if (requiresApproval) {
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("is_approved")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (profileError) {
+        throw profileError;
+      }
+      if (profile?.is_approved === true) {
+        isApproved = true;
+        approvalStatus = "approved";
+      } else if (profile?.is_approved === false) {
+        isApproved = false;
+        approvalStatus = "pending";
+      } else {
+        isApproved = null;
+        approvalStatus = "unknown";
+      }
+    } catch {
+      // Keep the gate closed when approval cannot be verified
+      isApproved = null;
+      approvalStatus = "unknown";
+      legacyAuthoritative = false;
+    }
+  }
+
+  return { role, isApproved, approvalStatus, authoritative: legacyAuthoritative };
+}
+
+// ---------------------------------------------------------------------------
 // Extract app-level user info from Supabase Auth user
 // The custom users.id and role are stored in user_metadata or app_metadata
 // set during registration or via a database trigger.
@@ -177,6 +342,7 @@ export const useAuth = create<AuthState>((set) => ({
     await supabase.auth.signOut();
     setStorageValue(COACH_SELECTED_ATHLETE_ID_KEY, null);
     setStorageValue(COACH_SELECTED_ATHLETE_NAME_KEY, null);
+    writeAuthContextSnapshot(null); // §379 — pas de contexte optimiste post-logout
     set({
       user: null,
       authUid: null,
@@ -250,119 +416,93 @@ export const useAuth = create<AuthState>((set) => ({
       }
     }
 
-    let role = extractAppUserRole(supabaseUser);
-    let isApproved: boolean | null = requiresApprovalForRole(role) ? null : true;
-    let approvalStatus: AuthState["approvalStatus"] = requiresApprovalForRole(role)
-      ? "unknown"
-      : "not_required";
+    const jwtRole = extractAppUserRole(supabaseUser);
+
+    const publish = (ctx: {
+      role: string | null;
+      isApproved: boolean | null;
+      approvalStatus: ApprovalStatus;
+    }) => {
+      set({
+        user: displayName,
+        authUid: supabaseUser?.id ?? null,
+        userId,
+        role: ctx.role,
+        isApproved: ctx.isApproved,
+        approvalStatus: ctx.approvalStatus,
+        isLoaded: true,
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+      });
+    };
 
     // Fetch the authoritative role + approval status from public.users + user_profiles
     // to handle stale JWT claims. The JWT claim (app_user_role) can be outdated
     // if the role was changed without a subsequent token refresh.
     //
-    // §247 — Try the unified RPC `get_user_auth_context` first (1 round-trip).
-    // Falls back to the legacy 2-select sequential path if the RPC is missing
-    // (migration 00158 not yet applied) or returns an error. -1 RTT login Slow 3G
-    // when the RPC is available, no regression otherwise.
+    // §379 — boot non bloquant : si on connaît déjà un contexte fiable (snapshot
+    // du dernier boot pour ce userId) ou si le rôle ne requiert pas d'approbation
+    // (athlete/comite/admin), on publie immédiatement et on revalide en
+    // arrière-plan. Le chemin bloquant historique ne reste que pour un rôle à
+    // approbation SANS snapshot (1er boot sur l'appareil) — la porte reste
+    // fermée tant que l'approbation n'est pas vérifiée.
     if (userId) {
-      let rpcRole: string | null = null;
-      let rpcApproved: boolean | null = null;
-      let rpcOk = false;
-      try {
-        // §260 — withTimeout 8s pour éviter blocage indéfini login Slow 3G/EDGE.
-        // Le fallback 2-select ci-dessous prend le relais en cas de timeout.
-        const { data: ctxData, error: ctxError } = await withTimeout(
-          supabase.rpc("get_user_auth_context"),
-          8_000,
-          "auth.get_user_auth_context",
+      const snapshot = readAuthContextSnapshot();
+      const snapshotMatches = snapshot !== null && snapshot.userId === userId;
+      const effectiveRole = snapshotMatches && snapshot.role ? snapshot.role : jwtRole;
+
+      const applyVerified = (verified: VerifiedAuthContext) => {
+        if (!verified.authoritative) return;
+        useAuth.setState({
+          role: verified.role,
+          isApproved: verified.isApproved,
+          approvalStatus: verified.approvalStatus,
+        });
+        writeAuthContextSnapshot({
+          userId,
+          role: verified.role,
+          isApproved: verified.isApproved,
+          approvalStatus: verified.approvalStatus,
+        });
+      };
+
+      if (snapshotMatches || !requiresApprovalForRole(effectiveRole)) {
+        publish(
+          snapshotMatches
+            ? snapshot
+            : {
+                role: jwtRole,
+                isApproved: requiresApprovalForRole(jwtRole) ? null : true,
+                approvalStatus: requiresApprovalForRole(jwtRole)
+                  ? "unknown"
+                  : "not_required",
+              },
         );
-        if (!ctxError && ctxData && typeof ctxData === "object") {
-          const ctx = ctxData as { role?: string | null; is_approved?: boolean | null };
-          rpcRole = ctx.role ?? null;
-          rpcApproved = ctx.is_approved ?? null;
-          rpcOk = true;
-        }
-      } catch {
-        // Fall through to legacy path below
-      }
-
-      if (rpcOk) {
-        if (rpcRole) {
-          role = rpcRole;
-        }
-        const requiresApproval = requiresApprovalForRole(role);
-        if (!requiresApproval) {
-          isApproved = true;
-          approvalStatus = "not_required";
-        } else if (rpcApproved === true) {
-          isApproved = true;
-          approvalStatus = "approved";
-        } else if (rpcApproved === false) {
-          isApproved = false;
-          approvalStatus = "pending";
-        } else {
-          isApproved = null;
-          approvalStatus = "unknown";
-        }
+        void verifyAuthContext(userId, jwtRole)
+          .then(applyVerified)
+          .catch(() => {
+            // Réseau indisponible : l'état optimiste reste en place, la
+            // prochaine revalidation (prochain boot/login) corrigera si besoin.
+          });
       } else {
-        // Legacy path: 2 sequential selects (preserved verbatim for back-compat).
-        try {
-          const { data: dbUser } = await supabase
-            .from("users")
-            .select("role")
-            .eq("id", userId)
-            .maybeSingle();
-          if (dbUser?.role) {
-            role = dbUser.role;
-          }
-        } catch {
-          // Fall back to JWT claim if DB query fails
-        }
-
-        const requiresApproval = requiresApprovalForRole(role);
-        isApproved = requiresApproval ? null : true;
-        approvalStatus = requiresApproval ? "unknown" : "not_required";
-
-        if (requiresApproval) {
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from("user_profiles")
-              .select("is_approved")
-              .eq("user_id", userId)
-              .maybeSingle();
-            if (profileError) {
-              throw profileError;
-            }
-            if (profile?.is_approved === true) {
-              isApproved = true;
-              approvalStatus = "approved";
-            } else if (profile?.is_approved === false) {
-              isApproved = false;
-              approvalStatus = "pending";
-            } else {
-              isApproved = null;
-              approvalStatus = "unknown";
-            }
-          } catch {
-            // Keep the gate closed when approval cannot be verified
-            isApproved = null;
-            approvalStatus = "unknown";
-          }
+        const verified = await verifyAuthContext(userId, jwtRole);
+        publish(verified);
+        if (verified.authoritative) {
+          writeAuthContextSnapshot({
+            userId,
+            role: verified.role,
+            isApproved: verified.isApproved,
+            approvalStatus: verified.approvalStatus,
+          });
         }
       }
+    } else {
+      publish({
+        role: jwtRole,
+        isApproved: requiresApprovalForRole(jwtRole) ? null : true,
+        approvalStatus: requiresApprovalForRole(jwtRole) ? "unknown" : "not_required",
+      });
     }
-
-    set({
-      user: displayName,
-      authUid: supabaseUser?.id ?? null,
-      userId,
-      role,
-      isApproved,
-      approvalStatus,
-      isLoaded: true,
-      accessToken: session.access_token,
-      refreshToken: session.refresh_token,
-    });
 
     // Hydrate lastRefreshAt from the session's expires_at so visibilitychange
     // and the proactive timer evaluate against the real token age, not module
@@ -427,6 +567,7 @@ export function handleAuthEvent(event: string, session: Session | null) {
     stopRefreshTimer();
     setStorageValue(COACH_SELECTED_ATHLETE_ID_KEY, null);
     setStorageValue(COACH_SELECTED_ATHLETE_NAME_KEY, null);
+    writeAuthContextSnapshot(null); // §379 — pas de contexte optimiste post-logout
     useAuth.setState({
       user: null,
       authUid: null,

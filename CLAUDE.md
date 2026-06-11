@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§378** — perf : bornes serveur sur 6 requêtes de liste non limitées (catalogues, notifs, chronos, imports, pointages).
+Dernier § livré : **§379** — perf : boot auth non bloquant (snapshot localStorage + revalidation en fond).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 
