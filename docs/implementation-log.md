@@ -4,6 +4,29 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §376 — Mode focus : substitution sans téléport à l'échauffement + picker stable iOS (2026-06-11)
+
+**Contexte** : retour terrain François — en remplaçant un exercice pendant une séance en mode focus muscu : (1) la recherche du picker « débordait de partout autour de l'écran » (iOS PWA) ; (2) après validation, retour forcé au début de la séance, section échauffement.
+
+**Cause racine (symptôme 2)** : l'effet de réconciliation de `WorkoutRunner` (deps `[initialLogs, session.items]`) recalcule la position via `resolveNextStep`, qui renvoie le **premier** item aux logs incomplets. Or « Passer l'échauffement » (chapitres §367) ne logge rien → les items warmup restent incomplets à jamais → toute substitution (nouvelle référence `session.items` via `handleSubstitute`) ou mise à jour d'`initialLogs` hors fenêtre `isLoggingRef` re-déclenchait le recalcul et téléportait l'utilisateur au step 1 (premier exo d'échauffement). Le même mécanisme cassait la reprise de séance (montage avec `initialStep` > step résolu). Reproduit en vitest (rouge) avant fix.
+
+**Changements** :
+1. `WorkoutRunner.tsx` — **clamp anti-retour** dans l'effet de réconciliation : `effectiveStep = Math.max(resolvedStep, currentStepRef.current)` (latest-ref du step, hors deps pour ne pas écraser les inputs à chaque avancement). La réconciliation ne déplace plus jamais le step en arrière ; le reset inputs/setIndex du cas « substitution de l'exo courant » est préservé (logs du nouvel exo = ∅ → setIndex 1, garde anti-race conservée).
+2. `ExercisePicker.tsx` — **hauteur fixe `h-[80dvh]`** (au lieu de `maxHeight`) : le sheet ne se redimensionne plus à chaque frappe (le bord haut sautait quand la liste filtrée raccourcissait) et le champ de recherche reste en haut de l'écran, hors zone clavier iOS ; **suppression de l'`autoFocus`** qui ouvrait le clavier iOS pendant l'animation slide-in du sheet (scroll-into-view sur géométrie transitoire → pan du visual viewport = « débordement » rapporté).
+
+**Fichiers modifiés** :
+- `src/components/strength/WorkoutRunner.tsx` (1899 → 1911 lignes)
+- `src/components/strength/ExercisePicker.tsx` (115 → 123 lignes)
+- `src/components/strength/WorkoutRunner.vitest.tsx` (104 → 210 lignes — +2 tests régression)
+
+**Tests** : 2 nouveaux vitest §376 (TDD, rouges avant fix, verts après) : (a) montage avec échauffement passé non loggé → reste sur l'exo courant ; (b) substitution mid-séance (`session.items` change) → reste sur l'exo substitué. Suite complète : node:test OK, **vitest 82/82**, `tsc --noEmit` exit 0.
+
+**Décisions** :
+- La réconciliation reste autorisée vers l'AVANT (sync multi-device / reprise depuis logs) — seul le retour en arrière est interdit ; aucun flux UI ne s'appuyait sur un recul piloté par l'effet.
+- Pas de re-conception de `resolveNextStep` : les logs ne tracent pas les skips, la fonction ne peut pas distinguer « sauté » de « pas encore fait ».
+
+**Limites** : le fix overflow (symptôme 1) est une mitigation raisonnée **non vérifiée sur device** (clavier iOS non reproductible en jsdom) — à smoke-tester sur iPhone (PWA à jour, vérifier `[EAC] Build:` en console). S'il déborde encore sur build frais, demander capture + texte console.
+
 ## §375 — Affûtage progressif par paliers + ajustement mid-cycle scoped (2026-06-11)
 
 **Contexte** : audit moteur muscu vs pratiques élite (2026-06-10). 3 écarts identifiés : (a) le multiplicateur d'affûtage `×0.4` plat contredit le doc validé coach (`bilan-muscu-templates-sources.md`, T1 : paliers −25 %→−40 %→−50 %) et la littérature taper (progressif > marche d'escalier) ; (b) `applyAdjustmentFactors` scalait aussi les amorces PAP, la mobilité corrective et les échauffements — dose fixe et sécurité ne sont pas des charges d'entraînement ; (c) progression intra-bloc `force_max` identique chaque semaine — **non traité**, question coach ci-dessous.

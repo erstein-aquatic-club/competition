@@ -49,10 +49,15 @@ export function ExercisePicker({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setSearch(""); }}>
+      {/* §376 — hauteur FIXE (h-[80dvh], pas maxHeight) : avec une hauteur
+          variable, chaque frappe re-filtrait la liste et redimensionnait le
+          sheet ancré en bas (le bord haut sautait), et un résultat court
+          plaçait le champ de recherche sous le clavier iOS → pan du visual
+          viewport = contenu « qui déborde » autour de l'écran. Hauteur fixe :
+          le champ reste en haut de l'écran, hors zone clavier. */}
       <SheetContent
         side="bottom"
-        className="flex flex-col overflow-hidden rounded-t-3xl px-4 pb-4 pt-5"
-        style={{ maxHeight: "80dvh" }}
+        className="flex h-[80dvh] flex-col overflow-hidden rounded-t-3xl px-4 pb-4 pt-5"
       >
         <SheetHeader className="shrink-0">
           <SheetTitle className="text-base font-semibold">{title}</SheetTitle>
@@ -61,12 +66,15 @@ export function ExercisePicker({
         {/* Sticky search */}
         <div className="relative mt-3 shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
+          {/* §376 — pas d'autoFocus : il ouvrait le clavier iOS PENDANT
+              l'animation slide-in du sheet (élément fixed transformé) →
+              scroll-into-view sur géométrie transitoire, rendu cassé. Le
+              nageur tape le champ une fois le sheet posé. */}
           <Input
             placeholder="Rechercher..."
             className="h-10 rounded-xl bg-muted/30 pl-10 pr-10 border-0 text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            autoFocus
           />
           {search && (
             <button

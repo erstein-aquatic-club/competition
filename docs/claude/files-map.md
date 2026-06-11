@@ -299,7 +299,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/swim/SwimPlanningTimeline.tsx` | Timeline semaines + micro-grille jour × créneau + chips filière (présentationnel, partagé coach/nageur) — ring+icon override, opacity inherited, `readOnly` (§153) | ~780 lignes |
 | `src/components/coach/swim/swimPlanningShared.ts` | Helpers/constantes partagés timeline swim (WeekInfo, DAY_ROWS, getMonday, generateWeeks, fmtDD_MM, isCurrentWeek) | ~75 lignes |
 | `src/pages/coach/CoachMessagesScreen.tsx` | Écran messages coach (formulaire épuré sans Cards, §196) | 244 lignes |
-| `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos) | 1484 lignes |
+| `src/components/strength/WorkoutRunner.tsx` | Runner séance muscu (mode focus, sets, repos ; réconciliation step jamais en arrière §376) | 1911 lignes |
 | `src/components/strength/SetRow.tsx` | Ligne exercice memoïsée pour l'aperçu séance dans WorkoutRunner (§267 R2 sub-§A) | 66 lignes |
 | `src/components/strength/kpi/KpiStepCard.tsx` | Étape KPI du wizard (§285) — protocole (steps, rôle binôme, mesure, GIF), N champs d'essais, valeur retenue live via `bestAttempt` ; branche `vertical_jump` → `VerticalJumpInputs`, `medball_vertical_throw` → `MedballThrowInputs` (§309) | 190 lignes |
 | `src/components/strength/kpi/MedballThrowInputs.tsx` | Saisie du KPI lancer médecine-ball assis (§309) — champ masse du ballon (kg) + 3 distances (cm) → indice masse × distance (kg·m) calculé en direct ; style aligné sur `VerticalJumpInputs` (cohérence wizard) | 165 lignes |

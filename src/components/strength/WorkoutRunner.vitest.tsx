@@ -56,6 +56,113 @@ function renderRunner(extra: Record<string, unknown> = {}) {
   return utils;
 }
 
+// §376 — Régression terrain (substitution en mode focus) : resolveNextStep
+// renvoie le PREMIER item aux logs incomplets. Un échauffement passé via
+// « Passer l'échauffement » ne logge rien → quand `session.items` change
+// (substitution Task 14), l'effet de réconciliation recalculait la position
+// et TÉLÉPORTAIT l'utilisateur au step 1, section échauffement. La
+// réconciliation ne doit jamais déplacer le step vers l'arrière.
+describe("§376 substitution mid-séance — pas de retour à l'échauffement", () => {
+  const warmupItem = {
+    exercise_id: 1,
+    exercise_name: "Mobilité épaules",
+    order_index: 0,
+    sets: 2,
+    reps: 10,
+    rest_seconds: 30,
+    percent_1rm: 0,
+    block: "warmup" as const,
+  };
+  const mainItem1 = {
+    exercise_id: 2,
+    exercise_name: "Tractions lestées",
+    order_index: 1,
+    sets: 1,
+    reps: 5,
+    rest_seconds: 120,
+    percent_1rm: 80,
+    block: "main" as const,
+  };
+  const mainItem2 = {
+    exercise_id: 3,
+    exercise_name: "Bench Pull",
+    order_index: 2,
+    sets: 3,
+    reps: 6,
+    rest_seconds: 120,
+    percent_1rm: 75,
+    block: "main" as const,
+  };
+
+  const session = {
+    id: 42,
+    name: "Séance focus",
+    items: [warmupItem, mainItem1, mainItem2],
+  } as unknown as StrengthSessionTemplate;
+
+  const catalog: Exercise[] = [
+    { id: 1, nom_exercice: "Mobilité épaules", exercise_type: "strength" },
+    { id: 2, nom_exercice: "Tractions lestées", exercise_type: "strength" },
+    { id: 3, nom_exercice: "Bench Pull", exercise_type: "strength" },
+    { id: 4, nom_exercice: "Tirage poulie", exercise_type: "strength" },
+  ] as unknown as Exercise[];
+
+  // Échauffement passé (aucun log pour l'exo 1), item main 1 complété,
+  // utilisateur positionné sur l'item 3 (Bench Pull).
+  const logs = [{ exercise_id: 2, set_number: 1, reps: 5, weight: 50 }];
+
+  function currentTitle() {
+    return screen.getByRole("heading", { level: 2 }).textContent;
+  }
+
+  it("reste sur l'exo courant au montage malgré un échauffement passé (non loggé)", () => {
+    render(
+      <WorkoutRunner
+        session={session}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={3}
+        initialLogs={logs}
+        userId={1}
+      />,
+    );
+    expect(currentTitle()).toBe("Bench Pull");
+  });
+
+  it("reste sur l'exo substitué quand session.items change mid-séance", () => {
+    const { rerender } = render(
+      <WorkoutRunner
+        session={session}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={3}
+        initialLogs={logs}
+        userId={1}
+      />,
+    );
+    // Substitution de l'exo courant (Bench Pull → Tirage poulie) : le parent
+    // remplace items[2] et repasse une nouvelle référence de session.
+    const substituted = {
+      ...session,
+      items: [warmupItem, mainItem1, { ...mainItem2, exercise_id: 4, exercise_name: "Tirage poulie" }],
+    } as unknown as StrengthSessionTemplate;
+    rerender(
+      <WorkoutRunner
+        session={substituted}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={3}
+        initialLogs={logs}
+        userId={1}
+      />,
+    );
+    expect(currentTitle()).toBe("Tirage poulie");
+  });
+});
+
 describe("§369 carte série 1 augmentée (jsdom)", () => {
   it("RIR par défaut = 2 pré-sélectionné (anti sous-estimation)", () => {
     renderRunner();

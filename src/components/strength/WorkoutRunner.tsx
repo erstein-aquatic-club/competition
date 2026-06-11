@@ -234,6 +234,11 @@ export function WorkoutRunner({
   }, []);
 
   const [currentStep, setCurrentStep] = useState(initialStep ?? 1);
+  // §376 — latest-ref du step pour le clamp anti-retour de la réconciliation,
+  // sans mettre currentStep dans les deps de l'effet (qui écraserait les
+  // inputs à chaque avancement).
+  const currentStepRef = useRef(currentStep);
+  currentStepRef.current = currentStep;
   const [logs, setLogs] = useState<SetLogEntry[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isActive, setIsActive] = useState(true);
@@ -634,8 +639,15 @@ export function WorkoutRunner({
       logsByExercise.set(log.exercise_id, existing);
     });
     const resolvedStep = resolveNextStep(blocks, initialLogs);
-    if (resolvedStep > 0 && resolvedStep <= blocks.length) {
-      const block = blocks[resolvedStep - 1];
+    // §376 — clamp anti-retour : resolveNextStep renvoie le PREMIER item aux
+    // logs incomplets. Un échauffement passé (« Passer l'échauffement » ne
+    // logge rien) ou un exo sauté reste incomplet à jamais : recalculer ici
+    // sur un changement de session.items (substitution mid-séance) ou
+    // d'initialLogs hors fenêtre isLoggingRef téléportait l'utilisateur au
+    // step 1, section échauffement. La réconciliation ne va jamais en arrière.
+    const effectiveStep = Math.max(resolvedStep, currentStepRef.current);
+    if (effectiveStep > 0 && effectiveStep <= blocks.length) {
+      const block = blocks[effectiveStep - 1];
       const existing = logsByExercise.get(block.exercise_id) ?? [];
       const inputs = existing.reduce((acc: Record<number, SetInputValues>, log: SetLogEntry, index: number) => {
         const setNumber = resolveSetNumber(log, index + 1);
@@ -652,7 +664,7 @@ export function WorkoutRunner({
       setCurrentSetInputs({});
       setCurrentSetIndex(1);
     }
-    setCurrentStep((prev) => (prev === resolvedStep ? prev : resolvedStep));
+    setCurrentStep((prev) => (prev === effectiveStep ? prev : effectiveStep));
   }, [initialLogs, session.items]);
 
   useEffect(() => {
