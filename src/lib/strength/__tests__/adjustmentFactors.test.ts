@@ -21,6 +21,7 @@ function makeExercise(overrides: Partial<MesocycleExercise>): MesocycleExercise 
   };
 }
 
+
 function makePlan(exercises: MesocycleExercise[]): GeneratedMesocycle {
   return {
     weeks: [{
@@ -102,4 +103,33 @@ test('applyAdjustmentFactors: input not mutated (purity)', () => {
   applyAdjustmentFactors(plan, 0.5, 0.5);
   assert.equal(plan.weeks[0].sessions[0].exercises[0].sets, 5);
   assert.equal(plan.weeks[0].sessions[0].exercises[0].intensityPct1rm, 85);
+});
+
+// §375 — scoping : PAP, mobilité corrective et échauffement hors du scaling
+
+test("§375: une séance amorce_pap n'est PAS scalée (dose PAP fixe — fraîcheur avant bassin)", () => {
+  const plan = makePlan([makeExercise({ sets: 2, intensityPct1rm: 85 })]);
+  plan.weeks[0].sessions[0].role = 'amorce_pap';
+  const out = applyAdjustmentFactors(plan, 1.5, 1.2);
+  assert.equal(out.weeks[0].sessions[0].exercises[0].sets, 2);
+  assert.equal(out.weeks[0].sessions[0].exercises[0].intensityPct1rm, 85);
+});
+
+test("§375: une séance mobilite_corrective n'est PAS scalée (prescription de sécurité, pas une charge d'entraînement)", () => {
+  const plan = makePlan([makeExercise({ sets: 3, intensityPct1rm: 0 })]);
+  plan.weeks[0].sessions[0].role = 'mobilite_corrective';
+  const out = applyAdjustmentFactors(plan, 1.5, 1.2);
+  assert.equal(out.weeks[0].sessions[0].exercises[0].sets, 3);
+});
+
+test("§375: les exos d'échauffement (warmupKind) gardent leur dose, les exos de travail scalent", () => {
+  const plan = makePlan([
+    makeExercise({ sets: 2, intensityPct1rm: 0, warmupKind: 'common' }),
+    makeExercise({ sets: 2, intensityPct1rm: 0, warmupKind: 'corrective' }),
+    makeExercise({ sets: 2, intensityPct1rm: 0, warmupKind: 'activation' }),
+    makeExercise({ sets: 4, intensityPct1rm: 80 }), // travail
+  ]);
+  const out = applyAdjustmentFactors(plan, 1.5, 1.0);
+  const exos = out.weeks[0].sessions[0].exercises;
+  assert.deepEqual(exos.map((e) => e.sets), [2, 2, 2, 6]);
 });
