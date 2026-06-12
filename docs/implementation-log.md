@@ -4,6 +4,22 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §380 — Assiduité muscu : frise « parcours du cycle » au clic sur une carte (2026-06-12)
+
+**Contexte.** Demande coach (François) : depuis la vue **Planif. Muscu → Assiduité muscu**, cliquer sur la carte d'un nageur doit montrer où il se situe dans son mésocycle (semaine force, affûtage…) et la suite du cycle sur les prochaines semaines. Jusqu'ici la carte n'affichait que les jauges/pastilles d'assiduité ; la position dans le cycle nécessitait d'ouvrir l'accordéon « Mésocycles actifs » ou la fiche nageur.
+
+**Décision — source des phases.** `strength_planning_week_overrides.week_type` (labels FR matérialisés par la RPC apply), PAS une recomposition de template (`composeTemplate` + `cycleAtWeek`) : la recomposition ignorerait le `startPhase` des mésos ajustés mi-cycle (§338), alors que les week_overrides reflètent toujours le plan réellement matérialisé. Une seule requête (`getStrengthPlanningWeekOverrides`, déjà exposée), déclenchée au dépliage uniquement (lazy mount, pattern `CoachMesocyclesAccordion`).
+
+**Changements.**
+1. **API** (`src/lib/api/strength-mesocycles.ts`) : `listActiveMesocyclesWithAthletes()` remonte aussi `start_week_monday` (§340) + `week_offset` (§358) — même table, zéro requête en plus. Interface `ActiveMesocycleWithAthlete` étendue.
+2. **Helper pur** `src/lib/strength/cycleJourney.ts` (85 l.) : `buildJourneyWeekStarts(startMonday, totalWeeks)` (lundis du méso) + `groupPhaseSegments(weeks, currentMonday)` (segments de phases consécutives avec timing `past`/`current`/`upcoming`).
+3. **Composant** `src/components/coach/strength/AttendanceMesocycleJourney.tsx` (201 l.) : position « Semaine X/Y · phase » (numérotation globale via `mesocyclePosition` + `week_offset` §358, repli `start_week_monday` → lundi de `generated_at` comme `MesocycleAdjust`), frise un-segment-par-semaine colorée par phase (`detectPhase` + `PHASE_STYLES`, passé atténué, semaine courante cerclée), puis liste des segments (« Force max · S3–S5 · 15 juin – 5 juil. », badge « en cours », passés atténués). États : skeleton au chargement, « Démarre le … » / « Cycle terminé » selon `position.status`, « Sans phase » si week_override absent (méso legacy/purgé).
+4. **Board** (`StrengthAttendanceBoard.tsx`, 357→410 l.) : en-tête de carte devenu bouton (nom + hint « Cycle » + chevron), état single-open `expandedAthleteId`, frise montée en lazy sous l'en-tête.
+
+**Tests.** Nouveau `src/lib/strength/__tests__/cycleJourney.test.ts` (9 tests : lundis consécutifs, changement d'année, regroupement, timing past/current/upcoming, labels null, méso passé, liste vide). Suite complète : **node:test 1704/1704**, vitest 82/82, tsc 0, lint 0 erreur. Pas de `test:rls` (lecture d'une table déjà lue côté coach par `useStrengthPlanningAthleteMode`, aucune policy modifiée).
+
+**Limites.** Les semaines sans week_override apparaissent « Sans phase » (gris) — cas des mésos antérieurs à §293 ou purgés partiellement. La frise repose sur `target_week_count` semaines à partir du lundi de départ : une 1re semaine partielle (§307) est affichée pleine (granularité semaine, cohérent avec le board). `expandedAthleteId` non persisté entre navigations (volontaire, écran consulté au bord du bassin).
+
 ## §379 — Perf lot 3 : boot auth non bloquant (snapshot + revalidation en fond) (2026-06-11)
 
 **Contexte.** Lot 3 de l'audit perf (2026-06-11). `loadUser()` attendait la vérification autoritaire rôle+approbation (RPC `get_user_auth_context`, timeout 8 s, fallback 2 selects) avant `isLoaded: true` — qui gate TOUT le routeur derrière `PageSkeleton`. Coût payé à chaque démarrage par tous les utilisateurs, alors que seul le rôle `coach` requiert l'approbation (`APPROVAL_REQUIRED_ROLES`) et qu'un changement de rôle est rarissime. Bug offline au passage : RPC + fallback échouent → `approvalStatus: "unknown"` → un coach en démarrage offline tombait sur l'écran « verification-error » au lieu de l'app en cache (contredisait la persistance §248).

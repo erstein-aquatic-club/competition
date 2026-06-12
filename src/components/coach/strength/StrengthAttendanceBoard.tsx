@@ -18,12 +18,19 @@
  */
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Dumbbell,
+} from 'lucide-react';
 
 import {
   getStrengthAttendanceData,
   listActiveMesocyclesWithAthletes,
 } from '@/lib/api';
+import AttendanceMesocycleJourney from '@/components/coach/strength/AttendanceMesocycleJourney';
 import {
   computeAttendance,
   derivePeriodWeekStarts,
@@ -111,6 +118,10 @@ function StatusDot({ status }: { status: AttendanceDayStatus }) {
 export default function StrengthAttendanceBoard() {
   const [weeks, setWeeks] = useState<WeeksOption>(2);
   const [offset, setOffset] = useState(0);
+  // §380 — carte dépliée (single-open) : montre la frise « parcours du cycle ».
+  const [expandedAthleteId, setExpandedAthleteId] = useState<number | null>(
+    null,
+  );
 
   const todayMonday = toISODate(getMonday(new Date()));
   const today = toISODate(new Date());
@@ -136,6 +147,15 @@ export default function StrengthAttendanceBoard() {
   const nameById = useMemo(() => {
     const map = new Map<number, string>();
     for (const m of mesoItems) map.set(m.athlete_id, m.athlete_name);
+    return map;
+  }, [mesoItems]);
+  // §380 — méso actif par nageur (la liste est triée du plus récent au plus
+  // ancien : on garde le premier rencontré).
+  const mesoByAthlete = useMemo(() => {
+    const map = new Map<number, (typeof mesoItems)[number]>();
+    for (const m of mesoItems) {
+      if (!map.has(m.athlete_id)) map.set(m.athlete_id, m);
+    }
     return map;
   }, [mesoItems]);
 
@@ -259,12 +279,45 @@ export default function StrengthAttendanceBoard() {
             {rows.map((row) => {
               const name =
                 nameById.get(row.athleteId) ?? `#${row.athleteId}`;
+              const meso = mesoByAthlete.get(row.athleteId);
+              const isExpanded = expandedAthleteId === row.athleteId;
               return (
                 <div
                   key={row.athleteId}
                   className="rounded-2xl border bg-card p-3.5"
                 >
-                  <p className="text-sm font-bold">{name}</p>
+                  {/* §380 — dépliage de la frise « parcours du cycle ». */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedAthleteId((cur) =>
+                        cur === row.athleteId ? null : row.athleteId,
+                      )
+                    }
+                    aria-expanded={isExpanded}
+                    className="-m-1 flex w-full items-center gap-2 rounded-lg p-1 text-left transition-colors hover:bg-accent/50"
+                  >
+                    <p className="min-w-0 flex-1 truncate text-sm font-bold">
+                      {name}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      Cycle
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                        isExpanded && 'rotate-180',
+                      )}
+                    />
+                  </button>
+
+                  {/* Lazy mount : la frise (et sa requête) n'est montée que
+                      lorsque la carte est dépliée. */}
+                  {isExpanded && meso && (
+                    <div className="mt-2 border-b pb-3">
+                      <AttendanceMesocycleJourney meso={meso} />
+                    </div>
+                  )}
 
                   <div className="mt-2 space-y-3">
                     {row.weeks.map((wk) => {

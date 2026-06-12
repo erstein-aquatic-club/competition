@@ -315,6 +315,10 @@ export interface ActiveMesocycleWithAthlete {
   sessions_per_week: number;
   generated_at: string;
   engine_version: string;
+  /** Lundi de la semaine 1 (§340) ; null pour les mésos antérieurs. */
+  start_week_monday: string | null;
+  /** §358 — semaines déjà entraînées avant le pivot d'un ajustement (0 sinon). */
+  week_offset: number;
 }
 
 /**
@@ -332,7 +336,7 @@ export async function listActiveMesocyclesWithAthletes(): Promise<
     await supabase
       .from('strength_mesocycles')
       .select(
-        'id, athlete_id, event_group, kind, target_week_count, sessions_per_week, generated_at, engine_version,' +
+        'id, athlete_id, event_group, kind, target_week_count, sessions_per_week, generated_at, engine_version, start_week_monday, week_offset,' +
           ' users:athlete_id (display_name)',
       )
       .eq('status', 'active')
@@ -347,6 +351,8 @@ export async function listActiveMesocyclesWithAthletes(): Promise<
     sessions_per_week: number;
     generated_at: string;
     engine_version: string;
+    start_week_monday: string | null;
+    week_offset: number | null;
     users:
       | { display_name: string | null }
       | { display_name: string | null }[]
@@ -364,6 +370,8 @@ export async function listActiveMesocyclesWithAthletes(): Promise<
       sessions_per_week: r.sessions_per_week,
       generated_at: r.generated_at,
       engine_version: r.engine_version,
+      start_week_monday: r.start_week_monday ?? null,
+      week_offset: r.week_offset ?? 0,
     } satisfies ActiveMesocycleWithAthlete;
   });
   return rows;
