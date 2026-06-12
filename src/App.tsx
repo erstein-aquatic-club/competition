@@ -127,6 +127,7 @@ const SharedPaceMatrix = lazyWithRetry(() => import("@/pages/SharedPaceMatrix"))
 const CoachSwimmerDetail = lazyWithRetry(() => import("@/pages/coach/CoachSwimmerDetail"));
 const SwimPlanningDemo = lazyWithRetry(() => import("@/pages/coach/SwimPlanningDemo"));
 const StrengthPlanningScreen = lazyWithRetry(() => import("@/pages/coach/StrengthPlanningScreen"));
+const AthleteCycleJourney = lazyWithRetry(() => import("@/pages/coach/AthleteCycleJourney"));
 const StrengthAssessmentScreen = lazyWithRetry(() => import("@/pages/coach/StrengthAssessmentScreen"));
 const CompetitionPrep = lazyWithRetry(() => import("@/pages/CompetitionPrep"));
 const CompetitionDetail = lazyWithRetry(() => import("@/pages/CompetitionDetail"));
@@ -281,6 +282,11 @@ function AppRouter() {
             <Route path="/coach/strength-planning">
               <Suspense fallback={<CalendarSkeleton />}>
                 <StrengthPlanningScreen />
+              </Suspense>
+            </Route>
+            <Route path="/coach/strength-cycle/:athleteId">
+              <Suspense fallback={<ListSkeleton />}>
+                <AthleteCycleJourney />
               </Suspense>
             </Route>
             <Route path="/coach/strength-assessment/:athleteId">

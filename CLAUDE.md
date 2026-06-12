@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§380** — assiduité muscu : carte dépliable → frise « parcours du cycle » (position + phases à venir).
+Dernier § livré : **§381** — parcours du cycle : page coach plein écran, timeline verticale par phases + assiduité.
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

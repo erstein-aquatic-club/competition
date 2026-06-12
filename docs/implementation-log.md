@@ -4,6 +4,22 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §381 — Parcours du cycle : page coach plein écran en timeline verticale (2026-06-12)
+
+**Contexte.** Retour immédiat sur §380 (François) : plutôt qu'un dépliage inline compact dans la carte d'assiduité, une **vue plein écran enrichie en timeline verticale**. Le dépliage §380 est remplacé par une navigation.
+
+**Changements.**
+1. **Nouvelle page** `src/pages/coach/AthleteCycleJourney.tsx` (463 l.), route lazy `/coach/strength-cycle/:athleteId` (App.tsx), gating coach/admin (pattern `MesocycleAdjust`) :
+   - **Hero** : nageur, objectif (`formatEventGroupLabel` + famille + séances/sem), « Semaine X/Y · phase » en gros (numérotation globale `week_offset` §358, mention « ajusté mi-cycle »), barre de progression du cycle, date de génération, **CTA « Ajuster le mésocycle »** → `/strength/mesocycle-adjust/:athleteId`.
+   - **Timeline verticale** groupée par segments de phase (`groupPhaseSegments` §380) : rail `border-l-2` coloré par phase (`PHASE_STYLES`), pastille de phase sur le rail, en-tête segment (label + « S a–S b · n sem. » + badge « en cours »), segments passés atténués.
+   - **Lignes semaine enrichies** : n° global, plage de dates, **jauge assiduité fait/prévu** (semaines passées/courante, mêmes couleurs que le board) + **bande 7 micro-pastilles Lun→Dim** (statuts `computeAttendance`), « n séances prévues » (semaines futures), semaine courante surlignée (ring + fond accent). Assiduité = `getStrengthAttendanceData` + `computeAttendance` sur la fenêtre du méso entier (1 nageur).
+2. **Board** (`StrengthAttendanceBoard.tsx`, 410→374 l.) : l'en-tête de carte navigue vers la page (ChevronRight) — état `expandedAthleteId` et dépliage inline supprimés.
+3. **Supprimé** : `AttendanceMesocycleJourney.tsx` (§380, remplacé par la page). **Reverté** : extension `start_week_monday`/`week_offset` de `listActiveMesocyclesWithAthletes` (la page lit le méso complet via `getActiveMesocycle` — plus de consommateur).
+
+**Tests / vérifs.** Helpers purs réutilisés déjà couverts (`cycleJourney.test.ts` §380, `attendance.test.ts`, `mesocycleProgress.test.ts`) ; page présentationnelle sans logique nouvelle. node:test **1704/1704**, vitest 82/82, tsc 0, lint 0 erreur, build OK (chunk lazy dédié 8.79 kB). Pas de `test:rls` (lectures existantes, aucune policy modifiée).
+
+**Limites.** Identiques à §380 (semaines sans week_override = « Sans phase » ; granularité semaine). La requête runs couvre toute la fenêtre du méso (jusqu'à ~16 sem.) pour 1 nageur — volume négligeable. Micro-pastilles jour sans tooltip riche (attr `title` natif seulement).
+
 ## §380 — Assiduité muscu : frise « parcours du cycle » au clic sur une carte (2026-06-12)
 
 **Contexte.** Demande coach (François) : depuis la vue **Planif. Muscu → Assiduité muscu**, cliquer sur la carte d'un nageur doit montrer où il se situe dans son mésocycle (semaine force, affûtage…) et la suite du cycle sur les prochaines semaines. Jusqu'ici la carte n'affichait que les jauges/pastilles d'assiduité ; la position dans le cycle nécessitait d'ouvrir l'accordéon « Mésocycles actifs » ou la fiche nageur.
