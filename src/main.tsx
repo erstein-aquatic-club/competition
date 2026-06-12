@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { registerSW } from 'virtual:pwa-register';
+import { shouldAnnounceSwUpdate, type ServerVersion } from "./lib/swUpdateGate";
 import App from "./App";
 import "./index.css";
 
@@ -23,10 +24,29 @@ const updateSW = registerSW({
     }
   },
   onNeedRefresh() {
-    // The new SW is waiting. Notify the UI so the user can accept the update.
-    window.dispatchEvent(new CustomEvent('pwa-update-available'));
+    // §381 — un SW en attente n'implique pas que l'APP soit périmée : le
+    // fallback version.json (useVersionCheck) ou lazyWithRetry (§330) ont pu
+    // déjà recharger l'app à jour via le réseau sans activer le nouveau SW.
+    // Dans ce cas, pas de bannière : le SW s'activera seul au prochain
+    // démarrage à froid.
+    void shouldAnnounceSwUpdate(__BUILD_TIMESTAMP__, fetchServerVersion).then((stale) => {
+      if (stale) {
+        window.dispatchEvent(new CustomEvent('pwa-update-available'));
+      } else {
+        console.log('[EAC] SW en attente ignoré : app déjà sur le build serveur');
+      }
+    });
   },
 });
+
+// Lit le build serveur (cache-busted, hors SW — version.json est denylisted).
+async function fetchServerVersion(): Promise<ServerVersion> {
+  const res = await fetch(`${import.meta.env.BASE_URL}version.json?_=${Date.now()}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
 
 async function applyUpdate() {
   try {

@@ -4,6 +4,22 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §383 — Bannière MAJ sans faux positif + toasts repositionnés/restylés (2026-06-12)
+
+**Contexte.** Deux irritants terrain (François) : (1) la bannière « Mise à jour disponible » apparaît très souvent alors que l'app est déjà à jour ; (2) les toasts sonner (« 🏆 Nouveau record ! », « Temps de récupération terminé », erreurs de sauvegarde) sont intrusifs, hors thème, et sortent en bas d'écran — pile sur la home bar iPhone et la zone de clic des boutons du mode focus.
+
+**Cause racine (1) — faux positif structurel entre les 2 canaux de mise à jour.** Le fallback `useVersionCheck` (App.tsx, mount+5 s et toutes les 30 min) et `lazyWithRetry` (§330) purgent TOUS les caches puis rechargent : l'app charge alors le dernier build depuis le réseau (precache vidé → `fallbackToNetwork`), mais **l'ancien SW reste actif**. Le check SW suivant (horaire, ou au lancement) installe le nouveau SW → `onNeedRefresh` → bannière… pour un build que l'app exécute déjà. Et tant que ce SW reste en `waiting` (« Plus tard »), la bannière revient à CHAQUE lancement. Chaque déploiement reproduisait la séquence pour chaque utilisateur actif (le check version.json gagne presque toujours la course contre le check SW horaire).
+
+**Fix (1).** Nouveau helper pur `src/lib/swUpdateGate.ts` : `shouldAnnounceSwUpdate(currentBuild, fetchServerVersion)` — compare `__BUILD_TIMESTAMP__` au `build` de `version.json` (fetch no-store cache-busted, hors SW). Identiques → pas de bannière (log `[EAC] SW en attente ignoré…`) ; le SW en attente s'activera seul au prochain démarrage à froid. Différents ou doute (offline, version.json illisible, build manquant) → bannière (status quo : une vraie MAJ n'est jamais perdue). Câblé dans `onNeedRefresh` (main.tsx). TDD : 6 tests node:test (`src/lib/__tests__/swUpdateGate.test.ts`), RED→GREEN.
+
+**Fix (2).** `src/components/ui/sonner.tsx` : Toaster en `position="top-center"` avec `offset`/`mobileOffset` `max(12px, env(safe-area-inset-top))` (notch PWA standalone, viewport-fit=cover) → hors home bar et hors boutons d'action du mode focus (tous en bas d'écran). Restyle aligné sur le langage « pilule » d'`UpdateNotification` : `rounded-2xl bg-card/95 backdrop-blur-xl border-border shadow-lg shadow-black/10 dark:shadow-black/30`, titre `text-xs font-semibold`, description `text-[11px] text-muted-foreground`, boutons d'action en `rounded-full`. `duration` 4000→3500 ms. Aucun call-site `toast()` modifié (~210 occurrences profitent du restyle global).
+
+**Fichiers.** `src/lib/swUpdateGate.ts` (nouveau, 35 l.), `src/lib/__tests__/swUpdateGate.test.ts` (nouveau), `src/main.tsx` (gate + `fetchServerVersion`), `src/components/ui/sonner.tsx` (position/offsets/style).
+
+**Tests / vérifs.** node:test 1701/1701, vitest 86/86, tsc 0, lint 0 erreur, build prod OK (precache 305 entrées). Pas de `test:rls` (purement client, aucune policy/API touchée).
+
+**Limites.** En haut d'écran, un toast transitoire peut chevaucher ~3,5 s la barre « Quitter » du mode focus (moins critique que les boutons d'action du bas ; swipe-up pour fermer). Si le serveur a déjà N+2 quand le SW en attente est N+1, la bannière s'affiche (légitime) et converge en deux étapes. Smoke terrain iPhone recommandé (standalone, notch).
+
 ## §382 — Perf lot 4 : fin des re-renders par seconde du WorkoutRunner (2026-06-12)
 
 **Contexte.** Lot 4 de l'audit perf. `WorkoutRunner` (~1900 lignes, l'écran le plus utilisé par les nageurs en salle) re-rendait son arbre ENTIER une fois par seconde pendant TOUTE la séance : (1) `setElapsedTime` tickait à 1 Hz du mount au unmount (`isActive` n'est jamais remis à false) alors que `elapsedTime` n'est affiché que sur l'écran de fin (ligne « Durée totale ») et lu par `onFinish` ; (2) `setRestTimer` tickait à 1 Hz pendant chaque repos, derrière l'overlay opaque `RestScreen`. Vérifications préalables : findings agent sur `Coach.tsx` majoritairement invalidés (`unassignedByWeek` déjà `useMemo`, `monday`/`sunday` déjà mémoïsés ; reste un `.find()` négligeable ~3×50) ; états `isRestPaused`/`elapsedPausedRef` vestigiaux (jamais activés).
