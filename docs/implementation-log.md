@@ -4,6 +4,20 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §384 — Auto-clôture des séances muscu restées « en cours » > 4h (2026-06-12)
+
+**Contexte.** Retour terrain (François) : beaucoup de séances de muscu démarrées mais jamais terminées restent `status='in_progress'` indéfiniment dans `strength_session_runs`. Constat prod au moment du patch : **28 runs in_progress, les 28 stale (> 4h)**, certaines ouvertes depuis > 100 jours (id 13 : 2645 h). Elles polluent l'historique nageur, faussent les stats/assiduité et laissent potentiellement des `session_assignments` bloqués en `in_progress`.
+
+**Règle produit.** Si une run est « en cours » depuis **plus de 4h** (`started_at < now() - 4h`), on la passe **d'office** en `completed` **en conservant `progress_pct`** (le niveau d'avancement atteint — on ne force PAS 100). `completed_at` est posé à `now()` s'il est absent. Les `session_assignments` liés restés `in_progress` sont aussi débloqués en `completed`, par cohérence avec les autres chemins de complétion (`save_strength_run_atomic`, `updateStrengthRun`).
+
+**Mécanisme (mig 00228).** Fonction `public.close_stale_strength_runs()` `SECURITY DEFINER` (CTE `UPDATE … RETURNING` sur les runs stale + `UPDATE` des assignments liés, renvoie le nombre de runs clôturées), `REVOKE ALL … FROM PUBLIC`. Planifiée par un **cron horaire** `pg_cron` (`'10 * * * *'`, jobname `close-stale-strength-runs`, unschedule idempotent préalable). **Backfill immédiat** à l'application de la migration (`SELECT close_stale_strength_runs();`).
+
+**Fichiers.** `supabase/migrations/00228_auto_close_stale_strength_runs.sql` (nouveau).
+
+**Tests / vérifs.** Migration appliquée via MCP Supabase. Vérif post-backfill : **0 run in_progress restante** (28 → 0), `progress_pct` préservé (échantillon : 75, 45, 43, 30, 25, 0…), `completed_at` posé partout, cron `active=true`. Pas de `npm run test:rls` : la fonction est `SECURITY DEFINER` appelée par cron (hors contexte JWT), ne modifie aucune policy ni helper auth, et ne touche pas les wrappers API JS.
+
+**Limites.** Le seuil de 4h + granularité horaire → une séance peut rester ouverte jusqu'à ~5h avant clôture (acceptable). Les runs `in_progress` sans `started_at` (0 en prod) sont laissées intactes (âge non mesurable). Le fallback localStorage offline n'est pas couvert (clôture purement serveur, sur les données partagées) — un run resté ouvert uniquement en local sera réconcilié à la prochaine sauvegarde Supabase.
+
 ## §383 — Bannière MAJ sans faux positif + toasts repositionnés/restylés (2026-06-12)
 
 **Contexte.** Deux irritants terrain (François) : (1) la bannière « Mise à jour disponible » apparaît très souvent alors que l'app est déjà à jour ; (2) les toasts sonner (« 🏆 Nouveau record ! », « Temps de récupération terminé », erreurs de sauvegarde) sont intrusifs, hors thème, et sortent en bas d'écran — pile sur la home bar iPhone et la zone de clic des boutons du mode focus.
