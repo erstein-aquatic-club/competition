@@ -4,6 +4,25 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §384 — Interface chrono mobile dédiée (phase course en liste verticale) (2026-06-13)
+
+**Contexte.** Retour terrain (François) : la fonction de chronométrage coach est **inutilisable sur mobile**. La phase setup gère déjà `isMobile` (limites : 3 lignes, 2 nageurs/ligne, 2 vagues) et les résultats sont une table scrollable horizontalement (acceptable), mais la **phase course** (`ChronoRace.tsx`) rend une matrice CSS grid Lignes×Vagues (`56px repeat(N, minmax(280px,1fr))`) : chaque carte nageur fait ≥ 280 px + bouton STOP 96 px → sur un téléphone, une seule colonne tient et le multi-vagues force un scroll horizontal ingérable pendant un chrono. Objectif : une UI/UX mobile dédiée gardant le **maximum de fonctionnalités**, sans toucher le desktop/tablette.
+
+**Approche — vue course mobile, parité fonctionnelle par réutilisation.** Plutôt que dupliquer la logique intriquée de la carte nageur (tap split, double-tap undo, stop, télémétrie allure/distance/progression), on **réutilise** les composants existants :
+- `ChronoRace.tsx` : `SwimmerCard` et `WaveHeaderCell` passent `export` (diff minimal, zéro régression matrice). `SwimmerCard` reçoit un prop optionnel `laneLabel?: number` → badge « L# » dans la Row 1 (les lignes ne sont plus des colonnes en vue verticale ; absent = comportement desktop inchangé).
+- Helper pur `src/lib/chrono-race-layout.ts` : `groupSwimmersByWave(swimmers)` → groupes ordonnés par vague (asc), nageurs triés par ligne puis nom. Testé `node:test` (6, TDD).
+- Nouveau `src/components/chrono/ChronoRaceMobile.tsx` : container full-bleed (même breakout `w-screen left-[calc(50%-50vw)]` que `ChronoRace`), barre du haut sticky (indicateur précision ± 0,01 s + bouton « Terminer » avec `AlertDialog` identique). Corps = **liste verticale groupée par vague** : chaque section a un **header de vague sticky** (`top-[45px]`) montrant le label « Vague V# » + le nombre de nageurs + le `WaveHeaderCell` (bouton GO h-16 plein écran → décompte récup + statut une fois lancé), puis les cartes nageur full-width empilées par ligne. **Pas de verrou d'orientation** (portrait une-main au bord du bassin = cas ergonomique ; le verrou paysage reste sur `ChronoRace` pour tablette).
+
+**Bascule.** `CoachChronoScreen.tsx` : `state.phase === "racing"` rend `ChronoRaceMobile` si `isMobile` (hook `useIsMobile` existant, `matchMedia max-width:767px`), sinon `ChronoRace`. Setup et résultats inchangés (déjà responsives).
+
+**Fonctionnalités conservées sur mobile** : multi-vagues (GO par vague, intervalles de départ, décompte récup, série suivante ↻), splits par tap, undo par double-tap (toast + vibration), stop individuel (auto-split final + auto « entre séries » quand toute la vague est stoppée), allure instantanée /100 m, distance courue / cible + barre de progression, alerte d'arrivée, terminer la série. Restrictions assumées (héritées du setup mobile) : 3 lignes, 2 nageurs/ligne, 2 vagues → ≤ 6 cartes, liste verticale courte.
+
+**Fichiers.** `src/components/chrono/ChronoRaceMobile.tsx` (nouveau, 161 l.), `src/lib/chrono-race-layout.ts` (nouveau, 41 l.), `src/lib/__tests__/chrono-race-layout.test.ts` (nouveau), `src/components/chrono/ChronoRace.tsx` (2 `export` + prop `laneLabel` + badge ligne), `src/pages/coach/CoachChronoScreen.tsx` (bascule mobile/desktop en phase course).
+
+**Tests / vérifs.** node:test 1716/1716 (dont 6 nouveaux `chrono-race-layout`), vitest 86/86, tsc 0, lint 0 erreur, build prod OK (precache 311 entrées). Purement client (aucune policy/API/table touchée) → pas de `test:rls`.
+
+**Limites.** Vérification terrain réelle sur iPhone (standalone, bord du bassin) recommandée avant de clore — sticky headers empilés sur 2 vagues, hauteur du `WaveHeaderCell` sticky, ergonomie du double-tap undo en conditions de course. Les résultats restent une table scrollable horizontalement (pas de refonte mobile dédiée à ce stade ; lisible mais perfectible). Pas de mode paysage optimisé sur mobile (choix portrait).
+
 ## §383 — Bannière MAJ sans faux positif + toasts repositionnés/restylés (2026-06-12)
 
 **Contexte.** Deux irritants terrain (François) : (1) la bannière « Mise à jour disponible » apparaît très souvent alors que l'app est déjà à jour ; (2) les toasts sonner (« 🏆 Nouveau record ! », « Temps de récupération terminé », erreurs de sauvegarde) sont intrusifs, hors thème, et sortent en bas d'écran — pile sur la home bar iPhone et la zone de clic des boutons du mode focus.

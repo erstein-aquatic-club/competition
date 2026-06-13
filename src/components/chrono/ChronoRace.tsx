@@ -36,7 +36,7 @@ interface ChronoRaceProps {
 // span is locked to the matrix column → all swimmer cards of the same
 // wave remain perfectly aligned below.
 
-function WaveHeaderCell({
+export function WaveHeaderCell({
   wave,
   now,
   dispatch,
@@ -231,7 +231,7 @@ function WaveHeaderCell({
 
 // ── Swimmer Split Card ──────────────────────────────────────────────
 
-function SwimmerCard({
+export function SwimmerCard({
   swimmerKey,
   displayName,
   avatarUrl,
@@ -244,6 +244,7 @@ function SwimmerCard({
   now,
   dispatch,
   getTimestamp,
+  laneLabel,
 }: {
   swimmerKey: string;
   displayName: string;
@@ -257,6 +258,8 @@ function SwimmerCard({
   now: number;
   dispatch: React.Dispatch<ChronoAction>;
   getTimestamp: () => number;
+  /** When set (mobile vertical layout), shows a lane badge — lanes are no longer columns. */
+  laneLabel?: number;
 }) {
   const lastTapRef = useRef(0);
   const flashRef = useRef<HTMLDivElement>(null);
@@ -365,8 +368,16 @@ function SwimmerCard({
           active ? "cursor-pointer active:bg-muted/30" : ""
         }`}
       >
-        {/* Row 1 : wave chip + avatar + name */}
+        {/* Row 1 : lane badge (mobile) + wave chip + avatar + name */}
         <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-0.5">
+          {laneLabel != null && (
+            <span
+              className="inline-flex h-5 min-w-[1.75rem] items-center justify-center rounded border border-primary/40 bg-primary/10 px-1.5 font-mono text-[10px] font-black text-primary leading-none tabular-nums"
+              aria-label={`Ligne ${laneLabel}`}
+            >
+              L{laneLabel}
+            </span>
+          )}
           <span
             className={`inline-flex h-5 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-[10px] font-black text-white leading-none ${wc.dot}`}
             aria-label={`Vague ${wc.label}`}

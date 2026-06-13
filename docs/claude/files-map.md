@@ -267,13 +267,15 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/strength/RestPerfsTab.tsx` | Tab performances (1RM, cible, intensité) (§94) | ~140 lignes |
 | `src/lib/chrono-types.ts` | Types chrono (registered/manual) + WaveConfigOverrides + resolveWaveConfig (§130) | ~155 lignes |
 | `src/lib/chrono-reducer.ts` | State machine chrono + SET_WAVE_OVERRIDES/SET_WAVE_OVERRIDE_FIELD (§130) | ~343 lignes |
+| `src/lib/chrono-race-layout.ts` | Helper pur layout course mobile : `groupSwimmersByWave` (groupes par vague asc, nageurs triés ligne/nom) — §384 | 41 lignes |
 | `src/lib/chronoXlsxExport.ts` | Export xlsx lazy + subtitle vagues personnalisées (§130) | ~562 lignes |
 | `src/lib/api/coach-manual-swimmers.ts` | API CRUD nageurs manuels coach (§126) | ~42 lignes |
 | `src/hooks/useChronoTimer.ts` | Hook RAF chrono 60fps + formatters | ~45 lignes |
 | `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard + preset chips Distance/Splits + section Avancé collapsible + sticky footer (§130, §155) | 1189 lignes |
-| `src/components/chrono/ChronoRace.tsx` | Phase course chrono — résolution per-wave + affichage config sous GO (§130) | ~827 lignes |
+| `src/components/chrono/ChronoRace.tsx` | Phase course chrono desktop/tablette (matrice Lignes×Vagues) — résolution per-wave + config sous GO ; exporte `SwimmerCard`/`WaveHeaderCell` (réutilisés par la vue mobile, prop `laneLabel` §384) (§130) | ~843 lignes |
+| `src/components/chrono/ChronoRaceMobile.tsx` | Phase course chrono mobile (`< 768 px`) : liste verticale groupée par vague, header de vague sticky + cartes nageur full-width (badge ligne) — §384 | 161 lignes |
 | `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono + badge Personnalisée sur ranking rows (§130) | ~652 lignes |
-| `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage | ~167 lignes |
+| `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage + bascule course mobile/desktop (§384) | ~172 lignes |
 | `src/lib/api/chrono-records.ts` | CRUD chrono records (historique coach) | ~80 lignes |
 | `src/pages/coach/CoachChronoHistoryScreen.tsx` | Historique chronos + éditeur + export xlsx (§126) | ~344 lignes |
 | `src/components/chrono/ChronoSplitEditor.tsx` | Éditeur splits (distance recalibrable, tabs) | ~200 lignes |

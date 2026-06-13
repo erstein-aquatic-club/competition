@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§383** — bannière MAJ gatée sur version.json (fin des faux positifs) + toasts top-center safe-area, style pilule.
+Dernier § livré : **§384** — interface chrono mobile dédiée : phase course en liste verticale groupée par vague (`ChronoRaceMobile`, < 768 px), parité fonctionnelle.
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

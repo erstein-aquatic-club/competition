@@ -11,6 +11,7 @@ import type { ChronoState } from "../../lib/chrono-types";
 import { useChronoTimer } from "../../hooks/useChronoTimer";
 import ChronoSetup from "../../components/chrono/ChronoSetup";
 import ChronoRace from "../../components/chrono/ChronoRace";
+import ChronoRaceMobile from "../../components/chrono/ChronoRaceMobile";
 import ChronoResults from "../../components/chrono/ChronoResults";
 import { STORAGE_KEYS } from "../../lib/api/client";
 import { Button } from "../../components/ui/button";
@@ -172,9 +173,13 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
 
   return (
     <>
-      {/* Race phase uses full width */}
+      {/* Race phase uses full width — dedicated vertical layout on mobile (§384) */}
       {state.phase === "racing" && (
-        <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
+        isMobile ? (
+          <ChronoRaceMobile state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
+        ) : (
+          <ChronoRace state={state} dispatch={dispatch} now={now} getTimestamp={getTimestamp} />
+        )
       )}
 
       {/* Setup & results */}
