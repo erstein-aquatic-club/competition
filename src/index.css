@@ -335,12 +335,16 @@ body[data-chrono-racing="true"] [data-sonner-toaster] {
    (`transform: var(--y)`) : pour une capsule au contenu ET centrée, on les
    recentre via `left:50%` + `translateX(-50%)` en préservant le `var(--y)`. */
 [data-sonner-toaster] {
-  --normal-bg: hsl(var(--card) / 0.95);
-  --normal-text: hsl(var(--foreground));
-  --normal-border: hsl(var(--border));
-  --border-radius: 9999px;
+  --normal-bg: hsl(var(--card) / 0.95) !important;
+  --normal-text: hsl(var(--foreground)) !important;
+  --normal-border: hsl(var(--border)) !important;
+  --border-radius: 9999px !important;
 }
 [data-sonner-toaster] [data-sonner-toast] {
+  background: hsl(var(--card) / 0.95) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 9999px !important;
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   box-shadow: 0 12px 28px -8px rgb(0 0 0 / 0.30) !important;
