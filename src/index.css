@@ -354,6 +354,19 @@ body[data-chrono-racing="true"] [data-sonner-toaster] {
   right: auto !important;
   transform: translateX(-50%) var(--y, translateY(0)) !important;
 }
+/* Sonner recadre tout dans `@media (max-width: 600px)` (donc sur mobile) : il
+   décale le conteneur `center` de `--mobile-offset-left` (16px) ET annule son
+   centrage (`transform: none`). Du coup le `left:50%` du toast se calculait par
+   rapport à un conteneur décalé → pilule poussée vers la droite. On rétablit un
+   conteneur EXACTEMENT plein écran pour que `left:50%` retombe au vrai centre. */
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-x-position="center"] {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    transform: none !important;
+  }
+}
 [data-sonner-toast] [data-button] {
   border-radius: 9999px !important;
   font-weight: 700 !important;
