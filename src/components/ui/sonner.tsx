@@ -28,6 +28,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       offset={SAFE_TOP_OFFSET}
       mobileOffset={SAFE_TOP_OFFSET}
       duration={3500}
+      // §385 — une seule capsule à la fois (comme la Dynamic Island iOS) : évite
+      // le stack aux largeurs « au contenu » qui laissait des pilules fantômes
+      // décalées derrière. Les toasts suivants s'enchaînent.
+      visibleToasts={1}
       toastOptions={{
         classNames: {
           toast:
