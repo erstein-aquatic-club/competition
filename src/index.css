@@ -327,6 +327,18 @@ body[data-chrono-racing="true"] [data-sonner-toaster] {
   display: none !important;
 }
 
+/* §384 — Toasts en pilule iOS (langage UpdateNotification) : la capsule épouse
+   son contenu et reste centrée. Sonner pose `width` en style inline → on force
+   `fit-content` en !important, et on centre la liste (flex column) + la capsule. */
+[data-sonner-toaster] {
+  align-items: center !important;
+}
+[data-sonner-toaster] [data-sonner-toast] {
+  width: fit-content !important;
+  max-width: calc(100vw - 2rem) !important;
+  margin-inline: auto !important;
+}
+
 /* Safe-area utilities for iOS notch/home-indicator/landscape (§230).
    Tailwind 4 ne fournit pas pb-safe/pt-safe natifs ici — déclarations explicites.
    Remplace le composant `<SafeArea top bottom>` (zombie : 1 call-site, style inline). */
