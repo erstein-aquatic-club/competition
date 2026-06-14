@@ -14,6 +14,7 @@ import ChronoRace from "../../components/chrono/ChronoRace";
 import ChronoRaceMobile from "../../components/chrono/ChronoRaceMobile";
 import ChronoResults from "../../components/chrono/ChronoResults";
 import { STORAGE_KEYS } from "../../lib/api/client";
+import { setSystemBannersSuppressed } from "../../lib/systemBanners";
 import { Button } from "../../components/ui/button";
 import { Timer, Smartphone } from "lucide-react";
 import type { AthleteSummary } from "../../lib/api/types";
@@ -170,6 +171,14 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
 
   const isRacing = state.phase === "racing";
   const { now, getTimestamp } = useChronoTimer(isRacing);
+
+  // §384 — pendant la course, suppression des bandeaux système (update/offline/
+  // push/install) : ils glisseraient du haut sur les en-têtes de vague / GO.
+  useEffect(() => {
+    if (!isRacing) return;
+    setSystemBannersSuppressed(true);
+    return () => setSystemBannersSuppressed(false);
+  }, [isRacing]);
 
   return (
     <>

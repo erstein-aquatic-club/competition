@@ -33,6 +33,21 @@ const PRIORITIES: Record<SystemBannerKey, number> = {
 const activeBanners = new Set<SystemBannerKey>();
 const listeners = new Set<() => void>();
 
+/**
+ * §384 — Suppression globale. Quand `true`, AUCUN bandeau système n'est rendu
+ * (offline/update/push/install), quelle que soit sa priorité. Utilisé pendant
+ * la phase course du chrono : un bandeau qui glisse du haut recouvrirait les
+ * en-têtes de vague / boutons GO et parasiterait le chronométrage.
+ */
+let suppressed = false;
+
+/** Active/désactive la suppression de tous les bandeaux système. */
+export function setSystemBannersSuppressed(value: boolean): void {
+  if (suppressed === value) return;
+  suppressed = value;
+  emit();
+}
+
 function emit(): void {
   for (const l of listeners) l();
 }
@@ -46,6 +61,7 @@ function subscribe(cb: () => void): () => void {
 
 /** Returns the highest-priority banner currently active, or null if none. */
 function getVisibleBanner(): SystemBannerKey | null {
+  if (suppressed) return null;
   let best: SystemBannerKey | null = null;
   let bestPrio = Number.POSITIVE_INFINITY;
   for (const k of activeBanners) {
@@ -99,6 +115,7 @@ export function useSystemBanner(key: SystemBannerKey, isActive: boolean): boolea
 export function _resetSystemBannerState(): void {
   activeBanners.clear();
   listeners.clear();
+  suppressed = false;
 }
 
 /** @internal Pour tests uniquement — snapshot read-only. */

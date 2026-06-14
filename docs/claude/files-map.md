@@ -112,7 +112,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/swim/SwimSessionTimeline.tsx` | Timeline verticale colorée, rail intensité, toggle 3 niveaux | ~555 lignes |
 | `src/lib/auth.ts` | Gestion auth, session, rôles ; boot non bloquant via snapshot `eac-auth-context` + revalidation en fond (§379) | 747 lignes |
 | `src/lib/supabase.ts` | Client Supabase | ~70 lignes |
-| `src/lib/systemBanners.ts` | Queue système pour les 4 bandeaux (§210 Chantier D) — hook `useSystemBanner(key, isActive)` + module state ; priorité fixe `offline > update > push > install` → 1 seul banner visible à la fois | ~95 lignes |
+| `src/lib/systemBanners.ts` | Queue système pour les 4 bandeaux (§210 Chantier D) — hook `useSystemBanner(key, isActive)` + module state ; priorité fixe `offline > update > push > install` → 1 seul banner visible à la fois ; `setSystemBannersSuppressed(bool)` masque TOUT (course chrono, §384) | ~115 lignes |
 | `src/lib/offlineQueue.ts` | Queue localStorage pour mutations offline — `enqueue`, `getQueue`, `markRetry`, dispatche `eac-offline-queue-updated` (§162) | 113 lignes |
 | `src/components/shared/OfflineMutationSync.tsx` | Rejoue la queue offline au retour réseau ET sur `eac-offline-queue-updated` (§162) | 168 lignes |
 | `src/lib/date.ts` | Helpers de date canoniques : `toISODate`/`formatLocalDateISO`/`formatDateIso`, `addDays`, `addDaysIso`, `getMonday`, `getSunday`, `mondayIsoOf`, `getMondaysBetween`, `formatSwimSessionDefaultTitle`, `computeTrainingDaysRemaining`, `formatRelativeDate` (§196, §214) | 138 lignes |
@@ -271,7 +271,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/chronoXlsxExport.ts` | Export xlsx lazy + subtitle vagues personnalisées (§130) | ~562 lignes |
 | `src/lib/api/coach-manual-swimmers.ts` | API CRUD nageurs manuels coach (§126) | ~42 lignes |
 | `src/hooks/useChronoTimer.ts` | Hook RAF chrono 60fps + formatters | ~45 lignes |
-| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard + preset chips Distance/Splits + section Avancé collapsible + sticky footer ; **corps mobile dédié** (`isMobile`) : cartes `rounded-2xl`, champs tactiles ≥44px, section Lignes & nageurs (compteur en haut + CTA large), bottom-sheet d'ajout (§130, §155, §384) | 1329 lignes |
+| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard + preset chips Distance/Splits + section Avancé collapsible + sticky footer ; **corps mobile dédié** (`isMobile`) : Programme compact sans scroll (`CompactPresetRow` une-ligne + strip de chips horizontal), section Lignes & nageurs dense (compteur en haut + CTA), bottom-sheet d'ajout (§130, §155, §384) | 1343 lignes |
 | `src/components/chrono/ChronoRace.tsx` | Phase course chrono desktop/tablette (matrice Lignes×Vagues) — résolution per-wave + config sous GO ; exporte `SwimmerCard`/`WaveHeaderCell` (réutilisés par la vue mobile, prop `laneLabel` §384) (§130) | ~843 lignes |
 | `src/components/chrono/ChronoRaceMobile.tsx` | Phase course chrono mobile (`< 768 px`) : liste verticale groupée par vague, header de vague sticky + cartes nageur full-width (badge ligne) — §384 | 161 lignes |
 | `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono + badge Personnalisée sur ranking rows (§130) | ~652 lignes |
