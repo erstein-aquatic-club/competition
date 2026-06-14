@@ -698,8 +698,12 @@ export default function ChronoSetup({
         </SheetContent>
       </Sheet>
 
-      {/* ── Sticky footer — résumé + Lancer ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/90 backdrop-blur-sm px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-4">
+      {/* ── Sticky footer — résumé + Lancer ──
+          Mobile : `sticky` épinglé au bas du <main> (au-dessus du dock de nav
+          coach, statique en bas du flex). `fixed` collerait au viewport et
+          passerait DERRIÈRE le dock opaque (z-mobilenav 40 > z-20) → bouton
+          « Lancer » invisible. Desktop (pas de dock) : `fixed` inchangé. §384 */}
+      <div className={`${isMobile ? "sticky -mx-4" : "fixed left-0 right-0"} bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-sm px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-4`}>
         <p className={`text-sm truncate ${
           state.swimmers.length === 0
             ? "text-muted-foreground/60 italic"
