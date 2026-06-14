@@ -232,6 +232,25 @@ export default function ChronoSetup({
               presets={SPLIT_PRESETS}
               onChange={(v) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: v })}
             />
+            {activeWaves.length > 0 && (
+              <>
+                <div className="h-px bg-border/40" />
+                <div className="flex items-center gap-2">
+                  <span className="w-11 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Départ</span>
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    {activeWaves.map((w) => (
+                      <WaveDepartureControl
+                        key={w}
+                        wave={w}
+                        state={state}
+                        dispatch={dispatch}
+                        showChip={activeWaves.length > 1}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             <div className="h-px bg-border/40" />
             <button
               type="button"
@@ -270,9 +289,9 @@ export default function ChronoSetup({
 
                 {activeWaves.length > 0 && (
                   <div className="flex flex-col gap-2">
-                    <span className="text-sm text-muted-foreground">Par vague</span>
+                    <span className="text-sm text-muted-foreground">Personnaliser par vague</span>
                     {activeWaves.map((w) => (
-                      <WaveConfigCard key={w} wave={w} state={state} dispatch={dispatch} />
+                      <WaveConfigCard key={w} wave={w} state={state} dispatch={dispatch} hideInterval />
                     ))}
                   </div>
                 )}
@@ -859,8 +878,12 @@ export default function ChronoSetup({
           coach, statique en bas du flex). `fixed` collerait au viewport et
           passerait DERRIÈRE le dock opaque (z-mobilenav 40 > z-20) → bouton
           « Lancer » invisible. Desktop (pas de dock) : `fixed` inchangé. §384 */}
-      <div className={`${isMobile ? "sticky -mx-4" : "fixed left-0 right-0"} bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-sm px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-4`}>
-        <p className={`text-sm truncate ${
+      <div className={`bottom-0 z-20 flex items-center justify-between gap-3 border-t border-border bg-background/90 px-4 backdrop-blur-sm ${
+        isMobile
+          ? "sticky -mx-4 py-2"
+          : "fixed left-0 right-0 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      }`}>
+        <p className={`truncate ${isMobile ? "text-xs" : "text-sm"} ${
           state.swimmers.length === 0
             ? "text-muted-foreground/60 italic"
             : "text-muted-foreground"
@@ -870,6 +893,7 @@ export default function ChronoSetup({
         <Button
           disabled={state.swimmers.length === 0}
           onClick={() => dispatch({ type: "START_RACE" })}
+          size={isMobile ? "sm" : "default"}
           className="gap-2 shrink-0"
         >
           <Play className="h-4 w-4" />
@@ -934,6 +958,59 @@ function CompactPresetRow({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── WaveDepartureControl — compact mm'ss departure-interval input (mobile) ──
+// Surfaces a wave's "départ toutes les …" outside the Advanced section so the
+// coach sees/sets the send-off time by default. §384
+function WaveDepartureControl({
+  wave,
+  state,
+  dispatch,
+  showChip,
+}: {
+  wave: number;
+  state: ChronoState;
+  dispatch: React.Dispatch<ChronoAction>;
+  showChip: boolean;
+}) {
+  const ws = state.waves.find((w) => w.wave === wave);
+  if (!ws) return null;
+  const c = WAVE_COLORS[wave - 1];
+  const totalSec = ws.departureIntervalSec;
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  const update = (min: number, sec: number) =>
+    dispatch({ type: "SET_WAVE_INTERVAL", wave, seconds: min * 60 + sec });
+
+  return (
+    <div className="flex items-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1">
+      {showChip && (
+        <span className={`mr-0.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white ${c.dot}`}>
+          {c.label}
+        </span>
+      )}
+      <input
+        type="text"
+        inputMode="numeric"
+        value={minutes || ""}
+        placeholder="0"
+        aria-label={`Vague ${c.label} — minutes de départ`}
+        onChange={(e) => update(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
+        className="w-5 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+      />
+      <span className="text-sm font-bold text-muted-foreground leading-none">'</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={seconds ? String(seconds).padStart(2, "0") : ""}
+        placeholder="00"
+        aria-label={`Vague ${c.label} — secondes de départ`}
+        onChange={(e) => update(minutes, Math.min(59, Number(e.target.value.replace(/\D/g, "")) || 0))}
+        className="w-7 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+      />
     </div>
   );
 }
@@ -1012,10 +1089,13 @@ function WaveConfigCard({
   wave,
   state,
   dispatch,
+  hideInterval = false,
 }: {
   wave: number;
   state: ChronoState;
   dispatch: React.Dispatch<ChronoAction>;
+  /** Mobile: the departure interval is surfaced in the main view, so hide it here. §384 */
+  hideInterval?: boolean;
 }) {
   const c = WAVE_COLORS[wave - 1];
   const waveState = state.waves.find((ws) => ws.wave === wave);
@@ -1083,31 +1163,33 @@ function WaveConfigCard({
         )}
       </div>
 
-      {/* Interval row — always visible */}
-      <div className="mt-2 flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground">Départ toutes les</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={minutes || ""}
-          placeholder="0"
-          onChange={(e) => updateInterval(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
-          className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-        />
-        <span className="text-xs text-muted-foreground">min</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={seconds || ""}
-          placeholder="0"
-          onChange={(e) => {
-            const val = Number(e.target.value.replace(/\D/g, "")) || 0;
-            updateInterval(minutes, Math.min(59, val));
-          }}
-          className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
-        />
-        <span className="text-xs text-muted-foreground">sec</span>
-      </div>
+      {/* Interval row — hidden on mobile (surfaced in the main view) */}
+      {!hideInterval && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Départ toutes les</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={minutes || ""}
+            placeholder="0"
+            onChange={(e) => updateInterval(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
+            className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+          />
+          <span className="text-xs text-muted-foreground">min</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={seconds || ""}
+            placeholder="0"
+            onChange={(e) => {
+              const val = Number(e.target.value.replace(/\D/g, "")) || 0;
+              updateInterval(minutes, Math.min(59, val));
+            }}
+            className="w-8 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+          />
+          <span className="text-xs text-muted-foreground">sec</span>
+        </div>
+      )}
 
       {/* Override row — visible only when personalized */}
       {isCustom && waveState.overrides && (
