@@ -319,6 +319,14 @@ body {
   z-index: var(--z-index-toast);
 }
 
+/* §384 — Pendant la phase course du chrono, masquer tous les toasts Sonner
+   (« X — Stoppé », « Split annulé », etc.) : aucune bannière ne doit recouvrir
+   les en-têtes de vague / boutons GO pendant le chronométrage. L'attribut est
+   posé sur <body> par CoachChronoScreen tant que `phase === "racing"`. */
+body[data-chrono-racing="true"] [data-sonner-toaster] {
+  display: none !important;
+}
+
 /* Safe-area utilities for iOS notch/home-indicator/landscape (§230).
    Tailwind 4 ne fournit pas pb-safe/pt-safe natifs ici — déclarations explicites.
    Remplace le composant `<SafeArea top bottom>` (zombie : 1 call-site, style inline). */

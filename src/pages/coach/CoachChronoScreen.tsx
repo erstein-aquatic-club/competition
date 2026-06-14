@@ -172,12 +172,16 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
   const isRacing = state.phase === "racing";
   const { now, getTimestamp } = useChronoTimer(isRacing);
 
-  // §384 — pendant la course, suppression des bandeaux système (update/offline/
-  // push/install) : ils glisseraient du haut sur les en-têtes de vague / GO.
+  // §384 — pendant la course : (1) suppression des bandeaux système, (2) masquage
+  // des toasts Sonner (« Stoppé », « Split annulé »…) via l'attribut body + CSS.
   useEffect(() => {
     if (!isRacing) return;
     setSystemBannersSuppressed(true);
-    return () => setSystemBannersSuppressed(false);
+    document.body.dataset.chronoRacing = "true";
+    return () => {
+      setSystemBannersSuppressed(false);
+      delete document.body.dataset.chronoRacing;
+    };
   }, [isRacing]);
 
   return (
