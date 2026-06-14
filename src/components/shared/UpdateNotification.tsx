@@ -75,7 +75,7 @@ export function UpdateNotification() {
   if (!shouldRender) return null;
 
   return (
-    <div className="fixed top-3 left-0 right-0 z-toast pointer-events-none flex justify-center px-4">
+    <div className="fixed top-island left-0 right-0 z-toast pointer-events-none flex justify-center px-4">
       <div
         className={cn(
           "pointer-events-auto inline-flex items-center gap-3 rounded-full bg-card/95 backdrop-blur-xl border border-border shadow-lg shadow-black/10 dark:shadow-black/30 pl-4 pr-1.5 py-1.5",

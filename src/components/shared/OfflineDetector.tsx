@@ -45,7 +45,7 @@ export function OfflineDetector() {
   if (!shouldRender) return null
 
   return (
-    <div className="fixed top-12 left-0 right-0 z-[var(--z-index-toast)] pointer-events-none flex justify-center px-4">
+    <div className="fixed top-island left-0 right-0 z-[var(--z-index-toast)] pointer-events-none flex justify-center px-4">
       <div
         role="alert"
         aria-live="assertive"

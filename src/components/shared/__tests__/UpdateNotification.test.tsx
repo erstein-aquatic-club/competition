@@ -148,13 +148,14 @@ test("UpdateNotification component is a function", async () => {
   assert.equal(mod.UpdateNotification.name, "UpdateNotification");
 });
 
-test("OfflineDetector is rendered at top-12 (stagger position)", async () => {
+test("OfflineDetector tucks under the Dynamic Island (top-island)", async () => {
   // Read the source to verify the class was applied correctly.
   const fs = await import("node:fs");
   const path = await import("node:path");
   const dir = path.dirname(new URL(import.meta.url).pathname);
   const srcPath = path.resolve(dir, "..", "OfflineDetector.tsx");
   const src = fs.readFileSync(srcPath, "utf-8");
-  assert.ok(src.includes("top-12"), "OfflineDetector should be positioned at top-12");
-  assert.ok(!src.includes("fixed top-3"), "OfflineDetector should no longer use top-3");
+  assert.ok(src.includes("top-island"), "OfflineDetector should be positioned at top-island");
+  assert.ok(!src.includes("fixed top-3"), "OfflineDetector should not use the fixed top-3");
+  assert.ok(!src.includes("top-12"), "OfflineDetector should no longer use the staggered top-12");
 });

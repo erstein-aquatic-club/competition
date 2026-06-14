@@ -15,7 +15,7 @@ type ToasterProps = React.ComponentProps<typeof Sonner>
  * La largeur « au contenu » + le centrage sont forcés en CSS (`index.css`,
  * `[data-sonner-toast]`) car Sonner pose `width` en style inline.
  */
-const SAFE_TOP_OFFSET = { top: "max(12px, env(safe-area-inset-top))" }
+const SAFE_TOP_OFFSET = { top: "var(--island-top)" }
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()

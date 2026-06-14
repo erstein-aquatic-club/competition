@@ -339,6 +339,17 @@ body[data-chrono-racing="true"] [data-sonner-toaster] {
   margin-inline: auto !important;
 }
 
+/* §384 — « Dynamic Island aware » : toutes les capsules système (toasts +
+   bandeaux update/offline/install) se calent juste SOUS la Dynamic Island /
+   barre d'état, centrées. `env(safe-area-inset-top)` ≈ 59px sur iPhone Pro
+   (sous l'island), 0 sur les autres → +6px de marge, plancher 12px. */
+:root {
+  --island-top: max(12px, calc(env(safe-area-inset-top) + 6px));
+}
+@utility top-island {
+  top: var(--island-top);
+}
+
 /* Safe-area utilities for iOS notch/home-indicator/landscape (§230).
    Tailwind 4 ne fournit pas pb-safe/pt-safe natifs ici — déclarations explicites.
    Remplace le composant `<SafeArea top bottom>` (zombie : 1 call-site, style inline). */
