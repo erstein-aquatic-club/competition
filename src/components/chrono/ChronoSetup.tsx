@@ -201,7 +201,7 @@ export default function ChronoSetup({
   };
 
   return (
-    <div className="flex flex-col gap-5 p-4 pb-24">
+    <div className={`flex flex-col gap-5 p-4 ${isMobile ? "pb-6" : "pb-24"}`}>
       {/* ── Title input — inline, minimalist, borderless ─ */}
       <label className="group flex items-baseline gap-2 border-b border-border/60 pb-1 focus-within:border-primary/70 transition-colors">
         <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 group-focus-within:text-primary" />
@@ -215,6 +215,194 @@ export default function ChronoSetup({
         />
       </label>
 
+      {isMobile ? (
+        <>
+          {/* ── Programme (mobile) — fields tactiles ── */}
+          <section className="rounded-2xl border border-border bg-card/60 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Waves className="h-3.5 w-3.5" />
+              </span>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Programme</h2>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <PresetDistanceField
+                label="Distance totale"
+                value={state.totalDistanceM}
+                presets={DISTANCE_PRESETS}
+                minValue={0}
+                inputWidth="w-16"
+                touch
+                onDecrement={() => {
+                  const prev = [...DISTANCE_PRESETS].reverse().find((d) => d < state.totalDistanceM);
+                  dispatch({ type: "SET_TOTAL_DISTANCE", meters: prev ?? 0 });
+                }}
+                onIncrement={() => {
+                  const next = DISTANCE_PRESETS.find((d) => d > state.totalDistanceM);
+                  dispatch({ type: "SET_TOTAL_DISTANCE", meters: next ?? state.totalDistanceM + 100 });
+                }}
+                onChange={(v) => dispatch({ type: "SET_TOTAL_DISTANCE", meters: v })}
+              />
+              <div className="h-px bg-border/50" />
+              <PresetDistanceField
+                label="Splits tous les"
+                value={state.splitDistanceM}
+                presets={SPLIT_PRESETS}
+                minValue={25}
+                inputWidth="w-14"
+                touch
+                onDecrement={() => {
+                  const prev = [...SPLIT_PRESETS].reverse().find((d) => d < state.splitDistanceM);
+                  dispatch({ type: "SET_SPLIT_DISTANCE", meters: prev ?? 25 });
+                }}
+                onIncrement={() => {
+                  const next = SPLIT_PRESETS.find((d) => d > state.splitDistanceM);
+                  dispatch({ type: "SET_SPLIT_DISTANCE", meters: next ?? state.splitDistanceM + 25 });
+                }}
+                onChange={(v) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: v })}
+              />
+            </div>
+
+            {/* Avancé */}
+            <div className="mt-4 border-t border-border/50 pt-3">
+              <button
+                type="button"
+                onClick={toggleAdvanced}
+                className="flex min-h-11 w-full items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                {advancedOpen
+                  ? <ChevronDown className="h-4 w-4 shrink-0" />
+                  : <ChevronRight className="h-4 w-4 shrink-0" />}
+                <span>Avancé</span>
+                {!advancedOpen && advancedSummary && (
+                  <span className="font-normal text-muted-foreground/70">{advancedSummary}</span>
+                )}
+              </button>
+
+              {advancedOpen && (
+                <div className="mt-3 flex flex-col gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Séries :</span>
+                    <div className="flex items-center gap-1.5">
+                      <Button variant="outline" size="icon" className="h-11 w-11"
+                        aria-label="Diminuer le nombre de séries"
+                        onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: Math.max(0, state.seriesCount - 1) })}
+                        disabled={state.seriesCount <= 0}
+                      ><Minus className="h-4 w-4" /></Button>
+                      <input type="text" inputMode="numeric" value={state.seriesCount || ""} placeholder="∞"
+                        aria-label="Nombre de séries"
+                        onChange={(e) => dispatch({ type: "SET_SERIES_COUNT", count: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+                        className="w-12 text-center font-mono text-base font-bold bg-transparent border-b border-border outline-none focus:border-primary"
+                      />
+                      <Button variant="outline" size="icon" className="h-11 w-11"
+                        aria-label="Augmenter le nombre de séries"
+                        onClick={() => dispatch({ type: "SET_SERIES_COUNT", count: state.seriesCount + 1 })}
+                      ><Plus className="h-4 w-4" /></Button>
+                    </div>
+                  </div>
+
+                  {activeWaves.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-sm text-muted-foreground">Par vague</span>
+                      {activeWaves.map((w) => (
+                        <WaveConfigCard key={w} wave={w} state={state} dispatch={dispatch} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* ── Lignes & nageurs (mobile) ── */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lignes &amp; nageurs</h2>
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="icon" className="h-10 w-10"
+                  aria-label="Réduire le nombre de lignes"
+                  onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount - 1 })}
+                  disabled={state.laneCount <= 1}
+                ><Minus className="h-4 w-4" /></Button>
+                <span className="min-w-[3rem] text-center text-sm font-semibold tabular-nums">
+                  {state.laneCount} lig.
+                </span>
+                <Button variant="outline" size="icon" className="h-10 w-10"
+                  aria-label="Augmenter le nombre de lignes"
+                  onClick={() => dispatch({ type: "SET_LANE_COUNT", count: state.laneCount + 1 })}
+                  disabled={state.laneCount >= maxLanes}
+                ><Plus className="h-4 w-4" /></Button>
+              </div>
+            </div>
+
+            {Array.from({ length: state.laneCount }, (_, i) => i + 1).map((lane) => {
+              const swimmers = swimmersByLane(lane);
+              const isEmpty = swimmers.length === 0;
+              const laneIsFull = swimmers.length >= maxSwimmersPerLane;
+              return (
+                <div
+                  key={lane}
+                  className={`rounded-2xl border p-3 transition-colors ${
+                    isEmpty ? "border-dashed border-border/60 bg-card/30" : "border-border bg-card"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 font-mono text-sm font-black text-primary tabular-nums">
+                      {lane}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      {swimmers.map((s) => (
+                        <SwimmerChip
+                          key={s.key}
+                          swimmer={s}
+                          laneCount={state.laneCount}
+                          maxSwimmersPerLane={maxSwimmersPerLane}
+                          allSwimmers={state.swimmers}
+                          maxWaves={maxWaves}
+                          dispatch={dispatch}
+                        />
+                      ))}
+                      {isEmpty && (
+                        <span className="select-none text-xs italic text-muted-foreground/60">Aucun nageur</span>
+                      )}
+                    </div>
+                    {!laneIsFull && (
+                      <button
+                        type="button"
+                        onClick={() => { setAddLane(lane); setSearch(""); }}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:bg-muted hover:text-primary active:scale-95 transition-all cursor-pointer touch-manipulation"
+                        aria-label={`Ajouter un nageur à la ligne ${lane}`}
+                      >
+                        <Plus className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {activeWaves.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 px-1">
+                <span className="text-[11px] text-muted-foreground/70">Vagues :</span>
+                {activeWaves.map((w) => {
+                  const c = WAVE_COLORS[w - 1];
+                  return (
+                    <span
+                      key={w}
+                      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium ${c.bg} ${c.text}`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+                      {c.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <>
       {/* ── Programme ─────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card/50 p-3">
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -424,6 +612,8 @@ export default function ChronoSetup({
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* ── Add swimmer sheet ──────────────────────────── */}
       <Sheet
@@ -432,7 +622,10 @@ export default function ChronoSetup({
           if (!open) closeAddSheet();
         }}
       >
-        <SheetContent side="right" className="w-80 sm:w-96 flex flex-col">
+        <SheetContent
+          side={isMobile ? "bottom" : "right"}
+          className={`flex flex-col ${isMobile ? "max-h-[85dvh]" : "w-80 sm:w-96"}`}
+        >
           <SheetHeader>
             <SheetTitle className="flex items-baseline gap-2">
               <span>Ligne {addLane}</span>
@@ -736,6 +929,7 @@ function PresetDistanceField({
   onDecrement,
   onIncrement,
   onChange,
+  touch = false,
 }: {
   label: string;
   value: number;
@@ -746,29 +940,33 @@ function PresetDistanceField({
   onDecrement: () => void;
   onIncrement: () => void;
   onChange: (v: number) => void;
+  /** Mobile: larger steppers/value/chips for finger taps (≥44px) — §384 */
+  touch?: boolean;
 }) {
+  const stepperSize = touch ? "h-11 w-11" : "h-10 w-10";
+  const valueText = touch ? "text-lg" : "text-sm";
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" className="h-10 w-10"
+      <span className={`font-medium text-muted-foreground ${touch ? "text-[13px]" : "text-xs"}`}>{label}</span>
+      <div className="flex items-center gap-1.5">
+        <Button variant="outline" size="icon" className={stepperSize}
           aria-label={`Diminuer ${label}`}
           onClick={onDecrement}
           disabled={value <= minValue}
-        ><Minus className="h-3.5 w-3.5" /></Button>
+        ><Minus className="h-4 w-4" /></Button>
         <input
           type="text" inputMode="numeric"
           value={value || ""} placeholder="—"
           onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
-          className={`${inputWidth} text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary`}
+          className={`${inputWidth} text-center font-mono ${valueText} font-bold bg-transparent border-b border-border outline-none focus:border-primary`}
         />
         <span className="text-xs text-muted-foreground">{suffix}</span>
-        <Button variant="outline" size="icon" className="h-10 w-10"
+        <Button variant="outline" size="icon" className={stepperSize}
           aria-label={`Augmenter ${label}`}
           onClick={onIncrement}
-        ><Plus className="h-3.5 w-3.5" /></Button>
+        ><Plus className="h-4 w-4" /></Button>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className={`flex flex-wrap ${touch ? "gap-2" : "gap-1.5"}`}>
         {presets.map((d) => (
           <button
             key={d}
@@ -776,7 +974,9 @@ function PresetDistanceField({
             aria-pressed={value === d}
             aria-label={`${label} ${d} ${suffix}`}
             onClick={() => onChange(d)}
-            className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
+            className={`rounded-full font-medium transition-colors cursor-pointer ${
+              touch ? "min-h-10 px-3.5 py-1.5 text-[13px]" : "px-2.5 py-0.5 text-[11px]"
+            } ${
               value === d
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"

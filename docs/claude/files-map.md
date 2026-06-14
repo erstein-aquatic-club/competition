@@ -271,7 +271,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/lib/chronoXlsxExport.ts` | Export xlsx lazy + subtitle vagues personnalisées (§130) | ~562 lignes |
 | `src/lib/api/coach-manual-swimmers.ts` | API CRUD nageurs manuels coach (§126) | ~42 lignes |
 | `src/hooks/useChronoTimer.ts` | Hook RAF chrono 60fps + formatters | ~45 lignes |
-| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard + preset chips Distance/Splits + section Avancé collapsible + sticky footer (§130, §155) | 1189 lignes |
+| `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard + preset chips Distance/Splits + section Avancé collapsible + sticky footer ; **corps mobile dédié** (`isMobile`) : cartes `rounded-2xl`, champs tactiles ≥44px, section Lignes & nageurs (compteur en haut + CTA large), bottom-sheet d'ajout (§130, §155, §384) | 1329 lignes |
 | `src/components/chrono/ChronoRace.tsx` | Phase course chrono desktop/tablette (matrice Lignes×Vagues) — résolution per-wave + config sous GO ; exporte `SwimmerCard`/`WaveHeaderCell` (réutilisés par la vue mobile, prop `laneLabel` §384) (§130) | ~843 lignes |
 | `src/components/chrono/ChronoRaceMobile.tsx` | Phase course chrono mobile (`< 768 px`) : liste verticale groupée par vague, header de vague sticky + cartes nageur full-width (badge ligne) — §384 | 161 lignes |
 | `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono + badge Personnalisée sur ranking rows (§130) | ~652 lignes |
