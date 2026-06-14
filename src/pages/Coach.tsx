@@ -1382,6 +1382,7 @@ export default function Coach() {
         <Suspense fallback={<ListSkeleton />}>
           <CoachChronoHistoryScreen
             onBack={() => setRouteState({ section: "home" })}
+            onNewChrono={() => setRouteState({ section: "chrono" })}
           />
         </Suspense>
       ) : null}

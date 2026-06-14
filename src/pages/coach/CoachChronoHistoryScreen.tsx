@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Trash2, Timer, Pencil, Download, Loader2 } from "lucide-react";
+import { Trash2, Timer, Pencil, Download, Loader2, Plus } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { exportChronoToXlsx } from "../../lib/chronoXlsxExport";
 import { toast } from "sonner";
@@ -25,6 +25,8 @@ import CoachBreadcrumb from "../../components/shared/CoachBreadcrumb";
 
 interface Props {
   onBack: () => void;
+  /** Navigate to the live chrono (setup phase) — §384 */
+  onNewChrono: () => void;
 }
 
 /** Resolve public.users integer ID → auth.users UUID */
@@ -51,7 +53,7 @@ function relativeDate(iso: string): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-export default function CoachChronoHistoryScreen({ onBack }: Props) {
+export default function CoachChronoHistoryScreen({ onBack, onNewChrono }: Props) {
   const queryClient = useQueryClient();
   const [selectedRecord, setSelectedRecord] = useState<ChronoRecord | null>(null);
 
@@ -172,6 +174,10 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
         <Button variant="ghost" size="sm" onClick={onBack}>
           ← Retour
         </Button>
+        <Button size="sm" onClick={onNewChrono} className="ml-auto gap-1.5">
+          <Plus className="h-4 w-4" />
+          Nouveau chrono
+        </Button>
       </div>
 
       {isLoading ? (
@@ -182,7 +188,8 @@ export default function CoachChronoHistoryScreen({ onBack }: Props) {
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
           <Timer className="h-10 w-10 opacity-40" />
           <p className="text-sm font-medium">Aucun chrono enregistré</p>
-          <Button size="sm" variant="outline" onClick={onBack}>
+          <Button size="sm" variant="outline" onClick={onNewChrono} className="gap-1.5">
+            <Plus className="h-4 w-4" />
             Lancer un chrono
           </Button>
         </div>
