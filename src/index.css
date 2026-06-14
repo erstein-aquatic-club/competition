@@ -327,16 +327,40 @@ body[data-chrono-racing="true"] [data-sonner-toaster] {
   display: none !important;
 }
 
-/* §384 — Toasts en pilule iOS (langage UpdateNotification) : la capsule épouse
-   son contenu et reste centrée. Sonner pose `width` en style inline → on force
-   `fit-content` en !important, et on centre la liste (flex column) + la capsule. */
+/* §384/§385 — Toasts thémés et positionnés comme la pilule de MAJ
+   (`UpdateNotification`). Sonner impose ses couleurs via des variables CSS
+   (`--normal-bg: #000` en dark) + des règles internes que les classes Tailwind
+   (`classNames`) ne surchargent PAS → on thème ici par les variables Sonner et
+   on force le reste en !important. Les toasts sont `position:absolute`
+   (`transform: var(--y)`) : pour une capsule au contenu ET centrée, on les
+   recentre via `left:50%` + `translateX(-50%)` en préservant le `var(--y)`. */
 [data-sonner-toaster] {
-  align-items: center !important;
+  --normal-bg: hsl(var(--card) / 0.95);
+  --normal-text: hsl(var(--foreground));
+  --normal-border: hsl(var(--border));
+  --border-radius: 9999px;
 }
 [data-sonner-toaster] [data-sonner-toast] {
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 28px -8px rgb(0 0 0 / 0.30) !important;
   width: fit-content !important;
   max-width: calc(100vw - 2rem) !important;
-  margin-inline: auto !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) var(--y, translateY(0)) !important;
+}
+[data-sonner-toast] [data-button] {
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
+}
+[data-sonner-toast] [data-button]:not([data-cancel]) {
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+[data-sonner-toast] [data-button][data-cancel] {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--muted-foreground)) !important;
 }
 
 /* §384 — « Dynamic Island aware » : toutes les capsules système (toasts +
