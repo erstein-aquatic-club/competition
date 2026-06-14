@@ -4,6 +4,16 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §385 — Page « Essais techniques » (admin) + bouton de test des toasts (2026-06-14)
+
+**Contexte.** Pour tester les toasts (style pilule + positionnement sous la Dynamic Island, §384) directement sur appareil, l'admin demande une tuile « Essais techniques » dans les accès rapides du hub coach, menant à une page de test avec un bouton « Test toast ».
+
+**Changements.** Nouvelle section de route `tech-tests` (`coachRouteState.ts`). Tuile **« Essais techniques »** (icône `FlaskConical`, teal) ajoutée à `quickAccess` (`CoachHome`) **uniquement si `isAdmin`** (nouveau prop `isAdmin` threadé jusqu'à `CoachHome`). Rendu de section gardé `activeSection === "tech-tests" && isAdmin`. Nouvelle page `src/pages/coach/TechTestsScreen.tsx` (lazy) : en-tête retour + section « Toasts » avec **bouton « Test toast »** + variantes (succès/erreur/alerte/avec description/avec bouton d'action) pour valider le rendu de chaque type.
+
+**Fichiers.** `src/pages/coach/TechTestsScreen.tsx` (nouveau, 84 l.), `src/pages/coach/coachRouteState.ts` (section `tech-tests`), `src/pages/Coach.tsx` (import lazy, prop `isAdmin` sur `CoachHome`, tuile conditionnelle, rendu de section).
+
+**Tests / vérifs.** tsc 0, lint 0 erreur, node:test 1721/1721, vitest 86/86, build OK. Aucune policy/table touchée (UI admin pure) → pas de `test:rls`. Garde double : tuile masquée + section non rendue si non-admin (la page ne contient de toute façon aucune donnée sensible).
+
 ## §384 — Interface chrono mobile dédiée (phase course en liste verticale) (2026-06-13)
 
 **Contexte.** Retour terrain (François) : la fonction de chronométrage coach est **inutilisable sur mobile**. La phase setup gère déjà `isMobile` (limites : 3 lignes, 2 nageurs/ligne, 2 vagues) et les résultats sont une table scrollable horizontalement (acceptable), mais la **phase course** (`ChronoRace.tsx`) rend une matrice CSS grid Lignes×Vagues (`56px repeat(N, minmax(280px,1fr))`) : chaque carte nageur fait ≥ 280 px + bouton STOP 96 px → sur un téléphone, une seule colonne tient et le multi-vagues force un scroll horizontal ingérable pendant un chrono. Objectif : une UI/UX mobile dédiée gardant le **maximum de fonctionnalités**, sans toucher le desktop/tablette.

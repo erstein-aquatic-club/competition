@@ -46,6 +46,7 @@ import {
   UsersRound,
   Timer,
   Waves,
+  FlaskConical,
 } from "lucide-react";
 import {
   HomeSkeleton,
@@ -81,6 +82,7 @@ const CoachLibrary = lazyWithRetry(() => import("./coach/CoachLibrary"));
 const CoachComms = lazyWithRetry(() => import("./coach/CoachComms"));
 const CoachChronoScreen = lazyWithRetry(() => import("./coach/CoachChronoScreen"));
 const CoachChronoHistoryScreen = lazyWithRetry(() => import("./coach/CoachChronoHistoryScreen"));
+const TechTestsScreen = lazyWithRetry(() => import("./coach/TechTestsScreen"));
 const CoachMySwimmersScreen = lazyWithRetry(() => import("./coach/CoachMySwimmersScreen"));
 const CoachCommentsScreen = lazyWithRetry(() => import("./coach/CoachCommentsScreen"));
 const CoachPaceCalculatorScreen = lazyWithRetry(() => import("./coach/CoachPaceCalculatorScreen"));
@@ -116,6 +118,7 @@ type CoachHomeProps = {
     level: "high" | "max";
   }>;
   groups: Array<{ id: number; name: string; member_count?: number | null; is_temporary?: boolean; is_active?: boolean; parent_group_id?: number | null }>;
+  isAdmin: boolean;
 };
 
 // ── Minimal section divider label ──────────────────────────────────────────
@@ -234,6 +237,7 @@ const CoachHome = ({
   kpiLoading,
   fatigueAlerts,
   groups,
+  isAdmin,
 }: CoachHomeProps) => {
   const userName = useAuth((s) => s.user);
   const coachUserId = useAuth((s) => s.userId);
@@ -507,8 +511,11 @@ const CoachHome = ({
       { label: "Records", icon: Trophy, action: onOpenRecordsClub, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-900/30" },
       { label: "Chronos", icon: Timer, action: () => onNavigate("chrono-history"), color: "text-rose-500", bg: "bg-rose-100 dark:bg-rose-900/30" },
       { label: "Admin rec.", icon: ShieldCheck, action: onOpenRecordsAdmin, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-900/30" },
+      ...(isAdmin
+        ? [{ label: "Essais techniques", icon: FlaskConical, action: () => onNavigate("tech-tests"), color: "text-teal-500", bg: "bg-teal-100 dark:bg-teal-900/30" }]
+        : []),
     ],
-    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment, nextComp, nextCompDaysUntil],
+    [onNavigate, onOpenRecordsClub, onOpenRecordsAdmin, onOpenSwimPlanning, onOpenStrengthPlanning, onOpenStrengthAssessment, nextComp, nextCompDaysUntil, isAdmin],
   );
 
   // ── Section E: Recent athletes ─────────────────────────────
@@ -1298,7 +1305,14 @@ export default function Coach() {
           kpiLoading={coachKpisQuery.isLoading}
           fatigueAlerts={coachKpisQuery.data?.fatigueAlerts ?? []}
           groups={groups}
+          isAdmin={isAdmin}
         />
+      ) : null}
+
+      {activeSection === "tech-tests" && isAdmin ? (
+        <Suspense fallback={<ListSkeleton />}>
+          <TechTestsScreen onBack={() => setRouteState({ section: "home" })} />
+        </Suspense>
       ) : null}
 
       {activeSection === "week" ? (
