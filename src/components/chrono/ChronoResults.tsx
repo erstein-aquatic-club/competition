@@ -41,6 +41,8 @@ interface ChronoResultsProps {
   onExportComplete?: () => void;
   onSaveDraft?: () => void;
   onDiscard?: () => void;
+  /** Mobile (<768px): vertical ranking cards instead of the wide table — §384 */
+  isMobile?: boolean;
 }
 
 type ExportStatus = "pending" | "sent" | "error";
@@ -159,7 +161,7 @@ function formatDiff(diffMs: number): string {
   return `+${formatLap(diffMs)}`;
 }
 
-export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft, onDiscard }: ChronoResultsProps) {
+export default function ChronoResults({ state, dispatch, onExportComplete, onSaveDraft, onDiscard, isMobile = false }: ChronoResultsProps) {
   const [exportStatuses, setExportStatuses] = useState<Map<string, ExportStatus>>(new Map());
   const [sending, setSending] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
@@ -433,6 +435,20 @@ export default function ChronoResults({ state, dispatch, onExportComplete, onSav
         <div className="rounded-xl border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
           Aucun temps enregistré.
         </div>
+      ) : isMobile ? (
+        <div className="flex flex-col gap-2.5">
+          {ranking.map((r, idx) => (
+            <RankCardMobile
+              key={r.key}
+              row={r}
+              idx={idx}
+              leaderMs={leaderMs}
+              splitLabels={splitLabels}
+              showDiff={showDiff}
+              status={exportStatuses.get(r.key)}
+            />
+          ))}
+        </div>
       ) : (
         <div className="rounded-xl border bg-card overflow-x-auto">
           <div className="min-w-full">
@@ -650,6 +666,129 @@ function RankRow({
       <div className="flex justify-end">
         <ExportStatusBadge status={status} kind={row.kind} />
       </div>
+    </div>
+  );
+}
+
+// ── Ranking card (mobile) ────────────────────────────────────────────
+// Vertical card replacing one table row on phones: rank + name + wave,
+// hero total time + Δ leader + export status, horizontally-scrollable
+// split strip. Reuses the same derived row data as RankRow. §384
+
+function RankCardMobile({
+  row,
+  idx,
+  leaderMs,
+  splitLabels,
+  showDiff,
+  status,
+}: {
+  row: RankingRow;
+  idx: number;
+  leaderMs: number;
+  splitLabels: string[];
+  showDiff: boolean;
+  status?: ExportStatus;
+}) {
+  const wc = WAVE_COLORS[(row.wave - 1) % WAVE_COLORS.length];
+  const isLeader = idx === 0;
+  const diffMs = row.bestTotalMs - leaderMs;
+  const isManual = row.kind === "manual";
+
+  let customLabel = "";
+  if (row.isCustomWave) {
+    const head: string[] = [];
+    if (row.resolved.seriesCount > 0) head.push(`${row.resolved.seriesCount}×`);
+    if (row.resolved.totalDistanceM > 0) head.push(`${row.resolved.totalDistanceM}m`);
+    const parts: string[] = [];
+    if (head.length > 0) parts.push(head.join(""));
+    if (row.resolved.splitDistanceM > 0) parts.push(`splits ${row.resolved.splitDistanceM}m`);
+    customLabel = parts.join(" ");
+  }
+
+  return (
+    <div
+      className={`rounded-2xl border p-3 transition-colors ${
+        isLeader ? "border-amber-400/40 bg-amber-500/[0.06]" : "border-border bg-card"
+      }`}
+    >
+      {/* Row 1 : rank + avatar + name + wave */}
+      <div className="flex items-center gap-2.5">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-base font-black tabular-nums"
+          aria-label={`Rang ${idx + 1}`}
+        >
+          {rankPodium(idx)}
+        </span>
+        <SwimmerAvatar swimmer={{ displayName: row.displayName, avatarUrl: row.avatarUrl }} size="sm" className="shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {isManual && <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-label="Nageur manuel" />}
+            <span className="truncate text-sm font-bold text-foreground">{row.displayName}</span>
+          </div>
+          {row.completedSeriesCount > 1 && (
+            <span className="text-[10px] leading-tight text-muted-foreground">
+              Meilleure · série {row.bestSeriesIdx + 1}/{row.completedSeriesCount}
+            </span>
+          )}
+        </div>
+        <span className={`inline-flex shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black text-white tabular-nums ${wc.dot}`}>
+          {wc.label}
+        </span>
+      </div>
+
+      {/* Row 2 : hero total + Δ + status */}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className={`font-mono text-2xl font-black leading-none tabular-nums ${isLeader ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
+          {formatTime(row.bestTotalMs)}
+        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {showDiff && (
+            isLeader ? (
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-600/80 dark:text-amber-400/80">
+                1ᵉʳ
+              </span>
+            ) : (
+              <span
+                className={`font-mono text-sm font-semibold tabular-nums ${
+                  diffMs <= 1000
+                    ? "text-green-600 dark:text-green-400"
+                    : diffMs <= 3000
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {formatDiff(diffMs)}
+              </span>
+            )
+          )}
+          <ExportStatusBadge status={status} kind={row.kind} />
+        </div>
+      </div>
+
+      {/* Row 3 : custom wave badge */}
+      {row.isCustomWave && (
+        <span className={`mt-2 inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${wc.bg} ${wc.text}`}>
+          <Check className="h-2.5 w-2.5" />
+          Personnalisée{customLabel ? ` : ${customLabel}` : ""}
+        </span>
+      )}
+
+      {/* Row 4 : split strip */}
+      {row.bestSplits.length > 0 && (
+        <div className="mt-2.5 flex gap-3 overflow-x-auto scrollbar-hide border-t border-border/50 pt-2">
+          {row.bestSplits.map((s, i) => (
+            <div key={i} className="flex shrink-0 flex-col items-center">
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/70 tabular-nums">
+                {splitLabels[i] ?? `#${i + 1}`}
+              </span>
+              <span className="font-mono text-xs font-semibold leading-tight text-muted-foreground tabular-nums">
+                {formatTime(s.cumulativeMs)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

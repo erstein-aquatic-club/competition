@@ -274,7 +274,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/chrono/ChronoSetup.tsx` | Phase préparation chrono + WaveConfigCard + preset chips Distance/Splits + section Avancé collapsible + sticky footer ; **corps mobile dédié** (`isMobile`) : Programme compact sans scroll (`CompactPresetRow` une-ligne + strip de chips horizontal), section Lignes & nageurs dense (compteur en haut + CTA), bottom-sheet d'ajout (§130, §155, §384) | 1343 lignes |
 | `src/components/chrono/ChronoRace.tsx` | Phase course chrono desktop/tablette (matrice Lignes×Vagues) — résolution per-wave + config sous GO ; exporte `SwimmerCard`/`WaveHeaderCell` (réutilisés par la vue mobile, prop `laneLabel` §384) (§130) | ~843 lignes |
 | `src/components/chrono/ChronoRaceMobile.tsx` | Phase course chrono mobile (`< 768 px`) : liste verticale groupée par vague, header de vague sticky + cartes nageur full-width (badge ligne) — §384 | 161 lignes |
-| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono + badge Personnalisée sur ranking rows (§130) | ~652 lignes |
+| `src/components/chrono/ChronoResults.tsx` | Phase résultats chrono + badge Personnalisée sur ranking rows ; **liste de cartes verticales** (`RankCardMobile`) sur mobile au lieu de la table scrollable (§130, §384) | 828 lignes |
 | `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage + bascule course mobile/desktop (§384) | ~172 lignes |
 | `src/lib/api/chrono-records.ts` | CRUD chrono records (historique coach) | ~80 lignes |
 | `src/pages/coach/CoachChronoHistoryScreen.tsx` | Historique chronos + éditeur + export xlsx + CTA « Nouveau chrono » (`onNewChrono` §384) (§126) | ~352 lignes |

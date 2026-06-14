@@ -247,7 +247,7 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
             <ChronoSetup state={state} dispatch={dispatch} athletes={athletes} allAthletes={allAthletes} isMobile={isMobile} />
           )}
           {state.phase === "results" && (
-            <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} onSaveDraft={handleSaveDraft} />
+            <ChronoResults state={state} dispatch={dispatch} onExportComplete={handleExportComplete} onSaveDraft={handleSaveDraft} isMobile={isMobile} />
           )}
         </div>
       )}
