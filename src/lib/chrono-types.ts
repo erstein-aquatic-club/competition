@@ -65,6 +65,9 @@ export interface ChronoState {
   splitDistanceM: number;
   /** Number of series (0 = unlimited) */
   seriesCount: number;
+  /** Default departure interval in seconds, seeds new waves + drives the global
+   *  mobile "Départ" control (0 = no countdown). §384 */
+  defaultDepartureSec: number;
   title: string;
 }
 

@@ -201,7 +201,7 @@ export default function ChronoSetup({
   };
 
   return (
-    <div className={`flex flex-col p-4 ${isMobile ? "gap-3 pb-6" : "gap-5 pb-24"}`}>
+    <div className={`flex flex-col ${isMobile ? "gap-3 px-0 pt-1 pb-6" : "p-4 gap-5 pb-24"}`}>
       {/* ── Title input — inline, minimalist, borderless ─ */}
       <label className="group flex items-baseline gap-2 border-b border-border/60 pb-1 focus-within:border-primary/70 transition-colors">
         <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 group-focus-within:text-primary" />
@@ -232,25 +232,15 @@ export default function ChronoSetup({
               presets={SPLIT_PRESETS}
               onChange={(v) => dispatch({ type: "SET_SPLIT_DISTANCE", meters: v })}
             />
-            {activeWaves.length > 0 && (
-              <>
-                <div className="h-px bg-border/40" />
-                <div className="flex items-center gap-2">
-                  <span className="w-11 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Départ</span>
-                  <div className="flex flex-1 flex-wrap items-center gap-2">
-                    {activeWaves.map((w) => (
-                      <WaveDepartureControl
-                        key={w}
-                        wave={w}
-                        state={state}
-                        dispatch={dispatch}
-                        showChip={activeWaves.length > 1}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="h-px bg-border/40" />
+            <div className="flex items-center gap-2">
+              <span className="w-11 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Départ</span>
+              <DepartureInput
+                valueSec={state.defaultDepartureSec}
+                onChange={(sec) => dispatch({ type: "SET_DEFAULT_DEPARTURE", seconds: sec })}
+              />
+              <span className="text-[10px] text-muted-foreground/60">min ' sec · par vague</span>
+            </div>
             <div className="h-px bg-border/40" />
             <button
               type="button"
@@ -962,42 +952,29 @@ function CompactPresetRow({
   );
 }
 
-// ── WaveDepartureControl — compact mm'ss departure-interval input (mobile) ──
-// Surfaces a wave's "départ toutes les …" outside the Advanced section so the
-// coach sees/sets the send-off time by default. §384
-function WaveDepartureControl({
-  wave,
-  state,
-  dispatch,
-  showChip,
+// ── DepartureInput — compact mm'ss departure-interval input (mobile) ──
+// Edits the GLOBAL default departure (`SET_DEFAULT_DEPARTURE`) so it is always
+// visible by default — even before any swimmer/wave exists — and seeds every
+// wave. The send-off time is a core training parameter, not an "advanced" one. §384
+function DepartureInput({
+  valueSec,
+  onChange,
 }: {
-  wave: number;
-  state: ChronoState;
-  dispatch: React.Dispatch<ChronoAction>;
-  showChip: boolean;
+  valueSec: number;
+  onChange: (sec: number) => void;
 }) {
-  const ws = state.waves.find((w) => w.wave === wave);
-  if (!ws) return null;
-  const c = WAVE_COLORS[wave - 1];
-  const totalSec = ws.departureIntervalSec;
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = totalSec % 60;
-  const update = (min: number, sec: number) =>
-    dispatch({ type: "SET_WAVE_INTERVAL", wave, seconds: min * 60 + sec });
+  const minutes = Math.floor(valueSec / 60);
+  const seconds = valueSec % 60;
+  const update = (min: number, sec: number) => onChange(min * 60 + sec);
 
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-border bg-background/40 px-2 py-1">
-      {showChip && (
-        <span className={`mr-0.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white ${c.dot}`}>
-          {c.label}
-        </span>
-      )}
+    <div className="flex items-center gap-1 rounded-lg border border-border bg-background/40 px-2.5 py-1.5">
       <input
         type="text"
         inputMode="numeric"
         value={minutes || ""}
         placeholder="0"
-        aria-label={`Vague ${c.label} — minutes de départ`}
+        aria-label="Départ — minutes"
         onChange={(e) => update(Number(e.target.value.replace(/\D/g, "")) || 0, seconds)}
         className="w-5 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
       />
@@ -1007,7 +984,7 @@ function WaveDepartureControl({
         inputMode="numeric"
         value={seconds ? String(seconds).padStart(2, "0") : ""}
         placeholder="00"
-        aria-label={`Vague ${c.label} — secondes de départ`}
+        aria-label="Départ — secondes"
         onChange={(e) => update(minutes, Math.min(59, Number(e.target.value.replace(/\D/g, "")) || 0))}
         className="w-7 text-center font-mono text-sm font-bold bg-transparent border-b border-border outline-none focus:border-primary"
       />

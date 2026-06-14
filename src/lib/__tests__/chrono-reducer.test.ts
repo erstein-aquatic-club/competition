@@ -102,6 +102,45 @@ describe("computeWaves", () => {
   it("returns empty array for no swimmers", () => {
     assert.deepEqual(computeWaves([]), []);
   });
+
+  it("seeds new waves with the default departure interval", () => {
+    const waves = computeWaves([reg(1, 1), reg(2, 2)], [], 90);
+    assert.equal(waves[0].departureIntervalSec, 90);
+    assert.equal(waves[1].departureIntervalSec, 90);
+  });
+
+  it("preserves an existing wave's interval over the default seed", () => {
+    const existing = [
+      { wave: 1, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 30, lastFinishedAt: null, overrides: null },
+    ];
+    const waves = computeWaves([reg(1, 1), reg(2, 2)], existing, 90);
+    assert.equal(waves[0].departureIntervalSec, 30); // kept
+    assert.equal(waves[1].departureIntervalSec, 90); // seeded
+  });
+});
+
+// ── SET_DEFAULT_DEPARTURE ───────────────────────────────────
+
+describe("SET_DEFAULT_DEPARTURE", () => {
+  it("stores the default and clamps negatives to 0", () => {
+    assert.equal(chronoReducer(initialChronoState, { type: "SET_DEFAULT_DEPARTURE", seconds: 90 }).defaultDepartureSec, 90);
+    assert.equal(chronoReducer(initialChronoState, { type: "SET_DEFAULT_DEPARTURE", seconds: -5 }).defaultDepartureSec, 0);
+  });
+
+  it("propagates to every existing wave", () => {
+    const withSwimmers = chronoReducer(
+      chronoReducer(initialChronoState, { type: "ADD_SWIMMER", swimmer: reg(1, 1) }),
+      { type: "ADD_SWIMMER", swimmer: reg(2, 2) },
+    );
+    const next = chronoReducer(withSwimmers, { type: "SET_DEFAULT_DEPARTURE", seconds: 75 });
+    assert.deepEqual(next.waves.map((w) => w.departureIntervalSec), [75, 75]);
+  });
+
+  it("seeds a wave added after the default is set", () => {
+    const withDefault = chronoReducer(initialChronoState, { type: "SET_DEFAULT_DEPARTURE", seconds: 60 });
+    const next = chronoReducer(withDefault, { type: "ADD_SWIMMER", swimmer: reg(1, 1) });
+    assert.equal(next.waves[0].departureIntervalSec, 60);
+  });
 });
 
 // ── Setup phase actions ─────────────────────────────────────

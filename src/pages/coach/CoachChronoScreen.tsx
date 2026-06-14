@@ -193,12 +193,12 @@ export default function CoachChronoScreen({ athletes, allAthletes }: Props) {
 
       {/* Setup & results */}
       {state.phase !== "racing" && (
-        <div className="max-w-6xl mx-auto p-4">
-          {/* Mobile info banner */}
+        <div className={`max-w-6xl mx-auto ${isMobile ? "px-4 pt-2 pb-4" : "p-4"}`}>
+          {/* Mobile info banner — slim single line */}
           {isMobile && state.phase === "setup" && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              <Smartphone className="h-3.5 w-3.5 shrink-0" />
-              <span>Mode mobile : max {MOBILE_LIMITS.maxLanes} lignes, {MOBILE_LIMITS.maxSwimmersPerLane} nageurs/ligne, {MOBILE_LIMITS.maxWaves} vagues</span>
+            <div className="mb-1.5 flex items-center gap-1.5 px-0.5 text-[11px] text-muted-foreground/70">
+              <Smartphone className="h-3 w-3 shrink-0" />
+              <span className="truncate">Max {MOBILE_LIMITS.maxLanes} lignes · {MOBILE_LIMITS.maxSwimmersPerLane}/ligne · {MOBILE_LIMITS.maxWaves} vagues</span>
             </div>
           )}
 

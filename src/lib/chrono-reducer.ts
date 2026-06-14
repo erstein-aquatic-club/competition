@@ -15,6 +15,7 @@ type ChronoAction =
   | { type: "SET_SPLIT_DISTANCE"; meters: number }
   | { type: "SET_SERIES_COUNT"; count: number }
   | { type: "SET_TITLE"; title: string }
+  | { type: "SET_DEFAULT_DEPARTURE"; seconds: number }
   | { type: "SET_WAVE_INTERVAL"; wave: number; seconds: number }
   | { type: "SET_WAVE_OVERRIDES"; wave: number; overrides: WaveConfigOverrides | null }
   | { type: "SET_WAVE_OVERRIDE_FIELD"; wave: number; field: keyof WaveConfigOverrides; value: number }
@@ -57,6 +58,7 @@ export function createInitialChronoState(date = new Date()): ChronoState {
     totalDistanceM: 0,
     splitDistanceM: 50,
     seriesCount: 0,
+    defaultDepartureSec: 0,
     title: createChronoDefaultTitle(date),
   };
 }
@@ -64,6 +66,7 @@ export function createInitialChronoState(date = new Date()): ChronoState {
 export function computeWaves(
   swimmers: ChronoSwimmer[],
   existingWaves: WaveState[] = [],
+  defaultDepartureSec = 0,
 ): WaveState[] {
   const waveNumbers = new Set(swimmers.map((s) => s.wave));
   const sorted = Array.from(waveNumbers).sort((a, b) => a - b);
@@ -71,7 +74,7 @@ export function computeWaves(
 
   return sorted.map((wave) => {
     const existing = existingMap.get(wave);
-    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: 0, lastFinishedAt: null, overrides: null };
+    return existing ?? { wave, startedAt: null, stopped: false, currentRep: 0, departureIntervalSec: defaultDepartureSec, lastFinishedAt: null, overrides: null };
   });
 }
 
@@ -87,6 +90,7 @@ export const initialChronoState: ChronoState = {
   totalDistanceM: 0,
   splitDistanceM: 50,
   seriesCount: 0,
+  defaultDepartureSec: 0,
   title: "",
 };
 
@@ -116,6 +120,14 @@ export function chronoReducer(
 
     case "SET_TITLE": {
       return { ...state, title: action.title };
+    }
+
+    case "SET_DEFAULT_DEPARTURE": {
+      const seconds = Math.max(0, action.seconds);
+      // Update the default (seeds future waves) AND every existing wave, so the
+      // single global mobile "Départ" control stays the source of truth.
+      const waves = state.waves.map((w) => ({ ...w, departureIntervalSec: seconds }));
+      return { ...state, defaultDepartureSec: seconds, waves };
     }
 
     case "SET_WAVE_INTERVAL": {
@@ -152,14 +164,14 @@ export function chronoReducer(
         return state;
       }
       const swimmers = [...state.swimmers, action.swimmer];
-      return { ...state, swimmers, waves: computeWaves(swimmers, state.waves) };
+      return { ...state, swimmers, waves: computeWaves(swimmers, state.waves, state.defaultDepartureSec) };
     }
 
     case "REMOVE_SWIMMER": {
       const swimmers = state.swimmers.filter(
         (s) => s.key !== action.key,
       );
-      return { ...state, swimmers, waves: computeWaves(swimmers, state.waves) };
+      return { ...state, swimmers, waves: computeWaves(swimmers, state.waves, state.defaultDepartureSec) };
     }
 
     case "UPDATE_SWIMMER_AVATAR": {
@@ -184,7 +196,7 @@ export function chronoReducer(
       const swimmers = state.swimmers.map((s) =>
         s.key === action.key ? { ...s, wave: action.wave } : s,
       );
-      return { ...state, swimmers, waves: computeWaves(swimmers, state.waves) };
+      return { ...state, swimmers, waves: computeWaves(swimmers, state.waves, state.defaultDepartureSec) };
     }
 
     case "START_RACE": {
