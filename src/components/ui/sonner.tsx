@@ -2,6 +2,7 @@
 
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
+import { CheckCircle2, XCircle, AlertTriangle, Info, Loader2 } from "lucide-react"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
@@ -32,6 +33,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // le stack aux largeurs « au contenu » qui laissait des pilules fantômes
       // décalées derrière. Les toasts suivants s'enchaînent.
       visibleToasts={1}
+      // Icônes Lucide de l'app (cohérence charte) au lieu des SVG par défaut Sonner.
+      icons={{
+        success: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+        error: <XCircle className="h-4 w-4 text-destructive" />,
+        warning: <AlertTriangle className="h-4 w-4 text-amber-500" />,
+        info: <Info className="h-4 w-4 text-primary" />,
+        loading: <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />,
+      }}
       toastOptions={{
         classNames: {
           toast:
