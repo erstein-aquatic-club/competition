@@ -278,7 +278,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/coach/CoachChronoScreen.tsx` | Orchestrateur chrono 3 phases + localStorage + bascule course mobile/desktop (§384) | ~172 lignes |
 | `src/lib/api/chrono-records.ts` | CRUD chrono records (historique coach) | ~80 lignes |
 | `src/pages/coach/CoachChronoHistoryScreen.tsx` | Historique chronos + éditeur + export xlsx + CTA « Nouveau chrono » (`onNewChrono` §384) (§126) | ~352 lignes |
-| `src/pages/coach/TechTestsScreen.tsx` | Page admin « Essais techniques » (route `tech-tests`) : bac à sable UI, bouton « Test toast » + variantes (§385) | 84 lignes |
+| `src/pages/coach/TechTestsScreen.tsx` | Page admin « Essais techniques » (route `tech-tests`) : bac à sable diagnostic appareil réel — toasts, infos appareil/env (build, PWA, safe-area-insets), push de bout en bout, cache/SW, haptique/presse-papier (§385, §386) | 382 lignes |
 | `src/components/chrono/ChronoSplitEditor.tsx` | Éditeur splits (distance recalibrable, tabs) | ~200 lignes |
 | `src/lib/api/coach-assignments.ts` | CRUD attributions coach ↔ nageur (§98) | ~110 lignes |
 | `src/hooks/useMySwimmerIds.ts` | Hook filtrage nageurs par coach + helper filterByAssignment (§98) | ~45 lignes |

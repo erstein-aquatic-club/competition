@@ -4,6 +4,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §386 — « Essais techniques » : blocs de diagnostic sur appareil réel (2026-06-14)
+
+**Contexte.** L'écran admin « Essais techniques » (§385) ne contenait que les boutons de test des toasts. À la demande, ajout de blocs de diagnostic ciblant les douleurs récurrentes de l'app (cache/version, offset Dynamic Island, push iOS, ressenti tactile), en réutilisant l'existant.
+
+**Changements (`src/pages/coach/TechTestsScreen.tsx`, réécrit ~84 → 382 lignes).** 4 nouvelles sections + complétion des toasts, via 2 sous-composants internes (`Section` carte charte, `Row` clé/valeur monospace) :
+- **Appareil & environnement** : build timestamp (`window.__eacBuildTimestamp` / `__BUILD_TIMESTAMP__`), plateforme (`detectPlatform`), mode PWA (`isStandalone`), thème (classe `.dark`), viewport+DPR, réseau live (`navigator.onLine` + listeners online/offline), **valeurs réelles des `safe-area-inset-*`** mesurées via une sonde DOM (debug offset Dynamic Island), + bouton « Copier le diagnostic » (presse-papier).
+- **Notifications push** : état support/permission/abonnement (`isPushSupported`/`getPushPermission`/`hasActivePushSubscription`), bouton « Activer » (`subscribeToPush(userId)`) et **« Envoyer une push test »** de bout en bout via `supabase.functions.invoke("push-send", { title, body, target_user_ids:[userId] })` — écran admin donc JWT autorisé sur le chemin manuel de la fonction.
+- **Haptique & presse-papier** : déclencheurs `haptic.light/medium/success/error`, copie de texte (`navigator.clipboard`), sous-titre adaptatif selon `"vibrate" in navigator`.
+- **Cache & service worker** : état du SW (registration + `controller`), build chargé, bouton **« Vider le cache & recharger »** (`caches.delete` ∀ + `unregister` ∀ + reload) — adresse la douleur cache de `CLAUDE.md`.
+- **Toasts** : ajout des états manquants `toast.loading` → succès (mise à jour par `id`) et `toast.promise`.
+
+**Réutilisation.** Aucune nouvelle lib : `lib/push.ts`, `lib/pwaHelpers.ts`, `lib/haptic.ts`, `lib/auth.ts` (`useAuth().userId`), `lib/supabase.ts`.
+
+**Tests/contrôles.** tsc 0, lint 0, build OK. Pas de RLS (UI/diagnostic pur, le seul appel serveur `push-send` réutilise un chemin existant inchangé). ⚠️ Smoke terrain iPhone recommandé (push réelle + safe-area).
+
 ## §385 — Page « Essais techniques » (admin) + bouton de test des toasts (2026-06-14)
 
 **Contexte.** Pour tester les toasts (style pilule + positionnement sous la Dynamic Island, §384) directement sur appareil, l'admin demande une tuile « Essais techniques » dans les accès rapides du hub coach, menant à une page de test avec un bouton « Test toast ».
