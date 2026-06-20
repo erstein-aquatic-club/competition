@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { useLocation } from "wouter";
-import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronLeft, ChevronRight, Settings, Users, Sun, Moon, Monitor, type LucideIcon } from "lucide-react";
+import { Lock, Pen, Trophy, LogOut, Save, AlertCircle, Download, Camera, Trash2, Bell, BellOff, ChevronLeft, ChevronRight, Settings, Users, Sun, Moon, Monitor, Activity, type LucideIcon } from "lucide-react";
 import { isPushSupported, hasActivePushSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import { compressImage, isAcceptedImageType } from "@/lib/imageUtils";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -39,11 +39,13 @@ import { useAchievementChecker } from "@/hooks/useAchievementChecker";
 import AchievementToast from "@/components/shared/AchievementToast";
 import type { BadgeDefinition } from "@/lib/achievementRules";
 import SwimmerMessagesView from "@/components/profile/SwimmerMessagesView";
+import PhysicalStatsView from "@/components/profile/PhysicalStatsView";
 import { haptic } from "@/lib/haptic";
 
 type ProfileSection =
   | "home"
   | "messages"
+  | "physical-stats"
   | "edit"
   | "password";
 
@@ -66,6 +68,7 @@ function readProfileSectionFromHash(): ProfileSection {
 
   switch (requested) {
     case "messages":
+    case "physical-stats":
       return requested;
     default:
       return "home";
@@ -679,6 +682,18 @@ export default function Profile() {
     );
   }
 
+  if (activeSection === "physical-stats") {
+    return (
+      <PhysicalStatsView
+        athleteId={userId ?? 0}
+        sex={profile?.sex === "M" || profile?.sex === "F" ? profile.sex : null}
+        birthdate={profile?.birthdate ?? null}
+        onBack={() => setActiveSection("home")}
+        onEditProfile={startEdit}
+      />
+    );
+  }
+
   if (activeSection === "edit") {
     return (
       <motion.div
@@ -1000,6 +1015,22 @@ export default function Profile() {
         ) : null}
 
         {userId ? <BadgesGrid userId={userId} /> : null}
+
+        {isSwimmer && userId ? (
+          <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base uppercase tracking-eyebrow-sm">Performance</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ProfileActionRow
+                icon={Activity}
+                title="Stats physiques"
+                description="KPIs muscu, points forts, comparaison population"
+                onClick={() => setActiveSection("physical-stats")}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
           <CardHeader className="pb-3">

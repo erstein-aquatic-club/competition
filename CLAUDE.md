@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§386** — « Essais techniques » : blocs diagnostic appareil (infos/safe-area, push de bout en bout, cache/SW, haptique).
+Dernier § livré : **§387** — Vue « Stats physiques » profil nageur (KPIs muscu, points forts/axes, comparaison population « top X % »).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

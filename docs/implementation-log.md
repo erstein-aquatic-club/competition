@@ -4,6 +4,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §387 — Vue « Stats physiques » dans le profil nageur (2026-06-20)
+
+**Contexte.** Les KPIs muscu mesurés (détente, traction lestée, tirage mi-cuisse, lancer médecine-ball, saut en longueur) étaient scorés vs population (barèmes percentiles, §293) mais n'étaient restitués au nageur que via le récap « Wrapped » éphémère (confidentialité : labels seulement, pas de score ni de valeur). Demande : une vue **persistante dans le profil** avec le résumé des KPIs mesurés, points forts / axes de progression, et **comparaison à la population** (« top X % », jusqu'à top 0,01 % pour l'élite).
+
+**Changements.**
+- **Module pur `src/lib/strength/physicalStats.ts`** (118 l) : `populationComparison(score)` — le score KPI étant ancré sur des percentiles (p10→10 … p90→90, extrapolé au-delà), `score ≈ rang centile` → `topPct = 100 − score` formaté à résolution croissante au sommet (top 5 % → top 0,1 % → top 0,01 %, plancher 0,01 car le score ne peut atteindre 100). `buildPhysicalStatsSummary(ranked)` — sépare points forts (score ≥ 70, top 30 %) et axes (score < 50, sous la médiane) avec fallbacks relatifs (meilleur/plus faible) pour rester informatif sur peu de mesures ; indice physique global = moyenne des scores mesurés. `formatKpiValue` (1 décimale). 9 tests `node:test`.
+- **Composant `src/components/profile/PhysicalStatsView.tsx`** (390 l) : fetch des dernières mesures (`getLatestKpiMeasurements`, query key `kpi-latest` partagée avec le hook Wrapped), bande d'âge depuis `birthdate`, scoring via `rankKpis`. Rendu : carte indice global, cartes Points forts / Axes de progression, détail par KPI (mesure brute + barre de score colorée par bande + comparaison « top X % » au-dessus de la médiane sinon bande qualitative + badge fiabilité barème §301 + statut « à valider par le coach »). États : profil incomplet (sexe/date manquants → CTA édition), aucune mesure, chargement.
+- **`src/pages/Profile.tsx`** : nouvelle section `physical-stats` (parse hash + sync), carte « Performance » → action « Stats physiques » visible pour les nageurs uniquement, branche de rendu plein écran.
+
+**Fichiers modifiés.** `src/lib/strength/physicalStats.ts` (+), `src/lib/strength/__tests__/physicalStats.test.ts` (+), `src/components/profile/PhysicalStatsView.tsx` (+), `src/pages/Profile.tsx`.
+
+**Tests.** `node:test` ciblés strength 77/77 (dont 9 nouveaux `physicalStats`). tsc 0, lint 0 sur les fichiers touchés. Pas de RLS (lecture via wrapper existant, aucune policy/migration touchée).
+
+**Décisions / limites.** Comparaison « top X % » affichée seulement au-dessus de la médiane (un « top 80 % » serait trompeur sur un KPI faible — la bande qualitative prend le relais). Vue réservée au nageur sur son propre profil (le coach dispose déjà de `CoachSwimmerFullView`). L'indice global est une moyenne brute des scores (pas de pondération par seau) — volontairement simple. Les barèmes `transposed` restent indicatifs (référence non-natation) : badge conservé.
+
 ## §386 — « Essais techniques » : blocs de diagnostic sur appareil réel (2026-06-14)
 
 **Contexte.** L'écran admin « Essais techniques » (§385) ne contenait que les boutons de test des toasts. À la demande, ajout de blocs de diagnostic ciblant les douleurs récurrentes de l'app (cache/version, offset Dynamic Island, push iOS, ressenti tactile), en réutilisant l'existant.

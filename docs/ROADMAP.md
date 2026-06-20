@@ -1,8 +1,10 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-06-14*
+*Dernière mise à jour : 2026-06-20*
 
-*Dernière : 2026-06-14 — **§386 — « Essais techniques » : blocs de diagnostic appareil réel** : ajout à `TechTestsScreen` de 4 sections réutilisant l'existant — infos appareil/env (build, PWA standalone, thème, viewport, réseau live, **safe-area-insets** mesurés par sonde DOM pour l'offset Dynamic Island), notifications push **de bout en bout** (`push-send` vers soi-même), cache & service worker (« Vider le cache & recharger »), haptique & presse-papier — + complétion des toasts (`loading`/`promise`). tsc 0, lint 0, build OK. ⚠️ smoke iPhone recommandé.*
+*Dernière : 2026-06-20 — **§387 — Vue « Stats physiques » dans le profil nageur** : nouvelle section profil (nageur) résumant les KPIs muscu mesurés — indice physique global, points forts (score ≥ 70) / axes de progression (score < 50), détail par KPI (mesure brute + barre de score + comparaison population « top X % », jusqu'à top 0,01 % pour l'élite). Module pur `physicalStats.ts` (`populationComparison`/`buildPhysicalStatsSummary`, 9 tests) + composant `PhysicalStatsView.tsx`, branchés sur le scoring percentiles existant (`rankKpis`). tsc 0, lint 0, node:test strength 77/77.*
+
+*§386 — **« Essais techniques » : blocs de diagnostic appareil réel** : ajout à `TechTestsScreen` de 4 sections réutilisant l'existant — infos appareil/env (build, PWA standalone, thème, viewport, réseau live, **safe-area-insets** mesurés par sonde DOM pour l'offset Dynamic Island), notifications push **de bout en bout** (`push-send` vers soi-même), cache & service worker (« Vider le cache & recharger »), haptique & presse-papier — + complétion des toasts (`loading`/`promise`). tsc 0, lint 0, build OK. ⚠️ smoke iPhone recommandé.*
 
 *§385 — **Page « Essais techniques » (admin)** : tuile admin-only « Essais techniques » dans les accès rapides du hub coach (nouvelle section de route `tech-tests`, prop `isAdmin` threadé jusqu'à `CoachHome`) → page de test `TechTestsScreen` avec un bouton « Test toast » + variantes (succès/erreur/alerte/description/action) pour valider sur appareil le rendu pilule des toasts (§384). tsc 0, lint 0, node:test 1721/1721, vitest 86/86, build OK.*
 
