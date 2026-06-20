@@ -1,1 +1,0 @@
-import{k as t,l as i,s as n}from"./index-BHmIK6bK.js";async function u(s,a,e,r=!1){return t()?i(await n.rpc("get_swimmer_sessions",{p_user_id:s,p_from:a,p_to:e,p_include_drafts:r}))??[]:[]}export{u as g};
