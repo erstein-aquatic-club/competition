@@ -13,6 +13,12 @@
  * brancher sur les mesures fetchées.
  */
 import type { RankedKpi } from './wrappedStats';
+import type {
+  StrengthKpiMeasurement,
+  StrengthKpiSource,
+  VerticalJumpAttempts,
+  MedballThrowAttempts,
+} from '@/lib/api/types';
 
 export interface PopulationComparison {
   /** Rang centile estimé (0-100). Le score KPI est ancré percentiles → score ≈ centile. */
@@ -112,7 +118,111 @@ export function buildPhysicalStatsSummary(ranked: RankedKpi[]): PhysicalStatsSum
   };
 }
 
+/** Arrondit un nombre pour l'affichage (sans zéro de bord inutile). */
+export function formatNumber(value: number, decimals = 1): string {
+  return String(Number(value.toFixed(decimals)));
+}
+
 /** Arrondit une mesure brute pour l'affichage (1 décimale max, sans zéro inutile). */
 export function formatKpiValue(value: number): string {
-  return String(Number(value.toFixed(1)));
+  return formatNumber(value, 1);
+}
+
+/** Une ligne de détail d'essai/mesure, prête à afficher. */
+export interface AttemptDetail {
+  label: string;
+  value: string;
+}
+
+/**
+ * Décompose les `attempts` (jsonb) d'une mesure KPI en lignes lisibles, selon
+ * la forme stockée (cf. `KpiAttempts`) :
+ *  - `number[]`            → essais bruts (3 KPIs « valeur simple ») ;
+ *  - `VerticalJumpAttempts` → poids, temps de vol, hauteur, puissance de pic ;
+ *  - `MedballThrowAttempts` → masse du ballon, distances, meilleure, indice.
+ *
+ * Pure : pas de dépendance React. `[]` si `attempts` absent / forme inconnue.
+ */
+export function describeAttempts(m: StrengthKpiMeasurement): AttemptDetail[] {
+  const a = m.attempts;
+  if (!a) return [];
+  if (Array.isArray(a)) {
+    if (a.length === 0) return [];
+    return [
+      {
+        label: a.length > 1 ? 'Essais' : 'Essai',
+        value: `${a.map((v) => formatKpiValue(v)).join(' · ')} ${m.unit}`.trim(),
+      },
+    ];
+  }
+  if ('flight_times' in a) {
+    const vj = a as VerticalJumpAttempts;
+    return [
+      { label: 'Poids saisi', value: `${formatKpiValue(vj.weight_kg)} kg` },
+      {
+        label: 'Temps de vol',
+        value: `${vj.flight_times.map((t) => formatNumber(t, 2)).join(' · ')} s`,
+      },
+      { label: 'Hauteur (meilleur saut)', value: `${formatKpiValue(vj.height_cm)} cm` },
+      { label: 'Puissance de pic', value: `${Math.round(vj.peak_power_w)} W` },
+    ];
+  }
+  if ('distances_cm' in a) {
+    const mb = a as MedballThrowAttempts;
+    return [
+      { label: 'Masse du ballon', value: `${formatKpiValue(mb.ball_mass_kg)} kg` },
+      {
+        label: 'Distances',
+        value: `${mb.distances_cm.map((d) => formatNumber(d / 100, 2)).join(' · ')} m`,
+      },
+      { label: 'Meilleure distance', value: `${formatNumber(mb.best_distance_cm / 100, 2)} m` },
+      { label: 'Indice (masse × distance)', value: `${formatKpiValue(mb.index_kg_m)} kg·m` },
+    ];
+  }
+  return [];
+}
+
+/** Une ligne d'historique d'un KPI, avec Δ vs la mesure comparable précédente. */
+export interface KpiHistoryRow {
+  id: string;
+  measuredAt: string;
+  value: number;
+  unit: string;
+  /** Δ vs la mesure plus ancienne de MÊME unité (null si aucune / unité différente). */
+  deltaVsPrev: number | null;
+  source: StrengthKpiSource;
+  coachReviewed: boolean;
+}
+
+/**
+ * Construit les lignes d'historique d'un KPI (plus récent → plus ancien) avec le
+ * Δ par rapport à la mesure comparable précédente. Le Δ n'est calculé qu'entre
+ * mesures de MÊME unité (le `vertical_jump` est passé de cm à W/kg au §293 →
+ * deux unités incomparables dans le même historique). Robuste à un ordre
+ * d'entrée quelconque (re-trie par date décroissante).
+ */
+export function buildKpiHistoryRows(
+  measurements: StrengthKpiMeasurement[],
+): KpiHistoryRow[] {
+  const desc = [...measurements].sort(
+    (a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime(),
+  );
+  return desc.map((m, i) => {
+    let deltaVsPrev: number | null = null;
+    for (let j = i + 1; j < desc.length; j++) {
+      if (desc[j].unit === m.unit) {
+        deltaVsPrev = Number((m.value - desc[j].value).toFixed(2));
+        break;
+      }
+    }
+    return {
+      id: m.id,
+      measuredAt: m.measured_at,
+      value: m.value,
+      unit: m.unit,
+      deltaVsPrev,
+      source: m.source,
+      coachReviewed: m.coach_reviewed,
+    };
+  });
 }

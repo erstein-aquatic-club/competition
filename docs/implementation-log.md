@@ -4,6 +4,22 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §388 — Stats physiques : fiche détail KPI au clic (2026-06-20)
+
+**Contexte.** Suite du §387 : la vue « Stats physiques » listait les KPIs mais ne donnait que le score/comparaison. Demande utilisateur : pouvoir cliquer chaque KPI pour en voir le détail.
+
+**Changements.**
+- **Helpers purs (`physicalStats.ts`, 118 → 228 l)** : `describeAttempts(measurement)` décompose le jsonb `attempts` en lignes lisibles selon sa forme (`number[]` essais bruts / `VerticalJumpAttempts` poids+temps de vol+hauteur+puissance / `MedballThrowAttempts` masse+distances+indice) ; `buildKpiHistoryRows(measurements)` construit l'historique trié (récent→ancien) avec Δ vs la mesure comparable précédente (Δ uniquement entre mesures de MÊME unité — le `vertical_jump` est passé cm→W/kg au §293) ; `formatNumber(value, decimals)` générique. +7 tests `node:test`.
+- **`src/components/profile/physicalStatsUi.tsx` (40 l)** : extraction des bouts d'UI partagés (`TIER_STYLE`, `CONFIDENCE_BADGE`, `comparisonLabel`, `ScoreBar`) pour éviter un cycle d'import entre la vue et la fiche.
+- **`src/components/profile/KpiDetailSheet.tsx` (268 l)** : bottom sheet iOS (au clic d'un KPI) — bloc score & comparaison population, dernière mesure + décomposition des essais (source, statut validation coach, notes), historique avec Δ (`getKpiHistory`, query `kpi-history`), protocole de mesure (étapes numérotées + rôle du binôme).
+- **`PhysicalStatsView.tsx`** : lignes KPI (détail + points forts + axes) rendues cliquables (`<button>` + chevron), état `selected`, montage du sheet ; bascule sur les helpers partagés.
+
+**Fichiers modifiés.** `src/lib/strength/physicalStats.ts`, `src/lib/strength/__tests__/physicalStats.test.ts`, `src/components/profile/physicalStatsUi.tsx` (+), `src/components/profile/KpiDetailSheet.tsx` (+), `src/components/profile/PhysicalStatsView.tsx`.
+
+**Tests.** `node:test` strength 32/32 (dont 16 `physicalStats`). tsc 0, lint 0. Pas de RLS (lecture via wrapper `getKpiHistory` existant).
+
+**Décisions / limites.** Δ historique seulement entre mesures de même unité (évite un faux Δ cm↔W/kg). Pas de graphe sparkline (liste datée + Δ suffit, plus lisible sur mobile, zéro dépendance). La fiche réutilise `KPI_PROTOCOLS` (déjà la source du wizard) → cohérence des libellés/étapes.
+
 ## §387 — Vue « Stats physiques » dans le profil nageur (2026-06-20)
 
 **Contexte.** Les KPIs muscu mesurés (détente, traction lestée, tirage mi-cuisse, lancer médecine-ball, saut en longueur) étaient scorés vs population (barèmes percentiles, §293) mais n'étaient restitués au nageur que via le récap « Wrapped » éphémère (confidentialité : labels seulement, pas de score ni de valeur). Demande : une vue **persistante dans le profil** avec le résumé des KPIs mesurés, points forts / axes de progression, et **comparaison à la population** (« top X % », jusqu'à top 0,01 % pour l'élite).

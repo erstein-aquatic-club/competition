@@ -247,7 +247,7 @@ Tous les feature flags sont activés.
 | Changement mot de passe | ✅ | `Profile.tsx` | Bottom sheet dédié Sécurité (§61, was Collapsible §38) |
 | FFN & Records | ✅ | `Profile.tsx` | Card fusionnée sync FFN + lien records (§38) |
 | Entretiens nageur | ✅ | `AthleteInterviewsSection.tsx`, `Profile.tsx` | Formulaire 4 sections en draft_athlete, lecture seule + signature en sent, historique en signed (§74) |
-| Stats physiques (nageur) | ✅ | `PhysicalStatsView.tsx`, `physicalStats.ts`, `Profile.tsx` | Carte Performance → vue résumé KPIs muscu : indice global, points forts / axes de progression, détail par KPI (mesure brute + barre de score + comparaison population « top X % », jusqu'à top 0,01 %). Scoring percentiles existant (`rankKpis`). 9 tests purs (§387) |
+| Stats physiques (nageur) | ✅ | `PhysicalStatsView.tsx`, `KpiDetailSheet.tsx`, `physicalStats.ts`, `Profile.tsx` | Carte Performance → vue résumé KPIs muscu : indice global, points forts / axes, détail par KPI (mesure brute + barre de score + comparaison population « top X % », jusqu'à top 0,01 %). KPI cliquable → fiche détail (essais, historique + Δ, protocole). Scoring percentiles existant (`rankKpis`). 16 tests purs (§387, §388) |
 
 ### Planification natation (granularité nageur, §153 — remplace macro-cycles)
 

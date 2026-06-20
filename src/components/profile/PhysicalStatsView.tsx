@@ -7,11 +7,12 @@
  * sur les dernières mesures du nageur ; toute l'agrégation passe par le module
  * pur `physicalStats.ts`.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ChevronLeft,
+  ChevronRight,
   Activity,
   Flame,
   Target,
@@ -22,20 +23,19 @@ import {
 } from "lucide-react";
 import { getLatestKpiMeasurements } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fadeIn } from "@/lib/animations";
 import { ageBandFor, baremeConfidenceFor } from "@/lib/strength/kpiBaremes";
-import type { BaremeConfidence } from "@/lib/strength/kpiBaremes";
 import { rankKpis, type RankedKpi } from "@/lib/strength/wrappedStats";
 import {
   buildPhysicalStatsSummary,
-  populationComparison,
   formatKpiValue,
 } from "@/lib/strength/physicalStats";
 import type { StrengthKpiKey, StrengthKpiMeasurement } from "@/lib/api/types";
+import { TIER_STYLE, CONFIDENCE_BADGE, comparisonLabel, ScoreBar } from "./physicalStatsUi";
+import KpiDetailSheet from "./KpiDetailSheet";
 
 function ageFromBirthdate(birthdate: string | null | undefined): number | null {
   if (!birthdate) return null;
@@ -46,25 +46,6 @@ function ageFromBirthdate(birthdate: string | null | undefined): number | null {
   const m = now.getMonth() - b.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
   return age;
-}
-
-/** Couleur de la bande percentile (tier 0 = plus fort → tier 4 = plus faible). */
-const TIER_STYLE: Record<number, { bar: string; text: string; chip: string }> = {
-  0: { bar: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", chip: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
-  1: { bar: "bg-green-500", text: "text-green-600 dark:text-green-400", chip: "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300" },
-  2: { bar: "bg-sky-500", text: "text-sky-600 dark:text-sky-400", chip: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300" },
-  3: { bar: "bg-amber-500", text: "text-amber-600 dark:text-amber-400", chip: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
-  4: { bar: "bg-orange-500", text: "text-orange-600 dark:text-orange-400", chip: "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300" },
-};
-
-const CONFIDENCE_BADGE: Record<Exclude<BaremeConfidence, "solid">, string> = {
-  transposed: "indicatif",
-  placeholder: "à calibrer",
-};
-
-/** Libellé de comparaison population : « top X % » au-dessus de la médiane, sinon la bande qualitative. */
-function comparisonLabel(kpi: RankedKpi): string {
-  return kpi.score >= 50 ? populationComparison(kpi.score).topLabel : kpi.band.label;
 }
 
 function Header({ onBack }: { onBack: () => void }) {
@@ -83,24 +64,14 @@ function Header({ onBack }: { onBack: () => void }) {
   );
 }
 
-function ScoreBar({ score, tier }: { score: number; tier: number }) {
-  const pct = Math.min(100, Math.max(0, score));
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className={cn("h-full rounded-full transition-all", TIER_STYLE[tier].bar)}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
 function KpiDetailRow({
   kpi,
   measurement,
+  onSelect,
 }: {
   kpi: RankedKpi;
   measurement: StrengthKpiMeasurement | null;
+  onSelect: () => void;
 }) {
   const style = TIER_STYLE[kpi.band.tier];
   const confidence = baremeConfidenceFor(kpi.key);
@@ -108,7 +79,11 @@ function KpiDetailRow({
     measurement?.source === "wizard_athlete" && measurement?.coach_reviewed === false;
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-left transition hover:border-primary/25 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -116,16 +91,17 @@ function KpiDetailRow({
           </p>
           <p className="truncate text-sm font-semibold text-foreground">{kpi.label}</p>
         </div>
-        {measurement ? (
-          <div className="shrink-0 text-right">
+        <div className="flex shrink-0 items-center gap-1.5">
+          {measurement ? (
             <div className="text-base font-bold tabular-nums text-foreground">
               {formatKpiValue(measurement.value)}
               <span className="ml-0.5 text-xs font-medium text-muted-foreground">
                 {measurement.unit}
               </span>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
 
       <div className="mt-2.5 flex items-center gap-3">
@@ -156,7 +132,7 @@ function KpiDetailRow({
           </span>
         ) : null}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -167,6 +143,7 @@ function HighlightList({
   kpis,
   emptyHint,
   useTopLabel,
+  onSelect,
 }: {
   title: string;
   icon: typeof Flame;
@@ -175,6 +152,7 @@ function HighlightList({
   emptyHint: string;
   /** Forces → « top X % » ; axes → bande qualitative. */
   useTopLabel: boolean;
+  onSelect: (kpi: RankedKpi) => void;
 }) {
   return (
     <Card className="overflow-hidden border-primary/15 bg-card shadow-sm">
@@ -191,9 +169,11 @@ function HighlightList({
           kpis.map((kpi) => {
             const style = TIER_STYLE[kpi.band.tier];
             return (
-              <div
+              <button
+                type="button"
                 key={kpi.key}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-3"
+                onClick={() => onSelect(kpi)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-left transition hover:border-primary/25 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -201,10 +181,13 @@ function HighlightList({
                   </p>
                   <p className="truncate text-sm font-semibold text-foreground">{kpi.label}</p>
                 </div>
-                <span className={cn("shrink-0 text-sm font-bold", style.text)}>
-                  {useTopLabel ? comparisonLabel(kpi) : kpi.band.label}
-                </span>
-              </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className={cn("text-sm font-bold", style.text)}>
+                    {useTopLabel ? comparisonLabel(kpi) : kpi.band.label}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </button>
             );
           })
         )}
@@ -229,6 +212,7 @@ export default function PhysicalStatsView({
 }) {
   const reduce = useReducedMotion();
   const fadeVariants = reduce ? {} : fadeIn;
+  const [selected, setSelected] = useState<RankedKpi | null>(null);
 
   const { data: latest, isLoading } = useQuery({
     queryKey: ["kpi-latest", athleteId],
@@ -341,6 +325,7 @@ export default function PhysicalStatsView({
             kpis={summary.strengths}
             emptyHint="Continue tes bilans pour faire ressortir tes points forts."
             useTopLabel
+            onSelect={setSelected}
           />
 
           {/* Axes de progression */}
@@ -351,6 +336,7 @@ export default function PhysicalStatsView({
             kpis={summary.improvements}
             emptyHint="Aucun point faible marqué — beau profil équilibré !"
             useTopLabel={false}
+            onSelect={setSelected}
           />
 
           {/* Détail des KPIs mesurés */}
@@ -360,6 +346,9 @@ export default function PhysicalStatsView({
                 <Sparkles className="h-4 w-4 text-primary" />
                 Détail des mesures
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Appuie sur un KPI pour voir les essais, l'historique et le protocole.
+              </p>
             </CardHeader>
             <CardContent className="space-y-2.5">
               {summary.measured.map((kpi) => (
@@ -367,6 +356,7 @@ export default function PhysicalStatsView({
                   key={kpi.key}
                   kpi={kpi}
                   measurement={measurementByKey[kpi.key] ?? null}
+                  onSelect={() => setSelected(kpi)}
                 />
               ))}
             </CardContent>
@@ -385,6 +375,13 @@ export default function PhysicalStatsView({
           </div>
         </>
       )}
+
+      <KpiDetailSheet
+        kpi={selected}
+        measurement={selected ? measurementByKey[selected.key] ?? null : null}
+        athleteId={athleteId}
+        onClose={() => setSelected(null)}
+      />
     </motion.div>
   );
 }

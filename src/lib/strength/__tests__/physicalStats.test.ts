@@ -4,10 +4,33 @@ import {
   populationComparison,
   buildPhysicalStatsSummary,
   formatKpiValue,
+  formatNumber,
+  describeAttempts,
+  buildKpiHistoryRows,
 } from '../physicalStats';
 import type { RankedKpi } from '../wrappedStats';
 import { scoreToBand } from '../wrappedStats';
-import type { StrengthKpiKey } from '@/lib/api/types';
+import type { StrengthKpiKey, StrengthKpiMeasurement, KpiAttempts } from '@/lib/api/types';
+
+function fullMeas(
+  over: Partial<StrengthKpiMeasurement> & { kpi_key: StrengthKpiKey },
+): StrengthKpiMeasurement {
+  return {
+    id: over.id ?? 'm1',
+    athlete_id: 1,
+    kpi_key: over.kpi_key,
+    value: over.value ?? 0,
+    unit: over.unit ?? 'kg',
+    attempts: (over.attempts ?? null) as KpiAttempts | null,
+    measured_at: over.measured_at ?? '2026-05-01',
+    measured_by: over.measured_by ?? 2,
+    assisted_by: null,
+    source: over.source ?? 'wizard_coach',
+    coach_reviewed: over.coach_reviewed ?? true,
+    notes: over.notes ?? null,
+    created_at: over.measured_at ?? '2026-05-01',
+  };
+}
 
 function rk(key: StrengthKpiKey, score: number): RankedKpi {
   return {
@@ -90,4 +113,71 @@ test('formatKpiValue: 1 décimale max, sans zéro inutile', () => {
   assert.equal(formatKpiValue(51.234), '51.2');
   assert.equal(formatKpiValue(40), '40');
   assert.equal(formatKpiValue(12.5), '12.5');
+});
+
+test('formatNumber: décimales paramétrables, sans zéro de bord', () => {
+  assert.equal(formatNumber(0.654, 2), '0.65');
+  assert.equal(formatNumber(0.6, 2), '0.6');
+  assert.equal(formatNumber(5, 0), '5');
+});
+
+test('describeAttempts: number[] → essais bruts', () => {
+  const d = describeAttempts(fullMeas({ kpi_key: 'imtp', unit: 'kg', attempts: [70, 72.5] }));
+  assert.equal(d.length, 1);
+  assert.equal(d[0].label, 'Essais');
+  assert.equal(d[0].value, '70 · 72.5 kg');
+});
+
+test('describeAttempts: VerticalJumpAttempts → poids/vol/hauteur/puissance', () => {
+  const d = describeAttempts(
+    fullMeas({
+      kpi_key: 'vertical_jump',
+      unit: 'W/kg',
+      attempts: { weight_kg: 65, flight_times: [0.52, 0.55], height_cm: 37.1, peak_power_w: 3520 },
+    }),
+  );
+  assert.deepEqual(d.map((x) => x.label), [
+    'Poids saisi', 'Temps de vol', 'Hauteur (meilleur saut)', 'Puissance de pic',
+  ]);
+  assert.equal(d[1].value, '0.52 · 0.55 s');
+  assert.equal(d[3].value, '3520 W');
+});
+
+test('describeAttempts: MedballThrowAttempts → masse/distances/indice', () => {
+  const d = describeAttempts(
+    fullMeas({
+      kpi_key: 'medball_vertical_throw',
+      unit: 'kg·m',
+      attempts: { ball_mass_kg: 2, distances_cm: [430, 460], best_distance_cm: 460, index_kg_m: 9.2 },
+    }),
+  );
+  assert.equal(d[0].value, '2 kg');
+  assert.equal(d[1].value, '4.3 · 4.6 m');
+  assert.equal(d[2].value, '4.6 m');
+  assert.equal(d[3].value, '9.2 kg·m');
+});
+
+test('describeAttempts: attempts null → []', () => {
+  assert.deepEqual(describeAttempts(fullMeas({ kpi_key: 'imtp', attempts: null })), []);
+});
+
+test('buildKpiHistoryRows: tri desc + Δ vs précédent comparable', () => {
+  const rows = buildKpiHistoryRows([
+    fullMeas({ id: 'a', kpi_key: 'imtp', unit: 'kg', value: 60, measured_at: '2026-01-01' }),
+    fullMeas({ id: 'c', kpi_key: 'imtp', unit: 'kg', value: 75, measured_at: '2026-05-01' }),
+    fullMeas({ id: 'b', kpi_key: 'imtp', unit: 'kg', value: 70, measured_at: '2026-03-01' }),
+  ]);
+  assert.deepEqual(rows.map((r) => r.id), ['c', 'b', 'a']);
+  assert.equal(rows[0].deltaVsPrev, 5); // 75 - 70
+  assert.equal(rows[1].deltaVsPrev, 10); // 70 - 60
+  assert.equal(rows[2].deltaVsPrev, null); // plus ancien
+});
+
+test('buildKpiHistoryRows: Δ ignore les unités différentes (cm vs W/kg §293)', () => {
+  const rows = buildKpiHistoryRows([
+    fullMeas({ id: 'new', kpi_key: 'vertical_jump', unit: 'W/kg', value: 45, measured_at: '2026-05-01' }),
+    fullMeas({ id: 'old', kpi_key: 'vertical_jump', unit: 'cm', value: 38, measured_at: '2026-01-01' }),
+  ]);
+  // pas de mesure W/kg plus ancienne → pas de Δ malgré une mesure cm antérieure
+  assert.equal(rows[0].deltaVsPrev, null);
 });
