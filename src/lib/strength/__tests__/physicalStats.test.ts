@@ -5,7 +5,7 @@ import {
   buildPhysicalStatsSummary,
   formatKpiValue,
   formatNumber,
-  describeAttempts,
+  summarizeAttempts,
   buildKpiHistoryRows,
 } from '../physicalStats';
 import type { RankedKpi } from '../wrappedStats';
@@ -121,44 +121,40 @@ test('formatNumber: décimales paramétrables, sans zéro de bord', () => {
   assert.equal(formatNumber(5, 0), '5');
 });
 
-test('describeAttempts: number[] → essais bruts', () => {
-  const d = describeAttempts(fullMeas({ kpi_key: 'imtp', unit: 'kg', attempts: [70, 72.5] }));
-  assert.equal(d.length, 1);
-  assert.equal(d[0].label, 'Essais');
-  assert.equal(d[0].value, '70 · 72.5 kg');
+test('summarizeAttempts: number[] → une ligne d\'essais bruts', () => {
+  const d = summarizeAttempts(fullMeas({ kpi_key: 'imtp', unit: 'kg', attempts: [70, 72.5] }));
+  assert.equal(d?.label, 'Essais');
+  assert.equal(d?.value, '70 · 72.5 kg');
 });
 
-test('describeAttempts: VerticalJumpAttempts → poids/vol/hauteur/puissance', () => {
-  const d = describeAttempts(
+test('summarizeAttempts: détente → temps de vol SANS le poids du nageur', () => {
+  const d = summarizeAttempts(
     fullMeas({
       kpi_key: 'vertical_jump',
       unit: 'W/kg',
       attempts: { weight_kg: 65, flight_times: [0.52, 0.55], height_cm: 37.1, peak_power_w: 3520 },
     }),
   );
-  assert.deepEqual(d.map((x) => x.label), [
-    'Poids saisi', 'Temps de vol', 'Hauteur (meilleur saut)', 'Puissance de pic',
-  ]);
-  assert.equal(d[1].value, '0.52 · 0.55 s');
-  assert.equal(d[3].value, '3520 W');
+  assert.equal(d?.label, 'Temps de vol');
+  assert.equal(d?.value, '0.52 · 0.55 s');
+  // le poids du nageur (65 kg) ne doit JAMAIS apparaître
+  assert.ok(!/65/.test(d?.value ?? ''));
 });
 
-test('describeAttempts: MedballThrowAttempts → masse/distances/indice', () => {
-  const d = describeAttempts(
+test('summarizeAttempts: médecine-ball → distances + masse du ballon', () => {
+  const d = summarizeAttempts(
     fullMeas({
       kpi_key: 'medball_vertical_throw',
       unit: 'kg·m',
       attempts: { ball_mass_kg: 2, distances_cm: [430, 460], best_distance_cm: 460, index_kg_m: 9.2 },
     }),
   );
-  assert.equal(d[0].value, '2 kg');
-  assert.equal(d[1].value, '4.3 · 4.6 m');
-  assert.equal(d[2].value, '4.6 m');
-  assert.equal(d[3].value, '9.2 kg·m');
+  assert.equal(d?.label, 'Distances');
+  assert.equal(d?.value, '4.3 · 4.6 m · ballon 2 kg');
 });
 
-test('describeAttempts: attempts null → []', () => {
-  assert.deepEqual(describeAttempts(fullMeas({ kpi_key: 'imtp', attempts: null })), []);
+test('summarizeAttempts: attempts null → null', () => {
+  assert.equal(summarizeAttempts(fullMeas({ kpi_key: 'imtp', attempts: null })), null);
 });
 
 test('buildKpiHistoryRows: tri desc + Δ vs précédent comparable', () => {

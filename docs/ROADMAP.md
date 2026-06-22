@@ -1,8 +1,10 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-06-20*
+*Dernière mise à jour : 2026-06-22*
 
-*Dernière : 2026-06-20 — **§388 — Stats physiques : fiche détail KPI au clic** : chaque KPI (détail, points forts, axes) devient cliquable et ouvre un bottom sheet — score & comparaison population, dernière mesure + décomposition des essais (`describeAttempts`), historique avec Δ vs mesure comparable précédente (`buildKpiHistoryRows`, `getKpiHistory`), protocole de mesure. Nouveaux `KpiDetailSheet.tsx` + `physicalStatsUi.tsx` (UI partagée). +7 tests purs. tsc 0, lint 0, node:test strength 32/32.*
+*Dernière : 2026-06-22 — **§389 — Stats physiques : fiche au clic synthétique, sans poids du nageur** : `describeAttempts` → `summarizeAttempts` (essais en une ligne, poids du nageur masqué) ; fiche resserrée — score + comparaison, dernière mesure compacte, mini-historique plafonné (5), protocole replié derrière « Voir le protocole ». tsc 0, lint 0, node:test physicalStats 16/16, build OK.*
+
+*§388 — **Stats physiques : fiche détail KPI au clic** : chaque KPI (détail, points forts, axes) devient cliquable et ouvre un bottom sheet — score & comparaison population, dernière mesure + décomposition des essais (`describeAttempts`), historique avec Δ vs mesure comparable précédente (`buildKpiHistoryRows`, `getKpiHistory`), protocole de mesure. Nouveaux `KpiDetailSheet.tsx` + `physicalStatsUi.tsx` (UI partagée). +7 tests purs. tsc 0, lint 0, node:test strength 32/32.*
 
 *§387 — **Vue « Stats physiques » dans le profil nageur** : nouvelle section profil (nageur) résumant les KPIs muscu mesurés — indice physique global, points forts (score ≥ 70) / axes de progression (score < 50), détail par KPI (mesure brute + barre de score + comparaison population « top X % », jusqu'à top 0,01 % pour l'élite). Module pur `physicalStats.ts` (`populationComparison`/`buildPhysicalStatsSummary`, 9 tests) + composant `PhysicalStatsView.tsx`, branchés sur le scoring percentiles existant (`rankKpis`). tsc 0, lint 0, node:test strength 77/77.*
 

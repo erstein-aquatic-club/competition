@@ -4,6 +4,20 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §389 — Stats physiques : fiche au clic synthétique, sans poids du nageur (2026-06-22)
+
+**Contexte.** Retours utilisateur sur la fiche détail KPI (§388) : (1) ne pas afficher le poids du nageur (saisi pour calculer la puissance de la détente — « poids théorique ») ; (2) une fiche plus synthétique au clic.
+
+**Changements.**
+- **`physicalStats.ts`** : `describeAttempts` (multi-lignes, exposait le poids du nageur + hauteur + puissance) remplacé par `summarizeAttempts` → **une seule ligne** d'essais par KPI, **sans le poids du nageur** (`number[]` → essais bruts ; détente → temps de vol uniquement ; médecine-ball → distances + masse du ballon). Tests mis à jour (assert explicite « le poids n'apparaît jamais »).
+- **`KpiDetailSheet.tsx`** : fiche resserrée — score & comparaison (cœur), dernière mesure compacte (valeur + date + essais en une ligne + statut/notes), **mini-historique** plafonné à 5 mesures (+ compteur « n plus anciennes »), **protocole replié** par défaut derrière « Voir le protocole » (toggle, repli auto au changement de KPI). Retrait du bloc méthode verbeux du header et des chips secondaires.
+
+**Fichiers modifiés.** `src/lib/strength/physicalStats.ts`, `src/lib/strength/__tests__/physicalStats.test.ts`, `src/components/profile/KpiDetailSheet.tsx`.
+
+**Tests.** `node:test` physicalStats 16/16. tsc 0, lint 0, build OK.
+
+**Décisions / limites.** Le poids du nageur (`weight_kg`) reste stocké dans `attempts` (audit/recalcul puissance §293) mais n'est plus affiché. Hauteur et puissance de pic dérivées retirées de la fiche (choix « synthétique ») — la valeur scorée W/kg reste l'info principale.
+
 ## §388 — Stats physiques : fiche détail KPI au clic (2026-06-20)
 
 **Contexte.** Suite du §387 : la vue « Stats physiques » listait les KPIs mais ne donnait que le score/comparaison. Demande utilisateur : pouvoir cliquer chaque KPI pour en voir le détail.

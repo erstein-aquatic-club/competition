@@ -135,51 +135,40 @@ export interface AttemptDetail {
 }
 
 /**
- * Décompose les `attempts` (jsonb) d'une mesure KPI en lignes lisibles, selon
- * la forme stockée (cf. `KpiAttempts`) :
+ * Résume les `attempts` (jsonb) d'une mesure KPI en UNE ligne lisible, selon la
+ * forme stockée (cf. `KpiAttempts`) — vue synthétique de la fiche détail :
  *  - `number[]`            → essais bruts (3 KPIs « valeur simple ») ;
- *  - `VerticalJumpAttempts` → poids, temps de vol, hauteur, puissance de pic ;
- *  - `MedballThrowAttempts` → masse du ballon, distances, meilleure, indice.
+ *  - `VerticalJumpAttempts` → temps de vol des essais (le poids du nageur,
+ *    saisi seulement pour calculer la puissance, est volontairement masqué) ;
+ *  - `MedballThrowAttempts` → distances des essais + masse du ballon.
  *
- * Pure : pas de dépendance React. `[]` si `attempts` absent / forme inconnue.
+ * Pure : pas de dépendance React. `null` si `attempts` absent / forme inconnue.
  */
-export function describeAttempts(m: StrengthKpiMeasurement): AttemptDetail[] {
+export function summarizeAttempts(m: StrengthKpiMeasurement): AttemptDetail | null {
   const a = m.attempts;
-  if (!a) return [];
+  if (!a) return null;
   if (Array.isArray(a)) {
-    if (a.length === 0) return [];
-    return [
-      {
-        label: a.length > 1 ? 'Essais' : 'Essai',
-        value: `${a.map((v) => formatKpiValue(v)).join(' · ')} ${m.unit}`.trim(),
-      },
-    ];
+    if (a.length === 0) return null;
+    return {
+      label: a.length > 1 ? 'Essais' : 'Essai',
+      value: `${a.map((v) => formatKpiValue(v)).join(' · ')} ${m.unit}`.trim(),
+    };
   }
   if ('flight_times' in a) {
     const vj = a as VerticalJumpAttempts;
-    return [
-      { label: 'Poids saisi', value: `${formatKpiValue(vj.weight_kg)} kg` },
-      {
-        label: 'Temps de vol',
-        value: `${vj.flight_times.map((t) => formatNumber(t, 2)).join(' · ')} s`,
-      },
-      { label: 'Hauteur (meilleur saut)', value: `${formatKpiValue(vj.height_cm)} cm` },
-      { label: 'Puissance de pic', value: `${Math.round(vj.peak_power_w)} W` },
-    ];
+    if (!vj.flight_times?.length) return null;
+    return {
+      label: 'Temps de vol',
+      value: `${vj.flight_times.map((t) => formatNumber(t, 2)).join(' · ')} s`,
+    };
   }
   if ('distances_cm' in a) {
     const mb = a as MedballThrowAttempts;
-    return [
-      { label: 'Masse du ballon', value: `${formatKpiValue(mb.ball_mass_kg)} kg` },
-      {
-        label: 'Distances',
-        value: `${mb.distances_cm.map((d) => formatNumber(d / 100, 2)).join(' · ')} m`,
-      },
-      { label: 'Meilleure distance', value: `${formatNumber(mb.best_distance_cm / 100, 2)} m` },
-      { label: 'Indice (masse × distance)', value: `${formatKpiValue(mb.index_kg_m)} kg·m` },
-    ];
+    if (!mb.distances_cm?.length) return null;
+    const dist = `${mb.distances_cm.map((d) => formatNumber(d / 100, 2)).join(' · ')} m`;
+    return { label: 'Distances', value: `${dist} · ballon ${formatKpiValue(mb.ball_mass_kg)} kg` };
   }
-  return [];
+  return null;
 }
 
 /** Une ligne d'historique d'un KPI, avec Δ vs la mesure comparable précédente. */
