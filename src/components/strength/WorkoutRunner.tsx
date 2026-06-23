@@ -191,10 +191,15 @@ export function WorkoutRunner({
   inlineEstimationExercises,
   onRequestRecalc,
   onEstimationComplete,
+  lastWeights,
 }: {
   session: StrengthSessionTemplate;
   exercises: Exercise[];
   oneRMs: OneRmEntry[];
+  /** §389 — Dernière charge loggée par exercice (exercise_id → kg). Sert de
+   *  charge par défaut d'une nouvelle série quand l'exercice n'a ni cible
+   *  calculable (%1RM × 1RM) ni target_intensity (ex. lancer médecine-ball). */
+  lastWeights?: Record<number, number>;
   onFinish: (data: WorkoutFinishData) => void;
   onLogSets?: (logs: SetLogEntry[]) => Promise<void> | void;
   onProgress?: (progressPct: number) => Promise<void> | void;
@@ -425,7 +430,16 @@ export function WorkoutRunner({
     tracksWeight &&
     (needsCalibration ||
       (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false));
-  const targetWeight = hasPercent ? Math.round(rm * (percentValue / 100)) : 0;
+  // §389 — Fallback "dernière charge loggée" pour les exos sans %1RM (cible
+  // non calculable) : ex. lancer médecine-ball, prescrit en charge libre. On
+  // ne l'applique qu'à la métrique poids (les autres ont target_intensity).
+  const lastLoggedWeight =
+    currentBlock != null && tracksWeight
+      ? Number(lastWeights?.[currentBlock.exercise_id] ?? 0)
+      : 0;
+  const targetWeight = hasPercent
+    ? Math.round(rm * (percentValue / 100))
+    : (lastLoggedWeight > 0 ? lastLoggedWeight : 0);
   // §298 — métriques non-poids : cible depuis l'item (target_intensity), pas le 1RM
   const targetValue = tracksWeight ? targetWeight : Number(currentBlock?.target_intensity ?? 0);
 

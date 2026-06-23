@@ -4,6 +4,21 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §389 — Mode focus : charge par défaut = dernière charge loggée (2026-06-23)
+
+**Contexte.** Remontée terrain (François Wagner) : en mode muscu focus, plus aucune charge calculée par défaut en arrivant sur une nouvelle série pour le « lancer rotatif médecine-ball ». Diagnostic : cet exercice (puissance) est prescrit **sans %1RM** (`pct_1rm = 0`) et **sans `target_intensity`** ; or la charge par défaut du runner (`targetValue`) se calcule uniquement via `%1RM × 1RM` (sinon 0 → « — »). L'athlète a pourtant un historique de charges loggées (12, 15, 17 kg…) qu'il s'attend à voir prérempli.
+
+**Changements.**
+- **`src/lib/api/strength.ts`** — nouvelle fonction `getLastSetWeights(athlete)` : retourne `{ exercise_id: weight }` avec la **dernière charge loggée** par exercice (série la plus récente, `completed_at` desc), en ignorant les poids ≤ 0 et le sentinel poids-de-corps. Chemin Supabase (embed `strength_set_logs → strength_session_runs!inner(athlete_id)`, limit 1000) + fallback localStorage (runs triés récent→ancien). Re-export dans `src/lib/api/index.ts`.
+- **`src/components/strength/WorkoutRunner.tsx`** — nouvelle prop `lastWeights?: Record<number, number>`. `targetWeight` retombe sur `lastWeights[exercise_id]` quand l'exo n'a pas de %1RM (fallback réservé à la métrique `weight_kg`). Aucun impact sur les exos prescrits en %1RM (cible calculée conservée) ni sur les métriques non-poids (`target_intensity` conservé).
+- **`src/pages/Strength.tsx`** — query `["strength_last_weights", user, userId]` (`getLastSetWeights`), prop `lastWeights` passée au `WorkoutRunner`, invalidation après une séance terminée pour refléter la charge du jour.
+
+**Fichiers modifiés.** `src/lib/api/strength.ts`, `src/lib/api/index.ts`, `src/components/strength/WorkoutRunner.tsx`, `src/pages/Strength.tsx`, `src/components/strength/WorkoutRunner.vitest.tsx` (+2 tests).
+
+**Tests.** `npx tsc --noEmit` 0, `npm run lint` 0 erreur. vitest `WorkoutRunner.vitest.tsx` 7/7 (dont 2 nouveaux : préremplissage charge depuis `lastWeights`, repli « — » sans historique). node:test API 200/200, `StrengthRunner.test.tsx` 23/23. Pas de test RLS : lecture des **propres** logs de l'athlète (filtre `athlete_id` explicite + politique SELECT déjà couverte par `getStrengthHistory`), aucune policy/helper modifié.
+
+**Décisions / limites.** Fallback borné à 1000 logs récents (largement suffisant pour « la dernière charge »). Non appliqué aux métriques non-poids (hauteur/distance/temps) qui s'appuient sur `target_intensity`. La charge en séance continue d'être reportée série→série par le mécanisme existant (`currentSetInputs`).
+
 ## §388 — Stats physiques : fiche détail KPI au clic (2026-06-20)
 
 **Contexte.** Suite du §387 : la vue « Stats physiques » listait les KPIs mais ne donnait que le score/comparaison. Demande utilisateur : pouvoir cliquer chaque KPI pour en voir le détail.

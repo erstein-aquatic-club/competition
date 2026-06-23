@@ -1235,6 +1235,79 @@ export async function get1RM(
   return records.filter((r: any) => r.athlete_name === athleteName);
 }
 
+/**
+ * §389 — Dernière charge loggée par exercice pour un athlète (mode focus).
+ *
+ * Préremplit la charge par défaut d'une nouvelle série quand l'exercice n'a
+ * pas de cible calculable (%1RM × 1RM) ni de `target_intensity` — typiquement
+ * les exercices de puissance prescrits sans %1RM (ex. lancer médecine-ball).
+ * Retourne `{ exercise_id: weight }` avec la charge de la série la PLUS récente,
+ * en ignorant les poids ≤ 0 et le sentinel poids-de-corps.
+ */
+export async function getLastSetWeights(
+  athlete:
+    | string
+    | { athleteName?: string | null; athleteId?: number | string | null },
+): Promise<Record<number, number>> {
+  const athleteName =
+    typeof athlete === "string" ? athlete : (athlete?.athleteName ?? null);
+  const athleteId =
+    typeof athlete === "string" ? null : (athlete?.athleteId ?? null);
+  const result: Record<number, number> = {};
+
+  if (canUseSupabase()) {
+    if (athleteId === null || athleteId === undefined || String(athleteId) === "") {
+      return result;
+    }
+    const { data, error } = await supabase
+      .from("strength_set_logs")
+      .select(
+        "exercise_id, weight, completed_at, strength_session_runs!inner(athlete_id)",
+      )
+      .eq("strength_session_runs.athlete_id", Number(athleteId))
+      .order("completed_at", { ascending: false, nullsFirst: false })
+      .limit(1000);
+    if (error) throw new Error(error.message);
+    // Les logs arrivent du plus récent au plus ancien : la première charge
+    // valide rencontrée pour un exercice est donc sa dernière charge loggée.
+    (data ?? []).forEach((log: any) => {
+      const exId = safeInt(log.exercise_id);
+      if (!exId || result[exId] !== undefined) return;
+      const w = Number(log.weight);
+      if (!Number.isFinite(w) || w <= 0 || isBodyweight(w)) return;
+      result[exId] = w;
+    });
+    return result;
+  }
+
+  // Fallback localStorage : trie les runs du plus récent au plus ancien,
+  // prend la première charge valide par exercice.
+  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const filtered = (Array.isArray(runs) ? runs : [])
+    .filter((r: any) =>
+      athleteId !== null && athleteId !== undefined && String(athleteId) !== ""
+        ? String(r.athlete_id) === String(athleteId)
+        : athleteName
+          ? r.athlete_name === athleteName
+          : true,
+    )
+    .sort((a: any, b: any) => {
+      const aDate = new Date(a.date || a.started_at || a.created_at || 0).getTime();
+      const bDate = new Date(b.date || b.started_at || b.created_at || 0).getTime();
+      return bDate - aDate;
+    });
+  filtered.forEach((run: any) => {
+    (run.logs || []).forEach((log: any) => {
+      const exId = safeInt(log.exercise_id);
+      if (!exId || result[exId] !== undefined) return;
+      const w = Number(log.weight);
+      if (!Number.isFinite(w) || w <= 0 || isBodyweight(w)) return;
+      result[exId] = w;
+    });
+  });
+  return result;
+}
+
 export async function update1RM(record: {
   athlete_id?: number | string | null;
   athleteId?: number | string | null;

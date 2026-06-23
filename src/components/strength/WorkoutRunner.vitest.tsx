@@ -163,6 +163,63 @@ describe("§376 substitution mid-séance — pas de retour à l'échauffement", 
   });
 });
 
+// §389 — Charge par défaut d'une nouvelle série pour un exo sans cible
+// calculable (%1RM × 1RM) ni target_intensity : ex. lancer médecine-ball,
+// prescrit en charge libre (percent_1rm = 0). Le runner doit retomber sur la
+// dernière charge loggée (`lastWeights`) au lieu d'afficher « — ».
+describe("§389 charge par défaut = dernière charge loggée (jsdom)", () => {
+  function powerSession(): StrengthSessionTemplate {
+    return {
+      id: 53,
+      name: "Séance puissance",
+      items: [
+        {
+          exercise_id: 53,
+          exercise_name: "Lancer rotatif médecine-ball",
+          order_index: 0,
+          sets: 2,
+          reps: 4,
+          rest_seconds: 90,
+          percent_1rm: 0,
+          block: "main" as const,
+        },
+      ],
+    } as unknown as StrengthSessionTemplate;
+  }
+  const catalog: Exercise[] = [
+    { id: 53, nom_exercice: "Lancer rotatif médecine-ball", exercise_type: "strength" } as unknown as Exercise,
+  ];
+
+  function renderPower(extra: Record<string, unknown> = {}) {
+    const utils = render(
+      <WorkoutRunner
+        session={powerSession()}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={1}
+        userId={1}
+        {...extra}
+      />,
+    );
+    const goBtn = screen.queryByRole("button", { name: /On y va/i });
+    if (goBtn) fireEvent.click(goBtn);
+    return utils;
+  }
+
+  it("préremplit la tuile charge avec la dernière charge loggée (sans %1RM)", () => {
+    renderPower({ lastWeights: { 53: 12 } });
+    const charge = screen.getByText("Charge").closest("button");
+    expect(charge?.textContent).toContain("12");
+  });
+
+  it("affiche « — » quand aucune charge loggée et pas de cible calculable", () => {
+    renderPower({ lastWeights: {} });
+    const charge = screen.getByText("Charge").closest("button");
+    expect(charge?.textContent).toContain("—");
+  });
+});
+
 describe("§369 carte série 1 augmentée (jsdom)", () => {
   it("RIR par défaut = 2 pré-sélectionné (anti sous-estimation)", () => {
     renderRunner();

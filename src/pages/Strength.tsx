@@ -11,6 +11,7 @@ import {
   getStrengthSessions,
   getExercises,
   get1RM,
+  getLastSetWeights,
   update1RM,
   withTimeout,
   startStrengthRun as startStrengthRunApi,
@@ -305,6 +306,15 @@ export default function Strength() {
     enabled: !!user,
   });
 
+  // §389 — Dernière charge loggée par exercice : sert de charge par défaut en
+  // mode focus pour les exercices sans cible calculable (%1RM × 1RM) ni
+  // target_intensity (ex. lancer médecine-ball, prescrit sans %1RM).
+  const { data: lastWeights } = useQuery({
+    queryKey: ["strength_last_weights", user, userId],
+    queryFn: () => getLastSetWeights({ athleteName: user, athleteId: userId }),
+    enabled: !!user,
+  });
+
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
 
   /** Bumped when we want to launch focus immediately after the next render
@@ -454,6 +464,9 @@ export default function Strength() {
       }
       setIsFinishing(false);
       queryClient.invalidateQueries({ queryKey: ["strength_history"] });
+      // §389 — rafraîchit la dernière charge par exercice après une séance
+      // terminée pour que le prochain défaut focus reflète la charge du jour.
+      queryClient.invalidateQueries({ queryKey: ["strength_last_weights", user, userId] });
       if (variables?.status !== "completed") {
         return;
       }
@@ -858,6 +871,7 @@ export default function Strength() {
               session={activeSession}
               exercises={exercises}
               oneRMs={oneRMs || []}
+              lastWeights={lastWeights}
               exerciseNotes={exerciseNotes}
               onUpdateNote={(exerciseId, note) => updateNote.mutate({ exercise_id: exerciseId, notes: note })}
               initialLogs={activeRunLogs}

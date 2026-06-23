@@ -533,6 +533,7 @@ export {
   getStrengthHistory,
   getStrengthHistoryAggregate,
   get1RM,
+  getLastSetWeights,
   update1RM,
   updateExerciseNote,
   getStrengthFolders,

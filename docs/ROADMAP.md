@@ -1,8 +1,10 @@
 # Roadmap de Développement
 
-*Dernière mise à jour : 2026-06-20*
+*Dernière mise à jour : 2026-06-23*
 
-*Dernière : 2026-06-20 — **§388 — Stats physiques : fiche détail KPI au clic** : chaque KPI (détail, points forts, axes) devient cliquable et ouvre un bottom sheet — score & comparaison population, dernière mesure + décomposition des essais (`describeAttempts`), historique avec Δ vs mesure comparable précédente (`buildKpiHistoryRows`, `getKpiHistory`), protocole de mesure. Nouveaux `KpiDetailSheet.tsx` + `physicalStatsUi.tsx` (UI partagée). +7 tests purs. tsc 0, lint 0, node:test strength 32/32.*
+*Dernière : 2026-06-23 — **§389 — Mode focus : charge par défaut = dernière charge loggée** : correctif terrain — un exo prescrit sans %1RM ni `target_intensity` (ex. lancer rotatif médecine-ball) n'affichait plus de charge par défaut (« — ») alors que l'athlète a un historique. Nouvelle API `getLastSetWeights` (dernière charge loggée par exercice) branchée sur le `WorkoutRunner` (prop `lastWeights`) comme repli de `targetWeight` quand %1RM absent. tsc 0, lint 0, vitest WorkoutRunner 7/7 (+2), node:test API 200/200.*
+
+*§388 — **Stats physiques : fiche détail KPI au clic** : chaque KPI (détail, points forts, axes) devient cliquable et ouvre un bottom sheet — score & comparaison population, dernière mesure + décomposition des essais (`describeAttempts`), historique avec Δ vs mesure comparable précédente (`buildKpiHistoryRows`, `getKpiHistory`), protocole de mesure. Nouveaux `KpiDetailSheet.tsx` + `physicalStatsUi.tsx` (UI partagée). +7 tests purs. tsc 0, lint 0, node:test strength 32/32.*
 
 *§387 — **Vue « Stats physiques » dans le profil nageur** : nouvelle section profil (nageur) résumant les KPIs muscu mesurés — indice physique global, points forts (score ≥ 70) / axes de progression (score < 50), détail par KPI (mesure brute + barre de score + comparaison population « top X % », jusqu'à top 0,01 % pour l'élite). Module pur `physicalStats.ts` (`populationComparison`/`buildPhysicalStatsSummary`, 9 tests) + composant `PhysicalStatsView.tsx`, branchés sur le scoring percentiles existant (`rankKpis`). tsc 0, lint 0, node:test strength 77/77.*
 
