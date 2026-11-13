@@ -46,6 +46,18 @@ export function cycleCoversWeek(
   return Number.isInteger(weeks) && weeks >= 0 && weeks < cycle.target_week_count;
 }
 
+/**
+ * During an individual cycle, only explicitly overridden slots are visible:
+ * a group-only slot on an unprogrammed day must not add a workout.
+ * Outside that window group slots remain available as before.
+ */
+export function isSlotVisibleForCycle(
+  slot: { week_start: string; overridden?: boolean },
+  activeCycle: CycleWindow | null | undefined,
+): boolean {
+  return !cycleCoversWeek(slot.week_start, activeCycle) || slot.overridden === true;
+}
+
 export interface StrengthWeekSources<T extends WeekWithKey> {
   weekKeys: readonly string[];
   /** Merged athlete/group dated slots (even empty active-cycle weeks). */
