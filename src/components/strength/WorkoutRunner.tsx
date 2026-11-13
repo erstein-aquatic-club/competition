@@ -453,6 +453,8 @@ export function WorkoutRunner({
       startedAt?: number;
       /** §371 (F4) — 1RM calibrées en séance (exerciseId → 1RM), pour survivre à un kill PWA. */
       runOneRms?: Array<[number, number]>;
+      restEndAt?: number;
+      restType?: "set" | "exercise";
     };
     const draft = loadDraft<WorkoutDraft>(draftKey);
     if (!draft) return;
@@ -468,7 +470,8 @@ export function WorkoutRunner({
       (typeof payload.fatigue === "number" && payload.fatigue !== 3) ||
       // §371 (F4) — une 1RM calibrée en séance seule compte comme contenu :
       // sinon un kill PWA juste après la série de calibration la perdrait.
-      (Array.isArray(payload.runOneRms) && payload.runOneRms.length > 0);
+      (Array.isArray(payload.runOneRms) && payload.runOneRms.length > 0) ||
+      (typeof payload.restEndAt === "number" && payload.restEndAt > Date.now());
     if (!hasContent) {
       clearDraft(draftKey);
       return;
@@ -483,6 +486,11 @@ export function WorkoutRunner({
     // §371 (F4) — restaure les 1RM calibrées en séance (cibles des séries 2+).
     if (Array.isArray(payload.runOneRms)) {
       setRunOneRms(new Map(payload.runOneRms));
+    }
+    if (typeof payload.restEndAt === "number" && payload.restEndAt > Date.now()) {
+      setRestEndAt(payload.restEndAt);
+      setRestType(payload.restType === "exercise" ? "exercise" : "set");
+      setIsResting(true);
     }
     // R4 (§343) — reprend le chrono au vrai départ (sinon `elapsedStartRef` remis
     // à `Date.now()` au remount → durée totale fausse, ~5 min au lieu de ~45).
@@ -503,10 +511,13 @@ export function WorkoutRunner({
         currentSetInputs,
         startedAt: elapsedStartRef.current, // R4 (§343)
         runOneRms: Array.from(runOneRms.entries()), // §371 (F4)
+        // Absolute deadline survives PWA suspension and a cold restart.
+        restEndAt: isResting ? restEndAt : 0,
+        restType,
       });
     }, 500);
     return () => clearTimeout(draftDebounceRef.current);
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType]);
 
   // Synchronous flush on tab hide / pagehide / beforeunload.
   useEffect(() => {
@@ -519,6 +530,9 @@ export function WorkoutRunner({
         currentSetInputs,
         startedAt: elapsedStartRef.current, // R4 (§343)
         runOneRms: Array.from(runOneRms.entries()), // §371 (F4)
+        // Absolute deadline survives PWA suspension and a cold restart.
+        restEndAt: isResting ? restEndAt : 0,
+        restType,
       });
     };
     const onVisibility = () => {
@@ -532,7 +546,7 @@ export function WorkoutRunner({
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType]);
 
   const logLookup = useMemo(() => {
     const map = new Map<string, SetLogEntry>();
@@ -750,6 +764,13 @@ export function WorkoutRunner({
     // skip the new exercise. Bail out instead — the next render reconciles.
     const blockSets = currentBlock.sets ?? 0;
     if (blockSets > 0 && currentSetIndex > blockSets) return;
+    if (tracksWeight && !isBodyweightExercise && hasPercent && rm <= 0 &&
+        !(Number(currentSetInputs[currentSetIndex - 1]?.weight) > 0)) {
+      toast.error("Charge à renseigner", {
+        description: "Ta 1RM est inconnue : saisis une charge avant de valider la série.",
+      });
+      return;
+    }
     if (currentLoggedSet) {
       if (currentSetIndex >= currentBlock.sets) {
         await advanceExercise();
@@ -1037,7 +1058,8 @@ export function WorkoutRunner({
                   comments,
                   logs,
                 });
-                if (draftKey) clearDraft(draftKey);
+                // Parent clears the draft only after a confirmed remote save
+                // or a successfully persisted offline queue entry.
               }}
             >
               {isFinishing ? "Enregistrement…" : "Enregistrer & fermer"}
