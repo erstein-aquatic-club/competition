@@ -152,13 +152,13 @@ type CycleDraft = {
 | **P2** | Wizard deux sources avec aperçu/diff commun ; import CSV/PDF revu par coach | Publication en 5 étapes, annulation sûre |
 | **P2** | Nettoyage guidé des `training_plan_applications` anciennes et gestion explicite des cycles achevés | Pas de repli silencieux sur plan périmé |
 
-## 4 bis. Fraîcheur des plans dans la PWA (correctif PR #81)
+## 4 bis. Fraîcheur des plans dans la PWA (suivi de la PR #81)
 
 **Problème identifié le 13/11/2026 :** la durée de fraîcheur React Query (10 min), la persistance de requêtes (24 h) et le Workbox `NetworkFirst` Supabase (cache de secours à 5 s, max 1 h) pouvaient donner des plans périmés. L'invalidation historique de `MesocyclePreview` oubliait `strength_catalog`, empêchant de voir immédiatement le détail des nouvelles séances.
 
 **Invariant de produit :** un plan publié et validé par Supabase est visible par un utilisateur connecté et en ligne sans attendre l'expiration d'un cache PWA. Le délai réseau normal reste inévitable ; on n'affiche pas un succès si la publication serveur échoue. En cas d'absence de réseau, ne pas confondre les anciennes données éventuellement disponibles avec un plan à jour.
 
-**Implémentation proposée dans la PR #81 (à déployer et vérifier) :**
+**Implémentation prévue dans la PR complémentaire de fraîcheur PWA (à déployer et vérifier) :**
 
 1. **HTTP :** la règle Workbox `NetworkOnly` pour les tables REST de planification et modèles de séance est définie **avant** le `NetworkFirst` Supabase générique. Pas de réponse ancienne depuis CacheStorage en cas de timeout. Le cache des actifs statiques (JS/CSS) et des autres domaines fonctionnels reste intact.
 2. **Mémoire React Query :** les clés critiques (`strength-mesocycle-*`, `strength_planning_*`, `strength-planning-*`, `strength_catalog`, `training_plan_*`, `strength_folders`) passent en `staleTime=0`, `refetchOnMount='always'`, `refetchOnWindowFocus='always'`, `refetchOnReconnect='always'`. Les callbacks de publication/édition appellent `invalidateStrengthPlanningQueries` pour les deux conventions de clés.
@@ -204,4 +204,4 @@ type CycleDraft = {
 
 ---
 
-**Statut de ce document** : diagnostic vérifié + procédure d'exploitation prudente + spécification proposée. Les garde-fous et la fraîcheur PWA font l'objet de la PR #81 (non déployée tant que non fusionnée et migrée) ; le parcours d'import unifié reste à développer.
+**Statut de ce document** : diagnostic vérifié + procédure d'exploitation prudente + spécification proposée. Les garde-fous historiques ont été fusionnés avec la PR #81 ; la fraîcheur des données PWA est proposée dans une PR complémentaire (code et migration 00229 restant à fusionner/déployer). Le parcours d'import unifié reste à développer.
