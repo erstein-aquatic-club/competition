@@ -152,6 +152,30 @@ type CycleDraft = {
 | **P2** | Wizard deux sources avec aperçu/diff commun ; import CSV/PDF revu par coach | Publication en 5 étapes, annulation sûre |
 | **P2** | Nettoyage guidé des `training_plan_applications` anciennes et gestion explicite des cycles achevés | Pas de repli silencieux sur plan périmé |
 
+## 4 bis. Fraîcheur des plans dans la PWA (correctif PR #81)
+
+**Problème identifié le 13/11/2026 :** la durée de fraîcheur React Query (10 min), la persistance de requêtes (24 h) et le Workbox `NetworkFirst` Supabase (cache de secours à 5 s, max 1 h) pouvaient donner des plans périmés. L'invalidation historique de `MesocyclePreview` oubliait `strength_catalog`, empêchant de voir immédiatement le détail des nouvelles séances.
+
+**Invariant de produit :** un plan publié et validé par Supabase est visible par un utilisateur connecté et en ligne sans attendre l'expiration d'un cache PWA. Le délai réseau normal reste inévitable ; on n'affiche pas un succès si la publication serveur échoue. En cas d'absence de réseau, ne pas confondre les anciennes données éventuellement disponibles avec un plan à jour.
+
+**Implémentation proposée dans la PR #81 (à déployer et vérifier) :**
+
+1. **HTTP :** la règle Workbox `NetworkOnly` pour les tables REST de planification et modèles de séance est définie **avant** le `NetworkFirst` Supabase générique. Pas de réponse ancienne depuis CacheStorage en cas de timeout. Le cache des actifs statiques (JS/CSS) et des autres domaines fonctionnels reste intact.
+2. **Mémoire React Query :** les clés critiques (`strength-mesocycle-*`, `strength_planning_*`, `strength-planning-*`, `strength_catalog`, `training_plan_*`, `strength_folders`) passent en `staleTime=0`, `refetchOnMount='always'`, `refetchOnWindowFocus='always'`, `refetchOnReconnect='always'`. Les callbacks de publication/édition appellent `invalidateStrengthPlanningQueries` pour les deux conventions de clés.
+3. **Persistance locale :** les clés critiques sont exclues du snapshot React Query localStorage. Les autres données restent cachées pour le mode hors ligne. **Compromis assumé :** un démarrage PWA totalement hors ligne ne peut pas promettre l'affichage des plans si aucune donnée récente n'a été chargée dans le processus courant ; une solution offline dédiée et explicitement horodatée pourra être envisagée ultérieurement.
+4. **Synchronisation distante :** `StrengthPlanningSync` sous le QueryClientProvider s'abonne aux changements Supabase Realtime (publication SQL `00229_strength_planning_realtime.sql`) pour les mésocycles, affectations et créneaux ; l'abonnement concerne le nageur/groupe ou le coach selon son rôle. Un événement **ne modifie pas** localement les séances : il invalide les clés et provoque une relecture canonique.
+5. **PWA iOS suspendue :** `visibilitychange`, `pageshow`, `focus`, `online` et reconnexion du canal déclenchent également une relecture ciblée. Pas de `window.location.reload()` forcé qui risquerait une page blanche ou une perte de saisie.
+6. **Migration :** Realtime Postgres Changes n'était pas activé sur ces tables à la date de l'audit. Le mécanisme distant ne fonctionnera pleinement **qu'après l'application de la migration 00229** et l'activation du nouveau code client. Vérifier les politiques RLS avant toute extension du périmètre temps réel.
+
+**Recette avant fusion/déploiement :**
+- Publier depuis une autre session/appareil un cycle de 6 semaines et vérifier que la PWA nageur déjà ouverte montre le nouveau cycle et ses séances sans rechargement manuel.
+- Faire de même pour une nouvelle `training_plan_application`, un créneau sportif modifié, un jour de repos et une suppression (les suppressions sont rattrapées à la reprise/reconnexion, pas via un filtre Realtime DELETE).
+- Répéter avec PWA en arrière-plan puis retour au premier plan, en Wi-Fi lent et après déconnexion/reconnexion ; confirmer l'absence de plan figé lié au cache.
+- Vérifier que les domaines non-musculation gardent leurs caches et qu'aucune donnée d'un autre nageur n'est visible par le canal Realtime (RLS).
+- Exécuter les tests TypeScript/Vitest et tester une installation PWA iOS réelle ; les tests unitaires de catégorisation du cache ne remplacent pas le test réseau/realtime.
+
+---
+
 ## 5. Contrôles de qualité et tests à ajouter
 
 - **Chemin nominal** : un plan de 6 semaines, démarrant mardi, avec 3 puis 4 séances/semaine, apparaît dans « Mon plan », calendrier, lecteur et runner. Les journées absentes restent absentes.
@@ -180,4 +204,4 @@ type CycleDraft = {
 
 ---
 
-**Statut de ce document** : diagnostic vérifié + procédure d'exploitation prudente + spécification proposée. Le parcours d'import unifié et les garde-fous **P0/P1/P2 ne sont pas encore implémentés** du seul fait de ce document.
+**Statut de ce document** : diagnostic vérifié + procédure d'exploitation prudente + spécification proposée. Les garde-fous et la fraîcheur PWA font l'objet de la PR #81 (non déployée tant que non fusionnée et migrée) ; le parcours d'import unifié reste à développer.
