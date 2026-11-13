@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { isTransientError } from "./offlineQueue";
+import { isStrengthPlanQueryKey, STRENGTH_PLAN_QUERY_PREFIXES } from "./strengthPlanFreshness";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,3 +24,28 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * New strength plans must not wait for the default 10-minute business cache.
+ * All plan views fetch on mount/focus/reconnect, even when cached data exists.
+ */
+for (const prefix of STRENGTH_PLAN_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], {
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
+  });
+}
+
+/** Refresh all variants of the strength-planning cache after any publication,
+ * coach edit, realtime event or foreground resume. Active queries refetch now;
+ * inactive ones are marked stale and will refetch on their next mount. */
+export function invalidateStrengthPlanningQueries(
+  client: QueryClient = queryClient,
+): Promise<void> {
+  return client.invalidateQueries({
+    predicate: (query) => isStrengthPlanQueryKey(query.queryKey),
+    refetchType: "active",
+  });
+}
