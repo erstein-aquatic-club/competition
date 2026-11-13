@@ -121,7 +121,7 @@ export function useStrengthPlanByISO(
 
   // Shared active-cycle queryKey with MyPlanTab: a group-only slot must not
   // add unplanned workouts during the athlete's individual mesocycle.
-  const { data: activeMesocycle } = useQuery({
+  const { data: activeMesocycle, isLoading: activeCycleLoading } = useQuery({
     queryKey: ["strength-mesocycle-active", athleteId],
     queryFn: () => getActiveMesocycle(athleteId!),
     enabled: athleteId != null,
@@ -129,9 +129,9 @@ export function useStrengthPlanByISO(
   });
 
   const effectiveSlots = useMemo(
-    () => mergeStrengthSlots(groupSlots, athleteOverrides)
+    () => activeCycleLoading ? [] : mergeStrengthSlots(groupSlots, athleteOverrides)
       .filter((slot) => isSlotVisibleForCycle(slot, activeMesocycle)),
-    [groupSlots, athleteOverrides, activeMesocycle],
+    [groupSlots, athleteOverrides, activeMesocycle, activeCycleLoading],
   );
 
   const planByISO = useMemo(() => {
