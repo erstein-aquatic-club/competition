@@ -457,6 +457,35 @@ export async function deleteStrengthSession(sessionId: number) {
   return { status: "deleted" };
 }
 
+/**
+ * Keep the local run mirror consistent with an offline completion, so that a
+ * cold start without network does not offer "Reprendre" for a finished workout.
+ * The offline queue remains the source of truth for pending upload.
+ */
+export function markLocalStrengthRunCompleted(
+  runId: number,
+  logs: unknown[],
+  syncPending: boolean,
+): void {
+  try {
+    const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+    const index = runs.findIndex((run) => run.id === runId);
+    if (index === -1) return;
+    const updated = [...runs];
+    updated[index] = {
+      ...updated[index],
+      logs,
+      status: "completed",
+      progress_pct: 100,
+      sync_pending: syncPending,
+      completed_at: updated[index].completed_at ?? new Date().toISOString(),
+    };
+    localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, updated);
+  } catch {
+    // The completion payload is still held in the separate durable queue.
+  }
+}
+
 // --- Strength Runs ---
 
 type StartStrengthRunInput = {
