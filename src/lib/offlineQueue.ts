@@ -3,6 +3,9 @@ const QUEUE_KEY = "eac-offline-queue";
 /** After 7 days, a queued mutation is considered stale and dropped at read time. */
 const QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Never auto-delete unsynchronized strength performances, even after a week. */
+const CRITICAL_STRENGTH_MUTATIONS = new Set(["strength-run-completed", "strength-set-log", "updateRun"]);
+
 /** A mutation that fails this many consecutive times is moved to "poisoned" and dropped. */
 export const MAX_RETRY_ATTEMPTS = 5;
 
@@ -81,7 +84,8 @@ export function getQueue(): QueuedMutation[] {
   for (const item of raw) {
     const age = now - (item.timestamp ?? now);
     const retries = item.retryCount ?? 0;
-    if (age > QUEUE_TTL_MS || retries >= MAX_RETRY_ATTEMPTS) {
+    if (!CRITICAL_STRENGTH_MUTATIONS.has(item.type) &&
+        (age > QUEUE_TTL_MS || retries >= MAX_RETRY_ATTEMPTS)) {
       reaped += 1;
       continue;
     }
@@ -130,7 +134,7 @@ export function markRetry(id: string): boolean {
   if (idx === -1) return false;
   const item = queue[idx];
   const nextRetry = (item.retryCount ?? 0) + 1;
-  if (nextRetry >= MAX_RETRY_ATTEMPTS) {
+  if (nextRetry >= MAX_RETRY_ATTEMPTS && !CRITICAL_STRENGTH_MUTATIONS.has(item.type)) {
     queue.splice(idx, 1);
     saveQueue(queue);
     console.error(
