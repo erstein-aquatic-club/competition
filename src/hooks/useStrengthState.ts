@@ -146,6 +146,7 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     }
     const payload = {
       screenMode,
+      updatedAt: Date.now(),
       session: activeSession,
       assignment: activeAssignment,
       runId: activeRunId,
