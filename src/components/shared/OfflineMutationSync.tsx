@@ -257,7 +257,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
 
   await saveStrengthRun({
     ...payload,
-    run_id: null,
+    run_id: payload.run_id,
     status: "completed",
     logs,
   });
