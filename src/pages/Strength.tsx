@@ -894,7 +894,7 @@ export default function Strength() {
                 // A negative ID represents a local-only run. The entire run
                 // will be uploaded atomically on completion; per-set RPCs
                 // would reference a non-existent foreign key.
-                if (activeRunId < 0) return;
+                if (activeRunId < 0 || activeRunId > 2147483647) return;
                 // If offline, queue the set for replay so the per-set log is
                 // not lost if the user finishes online from a different device
                 // or if the reconcile-at-finish step never runs.
