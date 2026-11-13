@@ -234,7 +234,7 @@ export default function Strength() {
       return;
     }
     if (!wasOfflineRef.current) return;
-    if (!activeRunId || activeRunId < 0 || !activeRunLogs || activeRunLogs.length === 0) {
+    if (!activeRunId || activeRunId < 0 || activeRunId > 2147483647 || !activeRunLogs || activeRunLogs.length === 0) {
       wasOfflineRef.current = false;
       return;
     }
