@@ -4,12 +4,14 @@ import {
   getStrengthPlanningSlots,
   getStrengthPlanningSlotOverrides,
   getStrengthSessions,
+  getActiveMesocycle,
 } from "@/lib/api";
 import type { StrengthSessionTemplate } from "@/lib/api/types";
 import {
   mergeStrengthSlots,
   type EffectiveStrengthSlot,
 } from "@/lib/strengthPlanningMerge";
+import { isSlotVisibleForCycle } from "@/lib/strength/resolveStrengthWeeks";
 
 /**
  * Reads the strength plan (group slots + per-athlete overrides) and produces
@@ -117,9 +119,19 @@ export function useStrengthPlanByISO(
     staleTime: 5 * 60 * 1000,
   });
 
+  // Shared active-cycle queryKey with MyPlanTab: a group-only slot must not
+  // add unplanned workouts during the athlete's individual mesocycle.
+  const { data: activeMesocycle } = useQuery({
+    queryKey: ["strength-mesocycle-active", athleteId],
+    queryFn: () => getActiveMesocycle(athleteId!),
+    enabled: athleteId != null,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const effectiveSlots = useMemo(
-    () => mergeStrengthSlots(groupSlots, athleteOverrides),
-    [groupSlots, athleteOverrides],
+    () => mergeStrengthSlots(groupSlots, athleteOverrides)
+      .filter((slot) => isSlotVisibleForCycle(slot, activeMesocycle)),
+    [groupSlots, athleteOverrides, activeMesocycle],
   );
 
   const planByISO = useMemo(() => {
