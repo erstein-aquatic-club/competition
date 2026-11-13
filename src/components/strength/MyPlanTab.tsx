@@ -37,7 +37,7 @@ import {
 import { mergeStrengthSlots } from "@/lib/strengthPlanningMerge";
 import { derivePlanByWeekDay, type DerivedCell } from "@/lib/strength/derivePlanByWeekDay";
 import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
-import { cycleCoversWeek, resolveStrengthWeeks } from "@/lib/strength/resolveStrengthWeeks";
+import { cycleCoversWeek, isSlotVisibleForCycle, resolveStrengthWeeks } from "@/lib/strength/resolveStrengthWeeks";
 
 /** Number of future weeks to display from current week */
 const PLAN_WEEK_COUNT = 12;
@@ -305,7 +305,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       // the athlete's programme. A merged slot with overridden=true carries
       // an explicit athlete override even when a group slot shares its key.
       const slots = (byWeek.get(weekStart) ?? []).filter(
-        (slot) => !inActiveCycle || slot.overridden,
+        (slot) => isSlotVisibleForCycle(slot, activeMesocycle),
       );
       if (slots.length === 0 && !inActiveCycle) continue;
 
