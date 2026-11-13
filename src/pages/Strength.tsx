@@ -1001,7 +1001,7 @@ export default function Strength() {
                   if (activeRunId < 0) {
                     // Materialize the local-only run and all its logs in one
                     // Supabase transaction. Never UPDATE a negative run ID.
-                    await saveStrengthRun({ ...offlinePayload, run_id: null });
+                    await saveStrengthRun(offlinePayload);
                     clearDraft(`workout_runner:${activeRunId}`);
                     queryClient.invalidateQueries({ queryKey: ["strength_history"] });
                     queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress"] });
