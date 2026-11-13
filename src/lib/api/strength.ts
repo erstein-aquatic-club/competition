@@ -633,7 +633,14 @@ export async function logStrengthSet(payload: {
       p_pct_1rm_suggested: payload.pct_1rm_suggested ?? null,
       p_one_rm_estimate: oneRmEstimate,
     }));
-    const data = assertSupabase(await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic"));
+    const rpcResult = await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic");
+    // An earlier write may have landed even if the client lost its ACK.
+    // Natural-key collision means this very set is already on Supabase.
+    if (rpcResult.error?.code === "23505" &&
+        String(rpcResult.error?.message ?? "").includes("strength_set_logs_natural_key_idx")) {
+      return { status: "ok", one_rm_updated: false, one_rm: undefined };
+    }
+    const data = assertSupabase(rpcResult);
     const result = (data ?? {}) as {
       set_id?: number;
       one_rm_updated?: boolean;
@@ -874,9 +881,17 @@ export async function saveStrengthRun(run: any) {
       }),
     );
 
-    const rpcPromise = Promise.resolve(supabase.rpc('save_strength_run_atomic', {
+    // Deduplicate offline-created runs across lost acknowledgements/retries.
+    // The same temporary client run ID must always resolve to one server run.
+    const clientDedupKey = run.run_id != null && run.athlete_id != null
+      ? `strength-run:${run.athlete_id}:${run.run_id}`
+      : null;
+    const rpcPromise = Promise.resolve(supabase.rpc(
+      clientDedupKey ? 'save_strength_run_offline_idempotent' : 'save_strength_run_atomic',
+      {
       p_data: {
-        run_id: run.run_id ?? null,
+        client_dedup_key: clientDedupKey,
+        run_id: clientDedupKey ? null : (run.run_id ?? null),
         session_id: run.session_id ?? null,
         athlete_id: run.athlete_id ?? null,
         assignment_id: run.assignment_id ?? null,
