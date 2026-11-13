@@ -16,6 +16,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateStrengthPlanningQueries } from "@/lib/queryClient";
 import { toast } from "sonner";
 import {
   getActiveMesocycle,
@@ -164,10 +165,7 @@ export default function CoachMesocyclePanel({
   const revertMutation = useMutation({
     mutationFn: async (id: string) => revertMesocycle(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-active", athleteId] });
-      queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-history", athleteId] });
-      queryClient.invalidateQueries({ queryKey: ["strength_planning_slot_overrides", athleteId] });
-      queryClient.invalidateQueries({ queryKey: ["strength_planning_week_overrides", athleteId] });
+      void invalidateStrengthPlanningQueries(queryClient);
       toast.success("Mésocycle rejeté", {
         description: `La planif d'avant a été restaurée. ${athleteName} sera notifié.`,
       });

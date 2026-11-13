@@ -58,6 +58,12 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/competition\/api/, /^\/competition\/version\.json/],
         runtimeCaching: [
           {
+            // Never return a 5-minute-old training plan on Workbox NetworkFirst
+            // timeout. Other APIs retain their offline behaviour.
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/rest\/v1\/(?:strength_mesocycles|strength_planning_slot_overrides|strength_planning_week_overrides|strength_planning_slots|strength_sessions|strength_session_items|training_plan_applications|training_plan_sessions|training_plans)(?:[/?]|$)/i,
+            handler: 'NetworkOnly',
+          },
+          {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {

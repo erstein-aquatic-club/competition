@@ -10,7 +10,7 @@
  */
 
 export interface CycleWindow {
-  start_week_monday: string | null;
+  start_week_monday?: string | null;
   target_week_count: number;
 }
 
