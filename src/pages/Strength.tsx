@@ -728,6 +728,7 @@ export default function Strength() {
                 focusKey,
                 JSON.stringify({
                   screenMode: "reader",
+                  updatedAt: Date.now(),
                   session: { ...activeSession, cycle: lockedCycle, items: activeFilteredItems },
                   assignment: activeAssignment,
                   runId: res.run_id,
