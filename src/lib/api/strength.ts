@@ -459,14 +459,33 @@ export async function deleteStrengthSession(sessionId: number) {
 
 // --- Strength Runs ---
 
-export async function startStrengthRun(data: {
+type StartStrengthRunInput = {
   assignment_id?: number | null;
   athlete_id?: number | null;
   athleteName?: string;
   session_id?: number;
   cycle_type?: string;
   progress_pct?: number;
-}) {
+};
+
+/** Offline sessions use negative IDs until they are atomically created online. */
+export function startStrengthRunLocally(data: StartStrengthRunInput) {
+  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const run_id = -(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+  const newRun = createLocalStrengthRun(data, run_id);
+  localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, [...runs, newRun]);
+  if (data.assignment_id) {
+    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
+    localStorageSave(STORAGE_KEYS.ASSIGNMENTS, assignments.map((assignment: any) =>
+      assignment.id === data.assignment_id
+        ? { ...assignment, status: "in_progress" }
+        : assignment,
+    ));
+  }
+  return { run_id };
+}
+
+export async function startStrengthRun(data: StartStrengthRunInput) {
   if (canUseSupabase()) {
     const run = assertSupabase(
       await supabase
@@ -490,22 +509,7 @@ export async function startStrengthRun(data: {
     }
     return { run_id: run.id };
   }
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
-  // Negative IDs are unmistakably local. Never send them in UPDATE / set RPCs:
-  // an offline-created run must be materialized by save_strength_run_atomic.
-  const run_id = -Date.now();
-  const newRun = createLocalStrengthRun(data, run_id);
-  localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, [...runs, newRun]);
-  if (data.assignment_id) {
-    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
-    const updated = assignments.map((assignment: any) =>
-      assignment.id === data.assignment_id
-        ? { ...assignment, status: "in_progress" }
-        : assignment,
-    );
-    localStorageSave(STORAGE_KEYS.ASSIGNMENTS, updated);
-  }
-  return { run_id };
+  return startStrengthRunLocally(data);
 }
 
 export async function logStrengthSet(payload: {
