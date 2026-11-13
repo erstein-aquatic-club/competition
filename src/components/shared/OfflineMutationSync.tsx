@@ -228,7 +228,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
   const runId = Number(payload.run_id);
   // A negative run ID was generated on this device while offline. It has
   // never existed on Supabase and must be created atomically with its logs.
-  const hasServerRunId = Number.isFinite(runId) && runId > 0;
+  const hasServerRunId = Number.isSafeInteger(runId) && runId > 0 && runId <= 2147483647;
   const remoteLogs = hasServerRunId ? await getRemoteRunLogs(runId) : null;
 
   if (remoteLogs !== null) {
