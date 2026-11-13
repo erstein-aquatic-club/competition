@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { invalidateStrengthPlanningQueries } from "@/lib/queryClient";
 
 import {
   applyMesocycle,
@@ -531,10 +532,10 @@ export default function MesocyclePreview() {
     } catch {
       // Ignore : sessionStorage peut être bloqué (private mode).
     }
-    queryClient.invalidateQueries({ queryKey: ["strength-mesocycle-active", effectiveAthleteId] });
-    queryClient.invalidateQueries({ queryKey: ["strength_planning_slot_overrides"] });
-    queryClient.invalidateQueries({ queryKey: ["strength_planning_week_overrides"] });
-    queryClient.invalidateQueries({ queryKey: ["strength_planning_slots"] });
+    // Includes the exercise/session catalogue, legacy applications, and both
+    // hyphen/underscore planning query keys. Inactive plan queries are marked
+    // stale and always re-fetch when MyPlanTab mounts after navigation.
+    void invalidateStrengthPlanningQueries(queryClient);
     toast.success("Mésocycle appliqué", { description });
     // Mode coach → retour à la fiche nageur (onglet Planning) ; sinon /strength.
     navigate(isCoachMode ? `/coach/swimmer/${effectiveAthleteId}` : "/strength");
