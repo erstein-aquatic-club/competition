@@ -956,7 +956,7 @@ export default function Strength() {
                 });
               }}
               onProgress={async (progressPct) => {
-                if (!activeRunId || activeRunId < 0) return;
+                if (!activeRunId || activeRunId < 0 || activeRunId > 2147483647) return;
                 if (!isOnline) return;
                 // Fire-and-forget: progress updates are nice-to-have; data is in localStorage
                 updateRun.mutate({
