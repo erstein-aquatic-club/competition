@@ -998,7 +998,7 @@ export default function Strength() {
                 }
                 setIsFinishing(true);
                 try {
-                  if (activeRunId < 0) {
+                  if (activeRunId < 0 || activeRunId > 2147483647) {
                     // Materialize the local-only run and all its logs in one
                     // Supabase transaction. Never UPDATE a negative run ID.
                     await saveStrengthRun(offlinePayload);
