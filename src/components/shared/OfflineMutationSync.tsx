@@ -28,6 +28,7 @@ import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
 import { runSyncOnce } from "@/lib/offlineSync";
 import { getMissingStrengthLogs, type RemoteStrengthLogIdentity } from "@/lib/strength/reconcileStrengthLogs";
+import { markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { supabase } from "@/lib/supabase";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useAuth } from "@/lib/auth";
@@ -261,6 +262,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
     status: "completed",
     logs,
   });
+  if (Number.isFinite(runId)) markLocalStrengthRunCompleted(runId, logs, false);
 }
 
 export function OfflineMutationSync() {
