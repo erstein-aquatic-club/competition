@@ -46,6 +46,7 @@ const {
   enqueue,
   getQueue,
   peekQueue,
+  saveQueue,
   clearQueue,
   markRetry,
   MAX_RETRY_ATTEMPTS,
@@ -146,6 +147,39 @@ describe("offlineQueue.markRetry / poisoning", () => {
       assert.equal(markRetry(id), false);
     }
     assert.equal(markRetry(id), true);
+    assert.equal(getQueue().length, 0);
+  });
+});
+
+describe("critical strength mutations are never silently reaped", () => {
+  beforeEach(() => clearQueue());
+
+  it("preserves completed strength runs and set logs after 7 days", () => {
+    enqueue("strength-run-completed", { run_id: -123, athlete_id: 42 });
+    enqueue("strength-set-log", { run_id: 55, athlete_id: 42 });
+    const old = getQueue().map((q) => ({
+      ...q,
+      timestamp: Date.now() - 9 * 24 * 60 * 60 * 1000,
+    }));
+    saveQueue(old);
+    assert.equal(getQueue().length, 2);
+  });
+
+  it("keeps a strength run after 5 non-transient replay failures", () => {
+    enqueue("strength-run-completed", { run_id: -123, athlete_id: 42 });
+    const id = getQueue()[0].id;
+    for (let i = 0; i < MAX_RETRY_ATTEMPTS + 2; i += 1) {
+      assert.equal(markRetry(id), false);
+    }
+    assert.equal(getQueue().length, 1);
+  });
+
+  it("continues to reap noncritical expired mutations", () => {
+    enqueue("test-noncritical", { value: 1 });
+    saveQueue(getQueue().map((q) => ({
+      ...q,
+      timestamp: Date.now() - 9 * 24 * 60 * 60 * 1000,
+    })));
     assert.equal(getQueue().length, 0);
   });
 });
