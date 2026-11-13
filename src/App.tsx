@@ -20,6 +20,7 @@ import {
   ListSkeleton,
 } from "@/components/shared/skeletons";
 import { PWAInstallGate } from "@/components/shared/PWAInstallGate";
+import { StrengthPlanningSync } from "@/components/shared/StrengthPlanningSync";
 import { requiresApprovalForRole } from "@/lib/authRules";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useInAppPushBridge } from "@/hooks/useInAppPushBridge";
@@ -527,6 +528,7 @@ function App() {
     <>
       <DarkModeApplier />
       <CacheWarmer />
+      <StrengthPlanningSync />
       <PushBridge />
       <TooltipProvider>
         <DeferredBootExtras />
