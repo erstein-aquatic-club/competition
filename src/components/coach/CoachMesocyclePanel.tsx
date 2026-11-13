@@ -191,6 +191,11 @@ export default function CoachMesocyclePanel({
     return <EmptyState history={history} />;
   }
 
+  // Les imports PDF historiques n'ont pas tous de snapshot ni de tags
+  // d'appartenance ; leur revert SQL pouvait marquer le cycle "reverted"
+  // sans nettoyer ses séances. Le backend garde aussi cette invariance.
+  const isManualImport = /^manual[-_]/i.test(active.engine_version);
+
   // Parse défensif du snapshot reasoning.
   const reasoning = parseReasoning(active.bucket_priorities);
 
@@ -323,10 +328,9 @@ export default function CoachMesocyclePanel({
         <div className="border-t border-violet-100 bg-card/60 px-4 py-3 dark:border-violet-900/50">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted-foreground">
-              Tu peux éditer chaque séance en cliquant dessus dans la timeline
-              du nageur — les séances générées sont des templates standards.
-              Pour annuler complètement ce mésocycle et restaurer la planif
-              d'avant, rejette-le ci-dessous.
+              {isManualImport
+                ? "Ce cycle a été importé manuellement : son annulation automatique est désactivée tant que la provenance et le snapshot de restauration ne sont pas réparés."
+                : "Tu peux éditer chaque séance dans la timeline du nageur. Pour annuler complètement ce mésocycle et restaurer la planif d'avant, rejette-le ci-dessous."}
             </div>
             <div className="flex shrink-0 flex-col gap-2">
               <Button

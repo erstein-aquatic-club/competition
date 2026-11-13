@@ -1,6 +1,7 @@
 import { ChevronRight, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WeekSession } from "@/lib/strength/strengthPlanWeeks";
+import { formatStrengthSessionTitle } from "@/lib/strength/formatStrengthSessionTitle";
 
 interface MyPlanSessionRowProps {
   weekSession: WeekSession;
@@ -40,7 +41,7 @@ export function MyPlanSessionRow({ weekSession, onSelect }: MyPlanSessionRowProp
         <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       )}
 
-      <span className="text-[12px] font-medium truncate flex-1 text-left">{cleanTitle}</span>
+      <span className="text-[12px] font-medium truncate flex-1 text-left">{formatStrengthSessionTitle(cleanTitle)}</span>
 
       <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
         {itemCount} ex.

@@ -37,6 +37,7 @@ import {
 import { mergeStrengthSlots } from "@/lib/strengthPlanningMerge";
 import { derivePlanByWeekDay, type DerivedCell } from "@/lib/strength/derivePlanByWeekDay";
 import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
+import { cycleCoversWeek, isSlotVisibleForCycle, resolveStrengthWeeks } from "@/lib/strength/resolveStrengthWeeks";
 
 /** Number of future weeks to display from current week */
 const PLAN_WEEK_COUNT = 12;
@@ -86,7 +87,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   const weekStarts = useMemo(() => buildWeekStarts(PLAN_WEEK_COUNT), []);
 
   // ── Profile (to get group_id) ───────────────────────────────────────────────
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", athleteId],
     queryFn: () => getProfile({ userId: athleteId }),
     staleTime: 5 * 60 * 1000,
@@ -96,7 +97,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // ── Phase 3 (§275.7) : training_plan applications targeting the athlete ───
   // Highest priority source: a coach-applied training plan supplies the
   // weekly sessions via training_plan_sessions, materialized in this view.
-  const { data: planApplications = [] } = useQuery({
+  const { data: planApplications = [], isLoading: applicationsLoading } = useQuery({
     queryKey: ["training_plan_applications", "for-user", athleteId],
     queryFn: () =>
       getTrainingPlanApplicationsForUser({
@@ -110,14 +111,14 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     [planApplications],
   );
 
-  const { data: applicationPlanSessions = [] } = useQuery({
+  const { data: applicationPlanSessions = [], isLoading: planSessionsLoading } = useQuery({
     queryKey: ["training_plan_sessions", "for-plans", applicationPlanIds],
     queryFn: () => getTrainingPlanSessionsForPlans(applicationPlanIds),
     enabled: applicationPlanIds.length > 0,
   });
 
   // ── Phase 2: Strength planning slots ────────────────────────────────────────
-  const { data: groupSlots = [] } = useQuery({
+  const { data: groupSlots = [], isLoading: groupSlotsLoading } = useQuery({
     queryKey: ["strength_planning_slots", groupId, weekStarts],
     queryFn: () =>
       groupId
@@ -126,7 +127,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     enabled: groupId != null,
   });
 
-  const { data: athleteOverrides = [] } = useQuery({
+  const { data: athleteOverrides = [], isLoading: athleteOverridesLoading } = useQuery({
     queryKey: ["strength_planning_slot_overrides", athleteId, weekStarts],
     queryFn: () =>
       getStrengthPlanningSlotOverrides({ athleteId, weekStarts }),
@@ -135,7 +136,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   // §293 — week_type posé par la RPC apply_strength_mesocycle (label du cycle
   // de périodisation : "Force max", "Pic", …). Sert à colorer la timeline en
   // Phase 2 par phase d'entraînement.
-  const { data: athleteWeekOverrides = [] } = useQuery({
+  const { data: athleteWeekOverrides = [], isLoading: weekOverridesLoading } = useQuery({
     queryKey: ["strength_planning_week_overrides", athleteId, weekStarts],
     queryFn: () =>
       getStrengthPlanningWeekOverrides({ athleteId, weekStarts }),
@@ -148,10 +149,17 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     return m;
   }, [athleteWeekOverrides]);
 
-  // Merge: athlete overrides take precedence over group slots
+  // Keep the same effective slots in the timeline and the day-J launcher.
+  // During an active personal cycle, group-only slots cannot add workouts.
+  const { data: activeMesocycle, isLoading: activeCycleLoading } = useQuery({
+    queryKey: ["strength-mesocycle-active", athleteId],
+    queryFn: () => getActiveMesocycle(athleteId),
+    staleTime: 60_000,
+  });
   const effectiveSlots = useMemo(
-    () => mergeStrengthSlots(groupSlots, athleteOverrides),
-    [groupSlots, athleteOverrides],
+    () => mergeStrengthSlots(groupSlots, athleteOverrides)
+      .filter((slot) => isSlotVisibleForCycle(slot, activeMesocycle)),
+    [groupSlots, athleteOverrides, activeMesocycle],
   );
 
   // ── Phase 1 fallback data (cycles-based) ────────────────────────────────────
@@ -160,7 +168,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     queryFn: () => getStrengthFolders("session", { athleteId }),
   });
 
-  const { data: allSessions = [] } = useQuery({
+  const { data: allSessions = [], isLoading: sessionsLoading } = useQuery({
     queryKey: ["strength_catalog"],
     queryFn: () => getStrengthSessions(),
   });
@@ -213,29 +221,15 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     });
   }, [planApplications, applicationPlanSessions, weekStarts]);
 
-  // §296 — Si l'athlète a un mésocycle muscu actif, ses slot_overrides (Phase
-  // 2) doivent gagner sur le training_plan_application (Phase 3) — sémantique :
-  // un mésocycle posé = override personnalisé récent qui DOIT s'afficher.
-  // Sans mésocycle actif, on garde la cascade historique (Phase 3 > Phase 2).
-  const { data: activeMesocycle } = useQuery({
-    queryKey: ["strength-mesocycle-active", athleteId],
-    queryFn: () => getActiveMesocycle(athleteId),
-  });
+  // Active cycle ownership is restricted to its actual dated window.
   const hasActiveMesocycle = activeMesocycle != null;
 
-  // ── Determine which source to use ──────────────────────────────────────────
-  // Priority (post-§296) :
-  //   • si mésocycle actif → Phase 2 (overrides) > Phase 3 > Phase 1
-  //   • sinon              → Phase 3 (applications) > Phase 2 > Phase 1
-  const usePhase2 =
-    (hasActiveMesocycle && effectiveSlots.length > 0) ||
-    (phase3Derived.size === 0 && effectiveSlots.length > 0);
-  const usePhase3 = !usePhase2 && phase3Derived.size > 0;
-  const useFallback = !usePhase2 && !usePhase3 && rootFolders.length > 0;
+  // The active cycle owns only its exact start/end weeks. Individual slots
+  // are authoritative there, including deliberately empty/rest weeks.
+  const activeCycleVisible = weekStarts.some((w) => cycleCoversWeek(w, activeMesocycle));
 
   // ── Phase 3: Build WeekInstances from derived plan cells ──────────────────
   const phase3WeekInstances = useMemo((): WeekInstance[] => {
-    if (!usePhase3) return [];
     const instances: WeekInstance[] = [];
     const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
     for (const weekStart of weekStarts) {
@@ -291,11 +285,10 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       });
     }
     return instances;
-  }, [usePhase3, phase3Derived, weekStarts, sessionsById]);
+  }, [phase3Derived, weekStarts, sessionsById]);
 
   // ── Phase 2: Build WeekInstances from effective slots ──────────────────────
   const phase2WeekInstances = useMemo((): WeekInstance[] => {
-    if (!usePhase2) return [];
 
     // Group effective slots by week_start
     const byWeek = new Map<string, typeof effectiveSlots>();
@@ -307,8 +300,11 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
 
     const instances: WeekInstance[] = [];
     for (const weekStart of weekStarts) {
+      const inActiveCycle = cycleCoversWeek(weekStart, activeMesocycle);
+      // effectiveSlots is already filtered for the individual cycle, so
+      // rendering and the day-J launcher use the exact same assignment set.
       const slots = byWeek.get(weekStart) ?? [];
-      if (slots.length === 0) continue;
+      if (slots.length === 0 && !inActiveCycle) continue;
 
       const monday = new Date(weekStart + "T00:00:00");
       const sunday = new Date(monday);
@@ -353,37 +349,48 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       });
     }
     return instances;
-  }, [usePhase2, effectiveSlots, weekStarts, sessionsById, weekTypeByStart]);
+  }, [activeMesocycle, effectiveSlots, weekStarts, sessionsById, weekTypeByStart]);
 
   // ── Phase 1 fallback: build WeekInstances from cycles ─────────────────────
   const fallbackWeekInstances = useMemo((): WeekInstance[] => {
-    if (!useFallback) return [];
+    if (rootFolders.length === 0) return [];
     const allCycles = rootFolders.flatMap((root) => subFoldersMap.get(root.id) ?? []);
     if (allCycles.length === 0) return [];
     const all = buildWeekInstances(rootFolders[0], allCycles, sessionsByFolder);
     const todayMondayKey = toISODate(getMonday(new Date()));
     return all.filter((inst) => inst.week.weekKey >= todayMondayKey);
-  }, [useFallback, rootFolders, subFoldersMap, sessionsByFolder]);
+  }, [rootFolders, subFoldersMap, sessionsByFolder]);
 
   // ── Final week instances ────────────────────────────────────────────────────
-  const weekInstances = usePhase3
-    ? phase3WeekInstances
-    : usePhase2
-      ? phase2WeekInstances
-      : fallbackWeekInstances;
+  const weekInstances = useMemo(
+    () => resolveStrengthWeeks({
+      weekKeys: weekStarts,
+      dated: phase2WeekInstances,
+      applications: phase3WeekInstances,
+      folders: fallbackWeekInstances,
+      activeCycle: activeMesocycle,
+    }),
+    [weekStarts, phase2WeekInstances, phase3WeekInstances, fallbackWeekInstances, activeMesocycle],
+  );
 
   // §296 — Auto-open priorité : si un mésocycle actif existe, ouvrir la
   // PREMIÈRE semaine du mésocycle (le plan que le nageur vient de générer
   // mérite la visibilité maximale). Sinon, semaine en cours comme avant.
   const firstMesoWeekKey = useMemo(() => {
     if (!hasActiveMesocycle) return null;
+    // Works for PDF/manual imports too (whose slot notes do not start with
+    // "Mésocycle "): start_week_monday is the authoritative boundary.
+    if (activeMesocycle?.start_week_monday &&
+        weekStarts.includes(activeMesocycle.start_week_monday)) {
+      return activeMesocycle.start_week_monday;
+    }
     for (const o of athleteOverrides) {
       if (typeof o.notes === "string" && o.notes.startsWith("Mésocycle ")) {
         return o.week_start;
       }
     }
     return null;
-  }, [hasActiveMesocycle, athleteOverrides]);
+  }, [hasActiveMesocycle, activeMesocycle, weekStarts, athleteOverrides]);
 
   // ── V5 (§341) — bandeau « hero » : objectif · Semaine X/Y · phase en cours.
   // Hook AVANT tout early return (mémoire #310). Ne se matérialise que pour un
@@ -497,8 +504,15 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     />
   ) : null;
 
+  // Do not briefly render stale folder/training-plan data while the active
+  // mesocycle and its weekly slots are still loading.
+  const planLoading =
+    foldersLoading || profileLoading || applicationsLoading ||
+    planSessionsLoading || groupSlotsLoading || athleteOverridesLoading ||
+    weekOverridesLoading || sessionsLoading || activeCycleLoading;
+
   // ── Loading skeleton ────────────────────────────────────────────────────────
-  if (foldersLoading) {
+  if (planLoading) {
     return (
       <div className="space-y-3 pt-2">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -510,7 +524,9 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
 
   // ── Empty states ────────────────────────────────────────────────────────────
   // No Phase 3 applications AND no Phase 2 slots AND no Phase 1 cycles → show "aucun plan"
-  if (!usePhase3 && !usePhase2 && rootFolders.length === 0) {
+  if (weekInstances.length === 0 && rootFolders.length === 0 &&
+      effectiveSlots.length === 0 && phase3Derived.size === 0 &&
+      !hasActiveMesocycle) {
     return (
       <div>
         {recapButton}
@@ -549,7 +565,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       {/* V5 (§341/§345) — bandeau objectif/position du cycle. Quand il est rendu,
           il ABSORBE le bouton « Récap » (pas de ligne séparée) ; sinon (Phase 3 /
           fallback) on garde le bouton « Récap » autonome. */}
-      {usePhase2 && mesocycleBanner ? (
+      {activeCycleVisible && mesocycleBanner ? (
         <MyPlanMesocycleBanner
           {...mesocycleBanner}
           recapEnabled={wrapped.enabled}

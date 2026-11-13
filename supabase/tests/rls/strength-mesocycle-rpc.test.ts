@@ -288,6 +288,63 @@ describe("revert_strength_mesocycle RLS", () => {
     });
   });
 
+  it("00228 — refuse un revert sans snapshot sans changer le statut ni les séances", async () => {
+    await asUser(ALICE, async (c) => {
+      const apply = await c.query<{ mesocycle_id: string }>(applySql, [
+        1, A_ASSESS, TEMPLATE, START_MONDAY, REASONING, PAYLOAD,
+      ]);
+      const id = apply.rows[0].mesocycle_id;
+      await c.query("DELETE FROM strength_planning_snapshots WHERE mesocycle_id = $1", [id]);
+
+      // A failed SQL statement aborts its transaction; a savepoint lets us
+      // check the unchanged state before asUser rolls everything back.
+      await c.query("SAVEPOINT unsafe_revert");
+      await expect(
+        c.query("SELECT revert_strength_mesocycle($1::uuid)", [id]),
+      ).rejects.toThrow(/missing planning snapshot/);
+      await c.query("ROLLBACK TO SAVEPOINT unsafe_revert");
+
+      const state = await c.query<{ status: string }>(
+        "SELECT status FROM strength_mesocycles WHERE id = $1", [id],
+      );
+      expect(state.rows[0].status).toBe("active");
+      const slots = await c.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM strength_planning_slot_overrides WHERE athlete_id = 1 AND notes LIKE 'Mésocycle %'",
+      );
+      expect(slots.rows[0].count).toBe("4");
+    });
+  });
+
+  it("00228 — refuse un revert sans séances tagguées même si le snapshot existe", async () => {
+    await asUser(ALICE, async (c) => {
+      const apply = await c.query<{ mesocycle_id: string }>(applySql, [
+        1, A_ASSESS, TEMPLATE, START_MONDAY, REASONING, PAYLOAD,
+      ]);
+      const id = apply.rows[0].mesocycle_id;
+
+      // Simulate a broken PDF import that has a valid cycle/snapshot but
+      // no belonging tags on its exercise rows.
+      await c.query(
+        "UPDATE strength_session_items SET raw_payload = '{}'::jsonb WHERE raw_payload->>'mesocycle_id' = $1",
+        [id],
+      );
+      await c.query("SAVEPOINT unsafe_revert");
+      await expect(
+        c.query("SELECT revert_strength_mesocycle($1::uuid)", [id]),
+      ).rejects.toThrow(/no tagged session templates/);
+      await c.query("ROLLBACK TO SAVEPOINT unsafe_revert");
+
+      const state = await c.query<{ status: string }>(
+        "SELECT status FROM strength_mesocycles WHERE id = $1", [id],
+      );
+      expect(state.rows[0].status).toBe("active");
+      const slots = await c.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM strength_planning_slot_overrides WHERE athlete_id = 1 AND notes LIKE 'Mésocycle %'",
+      );
+      expect(slots.rows[0].count).toBe("4");
+    });
+  });
+
   it("Bob ne peut PAS revert le mésocycle d'Alice", async () => {
     await asUser(ALICE, async (c) => {
       const apply = await c.query<{ mesocycle_id: string }>(applySql, [

@@ -1773,10 +1773,20 @@ BEGIN
   v_short_id := substring(p_mesocycle_id::text from 1 for 8);
   SELECT slot_overrides, week_overrides INTO v_snapshot_slots, v_snapshot_weeks
     FROM strength_planning_snapshots WHERE mesocycle_id = p_mesocycle_id ORDER BY created_at DESC LIMIT 1;
+  -- 00228: no snapshot means we cannot promise a safe rollback.
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'revert_strength_mesocycle: missing planning snapshot for mesocycle %; refusing unsafe revert',
+      p_mesocycle_id USING ERRCODE = '22023';
+  END IF;
   IF v_snapshot_slots IS NULL THEN v_snapshot_slots := '[]'::jsonb; END IF;
   IF v_snapshot_weeks IS NULL THEN v_snapshot_weeks := '[]'::jsonb; END IF;
   SELECT COALESCE(array_agg(DISTINCT session_id), ARRAY[]::integer[]) INTO v_template_ids
     FROM strength_session_items WHERE raw_payload->>'mesocycle_id' = p_mesocycle_id::text;
+  -- 00228: untagged manual imports cannot be cleaned by this revert.
+  IF COALESCE(array_length(v_template_ids, 1), 0) = 0 THEN
+    RAISE EXCEPTION 'revert_strength_mesocycle: no tagged session templates for mesocycle %; refusing unsafe revert',
+      p_mesocycle_id USING ERRCODE = '22023';
+  END IF;
   IF array_length(v_template_ids, 1) > 0 THEN
     SELECT MIN(week_start), MAX(week_start) INTO v_window_start, v_window_end
       FROM strength_planning_slot_overrides WHERE athlete_id = v_athlete_id AND session_template_id = ANY (v_template_ids);
