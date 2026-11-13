@@ -27,6 +27,8 @@ import {
 import { canUseSupabase } from "@/lib/api/client";
 import { getQueue, markRetry, removeQueueItem, QUEUE_UPDATED_EVENT, QUEUE_REAPED_EVENT, isTransientError, type QueuedMutation } from "@/lib/offlineQueue";
 import { runSyncOnce } from "@/lib/offlineSync";
+import { getMissingStrengthLogs, type RemoteStrengthLogIdentity } from "@/lib/strength/reconcileStrengthLogs";
+import { markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { supabase } from "@/lib/supabase";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useAuth } from "@/lib/auth";
@@ -205,7 +207,7 @@ function isQueuedAvatarUpload(
   return m.type === "avatar-upload";
 }
 
-async function getRemoteRunLogCount(runId: number): Promise<number | null> {
+async function getRemoteRunLogs(runId: number): Promise<RemoteStrengthLogIdentity[] | null> {
   const { data: run, error: runError } = await supabase
     .from("strength_session_runs")
     .select("id")
@@ -214,32 +216,31 @@ async function getRemoteRunLogCount(runId: number): Promise<number | null> {
   if (runError) throw new Error(runError.message);
   if (!run) return null;
 
-  const { count, error: logsError } = await supabase
+  const { data: logs, error: logsError } = await supabase
     .from("strength_set_logs")
-    .select("id", { count: "exact", head: true })
+    .select("exercise_id,set_index")
     .eq("run_id", runId);
   if (logsError) throw new Error(logsError.message);
-
-  return count ?? 0;
+  return logs ?? [];
 }
 
 async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload) {
   const logs = Array.isArray(payload.logs) ? payload.logs : [];
   const runId = Number(payload.run_id);
-  const hasRunId = Number.isFinite(runId) && runId > 0;
-  const remoteLogCount = hasRunId ? await getRemoteRunLogCount(runId) : null;
+  // A negative run ID was generated on this device while offline. It has
+  // never existed on Supabase and must be created atomically with its logs.
+  const hasServerRunId = Number.isSafeInteger(runId) && runId > 0 && runId <= 2147483647;
+  const remoteLogs = hasServerRunId ? await getRemoteRunLogs(runId) : null;
 
-  if (remoteLogCount !== null) {
-    const missingLogs = logs.slice(remoteLogCount);
-    // §298 — re-log offline : hériter du gating 1RM pour les métriques non-poids
-    // (sinon un Box Jump re-loggé au replay crée un 1RM fantôme).
-    const nonWeightIds = await getNonWeightExerciseIds();
+  if (remoteLogs !== null) {
+    const missingLogs = getMissingStrengthLogs(logs, remoteLogs);
+    const nonWeightIds = missingLogs.length ? await getNonWeightExerciseIds() : new Set<number>();
 
-    for (const [index, log] of missingLogs.entries()) {
+    for (const { log, setIndex } of missingLogs) {
       await logStrengthSet({
         run_id: runId,
         exercise_id: log.exercise_id,
-        set_index: log.set_index ?? log.set_number ?? remoteLogCount + index,
+        set_index: setIndex,
         reps: log.reps ?? null,
         weight: log.weight ?? null,
         rpe: log.rpe ?? null,
@@ -251,25 +252,23 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
       });
     }
 
-    await updateStrengthRun({
-      ...payload,
-      run_id: runId,
-      logs: undefined,
-    });
+    await updateStrengthRun({ ...payload, run_id: runId, logs: undefined });
     return;
   }
 
   await saveStrengthRun({
     ...payload,
-    run_id: null,
+    run_id: payload.run_id,
     status: "completed",
     logs,
   });
+  if (Number.isFinite(runId)) markLocalStrengthRunCompleted(runId, logs, false);
 }
 
 export function OfflineMutationSync() {
   const isOnline = useOnlineStatus();
   const user = useAuth((s) => s.user);
+  const userId = useAuth((s) => s.userId);
   const queryClient = useQueryClient();
 
   const runSync = useCallback(async () => {
@@ -286,6 +285,13 @@ export function OfflineMutationSync() {
       let lastError: unknown = null;
 
       for (const mutation of queue) {
+        // Never replay a swimmer's strength performance under another logged-in
+        // account on a shared device. Leave it safely queued for its owner.
+        if ((isQueuedStrengthCompletion(mutation) || isQueuedStrengthSetLog(mutation)) &&
+            mutation.payload.athlete_id != null &&
+            Number(mutation.payload.athlete_id) !== Number(userId)) {
+          continue;
+        }
         // Dispatch by type. Each branch is responsible for its own retry /
         // remove logic; unrecognised types are dropped so the queue does not
         // grow indefinitely from forgotten mutation kinds.
@@ -472,7 +478,7 @@ export function OfflineMutationSync() {
         toast.error("Données obsolètes ignorées", { description: `${unsupportedCount} mutation(s) d'un format inconnu (${Array.from(unsupportedTypes).join(", ")}) ont été abandonnées. Mets l'app à jour si le problème persiste.` });
       }
     });
-  }, [isOnline, queryClient, toast, user]);
+  }, [isOnline, queryClient, toast, user, userId]);
 
   // Replay on network/auth state changes (back online, login)
   useEffect(() => {

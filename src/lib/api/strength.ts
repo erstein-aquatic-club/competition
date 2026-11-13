@@ -46,6 +46,7 @@ import {
 } from './transformers';
 import { localStorageGet, localStorageSave } from './localStorage';
 import { reconcileMesocyclePayloads } from '../strength/mesocycleItemPayload';
+import { getMissingStrengthLogs } from '../strength/reconcileStrengthLogs';
 
 /** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
  *  ou métrique d'intensité non-poids (skip flag armé par le caller). */
@@ -456,16 +457,64 @@ export async function deleteStrengthSession(sessionId: number) {
   return { status: "deleted" };
 }
 
+/**
+ * Keep the local run mirror consistent with an offline completion, so that a
+ * cold start without network does not offer "Reprendre" for a finished workout.
+ * The offline queue remains the source of truth for pending upload.
+ */
+export function markLocalStrengthRunCompleted(
+  runId: number,
+  logs: unknown[],
+  syncPending: boolean,
+): void {
+  try {
+    const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+    const index = runs.findIndex((run) => run.id === runId);
+    if (index === -1) return;
+    const updated = [...runs];
+    updated[index] = {
+      ...updated[index],
+      logs,
+      status: "completed",
+      progress_pct: 100,
+      sync_pending: syncPending,
+      completed_at: updated[index].completed_at ?? new Date().toISOString(),
+    };
+    localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, updated);
+  } catch {
+    // The completion payload is still held in the separate durable queue.
+  }
+}
+
 // --- Strength Runs ---
 
-export async function startStrengthRun(data: {
+type StartStrengthRunInput = {
   assignment_id?: number | null;
   athlete_id?: number | null;
   athleteName?: string;
   session_id?: number;
   cycle_type?: string;
   progress_pct?: number;
-}) {
+};
+
+/** Offline sessions use negative IDs until they are atomically created online. */
+export function startStrengthRunLocally(data: StartStrengthRunInput) {
+  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const run_id = -(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+  const newRun = createLocalStrengthRun(data, run_id);
+  localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, [...runs, newRun]);
+  if (data.assignment_id) {
+    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
+    localStorageSave(STORAGE_KEYS.ASSIGNMENTS, assignments.map((assignment: any) =>
+      assignment.id === data.assignment_id
+        ? { ...assignment, status: "in_progress" }
+        : assignment,
+    ));
+  }
+  return { run_id };
+}
+
+export async function startStrengthRun(data: StartStrengthRunInput) {
   if (canUseSupabase()) {
     const run = assertSupabase(
       await supabase
@@ -489,20 +538,7 @@ export async function startStrengthRun(data: {
     }
     return { run_id: run.id };
   }
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
-  const run_id = Date.now();
-  const newRun = createLocalStrengthRun(data, run_id);
-  localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, [...runs, newRun]);
-  if (data.assignment_id) {
-    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
-    const updated = assignments.map((assignment: any) =>
-      assignment.id === data.assignment_id
-        ? { ...assignment, status: "in_progress" }
-        : assignment,
-    );
-    localStorageSave(STORAGE_KEYS.ASSIGNMENTS, updated);
-  }
-  return { run_id };
+  return startStrengthRunLocally(data);
 }
 
 export async function logStrengthSet(payload: {
@@ -626,7 +662,14 @@ export async function logStrengthSet(payload: {
       p_pct_1rm_suggested: payload.pct_1rm_suggested ?? null,
       p_one_rm_estimate: oneRmEstimate,
     }));
-    const data = assertSupabase(await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic"));
+    const rpcResult = await withTimeout(rpcPromise, 10_000, "log_strength_set_atomic");
+    // An earlier write may have landed even if the client lost its ACK.
+    // Natural-key collision means this very set is already on Supabase.
+    if (rpcResult.error?.code === "23505" &&
+        String(rpcResult.error?.message ?? "").includes("strength_set_logs_natural_key_idx")) {
+      return { status: "ok", one_rm_updated: false, one_rm: undefined };
+    }
+    const data = assertSupabase(rpcResult);
     const result = (data ?? {}) as {
       set_id?: number;
       one_rm_updated?: boolean;
@@ -684,7 +727,7 @@ export interface ReconcileStrengthRunLogsResult {
 
 export async function reconcileStrengthRunLogs(params: {
   runId: number;
-  logs: Array<{ exercise_id: number; set_number?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
+  logs: Array<{ exercise_id: number; set_number?: number | null; set_index?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
   athleteId?: number | null;
   athleteName?: string | null;
 }): Promise<ReconcileStrengthRunLogsResult> {
@@ -694,20 +737,17 @@ export async function reconcileStrengthRunLogs(params: {
     errors: [],
   };
   if (!canUseSupabase() || params.logs.length === 0) return emptyResult;
-  const { count, error } = await supabase
+  // Compare identities, not counts: asynchronous per-set writes may land
+  // out of order. A count-based slice can silently drop a middle set.
+  const { data: remoteLogs, error } = await supabase
     .from("strength_set_logs")
-    .select("id", { count: "exact", head: true })
+    .select("exercise_id,set_index")
     .eq("run_id", params.runId);
   if (error) {
-    // Previously this silently returned. Surface as an exception so the caller
-    // doesn't assume a clean reconcile when the count query failed.
-    throw new Error(
-      `reconcileStrengthRunLogs: count query failed: ${error.message}`,
-    );
+    throw new Error(`reconcileStrengthRunLogs: set lookup failed: ${error.message}`);
   }
-  const remoteCount = count ?? 0;
-  if (remoteCount >= params.logs.length) return emptyResult;
-  const missing = params.logs.slice(remoteCount);
+  const missing = getMissingStrengthLogs(params.logs, remoteLogs ?? []);
+  if (missing.length === 0) return emptyResult;
   const errors: ReconcileStrengthSetError[] = [];
   // §298 — un re-log doit hériter du gating 1RM : pour les exos à métrique
   // non-poids, armer skip_one_rm (sinon estimateOneRm produit un 1RM fantôme).
@@ -718,11 +758,11 @@ export async function reconcileStrengthRunLogs(params: {
   // triggers the timeout, unblocking the UI and letting the caller enqueue.
   const results = await withTimeout(
     Promise.allSettled(
-      missing.map((log, i) =>
+      missing.map(({ log, setIndex }) =>
         logStrengthSet({
           run_id: params.runId,
           exercise_id: log.exercise_id,
-          set_index: log.set_number ?? remoteCount + i + 1,
+          set_index: setIndex,
           reps: log.reps ?? null,
           weight: log.weight ?? null,
           difficulty: log.difficulty ?? null,
@@ -741,8 +781,8 @@ export async function reconcileStrengthRunLogs(params: {
       succeeded += 1;
     } else {
       errors.push({
-        index: remoteCount + i,
-        exercise_id: missing[i].exercise_id,
+        index: params.logs.indexOf(missing[i].log),
+        exercise_id: missing[i].log.exercise_id,
         message: res.reason instanceof Error ? res.reason.message : String(res.reason),
       });
     }
@@ -758,12 +798,16 @@ export async function updateStrengthRun(update: {
 }) {
   if (canUseSupabase()) {
     const updatePayload = buildRunUpdatePayload(update);
-    assertSupabase(
+    const updated = assertSupabase(
       await supabase
         .from("strength_session_runs")
         .update(updatePayload)
         .eq("id", update.run_id)
+        .select("id")
     );
+    if (!updated?.length) {
+      throw new Error("Séance distante introuvable : aucune modification enregistrée.");
+    }
     if (update.status === "completed" && update.assignment_id) {
       // Previously the error of this 2nd write was not inspected, leaving the
       // run flagged completed while the assignment stayed stuck "in_progress".
@@ -866,9 +910,17 @@ export async function saveStrengthRun(run: any) {
       }),
     );
 
-    const rpcPromise = Promise.resolve(supabase.rpc('save_strength_run_atomic', {
+    // Deduplicate offline-created runs across lost acknowledgements/retries.
+    // The same temporary client run ID must always resolve to one server run.
+    const clientDedupKey = run.run_id != null && run.athlete_id != null
+      ? `strength-run:${run.athlete_id}:${run.run_id}`
+      : null;
+    const rpcPromise = Promise.resolve(supabase.rpc(
+      clientDedupKey ? 'save_strength_run_offline_idempotent' : 'save_strength_run_atomic',
+      {
       p_data: {
-        run_id: run.run_id ?? null,
+        client_dedup_key: clientDedupKey,
+        run_id: clientDedupKey ? null : (run.run_id ?? null),
         session_id: run.session_id ?? null,
         athlete_id: run.athlete_id ?? null,
         assignment_id: run.assignment_id ?? null,

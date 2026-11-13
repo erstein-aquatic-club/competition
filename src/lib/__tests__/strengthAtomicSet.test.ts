@@ -14,7 +14,7 @@ type RpcHandler = (
   name: string,
   args: Record<string, unknown>,
 ) => { data: unknown; error: unknown };
-type SelectCountHandler = () => { count: number | null; error: unknown };
+type SelectCountHandler = () => { count?: number | null; data?: Array<{ exercise_id: number; set_index: number | null }>; error: unknown };
 
 const rpcCalls: RpcCall[] = [];
 let rpcHandler: RpcHandler = () => ({
@@ -179,7 +179,33 @@ describe("reconcileStrengthRunLogs — resilient loop", () => {
     assert.equal(rpcCalls.length, 3);
   });
 
-  it("throws when the initial count query fails (was silently returning)", async () => {
+  it("retries only the missing middle series when remote sets 1 and 3 arrived", async () => {
+    selectCountHandler = () => ({
+      data: [
+        { exercise_id: 100, set_index: 1 },
+        { exercise_id: 100, set_index: 3 },
+      ],
+      error: null,
+    });
+    const { reconcileStrengthRunLogs } = await import("../api/strength.ts");
+    const result = await reconcileStrengthRunLogs({
+      runId: 10,
+      logs: [
+        { exercise_id: 100, set_number: 1, reps: 5, weight: 50 },
+        { exercise_id: 100, set_number: 2, reps: 5, weight: 55 },
+        { exercise_id: 100, set_number: 3, reps: 5, weight: 60 },
+      ],
+      athleteId: 5,
+    });
+    assert.equal(result.attempted, 1);
+    assert.equal(result.succeeded, 1);
+    assert.equal(result.errors.length, 0);
+    assert.equal(rpcCalls.length, 1);
+    assert.equal(rpcCalls[0].args.p_set_index, 2);
+    assert.equal(rpcCalls[0].args.p_weight, 55);
+  });
+
+  it("throws when the remote set lookup fails", async () => {
     selectCountHandler = () => ({
       count: null,
       error: { message: "boom" },

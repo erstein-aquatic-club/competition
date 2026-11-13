@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { StrengthSessionTemplate, StrengthCycleType, Assignment } from "@/lib/api";
 import type { SetLogEntry } from "@/lib/types";
 import { SaveState } from "@/components/shared/BottomActionBar";
@@ -63,7 +64,9 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
   // Save preferences to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
+    try {
+      window.localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
+    } catch { /* noncritical preference write */ }
   }, [preferenceStorageKey, preferences]);
 
   // Focus mode body attribute
@@ -85,45 +88,52 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
 
   // Track whether a session was restored from localStorage
   const [wasRestored, setWasRestored] = useState(false);
+  // Restoration and persistence are both effects. Without a hydration gate the
+  // first persistence effect removes the snapshot BEFORE React applies the
+  // restored values, losing a workout on an iOS PWA cold start.
+  const [hydratedFocusKey, setHydratedFocusKey] = useState<string | null>(null);
+  const warnedStorageRef = useRef(false);
 
   // Restore focus state from localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (activeSession) return;
-    const stored = window.localStorage.getItem(focusStorageKey);
-    if (!stored) return;
+    if (activeSession) {
+      setHydratedFocusKey(focusStorageKey);
+      return;
+    }
     try {
+      const stored = window.localStorage.getItem(focusStorageKey);
+      if (!stored) return;
       const parsed = JSON.parse(stored);
+      const hasRun = typeof parsed?.runId === "number" && Number.isFinite(parsed.runId);
       const parsedMode =
-        parsed?.screenMode === "focus"
-          ? "focus"
-          : parsed?.screenMode === "reader"
-          ? "reader"
-          : null;
+        parsed?.screenMode === "focus" ? "focus"
+        : parsed?.screenMode === "reader" ? "reader"
+        : parsed?.screenMode === "list" && hasRun ? "list"
+        : null;
       if (!parsedMode || !parsed?.session) return;
       setActiveSession(parsed.session);
       setActiveAssignment(parsed.assignment ?? null);
-      setActiveRunId(typeof parsed.runId === "number" ? parsed.runId : null);
+      setActiveRunId(hasRun ? parsed.runId : null);
       setActiveRunLogs(Array.isArray(parsed.runLogs) ? parsed.runLogs : null);
       setActiveRunnerStep(Number.isFinite(parsed.runnerStep) ? parsed.runnerStep : 0);
-      // §297 — Restaure le Set des exos en attente d'estimation inline
       const restoredIds = Array.isArray(parsed.inlineEstimationExercises)
         ? parsed.inlineEstimationExercises.filter((id: unknown): id is number => typeof id === "number")
         : [];
       setInlineEstimationExercises(new Set(restoredIds));
-      if (parsed.cycleType) {
-        setCycleType(normalizeStrengthCycle(parsed.cycleType));
-      }
+      if (parsed.cycleType) setCycleType(normalizeStrengthCycle(parsed.cycleType));
       setScreenMode(parsedMode);
       setWasRestored(true);
     } catch {
-      return;
+      // Invalid snapshot: leave the page usable; never crash during hydration.
+    } finally {
+      setHydratedFocusKey(focusStorageKey);
     }
   }, [activeSession, focusStorageKey]);
 
   // Save focus state to localStorage
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || hydratedFocusKey !== focusStorageKey) return;
     // Persist while a run is in progress, even if the user has exited focus
     // mode to browse the list — otherwise a PWA refresh after onExitFocus
     // drops all accumulated logs (see Strength.tsx:683 "Don't clear run state").
@@ -131,11 +141,12 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     const shouldPersist =
       screenMode === "focus" || screenMode === "reader" || hasActiveRun;
     if (!shouldPersist || !activeSession) {
-      window.localStorage.removeItem(focusStorageKey);
+      try { window.localStorage.removeItem(focusStorageKey); } catch { /* storage unavailable */ }
       return;
     }
     const payload = {
       screenMode,
+      updatedAt: Date.now(),
       session: activeSession,
       assignment: activeAssignment,
       runId: activeRunId,
@@ -145,7 +156,17 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
       // §297 — Set non-JSON sérialisable → Array
       inlineEstimationExercises: Array.from(inlineEstimationExercises),
     };
-    window.localStorage.setItem(focusStorageKey, JSON.stringify(payload));
+    try {
+      window.localStorage.setItem(focusStorageKey, JSON.stringify(payload));
+      warnedStorageRef.current = false;
+    } catch {
+      if (!warnedStorageRef.current) {
+        warnedStorageRef.current = true;
+        toast.error("Sauvegarde locale indisponible", {
+          description: "Les données de la séance risquent d'être perdues si l'application est fermée.",
+        });
+      }
+    }
   }, [
     activeAssignment,
     activeRunId,
@@ -154,24 +175,26 @@ export function useStrengthState({ athleteKey }: UseStrengthStateProps) {
     activeSession,
     cycleType,
     focusStorageKey,
+    hydratedFocusKey,
     screenMode,
     inlineEstimationExercises,
   ]);
 
-  // Reset view state when dock icon is tapped while already on this page
+  // Dock navigation may close the screen but must never destroy an active run.
   useEffect(() => {
     const reset = () => {
       setScreenMode("list");
+      setSearchQuery("");
+      if (activeRunId !== null && activeSession) return;
       setActiveSession(null);
       setActiveAssignment(null);
       setActiveRunId(null);
       setActiveRunLogs(null);
       setActiveRunnerStep(0);
-      setSearchQuery("");
     };
     window.addEventListener("nav:reset", reset);
     return () => window.removeEventListener("nav:reset", reset);
-  }, []);
+  }, [activeRunId, activeSession]);
 
   // Reset run state helper
   const clearActiveRunState = () => {

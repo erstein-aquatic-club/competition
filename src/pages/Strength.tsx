@@ -42,6 +42,8 @@ import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/componen
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
+import { startStrengthRunLocally, saveStrengthRun, markLocalStrengthRunCompleted } from "@/lib/api/strength";
+import { clearDraft } from "@/lib/unsavedDraftStore";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -232,7 +234,7 @@ export default function Strength() {
       return;
     }
     if (!wasOfflineRef.current) return;
-    if (!activeRunId || !activeRunLogs || activeRunLogs.length === 0) {
+    if (!activeRunId || activeRunId < 0 || activeRunId > 2147483647 || !activeRunLogs || activeRunLogs.length === 0) {
       wasOfflineRef.current = false;
       return;
     }
@@ -384,7 +386,16 @@ export default function Strength() {
 
   // Mutations
   const startRun = useMutation({
-    mutationFn: (data: Parameters<typeof startStrengthRunApi>[0]) => startStrengthRunApi(data),
+    mutationFn: async (data: Parameters<typeof startStrengthRunApi>[0]) => {
+      try {
+        return await startStrengthRunApi(data);
+      } catch (err) {
+        // Browser can report online while Supabase is unreachable. Keep the
+        // session available locally instead of blocking the swimmer.
+        if (isTransientError(err)) return startStrengthRunLocally(data);
+        throw err;
+      }
+    },
     onMutate: () => {
       setSaveState("saving");
     },
@@ -457,6 +468,7 @@ export default function Strength() {
       if (variables?.status !== "completed") {
         return;
       }
+      clearDraft(`workout_runner:${variables.run_id}`);
       if (historyAthleteKey) {
         queryClient.setQueryData(
           ["strength_run_in_progress", historyAthleteKey],
@@ -716,6 +728,7 @@ export default function Strength() {
                 focusKey,
                 JSON.stringify({
                   screenMode: "reader",
+                  updatedAt: Date.now(),
                   session: { ...activeSession, cycle: lockedCycle, items: activeFilteredItems },
                   assignment: activeAssignment,
                   runId: res.run_id,
@@ -798,7 +811,7 @@ export default function Strength() {
     [activeSession?.items, exerciseLookup],
   );
 
-  if (isLoading) {
+  if (isLoading && screenMode !== "focus") {
     return (
       <div className="space-y-4 md:space-y-6">
         {/* Header skeleton */}
@@ -830,7 +843,7 @@ export default function Strength() {
     );
   }
 
-  if (error) {
+  if (error && screenMode !== "focus") {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
@@ -879,6 +892,10 @@ export default function Strength() {
                 if (!activeRunId) return;
                 // Always persist locally first — triggers localStorage write via useStrengthState
                 setActiveRunLogs((prev) => [...(prev ?? []), ...blockLogs]);
+                // A negative ID represents a local-only run. The entire run
+                // will be uploaded atomically on completion; per-set RPCs
+                // would reference a non-existent foreign key.
+                if (activeRunId < 0 || activeRunId > 2147483647) return;
                 // If offline, queue the set for replay so the per-set log is
                 // not lost if the user finishes online from a different device
                 // or if the reconcile-at-finish step never runs.
@@ -940,7 +957,7 @@ export default function Strength() {
                 });
               }}
               onProgress={async (progressPct) => {
-                if (!activeRunId) return;
+                if (!activeRunId || activeRunId < 0 || activeRunId > 2147483647) return;
                 if (!isOnline) return;
                 // Fire-and-forget: progress updates are nice-to-have; data is in localStorage
                 updateRun.mutate({
@@ -971,7 +988,9 @@ export default function Strength() {
                 };
                 if (!isOnline) {
                   try {
-                    enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                    enqueue("strength-run-completed", offlinePayload as Record<string, unknown>, `strength-completed:${activeRunId}`);
+                    markLocalStrengthRunCompleted(activeRunId, result.logs, true);
+                    clearDraft(`workout_runner:${activeRunId}`);
                     toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                     setScreenMode("summary");
                   } catch {
@@ -981,24 +1000,41 @@ export default function Strength() {
                 }
                 setIsFinishing(true);
                 try {
-                  // Re-insert any set logs that may have been lost in fire-and-forget saves
-                  await reconcileStrengthRunLogs({
-                    runId: activeRunId,
-                    logs: result.logs,
-                    athleteId: userId ?? null,
-                    athleteName: user ?? null,
-                  });
-                  await updateRun.mutateAsync({
-                    assignment_id: activeAssignment?.id ?? undefined,
-                    run_id: activeRunId,
-                    session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
-                    athlete_id: userId ?? undefined,
-                    date: new Date().toISOString(),
-                    progress_pct: 100,
-                    status: "completed",
-                    ...result,
-                  });
-                  // onSuccess handles navigation to summary + toast
+                  if (activeRunId < 0 || activeRunId > 2147483647) {
+                    // Materialize the local-only run and all its logs in one
+                    // Supabase transaction. Never UPDATE a negative run ID.
+                    await saveStrengthRun(offlinePayload);
+                    markLocalStrengthRunCompleted(activeRunId, result.logs, false);
+                    clearDraft(`workout_runner:${activeRunId}`);
+                    queryClient.invalidateQueries({ queryKey: ["strength_history"] });
+                    queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress"] });
+                    queryClient.invalidateQueries({ queryKey: ["assignments"] });
+                    queryClient.invalidateQueries({ queryKey: ["1rm"] });
+                    setScreenMode("summary");
+                    toast("Séance synchronisée");
+                  } else {
+                    // Verify each set identity, not just the remote count.
+                    const reconciliation = await reconcileStrengthRunLogs({
+                      runId: activeRunId,
+                      logs: result.logs,
+                      athleteId: userId ?? null,
+                      athleteName: user ?? null,
+                    });
+                    if (reconciliation.errors.length) {
+                      throw new Error(`Séries non synchronisées : ${reconciliation.errors[0].message}`);
+                    }
+                    await updateRun.mutateAsync({
+                      assignment_id: activeAssignment?.id ?? undefined,
+                      run_id: activeRunId,
+                      session_id: activeAssignment?.session_id ?? activeSession?.id ?? undefined,
+                      athlete_id: userId ?? undefined,
+                      date: new Date().toISOString(),
+                      progress_pct: 100,
+                      status: "completed",
+                      ...result,
+                    });
+                    // onSuccess handles navigation to summary + toast.
+                  }
                 } catch (err) {
                   // Distinguish transient errors (network blip, timeout including
                   // "reconcile-batch: timeout") from hard failures.
@@ -1006,7 +1042,9 @@ export default function Strength() {
                   // Hard failure → destructive toast, stay on WorkoutRunner for retry.
                   if (isTransientError(err)) {
                     try {
-                      enqueue("strength-run-completed", offlinePayload as Record<string, unknown>);
+                      enqueue("strength-run-completed", offlinePayload as Record<string, unknown>, `strength-completed:${activeRunId}`);
+                      markLocalStrengthRunCompleted(activeRunId, result.logs, true);
+                      clearDraft(`workout_runner:${activeRunId}`);
                       toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                       setScreenMode("summary");
                     } catch {
@@ -1059,6 +1097,17 @@ export default function Strength() {
             icon={<Dumbbell className="h-3.5 w-3.5" />}
           />
 
+          {screenMode === "list" && activeRunId !== null && activeSession && (
+            <div role="status" className="flex items-center gap-3 rounded-xl border bg-card p-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Séance en cours</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {activeSession.title ?? activeSession.name ?? "Musculation"} · progression conservée sur cet appareil
+                </p>
+              </div>
+              <Button size="sm" onClick={() => setScreenMode("focus")}>Reprendre</Button>
+            </div>
+          )}
           <Tabs defaultValue="planning" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="planning">Mon plan</TabsTrigger>

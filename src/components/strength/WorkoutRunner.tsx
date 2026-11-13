@@ -46,6 +46,7 @@ import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
 import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -224,14 +225,7 @@ export function WorkoutRunner({
 }) {
   const isLoggingRef = useRef(false);
 
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  useEffect(() => {
-    const on = () => setIsOnline(true);
-    const off = () => setIsOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
+  const isOnline = useOnlineStatus();
 
   const [currentStep, setCurrentStep] = useState(initialStep ?? 1);
   // §376 — latest-ref du step pour le clamp anti-retour de la réconciliation,
@@ -439,6 +433,7 @@ export function WorkoutRunner({
   // already persisted by the parent via `onLogSets` → localStorage.
   const draftKey = runId != null && runId !== "" ? `workout_runner:${runId}` : null;
   const draftRestoredRef = useRef(false);
+  const restoredInputsExerciseRef = useRef<number | null>(null);
   const draftDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // On mount: offer to restore if a snapshot exists for this run.
@@ -453,6 +448,9 @@ export function WorkoutRunner({
       startedAt?: number;
       /** §371 (F4) — 1RM calibrées en séance (exerciseId → 1RM), pour survivre à un kill PWA. */
       runOneRms?: Array<[number, number]>;
+      restEndAt?: number;
+      restType?: "set" | "exercise";
+      exerciseId?: number | null;
     };
     const draft = loadDraft<WorkoutDraft>(draftKey);
     if (!draft) return;
@@ -468,7 +466,8 @@ export function WorkoutRunner({
       (typeof payload.fatigue === "number" && payload.fatigue !== 3) ||
       // §371 (F4) — une 1RM calibrée en séance seule compte comme contenu :
       // sinon un kill PWA juste après la série de calibration la perdrait.
-      (Array.isArray(payload.runOneRms) && payload.runOneRms.length > 0);
+      (Array.isArray(payload.runOneRms) && payload.runOneRms.length > 0) ||
+      (typeof payload.restEndAt === "number" && payload.restEndAt > Date.now());
     if (!hasContent) {
       clearDraft(draftKey);
       return;
@@ -477,12 +476,19 @@ export function WorkoutRunner({
     if (typeof payload.difficulty === "number") setDifficulty(payload.difficulty);
     if (typeof payload.fatigue === "number") setFatigue(payload.fatigue);
     if (typeof payload.comments === "string") setComments(payload.comments);
-    if (payload.currentSetInputs && typeof payload.currentSetInputs === "object") {
+    if (payload.currentSetInputs && typeof payload.currentSetInputs === "object" &&
+        (payload.exerciseId == null || payload.exerciseId === currentBlock?.exercise_id)) {
+      restoredInputsExerciseRef.current = currentBlock?.exercise_id ?? null;
       setCurrentSetInputs(payload.currentSetInputs);
     }
     // §371 (F4) — restaure les 1RM calibrées en séance (cibles des séries 2+).
     if (Array.isArray(payload.runOneRms)) {
       setRunOneRms(new Map(payload.runOneRms));
+    }
+    if (typeof payload.restEndAt === "number" && payload.restEndAt > Date.now()) {
+      setRestEndAt(payload.restEndAt);
+      setRestType(payload.restType === "exercise" ? "exercise" : "set");
+      setIsResting(true);
     }
     // R4 (§343) — reprend le chrono au vrai départ (sinon `elapsedStartRef` remis
     // à `Date.now()` au remount → durée totale fausse, ~5 min au lieu de ~45).
@@ -503,10 +509,14 @@ export function WorkoutRunner({
         currentSetInputs,
         startedAt: elapsedStartRef.current, // R4 (§343)
         runOneRms: Array.from(runOneRms.entries()), // §371 (F4)
+        // Absolute deadline survives PWA suspension and a cold restart.
+        restEndAt: isResting ? restEndAt : 0,
+        restType,
+        exerciseId: currentBlock?.exercise_id ?? null,
       });
     }, 500);
     return () => clearTimeout(draftDebounceRef.current);
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType, currentBlock?.exercise_id]);
 
   // Synchronous flush on tab hide / pagehide / beforeunload.
   useEffect(() => {
@@ -519,6 +529,10 @@ export function WorkoutRunner({
         currentSetInputs,
         startedAt: elapsedStartRef.current, // R4 (§343)
         runOneRms: Array.from(runOneRms.entries()), // §371 (F4)
+        // Absolute deadline survives PWA suspension and a cold restart.
+        restEndAt: isResting ? restEndAt : 0,
+        restType,
+        exerciseId: currentBlock?.exercise_id ?? null,
       });
     };
     const onVisibility = () => {
@@ -532,7 +546,7 @@ export function WorkoutRunner({
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType, currentBlock?.exercise_id]);
 
   const logLookup = useMemo(() => {
     const map = new Map<string, SetLogEntry>();
@@ -650,7 +664,15 @@ export function WorkoutRunner({
         };
         return acc;
       }, {});
-      setCurrentSetInputs(inputs);
+      setCurrentSetInputs((prev) => {
+        // The draft-restoration effect runs before this log-reconciliation
+        // effect on mount. Keep unfinished values for the SAME exercise only.
+        if (restoredInputsExerciseRef.current === block.exercise_id) {
+          restoredInputsExerciseRef.current = null;
+          return { ...inputs, ...prev };
+        }
+        return inputs;
+      });
       const nextSetIndex = Math.min(block.sets ?? 1, existing.length + 1);
       setCurrentSetIndex(nextSetIndex);
     } else {
@@ -750,6 +772,13 @@ export function WorkoutRunner({
     // skip the new exercise. Bail out instead — the next render reconciles.
     const blockSets = currentBlock.sets ?? 0;
     if (blockSets > 0 && currentSetIndex > blockSets) return;
+    if (tracksWeight && !isBodyweightExercise && hasPercent && rm <= 0 &&
+        !(Number(currentSetInputs[currentSetIndex - 1]?.weight) > 0)) {
+      toast.error("Charge à renseigner", {
+        description: "Ta 1RM est inconnue : saisis une charge avant de valider la série.",
+      });
+      return;
+    }
     if (currentLoggedSet) {
       if (currentSetIndex >= currentBlock.sets) {
         await advanceExercise();
@@ -1037,7 +1066,8 @@ export function WorkoutRunner({
                   comments,
                   logs,
                 });
-                if (draftKey) clearDraft(draftKey);
+                // Parent clears the draft only after a confirmed remote save
+                // or a successfully persisted offline queue entry.
               }}
             >
               {isFinishing ? "Enregistrement…" : "Enregistrer & fermer"}
