@@ -42,7 +42,7 @@ import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/componen
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
-import { startStrengthRunLocally, saveStrengthRun } from "@/lib/api/strength";
+import { startStrengthRunLocally, saveStrengthRun, markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { clearDraft } from "@/lib/unsavedDraftStore";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
@@ -989,6 +989,7 @@ export default function Strength() {
                 if (!isOnline) {
                   try {
                     enqueue("strength-run-completed", offlinePayload as Record<string, unknown>, `strength-completed:${activeRunId}`);
+                    markLocalStrengthRunCompleted(activeRunId, result.logs, true);
                     clearDraft(`workout_runner:${activeRunId}`);
                     toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                     setScreenMode("summary");
@@ -1003,6 +1004,7 @@ export default function Strength() {
                     // Materialize the local-only run and all its logs in one
                     // Supabase transaction. Never UPDATE a negative run ID.
                     await saveStrengthRun(offlinePayload);
+                    markLocalStrengthRunCompleted(activeRunId, result.logs, false);
                     clearDraft(`workout_runner:${activeRunId}`);
                     queryClient.invalidateQueries({ queryKey: ["strength_history"] });
                     queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress"] });
@@ -1041,6 +1043,7 @@ export default function Strength() {
                   if (isTransientError(err)) {
                     try {
                       enqueue("strength-run-completed", offlinePayload as Record<string, unknown>, `strength-completed:${activeRunId}`);
+                      markLocalStrengthRunCompleted(activeRunId, result.logs, true);
                       clearDraft(`workout_runner:${activeRunId}`);
                       toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                       setScreenMode("summary");
