@@ -77,6 +77,23 @@ function useVersionCheck() {
         if (!res.ok) return;
         const { build } = await res.json();
         if (build && build !== currentBuild) {
+          // A forced reload while recording strength sets can interrupt an
+          // in-flight save. Wait until the active session has been closed.
+          const focusIsVisible = document.body.dataset.focusMode === "strength";
+          let activeStrengthRun = focusIsVisible;
+          try {
+            for (let i = 0; i < window.localStorage.length && !activeStrengthRun; i += 1) {
+              const key = window.localStorage.key(i);
+              if (!key?.startsWith("strength-focus-state-")) continue;
+              const snapshot = JSON.parse(window.localStorage.getItem(key) ?? "null");
+              if (typeof snapshot?.runId === "number" &&
+                  ["list", "reader", "focus"].includes(snapshot.screenMode) &&
+                  Number(snapshot.updatedAt ?? 0) > Date.now() - 12 * 60 * 60 * 1000) {
+                activeStrengthRun = true;
+              }
+            }
+          } catch { /* inaccessible storage: respect visible Focus at least */ }
+          if (activeStrengthRun) return;
           console.log(`[EAC] Version mismatch: running ${currentBuild}, server has ${build}. Reloading…`);
           // Clear all caches then reload
           if ('caches' in window) {
