@@ -55,6 +55,6 @@ jobs:
           src/lib/__tests__/strengthAtomicSet.test.ts
           src/lib/__tests__/offlineQueue.test.ts
       - name: Focus runner UI regression tests
-        run: npx vitest run --config vitest.config.unit.ts src/components/strength/WorkoutRunner.vitest.tsx
+        run: npx vitest run --config vitest.config.unit.ts src/components/strength/WorkoutRunner.vitest.tsx src/hooks/__tests__/useStrengthStateRestore.vitest.tsx
       - name: Production build (including Workbox)
         run: npm run build
