@@ -149,10 +149,17 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     return m;
   }, [athleteWeekOverrides]);
 
-  // Merge: athlete overrides take precedence over group slots
+  // Keep the same effective slots in the timeline and the day-J launcher.
+  // During an active personal cycle, group-only slots cannot add workouts.
+  const { data: activeMesocycle, isLoading: activeCycleLoading } = useQuery({
+    queryKey: ["strength-mesocycle-active", athleteId],
+    queryFn: () => getActiveMesocycle(athleteId),
+    staleTime: 60_000,
+  });
   const effectiveSlots = useMemo(
-    () => mergeStrengthSlots(groupSlots, athleteOverrides),
-    [groupSlots, athleteOverrides],
+    () => mergeStrengthSlots(groupSlots, athleteOverrides)
+      .filter((slot) => isSlotVisibleForCycle(slot, activeMesocycle)),
+    [groupSlots, athleteOverrides, activeMesocycle],
   );
 
   // ── Phase 1 fallback data (cycles-based) ────────────────────────────────────
@@ -214,14 +221,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     });
   }, [planApplications, applicationPlanSessions, weekStarts]);
 
-  // §296 — Si l'athlète a un mésocycle muscu actif, ses slot_overrides (Phase
-  // 2) doivent gagner sur le training_plan_application (Phase 3) — sémantique :
-  // un mésocycle posé = override personnalisé récent qui DOIT s'afficher.
-  // Sans mésocycle actif, on garde la cascade historique (Phase 3 > Phase 2).
-  const { data: activeMesocycle, isLoading: activeCycleLoading } = useQuery({
-    queryKey: ["strength-mesocycle-active", athleteId],
-    queryFn: () => getActiveMesocycle(athleteId),
-  });
+  // Active cycle ownership is restricted to its actual dated window.
   const hasActiveMesocycle = activeMesocycle != null;
 
   // The active cycle owns only its exact start/end weeks. Individual slots
@@ -301,12 +301,9 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     const instances: WeekInstance[] = [];
     for (const weekStart of weekStarts) {
       const inActiveCycle = cycleCoversWeek(weekStart, activeMesocycle);
-      // During a personal mesocycle, group-only sessions must not leak into
-      // the athlete's programme. A merged slot with overridden=true carries
-      // an explicit athlete override even when a group slot shares its key.
-      const slots = (byWeek.get(weekStart) ?? []).filter(
-        (slot) => isSlotVisibleForCycle(slot, activeMesocycle),
-      );
+      // effectiveSlots is already filtered for the individual cycle, so
+      // rendering and the day-J launcher use the exact same assignment set.
+      const slots = byWeek.get(weekStart) ?? [];
       if (slots.length === 0 && !inActiveCycle) continue;
 
       const monday = new Date(weekStart + "T00:00:00");
