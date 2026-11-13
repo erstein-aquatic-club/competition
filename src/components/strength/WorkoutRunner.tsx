@@ -46,6 +46,7 @@ import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
 import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -224,14 +225,7 @@ export function WorkoutRunner({
 }) {
   const isLoggingRef = useRef(false);
 
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  useEffect(() => {
-    const on = () => setIsOnline(true);
-    const off = () => setIsOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
+  const isOnline = useOnlineStatus();
 
   const [currentStep, setCurrentStep] = useState(initialStep ?? 1);
   // §376 — latest-ref du step pour le clamp anti-retour de la réconciliation,
