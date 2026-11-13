@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   cycleCoversWeek,
+  isSlotVisibleForCycle,
   resolveStrengthWeeks,
 } from "../resolveStrengthWeeks";
 
@@ -95,5 +96,20 @@ describe("resolveStrengthWeeks", () => {
       applications: [week(keys[0], "legacy")], folders: [],
     });
     assert.deepEqual(resolved.map((w) => w.week.weekKey), keys);
+  });
+});
+
+describe("isSlotVisibleForCycle", () => {
+  it("hides group-only sessions during a personalized cycle", () => {
+    assert.equal(isSlotVisibleForCycle({ week_start: "2026-11-09" }, cycle), false);
+    assert.equal(
+      isSlotVisibleForCycle({ week_start: "2026-11-09", overridden: true }, cycle),
+      true,
+    );
+  });
+
+  it("keeps group sessions outside a cycle", () => {
+    assert.equal(isSlotVisibleForCycle({ week_start: "2026-12-21" }, cycle), true);
+    assert.equal(isSlotVisibleForCycle({ week_start: "2026-11-09" }, null), true);
   });
 });
