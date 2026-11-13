@@ -1,0 +1,47 @@
+name: Muscu plan / PWA freshness checks
+
+on:
+  pull_request:
+    paths:
+      - "src/App.tsx"
+      - "src/lib/queryClient.ts"
+      - "src/lib/strengthPlanFreshness.ts"
+      - "src/lib/__tests__/strengthPlanFreshness.test.ts"
+      - "src/lib/strength/**"
+      - "src/components/strength/**"
+      - "src/components/shared/StrengthPlanningSync.tsx"
+      - "src/components/coach/CoachMesocyclePanel.tsx"
+      - "src/hooks/useStrengthPlanByISO.ts"
+      - "src/hooks/coach/useStrengthPlanningAthleteMode.ts"
+      - "src/pages/MesocyclePreview.tsx"
+      - "vite.config.ts"
+      - "supabase/migrations/00229_strength_planning_realtime.sql"
+      - ".github/workflows/muscu-plan-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: TypeScript
+        run: npm run check
+      - name: Targeted unit tests
+        run: >-
+          node --test --import tsx
+          src/lib/__tests__/strengthPlanFreshness.test.ts
+          src/lib/strength/__tests__/resolveStrengthWeeks.test.ts
+          src/lib/strength/__tests__/formatStrengthSessionTitle.test.ts
+      - name: Production build (including Workbox)
+        run: npm run build
