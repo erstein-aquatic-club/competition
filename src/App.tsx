@@ -2,6 +2,7 @@
 import React, { Suspense, useState, useEffect } from "react";
 import { Switch, Route, Redirect, Router } from "wouter";
 import { queryClient } from "./lib/queryClient";
+import { isStrengthPlanQueryKey } from "@/lib/strengthPlanFreshness";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { Toaster } from "@/components/ui/sonner";
@@ -47,8 +48,12 @@ const rqPersistOptions = rqPersister
       buster: __BUILD_TIMESTAMP__,
       dehydrateOptions: {
         // Skip queries in error/pending state — persist only successful data.
-        shouldDehydrateQuery: (query: { state: { status: string } }) =>
-          query.state.status === "success",
+        shouldDehydrateQuery: (query: {
+          state: { status: string };
+          queryKey: readonly unknown[];
+        }) =>
+          query.state.status === "success" &&
+          !isStrengthPlanQueryKey(query.queryKey),
       },
     }
   : null;
