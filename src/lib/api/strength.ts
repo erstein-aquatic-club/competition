@@ -46,6 +46,7 @@ import {
 } from './transformers';
 import { localStorageGet, localStorageSave } from './localStorage';
 import { reconcileMesocyclePayloads } from '../strength/mesocycleItemPayload';
+import { getMissingStrengthLogs } from '../strength/reconcileStrengthLogs';
 
 /** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
  *  ou métrique d'intensité non-poids (skip flag armé par le caller). */
@@ -490,7 +491,9 @@ export async function startStrengthRun(data: {
     return { run_id: run.id };
   }
   const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
-  const run_id = Date.now();
+  // Negative IDs are unmistakably local. Never send them in UPDATE / set RPCs:
+  // an offline-created run must be materialized by save_strength_run_atomic.
+  const run_id = -Date.now();
   const newRun = createLocalStrengthRun(data, run_id);
   localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, [...runs, newRun]);
   if (data.assignment_id) {
@@ -684,7 +687,7 @@ export interface ReconcileStrengthRunLogsResult {
 
 export async function reconcileStrengthRunLogs(params: {
   runId: number;
-  logs: Array<{ exercise_id: number; set_number?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
+  logs: Array<{ exercise_id: number; set_number?: number | null; set_index?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
   athleteId?: number | null;
   athleteName?: string | null;
 }): Promise<ReconcileStrengthRunLogsResult> {
@@ -694,20 +697,17 @@ export async function reconcileStrengthRunLogs(params: {
     errors: [],
   };
   if (!canUseSupabase() || params.logs.length === 0) return emptyResult;
-  const { count, error } = await supabase
+  // Compare identities, not counts: asynchronous per-set writes may land
+  // out of order. A count-based slice can silently drop a middle set.
+  const { data: remoteLogs, error } = await supabase
     .from("strength_set_logs")
-    .select("id", { count: "exact", head: true })
+    .select("exercise_id,set_index")
     .eq("run_id", params.runId);
   if (error) {
-    // Previously this silently returned. Surface as an exception so the caller
-    // doesn't assume a clean reconcile when the count query failed.
-    throw new Error(
-      `reconcileStrengthRunLogs: count query failed: ${error.message}`,
-    );
+    throw new Error(`reconcileStrengthRunLogs: set lookup failed: ${error.message}`);
   }
-  const remoteCount = count ?? 0;
-  if (remoteCount >= params.logs.length) return emptyResult;
-  const missing = params.logs.slice(remoteCount);
+  const missing = getMissingStrengthLogs(params.logs, remoteLogs ?? []);
+  if (missing.length === 0) return emptyResult;
   const errors: ReconcileStrengthSetError[] = [];
   // §298 — un re-log doit hériter du gating 1RM : pour les exos à métrique
   // non-poids, armer skip_one_rm (sinon estimateOneRm produit un 1RM fantôme).
@@ -718,11 +718,11 @@ export async function reconcileStrengthRunLogs(params: {
   // triggers the timeout, unblocking the UI and letting the caller enqueue.
   const results = await withTimeout(
     Promise.allSettled(
-      missing.map((log, i) =>
+      missing.map(({ log, setIndex }) =>
         logStrengthSet({
           run_id: params.runId,
           exercise_id: log.exercise_id,
-          set_index: log.set_number ?? remoteCount + i + 1,
+          set_index: setIndex,
           reps: log.reps ?? null,
           weight: log.weight ?? null,
           difficulty: log.difficulty ?? null,
@@ -741,8 +741,8 @@ export async function reconcileStrengthRunLogs(params: {
       succeeded += 1;
     } else {
       errors.push({
-        index: remoteCount + i,
-        exercise_id: missing[i].exercise_id,
+        index: params.logs.indexOf(missing[i].log),
+        exercise_id: missing[i].log.exercise_id,
         message: res.reason instanceof Error ? res.reason.message : String(res.reason),
       });
     }
@@ -758,12 +758,16 @@ export async function updateStrengthRun(update: {
 }) {
   if (canUseSupabase()) {
     const updatePayload = buildRunUpdatePayload(update);
-    assertSupabase(
+    const updated = assertSupabase(
       await supabase
         .from("strength_session_runs")
         .update(updatePayload)
         .eq("id", update.run_id)
+        .select("id")
     );
+    if (!updated?.length) {
+      throw new Error("Séance distante introuvable : aucune modification enregistrée.");
+    }
     if (update.status === "completed" && update.assignment_id) {
       // Previously the error of this 2nd write was not inspected, leaving the
       // run flagged completed while the assignment stayed stuck "in_progress".
