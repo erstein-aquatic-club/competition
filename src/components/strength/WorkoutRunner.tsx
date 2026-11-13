@@ -433,6 +433,7 @@ export function WorkoutRunner({
   // already persisted by the parent via `onLogSets` → localStorage.
   const draftKey = runId != null && runId !== "" ? `workout_runner:${runId}` : null;
   const draftRestoredRef = useRef(false);
+  const restoredInputsExerciseRef = useRef<number | null>(null);
   const draftDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // On mount: offer to restore if a snapshot exists for this run.
@@ -449,6 +450,7 @@ export function WorkoutRunner({
       runOneRms?: Array<[number, number]>;
       restEndAt?: number;
       restType?: "set" | "exercise";
+      exerciseId?: number | null;
     };
     const draft = loadDraft<WorkoutDraft>(draftKey);
     if (!draft) return;
@@ -474,7 +476,9 @@ export function WorkoutRunner({
     if (typeof payload.difficulty === "number") setDifficulty(payload.difficulty);
     if (typeof payload.fatigue === "number") setFatigue(payload.fatigue);
     if (typeof payload.comments === "string") setComments(payload.comments);
-    if (payload.currentSetInputs && typeof payload.currentSetInputs === "object") {
+    if (payload.currentSetInputs && typeof payload.currentSetInputs === "object" &&
+        (payload.exerciseId == null || payload.exerciseId === currentBlock?.exercise_id)) {
+      restoredInputsExerciseRef.current = currentBlock?.exercise_id ?? null;
       setCurrentSetInputs(payload.currentSetInputs);
     }
     // §371 (F4) — restaure les 1RM calibrées en séance (cibles des séries 2+).
@@ -508,10 +512,11 @@ export function WorkoutRunner({
         // Absolute deadline survives PWA suspension and a cold restart.
         restEndAt: isResting ? restEndAt : 0,
         restType,
+        exerciseId: currentBlock?.exercise_id ?? null,
       });
     }, 500);
     return () => clearTimeout(draftDebounceRef.current);
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType, currentBlock?.exercise_id]);
 
   // Synchronous flush on tab hide / pagehide / beforeunload.
   useEffect(() => {
@@ -527,6 +532,7 @@ export function WorkoutRunner({
         // Absolute deadline survives PWA suspension and a cold restart.
         restEndAt: isResting ? restEndAt : 0,
         restType,
+        exerciseId: currentBlock?.exercise_id ?? null,
       });
     };
     const onVisibility = () => {
@@ -540,7 +546,7 @@ export function WorkoutRunner({
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType]);
+  }, [draftKey, difficulty, fatigue, comments, currentSetInputs, runOneRms, isResting, restEndAt, restType, currentBlock?.exercise_id]);
 
   const logLookup = useMemo(() => {
     const map = new Map<string, SetLogEntry>();
@@ -658,7 +664,15 @@ export function WorkoutRunner({
         };
         return acc;
       }, {});
-      setCurrentSetInputs(inputs);
+      setCurrentSetInputs((prev) => {
+        // The draft-restoration effect runs before this log-reconciliation
+        // effect on mount. Keep unfinished values for the SAME exercise only.
+        if (restoredInputsExerciseRef.current === block.exercise_id) {
+          restoredInputsExerciseRef.current = null;
+          return { ...inputs, ...prev };
+        }
+        return inputs;
+      });
       const nextSetIndex = Math.min(block.sets ?? 1, existing.length + 1);
       setCurrentSetIndex(nextSetIndex);
     } else {
