@@ -526,7 +526,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   const planLoading =
     foldersLoading || profileLoading || applicationsLoading ||
     planSessionsLoading || groupSlotsLoading || athleteOverridesLoading ||
-    weekOverridesLoading || sessionsLoading || activeCycleLoading;
+    weekOverridesLoading || sessionsLoading || datedSessionsLoading || activeCycleLoading;
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
   if (planLoading) {
