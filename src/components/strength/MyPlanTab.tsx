@@ -8,6 +8,7 @@ import {
   getStrengthPlanningWeekOverrides,
   getStrengthFolders,
   getStrengthSessions,
+  getStrengthSessionsByIds,
   getTrainingPlanApplicationsForUser,
   getTrainingPlanSessionsForPlans,
 } from "@/lib/api";
@@ -162,6 +163,19 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     [groupSlots, athleteOverrides, activeMesocycle],
   );
 
+  // Les séances datées restent accessibles même après que leur modèle a été
+  // évincé de la liste globale (500 plus récentes).
+  const datedSessionIds = useMemo(() => Array.from(new Set([
+    ...effectiveSlots.map((slot) => slot.session_template_id),
+    ...applicationPlanSessions.map((item) => item.session_template_id),
+  ].filter((id): id is number => typeof id === "number" && id > 0))),
+    [effectiveSlots, applicationPlanSessions]);
+  const { data: datedSessions = [], isLoading: datedSessionsLoading } = useQuery({
+    queryKey: ["strength-sessions-by-ids", datedSessionIds],
+    queryFn: () => getStrengthSessionsByIds(datedSessionIds),
+    enabled: datedSessionIds.length > 0,
+  });
+
   // ── Phase 1 fallback data (cycles-based) ────────────────────────────────────
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
@@ -208,8 +222,11 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     for (const s of allSessions) {
       map.set(s.id, s);
     }
+    for (const s of datedSessions) {
+      map.set(s.id, s);
+    }
     return map;
-  }, [allSessions]);
+  }, [allSessions, datedSessions]);
 
   // ── Phase 3 (§275.7) — derive sessions per visible week from applications ──
   const phase3Derived = useMemo<Map<string, Map<number, DerivedCell>>>(() => {
