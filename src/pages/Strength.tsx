@@ -910,6 +910,7 @@ export default function Strength() {
                         reps: log.reps ?? null,
                         weight: log.weight ?? null,
                         difficulty: log.difficulty ?? null,
+                        notes: log.notes ?? null,
                         athlete_id: userId ?? null,
                         athlete_name: user ?? null,
                         // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
@@ -938,6 +939,7 @@ export default function Strength() {
                     reps: log.reps ?? null,
                     weight: log.weight ?? null,
                     difficulty: log.difficulty ?? null,
+                    notes: log.notes ?? null,
                     athlete_id: userId ?? null,
                     athlete_name: user ?? null,
                     // §298 — métriques non-poids : pas d'estimation 1RM côté serveur

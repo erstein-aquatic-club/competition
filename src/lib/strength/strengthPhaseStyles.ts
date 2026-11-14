@@ -15,7 +15,8 @@ export function detectPhase(name: string): StrengthPhase {
   // retomber sur "force" (badge/point rouge trompeur). Neutre = reprise (gris).
   if (!name.trim()) return "reprise";
   const n = name.toLowerCase();
-  if (n.includes("reprise") || n.includes("s0") || n.includes("préparation générale") || n.includes("prepa")) return "reprise";
+  if (n.includes("reprise") || n.includes("relance") || n.includes("transition") || n.includes("décharge") || n.includes("s0") || n.includes("préparation générale") || n.includes("prepa")) return "reprise";
+  if (n.includes("activation") || n.includes("spécifique")) return "puissance";
   if (n.includes("force")) return "force";
   if (n.includes("puissance") || n.includes("vitesse")) return "puissance";
   // §293 — vocabulaire mésocycle : maintien et affûtage = phase de taper.

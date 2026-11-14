@@ -47,6 +47,7 @@ import type { PrDetection } from "@/lib/prDetection";
 import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { formatPrep, formatWork, itemPrescription } from "@/lib/strength/prescriptionDisplay";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -263,6 +264,24 @@ export function WorkoutRunner({
   // Track which set keys triggered a PR for trophy display
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
 
+  // Chauffe de chaque exercice : hors séries et 1RM. Reprise locale PWA.
+  const prepStorageKey = `strength-prep:${runId ?? "draft"}:${session.id ?? "manual"}`;
+  const [prepsDone, setPrepsDone] = useState<Record<string, boolean>>({});
+  const [prepHydratedKey, setPrepHydratedKey] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(prepStorageKey);
+      const data = saved ? JSON.parse(saved) : {};
+      setPrepsDone(data && typeof data === "object" && !Array.isArray(data) ? data : {});
+    } catch { setPrepsDone({}); }
+    setPrepHydratedKey(prepStorageKey);
+  }, [prepStorageKey]);
+  useEffect(() => {
+    if (prepHydratedKey !== prepStorageKey) return;
+    try { window.localStorage.setItem(prepStorageKey, JSON.stringify(prepsDone)); }
+    catch { /* session reste utilisable sans stockage local */ }
+  }, [prepsDone, prepHydratedKey, prepStorageKey]);
+
   // §369 — Calibration 1RM inline (carte série 1 augmentée). `runOneRms` =
   // 1RM estimés en séance, utilisés comme cible IMMÉDIATE pour les séries 2+
   // (avant que la persistance parent ne se répercute). `calibRir` = reps en
@@ -345,10 +364,11 @@ export function WorkoutRunner({
   const currentExerciseIndex = currentStep - 1;
   const currentBlock =
     currentStep > 0 && currentStep <= workoutPlan.length ? workoutPlan[currentExerciseIndex] : null;
+  const needsAssistanceLog = itemPrescription(currentBlock)?.assistance?.log_actual === true;
   const currentExerciseDef = currentBlock
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
-  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true;
+  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true || currentBlock?.raw_payload?.bodyweight_override === true;
   // §298 — métrique d'intensité de l'exo courant (pilote tile/numpad/gating 1RM)
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
@@ -661,6 +681,7 @@ export function WorkoutRunner({
         acc[setNumber - 1] = {
           reps: log.reps ?? undefined,
           weight: log.weight ?? undefined,
+          notes: log.notes ?? null,
         };
         return acc;
       }, {});
@@ -796,6 +817,7 @@ export function WorkoutRunner({
         ? BODYWEIGHT_SENTINEL
         : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue),
       difficulty: setDifficultyValue,
+      notes: needsAssistanceLog ? currentSetInputs[currentSetIndex - 1]?.notes?.trim() || null : null,
     };
     setLogs((prev) => [...prev, newLog]);
 
@@ -862,7 +884,7 @@ export function WorkoutRunner({
       const nextIdx = currentSetIndex; // 0-indexed key for next set (currentSetIndex + 1 - 1)
       setCurrentSetInputs((prev) => {
         if (prev[nextIdx] !== undefined) return prev;
-        return { ...prev, [nextIdx]: { weight: newLog.weight, reps: newLog.reps } };
+        return { ...prev, [nextIdx]: { weight: newLog.weight, reps: newLog.reps, notes: newLog.notes } };
       });
       setCurrentSetIndex((prev) => Math.min(currentBlock.sets, prev + 1));
     }
@@ -1021,6 +1043,12 @@ export function WorkoutRunner({
               </Button>
             </div>
 
+            {session.description?.includes("Eau :") && (
+              <div className="rounded-xl bg-muted/40 px-3 py-2">
+                <p className="text-xs font-semibold mb-1">Dans l’eau</p>
+                <p className="text-sm whitespace-pre-line">{session.description.split("Eau :")[1]?.trim()}</p>
+              </div>
+            )}
             <div className="space-y-3">
               <Label className="uppercase font-bold text-xs text-muted-foreground">
                 Difficulté de la séance
@@ -1246,7 +1274,7 @@ export function WorkoutRunner({
             />
           </button>
           <h2 className="flex-1 min-w-0 text-lg font-semibold tracking-tight truncate">
-            {currentExerciseDef?.nom_exercice ?? "Exercice"}
+            {currentBlock?.exercise_name ?? currentExerciseDef?.nom_exercice ?? "Exercice"}
           </h2>
           <div className={cn(
             "h-2 w-2 shrink-0 rounded-full transition-colors",
@@ -1365,6 +1393,23 @@ export function WorkoutRunner({
         </div>
       )}
 
+      {needsAssistanceLog && currentBlock && (
+        <div className="rounded-xl border px-3 py-2 space-y-1.5">
+          <label htmlFor="strength-assistance-note" className="block text-xs font-semibold">Assistance réelle</label>
+          <input
+            id="strength-assistance-note"
+            type="text"
+            value={currentSetInputs[currentSetIndex - 1]?.notes ?? ""}
+            onChange={(event) => setCurrentSetInputs(prev => ({
+              ...prev,
+              [currentSetIndex - 1]: { ...prev[currentSetIndex - 1], notes: event.target.value },
+            }))}
+            placeholder="15 kg / élastique bleu / sans aide"
+            className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+            maxLength={100}
+          />
+        </div>
+      )}
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
@@ -1466,7 +1511,23 @@ export function WorkoutRunner({
         )}
       </Card>
 
-      {currentExerciseDef?.description && (
+      {currentBlock && currentBlock.block !== "warmup" && currentSetIndex === 1 && !currentLoggedSet &&
+        !prepsDone[String(currentStep)] && formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise) && (
+        <div className="rounded-2xl border bg-muted/30 px-4 py-3 space-y-2">
+          <p className="text-xs font-semibold">Préparation · {formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise)}</p>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String(currentStep)]: true }))}>Fait</Button>
+            <Button variant="ghost" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String(currentStep)]: true }))}>Passer</Button>
+          </div>
+        </div>
+      )}
+      {currentBlock?.notes && (
+        <div className="rounded-xl bg-muted/40 px-3 py-2">
+          <p className="text-xs font-semibold">Consigne · {formatWork(currentBlock)}</p>
+          <p className="text-sm">{currentBlock.notes}</p>
+        </div>
+      )}
+      {!currentBlock?.raw_payload?.pdf_exercise_name && currentExerciseDef?.description && (
         <div className="rounded-2xl border bg-muted/10 px-4 py-3">
           <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">Description</p>
           <p className="text-sm text-muted-foreground">
