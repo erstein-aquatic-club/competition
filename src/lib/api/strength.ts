@@ -727,7 +727,7 @@ export interface ReconcileStrengthRunLogsResult {
 
 export async function reconcileStrengthRunLogs(params: {
   runId: number;
-  logs: Array<{ exercise_id: number; set_number?: number | null; set_index?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null }>;
+  logs: Array<{ exercise_id: number; set_number?: number | null; set_index?: number | null; reps?: number | null; weight?: number | null; difficulty?: number | null; notes?: string | null }>;
   athleteId?: number | null;
   athleteName?: string | null;
 }): Promise<ReconcileStrengthRunLogsResult> {
@@ -766,6 +766,7 @@ export async function reconcileStrengthRunLogs(params: {
           reps: log.reps ?? null,
           weight: log.weight ?? null,
           difficulty: log.difficulty ?? null,
+          notes: log.notes ?? null,
           athlete_id: params.athleteId ?? null,
           athlete_name: params.athleteName ?? null,
           skip_one_rm: nonWeightIds.has(log.exercise_id),
