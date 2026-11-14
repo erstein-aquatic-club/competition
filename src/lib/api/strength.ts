@@ -213,7 +213,7 @@ export async function getStrengthSessions(): Promise<StrengthSessionTemplate[]> 
           .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
           .map((item: any, index: number) => ({
             ...normalizeStrengthItem(item, index, cycle),
-            exercise_name: item.dim_exercices?.nom_exercice ?? undefined,
+            exercise_name: (typeof item.raw_payload?.pdf_exercise_name === "string" ? item.raw_payload.pdf_exercise_name : item.dim_exercices?.nom_exercice) ?? undefined,
             category: item.dim_exercices?.exercise_type ?? undefined,
           })),
       };
