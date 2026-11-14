@@ -16,6 +16,7 @@ type Prescription = {
   hold_seconds?: { min: number; max: number };
   duration_minutes?: { min: number; max: number };
   per_side?: boolean;
+  assistance?: { mode?: string; log_actual?: boolean } | null;
 };
 export function itemPrescription(item: StrengthSessionItem | null | undefined): Prescription | null {
   const value = item?.raw_payload?.prescription_v1;
