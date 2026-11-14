@@ -4,6 +4,8 @@ import {
   cycleCoversWeek,
   isSlotVisibleForCycle,
   resolveStrengthWeeks,
+  resolvePersonalWeekPhase,
+  isGenericStrengthPhase,
 } from "../resolveStrengthWeeks";
 
 type W = { week: { weekKey: string }; source: string; sessions: string[] };
@@ -111,5 +113,22 @@ describe("isSlotVisibleForCycle", () => {
   it("keeps group sessions outside a cycle", () => {
     assert.equal(isSlotVisibleForCycle({ week_start: "2026-12-21" }, cycle), true);
     assert.equal(isSlotVisibleForCycle({ week_start: "2026-11-09" }, null), true);
+  });
+});
+
+describe("phase affichée d'un cycle PDF", () => {
+  it("remplace une préparation générale générique par la vraie phase du PDF", () => {
+    assert.equal(resolvePersonalWeekPhase("Préparation générale", "Force I"), "Force I");
+    assert.equal(resolvePersonalWeekPhase("prepa_generale", "Puissance printemps"), "Puissance printemps");
+    assert.equal(resolvePersonalWeekPhase("Prépa générale", "Affûtage juin"), "Affûtage juin");
+    assert.equal(isGenericStrengthPhase("Préparation générale"), true);
+  });
+  it("respecte un titre de semaine corrigé par le coach", () => {
+    assert.equal(resolvePersonalWeekPhase("Force II", "Force I"), "Force II");
+    assert.equal(resolvePersonalWeekPhase("Affûtage mars", "Force-vitesse"), "Affûtage mars");
+  });
+  it("n'invente pas de phase si les deux sources sont vides", () => {
+    assert.equal(resolvePersonalWeekPhase(null, ""), null);
+    assert.equal(resolvePersonalWeekPhase("Préparation générale", null), "Préparation générale");
   });
 });
