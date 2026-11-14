@@ -54,13 +54,13 @@ jobs:
           /tmp/manon-gif-env/bin/python - <<'PY'
           from pathlib import Path
           from PIL import Image
-          items=['tractions-assistees','hang-power-clean','gainage-frontal','pompes-dynamiques']
+          items=['tractions-assistees','tractions-strictes','hang-power-clean','gainage-frontal','pompes-dynamiques','pompes-sur-appui']
           for name in items:
               p=Path('public/exercise-gifs')/(name+'.gif')
               with Image.open(p) as im:
                   assert im.format=='GIF', name
                   assert min(im.size)>=250, (name,im.size)
-                  if name in ('tractions-assistees','hang-power-clean','pompes-dynamiques'):
+                  if name in ('tractions-assistees','tractions-strictes','hang-power-clean','pompes-dynamiques','pompes-sur-appui'):
                       assert im.n_frames>3, (name,im.n_frames)
                   print(name,im.size,im.n_frames,p.stat().st_size)
               assert p.stat().st_size < 1_900_000, name
