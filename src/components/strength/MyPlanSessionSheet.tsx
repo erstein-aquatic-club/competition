@@ -62,7 +62,7 @@ export function MyPlanSessionSheet({
                 )}
               </SheetTitle>
               {session.description && (
-                <p className="text-xs text-muted-foreground text-left mt-1">
+                <p className="text-xs text-muted-foreground text-left mt-1 whitespace-pre-line leading-relaxed">
                   {session.description}
                 </p>
               )}
