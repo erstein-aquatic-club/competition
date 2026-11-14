@@ -17,9 +17,7 @@
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
     "test:rls": "vitest run --config vitest.config.rls.ts",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "prebuild": "node scripts/generate-manon-gifs.mjs",
-    "predev": "node scripts/generate-manon-gifs.mjs"
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
