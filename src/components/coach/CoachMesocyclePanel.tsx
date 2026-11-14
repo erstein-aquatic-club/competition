@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import {
   getActiveMesocycle,
   getMesocycleSessionsContent,
+  getStrengthPlanningWeekOverrides,
   listMesocycles,
   revertMesocycle,
 } from "@/lib/api";
@@ -31,6 +32,10 @@ import type {
 } from "@/lib/api/types";
 import type { MesocycleSessionContent } from "@/lib/api";
 import { PERIODIZATION_CYCLES } from "@/lib/strength/periodizationCycles";
+import { formatEventGroupLabel } from "@/lib/strength/mesocycleProgress";
+import { auditWeekStart } from "@/lib/strength/coachMesocycleAudit";
+import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
+import { resolvePersonalWeekPhase } from "@/lib/strength/resolveStrengthWeeks";
 import { ZONE_LABEL_FR } from "@/lib/strength/zones";
 import { ExerciseGifLightbox } from "@/components/strength/ExerciseGifLightbox";
 
@@ -99,6 +104,18 @@ const CYCLE_COLOR: Record<PeriodizationCycle, {
   affutage:       { dot: "bg-violet-500",ring: "ring-violet-200 dark:ring-violet-900/50", text: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 dark:bg-violet-950/30" },
   pic:            { dot: "bg-emerald-500",ring: "ring-emerald-200 dark:ring-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
 };
+
+/** Styles inchangés pour les cycles moteur ; phases PDF reconnues par qualité. */
+function auditCycleColor(phase: string): (typeof CYCLE_COLOR)[PeriodizationCycle] {
+  if (phase in CYCLE_COLOR) return CYCLE_COLOR[phase as PeriodizationCycle];
+  switch (detectPhase(phase)) {
+    case "force": return CYCLE_COLOR.force_max;
+    case "puissance": return CYCLE_COLOR.puissance;
+    case "taper": return CYCLE_COLOR.affutage;
+    case "compétition": return CYCLE_COLOR.pic;
+    default: return CYCLE_COLOR.prepa_generale;
+  }
+}
 
 // ── Schéma du snapshot du raisonnement (forme du jsonb) ──────────────────────
 
@@ -193,6 +210,7 @@ export default function CoachMesocyclePanel({
   // d'appartenance ; leur revert SQL pouvait marquer le cycle "reverted"
   // sans nettoyer ses séances. Le backend garde aussi cette invariance.
   const isManualImport = /^manual[-_]/i.test(active.engine_version);
+  const isPdfImport = /^external_pdf:/i.test(active.engine_version);
 
   // Parse défensif du snapshot reasoning.
   const reasoning = parseReasoning(active.bucket_priorities);
@@ -219,12 +237,13 @@ export default function CoachMesocyclePanel({
                 </Badge>
               </div>
               <h3 className="mt-0.5 text-sm font-bold">
-                {active.event_group} · {active.kind === "season" ? "Saison" : "Mini-prépa"}
+                {formatEventGroupLabel(active.event_group)} · {active.kind === "season" ? "Saison" : "Mini-prépa"}
               </h3>
               <p className="mt-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
                 {active.target_week_count} sem. ·{" "}
                 {active.sessions_per_week} séances/sem. ·{" "}
-                généré le {fmtDate(active.generated_at)} · engine v{active.engine_version}
+                {isPdfImport ? "importé le" : "généré le"} {fmtDate(active.generated_at)} ·{" "}
+                {isPdfImport ? "Plan PDF V5" : `Moteur ${active.engine_version}`}
               </p>
             </div>
           </div>
@@ -374,7 +393,7 @@ export default function CoachMesocyclePanel({
       </Card>
 
       {/* ── Plan détaillé du mésocycle (auditable) ──────────────────────── */}
-      <MesocyclePlanContent mesocycleId={active.id} />
+      <MesocyclePlanContent mesocycle={active} />
 
       {/* ── Historique mésocycles (compact) ─────────────────────────────── */}
       {history.length > 1 && (
@@ -503,12 +522,37 @@ function NoteStrip({
  * Toutes les semaines repliées par défaut, comme côté nageur (§294, fix
  * cohérence Coach ↔ Nageur). Bouton « Tout déplier » disponible.
  */
-function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
+function MesocyclePlanContent({ mesocycle }: { mesocycle: StrengthMesocycle }) {
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ["mesocycle-content", mesocycleId],
-    queryFn: () => getMesocycleSessionsContent(mesocycleId),
-    staleTime: 60_000,
+    queryKey: ["mesocycle-content", mesocycle.id],
+    queryFn: () => getMesocycleSessionsContent(mesocycle.id),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
+
+  // Les phases hebdomadaires du coach sont la source de vérité. Les PDF
+  // conservent source_phase dans les items en repli (pas de moteur relancé).
+  const weekStarts = useMemo(() => {
+    const result: string[] = [];
+    for (let i = 1; i <= mesocycle.target_week_count; i++) {
+      const monday = auditWeekStart(mesocycle.start_week_monday, i);
+      if (monday) result.push(monday);
+    }
+    return result;
+  }, [mesocycle.start_week_monday, mesocycle.target_week_count]);
+
+  const { data: overrides = [], isLoading: phaseLoading } = useQuery({
+    queryKey: ["strength_planning_week_overrides", mesocycle.athlete_id, weekStarts],
+    queryFn: () => getStrengthPlanningWeekOverrides({
+      athleteId: mesocycle.athlete_id,
+      weekStarts,
+    }),
+    enabled: weekStarts.length > 0,
+  });
+  const phaseByWeek = useMemo(
+    () => new Map(overrides.map((week) => [week.week_start, week.week_type])),
+    [overrides],
+  );
 
   // Regroupe par week_number → liste de sessions.
   const weeks = useMemo(() => {
@@ -529,7 +573,7 @@ function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
 
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
 
-  if (isLoading) {
+  if (isLoading || (weekStarts.length > 0 && phaseLoading)) {
     return (
       <Card className="rounded-2xl border bg-card p-4">
         <div className="h-24 animate-pulse rounded bg-muted" />
@@ -584,9 +628,12 @@ function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
 
       <ol className="space-y-2">
         {weeks.map((w) => {
-          const cycle = (w.cycle as PeriodizationCycle) || "prepa_generale";
-          const c = CYCLE_COLOR[cycle] ?? CYCLE_COLOR.prepa_generale;
-          const cycleLabel = PERIODIZATION_CYCLES[cycle]?.label ?? w.cycle;
+          const monday = auditWeekStart(mesocycle.start_week_monday, w.weekNumber);
+          const storedLabel = monday ? phaseByWeek.get(monday) : null;
+          const cycle = resolvePersonalWeekPhase(storedLabel, w.cycle) ?? "";
+          const c = auditCycleColor(cycle);
+          const cycleLabel = PERIODIZATION_CYCLES[cycle as PeriodizationCycle]?.label
+            ?? (cycle || "Phase non renseignée");
           const isOpen = expanded.has(w.weekNumber);
           return (
             <li
@@ -627,10 +674,11 @@ function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
               {isOpen && (
                 <div className={cn("border-t px-2 py-2", c.bg)}>
                   <div className="space-y-2">
-                    {w.sessions.map((s) => (
+                    {w.sessions.map((s, index) => (
                       <SessionContentCard
                         key={s.sessionNumber}
                         session={s}
+                        sessionOrdinal={index + 1}
                         cycleColor={c}
                       />
                     ))}
@@ -647,9 +695,11 @@ function MesocyclePlanContent({ mesocycleId }: { mesocycleId: string }) {
 
 function SessionContentCard({
   session,
+  sessionOrdinal,
   cycleColor,
 }: {
   session: MesocycleSessionContent;
+  sessionOrdinal: number;
   cycleColor: (typeof CYCLE_COLOR)[PeriodizationCycle];
 }) {
   return (
@@ -657,9 +707,9 @@ function SessionContentCard({
       <div className="mb-2 flex items-center justify-between gap-3">
         <h4 className="flex items-center gap-2 text-xs font-bold">
           <span className="font-mono text-[9px] font-black tabular-nums text-muted-foreground">
-            J{session.sessionNumber}
+            J{sessionOrdinal}
           </span>
-          <span>Séance {session.sessionNumber}</span>
+          <span>Séance {sessionOrdinal}</span>
         </h4>
         <div className="flex flex-wrap items-center justify-end gap-1">
           {session.buckets.map((b) => (
