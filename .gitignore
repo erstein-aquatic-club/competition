@@ -50,6 +50,3 @@ _archive/
 
 # Git worktrees (local isolated branches)
 .worktrees/
-
-# GIFs originaux générés au prebuild/predev : ne pas committer les binaires
-/public/exercise-gifs/manon/*.gif
