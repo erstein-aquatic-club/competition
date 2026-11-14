@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from io import BytesIO
 import sys
+import re
 import cairosvg
 from PIL import Image, ImageSequence
 
@@ -13,7 +14,14 @@ for folder in sorted(src.iterdir()):
     if not folder.is_dir(): continue
     poses=[]
     for file in sorted(folder.glob('*.svg')):
-        png = cairosvg.svg2png(bytestring=file.read_bytes(), output_width=400, output_height=400)
+        svg = file.read_text(encoding='utf-8')
+        # CairoSVG ne sait pas résoudre CSS var(--figure-ink,#hex). Utiliser
+        # les couleurs de repli officielles du projet, sans changer le dessin.
+        svg = re.sub(r'var\\(--figure-[\\w-]+,(#[0-9a-fA-F]{6})\\)',
+                     lambda match: match.group(1), svg)
+        if 'var(--figure-' in svg:
+            raise RuntimeError(f'Unresolved color in {file}')
+        png = cairosvg.svg2png(bytestring=svg.encode('utf-8'), output_width=400, output_height=400)
         img = Image.open(BytesIO(png)).convert('RGBA')
         background=Image.new('RGBA',img.size, '#151718')
         background.alpha_composite(img)
