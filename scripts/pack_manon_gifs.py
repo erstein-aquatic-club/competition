@@ -21,8 +21,9 @@ for folder in sorted(src.iterdir()):
             'paper': '#151718', 'ink': '#e5e4e2',
             'detail': '#cecdca', 'muted': '#969b9e',
         }
-        svg = re.sub(r'var\\(--figure-(paper|ink|detail|muted)(?:,\\s*#[0-9a-fA-F]{6})?\\)',
-                     lambda match: palette[match.group(1)], svg)
+        for name, color in palette.items():
+            svg = svg.replace(f'var(--figure-{name},{color})', color)
+            svg = svg.replace(f'var(--figure-{name})', color)
         if 'var(--figure-' in svg:
             raise RuntimeError(f'Unresolved color in {file}')
         png = cairosvg.svg2png(bytestring=svg.encode('utf-8'), output_width=400, output_height=400)
