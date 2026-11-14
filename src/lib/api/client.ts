@@ -200,6 +200,11 @@ export const normalizeStrengthItem = (
       : null,
   // §298 — propage la cible absolue (cm/s) prescrite par le coach
   target_intensity: item.target_intensity == null ? null : Number(item.target_intensity),
+  // Les prescriptions du programme PDF doivent survivre à la lecture standard,
+  // pas uniquement à l'éditeur coach.
+  raw_payload: item.raw_payload && typeof item.raw_payload === "object"
+    ? item.raw_payload as Record<string, unknown>
+    : null,
 });
 
 export const validateStrengthItems = (items: StrengthSessionItem[]): void => {
