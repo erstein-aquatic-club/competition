@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPrep, formatWork, itemPrescription } from "./prescriptionDisplay";
+import { formatPrep, formatWork, formatSetTarget, formatRest, itemPrescription } from "./prescriptionDisplay";
 import type { StrengthSessionItem } from "@/lib/api/types";
 
 const item = (raw_payload: Record<string, unknown> | null, over: Partial<StrengthSessionItem> = {}) => ({
@@ -37,6 +37,24 @@ describe("prescriptions individuelles", () => {
   it("les jours de repos n'ont pas de préparation", () => {
     const it = item({ rest_day: true });
     expect(formatPrep(it, 0, true)).toBeNull();
+  });
+
+  it("gainage en secondes, sans faux comptage en reps", () => {
+    const it = item({ prescription_v1: { hold_seconds: { min: 20, max: 25 } } }, { reps: 1, percent_1rm: 0 });
+    expect(formatSetTarget(it)).toBe("20–25 s");
+    expect(formatWork(it)).toBe("2×20–25 s");
+  });
+
+  it("récupération 3–4 min conservée", () => {
+    const it = item({ prescription_v1: { rest_seconds_range: { min: 180, max: 240 } } });
+    expect(formatRest(it)).toBe("3–4 min");
+  });
+
+  it("préparation courte pour exercices explosifs", () => {
+    const it = item({ prescription_v1: {
+      preparation: { mode: "lower_box", label: "2 sauts · boîte basse" },
+    } });
+    expect(formatPrep(it, 0, false)).toBe("2 sauts · boîte basse");
   });
 
   it("le payload absent reste compatible", () => {
