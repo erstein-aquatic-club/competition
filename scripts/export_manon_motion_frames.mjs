@@ -13,6 +13,8 @@ const exercises = [
   { key: 'assisted-pull-up', name: 'tractions-assistees', title: 'Tractions assistées', frames: 22 },
   { key: 'hang-clean', name: 'hang-power-clean', title: 'Hang Power Clean', frames: 24 },
   { key: 'forearm-plank', name: 'gainage-frontal', title: 'Gainage frontal', frames: 1 },
+  { key: 'pull-up', name: 'tractions-strictes', title: 'Tractions strictes', frames: 22 },
+  { key: 'incline-push-up', name: 'pompes-sur-appui', title: 'Pompes sur appui', frames: 22 },
 ];
 for (const exercise of exercises) {
   if (!getExercise(exercise.key)) throw new Error('Missing workout-motion exercise: ' + exercise.key);
