@@ -17,6 +17,8 @@ export function detectPhase(name: string): StrengthPhase {
   const n = name.toLowerCase();
   if (n.includes("reprise") || n.includes("relance") || n.includes("transition") || n.includes("décharge") || n.includes("s0") || n.includes("préparation générale") || n.includes("prepa")) return "reprise";
   if (n.includes("activation") || n.includes("spécifique")) return "puissance";
+  // Force-vitesse = vitesse d'exécution / puissance, pas force maximale.
+  if (n.includes("force-vitesse") || n.includes("force vitesse")) return "puissance";
   if (n.includes("force")) return "force";
   if (n.includes("puissance") || n.includes("vitesse")) return "puissance";
   // §293 — vocabulaire mésocycle : maintien et affûtage = phase de taper.
