@@ -223,6 +223,52 @@ export async function getStrengthSessions(): Promise<StrengthSessionTemplate[]> 
 }
 
 /**
+ * Charge les modèles effectivement référencés par les créneaux datés.
+ * Ne dépend pas de la limite globale des 500 séances du catalogue : un plan
+ * de 32 semaines doit rester lisible même après de nouveaux imports.
+ */
+export async function getStrengthSessionsByIds(ids: number[]): Promise<StrengthSessionTemplate[]> {
+  const distinct = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  if (distinct.length === 0) return [];
+  if (!canUseSupabase()) {
+    const cached = (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as StrengthSessionTemplate[];
+    return cached.filter((session) => distinct.includes(session.id));
+  }
+  const results: StrengthSessionTemplate[] = [];
+  // 100 ids maximum par requête, pour éviter les URLs PostgREST trop longues.
+  for (let i = 0; i < distinct.length; i += 100) {
+    const batch = distinct.slice(i, i + 100);
+    const rows = assertSupabase(
+      await supabase.from("strength_sessions")
+        .select("*, strength_session_items(*, dim_exercices(nom_exercice, exercise_type))")
+        .in("id", batch)
+    );
+    for (const session of rows ?? []) {
+      const rawItems = Array.isArray(session.strength_session_items)
+        ? session.strength_session_items : [];
+      const cycle = normalizeCycleType(rawItems[0]?.cycle_type);
+      results.push({
+        id: safeInt(session.id),
+        title: String(session.name || ""),
+        description: session.description ?? "",
+        cycle,
+        folder_id: safeOptionalInt(session.folder_id),
+        items: rawItems
+          .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
+          .map((item: any, index: number) => ({
+            ...normalizeStrengthItem(item, index, cycle),
+            exercise_name: (typeof item.raw_payload?.pdf_exercise_name === "string"
+              ? item.raw_payload.pdf_exercise_name
+              : item.dim_exercices?.nom_exercice) ?? undefined,
+            category: item.dim_exercices?.exercise_type ?? undefined,
+          })),
+      });
+    }
+  }
+  return results;
+}
+
+/**
  * §300 Part 2 — Charge UNE séance en forme éditeur (items + `raw_payload`) par id,
  * hors logique de liste. Les séances `[Méso …]` sont exclues de la liste
  * catalogue (mig 00180) mais restent éditables par id ; le `raw_payload`
