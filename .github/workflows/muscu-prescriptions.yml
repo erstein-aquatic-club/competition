@@ -9,8 +9,6 @@ on:
       - 'src/lib/types.ts'
       - 'src/pages/Strength.tsx'
       - 'supabase/migrations/**'
-      - 'scripts/generate-manon-gifs.mjs'
-      - 'package.json'
       - '.github/workflows/muscu-prescriptions.yml'
   workflow_dispatch:
 
@@ -32,26 +30,3 @@ jobs:
         run: npx vitest run --config vitest.config.unit.ts src/lib/strength/prescriptionDisplay.vitest.ts
       - name: Build
         run: npm run build
-      - name: GIF des exercices — fichiers exploitables
-        run: |
-          node --input-type=module <<'NODE'
-          import {readFileSync} from 'node:fs';
-          const files = [
-            '117-tractions-assistees.gif',
-            '118-hang-power-clean.gif',
-            '119-pompes-dynamiques.gif',
-            '120-gainage-frontal.gif',
-            '115-mobilite-active.gif',
-          ];
-          for (const name of files) {
-            const file = readFileSync('dist/exercise-gifs/manon/'+name);
-            const width = file.readUInt16LE(6), height = file.readUInt16LE(8);
-            if (file.toString('ascii',0,6)!=='GIF89a' || width!==320 || height!==220) {
-              throw new Error(name + ': GIF non valide');
-            }
-            if (file.length < 500 || file.length > 300000) {
-              throw new Error(name + ': taille suspecte '+file.length);
-            }
-            console.log(name, file.length, 'octets', width+'x'+height);
-          }
-          NODE
