@@ -211,6 +211,8 @@ export default function CoachMesocyclePanel({
   // sans nettoyer ses séances. Le backend garde aussi cette invariance.
   const isManualImport = /^manual[-_]/i.test(active.engine_version);
   const isPdfImport = /^external_pdf:/i.test(active.engine_version);
+  const pdfSource = typeof active.bucket_priorities?.source === "string"
+    ? active.bucket_priorities.source : "PDF";
 
   // Parse défensif du snapshot reasoning.
   const reasoning = parseReasoning(active.bucket_priorities);
@@ -243,7 +245,7 @@ export default function CoachMesocyclePanel({
                 {active.target_week_count} sem. ·{" "}
                 {active.sessions_per_week} séances/sem. ·{" "}
                 {isPdfImport ? "importé le" : "généré le"} {fmtDate(active.generated_at)} ·{" "}
-                {isPdfImport ? "Plan PDF V5" : `Moteur ${active.engine_version}`}
+                {isPdfImport ? `Plan ${pdfSource}` : `Moteur ${active.engine_version}`}
               </p>
             </div>
           </div>
@@ -347,7 +349,7 @@ export default function CoachMesocyclePanel({
             <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted-foreground">
               {isManualImport
                 ? "Ce cycle a été importé manuellement : son annulation automatique est désactivée tant que la provenance et le snapshot de restauration ne sont pas réparés."
-                : "Tu peux éditer chaque séance dans la timeline du nageur. Pour annuler complètement ce mésocycle et restaurer la planif d'avant, rejette-le ci-dessous."}
+                : "Séances modifiables dans la planification du nageur. « Rejeter » restaure le plan précédent."}
             </div>
             <div className="flex shrink-0 flex-col gap-2">
               <Button
