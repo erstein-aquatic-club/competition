@@ -258,6 +258,7 @@ export function WorkoutRunner({
   const [draftValue, setDraftValue] = useState("");
   const [shouldReplace, setShouldReplace] = useState(false);
   const [isGifOpen, setIsGifOpen] = useState(false);
+  const [showAlternateGif, setShowAlternateGif] = useState(false);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [skipExerciseConfirmOpen, setSkipExerciseConfirmOpen] = useState(false);
   const [chapterBlock, setChapterBlock] = useState<"warmup" | "main" | null>(null);
@@ -370,6 +371,19 @@ export function WorkoutRunner({
     : null;
   const isIsometricPrescription = itemPrescription(currentBlock)?.hold_seconds != null || itemPrescription(currentBlock)?.duration_minutes != null;
   const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true || currentBlock?.raw_payload?.bodyweight_override === true || isIsometricPrescription;
+  // Un PDF peut prescrire une variante de l'exercice catalogue.
+  // Son visuel doit refléter la variante, sans changer le GIF commun.
+  const rawPrimaryGif = currentBlock?.raw_payload?.visual_gif_url;
+  const primaryGifUrl = typeof rawPrimaryGif === "string" && rawPrimaryGif.trim()
+    ? rawPrimaryGif : currentExerciseDef?.illustration_gif ?? null;
+  const rawAlternate = currentBlock?.raw_payload?.visual_alternate;
+  const altGif = rawAlternate && typeof rawAlternate === "object" && !Array.isArray(rawAlternate)
+    ? rawAlternate as { url?: unknown; label?: unknown } : null;
+  const alternateGifUrl = typeof altGif?.url === "string" && altGif.url ? altGif.url : null;
+  const primaryGifLabel = typeof currentBlock?.raw_payload?.visual_primary_label === "string"
+    ? currentBlock.raw_payload.visual_primary_label : "Principal";
+  const alternateGifLabel = typeof altGif?.label === "string" ? altGif.label : "Variante";
+  useEffect(() => { setShowAlternateGif(false); }, [currentStep, currentBlock?.exercise_id]);
   // §298 — métrique d'intensité de l'exo courant (pilote tile/numpad/gating 1RM)
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
@@ -1258,7 +1272,7 @@ export function WorkoutRunner({
             type="button"
             aria-label="Voir l'animation de l'exercice"
             onClick={() => {
-              if (!currentExerciseDef?.illustration_gif) return;
+              if (!primaryGifUrl) return;
               setIsGifOpen(true);
             }}
             className={cn(
@@ -1267,7 +1281,7 @@ export function WorkoutRunner({
             )}
           >
             <ExerciseGif
-              src={currentExerciseDef?.illustration_gif}
+              src={primaryGifUrl}
               alt=""
               offline={!isOnline}
               className="h-full w-full rounded-full"
@@ -1636,7 +1650,7 @@ export function WorkoutRunner({
         />
       )}
 
-      {isGifOpen && currentExerciseDef?.illustration_gif && (
+      {isGifOpen && primaryGifUrl && (
         <div
           className="fixed inset-0 z-50 bg-black/50"
           onClick={() => setIsGifOpen(false)}
@@ -1654,9 +1668,17 @@ export function WorkoutRunner({
               >
                 <X className="h-4 w-4" />
               </button>
+              {alternateGifUrl && (
+                <div className="flex justify-center gap-2 mb-3">
+                  <Button size="sm" variant={!showAlternateGif ? "default" : "outline"}
+                    onClick={() => setShowAlternateGif(false)}>{primaryGifLabel}</Button>
+                  <Button size="sm" variant={showAlternateGif ? "default" : "outline"}
+                    onClick={() => setShowAlternateGif(true)}>{alternateGifLabel}</Button>
+                </div>
+              )}
               <ExerciseGif
-                src={currentExerciseDef.illustration_gif}
-                alt=""
+                src={showAlternateGif && alternateGifUrl ? alternateGifUrl : primaryGifUrl}
+                alt={showAlternateGif ? String(alternateGifLabel) : String(primaryGifLabel)}
                 offline={!isOnline}
                 className="max-h-[80dvh] max-w-[92vw] rounded-2xl"
                 imgClassName="max-h-[80dvh] w-auto max-w-[92vw]"
