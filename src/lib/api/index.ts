@@ -518,6 +518,7 @@ export {
   updateExercise,
   deleteExercise,
   getStrengthSessions,
+  getStrengthSessionsByIds,
   getStrengthSessionForEdit,
   createStrengthSession,
   updateStrengthSession,
