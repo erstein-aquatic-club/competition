@@ -84,7 +84,7 @@ export function MyPlanWeekCard({
           {instance.phaseName ? (
             <span
               className={cn(
-                "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold border-0 shrink-0 max-w-[7.5rem] truncate",
+                "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] leading-tight font-semibold border-0 shrink-0 max-w-[8.5rem] whitespace-normal text-left",
                 style.bg,
                 style.text,
               )}
