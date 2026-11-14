@@ -27,6 +27,6 @@ jobs:
       - name: Typecheck
         run: npm run check
       - name: Prescription unit tests
-        run: npx vitest run --config vitest.config.unit.ts src/lib/strength/prescriptionDisplay.test.ts
+        run: npx vitest run --config vitest.config.unit.ts src/lib/strength/prescriptionDisplay.vitest.ts
       - name: Build
         run: npm run build
