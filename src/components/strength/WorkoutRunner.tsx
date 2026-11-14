@@ -47,6 +47,7 @@ import type { PrDetection } from "@/lib/prDetection";
 import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { formatPrep, formatWork } from "@/lib/strength/prescriptionDisplay";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -262,6 +263,24 @@ export function WorkoutRunner({
   const [chapterBlock, setChapterBlock] = useState<"warmup" | "main" | null>(null);
   // Track which set keys triggered a PR for trophy display
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
+
+  // Chauffe de chaque exercice : hors séries et 1RM. Reprise locale PWA.
+  const prepStorageKey = `strength-prep:${runId ?? "draft"}:${session.id ?? "manual"}`;
+  const [prepsDone, setPrepsDone] = useState<Record<string, boolean>>({});
+  const [prepHydratedKey, setPrepHydratedKey] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(prepStorageKey);
+      const data = saved ? JSON.parse(saved) : {};
+      setPrepsDone(data && typeof data === "object" && !Array.isArray(data) ? data : {});
+    } catch { setPrepsDone({}); }
+    setPrepHydratedKey(prepStorageKey);
+  }, [prepStorageKey]);
+  useEffect(() => {
+    if (prepHydratedKey !== prepStorageKey) return;
+    try { window.localStorage.setItem(prepStorageKey, JSON.stringify(prepsDone)); }
+    catch { /* session reste utilisable sans stockage local */ }
+  }, [prepsDone, prepHydratedKey, prepStorageKey]);
 
   // §369 — Calibration 1RM inline (carte série 1 augmentée). `runOneRms` =
   // 1RM estimés en séance, utilisés comme cible IMMÉDIATE pour les séries 2+
@@ -1021,6 +1040,12 @@ export function WorkoutRunner({
               </Button>
             </div>
 
+            {session.description?.includes("Eau :") && (
+              <div className="rounded-xl bg-muted/40 px-3 py-2">
+                <p className="text-xs font-semibold mb-1">Dans l’eau</p>
+                <p className="text-sm whitespace-pre-line">{session.description.split("Eau :")[1]?.trim()}</p>
+              </div>
+            )}
             <div className="space-y-3">
               <Label className="uppercase font-bold text-xs text-muted-foreground">
                 Difficulté de la séance
@@ -1466,6 +1491,22 @@ export function WorkoutRunner({
         )}
       </Card>
 
+      {currentBlock && currentBlock.block !== "warmup" && currentSetIndex === 1 && !currentLoggedSet &&
+        !prepsDone[String(currentStep)] && formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise) && (
+        <div className="rounded-2xl border bg-muted/30 px-4 py-3 space-y-2">
+          <p className="text-xs font-semibold">Préparation · {formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise)}</p>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String(currentStep)]: true }))}>Fait</Button>
+            <Button variant="ghost" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String(currentStep)]: true }))}>Passer</Button>
+          </div>
+        </div>
+      )}
+      {currentBlock?.notes && (
+        <div className="rounded-xl bg-muted/40 px-3 py-2">
+          <p className="text-xs font-semibold">Consigne · {formatWork(currentBlock)}</p>
+          <p className="text-sm">{currentBlock.notes}</p>
+        </div>
+      )}
       {currentExerciseDef?.description && (
         <div className="rounded-2xl border bg-muted/10 px-4 py-3">
           <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">Description</p>
