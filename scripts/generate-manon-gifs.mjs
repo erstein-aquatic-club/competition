@@ -7,7 +7,8 @@
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { GIFEncoder } from "gifenc";
+import gifenc from "gifenc";
+const { GIFEncoder } = gifenc;
 
 const ROOT = fileURLToPath(new URL("../public/exercise-gifs/manon/", import.meta.url));
 const W = 320;
