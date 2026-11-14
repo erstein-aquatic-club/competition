@@ -40,9 +40,9 @@ describe("prescriptions individuelles", () => {
   });
 
   it("gainage en secondes, sans faux comptage en reps", () => {
-    const it = item({ prescription_v1: { hold_seconds: { min: 20, max: 25 } } }, { reps: 1 });
+    const it = item({ prescription_v1: { hold_seconds: { min: 20, max: 25 } } }, { reps: 1, percent_1rm: 0 });
     expect(formatSetTarget(it)).toBe("20–25 s");
-    expect(formatWork(it)).toBe("2×20–25 s · 80 % 1RM");
+    expect(formatWork(it)).toBe("2×20–25 s");
   });
 
   it("récupération 3–4 min conservée", () => {
