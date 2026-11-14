@@ -58,6 +58,17 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/competition\/api/, /^\/competition\/version\.json/],
         runtimeCaching: [
           {
+            // GIF du catalogue stockés sur Supabase : chargement une fois,
+            // réutilisation hors-ligne en Focus/PWA.
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\/exercise-gifs\/.+\.gif(?:\?.*)?$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'eac-exercise-gifs',
+              expiration: { maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Never return a 5-minute-old training plan on Workbox NetworkFirst
             // timeout. Other APIs retain their offline behaviour.
             urlPattern: /^https:\/\/[^/]+\.supabase\.co\/rest\/v1\/(?:strength_mesocycles|strength_planning_slot_overrides|strength_planning_week_overrides|strength_planning_slots|strength_sessions|strength_session_items|training_plan_applications|training_plan_sessions|training_plans)(?:[/?]|$)/i,
