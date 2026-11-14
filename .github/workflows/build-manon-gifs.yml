@@ -1,0 +1,76 @@
+name: Générer les GIFs Manon (sources autorisées)
+on:
+  push:
+    branches: [feat/manon-gif-coverage]
+    paths:
+      - "scripts/export_manon_motion_frames.mjs"
+      - "scripts/pack_manon_gifs.py"
+      - ".github/workflows/build-manon-gifs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  artwork:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          ref: feat/manon-gif-coverage
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Préparer le moteur d'animations
+        run: |
+          npm install --global pnpm@10.28.2
+          git clone --depth 100 https://github.com/februarysea/workout-motion.git /tmp/workout-motion
+          cd /tmp/workout-motion
+          git checkout 424fbcc1548b6e14a2276bc0886c13c7a228eb81
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Générer les poses SVG originales
+        run: node scripts/export_manon_motion_frames.mjs /tmp/workout-motion /tmp/manon-gif-frames
+      - name: Convertir en GIF et contrôler les fichiers
+        run: |
+          python3 -m venv /tmp/manon-gif-env
+          /tmp/manon-gif-env/bin/pip install Pillow==11.3.0 CairoSVG==2.8.2
+          /tmp/manon-gif-env/bin/python scripts/pack_manon_gifs.py /tmp/manon-gif-frames public/exercise-gifs
+      - name: Ajouter la démonstration de pompe sous licence MIT
+        run: |
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/harshvishu/free-exercise-db-with-videos/main/.github/media/push-ups.gif \
+            -o public/exercise-gifs/pompes-dynamiques.gif
+          test "$(git hash-object public/exercise-gifs/pompes-dynamiques.gif)" = "0c94a82f327eeb9da568ccd0aeb31e24eafd10a8"
+      - name: Copie des notices source
+        run: |
+          mkdir -p docs/assets
+          cp /tmp/workout-motion/LICENSE docs/assets/workout-motion-LICENSE.txt
+          cp /tmp/workout-motion/NOTICE docs/assets/workout-motion-NOTICE.txt
+      - name: Vérifier tous les GIFs
+        run: |
+          /tmp/manon-gif-env/bin/python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          items=['tractions-assistees','hang-power-clean','gainage-frontal','pompes-dynamiques']
+          for name in items:
+              p=Path('public/exercise-gifs')/(name+'.gif')
+              with Image.open(p) as im:
+                  assert im.format=='GIF', name
+                  assert min(im.size)>=250, (name,im.size)
+                  if name in ('tractions-assistees','hang-power-clean','pompes-dynamiques'):
+                      assert im.n_frames>3, (name,im.n_frames)
+                  print(name,im.size,im.n_frames,p.stat().st_size)
+              assert p.stat().st_size < 1_900_000, name
+          PY
+      - name: Committer les GIF dans la branche
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/exercise-gifs docs/assets/workout-motion-LICENSE.txt docs/assets/workout-motion-NOTICE.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'assets(muscu): GIFs contrôlés pour les exercices Manon'
+            git push origin HEAD:feat/manon-gif-coverage
+          fi
