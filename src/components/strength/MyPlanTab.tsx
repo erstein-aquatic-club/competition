@@ -38,7 +38,7 @@ import {
 import { mergeStrengthSlots } from "@/lib/strengthPlanningMerge";
 import { derivePlanByWeekDay, type DerivedCell } from "@/lib/strength/derivePlanByWeekDay";
 import { detectPhase } from "@/lib/strength/strengthPhaseStyles";
-import { cycleCoversWeek, isSlotVisibleForCycle, resolveStrengthWeeks } from "@/lib/strength/resolveStrengthWeeks";
+import { cycleCoversWeek, isSlotVisibleForCycle, resolveStrengthWeeks, resolvePersonalWeekPhase } from "@/lib/strength/resolveStrengthWeeks";
 
 /** Number of future weeks to display from current week */
 const PLAN_WEEK_COUNT = 12;
@@ -228,6 +228,38 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     return map;
   }, [allSessions, datedSessions]);
 
+  // Source de vérité du titre hebdomadaire : le week_override individuel.
+  // Pour les cycles PDF importés, les items gardent aussi la phase d'origine :
+  // on s'en sert uniquement si l'override est vide / « Préparation générale ».
+  // Une correction manuelle du coach doit toujours rester prioritaire.
+  const personalWeekPhases = useMemo(() => {
+    const labels = new Map(weekTypeByStart);
+    if (!activeMesocycle?.engine_version?.startsWith("external_pdf:")) return labels;
+
+    const pdfPhasesByWeek = new Map<string, Set<string>>();
+    for (const slot of effectiveSlots) {
+      if (!slot.session_template_id || !cycleCoversWeek(slot.week_start, activeMesocycle)) continue;
+      const template = sessionsById.get(slot.session_template_id);
+      for (const item of template?.items ?? []) {
+        const payload = item.raw_payload;
+        if (payload?.engine_source !== "external_pdf" ||
+            payload.mesocycle_id !== activeMesocycle.id ||
+            typeof payload.source_phase !== "string" || !payload.source_phase.trim()) continue;
+        const current = pdfPhasesByWeek.get(slot.week_start) ?? new Set<string>();
+        current.add(payload.source_phase.trim());
+        pdfPhasesByWeek.set(slot.week_start, current);
+        break; // L'étiquette source est répétée dans les séances, pas à chaque item.
+      }
+    }
+    for (const [weekStart, values] of pdfPhasesByWeek) {
+      // En cas de conflit entre séances, ne pas choisir arbitrairement.
+      if (values.size !== 1) continue;
+      const label = resolvePersonalWeekPhase(labels.get(weekStart), [...values][0]);
+      if (label) labels.set(weekStart, label);
+    }
+    return labels;
+  }, [weekTypeByStart, activeMesocycle, effectiveSlots, sessionsById]);
+
   // ── Phase 3 (§275.7) — derive sessions per visible week from applications ──
   const phase3Derived = useMemo<Map<string, Map<number, DerivedCell>>>(() => {
     if (planApplications.length === 0) return new Map();
@@ -353,7 +385,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       // §293 — si un week_override a posé un week_type (label cycle du
       // mésocycle généré), on le surface comme nom de cycle/phase pour que la
       // timeline affiche « Force max » / « Pic » plutôt qu'un libellé vide.
-      const weekType = weekTypeByStart.get(weekStart) ?? "";
+      const weekType = personalWeekPhases.get(weekStart) ?? "";
       instances.push({
         week: { monday, sunday, weekNumber, weekKey: weekStart },
         cycleId: 0, // no cycle for Phase 2
@@ -366,7 +398,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       });
     }
     return instances;
-  }, [activeMesocycle, effectiveSlots, weekStarts, sessionsById, weekTypeByStart]);
+  }, [activeMesocycle, effectiveSlots, weekStarts, sessionsById, personalWeekPhases]);
 
   // ── Phase 1 fallback: build WeekInstances from cycles ─────────────────────
   const fallbackWeekInstances = useMemo((): WeekInstance[] => {
@@ -379,16 +411,23 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   }, [rootFolders, subFoldersMap, sessionsByFolder]);
 
   // ── Final week instances ────────────────────────────────────────────────────
-  const weekInstances = useMemo(
-    () => resolveStrengthWeeks({
+  const weekInstances = useMemo(() => {
+    const resolved = resolveStrengthWeeks({
       weekKeys: weekStarts,
       dated: phase2WeekInstances,
       applications: phase3WeekInstances,
       folders: fallbackWeekInstances,
       activeCycle: activeMesocycle,
-    }),
-    [weekStarts, phase2WeekInstances, phase3WeekInstances, fallbackWeekInstances, activeMesocycle],
-  );
+    });
+    // L'override de semaine individuel doit gagner sur un ancien libellé
+    // générique issu des dossiers ou d'un plan appliqué.
+    return resolved.map((instance) => {
+      if (!cycleCoversWeek(instance.week.weekKey, activeMesocycle)) return instance;
+      const label = personalWeekPhases.get(instance.week.weekKey);
+      if (!label || label === instance.phaseName) return instance;
+      return { ...instance, phaseName: label, cycleName: label, phase: detectPhase(label) };
+    });
+  }, [weekStarts, phase2WeekInstances, phase3WeekInstances, fallbackWeekInstances, activeMesocycle, personalWeekPhases]);
 
   // §296 — Auto-open priorité : si un mésocycle actif existe, ouvrir la
   // PREMIÈRE semaine du mésocycle (le plan que le nageur vient de générer
@@ -426,7 +465,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       currentMonday,
       activeMesocycle.week_offset ?? 0,
     );
-    const phaseLabel = weekTypeByStart.get(currentMonday) ?? null;
+    const phaseLabel = personalWeekPhases.get(currentMonday) ?? null;
     let generatedAtLabel: string | null = null;
     if (activeMesocycle.generated_at) {
       const d = new Date(activeMesocycle.generated_at);
@@ -450,7 +489,7 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
       phase: detectPhase(phaseLabel ?? ""),
       generatedAtLabel,
     };
-  }, [hasActiveMesocycle, activeMesocycle, firstMesoWeekKey, weekTypeByStart]);
+  }, [hasActiveMesocycle, activeMesocycle, firstMesoWeekKey, personalWeekPhases]);
 
   useEffect(() => {
     if (weekInstances.length > 0 && expandedWeekKey === null) {

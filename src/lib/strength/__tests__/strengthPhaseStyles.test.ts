@@ -11,6 +11,10 @@ test('detectPhase: chaîne vide → neutre (reprise), pas force', () => {
 
 test('detectPhase: libellés mésocycle reconnus', () => {
   assert.equal(detectPhase('Force max'), 'force');
+  assert.equal(detectPhase('Force-vitesse'), 'puissance');
+  assert.equal(detectPhase('Puissance printemps'), 'puissance');
+  assert.equal(detectPhase('Affûtage juin'), 'taper');
+  assert.equal(detectPhase('Force II'), 'force');
   assert.equal(detectPhase('Puissance / vitesse'), 'puissance');
   assert.equal(detectPhase('Maintien'), 'taper');
   assert.equal(detectPhase('Affûtage'), 'taper');

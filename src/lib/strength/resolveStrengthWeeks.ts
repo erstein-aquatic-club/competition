@@ -97,3 +97,26 @@ export function resolveStrengthWeeks<T extends WeekWithKey>({
   }
   return result;
 }
+
+/**
+ * Libellé générique d'un moteur ou d'un ancien plan : pas une phase précise.
+ * Seul un libellé effectivement vide / générique peut être remplacé par le PDF.
+ */
+export function isGenericStrengthPhase(label: string | null | undefined): boolean {
+  const normalized = (label ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim().toLowerCase().replace(/[_-]/g, " ").replace(/\s+/g, " ");
+  return normalized === "preparation generale" || normalized === "prepa generale";
+}
+
+/** Priorité : correction hebdomadaire coach > phase PDF > libellé générique. */
+export function resolvePersonalWeekPhase(
+  storedLabel: string | null | undefined,
+  sourcePdfLabel: string | null | undefined,
+): string | null {
+  const stored = storedLabel?.trim() || null;
+  const pdf = sourcePdfLabel?.trim() || null;
+  if (stored && !isGenericStrengthPhase(stored)) return stored;
+  if (pdf && !isGenericStrengthPhase(pdf)) return pdf;
+  return stored ?? pdf;
+}

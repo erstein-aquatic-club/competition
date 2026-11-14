@@ -50,6 +50,7 @@ jobs:
           node --test --experimental-test-module-mocks --import tsx
           src/lib/__tests__/strengthPlanFreshness.test.ts
           src/lib/strength/__tests__/resolveStrengthWeeks.test.ts
+          src/lib/strength/__tests__/strengthPhaseStyles.test.ts
           src/lib/strength/__tests__/formatStrengthSessionTitle.test.ts
           src/lib/strength/__tests__/reconcileStrengthLogs.test.ts
           src/lib/__tests__/strengthAtomicSet.test.ts
