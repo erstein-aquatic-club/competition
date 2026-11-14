@@ -367,7 +367,7 @@ export function WorkoutRunner({
   const currentExerciseDef = currentBlock
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
-  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true;
+  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true || currentBlock?.raw_payload?.bodyweight_override === true;
   // §298 — métrique d'intensité de l'exo courant (pilote tile/numpad/gating 1RM)
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
@@ -1507,7 +1507,7 @@ export function WorkoutRunner({
           <p className="text-sm">{currentBlock.notes}</p>
         </div>
       )}
-      {currentExerciseDef?.description && (
+      {!currentBlock?.raw_payload?.pdf_exercise_name && currentExerciseDef?.description && (
         <div className="rounded-2xl border bg-muted/10 px-4 py-3">
           <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">Description</p>
           <p className="text-sm text-muted-foreground">
