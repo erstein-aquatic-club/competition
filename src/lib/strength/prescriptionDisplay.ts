@@ -46,6 +46,28 @@ export function formatPrep(item: StrengthSessionItem, workWeightKg: number, weig
   return "Quelques reps faciles";
 }
 
+export function formatSetTarget(item: StrengthSessionItem): string {
+  const p = itemPrescription(item);
+  const fmt = (r: { min: number; max: number } | undefined, fallback: number) =>
+    r && r.max > r.min ? `${r.min}–${r.max}` : String(r?.min ?? fallback);
+  if (p?.duration_minutes) return `${fmt(p.duration_minutes, 0)} min`;
+  if (p?.hold_seconds) return `${fmt(p.hold_seconds, 0)} s`;
+  return `${fmt(p?.reps_range, item.reps)} reps${p?.per_side ? " / côté" : ""}`;
+}
+
+export function formatRest(item: StrengthSessionItem): string | null {
+  const p = itemPrescription(item) as (Prescription & {
+    rest_seconds_range?: { min: number; max: number } | null;
+  }) | null;
+  const min = p?.rest_seconds_range?.min ?? item.rest_seconds;
+  const max = p?.rest_seconds_range?.max ?? item.rest_seconds;
+  if (!Number.isFinite(min) || min <= 0) return null;
+  const label = (v: number) => v % 60 === 0 ? `${v / 60} min` : `${v} s`;
+  if (min === max) return label(min);
+  if (min % 60 === 0 && max % 60 === 0) return `${min / 60}–${max / 60} min`;
+  return `${label(min)}–${label(max)}`;
+}
+
 export function formatWork(item: StrengthSessionItem): string {
   const p = itemPrescription(item);
   const range = (v: { min: number; max: number } | undefined, fallback: number) =>
