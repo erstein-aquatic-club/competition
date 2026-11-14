@@ -34,6 +34,7 @@ import type {
   StrengthPeriodizationTemplate,
 } from './types';
 import { cycleAtWeek } from '@/lib/strength/mesocycleEngine';
+import { readAuditSessionMeta, auditSourcePhase } from '@/lib/strength/coachMesocycleAudit';
 
 /**
  * Exécute le moteur de génération localement, sans aucun appel réseau.
@@ -402,7 +403,7 @@ export interface MesocycleSessionExerciseContent {
 export interface MesocycleSessionContent {
   weekNumber: number;
   sessionNumber: number;
-  /** PeriodizationCycle string : `'prepa_generale'` | `'force_max'` | … */
+  /** Phase d'origine PDF (Force I, Affûtage…) ou code de périodisation du moteur. */
   cycle: string;
   /** Seaux travaillés (dérivés des items de la séance, dédoublonnés). */
   buckets: string[];
@@ -467,9 +468,9 @@ export async function getMesocycleSessionsContent(
 
   for (const r of rows) {
     const p = r.raw_payload!;
-    const weekNumber = Number(p.week_number ?? 0);
-    const sessionNumber = Number(p.session_number ?? 0);
-    if (!weekNumber || !sessionNumber) continue;
+    const meta = readAuditSessionMeta(p);
+    if (!meta) continue;
+    const { weekNumber, sessionNumber } = meta;
 
     const key = `${weekNumber}-${sessionNumber}`;
     let session = byKey.get(key);
@@ -477,7 +478,7 @@ export async function getMesocycleSessionsContent(
       session = {
         weekNumber,
         sessionNumber,
-        cycle: String(p.periodization_cycle ?? ''),
+        cycle: auditSourcePhase(p),
         buckets: [],
         exercises: [],
       };
@@ -490,7 +491,8 @@ export async function getMesocycleSessionsContent(
     }
 
     const dimEx = Array.isArray(r.dim_exercices) ? r.dim_exercices[0] : r.dim_exercices;
-    const nomExercice = dimEx?.nom_exercice ?? `#${r.exercise_id}`;
+    const nomExercice = typeof p.pdf_exercise_name === 'string' && p.pdf_exercise_name.trim()
+      ? p.pdf_exercise_name.trim() : (dimEx?.nom_exercice ?? `#${r.exercise_id}`);
     const illustrationGif = dimEx?.illustration_gif ?? null;
 
     session.exercises.push({

@@ -19,6 +19,7 @@ import { listActiveMesocyclesWithAthletes } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import CoachMesocyclePanel from '@/components/coach/CoachMesocyclePanel';
+import { formatEventGroupLabel } from '@/lib/strength/mesocycleProgress';
 
 const FR_DATE = new Intl.DateTimeFormat('fr-FR', {
   day: '2-digit',
@@ -104,14 +105,15 @@ export default function CoachMesocyclesAccordion() {
                         variant="outline"
                         className="h-4 border-emerald-300 bg-emerald-50 px-1 text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                       >
-                        active
+                        Actif
                       </Badge>
                     </div>
                     <p className="mt-0.5 truncate font-mono text-[10px] tabular-nums text-muted-foreground">
-                      {m.event_group} ·{' '}
+                      {formatEventGroupLabel(m.event_group)} ·{' '}
                       {m.kind === 'season' ? 'saison' : 'mini-prépa'} ·{' '}
                       {m.target_week_count} sem · {m.sessions_per_week}/sem ·
-                      généré le {FR_DATE.format(new Date(m.generated_at))}
+                      {m.engine_version.startsWith('external_pdf:') ? 'importé' : 'généré'} le{' '}
+                      {FR_DATE.format(new Date(m.generated_at))}
                     </p>
                   </div>
                   <ChevronDown
