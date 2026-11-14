@@ -17,8 +17,12 @@ for folder in sorted(src.iterdir()):
         svg = file.read_text(encoding='utf-8')
         # CairoSVG ne sait pas résoudre CSS var(--figure-ink,#hex). Utiliser
         # les couleurs de repli officielles du projet, sans changer le dessin.
-        svg = re.sub(r'var\\(--figure-[\\w-]+,(#[0-9a-fA-F]{6})\\)',
-                     lambda match: match.group(1), svg)
+        palette = {
+            'paper': '#151718', 'ink': '#e5e4e2',
+            'detail': '#cecdca', 'muted': '#969b9e',
+        }
+        svg = re.sub(r'var\\(--figure-(paper|ink|detail|muted)(?:,\\s*#[0-9a-fA-F]{6})?\\)',
+                     lambda match: palette[match.group(1)], svg)
         if 'var(--figure-' in svg:
             raise RuntimeError(f'Unresolved color in {file}')
         png = cairosvg.svg2png(bytestring=svg.encode('utf-8'), output_width=400, output_height=400)
