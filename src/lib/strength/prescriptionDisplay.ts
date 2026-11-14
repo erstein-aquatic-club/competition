@@ -13,6 +13,9 @@ type Prescription = {
   sets_range?: { min: number; max: number };
   reps_range?: { min: number; max: number };
   pct_1rm_range?: { min: number; max: number };
+  hold_seconds?: { min: number; max: number };
+  duration_minutes?: { min: number; max: number };
+  per_side?: boolean;
 };
 export function itemPrescription(item: StrengthSessionItem | null | undefined): Prescription | null {
   const value = item?.raw_payload?.prescription_v1;
@@ -46,10 +49,12 @@ export function formatWork(item: StrengthSessionItem): string {
   const p = itemPrescription(item);
   const range = (v: { min: number; max: number } | undefined, fallback: number) =>
     v && v.max > v.min ? `${v.min}–${v.max}` : String(v?.min ?? fallback);
+  if (p?.duration_minutes) return `${range(p.duration_minutes, 0)} min · facultatif`;
   const sets = range(p?.sets_range, item.sets);
-  const reps = range(p?.reps_range, item.reps);
+  const reps = p?.hold_seconds ? `${range(p.hold_seconds, 0)} s` : range(p?.reps_range, item.reps);
+  const side = p?.per_side ? " / côté" : "";
   const pct = p?.pct_1rm_range
     ? ` · ${range(p.pct_1rm_range, item.percent_1rm)} % 1RM`
     : item.percent_1rm > 0 ? ` · ${item.percent_1rm} % 1RM` : "";
-  return `${sets}×${reps}${pct}`;
+  return `${sets}×${reps}${side}${pct}`;
 }
