@@ -1,0 +1,32 @@
+name: Musculation — prescriptions
+
+on:
+  pull_request:
+    paths:
+      - 'src/components/strength/**'
+      - 'src/lib/strength/**'
+      - 'src/lib/api/**'
+      - 'src/lib/types.ts'
+      - 'src/pages/Strength.tsx'
+      - 'supabase/migrations/**'
+      - '.github/workflows/muscu-prescriptions.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run check
+      - name: Prescription unit tests
+        run: npx vitest run --config vitest.config.unit.ts src/lib/strength/prescriptionDisplay.test.ts
+      - name: Build
+        run: npm run build
