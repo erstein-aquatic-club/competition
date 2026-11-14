@@ -457,6 +457,8 @@ export interface SetInputValues {
   reps?: number;
   weight?: number;
   difficulty?: number | null;
+  /** Ex. "Assistance 15 kg" ou "Élastique bleu" pour les tractions. */
+  notes?: string | null;
 }
 
 export interface WorkoutFinishData {
