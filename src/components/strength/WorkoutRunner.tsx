@@ -1271,7 +1271,7 @@ export function WorkoutRunner({
             />
           </button>
           <h2 className="flex-1 min-w-0 text-lg font-semibold tracking-tight truncate">
-            {currentExerciseDef?.nom_exercice ?? "Exercice"}
+            {currentBlock?.exercise_name ?? currentExerciseDef?.nom_exercice ?? "Exercice"}
           </h2>
           <div className={cn(
             "h-2 w-2 shrink-0 rounded-full transition-colors",
