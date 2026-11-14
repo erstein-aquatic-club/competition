@@ -15,6 +15,7 @@ import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { formatStrengthSessionTitle } from "@/lib/strength/formatStrengthSessionTitle";
+import { formatPrep, formatWork } from "@/lib/strength/prescriptionDisplay";
 
 interface MyPlanSessionSheetProps {
   session: StrengthSessionTemplate | null;
@@ -85,7 +86,7 @@ export function MyPlanSessionSheet({
                   Éditer la séance
                 </Button>
               )}
-              {!readOnly && onLaunch && (
+              {!readOnly && onLaunch && items.length > 0 && (
                 <Button
                   size="lg"
                   className="flex-1"
@@ -149,9 +150,13 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
       >
         {displayIdx + 1}.
       </span>
-      <span className="text-[12px] font-medium flex-1 truncate">
-        {item.exercise_name ?? `Exercice ${displayIdx + 1}`}
-      </span>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="text-[12px] font-medium leading-snug">{item.exercise_name ?? `Exercice ${displayIdx + 1}`}</p>
+        {item.notes && <p className="text-[11px] text-muted-foreground leading-snug">{item.notes}</p>}
+        {!isWarmup && formatPrep(item, 0, true) && (
+          <p className="text-[11px] text-muted-foreground leading-snug">Prépa · {formatPrep(item, 0, true)}</p>
+        )}
+      </div>
       {(() => {
         const meta = warmupMetaFromItem(item);
         const chip =
@@ -177,8 +182,7 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
             : "text-muted-foreground",
         )}
       >
-        {item.sets}×{item.reps}
-        {item.percent_1rm > 0 && ` @ ${item.percent_1rm}%`}
+        {formatWork(item)}
       </span>
     </div>
   );
