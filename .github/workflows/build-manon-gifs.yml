@@ -72,5 +72,7 @@ jobs:
           git add public/exercise-gifs docs/assets/workout-motion-LICENSE.txt docs/assets/workout-motion-NOTICE.txt
           if ! git diff --cached --quiet; then
             git commit -m 'assets(muscu): GIFs contrôlés pour les exercices Manon'
+            git fetch origin feat/manon-gif-coverage
+            git rebase FETCH_HEAD
             git push origin HEAD:feat/manon-gif-coverage
           fi
