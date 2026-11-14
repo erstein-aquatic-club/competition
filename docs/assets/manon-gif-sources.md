@@ -18,7 +18,8 @@ Audit du 14 novembre 2026 : 15 exercices de catalogue utilisés par le cycle (53
 ### Trois GIF issus de workout-motion
 
 - Œuvre originale : [februarysea/workout-motion](https://github.com/februarysea/workout-motion), commit `424fbcc1548b6e14a2276bc0886c13c7a228eb81`.
-- Mouvements : `assisted-pull-up`, `hang-clean`, `forearm-plank`.
+- Mouvements : `assisted-pull-up`, `pull-up`, `hang-clean`, `forearm-plank`, `incline-push-up`.
+- Variantes du PDF : « Tractions assistées ou strictes » propose les deux visuels ; « Pompes dynamiques sur appui » utilise l'animation inclinée. « Gainage frontal ou latéral » peut afficher l'animation latérale déjà présente au catalogue.
 - Source : SVG vectoriels dessinés par les auteurs ; conversion en GIF par les scripts de ce dépôt, sans recours à une banque commerciale d'images.
 - **Licence : PolyForm Noncommercial 1.0.0**, pas MIT, limitée aux usages non commerciaux autorisés. Ne pas réutiliser ces GIF dans des produits commerciaux sans autorisation.
 - Attribution exigée : **Required Notice: Copyright (c) 2026 februarysea and workout-motion contributors (https://github.com/februarysea/workout-motion)**.
