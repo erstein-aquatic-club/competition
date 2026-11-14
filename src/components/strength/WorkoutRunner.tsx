@@ -47,7 +47,7 @@ import type { PrDetection } from "@/lib/prDetection";
 import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { formatPrep, formatWork, itemPrescription } from "@/lib/strength/prescriptionDisplay";
+import { formatPrep, formatWork, formatSetTarget, formatRest, itemPrescription } from "@/lib/strength/prescriptionDisplay";
 
 /** Emit a short beep + vibration when the rest timer ends */
 const notifyRestEnd = () => {
@@ -368,7 +368,8 @@ export function WorkoutRunner({
   const currentExerciseDef = currentBlock
     ? exercises.find((e) => e.id === currentBlock.exercise_id)
     : null;
-  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true || currentBlock?.raw_payload?.bodyweight_override === true;
+  const isIsometricPrescription = itemPrescription(currentBlock)?.hold_seconds != null || itemPrescription(currentBlock)?.duration_minutes != null;
+  const isBodyweightExercise = currentExerciseDef?.is_bodyweight === true || currentBlock?.raw_payload?.bodyweight_override === true || isIsometricPrescription;
   // §298 — métrique d'intensité de l'exo courant (pilote tile/numpad/gating 1RM)
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
@@ -1413,14 +1414,14 @@ export function WorkoutRunner({
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
-            Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {formatStrengthValue(currentBlock?.reps)} reps
+            Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {currentBlock ? formatSetTarget(currentBlock) : ""}
             {currentSetKey && prSets.has(currentSetKey) && (
               <Trophy className="h-4 w-4 text-amber-500" aria-label="Record personnel" />
             )}
           </div>
           {restDuration > 0 && (
             <span className="text-xs text-muted-foreground">
-              Repos {restDuration}s
+              Repos {currentBlock ? formatRest(currentBlock) ?? `${restDuration} s` : `${restDuration} s`}
             </span>
           )}
         </div>
@@ -1448,19 +1449,26 @@ export function WorkoutRunner({
               </div>
             </button>
           )}
-          <button
-            type="button"
-            className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
-            onClick={() => openInputSheet("reps")}
-          >
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Reps</div>
-            <div className="mt-1 flex items-baseline gap-0.5">
-              <span className="text-3xl font-bold tabular-nums tracking-tight">
-                {activeReps || "—"}
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">reps</span>
+          {isIsometricPrescription ? (
+            <div className="rounded-2xl border bg-secondary p-4">
+              <div className="text-[11px] font-semibold uppercase text-muted-foreground">Maintien</div>
+              <div className="mt-1 text-2xl font-bold">{currentBlock ? formatSetTarget(currentBlock) : ""}</div>
             </div>
-          </button>
+          ) : (
+            <button
+              type="button"
+              className="group relative rounded-2xl border border-border bg-secondary p-4 text-left transition-all active:scale-[0.98] hover:bg-secondary/80"
+              onClick={() => openInputSheet("reps")}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Reps</div>
+              <div className="mt-1 flex items-baseline gap-0.5">
+                <span className="text-3xl font-bold tabular-nums tracking-tight">
+                  {activeReps || "—"}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">reps</span>
+              </div>
+            </button>
+          )}
         </div>
         {/* §371 (F2) — Difficulté 1-5 masquée sur la carte de calibration : le
             sélecteur "reps en réserve" (RIR) y est l'unique mesure d'effort,
