@@ -15,7 +15,7 @@ import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { formatStrengthSessionTitle } from "@/lib/strength/formatStrengthSessionTitle";
-import { formatPrep, formatWork } from "@/lib/strength/prescriptionDisplay";
+import { formatPrep, formatWork, formatRest } from "@/lib/strength/prescriptionDisplay";
 
 interface MyPlanSessionSheetProps {
   session: StrengthSessionTemplate | null;
@@ -153,6 +153,7 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="text-[12px] font-medium leading-snug">{item.exercise_name ?? `Exercice ${displayIdx + 1}`}</p>
         {item.notes && <p className="text-[11px] text-muted-foreground leading-snug">{item.notes}</p>}
+        {formatRest(item) && <p className="text-[11px] text-muted-foreground leading-snug">Repos · {formatRest(item)}</p>}
         {!isWarmup && formatPrep(item, 0, true) && (
           <p className="text-[11px] text-muted-foreground leading-snug">Prépa · {formatPrep(item, 0, true)}</p>
         )}
