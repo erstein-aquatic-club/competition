@@ -11,7 +11,7 @@ import {
   getSwimmerPerformances,
   getAthleteObjectives,
   importSwimmerPerformances,
-  update1RM as update1RMApi,
+  setManual1RM as update1RMApi,
   updateExerciseNote as updateExerciseNoteApi,
   upsertSwimRecord as upsertSwimRecordApi,
   deleteSwimRecord,
