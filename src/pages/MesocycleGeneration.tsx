@@ -63,6 +63,7 @@ import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
+import { savePendingMesocycleParams } from "@/lib/strength/pendingMesocycleHandoff";
 import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import {
   ArrowLeft,
@@ -107,7 +108,6 @@ const DISTANCE_LABELS_FALLBACK: Record<DistanceKey, string> = {
 };
 
 /** Clé sessionStorage pour le hand-off vers l'écran d'aperçu. */
-const SESSION_KEY = "eac_pending_mesocycle_params";
 
 const KIND_OPTIONS: Array<{
   value: "season" | "inter_competition";
@@ -484,12 +484,8 @@ export default function MesocycleGeneration() {
       athleteId: effectiveAthleteId,
       coachMode: isCoachMode,
     };
-    try {
-      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
-    } catch {
-      // sessionStorage indisponible (private mode) — on continue malgré tout
-      // via le route state ; l'écran d'aperçu fera son propre fallback.
-    }
+    // Repli mémoire si sessionStorage est indisponible (cf. pendingMesocycleHandoff).
+    savePendingMesocycleParams(payload);
     navigate("/strength/mesocycle-preview");
   }
 

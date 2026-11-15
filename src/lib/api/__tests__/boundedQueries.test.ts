@@ -58,6 +58,7 @@ before(async () => {
   mock.module("../localStorage", {
     namedExports: {
       localStorageGet: () => null,
+      readLocalList: () => [],
       localStorageSave: () => undefined,
     },
   });

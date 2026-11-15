@@ -4,6 +4,24 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §393 — Muscu : passage de paramètres méso fiable, séries sans doublon, `strength.ts` sans `as any` (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 4 (constats 9, 10, 11) — fin de l'audit. Branche `fix/muscu-robustesse-lot4` (empilée sur `fix/muscu-robustesse-lot3`, PR #93).
+
+**Changements.**
+- **Constat 9 — passage génération/ajustement → aperçu.** `MesocycleGeneration` et `MesocycleAdjust` écrivaient en `sessionStorage` ; en cas d'échec, le commentaire promettait un repli « via le route state » inexistant → l'aperçu ne trouvait rien et renvoyait vers la génération (boucle). Nouveau `src/lib/strength/pendingMesocycleHandoff.ts` (+) : `save/readPendingMesocycleRaw/clear`, **copie mémoire prioritaire** (toujours la plus récente pendant la vie de la page), `sessionStorage` seulement pour survivre à un rechargement ; écriture en échec → purge du payload périmé (un ancien paramétrage ne ressuscite pas). Les 3 écrans passent par ce module (plus aucune clé en dur). 6 tests.
+- **Constat 10 — « Réessayer » d'une série.** Le parent (`Strength.tsx`) ré-ajoutait la série renvoyée → doublon local, que `getMissingStrengthLogs` rejette (« Deux séries partagent le même identifiant ») → réconciliation d'arrière-plan en échec. Nouveau `src/lib/strength/mergeRunLogs.ts` (+) : ajout idempotent par identité `exercise_id` + numéro (`set_index`/`set_number`/`setIndex`), version la plus récente gagne à sa place ; sans numéro → ajout simple. 6 tests.
+- **Constat 11 — `as any` dans `src/lib/api/strength.ts` : 29 → 0.**
+  - 27 lectures du cache hors-ligne `(localStorageGet(k) || []) as any[]` → nouveau `readLocalList<T>` (`src/lib/api/localStorage.ts`), typé (`Exercise`, `StrengthSessionTemplate`, `LocalStrengthRun`, `Assignment`, `LocalOneRmRecord`) et **robuste** : renvoie `[]` si la valeur stockée n'est pas un tableau (avant : un cache corrompu faisait planter le `.filter` suivant). 4 tests.
+  - 2 lignes Supabase typées (`StrengthSessionRow`/`StrengthSessionItemRow` pour `getStrengthSessionById` ; jointure `users(display_name)` objet ou tableau).
+  - **Bug révélé par le typage** : `get1RM` hors-ligne renvoyait la forme brute du cache (`one_rm`), alors que l'écran lit `weight` → 1RM = `undefined` hors-ligne. Désormais même forme que la branche Supabase (`weight: weight ?? one_rm ?? 0`).
+  - `markLocalStrengthRunCompleted(logs: SetLogEntry[])` (au lieu de `unknown[]`) ; `LocalStrengthRun.sync_pending?` déclaré (champ réellement écrit).
+  - Les 50 annotations `: any` des callbacks sur lignes Supabase non typées restent (hors périmètre : nécessiterait les types générés Supabase).
+
+**Fichiers modifiés.** `src/lib/strength/pendingMesocycleHandoff.ts` (+), `src/lib/strength/mergeRunLogs.ts` (+), `src/lib/api/localStorage.ts`, `src/lib/api/strength.ts`, `src/lib/types.ts`, `src/pages/MesocycleGeneration.tsx`, `src/pages/MesocycleAdjust.tsx`, `src/pages/MesocyclePreview.tsx`, `src/pages/Strength.tsx` ; tests : `pendingMesocycleHandoff.test.ts` (+), `mergeRunLogs.test.ts` (+), `src/lib/api/__tests__/readLocalList.test.ts` (+), `boundedQueries.test.ts` (mock `../localStorage` complété avec `readLocalList`).
+
+**Tests.** `npm test` exit 0 : node:test 1809/1809, vitest 23/23 fichiers. tsc 0, lint 0 erreur (8 warnings exhaustive-deps préexistants). RLS non concerné. Pas de smoke navigateur.
+
 ## §392 — Muscu : état vide actionnable, onglet conservé, indicateur « en attente d'envoi » (2026-11-15)
 
 **Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 3 (constats 5, 6, 7). Branche `fix/muscu-robustesse-lot3` (empilée sur `fix/muscu-robustesse-audit`, PR #92).

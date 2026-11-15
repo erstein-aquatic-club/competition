@@ -27,7 +27,9 @@ import type {
   StrengthCycleType,
   StrengthFolder,
   TeamAthletePlan,
+  Assignment,
 } from './types';
+import type { LocalStrengthRun, SetLogEntry } from '../types';
 import { normalizeExercise } from './helpers';
 import type {
   StrengthExerciseSummary,
@@ -44,9 +46,40 @@ import {
   collectEstimated1RMs,
   enrichItemsWithExerciseNames,
 } from './transformers';
-import { localStorageGet, localStorageSave } from './localStorage';
+import { localStorageGet, localStorageSave, readLocalList } from './localStorage';
 import { reconcileMesocyclePayloads } from '../strength/mesocycleItemPayload';
 import { getMissingStrengthLogs } from '../strength/reconcileStrengthLogs';
+
+/** Ligne `strength_sessions` + jointure `strength_session_items(*, dim_exercices(...))`. */
+interface StrengthSessionItemRow extends Record<string, unknown> {
+  ordre?: number | null;
+  cycle_type?: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  dim_exercices?: { nom_exercice?: string | null; exercise_type?: string | null } | null;
+}
+interface StrengthSessionRow {
+  id: number;
+  name?: string | null;
+  description?: string | null;
+  folder_id?: number | null;
+  strength_session_items?: StrengthSessionItemRow[] | null;
+}
+
+/** Forme d'un 1RM dans le cache hors-ligne (`STORAGE_KEYS.ONE_RM`) — écrite par
+ *  `update1RM` / `updateExerciseNote` en mode sans Supabase. */
+interface LocalOneRmRecord {
+  id?: number;
+  athlete_id?: number | string | null;
+  athleteId?: number | string | null;
+  athlete_name?: string | null;
+  athleteName?: string | null;
+  exercise_id: number;
+  one_rm?: number;
+  weight?: number;
+  notes?: string | null;
+  date?: string;
+  recorded_at?: string | null;
+}
 
 /** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
  *  ou métrique d'intensité non-poids (skip flag armé par le caller). */
@@ -93,14 +126,14 @@ export async function getExercises(): Promise<Exercise[]> {
       localStorageSave(STORAGE_KEYS.EXERCISES, list);
       return list;
     } catch (err) {
-      const cached = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+      const cached = readLocalList<Exercise>(STORAGE_KEYS.EXERCISES);
       if (Array.isArray(cached) && cached.length > 0) {
         return cached.map((exercise: any) => normalizeExercise(exercise));
       }
       throw err;
     }
   }
-  const exercises = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+  const exercises = readLocalList<Exercise>(STORAGE_KEYS.EXERCISES);
   const list = Array.isArray(exercises) ? exercises : [];
   return list.map((exercise: any) => normalizeExercise(exercise));
 }
@@ -114,7 +147,7 @@ export async function createExercise(exercise: Omit<Exercise, "id">) {
     return { status: "created" };
   }
 
-  const ex = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+  const ex = readLocalList<Exercise>(STORAGE_KEYS.EXERCISES);
   const nextExercise = normalizeExercise({
     ...exercise,
     exercise_type,
@@ -138,7 +171,7 @@ export async function updateExercise(exercise: Exercise) {
     return { status: "updated" };
   }
 
-  const exercises = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+  const exercises = readLocalList<Exercise>(STORAGE_KEYS.EXERCISES);
   const index = exercises.findIndex((item: Exercise) => item.id === exercise.id);
   if (index === -1) {
     throw new Error("Exercice introuvable");
@@ -165,12 +198,12 @@ export async function deleteExercise(exerciseId: number) {
     return { status: "deleted" };
   }
 
-  const exercises = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+  const exercises = readLocalList<Exercise>(STORAGE_KEYS.EXERCISES);
   const updatedExercises = exercises.filter(
     (exercise: Exercise) => exercise.id !== exerciseId,
   );
   localStorageSave(STORAGE_KEYS.EXERCISES, updatedExercises);
-  const sessions = (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as any[];
+  const sessions = readLocalList<StrengthSessionTemplate>(STORAGE_KEYS.STRENGTH_SESSIONS);
   const updatedSessions = sessions.map((session: StrengthSessionTemplate) => ({
     ...session,
     items: Array.isArray(session.items)
@@ -292,9 +325,9 @@ export async function getStrengthSessionForEdit(
       .eq("id", sessionId)
       .limit(1),
   );
-  const session = (rows ?? [])[0] as any;
+  const session = (rows ?? [])[0] as StrengthSessionRow | undefined;
   if (!session) return null;
-  const rawItems = Array.isArray(session.strength_session_items)
+  const rawItems: StrengthSessionItemRow[] = Array.isArray(session.strength_session_items)
     ? session.strength_session_items
     : [];
   const cycle = normalizeCycleType(rawItems[0]?.cycle_type);
@@ -305,14 +338,17 @@ export async function getStrengthSessionForEdit(
     cycle,
     folder_id: safeOptionalInt(session.folder_id),
     items: rawItems
-      .sort((a: any, b: any) => (a.ordre ?? 0) - (b.ordre ?? 0))
-      .map((item: any, index: number) => ({
-        ...normalizeStrengthItem(item, index, cycle),
-        exercise_name: (typeof item.raw_payload?.pdf_exercise_name === "string" ? item.raw_payload.pdf_exercise_name : item.dim_exercices?.nom_exercice) ?? undefined,
-        category: item.dim_exercices?.exercise_type ?? undefined,
-        // §300 — indispensable au round-trip : préserve mesocycle_id à la save.
-        raw_payload: (item.raw_payload ?? null) as Record<string, unknown> | null,
-      })),
+      .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+      .map((item, index) => {
+        const pdfName = item.raw_payload?.pdf_exercise_name;
+        return {
+          ...normalizeStrengthItem(item, index, cycle),
+          exercise_name: (typeof pdfName === "string" ? pdfName : item.dim_exercices?.nom_exercice) ?? undefined,
+          category: item.dim_exercices?.exercise_type ?? undefined,
+          // §300 — indispensable au round-trip : préserve mesocycle_id à la save.
+          raw_payload: item.raw_payload ?? null,
+        };
+      }),
   };
 }
 
@@ -380,11 +416,11 @@ export async function createStrengthSession(session: any) {
     return { status: "created", id: sessionId };
   }
 
-  const s = (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as any[];
+  const s = readLocalList<StrengthSessionTemplate>(STORAGE_KEYS.STRENGTH_SESSIONS);
   const id = Date.now();
   const enrichedItems = enrichItemsWithExerciseNames(
     normalizedItems,
-    (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[],
+    readLocalList<Exercise>(STORAGE_KEYS.EXERCISES),
   );
   localStorageSave(STORAGE_KEYS.STRENGTH_SESSIONS, [
     ...s,
@@ -454,7 +490,7 @@ export async function updateStrengthSession(session: any) {
     return { status: "updated" };
   }
 
-  const sessions = (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as any[];
+  const sessions = readLocalList<StrengthSessionTemplate>(STORAGE_KEYS.STRENGTH_SESSIONS);
   const index = sessions.findIndex(
     (item: StrengthSessionTemplate) => item.id === session.id,
   );
@@ -463,7 +499,7 @@ export async function updateStrengthSession(session: any) {
   }
   const enrichedItems = enrichItemsWithExerciseNames(
     normalizedItems,
-    (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[],
+    readLocalList<Exercise>(STORAGE_KEYS.EXERCISES),
   );
   const updatedSession = {
     ...sessions[index],
@@ -495,7 +531,7 @@ export async function deleteStrengthSession(sessionId: number) {
     return { status: "deleted" };
   }
 
-  const sessions = (localStorageGet(STORAGE_KEYS.STRENGTH_SESSIONS) || []) as any[];
+  const sessions = readLocalList<StrengthSessionTemplate>(STORAGE_KEYS.STRENGTH_SESSIONS);
   const updatedSessions = sessions.filter(
     (session: StrengthSessionTemplate) => session.id !== sessionId,
   );
@@ -510,11 +546,11 @@ export async function deleteStrengthSession(sessionId: number) {
  */
 export function markLocalStrengthRunCompleted(
   runId: number,
-  logs: unknown[],
+  logs: SetLogEntry[],
   syncPending: boolean,
 ): void {
   try {
-    const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+    const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
     const index = runs.findIndex((run) => run.id === runId);
     if (index === -1) return;
     const updated = [...runs];
@@ -545,12 +581,12 @@ type StartStrengthRunInput = {
 
 /** Offline sessions use negative IDs until they are atomically created online. */
 export function startStrengthRunLocally(data: StartStrengthRunInput) {
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const run_id = -(Date.now() * 1000 + Math.floor(Math.random() * 1000));
   const newRun = createLocalStrengthRun(data, run_id);
   localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, [...runs, newRun]);
   if (data.assignment_id) {
-    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
+    const assignments = readLocalList<Assignment>(STORAGE_KEYS.ASSIGNMENTS);
     localStorageSave(STORAGE_KEYS.ASSIGNMENTS, assignments.map((assignment: any) =>
       assignment.id === data.assignment_id
         ? { ...assignment, status: "in_progress" }
@@ -728,7 +764,7 @@ export async function logStrengthSet(payload: {
     };
   }
 
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const runIndex = runs.findIndex((entry: any) => entry.id === payload.run_id);
   const baseRun =
     runIndex >= 0 ? runs[runIndex] : { id: payload.run_id, logs: [] };
@@ -867,7 +903,7 @@ export async function updateStrengthRun(update: {
     return { status: "ok" };
   }
 
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const runIndex = runs.findIndex((entry: any) => entry.id === update.run_id);
   const now = new Date().toISOString();
   const baseRun =
@@ -884,7 +920,7 @@ export async function updateStrengthRun(update: {
   if (update.status === "completed") {
     const assignmentId = update.assignment_id ?? baseRun.assignment_id;
     if (assignmentId) {
-      const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
+      const assignments = readLocalList<Assignment>(STORAGE_KEYS.ASSIGNMENTS);
       const updatedAssignments = assignments.map((assignment: any) =>
         assignment.id === assignmentId
           ? { ...assignment, status: "completed" }
@@ -912,12 +948,12 @@ export async function deleteStrengthRun(runId: number) {
     return { status: "deleted", source: "remote" as const };
   }
 
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const target = runs.find((entry: any) => entry.id === runId);
   const updatedRuns = runs.filter((entry: any) => entry.id !== runId);
   localStorageSave(STORAGE_KEYS.STRENGTH_RUNS, updatedRuns);
   if (target?.assignment_id) {
-    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
+    const assignments = readLocalList<Assignment>(STORAGE_KEYS.ASSIGNMENTS);
     const nextAssignments = assignments.map((assignment: any) =>
       assignment.id === target.assignment_id
         ? { ...assignment, status: "assigned" }
@@ -993,9 +1029,9 @@ export async function saveStrengthRun(run: any) {
     return { status: "ok", run_id: result?.run_id ?? null };
   }
 
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const runId = run.run_id ?? Date.now();
-  const existingRun = runs.find((entry: any) => entry.id === runId) || {};
+  const existingRun: Partial<LocalStrengthRun> = runs.find((entry) => entry.id === runId) ?? {};
   const completedRun = {
     ...existingRun,
     ...run,
@@ -1013,7 +1049,7 @@ export async function saveStrengthRun(run: any) {
     completedRun,
   ]);
   if (run.assignment_id) {
-    const assignments = (localStorageGet(STORAGE_KEYS.ASSIGNMENTS) || []) as any[];
+    const assignments = readLocalList<Assignment>(STORAGE_KEYS.ASSIGNMENTS);
     const updated = assignments.map((assignment: any) =>
       assignment.id === run.assignment_id
         ? { ...assignment, status: "completed" }
@@ -1106,7 +1142,7 @@ export async function getStrengthHistory(
     };
   }
 
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const filtered = runs.filter((r: any) => {
     if (hasAthleteId && String(r.athlete_id) !== String(athleteId)) {
       return false;
@@ -1143,7 +1179,7 @@ export async function getStrengthHistory(
     const bDate = new Date(b.date || b.started_at || b.created_at || 0).getTime();
     return order === "asc" ? aDate - bDate : bDate - aDate;
   });
-  const exercises = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as any[];
+  const exercises = readLocalList<Exercise>(STORAGE_KEYS.EXERCISES);
   const exerciseMap = new Map(
     (Array.isArray(exercises) ? exercises : []).map((exercise: any) => [
       safeInt(exercise.id),
@@ -1236,7 +1272,7 @@ export async function getStrengthHistoryAggregate(
     return { periods, pagination: { limit, offset, total: periods.length } };
   }
 
-  const runs = (localStorageGet(STORAGE_KEYS.STRENGTH_RUNS) || []) as any[];
+  const runs = readLocalList<LocalStrengthRun>(STORAGE_KEYS.STRENGTH_RUNS);
   const filtered = runs.filter((r: any) => {
     if (hasAthleteId) {
       return r.athlete_id
@@ -1330,8 +1366,18 @@ export async function get1RM(
       notes: (record.notes as string) ?? null,
     }));
   }
-  const records = (localStorageGet(STORAGE_KEYS.ONE_RM) || []) as any[];
-  return records.filter((r: any) => r.athlete_name === athleteName);
+  // Même forme que la branche Supabase : le cache stocke `one_rm` (update1RM) ou
+  // `weight` selon l'appelant — avant, l'écran lisait `weight` = undefined hors-ligne.
+  return readLocalList<LocalOneRmRecord>(STORAGE_KEYS.ONE_RM)
+    .filter((r) => r.athlete_name === athleteName)
+    .map((r) => ({
+      id: safeOptionalInt(r.id),
+      athlete_id: safeOptionalInt(r.athlete_id),
+      exercise_id: safeInt(r.exercise_id),
+      weight: Number(r.weight ?? r.one_rm ?? 0),
+      recorded_at: r.recorded_at ?? r.date ?? null,
+      notes: r.notes ?? null,
+    }));
 }
 
 export async function update1RM(record: {
@@ -1369,7 +1415,7 @@ export async function update1RM(record: {
     ));
     return { status: "ok" };
   }
-  const records = (localStorageGet(STORAGE_KEYS.ONE_RM) || []) as any[];
+  const records = readLocalList<LocalOneRmRecord>(STORAGE_KEYS.ONE_RM);
   const athleteName = record.athlete_name ?? record.athleteName;
   const filtered = records.filter(
     (r: any) =>
@@ -1416,7 +1462,7 @@ export async function updateExerciseNote(params: {
     }
     return { status: "ok" };
   }
-  const records = (localStorageGet(STORAGE_KEYS.ONE_RM) || []) as any[];
+  const records = readLocalList<LocalOneRmRecord>(STORAGE_KEYS.ONE_RM);
   const idx = records.findIndex(
     (r: any) =>
       String(r.athlete_id) === String(params.athlete_id) &&
@@ -1586,7 +1632,9 @@ export async function getTeamAthletePlans(
   const athleteMap = new Map<number, { name: string; folders: StrengthFolder[] }>();
   for (const row of roots) {
     const aid = safeInt(row.athlete_id);
-    const name = (row.users as any)?.display_name ?? "Nageur";
+    // Jointure `users(display_name)` : objet (FK simple) ou tableau selon PostgREST.
+    const users = row.users as { display_name?: string | null } | Array<{ display_name?: string | null }> | null;
+    const name = (Array.isArray(users) ? users[0]?.display_name : users?.display_name) ?? "Nageur";
     if (!athleteMap.has(aid)) athleteMap.set(aid, { name, folders: [] });
     athleteMap.get(aid)!.folders.push(mapFolder(row));
   }
