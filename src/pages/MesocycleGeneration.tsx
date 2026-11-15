@@ -62,6 +62,8 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import {
   ArrowLeft,
   Calendar,
@@ -260,18 +262,20 @@ export default function MesocycleGeneration() {
   }, []);
 
   // ── Pré-requis : bilan complété ──────────────────────────────────────────
-  const { data: assessment, isLoading: assessmentLoading } = useQuery({
+  const assessmentQ = useQuery({
     queryKey: ["strength-assessment-latest", effectiveAthleteId],
     queryFn: () => getLatestAssessment(effectiveAthleteId!),
     enabled: effectiveAthleteId != null,
   });
+  const { data: assessment, isLoading: assessmentLoading } = assessmentQ;
 
-  const { data: profile } = useQuery({
+  const profileQ = useQuery({
     queryKey: ["profile", effectiveAthleteId],
     queryFn: () => getProfile({ userId: effectiveAthleteId! }),
     enabled: effectiveAthleteId != null,
     staleTime: 5 * 60 * 1000,
   });
+  const { data: profile } = profileQ;
 
   // Nom du nageur ciblé (mode coach uniquement) — en-tête de cible non ambigu.
   const { data: athletes } = useQuery({
@@ -284,17 +288,28 @@ export default function MesocycleGeneration() {
     athletes?.find((a) => a.id === effectiveAthleteId)?.display_name ?? null;
 
   // ── Données du catalogue — taxonomie nage × distance (§305) ──────────────
-  const { data: strokeSignatures = [], isLoading: strokesLoading } = useQuery({
+  const strokesQ = useQuery({
     queryKey: ["strength-stroke-signatures"],
     queryFn: () => getStrokeSignatures(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: strokeSignatures = [], isLoading: strokesLoading } = strokesQ;
+  const distanceProfilesQ = useQuery({
+    queryKey: ["strength-distance-profiles"],
+    queryFn: () => getDistanceProfiles(),
+    staleTime: 5 * 60 * 1000,
+  });
   const { data: distanceProfiles = [], isLoading: distanceProfilesLoading } =
-    useQuery({
-      queryKey: ["strength-distance-profiles"],
-      queryFn: () => getDistanceProfiles(),
-      staleTime: 5 * 60 * 1000,
-    });
+    distanceProfilesQ;
+
+  // Audit robustesse muscu (lot 1) — un échec réseau ne doit pas se lire
+  // « Tu dois d'abord faire ton bilan » ni « aucune nage disponible ».
+  const loadFailures = summarizeLoadFailures([
+    ["bilan", assessmentQ],
+    ["profil", profileQ],
+    ["nages", strokesQ],
+    ["épreuves", distanceProfilesQ],
+  ]);
 
   // ── État local des sections ──────────────────────────────────────────────
   const [stroke, setStroke] = useState<StrokeKey | null>(null);
@@ -507,6 +522,24 @@ export default function MesocycleGeneration() {
   const backTarget = isCoachMode
     ? `/coach/swimmer/${effectiveAthleteId}`
     : "/strength";
+
+  if (loadFailures.hasFailure) {
+    return (
+      <div className="min-h-dvh bg-muted/30">
+        <Header onBack={() => navigate(backTarget)} />
+        <div className="mx-auto max-w-2xl px-4 pt-8">
+          <Card className="p-2">
+            <QueryErrorState
+              title="Génération indisponible"
+              description={`Chargement impossible : ${loadFailures.failedText}. Vérifie ta connexion, puis réessaie.`}
+              onRetry={loadFailures.retry}
+              isRetrying={loadFailures.isRetrying}
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (!assessment || !canGenerateMesocycle(assessment.status)) {
     return <AssessmentRequiredScreen onBack={() => navigate(backTarget)} />;

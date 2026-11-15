@@ -4,6 +4,23 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §389 — Muscu : les échecs réseau ne se déguisent plus en « pas de plan / pas de bilan » (2026-11-15)
+
+**Contexte.** Audit robustesse & UX du module muscu (2026-11-15), lot 1 (constats 1, 3, 8). Plusieurs écrans lisaient `data` avec une valeur par défaut (`= []`, `?? null`) sans regarder l'erreur React Query (les wrappers API lèvent bien via `assertSupabase`) : un échec réseau devenait un état métier trompeur — voire un plan calculé sur des données partielles.
+
+**Changements.**
+- **`src/lib/queryLoadFailures.ts` (48 l, +)** : helper pur `summarizeLoadFailures([[libellé, query]…])` → `hasFailure`, `failedLabels`, `failedText` (« a, b et c »), `isRetrying`, `retry()` (relance UNIQUEMENT les requêtes en échec). Basé sur `isLoadingError` (échec sans donnée en cache) : un refetch d'arrière-plan raté avec données présentes ne masque pas un écran valide. 6 tests `node:test`.
+- **`src/components/shared/QueryErrorState.tsx` (57 l, +)** : état « chargement impossible + Réessayer » construit sur `EmptyState` (icône `CloudOff`, bouton `RotateCcw` qui tourne pendant la relance, `motion-reduce` respecté), variante `compact`.
+- **`MesocyclePreview.tsx` (constat 1)** : 8 requêtes moteur (profil, bilan, KPI, réglages coach, nages, épreuves, échauffement, activation) agrégées ; tout échec → `ErrorScreen` « Données du plan indisponibles » listant les données manquantes + Réessayer, AVANT les autres écrans bloquants. Avant : plan généré et **applicable** sans KPI / sans Bloc 1-3 / avec niveau par défaut ; bilan en échec lu « Bilan non complété » ; profil en échec = squelette infini ; nages en échec = « combinaison introuvable ». `ErrorScreen.primary` accepte `disabled`.
+- **`MyPlanTab.tsx` (constat 3)** : 10 requêtes agrégées. Échec + rien d'affichable → « Impossible de charger ton plan » (au lieu de « Aucun plan personnalisé ») ; échec partiel avec plan affiché → bandeau compact « Plan incomplet » + Réessayer au-dessus de la timeline.
+- **`MesocycleGeneration.tsx` + `MesocycleEntry.tsx` (constat 8)** : génération — bilan/profil/nages/épreuves en échec → « Génération indisponible » au lieu de « Tu dois d'abord faire ton bilan » ; tuile d'entrée — bilan/méso actif en échec → tuile compacte « Mésocycle indisponible » au lieu de disparaître (ou d'afficher « Génère ton mésocycle » à un nageur qui en a déjà un).
+
+**Fichiers modifiés.** `src/lib/queryLoadFailures.ts` (+), `src/lib/queryLoadFailures.test.ts` (+), `src/components/shared/QueryErrorState.tsx` (+), `src/pages/MesocyclePreview.tsx`, `src/pages/MesocycleGeneration.tsx`, `src/components/strength/MyPlanTab.tsx`, `src/components/strength/MesocycleEntry.tsx`.
+
+**Tests.** `queryLoadFailures` 6/6. `npm test` : 1772/1778 — les 6 échecs sont **préexistants et hors périmètre** (`src/lib/api/__tests__/strength.test.ts`, `updateStrengthRun` §159 + `reconcileStrengthRunLogs` : mocks non mis à jour après la garde « Séance distante introuvable » ajoutée par `bd903bede`, 2026-11-13). tsc 0, lint 0 erreur (3 warnings exhaustive-deps préexistants). Pas de RLS (UI seule, aucun appel Supabase modifié). Pas de smoke navigateur.
+
+**Décisions / limites.** Écran d'erreur seulement sur échec de *premier* chargement (`isLoadingError`). Constats restants de l'audit (lot 2) : suppression de cycle coach sans confirmation ni détection §113 (2), double-tap série fantôme (4), puis 5-7, 9-11.
+
 ## §388 — Stats physiques : fiche détail KPI au clic (2026-06-20)
 
 **Contexte.** Suite du §387 : la vue « Stats physiques » listait les KPIs mais ne donnait que le score/comparaison. Demande utilisateur : pouvoir cliquer chaque KPI pour en voir le détail.

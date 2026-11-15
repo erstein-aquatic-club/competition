@@ -75,6 +75,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 import {
   Activity,
   AlertCircle,
@@ -340,19 +341,19 @@ export default function MesocyclePreview() {
   const isCoachMode = effectiveAthleteId !== userId;
 
   // ── Fetches en parallèle ─────────────────────────────────────────────────
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const profileQ = useQuery({
     queryKey: ["profile", effectiveAthleteId],
     queryFn: () => getProfile({ userId: effectiveAthleteId! }),
     enabled: effectiveAthleteId != null,
   });
 
-  const { data: assessment, isLoading: assessLoading } = useQuery({
+  const assessmentQ = useQuery({
     queryKey: ["strength-assessment-latest", effectiveAthleteId],
     queryFn: () => getLatestAssessment(effectiveAthleteId!),
     enabled: effectiveAthleteId != null,
   });
 
-  const { data: kpiLatest, isLoading: kpiLoading } = useQuery({
+  const kpiQ = useQuery({
     queryKey: ["strength-kpi-latest", effectiveAthleteId],
     queryFn: () => getLatestKpiMeasurements(effectiveAthleteId!),
     enabled: effectiveAthleteId != null,
@@ -360,11 +361,15 @@ export default function MesocyclePreview() {
 
   // Réglages muscu coach (niveau de pratique G3 + tier de performance G1).
   // Null si pas de ligne / Supabase off → défauts applicatifs côté input.
-  const { data: settings, isLoading: settingsLoading } = useQuery({
+  const settingsQ = useQuery({
     queryKey: ["strength-athlete-settings", effectiveAthleteId],
     queryFn: () => getStrengthAthleteSettings(effectiveAthleteId!),
     enabled: effectiveAthleteId != null,
   });
+  const { data: profile, isLoading: profileLoading } = profileQ;
+  const { data: assessment, isLoading: assessLoading } = assessmentQ;
+  const { data: kpiLatest, isLoading: kpiLoading } = kpiQ;
+  const { data: settings, isLoading: settingsLoading } = settingsQ;
 
   // Audit 2026-05-26 (§308 ↔ édition) — un mésocycle actif existe-t-il déjà ?
   // Si oui, confirmer cet aperçu REMPLACE le plan en cours à partir de la date
@@ -390,17 +395,19 @@ export default function MesocyclePreview() {
   // Taxonomie nage × distance (§305) : on compose le template localement à
   // partir d'une nage (signature) + une distance/famille (profil) plutôt que
   // de fetcher un template unique par id.
-  const { data: signatures = [], isLoading: signaturesLoading } = useQuery({
+  const signaturesQ = useQuery({
     queryKey: ["strength-stroke-signatures"],
     queryFn: () => getStrokeSignatures(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+  const profilesQ = useQuery({
     queryKey: ["strength-distance-profiles"],
     queryFn: () => getDistanceProfiles(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: signatures = [], isLoading: signaturesLoading } = signaturesQ;
+  const { data: profiles = [], isLoading: profilesLoading } = profilesQ;
 
   const signature = useMemo(
     () =>
@@ -438,18 +445,35 @@ export default function MesocyclePreview() {
   });
 
   // §351 — routine articulaire commune (Bloc 1) injectée dans le MesocycleInput.
-  const { data: commonWarmupRoutine = [], isLoading: warmupLoading } = useQuery({
+  const warmupQ = useQuery({
     queryKey: ["strength-warmup-common"],
     queryFn: () => getCommonWarmupRoutine(),
     staleTime: 5 * 60 * 1000,
   });
 
   // §352 — routine d'activation (Bloc 3) injectée dans le MesocycleInput.
-  const { data: activationRoutine = {}, isLoading: activationLoading } = useQuery({
+  const activationQ = useQuery({
     queryKey: ["strength-warmup-activation"],
     queryFn: () => getActivationRoutine(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: commonWarmupRoutine = [], isLoading: warmupLoading } = warmupQ;
+  const { data: activationRoutine = {}, isLoading: activationLoading } = activationQ;
+
+  // Audit robustesse muscu (lot 1) — toutes ces données alimentent le moteur :
+  // un échec de chargement ne doit JAMAIS produire (ni laisser appliquer) un plan
+  // calculé sur des valeurs par défaut (KPI vides, sans échauffement…), ni se
+  // déguiser en « bilan non complété » / « combinaison introuvable ».
+  const loadFailures = summarizeLoadFailures([
+    ["profil", profileQ],
+    ["bilan", assessmentQ],
+    ["mesures KPI", kpiQ],
+    ["réglages coach", settingsQ],
+    ["nages", signaturesQ],
+    ["épreuves", profilesQ],
+    ["échauffement", warmupQ],
+    ["activation", activationQ],
+  ]);
 
   const allLoading =
     profileLoading ||
@@ -603,6 +627,22 @@ export default function MesocyclePreview() {
   if (allLoading) return <PageSkeleton />;
 
   if (!params) return null; // useEffect navigate déjà déclenché
+
+  // Avant tout autre écran bloquant : un échec réseau sur le bilan ou le profil
+  // serait sinon lu comme « bilan non complété » / squelette sans fin.
+  if (loadFailures.hasFailure) {
+    return (
+      <ErrorScreen
+        title="Données du plan indisponibles"
+        body={`Chargement impossible : ${loadFailures.failedText}. Le plan n'est pas calculé sur des données incomplètes. Vérifie ta connexion, puis réessaie.`}
+        primary={{
+          label: loadFailures.isRetrying ? "Chargement…" : "Réessayer",
+          onClick: loadFailures.retry,
+          disabled: loadFailures.isRetrying,
+        }}
+      />
+    );
+  }
 
   if (profile && (!profile.birthdate || (profile.sex !== "M" && profile.sex !== "F"))) {
     return <ProfileIncompleteScreen />;
@@ -1475,7 +1515,7 @@ function ErrorScreen({
 }: {
   title: string;
   body: string;
-  primary: { label: string; onClick: () => void };
+  primary: { label: string; onClick: () => void; disabled?: boolean };
 }) {
   const [, navigate] = useLocation();
   return (
@@ -1507,6 +1547,7 @@ function ErrorScreen({
           <Button
             type="button"
             onClick={primary.onClick}
+            disabled={primary.disabled}
             className="mt-5 bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-400"
           >
             {primary.label}

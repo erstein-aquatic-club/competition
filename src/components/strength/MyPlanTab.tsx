@@ -16,6 +16,8 @@ import type { StrengthFolder, StrengthSessionTemplate, Competition } from "@/lib
 import { FolderOpen, Trophy, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 import { useStrengthWrapped } from "@/hooks/useStrengthWrapped";
 import { StrengthWrappedRecap } from "@/components/strength/wrapped/StrengthWrappedRecap";
 import { isCurrentWeek, fmtDD_MM, getMonday, getISOWeekNumber } from "@/components/coach/swim/swimPlanningShared";
@@ -88,17 +90,18 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
   const weekStarts = useMemo(() => buildWeekStarts(PLAN_WEEK_COUNT), []);
 
   // ── Profile (to get group_id) ───────────────────────────────────────────────
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const profileQ = useQuery({
     queryKey: ["profile", athleteId],
     queryFn: () => getProfile({ userId: athleteId }),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: profile, isLoading: profileLoading } = profileQ;
   const groupId = profile?.group_id ?? null;
 
   // ── Phase 3 (§275.7) : training_plan applications targeting the athlete ───
   // Highest priority source: a coach-applied training plan supplies the
   // weekly sessions via training_plan_sessions, materialized in this view.
-  const { data: planApplications = [], isLoading: applicationsLoading } = useQuery({
+  const applicationsQ = useQuery({
     queryKey: ["training_plan_applications", "for-user", athleteId],
     queryFn: () =>
       getTrainingPlanApplicationsForUser({
@@ -106,20 +109,22 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
         discipline: "strength",
       }),
   });
+  const { data: planApplications = [], isLoading: applicationsLoading } = applicationsQ;
 
   const applicationPlanIds = useMemo(
     () => Array.from(new Set(planApplications.map((a) => a.plan_id))),
     [planApplications],
   );
 
-  const { data: applicationPlanSessions = [], isLoading: planSessionsLoading } = useQuery({
+  const planSessionsQ = useQuery({
     queryKey: ["training_plan_sessions", "for-plans", applicationPlanIds],
     queryFn: () => getTrainingPlanSessionsForPlans(applicationPlanIds),
     enabled: applicationPlanIds.length > 0,
   });
+  const { data: applicationPlanSessions = [], isLoading: planSessionsLoading } = planSessionsQ;
 
   // ── Phase 2: Strength planning slots ────────────────────────────────────────
-  const { data: groupSlots = [], isLoading: groupSlotsLoading } = useQuery({
+  const groupSlotsQ = useQuery({
     queryKey: ["strength_planning_slots", groupId, weekStarts],
     queryFn: () =>
       groupId
@@ -127,21 +132,24 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
         : Promise.resolve([]),
     enabled: groupId != null,
   });
+  const { data: groupSlots = [], isLoading: groupSlotsLoading } = groupSlotsQ;
 
-  const { data: athleteOverrides = [], isLoading: athleteOverridesLoading } = useQuery({
+  const athleteOverridesQ = useQuery({
     queryKey: ["strength_planning_slot_overrides", athleteId, weekStarts],
     queryFn: () =>
       getStrengthPlanningSlotOverrides({ athleteId, weekStarts }),
   });
+  const { data: athleteOverrides = [], isLoading: athleteOverridesLoading } = athleteOverridesQ;
 
   // §293 — week_type posé par la RPC apply_strength_mesocycle (label du cycle
   // de périodisation : "Force max", "Pic", …). Sert à colorer la timeline en
   // Phase 2 par phase d'entraînement.
-  const { data: athleteWeekOverrides = [], isLoading: weekOverridesLoading } = useQuery({
+  const weekOverridesQ = useQuery({
     queryKey: ["strength_planning_week_overrides", athleteId, weekStarts],
     queryFn: () =>
       getStrengthPlanningWeekOverrides({ athleteId, weekStarts }),
   });
+  const { data: athleteWeekOverrides = [], isLoading: weekOverridesLoading } = weekOverridesQ;
   const weekTypeByStart = useMemo(() => {
     const m = new Map<string, string>();
     for (const w of athleteWeekOverrides) {
@@ -152,11 +160,12 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
 
   // Keep the same effective slots in the timeline and the day-J launcher.
   // During an active personal cycle, group-only slots cannot add workouts.
-  const { data: activeMesocycle, isLoading: activeCycleLoading } = useQuery({
+  const activeCycleQ = useQuery({
     queryKey: ["strength-mesocycle-active", athleteId],
     queryFn: () => getActiveMesocycle(athleteId),
     staleTime: 60_000,
   });
+  const { data: activeMesocycle, isLoading: activeCycleLoading } = activeCycleQ;
   const effectiveSlots = useMemo(
     () => mergeStrengthSlots(groupSlots, athleteOverrides)
       .filter((slot) => isSlotVisibleForCycle(slot, activeMesocycle)),
@@ -170,22 +179,25 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     ...applicationPlanSessions.map((item) => item.session_template_id),
   ].filter((id): id is number => typeof id === "number" && id > 0))),
     [effectiveSlots, applicationPlanSessions]);
-  const { data: datedSessions = [], isLoading: datedSessionsLoading } = useQuery({
+  const datedSessionsQ = useQuery({
     queryKey: ["strength-sessions-by-ids", datedSessionIds],
     queryFn: () => getStrengthSessionsByIds(datedSessionIds),
     enabled: datedSessionIds.length > 0,
   });
+  const { data: datedSessions = [], isLoading: datedSessionsLoading } = datedSessionsQ;
 
   // ── Phase 1 fallback data (cycles-based) ────────────────────────────────────
-  const { data: folders = [], isLoading: foldersLoading } = useQuery({
+  const foldersQ = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
     queryFn: () => getStrengthFolders("session", { athleteId }),
   });
+  const { data: folders = [], isLoading: foldersLoading } = foldersQ;
 
-  const { data: allSessions = [], isLoading: sessionsLoading } = useQuery({
+  const allSessionsQ = useQuery({
     queryKey: ["strength_catalog"],
     queryFn: () => getStrengthSessions(),
   });
+  const { data: allSessions = [], isLoading: sessionsLoading } = allSessionsQ;
 
   // ── Hierarchy for Phase 1 fallback ─────────────────────────────────────────
   const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
@@ -567,6 +579,19 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     planSessionsLoading || groupSlotsLoading || athleteOverridesLoading ||
     weekOverridesLoading || sessionsLoading || datedSessionsLoading || activeCycleLoading;
 
+  const loadFailures = summarizeLoadFailures([
+    ["profil", profileQ],
+    ["plans appliqués", applicationsQ],
+    ["séances du plan", planSessionsQ],
+    ["créneaux du groupe", groupSlotsQ],
+    ["créneaux personnels", athleteOverridesQ],
+    ["phases", weekOverridesQ],
+    ["mésocycle", activeCycleQ],
+    ["séances datées", datedSessionsQ],
+    ["cycles", foldersQ],
+    ["catalogue", allSessionsQ],
+  ]);
+
   // ── Loading skeleton ────────────────────────────────────────────────────────
   if (planLoading) {
     return (
@@ -574,6 +599,25 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="rounded-xl border p-3 h-14 bg-muted animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  // ── Échec de chargement (audit robustesse muscu, lot 1) ─────────────────────
+  // Un échec réseau ne doit jamais se lire « Aucun plan personnalisé ». Si rien
+  // n'est affichable → écran d'erreur ; si le plan est partiel → bandeau compact.
+  const loadErrorProps = {
+    onRetry: loadFailures.retry,
+    isRetrying: loadFailures.isRetrying,
+  };
+  if (loadFailures.hasFailure && weekInstances.length === 0) {
+    return (
+      <div>
+        <QueryErrorState
+          title="Impossible de charger ton plan"
+          description="Ton plan muscu n'a pas pu être récupéré. Vérifie ta connexion, puis réessaie."
+          {...loadErrorProps}
+        />
       </div>
     );
   }
@@ -629,6 +673,16 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
         />
       ) : (
         recapButton
+      )}
+
+      {loadFailures.hasFailure && (
+        <QueryErrorState
+          compact
+          className="mb-3 rounded-xl border border-status-error/20 bg-status-error-bg"
+          title="Plan incomplet"
+          description="Une partie de ton plan n'a pas pu être chargée. Des séances peuvent manquer."
+          {...loadErrorProps}
+        />
       )}
 
       {/* Timeline (rail décoratif scopé à la liste des semaines) */}
