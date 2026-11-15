@@ -1,9 +1,5 @@
 import type { StrengthSessionTemplate, StrengthFolder } from "@/lib/api/types";
-import {
-  type WeekInfo,
-  getISOWeekNumber,
-  getMonday,
-} from "@/components/coach/swim/swimPlanningShared";
+import { type WeekInfo, getISOWeekNumber, getMonday } from "@/lib/date";
 import { toISODate } from "@/lib/date";
 import { type StrengthPhase, detectPhase } from "./strengthPhaseStyles";
 
