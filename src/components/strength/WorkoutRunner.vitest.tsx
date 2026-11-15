@@ -32,7 +32,7 @@ function calibSession(over: Partial<StrengthSessionItem> = {}): StrengthSessionT
 }
 
 const exercises: Exercise[] = [
-  { id: 10, nom_exercice: "Développé couché", exercise_type: "strength" } as unknown as Exercise,
+  { id: 10, nom_exercice: "Développé couché", exercise_type: "strength", intensity_metric: "weight_kg", one_rm_eligible: true } as unknown as Exercise,
 ];
 
 function renderRunner(extra: Record<string, unknown> = {}) {
@@ -164,6 +164,27 @@ describe("§376 substitution mid-séance — pas de retour à l'échauffement", 
 });
 
 describe("§369 carte série 1 augmentée (jsdom)", () => {
+  it("ne suggère jamais une calibration avant résolution du chargement 1RM", () => {
+    renderRunner({ oneRmsReady: false });
+    expect(screen.queryByRole("button", { name: "Reps en réserve : 2" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Saisir ma 1RM" })).toBeNull();
+  });
+
+  it("ne suggère jamais une calibration si une 1RM est déjà enregistrée", () => {
+    renderRunner({ oneRMs: [{ exercise_id: 10, weight: 80 }] });
+    expect(screen.queryByRole("button", { name: "Reps en réserve : 2" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Modifier" })).toBeTruthy();
+  });
+
+  it("propose une saisie manuelle directe et une sortie sans calcul", () => {
+    renderRunner({ onManualOneRm: async () => undefined });
+    expect(screen.getByRole("button", { name: "Saisir ma 1RM" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Saisir ma 1RM" }));
+    expect(screen.getByRole("textbox", { name: "1RM en kilogrammes" })).toBeTruthy();
+    fireEvent.click(screen.getByText("Continuer sans calcul"));
+    expect(screen.queryByRole("button", { name: "Reps en réserve : 2" })).toBeNull();
+  });
+
   it("RIR par défaut = 2 pré-sélectionné (anti sous-estimation)", () => {
     renderRunner();
     const rir2 = screen.getByRole("button", { name: "Reps en réserve : 2" });
