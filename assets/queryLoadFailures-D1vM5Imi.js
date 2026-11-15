@@ -1,0 +1,1 @@
+function n(e){return e.length<=1?e[0]??"":`${e.slice(0,-1).join(", ")} et ${e[e.length-1]}`}function o(e){const i=e.filter(([,r])=>r.isLoadingError),t=i.map(([r])=>r);return{hasFailure:i.length>0,failedLabels:t,failedText:n(t),isRetrying:i.some(([,r])=>r.isFetching),retry:()=>{for(const[,r]of i)r.refetch()}}}export{o as s};
