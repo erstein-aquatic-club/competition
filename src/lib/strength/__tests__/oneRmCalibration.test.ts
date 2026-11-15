@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { needsOneRmCalibration } from "../oneRmCalibration.ts";
+import { needsOneRmCalibration, isOneRmEligible } from "../oneRmCalibration.ts";
 
-const base = { setIndex: 1, percent1rm: 70, metric: "weight_kg", isBodyweight: false, hasOneRm: false };
+const base = { setIndex: 1, percent1rm: 70, metric: "weight_kg", isBodyweight: false, hasOneRm: false, oneRmEligible: true };
 
 test("éligible : %1RM + weight_kg + non-PDC + sans 1RM, série 1", () => {
   assert.equal(needsOneRmCalibration(base), true);
@@ -21,4 +21,24 @@ test("PAS éligible : 1RM déjà connu", () => {
 });
 test("PAS éligible : pas la série 1", () => {
   assert.equal(needsOneRmCalibration({ ...base, setIndex: 2 }), false);
+});
+
+test("aucun prompt lorsque la classification est absente, fausse ou non éligible", () => {
+  for (const input of [
+    { ...base, oneRmEligible: false },
+    { ...base, hasOneRm: true },
+    { ...base, isBodyweight: true },
+    { ...base, metric: "time_s" },
+  ]) assert.equal(needsOneRmCalibration(input), false);
+});
+
+test("éligibilité explicite : saut et poids du corps exclus même si %1RM existe", () => {
+  const loaded = { id: 1, nom_exercice: "Squat", exercise_type: "strength" as const, intensity_metric: "weight_kg" as const, is_bodyweight: false, one_rm_eligible: true };
+  assert.equal(isOneRmEligible(loaded), true);
+  assert.equal(isOneRmEligible({ ...loaded, one_rm_eligible: false, nom_exercice: "Depth Jump" }), false);
+  assert.equal(isOneRmEligible({ ...loaded, is_bodyweight: true }), false);
+  assert.equal(isOneRmEligible({ ...loaded, intensity_metric: "height_cm" }), false);
+  assert.equal(isOneRmEligible({ ...loaded, exercise_type: "warmup" }), false);
+  assert.equal(isOneRmEligible({ ...loaded, one_rm_eligible: undefined }), false);
+  assert.equal(isOneRmEligible(undefined), false);
 });
