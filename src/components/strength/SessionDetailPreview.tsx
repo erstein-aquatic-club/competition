@@ -24,6 +24,7 @@ import { ExercisePicker } from "@/components/strength/ExercisePicker";
 import { estimateStrengthSessionDurationSeconds, formatApproxMinutes } from "@/lib/strength/sessionDuration";
 import { cn } from "@/lib/utils";
 import type { OneRmEntry } from "@/lib/types";
+import { isOneRmEligible } from "@/lib/strength/oneRmCalibration";
 
 const cycleColors: Record<string, { dot: string; text: string; bg: string }> = {
   endurance: { dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
@@ -187,7 +188,7 @@ export function SessionDetailPreview({
         {items.map((item, index) => {
           const exercise = exerciseLookup.get(item.exercise_id);
           const percentValue = Number(item.percent_1rm);
-          const hasPercent = Number.isFinite(percentValue) && percentValue > 0;
+          const hasPercent = isOneRmEligible(exercise) && Number.isFinite(percentValue) && percentValue > 0;
           const rm = hasPercent
             ? oneRMs?.find((entry: OneRmEntry) => entry.exercise_id === item.exercise_id)?.weight ?? 0
             : 0;
