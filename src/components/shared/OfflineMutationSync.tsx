@@ -234,7 +234,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
 
   if (remoteLogs !== null) {
     const missingLogs = getMissingStrengthLogs(logs, remoteLogs);
-    const nonWeightIds = missingLogs.length ? await getNonWeightExerciseIds() : new Set<number>();
+    const nonWeightIds = missingLogs.length ? await getNonWeightExerciseIds(missingLogs.map(({ log }) => log.exercise_id)) : new Set<number>();
 
     for (const { log, setIndex } of missingLogs) {
       await logStrengthSet({
