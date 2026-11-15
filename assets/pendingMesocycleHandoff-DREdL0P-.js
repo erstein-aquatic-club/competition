@@ -1,0 +1,1 @@
+const e="eac_pending_mesocycle_params";let n=null;function r(s){const t=JSON.stringify(s);n=t;try{window.sessionStorage.setItem(e,t)}catch{try{window.sessionStorage.removeItem(e)}catch{}}}function o(){if(n!=null)return n;try{return window.sessionStorage.getItem(e)}catch{return null}}function c(){n=null;try{window.sessionStorage.removeItem(e)}catch{}}export{c,o as r,r as s};
