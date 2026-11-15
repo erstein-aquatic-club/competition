@@ -63,7 +63,7 @@ BEFORE INSERT OR UPDATE ON public.one_rm_records
 FOR EACH ROW EXECUTE FUNCTION public.guard_ineligible_one_rm();
 
 -- Deliberate athlete references have priority over automatic PR estimates.
--- Existing rows without a source run may have been manually entered in Records.
+-- Existing valid references are preserved as-is, including historical manual values.
 ALTER TABLE public.one_rm_records
   ADD COLUMN IF NOT EXISTS explicit_reference boolean NOT NULL DEFAULT false;
 
@@ -72,7 +72,6 @@ UPDATE public.one_rm_records r
   FROM public.dim_exercices e
  WHERE r.exercise_id = e.id
    AND e.one_rm_eligible
-   AND r.source_run_id IS NULL
    AND r.one_rm > 0;
 
 -- The same trigger protects both catalogue eligibility AND user intent.
