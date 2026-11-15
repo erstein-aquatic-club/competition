@@ -101,7 +101,7 @@ describe("updateStrengthRun — §159 regression", () => {
     // Before §159 the second error was swallowed; the swimmer's calendar
     // showed the muscu slot stuck on "in_progress" until manual reset.
     scripts.push(
-      { expect: "strength_session_runs", result: { data: null, error: null } },
+      { expect: "strength_session_runs", result: { data: [{ id: 1 }], error: null } },
       {
         expect: "session_assignments",
         result: { data: null, error: { message: "RLS denied", code: "42501" } },
@@ -126,7 +126,7 @@ describe("updateStrengthRun — §159 regression", () => {
 
   it("returns ok when both updates succeed (status=completed + assignment_id)", async () => {
     scripts.push(
-      { expect: "strength_session_runs", result: { data: null, error: null } },
+      { expect: "strength_session_runs", result: { data: [{ id: 1 }], error: null } },
       { expect: "session_assignments", result: { data: null, error: null } },
     );
 
@@ -147,7 +147,7 @@ describe("updateStrengthRun — §159 regression", () => {
     // Pure run completion (catalog session, no coach assignment) — the
     // 2nd write must be skipped. Otherwise we'd hit a NPE (eq null).
     scripts.push(
-      { expect: "strength_session_runs", result: { data: null, error: null } },
+      { expect: "strength_session_runs", result: { data: [{ id: 1 }], error: null } },
     );
 
     const { updateStrengthRun } = await import("../strength.ts");
@@ -164,7 +164,7 @@ describe("updateStrengthRun — §159 regression", () => {
     // In-progress updates (per-set progress_pct) shouldn't touch the
     // assignment status — that's only meaningful at completion.
     scripts.push(
-      { expect: "strength_session_runs", result: { data: null, error: null } },
+      { expect: "strength_session_runs", result: { data: [{ id: 1 }], error: null } },
     );
 
     const { updateStrengthRun } = await import("../strength.ts");
@@ -176,6 +176,22 @@ describe("updateStrengthRun — §159 regression", () => {
     });
 
     assert.deepEqual(result, { status: "ok" });
+    assert.deepEqual(fromCalls, ["strength_session_runs"]);
+  });
+
+  it("throws when the run update matches no row (RLS / unknown run — bd903bede guard)", async () => {
+    // UPDATE … RETURNING id that hits 0 rows is NOT an error for PostgREST
+    // (§113 class). The guard must surface it instead of reporting "ok", and
+    // must not go on to touch session_assignments.
+    scripts.push(
+      { expect: "strength_session_runs", result: { data: [], error: null } },
+    );
+
+    const { updateStrengthRun } = await import("../strength.ts");
+    await assert.rejects(
+      () => updateStrengthRun({ run_id: 1, status: "completed", assignment_id: 42 }),
+      /Séance distante introuvable/,
+    );
     assert.deepEqual(fromCalls, ["strength_session_runs"]);
   });
 
@@ -222,7 +238,7 @@ describe("reconcileStrengthRunLogs", () => {
     assert.deepEqual(fromCalls, []);
   });
 
-  it("throws when the count query fails (was silently returning before §170)", async () => {
+  it("throws when the set lookup fails (was silently returning before §170)", async () => {
     // Pre-§170 this returned a clean result and the caller assumed the
     // reconcile succeeded — actual DB state could be drifted.
     scripts.push(
@@ -239,18 +255,25 @@ describe("reconcileStrengthRunLogs", () => {
         logs: [{ exercise_id: 10, set_number: 1, reps: 5, weight: 80 }],
         athleteId: 5,
       }),
-      (err: Error) => err.message.includes("count query failed"),
+      (err: Error) => err.message.includes("set lookup failed"),
     );
   });
 
-  it("returns no-op result when remoteCount >= local logs length", async () => {
+  it("returns no-op result when every local set already exists remotely (by identity)", async () => {
     // Common case after a successful online run: server already has all
     // sets via fire-and-forget per-set saves. Reconcile is idempotent.
+    // bd903bede — comparison is by (exercise_id, set_index), not by count.
     scripts.push(
       {
         expect: "strength_set_logs",
-        // count: exact head:true returns count, no data
-        result: { data: null, error: null, count: 3 } as ChainScript["result"] & { count: number },
+        result: {
+          data: [
+            { exercise_id: 10, set_index: 1 },
+            { exercise_id: 10, set_index: 2 },
+            { exercise_id: 10, set_index: 3 },
+          ],
+          error: null,
+        },
       },
     );
 
@@ -265,7 +288,7 @@ describe("reconcileStrengthRunLogs", () => {
       athleteId: 5,
     });
     assert.deepEqual(result, { attempted: 0, succeeded: 0, errors: [] });
-    // Only the count query was issued — no per-set inserts.
+    // Only the identity lookup was issued — no per-set inserts.
     assert.deepEqual(fromCalls, ["strength_set_logs"]);
   });
 });
@@ -397,5 +420,34 @@ describe("logStrengthSet — branch coverage", () => {
       }),
       (err: Error) => err.message.includes("Connection reset"),
     );
+  });
+});
+
+// Audit robustesse muscu (lot 2, constat 2) — §113-style : un DELETE refusé
+// par RLS renvoie { data: [], error: null }. Avant, deleteStrengthFolder
+// résolvait quand même → le coach voyait « Cycle supprimé » sans effet.
+describe("deleteStrengthFolder — détection du no-op silencieux", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+  });
+
+  it("résout quand une ligne a bien été supprimée", async () => {
+    scripts.push({ expect: "strength_folders", result: { data: [{ id: 5 }], error: null } });
+    const { deleteStrengthFolder } = await import("../strength.ts");
+    await deleteStrengthFolder(5);
+    assert.deepEqual(fromCalls, ["strength_folders"]);
+  });
+
+  it("rejette quand aucune ligne n'est supprimée (RLS / déjà supprimé)", async () => {
+    scripts.push({ expect: "strength_folders", result: { data: [], error: null } });
+    const { deleteStrengthFolder } = await import("../strength.ts");
+    await assert.rejects(() => deleteStrengthFolder(5), /introuvable ou non autorisé/);
+  });
+
+  it("propage l'erreur Supabase", async () => {
+    scripts.push({ expect: "strength_folders", result: { data: null, error: { message: "Connection reset" } } });
+    const { deleteStrengthFolder } = await import("../strength.ts");
+    await assert.rejects(() => deleteStrengthFolder(5), /Connection reset/);
   });
 });

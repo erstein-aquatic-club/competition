@@ -29,6 +29,30 @@ export function addDaysIso(iso: string, days: number): string {
   return toISODate(d);
 }
 
+export interface WeekInfo {
+  monday: Date;
+  sunday: Date;
+  weekNumber: number;
+  weekKey: string; // "2026-04-06"
+}
+
+/** Numéro de semaine ISO (1-53) pour la date `date`. */
+export function getISOWeekNumber(date: Date): number {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  return (
+    1 +
+    Math.round(
+      ((d.getTime() - week1.getTime()) / 86400000 -
+        3 +
+        ((week1.getDay() + 6) % 7)) /
+        7,
+    )
+  );
+}
+
 /** Lundi (00:00 local) de la semaine ISO contenant `d`. */
 export function getMonday(d: Date): Date {
   const r = new Date(d);

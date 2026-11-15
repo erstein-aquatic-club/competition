@@ -1635,7 +1635,14 @@ export async function renameStrengthFolder(id: number, name: string): Promise<vo
 
 export async function deleteStrengthFolder(id: number): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  assertSupabase(await supabase.from("strength_folders").delete().eq("id", id));
+  // RETURNING id : un DELETE refusé par RLS renvoie 0 ligne SANS erreur (§113) —
+  // sans ce contrôle l'UI annonçait « Cycle supprimé » alors que rien ne l'était.
+  const data = assertSupabase(
+    await supabase.from("strength_folders").delete().eq("id", id).select("id"),
+  );
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error("Cycle introuvable ou non autorisé : rien n'a été supprimé.");
+  }
 }
 
 export async function moveToFolder(

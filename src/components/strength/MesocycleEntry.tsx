@@ -19,10 +19,13 @@ import { getActiveMesocycle, getLatestAssessment } from "@/lib/api";
 import { Dumbbell, ChevronRight, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 
 /**
  * Tuile d'entrée vers la génération de mésocycle.
  * - Bilan non complété → null (autre tuile prend le relais).
+ * - Échec de chargement → tuile compacte « Réessayer » (jamais silencieuse).
  * - Aucun mésocycle actif → carte violette "Action attendue".
  * - Mésocycle actif → tuile neutre "Régénérer un mésocycle".
  */
@@ -30,19 +33,42 @@ export function MesocycleEntry() {
   const userId = useAuth((s) => s.userId);
   const [, navigate] = useLocation();
 
-  const { data: assessment } = useQuery({
+  const assessmentQ = useQuery({
     queryKey: ["strength-assessment-latest", userId],
     queryFn: () => getLatestAssessment(userId!),
     enabled: userId != null,
     staleTime: 60_000,
   });
+  const { data: assessment } = assessmentQ;
 
-  const { data: activeMesocycle } = useQuery({
+  const activeMesocycleQ = useQuery({
     queryKey: ["strength-mesocycle-active", userId],
     queryFn: () => getActiveMesocycle(userId!),
     enabled: userId != null,
     staleTime: 60_000,
   });
+  const { data: activeMesocycle } = activeMesocycleQ;
+
+  // Audit robustesse muscu (lot 1) — avant : un échec réseau faisait disparaître
+  // la tuile en silence (lu comme « bilan non complété »), ou affichait « Génère
+  // ton mésocycle » à un nageur qui en a déjà un actif.
+  const loadFailures = summarizeLoadFailures([
+    ["bilan", assessmentQ],
+    ["mésocycle", activeMesocycleQ],
+  ]);
+  if (loadFailures.hasFailure) {
+    return (
+      <div className="rounded-2xl border bg-card shadow-sm">
+        <QueryErrorState
+          compact
+          title="Mésocycle indisponible"
+          description="Ton bilan et ton plan n'ont pas pu être vérifiés. Vérifie ta connexion, puis réessaie."
+          onRetry={loadFailures.retry}
+          isRetrying={loadFailures.isRetrying}
+        />
+      </div>
+    );
+  }
 
   if (!assessment || !canGenerateMesocycle(assessment.status)) return null;
 

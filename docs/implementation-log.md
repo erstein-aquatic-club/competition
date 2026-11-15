@@ -4,6 +4,51 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §391 — Tests : suite `npm test` de nouveau verte de bout en bout (2026-11-15)
+
+**Contexte.** Depuis `bd903bede` (2026-11-13), 6 tests `node:test` échouaient ; comme `npm test` enchaîne `node:test && vitest`, **vitest ne tournait plus du tout** via `npm test`. S'y ajoutait 1 test vitest à bombe à retardement (dates figées).
+
+**Changements (tests uniquement, aucun code applicatif).**
+- **`src/lib/api/__tests__/strength.test.ts`** — alignement sur le contrat durci par `bd903bede` (comportement voulu, pas une régression) : `updateStrengthRun` fait `UPDATE … RETURNING id` et lève « Séance distante introuvable » si 0 ligne → les mocks de succès renvoient `[{ id: 1 }]` ; +1 test qui fige cette garde (0 ligne → rejet, `session_assignments` non touché). `reconcileStrengthRunLogs` compare désormais par identité `(exercise_id, set_index)` et non plus par `count` → message « set lookup failed », fixture no-op = 3 identités distantes.
+- **`src/lib/strength/__tests__/reconcileStrengthLogs.test.ts` (+)** — `getMissingStrengthLogs` (cœur du fix `bd903bede`) n'avait aucun test : 5 tests (trou au milieu séries 1+3 → seule la 2 renvoyée ; identité par exercice ; index séquentiel sans numéro ; doublon local → erreur ; ligne distante sans `set_index` → erreur).
+- **`src/hooks/useStrengthWrapped.vitest.tsx`** — dates de fixture rendues relatives (`daysAgo(n)`) : le volume est calculé sur fenêtre glissante, les dates de mai 2026 en sortaient avec le temps.
+
+**Tests.** `npm test` exit 0 : node:test 1786/1786, vitest 23/23 fichiers. tsc 0.
+
+## §390 — Muscu : confirmation de suppression de cycle/dossier + anti double-tap « Valider série » (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 2 (constats 2 et 4).
+
+**Changements.**
+- **Constat 2 — suppression de cycle/dossier.** Avant : un tap dans le menu supprimait immédiatement (plans nageur `AthletePlansTab` ET catalogue `StrengthCatalog`), sans `onError`, et `deleteStrengthFolder` ne détectait pas le no-op RLS (§113) → « Cycle supprimé » affiché sans effet. Désormais :
+  - **`deleteStrengthFolder`** (`src/lib/api/strength.ts`) : `DELETE … RETURNING id` ; 0 ligne → erreur « Cycle introuvable ou non autorisé ». +3 tests (`src/lib/api/__tests__/strength.test.ts`).
+  - **`src/components/coach/strength/ConfirmFolderDeleteDialog.tsx` (79 l, +)** : AlertDialog « Supprimer « nom » ? » qui annonce le nombre de séances/exercices concernés (ils ne sont pas supprimés — FK `ON DELETE SET NULL` — mais sortent du cycle/dossier) ; helper pur `folderDeleteDescription` (accords singulier/pluriel, masculin/féminin), 4 tests.
+  - Branché sur `CycleCard` (`AthletePlansTab`) et `FolderDropdown` (`StrengthCatalog`, dossiers de séances et d'exercices) ; `onError` → toast « Suppression impossible » sur les deux mutations.
+- **Constat 4 — série fantôme au double-tap.** `isLoggingRef` ne couvrait que `onLogSets` (fire-and-forget, rend la main quasi immédiatement) → un 2ᵉ tap ~100 ms après tombait sur le bouton re-rendu de la série/exo suivant (sans repos auto rien ne le recouvre) et loggait une série jamais faite. Ajout d'un anti-rebond `VALIDATE_DEBOUNCE_MS = 700` (`lastValidateAtRef`) en tête de `handleValidateSet` (`WorkoutRunner.tsx`). +2 tests vitest jsdom (`WorkoutRunner.vitest.tsx`) : double-tap → 1 seule série (RED avant fix : série fantôme de l'exo 2) ; validation après le délai → acceptée.
+
+**Fichiers modifiés.** `src/lib/api/strength.ts`, `src/lib/api/__tests__/strength.test.ts`, `src/components/coach/strength/ConfirmFolderDeleteDialog.tsx` (+), `src/components/coach/strength/__tests__/ConfirmFolderDeleteDialog.test.tsx` (+), `src/components/coach/strength/AthletePlansTab.tsx`, `src/pages/coach/StrengthCatalog.tsx`, `src/components/strength/WorkoutRunner.tsx`, `src/components/strength/WorkoutRunner.vitest.tsx`.
+
+**Tests.** node:test 1779/1785 — 6 échecs **préexistants** inchangés (`strength.test.ts` `updateStrengthRun`/`reconcileStrengthRunLogs`, cf. §389). vitest 98/99 — 1 échec **préexistant hors périmètre** : `useStrengthWrapped.vitest.tsx` (fixtures datées mai 2026 → dépend de la date courante). NB : `npm test` enchaîne `node:test && vitest` → tant que les 6 échecs node:test persistent, vitest ne tourne pas via `npm test`. tsc 0, lint 0 erreur (warnings préexistants). RLS : non lancé — le changement n'ajoute qu'un `RETURNING` client, aucune policy modifiée, et le harness RLS ne couvre pas `strength_folders` ; le no-op RLS est couvert par test unitaire mocké. Pas de smoke navigateur.
+
+**Limites.** Constats restants de l'audit : 5 (texte écran vide « Mon plan »), 6 (onglet actif perdu après séance), 7 (indicateur « en attente de synchro »), 9-11.
+
+## §389 — Muscu : les échecs réseau ne se déguisent plus en « pas de plan / pas de bilan » (2026-11-15)
+
+**Contexte.** Audit robustesse & UX du module muscu (2026-11-15), lot 1 (constats 1, 3, 8). Plusieurs écrans lisaient `data` avec une valeur par défaut (`= []`, `?? null`) sans regarder l'erreur React Query (les wrappers API lèvent bien via `assertSupabase`) : un échec réseau devenait un état métier trompeur — voire un plan calculé sur des données partielles.
+
+**Changements.**
+- **`src/lib/queryLoadFailures.ts` (48 l, +)** : helper pur `summarizeLoadFailures([[libellé, query]…])` → `hasFailure`, `failedLabels`, `failedText` (« a, b et c »), `isRetrying`, `retry()` (relance UNIQUEMENT les requêtes en échec). Basé sur `isLoadingError` (échec sans donnée en cache) : un refetch d'arrière-plan raté avec données présentes ne masque pas un écran valide. 6 tests `node:test`.
+- **`src/components/shared/QueryErrorState.tsx` (57 l, +)** : état « chargement impossible + Réessayer » construit sur `EmptyState` (icône `CloudOff`, bouton `RotateCcw` qui tourne pendant la relance, `motion-reduce` respecté), variante `compact`.
+- **`MesocyclePreview.tsx` (constat 1)** : 8 requêtes moteur (profil, bilan, KPI, réglages coach, nages, épreuves, échauffement, activation) agrégées ; tout échec → `ErrorScreen` « Données du plan indisponibles » listant les données manquantes + Réessayer, AVANT les autres écrans bloquants. Avant : plan généré et **applicable** sans KPI / sans Bloc 1-3 / avec niveau par défaut ; bilan en échec lu « Bilan non complété » ; profil en échec = squelette infini ; nages en échec = « combinaison introuvable ». `ErrorScreen.primary` accepte `disabled`.
+- **`MyPlanTab.tsx` (constat 3)** : 10 requêtes agrégées. Échec + rien d'affichable → « Impossible de charger ton plan » (au lieu de « Aucun plan personnalisé ») ; échec partiel avec plan affiché → bandeau compact « Plan incomplet » + Réessayer au-dessus de la timeline.
+- **`MesocycleGeneration.tsx` + `MesocycleEntry.tsx` (constat 8)** : génération — bilan/profil/nages/épreuves en échec → « Génération indisponible » au lieu de « Tu dois d'abord faire ton bilan » ; tuile d'entrée — bilan/méso actif en échec → tuile compacte « Mésocycle indisponible » au lieu de disparaître (ou d'afficher « Génère ton mésocycle » à un nageur qui en a déjà un).
+
+**Fichiers modifiés.** `src/lib/queryLoadFailures.ts` (+), `src/lib/queryLoadFailures.test.ts` (+), `src/components/shared/QueryErrorState.tsx` (+), `src/pages/MesocyclePreview.tsx`, `src/pages/MesocycleGeneration.tsx`, `src/components/strength/MyPlanTab.tsx`, `src/components/strength/MesocycleEntry.tsx`.
+
+**Tests.** `queryLoadFailures` 6/6. `npm test` : 1772/1778 — les 6 échecs sont **préexistants et hors périmètre** (`src/lib/api/__tests__/strength.test.ts`, `updateStrengthRun` §159 + `reconcileStrengthRunLogs` : mocks non mis à jour après la garde « Séance distante introuvable » ajoutée par `bd903bede`, 2026-11-13). tsc 0, lint 0 erreur (3 warnings exhaustive-deps préexistants). Pas de RLS (UI seule, aucun appel Supabase modifié). Pas de smoke navigateur.
+
+**Décisions / limites.** Écran d'erreur seulement sur échec de *premier* chargement (`isLoadingError`). Constats restants de l'audit (lot 2) : suppression de cycle coach sans confirmation ni détection §113 (2), double-tap série fantôme (4), puis 5-7, 9-11.
+
 ## §388 — Stats physiques : fiche détail KPI au clic (2026-06-20)
 
 **Contexte.** Suite du §387 : la vue « Stats physiques » listait les KPIs mais ne donnait que le score/comparaison. Demande utilisateur : pouvoir cliquer chaque KPI pour en voir le détail.

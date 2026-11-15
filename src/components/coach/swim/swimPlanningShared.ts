@@ -4,32 +4,16 @@
  * (shared presentational component, also used by future SwimmerPlanningPanel).
  */
 
-export interface WeekInfo {
-  monday: Date;
-  sunday: Date;
-  weekNumber: number;
-  weekKey: string; // "2026-04-06"
-}
-
-export function getISOWeekNumber(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  return (
-    1 +
-    Math.round(
-      ((d.getTime() - week1.getTime()) / 86400000 -
-        3 +
-        ((week1.getDay() + 6) % 7)) /
-        7,
-    )
-  );
-}
-
 // §211 — getMonday déplacé dans src/lib/date.ts. Re-export pour compat.
-import { toISODate } from "@/lib/date";
-export { getMonday } from "@/lib/date";
+// WeekInfo + getISOWeekNumber déplacés dans src/lib/date.ts. Re-exports pour compat.
+import {
+  toISODate,
+  type WeekInfo,
+  getISOWeekNumber,
+  getMonday,
+} from "@/lib/date";
+export { getMonday, getISOWeekNumber };
+export type { WeekInfo };
 
 export function generateWeeks(startMonday: Date, count: number): WeekInfo[] {
   return Array.from({ length: count }, (_, i) => {

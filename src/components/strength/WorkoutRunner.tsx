@@ -50,6 +50,15 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { formatPrep, formatWork, formatSetTarget, formatRest, itemPrescription } from "@/lib/strength/prescriptionDisplay";
 
 /** Emit a short beep + vibration when the rest timer ends */
+/**
+ * Anti double-tap « Valider série » (audit robustesse muscu, lot 2). Le verrou
+ * `isLoggingRef` ne couvre que l'appel `onLogSets`, qui rend la main quasi
+ * instantanément (envoi fire-and-forget) : un 2ᵉ tap ~100 ms plus tard tombait
+ * sur le bouton re-rendu de la série / de l'exo SUIVANT → série fantôme. Aucune
+ * vraie série ne s'enchaîne en moins de ce délai.
+ */
+export const VALIDATE_DEBOUNCE_MS = 700;
+
 const notifyRestEnd = () => {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -225,6 +234,7 @@ export function WorkoutRunner({
   onEstimationComplete?: (exerciseId: number, estimatedOneRm: number) => Promise<void>;
 }) {
   const isLoggingRef = useRef(false);
+  const lastValidateAtRef = useRef(0);
 
   const isOnline = useOnlineStatus();
 
@@ -801,6 +811,9 @@ export function WorkoutRunner({
   const handleValidateSet = async () => {
     if (!currentBlock) return;
     if (isLoggingRef.current) return;
+    const now = Date.now();
+    if (now - lastValidateAtRef.current < VALIDATE_DEBOUNCE_MS) return;
+    lastValidateAtRef.current = now;
     // Defensive guard against a substitute → validate race: when session.items
     // is swapped under us, currentSetIndex can briefly point past the new
     // exercise's set count before the useEffect resets it. Validating in that
