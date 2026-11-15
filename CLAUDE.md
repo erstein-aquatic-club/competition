@@ -79,7 +79,7 @@ Lire ces fichiers dans cet ordre pour reprendre le contexte :
 
 **Historique complet** : `docs/implementation-log.md` — à lire pour retrouver le contexte d'un composant ou d'une décision passée. Ne pas dupliquer ici.
 
-Dernier § livré : **§390** — Muscu : confirmation suppression cycle/dossier + anti double-tap « Valider série ».
+Dernier § livré : **§391** — Tests : `npm test` de nouveau vert de bout en bout (vitest inclus).
 
 > Lint : `npm run lint` (eslint flat config minimal, react-hooks ; warnings exhaustive-deps tolérés). Garde CI `react-hooks/rules-of-hooks` bloquante dans `pages.yml`.
 

@@ -4,6 +4,17 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §391 — Tests : suite `npm test` de nouveau verte de bout en bout (2026-11-15)
+
+**Contexte.** Depuis `bd903bede` (2026-11-13), 6 tests `node:test` échouaient ; comme `npm test` enchaîne `node:test && vitest`, **vitest ne tournait plus du tout** via `npm test`. S'y ajoutait 1 test vitest à bombe à retardement (dates figées).
+
+**Changements (tests uniquement, aucun code applicatif).**
+- **`src/lib/api/__tests__/strength.test.ts`** — alignement sur le contrat durci par `bd903bede` (comportement voulu, pas une régression) : `updateStrengthRun` fait `UPDATE … RETURNING id` et lève « Séance distante introuvable » si 0 ligne → les mocks de succès renvoient `[{ id: 1 }]` ; +1 test qui fige cette garde (0 ligne → rejet, `session_assignments` non touché). `reconcileStrengthRunLogs` compare désormais par identité `(exercise_id, set_index)` et non plus par `count` → message « set lookup failed », fixture no-op = 3 identités distantes.
+- **`src/lib/strength/__tests__/reconcileStrengthLogs.test.ts` (+)** — `getMissingStrengthLogs` (cœur du fix `bd903bede`) n'avait aucun test : 5 tests (trou au milieu séries 1+3 → seule la 2 renvoyée ; identité par exercice ; index séquentiel sans numéro ; doublon local → erreur ; ligne distante sans `set_index` → erreur).
+- **`src/hooks/useStrengthWrapped.vitest.tsx`** — dates de fixture rendues relatives (`daysAgo(n)`) : le volume est calculé sur fenêtre glissante, les dates de mai 2026 en sortaient avec le temps.
+
+**Tests.** `npm test` exit 0 : node:test 1786/1786, vitest 23/23 fichiers. tsc 0.
+
 ## §390 — Muscu : confirmation de suppression de cycle/dossier + anti double-tap « Valider série » (2026-11-15)
 
 **Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 2 (constats 2 et 4).

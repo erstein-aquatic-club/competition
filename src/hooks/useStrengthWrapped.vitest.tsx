@@ -37,6 +37,13 @@ function wrapper() {
   );
 }
 
+// Dates RELATIVES à aujourd'hui : le volume est calculé sur une fenêtre glissante
+// (computeVolumeStats(sets, now)) — des dates figées (mai 2026) sortaient de la
+// fenêtre avec le temps et cassaient le test sans aucun changement de code.
+function daysAgo(n: number): string {
+  return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   cleanup();
@@ -61,13 +68,13 @@ describe('useStrengthWrapped', () => {
     // 3 runs Supabase (chemin strength_set_logs) → ≥3 completedRuns + du volume.
     mocks.getStrengthHistory.mockResolvedValue({
       runs: [
-        { id: 'r1', started_at: '2026-05-20T10:00:00Z', strength_set_logs: [
+        { id: 'r1', started_at: daysAgo(5), strength_set_logs: [
           { exercise_id: 1, reps: 5, weight: 20, set_number: 1, completed_at: null },
         ] },
-        { id: 'r2', started_at: '2026-05-15T10:00:00Z', strength_set_logs: [
+        { id: 'r2', started_at: daysAgo(10), strength_set_logs: [
           { exercise_id: 1, reps: 5, weight: 20, set_number: 1, completed_at: null },
         ] },
-        { id: 'r3', started_at: '2026-05-10T10:00:00Z', strength_set_logs: [
+        { id: 'r3', started_at: daysAgo(15), strength_set_logs: [
           { exercise_id: 1, reps: 5, weight: 20, set_number: 1, completed_at: null },
         ] },
       ],
@@ -117,7 +124,7 @@ describe('useStrengthWrapped', () => {
     ] as any);
     mocks.getStrengthHistory.mockResolvedValue({
       runs: [
-        { id: 'r1', started_at: '2026-05-20T10:00:00Z', strength_set_logs: [
+        { id: 'r1', started_at: daysAgo(5), strength_set_logs: [
           { exercise_id: 1, reps: 5, weight: 20, set_number: 1, completed_at: null },
         ] },
       ],
