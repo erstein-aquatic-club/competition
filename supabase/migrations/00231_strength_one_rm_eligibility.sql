@@ -27,7 +27,7 @@ UPDATE public.dim_exercices SET intensity_metric = 'distance_cm'
 UPDATE public.dim_exercices SET intensity_metric = 'time_s'
   WHERE id IN (47, 58, 79, 82) AND intensity_metric = 'weight_kg'; -- Plank variations
 UPDATE public.dim_exercices SET is_bodyweight = true
-  WHERE id IN (10, 27, 31, 52, 76, 91) AND NOT is_bodyweight;
+  WHERE id IN (5, 10, 27, 31, 52, 76, 91) AND NOT is_bodyweight;
 
 -- Never opt in for non-kg measurements or bodyweight, even if an existing row
 -- was edited before this migration.
@@ -86,6 +86,7 @@ BEGIN
      AND current_setting('eac.explicit_one_rm_write', true) IS DISTINCT FROM 'yes' THEN
     NEW.one_rm := OLD.one_rm;
     NEW.recorded_at := OLD.recorded_at;
+    NEW.source_run_id := OLD.source_run_id;
     NEW.explicit_reference := true;
   END IF;
   IF NOT EXISTS (
@@ -139,6 +140,7 @@ BEGIN
   ON CONFLICT (athlete_id, exercise_id) DO UPDATE SET
     one_rm = EXCLUDED.one_rm,
     recorded_at = EXCLUDED.recorded_at,
+    source_run_id = NULL,
     explicit_reference = true;
 END;
 $$;
