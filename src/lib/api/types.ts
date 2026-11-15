@@ -67,6 +67,8 @@ export interface Exercise {
    * Défaut 0 (normal) ; négatif = évité. Éditable par le coach au catalogue.
    */
   selection_priority?: number;
+  /** §394 — date d'archivage (exo retiré du catalogue/sélecteurs/moteur, historique conservé). */
+  archived_at?: string | null;
 }
 
 export type StrengthCycleType = "endurance" | "hypertrophie" | "force";

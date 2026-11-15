@@ -15,6 +15,8 @@ import {
   assignments_create,
   updateExercise as updateExerciseApi,
   deleteExercise as deleteExerciseApi,
+  ExerciseInUseError,
+  setExerciseArchived,
   deleteStrengthSession,
   updateStrengthSession,
   persistStrengthSessionOrder,
@@ -37,23 +39,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensityMetrics";
-import { AlertCircle, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { invalidateStrengthPlanningQueries } from "@/lib/queryClient";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StrengthSessionBuilder } from "@/components/coach/strength/StrengthSessionBuilder";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
@@ -70,6 +63,10 @@ import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPop
 import { ExercisePrioritySelector } from "@/components/coach/strength/ExercisePrioritySelector";
 import { WarmupRoutinesEditor } from "@/components/coach/strength/WarmupRoutinesEditor";
 import { ConfirmFolderDeleteDialog } from "@/components/coach/strength/ConfirmFolderDeleteDialog";
+import {
+  ConfirmExerciseDeleteDialog,
+  ConfirmSessionDeleteDialog,
+} from "@/components/coach/strength/ConfirmCatalogDeleteDialogs";
 // Lazy-loaded children : ne sont rendus qu'à l'ouverture de modals/sheets
 // ou via un onglet (TabsContent). Évite ~1100 LOC dans le bundle initial du wrapper.
 const CopyToAthleteDialog = lazyWithRetry(
@@ -578,14 +575,18 @@ export default function StrengthCatalog() {
     return map;
   }, [filteredSessions]);
 
+  // §394 — les exercices archivés sortent des listes du catalogue (section dédiée).
+  const activeExercises = useMemo(() => (exercises ?? []).filter((ex) => !ex.archived_at), [exercises]);
+  const archivedExercises = useMemo(() => (exercises ?? []).filter((ex) => ex.archived_at), [exercises]);
+
   const unfiledExercises = useMemo(() =>
-    (exercises ?? []).filter((ex) => !ex.folder_id),
-    [exercises]
+    activeExercises.filter((ex) => !ex.folder_id),
+    [activeExercises]
   );
 
   const exercisesByFolder = useMemo(() => {
     const map = new Map<number, Exercise[]>();
-    for (const ex of (exercises ?? [])) {
+    for (const ex of activeExercises) {
       if (ex.folder_id) {
         const arr = map.get(ex.folder_id) ?? [];
         arr.push(ex);
@@ -593,7 +594,7 @@ export default function StrengthCatalog() {
       }
     }
     return map;
-  }, [exercises]);
+  }, [activeExercises]);
 
   const createExercise = useMutation({
     mutationFn: (data: Omit<Exercise, "id">) => createExerciseApi(data),
@@ -649,14 +650,46 @@ export default function StrengthCatalog() {
     },
   });
 
+  const invalidateExerciseLists = () => {
+    queryClient.invalidateQueries({ queryKey: ["exercises"] });
+    queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
+    queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+    queryClient.invalidateQueries({ queryKey: ["strength-catalog-tagged"] });
+  };
+
   const deleteExercise = useMutation({
     mutationFn: (exerciseId: number) => deleteExerciseApi(exerciseId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exercises"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
-      queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      invalidateExerciseLists();
       setPendingDeleteExercise(null);
       toast("Exercice supprimé");
+    },
+    onError: (err: unknown) => {
+      // §394 — la base refuse (FK RESTRICT) si l'exo a été utilisé entre-temps.
+      toast.error("Suppression impossible", {
+        description:
+          err instanceof ExerciseInUseError
+            ? "Cet exercice est utilisé. Archive-le pour le retirer du catalogue sans effacer l'historique."
+            : err instanceof Error
+              ? err.message
+              : "L'exercice n'a pas été supprimé. Réessaie.",
+      });
+    },
+  });
+
+  // §394 (R3) — archivage : retiré du catalogue, des sélecteurs et du moteur ;
+  // séries et 1RM conservés. Restaurable.
+  const archiveExercise = useMutation({
+    mutationFn: ({ id, archived }: { id: number; archived: boolean }) => setExerciseArchived(id, archived),
+    onSuccess: (_data, { archived }) => {
+      invalidateExerciseLists();
+      setPendingDeleteExercise(null);
+      toast(archived ? "Exercice archivé" : "Exercice restauré");
+    },
+    onError: (err: unknown, { archived }) => {
+      toast.error(archived ? "Archivage impossible" : "Restauration impossible", {
+        description: err instanceof Error ? err.message : "Rien n'a été modifié. Réessaie.",
+      });
     },
   });
 
@@ -665,8 +698,14 @@ export default function StrengthCatalog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
+      void invalidateStrengthPlanningQueries(queryClient);
       setPendingDeleteSession(null);
       toast("Séance supprimée");
+    },
+    onError: (err: unknown) => {
+      toast.error("Suppression impossible", {
+        description: err instanceof Error ? err.message : "La séance n'a pas été supprimée. Réessaie.",
+      });
     },
   });
 
@@ -1329,67 +1368,24 @@ export default function StrengthCatalog() {
   );
 
   const deleteSessionDialog = (
-    <AlertDialog
-      open={Boolean(pendingDeleteSession)}
+    <ConfirmSessionDeleteDialog
+      session={pendingDeleteSession?.id != null ? { id: pendingDeleteSession.id, title: pendingDeleteSession.title } : null}
       onOpenChange={(open) => {
-        if (!open) {
-          setPendingDeleteSession(null);
-        }
+        if (!open) setPendingDeleteSession(null);
       }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Supprimer la séance ?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Cette action est définitive. La séance "{pendingDeleteSession?.title}" sera supprimée.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              if (pendingDeleteSession?.id) {
-                deleteSession.mutate(pendingDeleteSession.id);
-              }
-            }}
-          >
-            Supprimer
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      onDelete={(id) => deleteSession.mutate(id)}
+    />
   );
 
   const deleteExerciseDialog = (
-    <AlertDialog
-      open={Boolean(pendingDeleteExercise)}
+    <ConfirmExerciseDeleteDialog
+      exercise={pendingDeleteExercise}
       onOpenChange={(open) => {
-        if (!open) {
-          setPendingDeleteExercise(null);
-        }
+        if (!open) setPendingDeleteExercise(null);
       }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Supprimer l'exercice ?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Cette action est définitive. L'exercice "{pendingDeleteExercise?.nom_exercice}" sera supprimé.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              if (pendingDeleteExercise?.id) {
-                deleteExercise.mutate(pendingDeleteExercise.id);
-              }
-            }}
-          >
-            Supprimer
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      onDelete={(id) => deleteExercise.mutate(id)}
+      onArchive={(id) => archiveExercise.mutate({ id, archived: true })}
+    />
   );
 
   if (isCreating) {
@@ -1783,6 +1779,34 @@ export default function StrengthCatalog() {
                 </FolderCard>
               );
             })}
+
+            {/* §394 — exercices archivés : hors catalogue/sélecteurs/moteur, historique conservé. */}
+            {archivedExercises.length > 0 && (
+              <FolderCard name="Archivés" icon={Archive} count={archivedExercises.length}>
+                <p className="px-1 pb-2 text-xs text-muted-foreground">
+                  Retirés du catalogue et des prochains mésocycles. Séries et 1RM conservés.
+                </p>
+                <div className="space-y-1">
+                  {archivedExercises.map((exercise) => (
+                    <div key={exercise.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
+                      <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                        {exercise.nom_exercice}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={archiveExercise.isPending}
+                        onClick={() => archiveExercise.mutate({ id: exercise.id, archived: false })}
+                      >
+                        <ArchiveRestore className="mr-1.5 h-4 w-4" />
+                        Restaurer
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </FolderCard>
+            )}
           </TabsContent>
 
           {/* === ÉCHAUFFEMENT TAB (§354 — routines warmup) === */}

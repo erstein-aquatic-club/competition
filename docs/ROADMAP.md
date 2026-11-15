@@ -2,7 +2,9 @@
 
 *Dernière mise à jour : 2026-11-15*
 
-*Dernière : 2026-11-15 — **§393 — Muscu : passage de paramètres méso fiable, séries sans doublon, `strength.ts` sans `as any`** (audit robustesse lot 4, fin de l'audit) : `pendingMesocycleHandoff` (repli mémoire, fin de la boucle génération ↔ aperçu) ; `mergeRunLogs` idempotent (« Réessayer » ne duplique plus une série) ; 29 → 0 `as any` via `readLocalList<T>` (cache corrompu → `[]`), bug 1RM hors-ligne (`weight` undefined) corrigé au passage. +16 tests.*
+*Dernière : 2026-11-15 — **§394 — Muscu : plus de suppression destructrice ni de doublon de bilan** (audit robustesse 2ᵉ passe, lot 5) : exercice utilisé = archivé au lieu de supprimé (mig 00231 : `archived_at` + FK RESTRICT, fini la cascade sur séries/1RM) ; suppression de séance annonce les créneaux vidés ; routines d'échauffement non éditables sur échec de chargement ; tuile « Démarrer mon bilan » masquée tant que l'état est inconnu. mig 00231 appliquée en prod. Restent lots 6-8.*
+
+*§393 — Muscu : passage de paramètres méso fiable, séries sans doublon, `strength.ts` sans `as any`** (audit robustesse lot 4, fin de l'audit) : `pendingMesocycleHandoff` (repli mémoire, fin de la boucle génération ↔ aperçu) ; `mergeRunLogs` idempotent (« Réessayer » ne duplique plus une série) ; 29 → 0 `as any` via `readLocalList<T>` (cache corrompu → `[]`), bug 1RM hors-ligne (`weight` undefined) corrigé au passage. +16 tests.*
 
 *§392 — **Muscu : état vide actionnable, onglet conservé, indicateur d'envoi** (audit robustesse lot 3) : « Mon plan » vide propose « Générer mon plan » / « Faire mon bilan » ; onglet Muscu conservé après une séance ; bandeau « N séance(s) en attente d'envoi » alimenté par `QUEUE_CHANGED_EVENT` (distinct de l'événement de vidange). +7 tests.*
 

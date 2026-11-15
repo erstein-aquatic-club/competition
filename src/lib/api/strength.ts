@@ -2,6 +2,7 @@
  * API Strength - Strength training methods
  */
 
+import type { ExerciseUsage, SessionUsage } from "../strength/exerciseArchive";
 import {
   supabase,
   canUseSupabase,
@@ -187,14 +188,78 @@ export async function updateExercise(exercise: Exercise) {
   return { status: "updated" };
 }
 
+/** §394 — la base refuse (FK RESTRICT, mig 00231) de supprimer un exo encore référencé. */
+export class ExerciseInUseError extends Error {
+  constructor() {
+    super("Exercice utilisé : il ne peut pas être supprimé sans effacer cet historique. Archive-le.");
+    this.name = "ExerciseInUseError";
+  }
+}
+
+type CountResult = { count: number | null; error: { message: string } | null };
+
+function countOf(res: CountResult): number {
+  if (res.error) throw new Error(res.error.message);
+  return res.count ?? 0;
+}
+
+/**
+ * §394 (R3) — usages d'un exercice (séances-modèles, séries et 1RM de tous les
+ * nageurs, routines d'échauffement). Lève en cas d'échec : un « 0 usage » sur
+ * erreur réseau autoriserait une suppression destructrice.
+ */
+export async function getExerciseUsage(exerciseId: number): Promise<ExerciseUsage> {
+  if (!canUseSupabase()) throw new Error("Supabase requis");
+  const head = { count: "exact" as const, head: true };
+  const [items, setLogs, oneRms, common, activation] = await Promise.all([
+    supabase.from("strength_session_items").select("session_id").eq("exercise_id", exerciseId),
+    supabase.from("strength_set_logs").select("id", head).eq("exercise_id", exerciseId),
+    supabase.from("one_rm_records").select("id", head).eq("exercise_id", exerciseId),
+    supabase.from("warmup_common_routine").select("exercise_id", head).eq("exercise_id", exerciseId),
+    supabase.from("warmup_activation_routine").select("exercise_id", head).eq("exercise_id", exerciseId),
+  ]);
+  const itemRows = assertSupabase(items) as { session_id: number }[] | null;
+  return {
+    sessions: new Set((itemRows ?? []).map((r) => r.session_id)).size,
+    setLogs: countOf(setLogs as CountResult),
+    oneRms: countOf(oneRms as CountResult),
+    warmups: countOf(common as CountResult) + countOf(activation as CountResult),
+  };
+}
+
+/**
+ * §394 (R3) — archive (ou restaure) un exercice : retiré du catalogue, des
+ * sélecteurs et du moteur de mésocycle ; séries et 1RM conservés.
+ */
+export async function setExerciseArchived(exerciseId: number, archived: boolean): Promise<void> {
+  if (!canUseSupabase()) throw new Error("Supabase requis");
+  const data = assertSupabase(
+    await supabase
+      .from("dim_exercices")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("id", exerciseId)
+      .select("id"),
+  );
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error("Exercice introuvable ou non autorisé : rien n'a été modifié.");
+  }
+}
+
 export async function deleteExercise(exerciseId: number) {
   if (canUseSupabase()) {
-    assertSupabase(
-      await supabase
-        .from("dim_exercices")
-        .delete()
-        .eq("id", exerciseId)
-    );
+    // §394 — RETURNING id (no-op RLS §113) + refus FK (23503) explicite.
+    const { data, error } = await supabase
+      .from("dim_exercices")
+      .delete()
+      .eq("id", exerciseId)
+      .select("id");
+    if (error) {
+      if ((error as { code?: string }).code === "23503") throw new ExerciseInUseError();
+      throw new Error(error.message);
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error("Exercice introuvable ou non autorisé : rien n'a été supprimé.");
+    }
     return { status: "deleted" };
   }
 
@@ -520,14 +585,37 @@ export async function persistStrengthSessionOrder(
   return updateStrengthSession(session);
 }
 
+/**
+ * §394 (O1) — créneaux de planification et cases de plans qui référencent une
+ * séance-modèle : ils sont vidés (FK SET NULL) si on la supprime.
+ */
+export async function getStrengthSessionUsage(sessionId: number): Promise<SessionUsage> {
+  if (!canUseSupabase()) throw new Error("Supabase requis");
+  const head = { count: "exact" as const, head: true };
+  const [slots, overrides, planSessions] = await Promise.all([
+    supabase.from("strength_planning_slots").select("id", head).eq("session_template_id", sessionId),
+    supabase.from("strength_planning_slot_overrides").select("id", head).eq("session_template_id", sessionId),
+    supabase.from("training_plan_sessions").select("id", head).eq("session_template_id", sessionId),
+  ]);
+  return {
+    planningSlots: countOf(slots as CountResult) + countOf(overrides as CountResult),
+    planSessions: countOf(planSessions as CountResult),
+  };
+}
+
 export async function deleteStrengthSession(sessionId: number) {
   if (canUseSupabase()) {
-    assertSupabase(
+    // §394 — RETURNING id : un DELETE refusé par RLS renvoie 0 ligne (§113).
+    const data = assertSupabase(
       await supabase
         .from("strength_sessions")
         .delete()
         .eq("id", sessionId)
+        .select("id"),
     );
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error("Séance introuvable ou non autorisée : rien n'a été supprimé.");
+    }
     return { status: "deleted" };
   }
 

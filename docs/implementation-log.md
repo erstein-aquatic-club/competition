@@ -4,6 +4,30 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §394 — Muscu : plus de suppression destructrice ni de doublon de bilan (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu, 2ᵉ passe (2026-11-15), lot 5 (constats R1, R2, R3, O1 — pertes de données). Branche `fix/muscu-robustesse-lot5`. Décisions : R3 option (a) bloquer + archiver ; R1 correctif client seul.
+
+**Changements.**
+- **R1 — doublon de bilan.** `StartBilanEntry` (`StrengthBilanEntry.tsx`) s'affichait pendant le chargement / en échec réseau du dernier bilan (`data` `undefined`) → un tap créait un 2ᵉ bilan par-dessus celui en cours (aucun index unique). Désormais rien n'est proposé tant que l'état n'est pas confirmé ; la relance est portée par `MesocycleEntry` (même clé de cache, pas de 2ᵉ tuile d'erreur). 4 tests vitest.
+- **R2 — routines d'échauffement écrasées.** `WarmupRoutinesEditor` lisait ses 3 requêtes avec `= []`/`= {}` : en échec, liste vide éditable, et « Enregistrer » REMPLACE la routine (RPC delete+insert). Échec → `QueryErrorState` « Routines indisponibles » + Réessayer (`summarizeLoadFailures`), aucun éditeur. +3 tests vitest.
+- **R3 — suppression d'exercice en cascade.** `strength_session_items` / `strength_set_logs` / `one_rm_records` étaient en `ON DELETE CASCADE` : supprimer un exo du catalogue effaçait séries et 1RM de tous les nageurs, sans avertissement. Désormais :
+  - **mig `00231_exercise_archive_restrict_delete.sql`** : colonne `dim_exercices.archived_at` + les 3 FK en `ON DELETE RESTRICT` (noms résolus dynamiquement). Aucune policy RLS touchée.
+  - API (`strength.ts`) : `getExerciseUsage` (séances distinctes, séries, 1RM, routines — lève sur erreur, jamais « 0 usage » par défaut), `setExerciseArchived`, `deleteExercise` avec `RETURNING id` (§113) et `ExerciseInUseError` sur 23503.
+  - `src/lib/strength/exerciseArchive.ts` (+) : `isExerciseInUse`, `exerciseUsageText`, `sessionUsageText`, `selectableExercises`. `archived_at` lu par `normalizeExercise`/`mapDbExerciseToApi`, jamais écrit par `mapApiExerciseToDb`.
+  - `ConfirmCatalogDeleteDialogs.tsx` (+) : exo utilisé → « Archiver » avec les chiffres ; jamais utilisé → suppression définitive ; usages inconnus → aucune action destructrice + Réessayer.
+  - Archivé = hors listes du catalogue (section repliée « Archivés » + Restaurer), hors sélecteurs (`ExercisePickerDrawer` sauf l'exo déjà choisi, `ExercisePicker` nageur), hors moteur/éditeur d'échauffement (`listCatalogExercisesTagged` filtre `archived_at IS NULL`). Historique/noms intacts (`getExercises` non filtré).
+- **O1 — suppression de séance.** Le dialog annonce les créneaux de planification + cases de plans vidés (`getStrengthSessionUsage`) ; `deleteStrengthSession` en `RETURNING id` (§113) ; `onError` + invalidation planif.
+- `onError` ajouté aux mutations supprimer exercice / séance du catalogue.
+
+**Fichiers.** `supabase/migrations/00231_exercise_archive_restrict_delete.sql` (+), `src/lib/strength/exerciseArchive.ts` (+), `src/components/coach/strength/ConfirmCatalogDeleteDialogs.tsx` (+, 187 l), `src/lib/api/strength.ts`, `src/lib/api/strength-catalog.ts`, `src/lib/api/index.ts`, `src/lib/api/client.ts`, `src/lib/api/helpers.ts`, `src/lib/api/types.ts`, `src/pages/coach/StrengthCatalog.tsx`, `src/components/coach/strength/WarmupRoutinesEditor.tsx`, `src/components/coach/strength/ExercisePickerDrawer.tsx`, `src/components/strength/ExercisePicker.tsx`, `src/components/strength/StrengthBilanEntry.tsx` ; tests : `StrengthBilanEntry.vitest.tsx` (+), `ConfirmCatalogDeleteDialogs.vitest.tsx` (+), `ExercisePicker.vitest.tsx` (+), `WarmupRoutinesEditor.vitest.tsx`, `exerciseArchive.test.ts` (+), `strength-catalog.test.ts` (+), `strength.test.ts`.
+
+**Tests.** `npm test` exit 0 : node:test 1824/1824, vitest 26/26 fichiers (112 tests). tsc 0, lint 0 erreur (43 warnings préexistants, aucun dans les fichiers touchés). RLS non lancé (aucune policy/helper auth modifié ; FK + colonne seulement). Pas de smoke navigateur. `ExercisePickerDrawer` : filtrage couvert via le helper pur, pas de test DOM dédié.
+
+**Migration.** 00231 **appliquée en prod via MCP** (2026-11-15) ; vérifié : `archived_at` (timestamptz) présent, les 3 FK `exercise_id` passées de CASCADE à RESTRICT (les FK des routines d'échauffement restent NO ACTION), 0 exercice archivé. Ordre requis respecté : sans la colonne, `listCatalogExercisesTagged` (`.is('archived_at', null)`) échouerait.
+
+**Limites.** Un exo archivé présent dans une routine d'échauffement est ignoré par le moteur (absent du catalogue taggé). Restent de l'audit : lots 6 (O2-O4), 7 (O5-O8, 🟡5), 8 (🟡).
+
 ## §393 — Muscu : passage de paramètres méso fiable, séries sans doublon, `strength.ts` sans `as any` (2026-11-15)
 
 **Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 4 (constats 9, 10, 11) — fin de l'audit. Branche `fix/muscu-robustesse-lot4` (empilée sur `fix/muscu-robustesse-lot3`, PR #93).

@@ -19,7 +19,7 @@ import { describe, it, before, beforeEach, mock } from "node:test";
 
 type ChainScript = {
   expect?: string;
-  result: { data: unknown; error: null | { message: string; code?: string } };
+  result: { data: unknown; error: null | { message: string; code?: string }; count?: number | null };
 };
 
 const scripts: ChainScript[] = [];
@@ -449,5 +449,117 @@ describe("deleteStrengthFolder — détection du no-op silencieux", () => {
     scripts.push({ expect: "strength_folders", result: { data: null, error: { message: "Connection reset" } } });
     const { deleteStrengthFolder } = await import("../strength.ts");
     await assert.rejects(() => deleteStrengthFolder(5), /Connection reset/);
+  });
+});
+
+// §394 (audit muscu 2ᵉ passe, R3) — un exercice utilisé ne se supprime plus :
+// la suppression effaçait en cascade séries + 1RM de tous les nageurs.
+describe("getExerciseUsage — usages d'un exercice", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+  });
+
+  it("compte séances distinctes, séries, 1RM et routines", async () => {
+    scripts.push(
+      { expect: "strength_session_items", result: { data: [{ session_id: 1 }, { session_id: 1 }, { session_id: 4 }], error: null } },
+      { expect: "strength_set_logs", result: { data: null, error: null, count: 120 } },
+      { expect: "one_rm_records", result: { data: null, error: null, count: 4 } },
+      { expect: "warmup_common_routine", result: { data: null, error: null, count: 1 } },
+      { expect: "warmup_activation_routine", result: { data: null, error: null, count: 0 } },
+    );
+    const { getExerciseUsage } = await import("../strength.ts");
+    assert.deepEqual(await getExerciseUsage(12), { sessions: 2, setLogs: 120, oneRms: 4, warmups: 1 });
+  });
+
+  it("propage une erreur (jamais « 0 usage » sur un échec)", async () => {
+    scripts.push(
+      { expect: "strength_session_items", result: { data: [], error: null } },
+      { expect: "strength_set_logs", result: { data: null, error: { message: "Failed to fetch" } } },
+      { expect: "one_rm_records", result: { data: null, error: null, count: 0 } },
+      { expect: "warmup_common_routine", result: { data: null, error: null, count: 0 } },
+      { expect: "warmup_activation_routine", result: { data: null, error: null, count: 0 } },
+    );
+    const { getExerciseUsage } = await import("../strength.ts");
+    await assert.rejects(() => getExerciseUsage(12), /Failed to fetch/);
+  });
+});
+
+describe("deleteExercise — no-op §113 et refus FK", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+  });
+
+  it("0 ligne supprimée → rejet", async () => {
+    scripts.push({ expect: "dim_exercices", result: { data: [], error: null } });
+    const { deleteExercise } = await import("../strength.ts");
+    await assert.rejects(() => deleteExercise(12), /introuvable ou non autorisé/);
+  });
+
+  it("violation de FK (23503) → ExerciseInUseError", async () => {
+    scripts.push({
+      expect: "dim_exercices",
+      result: { data: null, error: { message: "violates foreign key constraint", code: "23503" } },
+    });
+    const { deleteExercise, ExerciseInUseError } = await import("../strength.ts");
+    await assert.rejects(() => deleteExercise(12), (err: unknown) => err instanceof ExerciseInUseError);
+  });
+
+  it("ligne supprimée → ok", async () => {
+    scripts.push({ expect: "dim_exercices", result: { data: [{ id: 12 }], error: null } });
+    const { deleteExercise } = await import("../strength.ts");
+    assert.deepEqual(await deleteExercise(12), { status: "deleted" });
+  });
+});
+
+describe("setExerciseArchived", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+    updatedPayloads.length = 0;
+  });
+
+  it("archive (date) puis restaure (null)", async () => {
+    scripts.push(
+      { expect: "dim_exercices", result: { data: [{ id: 12 }], error: null } },
+      { expect: "dim_exercices", result: { data: [{ id: 12 }], error: null } },
+    );
+    const { setExerciseArchived } = await import("../strength.ts");
+    await setExerciseArchived(12, true);
+    await setExerciseArchived(12, false);
+    const [archived, restored] = updatedPayloads as { archived_at: string | null }[];
+    assert.equal(typeof archived.archived_at, "string");
+    assert.equal(restored.archived_at, null);
+  });
+
+  it("0 ligne → rejet (§113)", async () => {
+    scripts.push({ expect: "dim_exercices", result: { data: [], error: null } });
+    const { setExerciseArchived } = await import("../strength.ts");
+    await assert.rejects(() => setExerciseArchived(12, true), /introuvable ou non autorisé/);
+  });
+});
+
+// §394 (O1) — supprimer une séance vide en silence les créneaux qui la référencent.
+describe("getStrengthSessionUsage + deleteStrengthSession", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+  });
+
+  it("additionne créneaux groupe + surcharges, et cases de plans", async () => {
+    scripts.push(
+      { expect: "strength_planning_slots", result: { data: null, error: null, count: 2 } },
+      { expect: "strength_planning_slot_overrides", result: { data: null, error: null, count: 3 } },
+      { expect: "training_plan_sessions", result: { data: null, error: null, count: 1 } },
+    );
+    const { getStrengthSessionUsage } = await import("../strength.ts");
+    assert.deepEqual(await getStrengthSessionUsage(8), { planningSlots: 5, planSessions: 1 });
+  });
+
+  it("deleteStrengthSession : 0 ligne → rejet (§113)", async () => {
+    scripts.push({ expect: "strength_sessions", result: { data: [], error: null } });
+    const { deleteStrengthSession } = await import("../strength.ts");
+    await assert.rejects(() => deleteStrengthSession(8), /introuvable ou non autorisé/);
   });
 });

@@ -148,6 +148,12 @@ export function StartBilanEntry({ userId }: { userId: number | null }) {
   // Rien à amorcer si un bilan est déjà en cours : seul un état vide ou un
   // bilan `completed` propose un nouveau départ.
   if (userId == null) return null;
+  // §394 (R1) — `undefined` = état du dernier bilan INCONNU (chargement en cours
+  // ou échec réseau ; `getLatestAssessment` renvoie `null` quand il n'y en a
+  // aucun). Avant : la tuile s'affichait dans ce cas → un tap créait un 2ᵉ bilan
+  // par-dessus celui en cours (aucun index unique en base). La relance en cas
+  // d'échec est portée par `MesocycleEntry` (même clé de cache).
+  if (assessment === undefined) return null;
   if (assessment && assessment.status !== "completed") return null;
 
   const pending = startMutation.isPending;
