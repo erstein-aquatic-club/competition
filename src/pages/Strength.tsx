@@ -41,7 +41,8 @@ import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/components/strength/StrengthBilanEntry";
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { enqueue, isTransientError } from "@/lib/offlineQueue";
+import { enqueue, isTransientError, tryWithOfflineQueue, isOfflineQueuedResult } from "@/lib/offlineQueue";
+import { isOneRmEligible } from "@/lib/strength/oneRmCalibration";
 import { startStrengthRunLocally, saveStrengthRun, markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { clearDraft } from "@/lib/unsavedDraftStore";
 
@@ -633,49 +634,55 @@ export default function Strength() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLaunchKey, activeSession, screenMode, activeFilteredItems.length]);
 
-  // §297 — Callbacks pour l'estimation 1RM inline depuis le WorkoutRunner.
+  // Calibration explicite ou saisie manuelle — même file offline que Mes Records.
+  // On ne déclenche jamais un recalcul à l'arrivée d'une requête 1RM tardive.
   const handleRequestRecalc = useCallback((exerciseId: number) => {
-    setInlineEstimationExercises((prev) => {
-      const next = new Set(prev);
-      next.add(exerciseId);
-      return next;
-    });
-    toast("Mode estimation activé", {
-      description: "Renseigne ta série de travail (charge + reps en réserve) pour recalculer ta 1RM.",
-    });
+    setInlineEstimationExercises((prev) => new Set(prev).add(exerciseId));
+    toast("Estimation activée", { description: "Renseigne la charge, les reps et les reps en réserve." });
   }, []);
 
-  const handleEstimationComplete = useCallback(
-    async (exerciseId: number, estimatedOneRm: number) => {
-      if (!userId) return;
-      // R2 — borné : évite l'UI figée si le réseau traîne pendant l'estimation.
-      await withTimeout(
-        update1RM({
-          athlete_id: userId,
-          exercise_id: exerciseId,
-          one_rm: estimatedOneRm,
-        }),
-        8000,
-        "update-1rm",
+  const persistOneRm = useCallback(
+    async (exerciseId: number, value: number, manual: boolean) => {
+      if (!userId || !Number.isFinite(value) || value <= 0) {
+        throw new Error("Invalid 1RM or athlete");
+      }
+      const payload = { athlete_id: userId, athlete_name: user, exercise_id: exerciseId, one_rm: value };
+      const result = await tryWithOfflineQueue(
+        "record-1rm-update",
+        payload as Record<string, unknown>,
+        () => withTimeout(update1RM(payload), 8000, "update-1rm"),
+        `1rm:${userId}:${exerciseId}:${value}`,
       );
-      // §369 — PAS d'invalidation de ["1rm"] ici (cause #3 de l'incident §368).
-      // En séance, les charges cibles sont pilotées par la map locale `runOneRms`
-      // du WorkoutRunner ; invalider ["1rm"] mid-séance force un re-render parent
-      // + l'effet de réconciliation du runner (`resolveNextStep`), soupçonné de
-      // provoquer les resets de position / « boucles ». La 1RM fraîche est
-      // re-lue naturellement au rechargement de l'écran muscu, hors séance active.
+      // Optimistic cache (not invalidateQueries mid-Focus): known max immediately
+      // available after manual entry even if server is slow/offline.
+      queryClient.setQueryData<OneRmEntry[]>(["1rm", user, userId], (previous) => {
+        const entries = Array.isArray(previous) ? previous : [];
+        return [
+          ...entries.filter((r) => r.exercise_id !== exerciseId),
+          { ...entries.find((r) => r.exercise_id === exerciseId), exercise_id: exerciseId, weight: value } as OneRmEntry,
+        ];
+      });
       setInlineEstimationExercises((prev) => {
         const next = new Set(prev);
         next.delete(exerciseId);
         return next;
       });
-      // §373 (F3) — feedback explicite : le bénéfice de la calibration est
-      // surtout pour la suite (les prochaines séances se calent sur ce max).
-      toast(`🎯 1RM estimé : ${estimatedOneRm} kg`, {
-        description: "Tes prochaines séances seront calées sur ce max.",
-      });
+      if (isOfflineQueuedResult(result)) {
+        toast("1RM conservée hors ligne", { description: "Synchronisation au retour du réseau." });
+      } else if (!manual) {
+        toast(`1RM estimée : ${value} kg`, { description: "Référence enregistrée pour les prochaines séances." });
+      }
     },
-    [userId],
+    [userId, user, queryClient],
+  );
+
+  const handleEstimationComplete = useCallback(
+    (exerciseId: number, estimatedOneRm: number) => persistOneRm(exerciseId, estimatedOneRm, false),
+    [persistOneRm],
+  );
+  const handleManualOneRm = useCallback(
+    (exerciseId: number, oneRm: number) => persistOneRm(exerciseId, oneRm, true),
+    [persistOneRm],
   );
 
   const handleLaunchFocus = async () => {
@@ -871,6 +878,8 @@ export default function Strength() {
               session={activeSession}
               exercises={exercises}
               oneRMs={oneRMs || []}
+              oneRmsReady={Array.isArray(oneRMs)}
+              onManualOneRm={handleManualOneRm}
               exerciseNotes={exerciseNotes}
               onUpdateNote={(exerciseId, note) => updateNote.mutate({ exercise_id: exerciseId, notes: note })}
               initialLogs={activeRunLogs}
@@ -914,9 +923,7 @@ export default function Strength() {
                         athlete_id: userId ?? null,
                         athlete_name: user ?? null,
                         // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
-                        skip_one_rm:
-                          (exerciseLookup.get(log.exercise_id)?.intensity_metric ?? "weight_kg") !==
-                          "weight_kg",
+                        skip_one_rm: !isOneRmEligible(exerciseLookup.get(log.exercise_id)),
                       } as Record<string, unknown>);
                     } catch {
                       quotaErrored = true;
@@ -943,9 +950,7 @@ export default function Strength() {
                     athlete_id: userId ?? null,
                     athlete_name: user ?? null,
                     // §298 — métriques non-poids : pas d'estimation 1RM côté serveur
-                    skip_one_rm:
-                      (exerciseLookup.get(log.exercise_id)?.intensity_metric ?? "weight_kg") !==
-                      "weight_kg",
+                    skip_one_rm: !isOneRmEligible(exerciseLookup.get(log.exercise_id)),
                   };
                   logStrengthSet.mutate(payload, {
                     onError: () => {
