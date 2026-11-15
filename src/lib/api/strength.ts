@@ -47,6 +47,7 @@ import {
 import { localStorageGet, localStorageSave } from './localStorage';
 import { reconcileMesocyclePayloads } from '../strength/mesocycleItemPayload';
 import { getMissingStrengthLogs } from '../strength/reconcileStrengthLogs';
+import { isOneRmEligible } from '../strength/oneRmCalibration';
 
 /** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
  *  ou métrique d'intensité non-poids (skip flag armé par le caller). */
@@ -54,29 +55,20 @@ export function shouldSkipOneRm(weight: number | null | undefined, skipFlag?: bo
   return isBodyweight(weight) || skipFlag === true;
 }
 
-/** §298 — Set des exercise_ids dont la métrique n'est PAS weight_kg (hauteur/
- *  distance/temps), donc non éligibles à l'estimation 1RM. Lit le catalogue
- *  (cache localStorage/mémoire via getExercises). Utilisé par les chemins de
- *  récupération (reconcile, fin de séance, replay offline) où le flag
- *  `skip_one_rm` par-log n'est pas disponible — sinon un Box Jump re-loggé
- *  créerait un 1RM fantôme. Renvoie un Set vide en cas d'échec (dégradation
- *  gracieuse : on ne bloque pas la sauvegarde des séries). */
-export async function getNonWeightExerciseIds(): Promise<Set<number>> {
+/** Ineligible exercises for all automatic 1RM calculations.
+ * A missing/old catalogue fails CLOSED: we skip estimates for unknown exercise IDs,
+ * while letting workout logs save normally. Pass candidate IDs in replay paths. */
+export async function getNonWeightExerciseIds(candidateIds: Iterable<number> = []): Promise<Set<number>> {
+  const candidates = Array.from(candidateIds);
   try {
-    // §177/§298 — borne le fetch catalogue. Ce helper tourne sur les chemins de
-    // récupération (reconcile fin de séance, replay offline, fallback save) que
-    // §177 a durcis contre les hangs réseau. Sans withTimeout, un getExercises()
-    // qui traîne bloquerait reconcile indéfiniment (régression du durcissement).
-    // Timeout/erreur → catch → Set vide (skip_one_rm = false, comportement
-    // pré-§298 : au pire un 1RM est estimé, jamais un blocage de la sauvegarde).
     const exercises = await withTimeout(getExercises(), 10_000, "catalog-metric");
-    return new Set(
-      exercises
-        .filter((e) => (e.intensity_metric ?? "weight_kg") !== "weight_kg")
-        .map((e) => e.id),
-    );
+    const eligibleIds = new Set(exercises.filter(isOneRmEligible).map((e) => e.id));
+    const ineligible = new Set(exercises.filter((e) => !isOneRmEligible(e)).map((e) => e.id));
+    for (const id of candidates) if (!eligibleIds.has(id)) ineligible.add(id);
+    return ineligible;
   } catch {
-    return new Set();
+    // Never convert unknown heights, plank seconds or jumps into kilograms.
+    return new Set(candidates);
   }
 }
 
@@ -606,12 +598,18 @@ export async function logStrengthSet(payload: {
    *  la valeur loggée dans `weight` n'est pas une charge → pas d'estimation 1RM. */
   skip_one_rm?: boolean;
 }) {
+  const cachedCatalogue = (localStorageGet(STORAGE_KEYS.EXERCISES) || []) as Exercise[];
+  const knownEligible = Array.isArray(cachedCatalogue) &&
+    cachedCatalogue.some((exercise) =>
+      exercise.id === payload.exercise_id && isOneRmEligible(exercise)
+    );
+  const skipOneRm = payload.skip_one_rm === true || !knownEligible;
   const maybeUpdateOneRm = async (context?: {
     athleteId?: number | string | null;
     athleteName?: string | null;
   }) => {
     // Skip 1RM estimation for bodyweight sets ou métriques non-poids (§298)
-    if (shouldSkipOneRm(payload.weight, payload.skip_one_rm)) return null;
+    if (shouldSkipOneRm(payload.weight, skipOneRm)) return null;
     const estimate = estimateOneRm(Number(payload.weight), Number(payload.reps));
     if (!estimate) return null;
     const athleteId = context?.athleteId ?? null;
@@ -689,7 +687,7 @@ export async function logStrengthSet(payload: {
     // it beats the existing record. Bodyweight sets ou métriques non-poids
     // (§298) skip 1RM estimation.
     const oneRmEstimate =
-      shouldSkipOneRm(payload.weight, payload.skip_one_rm)
+      shouldSkipOneRm(payload.weight, skipOneRm)
         ? null
         : estimateOneRm(Number(payload.weight), Number(payload.reps));
 
@@ -797,7 +795,7 @@ export async function reconcileStrengthRunLogs(params: {
   const errors: ReconcileStrengthSetError[] = [];
   // §298 — un re-log doit hériter du gating 1RM : pour les exos à métrique
   // non-poids, armer skip_one_rm (sinon estimateOneRm produit un 1RM fantôme).
-  const nonWeightIds = await getNonWeightExerciseIds();
+  const nonWeightIds = await getNonWeightExerciseIds(missing.map(({ log }) => log.exercise_id));
   // Run all missing-set inserts in parallel and enforce a global 30 s budget.
   // Sequential fire-and-forget could take 200 s+ (20 sets × 10 s each);
   // the allSettled wrapper ensures we wait for all slots but a hung network
@@ -946,7 +944,7 @@ export async function saveStrengthRun(run: any) {
     // §298 — exclure les exos à métrique non-poids (pas de 1RM sur cm/s).
     const estimatedRecords = collectEstimated1RMs(
       rawLogs,
-      await getNonWeightExerciseIds(),
+      await getNonWeightExerciseIds(rawLogs.map((log) => Number(log.exercise_id))),
     );
     const oneRmEstimates = Array.from(estimatedRecords.entries()).map(
       ([exerciseId, weight]) => ({
@@ -1023,7 +1021,7 @@ export async function saveStrengthRun(run: any) {
   }
   const estimatedRecords = collectEstimated1RMs(
     Array.isArray(run.logs) ? run.logs : [],
-    await getNonWeightExerciseIds(),
+    await getNonWeightExerciseIds((Array.isArray(run.logs) ? run.logs : []).map((log) => Number(log.exercise_id))),
   );
   if (estimatedRecords.size > 0) {
     const athleteId = run.athlete_id ?? null;
