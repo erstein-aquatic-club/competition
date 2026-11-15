@@ -108,10 +108,25 @@ const PROFILE_50_SEASON: DistanceProfile = {
   max_week_count: 9,
 };
 
+// §396 (O6) — requêtes en échec, pilotables par test.
+const failing = new Set<string>();
+function failIf(key: string) {
+  if (failing.has(key)) throw new Error("Failed to fetch");
+}
+
 vi.mock("@/lib/api", () => ({
-  getActiveMesocycle: vi.fn(async () => mockMeso),
-  getStrokeSignatures: vi.fn(async () => [FREESTYLE_SIGNATURE]),
-  getDistanceProfiles: vi.fn(async () => [PROFILE_50_SEASON]),
+  getActiveMesocycle: vi.fn(async () => {
+    failIf("meso");
+    return mockMeso;
+  }),
+  getStrokeSignatures: vi.fn(async () => {
+    failIf("signatures");
+    return [FREESTYLE_SIGNATURE];
+  }),
+  getDistanceProfiles: vi.fn(async () => {
+    failIf("profiles");
+    return [PROFILE_50_SEASON];
+  }),
   getLatestAssessment: vi.fn(async () => ({ updated_at: "2026-05-01T10:00:00Z" })),
   getAthletes: vi.fn(async () => [{ id: 18, display_name: "Nageur Test" }]),
   // PUR (aucun I/O dans l'original) : on reproduit la vraie logique avec le vrai
@@ -179,6 +194,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  failing.clear();
   navigateSpy.mockClear();
   setMockMeso(null);
   setMockRole("coach");
@@ -310,4 +326,24 @@ describe("MesocycleAdjust — composant", () => {
     const apercu = screen.getByRole("button", { name: /Aperçu/i });
     expect(apercu).toHaveProperty("disabled", true);
   });
+});
+
+// §396 (audit muscu 2ᵉ passe, O6) — un échec réseau s'affichait « Aucun
+// mésocycle actif » ou « Impossible de dériver le template ».
+describe("MesocycleAdjust — échecs de chargement", () => {
+  it.each([["meso"], ["signatures"], ["profiles"]])(
+    "échec %s → « Données indisponibles » + Réessayer, jamais un état métier",
+    async (key) => {
+      setMockMeso(makeMeso(new Date().toISOString()));
+      failing.add(key);
+      renderPage();
+      expect(await screen.findByText("Données indisponibles")).toBeTruthy();
+      expect(screen.queryByText(/Aucun mésocycle actif/)).toBeNull();
+      expect(screen.queryByText(/Impossible de dériver le template/)).toBeNull();
+
+      failing.clear();
+      fireEvent.click(screen.getByRole("button", { name: /Réessayer/ }));
+      expect(await screen.findByDisplayValue(nextMonday())).toBeTruthy();
+    },
+  );
 });

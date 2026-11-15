@@ -9,6 +9,8 @@
  *
  * Design : docs/plans/2026-05-28-mesocycle-adjust-design.md
  */
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -152,27 +154,34 @@ export default function MesocycleAdjust() {
   const athleteId = params?.athleteId ? Number(params.athleteId) : null;
 
   // ── Fetches ───────────────────────────────────────────────────────────────
-  const {
-    data: meso,
-    isLoading: mesoLoading,
-    isError: mesoError,
-  } = useQuery({
+  const mesoQ = useQuery({
     queryKey: ["strength-mesocycle-active", athleteId],
     queryFn: () => getActiveMesocycle(athleteId!),
     enabled: athleteId != null,
   });
+  const { data: meso, isLoading: mesoLoading } = mesoQ;
 
-  const { data: signatures = [], isLoading: signaturesLoading } = useQuery({
+  const signaturesQ = useQuery({
     queryKey: ["strength-stroke-signatures"],
     queryFn: () => getStrokeSignatures(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: signatures = [], isLoading: signaturesLoading } = signaturesQ;
 
-  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+  const profilesQ = useQuery({
     queryKey: ["strength-distance-profiles"],
     queryFn: () => getDistanceProfiles(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: profiles = [], isLoading: profilesLoading } = profilesQ;
+
+  // §396 (O6) — un échec réseau ne doit plus se lire « Aucun mésocycle actif »
+  // ni « Impossible de dériver le template ».
+  const loadFailures = summarizeLoadFailures([
+    ["le mésocycle actif", mesoQ],
+    ["les signatures de nage", signaturesQ],
+    ["les profils de distance", profilesQ],
+  ]);
 
   const { data: assessment } = useQuery({
     queryKey: ["strength-assessment-latest", athleteId],
@@ -352,7 +361,16 @@ export default function MesocycleAdjust() {
         Chargement…
       </div>
     );
-  } else if (mesoError || !meso) {
+  } else if (loadFailures.hasFailure) {
+    body = (
+      <QueryErrorState
+        title="Données indisponibles"
+        description={`Chargement impossible : ${loadFailures.failedText}. Le plan du nageur n'est pas modifié. Vérifie ta connexion, puis réessaie.`}
+        onRetry={loadFailures.retry}
+        isRetrying={loadFailures.isRetrying}
+      />
+    );
+  } else if (!meso) {
     body = (
       <EmptyState
         message="Aucun mésocycle actif pour ce nageur."

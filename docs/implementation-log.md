@@ -4,6 +4,26 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §396 — Muscu : plus de liste vide muette quand un chargement échoue (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu, 2ᵉ passe (2026-11-15), lot 7 (constats O5, O6, O7, O8, 🟡5). Branche `fix/muscu-robustesse-lot7`. Même pattern partout : `summarizeLoadFailures` + `QueryErrorState` (Réessayer ne relance que les requêtes en échec), état vide affiché seulement quand les données sont réellement connues.
+
+**Changements.**
+- **O5 — historique nageur.** `HistoryTable` : squelette pendant le chargement (« Aucun historique » ne s'affiche plus pendant le chargement), `QueryErrorState` « Historique indisponible » en échec.
+- **O6 — ajustement mid-cycle.** `MesocycleAdjust` : méso / signatures de nage / profils de distance en échec → « Données indisponibles » + Réessayer (avant : faux « aucun mésocycle actif », ou un aperçu calculé sur des données partielles).
+- **O7 — listes coach.** `CoachMesocyclesAccordion` (« Mésocycles indisponibles »), `StrengthAttendanceBoard` (« Assiduité indisponible »), `TrainingPlansList` (« Plans indisponibles »), `AthletePlansTab` :
+  - vue détail : « Plan indisponible », EmptyState seulement si les dossiers sont chargés, « Ajouter un cycle » désactivé tant que les dossiers ne sont pas connus (évite de créer à l'aveugle) ;
+  - vue liste : bandeau compact, « — » au lieu de « Aucun plan » par nageur.
+  - `CoachMesocyclePanel` : « Mésocycle indisponible » en échec (avant : « aucun mésocycle » trompeur).
+- **🟡5 — panneau méso vide actionnable.** `CoachMesocyclePanel` sans méso actif : bouton « Générer un mésocycle » → `/coach/mesocycle-generate/:athleteId`.
+- **O8 — accueil séances nageur.** `SessionBrowser` : assignations / catalogue / séance en cours en échec → bandeau compact « Séances indisponibles » (avant : liste vide et carte « Reprendre » disparue sans explication). Hooks calculés avant l'early return `isLoading` (#310).
+
+**Fichiers modifiés.** `src/components/strength/HistoryTable.tsx`, `src/components/strength/SessionBrowser.tsx`, `src/pages/MesocycleAdjust.tsx`, `src/components/coach/CoachMesocyclePanel.tsx`, `src/components/coach/strength/{AthletePlansTab,CoachMesocyclesAccordion,StrengthAttendanceBoard,TrainingPlansBrowser}.tsx` ; tests : `HistoryTable.vitest.tsx` (+), `SessionBrowser.vitest.tsx` (+), `coachStrengthLists.vitest.tsx` (+, 7 tests), `MesocycleAdjust.vitest.tsx` (+3 cas d'échec).
+
+**Tests.** `npm test` exit 0 : node:test 1834/1834, vitest 30/30 fichiers (129 tests). tsc 0, lint 0 erreur (43 warnings préexistants, aucun dans les fichiers touchés). RLS non lancé (UI seule, aucune requête/policy modifiée). Pas de smoke navigateur.
+
+**Limites.** Les échecs de *refetch* (données en cache déjà présentes) restent silencieux, par choix : la donnée affichée reste valide. Reste de l'audit : lot 8 (🟡 : offset semaine aperçu, verrou double-tap « Terminer », reset assignation après suppression de run, hook mort, faux succès échauffement hors-ligne).
+
 ## §395 — Muscu : les échecs de mutation s'affichent enfin, plus de succès fantôme, retrait de plan confirmé (2026-11-15)
 
 **Contexte.** Audit robustesse & UX muscu, 2ᵉ passe (2026-11-15), lot 6 (constats O2, O3, O4). Branche `fix/muscu-robustesse-lot6`.

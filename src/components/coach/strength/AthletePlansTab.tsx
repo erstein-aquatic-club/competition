@@ -37,6 +37,8 @@ import { CopyToAthleteDialog } from "./CopyToAthleteDialog";
 import { ConfirmFolderDeleteDialog } from "./ConfirmFolderDeleteDialog";
 import { AddSessionSheet } from "./AddSessionSheet";
 import { cn } from "@/lib/utils";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 /* ---------- colour palette for cycle left borders ---------- */
@@ -107,10 +109,11 @@ export function AthletePlansTab({
   const debouncedAthleteSearch = useDebouncedValue(athleteSearch, 200);
 
   /* Count sessions per athlete across all their folders */
-  const { data: allFolders = [] } = useQuery({
+  const allFoldersQ = useQuery({
     queryKey: ["strength_folders", "session", "all_athletes"],
     queryFn: () => getStrengthFolders("session"),
   });
+  const { data: allFolders = [] } = allFoldersQ;
 
   const athleteFolderIds = useMemo(() => {
     // Build root-to-athlete mapping
@@ -131,10 +134,16 @@ export function AthletePlansTab({
     return map;
   }, [allFolders]);
 
-  const { data: allSessions = [] } = useQuery({
+  const allSessionsQ = useQuery({
     queryKey: ["strength_catalog"],
     queryFn: () => getStrengthSessions(),
   });
+  const { data: allSessions = [] } = allSessionsQ;
+  // §396 (O7) — échec réseau ≠ « Aucun plan » sous chaque nageur.
+  const listFailures = summarizeLoadFailures([
+    ["les plans", allFoldersQ],
+    ["les séances", allSessionsQ],
+  ]);
 
   const sessionCountByAthlete = useMemo(() => {
     const map = new Map<number, number>();
@@ -194,6 +203,16 @@ export function AthletePlansTab({
         </div>
       </div>
 
+      {listFailures.hasFailure && (
+        <QueryErrorState
+          compact
+          title="Plans indisponibles"
+          description={`Chargement impossible : ${listFailures.failedText}. Vérifie ta connexion, puis réessaie.`}
+          onRetry={listFailures.retry}
+          isRetrying={listFailures.isRetrying}
+        />
+      )}
+
       {/* Athlete grid */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
@@ -225,6 +244,8 @@ export function AthletePlansTab({
                   <span className="text-xs text-muted-foreground">
                     {count} séance{count > 1 ? "s" : ""}
                   </span>
+                ) : listFailures.hasFailure ? (
+                  <span className="text-xs text-muted-foreground/60">—</span>
                 ) : athleteFolderIds.has(athlete.id!) ? (
                   <span className="text-xs text-muted-foreground/60">Plan vide</span>
                 ) : (
@@ -264,15 +285,26 @@ function AthletePlanDetail({
   const queryClient = useQueryClient();
 
   /* ----- queries ----- */
-  const { data: sessionFolders = [] } = useQuery({
+  const foldersQ = useQuery({
     queryKey: ["strength_folders", "session", athleteId],
     queryFn: () => getStrengthFolders("session", { athleteId }),
   });
+  const { data: sessionFolders = [] } = foldersQ;
 
-  const { data: allSessions = [] } = useQuery({
+  const sessionsQ = useQuery({
     queryKey: ["strength_catalog"],
     queryFn: () => getStrengthSessions(),
   });
+  const { data: allSessions = [] } = sessionsQ;
+
+  // §396 (O7) — « Aucun plan pour ce nageur » + « Créer » ne s'affichent que sur
+  // une liste CONFIRMÉE vide : sur un chargement / échec, ils créaient un plan en
+  // doublon de celui existant.
+  const foldersKnown = foldersQ.isSuccess;
+  const loadFailures = summarizeLoadFailures([
+    ["ses cycles", foldersQ],
+    ["les séances", sessionsQ],
+  ]);
 
   const rootFolders = useMemo(
     () => sessionFolders.filter((f) => !f.parent_id),
@@ -454,6 +486,7 @@ function AthletePlanDetail({
         <Button
           variant="outline"
           size="default"
+          disabled={!foldersKnown}
           onClick={() => {
             if (rootFolders.length > 0) {
               createFolder.mutate({
@@ -490,8 +523,17 @@ function AthletePlanDetail({
         )}
       </div>
 
+      {loadFailures.hasFailure && (
+        <QueryErrorState
+          title="Plan indisponible"
+          description={`Chargement impossible : ${loadFailures.failedText}. Le plan de ${athleteName} n'est pas perdu : vérifie ta connexion, puis réessaie.`}
+          onRetry={loadFailures.retry}
+          isRetrying={loadFailures.isRetrying}
+        />
+      )}
+
       {/* No plan state */}
-      {rootFolders.length === 0 && (
+      {foldersKnown && !loadFailures.hasFailure && rootFolders.length === 0 && (
         <EmptyState
           compact
           icon={<Dumbbell />}
