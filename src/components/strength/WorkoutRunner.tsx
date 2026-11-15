@@ -1410,11 +1410,9 @@ export function WorkoutRunner({
       {showCalibration && (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
-            {hasOneRmForCurrent ? "Pour recalculer, prends une charge que tu peux faire " : "On ne connaît pas encore ton max. Prends une charge que tu peux faire "}
-            {" "}
-            {currentBlock?.reps ? `~${currentBlock.reps} reps` : "tes reps"} en
-            gardant 2-3 reps en réserve (sans aller à l'échec). Dans le doute,
-            commence léger — tu ajusteras aux séries suivantes.
+            {hasOneRmForCurrent ? "Recalcul facultatif : " : "Estimation facultative : "}
+            réalise {currentBlock?.reps ? `~${currentBlock.reps} reps` : "tes reps"} à
+            charge contrôlée, en gardant 2-3 reps possibles. Pas d'échec.
           </p>
           <div className="mt-3 flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80 dark:text-amber-200/80">
@@ -1451,7 +1449,7 @@ export function WorkoutRunner({
         <div className="rounded-xl border bg-muted/10 px-3 py-2 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">
-              {hasOneRmForCurrent ? `1RM : ${runOneRms.get(currentBlock.exercise_id) ?? oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight} kg` : "1RM non renseignée"}
+              {hasOneRmForCurrent ? `1RM : ${runOneRms.get(currentBlock.exercise_id) ?? oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight} kg` : (oneRmsReady ? "1RM non renseignée" : "1RM non vérifiée") }
             </span>
             {onManualOneRm && (
               <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-xs"
@@ -1653,7 +1651,7 @@ export function WorkoutRunner({
             onClick={() => onRequestRecalc(currentBlock.exercise_id)}
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-            Recalculer ma 1RM
+            {hasOneRmForCurrent ? "Recalculer ma 1RM" : "Renseigner ma 1RM"}
           </Button>
         )}
       <Button
