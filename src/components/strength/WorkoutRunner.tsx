@@ -1447,7 +1447,7 @@ export function WorkoutRunner({
         </div>
       )}
 
-      {canUseOneRm && currentBlock && (oneRmsReady || hasOneRmForCurrent) && (hasPercent || hasOneRmForCurrent) && (
+      {canUseOneRm && currentBlock && (oneRmsReady || hasOneRmForCurrent || showCalibration) && (hasPercent || hasOneRmForCurrent || showCalibration) && (
         <div className="rounded-xl border bg-muted/10 px-3 py-2 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">
