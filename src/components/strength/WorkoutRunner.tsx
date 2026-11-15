@@ -44,7 +44,7 @@ import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensit
 import type { SetLogEntry, OneRmEntry, WorkoutFinishData, SetInputValues } from "@/lib/types";
 import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
-import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
+import { isOneRmEligible, needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { formatPrep, formatWork, formatSetTarget, formatRest, itemPrescription } from "@/lib/strength/prescriptionDisplay";
@@ -193,6 +193,8 @@ export function WorkoutRunner({
   inlineEstimationExercises,
   onRequestRecalc,
   onEstimationComplete,
+  onManualOneRm,
+  oneRmsReady = true,
 }: {
   session: StrengthSessionTemplate;
   exercises: Exercise[];
@@ -223,6 +225,9 @@ export function WorkoutRunner({
   inlineEstimationExercises?: Set<number>;
   onRequestRecalc?: (exerciseId: number) => void;
   onEstimationComplete?: (exerciseId: number, estimatedOneRm: number) => Promise<void>;
+  onManualOneRm?: (exerciseId: number, oneRm: number) => Promise<void>;
+  /** False while a remote 1RM lookup is pending or failed: never assume "missing". */
+  oneRmsReady?: boolean;
 }) {
   const isLoggingRef = useRef(false);
 
@@ -293,6 +298,10 @@ export function WorkoutRunner({
   // après un early return.
   const [runOneRms, setRunOneRms] = useState<Map<number, number>>(new Map());
   const [calibRir, setCalibRir] = useState<number>(2);
+  const [skippedCalibrations, setSkippedCalibrations] = useState<Set<number>>(new Set());
+  const [manualOneRmOpen, setManualOneRmOpen] = useState(false);
+  const [manualOneRmDraft, setManualOneRmDraft] = useState("");
+  const [savingManualOneRm, setSavingManualOneRm] = useState(false);
 
   // Inline note state (refs only - effects defined after currentBlock)
   const [localNote, setLocalNote] = useState("");
@@ -388,11 +397,14 @@ export function WorkoutRunner({
   const metric = (currentExerciseDef?.intensity_metric ?? "weight_kg") as IntensityMetric;
   const metricCfg = INTENSITY_METRICS[metric];
   const tracksWeight = metric === "weight_kg";
+  const canUseOneRm = isOneRmEligible(currentExerciseDef) && !isIsometricPrescription;
 
   // §369 — reset du RIR de calibration au défaut (2) à chaque changement
   // d'exercice (l'ancien reset de `warmupHistory` du ramp-up §297 vivait ici).
   useEffect(() => {
     setCalibRir(2);
+    setManualOneRmOpen(false);
+    setManualOneRmDraft("");
   }, [currentBlock?.exercise_id]);
   const nextBlock = currentStep < workoutPlan.length ? workoutPlan[currentStep] : null;
   const nextExerciseDef = nextBlock
@@ -447,11 +459,16 @@ export function WorkoutRunner({
       metric,
       isBodyweight: isBodyweightExercise,
       hasOneRm: hasOneRmForCurrent,
+      oneRmEligible: canUseOneRm && oneRmsReady &&
+        !skippedCalibrations.has(currentBlock.exercise_id),
     });
   const showCalibration =
-    currentSetIndex === 1 &&
-    !isBodyweightExercise &&
-    tracksWeight &&
+    canUseOneRm &&
+    !skippedCalibrations.has(currentBlock?.exercise_id ?? -1) &&
+    !logs.some((log) =>
+      log.exercise_id === currentBlock?.exercise_id &&
+      resolveSetNumber(log, 1) === currentSetIndex
+    ) &&
     (needsCalibration ||
       (inlineEstimationExercises?.has(currentBlock?.exercise_id ?? -1) ?? false));
   const targetWeight = hasPercent ? Math.round(rm * (percentValue / 100)) : 0;
@@ -798,6 +815,27 @@ export function WorkoutRunner({
     }
   };
 
+  const saveManualOneRm = async () => {
+    if (!currentBlock || !canUseOneRm || !onManualOneRm || savingManualOneRm) return;
+    const value = Number(manualOneRmDraft.trim().replace(",", "."));
+    if (!Number.isFinite(value) || value <= 0 || value > 1000) {
+      toast.error("1RM invalide", { description: "Saisis une charge entre 0 et 1 000 kg." });
+      return;
+    }
+    setSavingManualOneRm(true);
+    try {
+      await onManualOneRm(currentBlock.exercise_id, value);
+      setRunOneRms((prev) => new Map(prev).set(currentBlock.exercise_id, value));
+      setSkippedCalibrations((prev) => new Set(prev).add(currentBlock.exercise_id));
+      setManualOneRmOpen(false);
+      toast("1RM enregistrée", { description: "Charges mises à jour pour cette séance." });
+    } catch {
+      toast.error("1RM non enregistrée", { description: "Réessaie lorsque le réseau est disponible." });
+    } finally {
+      setSavingManualOneRm(false);
+    }
+  };
+
   const handleValidateSet = async () => {
     if (!currentBlock) return;
     if (isLoggingRef.current) return;
@@ -863,7 +901,7 @@ export function WorkoutRunner({
     // invalidation de query (Task 4 retire l'invalidation en séance). `runOneRms`
     // fournit la cible locale immédiate aux séries 2+. La série est ensuite
     // loggée et avancée par le flux normal ci-dessous — pas de saut d'index.
-    if (showCalibration && currentSetIndex === 1 && tracksWeight && logWeight > 0 && logReps > 0) {
+    if (showCalibration && canUseOneRm && tracksWeight && logWeight > 0 && logReps > 0) {
       const oneRm = estimateOneRM(logWeight, logReps, calibRir != null ? { rir: calibRir } : undefined);
       if (oneRm > 0) {
         setRunOneRms((prev) => new Map(prev).set(currentBlock.exercise_id, oneRm));
@@ -1372,7 +1410,8 @@ export function WorkoutRunner({
       {showCalibration && (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
-            On ne connaît pas encore ton max. Prends une charge que tu peux faire{" "}
+            {hasOneRmForCurrent ? "Pour recalculer, prends une charge que tu peux faire " : "On ne connaît pas encore ton max. Prends une charge que tu peux faire "}
+            {" "}
             {currentBlock?.reps ? `~${currentBlock.reps} reps` : "tes reps"} en
             gardant 2-3 reps en réserve (sans aller à l'échec). Dans le doute,
             commence léger — tu ajusteras aux séries suivantes.
@@ -1405,6 +1444,48 @@ export function WorkoutRunner({
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {canUseOneRm && currentBlock && (hasPercent || hasOneRmForCurrent) && (
+        <div className="rounded-xl border bg-muted/10 px-3 py-2 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {hasOneRmForCurrent ? `1RM : ${runOneRms.get(currentBlock.exercise_id) ?? oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight} kg` : "1RM non renseignée"}
+            </span>
+            {onManualOneRm && (
+              <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-xs"
+                onClick={() => {
+                  setManualOneRmDraft(String(runOneRms.get(currentBlock.exercise_id) ??
+                    oneRMs.find((r) => r.exercise_id === currentBlock.exercise_id)?.weight ?? ""));
+                  setManualOneRmOpen((prev) => !prev);
+                }}>
+                {hasOneRmForCurrent ? "Modifier" : "Saisir ma 1RM"}
+              </Button>
+            )}
+          </div>
+          {manualOneRmOpen && (
+            <div className="flex items-center gap-2">
+              <Input
+                aria-label="1RM en kilogrammes"
+                placeholder="Ex. 80"
+                inputMode="decimal"
+                value={manualOneRmDraft}
+                onChange={(event) => setManualOneRmDraft(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void saveManualOneRm(); } }}
+              />
+              <Button type="button" size="sm" className="h-10" disabled={savingManualOneRm}
+                onClick={() => void saveManualOneRm()}>Enregistrer</Button>
+              <Button type="button" size="sm" variant="ghost" className="h-10"
+                onClick={() => setManualOneRmOpen(false)}>Annuler</Button>
+            </div>
+          )}
+          {showCalibration && (
+            <button type="button" className="text-xs text-muted-foreground underline underline-offset-2"
+              onClick={() => setSkippedCalibrations((prev) => new Set(prev).add(currentBlock.exercise_id))}>
+              Continuer sans calcul
+            </button>
+          )}
         </div>
       )}
 
@@ -1560,9 +1641,8 @@ export function WorkoutRunner({
       {/* §297/§369 — Recalculer 1RM : série 1 d'exos chargés, avant que la série 1
           ne soit loggée. Masqué si la carte de calibration est déjà affichée
           (`showCalibration` couvre déjà le cas sans 1RM connu). */}
-      {!isBodyweightExercise &&
+      {canUseOneRm &&
         !showCalibration &&
-        currentSetIndex === 1 &&
         !currentLoggedSet &&
         onRequestRecalc &&
         currentBlock && (
