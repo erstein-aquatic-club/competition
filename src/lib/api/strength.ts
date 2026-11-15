@@ -1413,6 +1413,23 @@ export async function update1RM(record: {
   return { status: "ok" };
 }
 
+/** Athlete-chosen calibration / manual reference. Distinct from automatic
+ * per-set PR estimates: the database prevents background overwrites. */
+export async function setManual1RM(record: Parameters<typeof update1RM>[0]) {
+  if (!canUseSupabase()) return update1RM(record);
+  const athleteId = record.athlete_id ?? record.athleteId;
+  const value = Number(record.one_rm ?? record.weight);
+  if (athleteId == null || !Number.isFinite(value) || value <= 0 || value > 1000) {
+    throw new Error("Invalid 1RM reference");
+  }
+  assertSupabase(await supabase.rpc("set_strength_1rm_reference", {
+    p_athlete_id: Number(athleteId),
+    p_exercise_id: record.exercise_id,
+    p_one_rm: value,
+  }));
+  return { status: "ok" };
+}
+
 export async function updateExerciseNote(params: {
   athlete_id: number | string;
   exercise_id: number;
