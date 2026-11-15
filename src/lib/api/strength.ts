@@ -1355,7 +1355,9 @@ export async function get1RM(
     })), athleteId);
   }
   const records = (localStorageGet(STORAGE_KEYS.ONE_RM) || []) as any[];
-  return includePendingOneRmUpdates(records.filter((r: any) => r.athlete_name === athleteName), athleteId);
+  return includePendingOneRmUpdates(records
+    .filter((r: any) => r.athlete_name === athleteName)
+    .map((r: any) => ({ ...r, weight: Number(r.weight ?? r.one_rm ?? 0) })), athleteId);
 }
 
 export async function update1RM(record: {
