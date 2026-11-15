@@ -535,6 +535,7 @@ export {
   getStrengthHistoryAggregate,
   get1RM,
   update1RM,
+  setManual1RM,
   updateExerciseNote,
   getStrengthFolders,
   getTeamAthletePlans,
