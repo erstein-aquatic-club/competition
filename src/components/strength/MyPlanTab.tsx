@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   getActiveMesocycle,
+  getLatestAssessment,
   getProfile,
   getStrengthPlanningSlots,
   getStrengthPlanningSlotOverrides,
@@ -17,6 +18,9 @@ import { FolderOpen, Trophy, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useLocation } from "wouter";
+import { canGenerateMesocycle } from "@/lib/strength/mesocycleGating";
 import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 import { useStrengthWrapped } from "@/hooks/useStrengthWrapped";
 import { StrengthWrappedRecap } from "@/components/strength/wrapped/StrengthWrappedRecap";
@@ -71,9 +75,22 @@ interface MyPlanTabProps {
    *  Used by the day-J "Démarrer maintenant" CTA and by the handoff from
    *  the Dashboard drawer (eac_pending_strength_focus_slot_id). */
   onLaunchSessionDirect?: (session: StrengthSessionTemplate) => void;
+  /** Vue du nageur sur SON plan (écran Muscu) : l'état vide propose de générer
+   *  son mésocycle ou de faire son bilan. Absent (plans d'équipe, autres vues)
+   *  → message neutre, sans action. */
+  selfService?: boolean;
 }
 
-function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: MyPlanTabProps) {
+function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect, selfService = false }: MyPlanTabProps) {
+  const [, navigate] = useLocation();
+  // Même clé que MesocycleEntry → cache partagé, pas de requête en plus.
+  const { data: selfAssessment } = useQuery({
+    queryKey: ["strength-assessment-latest", athleteId],
+    queryFn: () => getLatestAssessment(athleteId),
+    enabled: selfService,
+    staleTime: 60_000,
+  });
+  const canGeneratePlan = selfAssessment != null && canGenerateMesocycle(selfAssessment.status);
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | null>(null);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
 
@@ -630,13 +647,37 @@ function MyPlanTabImpl({ athleteId, onSelectSession, onLaunchSessionDirect }: My
     return (
       <div>
         {recapButton}
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <FolderOpen className="h-10 w-10 mb-4 text-muted-foreground/30" />
-          <p className="text-sm font-medium text-muted-foreground">Aucun plan personnalisé</p>
-          <p className="text-xs text-muted-foreground/60 mt-1.5 max-w-[240px]">
-            Ton coach peut créer un plan d'entraînement depuis le catalogue musculation.
-          </p>
-        </div>
+        {/* Audit robustesse muscu (lot 3) — avant : « Ton coach peut créer un plan »,
+            alors que le nageur peut générer son propre mésocycle (entrée cachée
+            dans l'onglet « S'entraîner »). L'état vide devient une invitation. */}
+        {selfService ? (
+          <EmptyState
+            icon={<FolderOpen />}
+            title="Aucun plan en cours"
+            description={
+              canGeneratePlan
+                ? "Génère ton mésocycle à partir de ton bilan, ou attends le plan de ton coach."
+                : "Fais ton bilan muscu pour générer ton plan, ou attends celui de ton coach."
+            }
+            cta={
+              <Button
+                type="button"
+                className="rounded-xl"
+                onClick={() =>
+                  navigate(canGeneratePlan ? "/strength/mesocycle-generate" : "/strength/questionnaire")
+                }
+              >
+                {canGeneratePlan ? "Générer mon plan" : "Faire mon bilan"}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<FolderOpen />}
+            title="Aucun plan en cours"
+            description="Aucun plan muscu n'est programmé pour l'instant."
+          />
+        )}
         {recapOverlay}
       </div>
     );
