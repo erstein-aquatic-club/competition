@@ -91,6 +91,7 @@ export const normalizeExercise = (exercise: Record<string, unknown>): Exercise =
   recup_force: safeOptionalInt(exercise.recup_force),
   recup_exercices_force: safeOptionalInt(exercise.recup_exercices_force),
   is_bodyweight: exercise.is_bodyweight === true,
+  one_rm_eligible: exercise.one_rm_eligible === true,
   intensity_metric: normalizeIntensityMetric(exercise.intensity_metric),
   // §320 — priorité de sélection coach (défaut 0). Lu ici pour ne pas l'écraser
   // au round-trip d'édition (le catalogue liste via normalizeExercise).
