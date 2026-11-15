@@ -11,7 +11,7 @@ import {
   getStrengthSessions,
   getExercises,
   get1RM,
-  update1RM,
+  setManual1RM,
   withTimeout,
   startStrengthRun as startStrengthRunApi,
   logStrengthSet as logStrengthSetApi,
@@ -650,7 +650,7 @@ export default function Strength() {
       const result = await tryWithOfflineQueue(
         "record-1rm-update",
         payload as Record<string, unknown>,
-        () => withTimeout(update1RM(payload), 8000, "update-1rm"),
+        () => withTimeout(setManual1RM(payload), 8000, "update-1rm"),
         `1rm:${userId}:${exerciseId}:${value}`,
       );
       // Optimistic cache (not invalidateQueries mid-Focus): known max immediately
