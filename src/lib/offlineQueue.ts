@@ -4,7 +4,7 @@ const QUEUE_KEY = "eac-offline-queue";
 const QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Never auto-delete unsynchronized strength performances, even after a week. */
-const CRITICAL_STRENGTH_MUTATIONS = new Set(["strength-run-completed", "strength-set-log", "updateRun"]);
+const CRITICAL_STRENGTH_MUTATIONS = new Set(["strength-run-completed", "strength-set-log", "updateRun", "record-1rm-update"]);
 
 /** A mutation that fails this many consecutive times is moved to "poisoned" and dropped. */
 export const MAX_RETRY_ATTEMPTS = 5;
