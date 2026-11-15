@@ -15,6 +15,17 @@ export const localStorageGet = <T = unknown>(key: string): T | null => {
   }
 };
 
+/**
+ * Lit une LISTE du cache hors-ligne. Renvoie `[]` si la clé est absente OU si la
+ * valeur n'est pas un tableau (cache corrompu / ancien format) — avant,
+ * `(localStorageGet(k) || []) as any[]` laissait passer un objet et le `.filter`
+ * suivant plantait. Le typage reste déclaratif (pas de validation par élément).
+ */
+export const readLocalList = <T>(key: string): T[] => {
+  const value = localStorageGet<unknown>(key);
+  return Array.isArray(value) ? (value as T[]) : [];
+};
+
 const isQuotaError = (error: unknown): boolean =>
   error instanceof DOMException &&
   (error.name === 'QuotaExceededError' || error.code === 22 || error.code === 1014);

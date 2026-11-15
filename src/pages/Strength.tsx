@@ -42,6 +42,7 @@ import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/componen
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { usePendingStrengthSync } from "@/hooks/usePendingStrengthSync";
+import { mergeRunLogs } from "@/lib/strength/mergeRunLogs";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
 import { startStrengthRunLocally, saveStrengthRun, markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { clearDraft } from "@/lib/unsavedDraftStore";
@@ -898,7 +899,9 @@ export default function Strength() {
               onLogSets={async (blockLogs) => {
                 if (!activeRunId) return;
                 // Always persist locally first — triggers localStorage write via useStrengthState
-                setActiveRunLogs((prev) => [...(prev ?? []), ...blockLogs]);
+                // Idempotent : « Réessayer » renvoie la même série (lot 4) — pas de
+                // doublon local, qui ferait échouer la réconciliation par identité.
+                setActiveRunLogs((prev) => mergeRunLogs(prev, blockLogs));
                 // A negative ID represents a local-only run. The entire run
                 // will be uploaded atomically on completion; per-set RPCs
                 // would reference a non-existent foreign key.

@@ -2,7 +2,9 @@
 
 *Dernière mise à jour : 2026-11-15*
 
-*Dernière : 2026-11-15 — **§392 — Muscu : état vide actionnable, onglet conservé, indicateur d'envoi** (audit robustesse lot 3) : « Mon plan » vide propose « Générer mon plan » / « Faire mon bilan » ; onglet Muscu conservé après une séance ; bandeau « N séance(s) en attente d'envoi » alimenté par `QUEUE_CHANGED_EVENT` (distinct de l'événement de vidange). +7 tests.*
+*Dernière : 2026-11-15 — **§393 — Muscu : passage de paramètres méso fiable, séries sans doublon, `strength.ts` sans `as any`** (audit robustesse lot 4, fin de l'audit) : `pendingMesocycleHandoff` (repli mémoire, fin de la boucle génération ↔ aperçu) ; `mergeRunLogs` idempotent (« Réessayer » ne duplique plus une série) ; 29 → 0 `as any` via `readLocalList<T>` (cache corrompu → `[]`), bug 1RM hors-ligne (`weight` undefined) corrigé au passage. +16 tests.*
+
+*§392 — **Muscu : état vide actionnable, onglet conservé, indicateur d'envoi** (audit robustesse lot 3) : « Mon plan » vide propose « Générer mon plan » / « Faire mon bilan » ; onglet Muscu conservé après une séance ; bandeau « N séance(s) en attente d'envoi » alimenté par `QUEUE_CHANGED_EVENT` (distinct de l'événement de vidange). +7 tests.*
 
 *§391 — **Suite `npm test` verte de bout en bout** : 6 tests `strength.test.ts` alignés sur le contrat durci de `bd903bede` (RETURNING id, réconciliation par identité) + test de la garde ; 5 tests pour `getMissingStrengthLogs` (non couvert) ; fixture `useStrengthWrapped` en dates relatives. vitest de nouveau exécuté par `npm test`.*
 

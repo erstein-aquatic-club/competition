@@ -186,6 +186,8 @@ export interface LocalStrengthRun {
   comments?: string | null;
   logs?: SetLogEntry[];
   raw_payload?: Record<string, unknown> | null;
+  /** Séance terminée hors-ligne, encore dans la file d'envoi (markLocalStrengthRunCompleted). */
+  sync_pending?: boolean;
   // Supabase join column
   strength_set_logs?: SetLogEntry[];
 }

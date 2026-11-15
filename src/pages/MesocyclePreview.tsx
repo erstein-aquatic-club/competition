@@ -2,7 +2,7 @@
  * MesocyclePreview — aperçu nageur du mésocycle généré (§293, Phase 5.3).
  *
  * Pipeline :
- *  1. Lit les paramètres depuis sessionStorage["eac_pending_mesocycle_params"]
+ *  1. Lit les paramètres via `readPendingMesocycleRaw` (mémoire, puis sessionStorage["eac_pending_mesocycle_params"])
  *     (posés par /strength/mesocycle-generate). Si absents → retour à l'écran
  *     de génération.
  *  2. Fetch en parallèle : profile (sexe + date de naissance), évaluation,
@@ -76,6 +76,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
+import { savePendingMesocycleParams, readPendingMesocycleRaw, clearPendingMesocycleParams } from "@/lib/strength/pendingMesocycleHandoff";
 import {
   Activity,
   AlertCircle,
@@ -92,7 +93,6 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const SESSION_KEY = "eac_pending_mesocycle_params";
 
 interface PendingParams {
   stroke: StrokeKey;
@@ -237,7 +237,7 @@ function ageFromBirthdate(birthdateIso: string, now: Date = new Date()): number 
 
 function loadPendingParams(): PendingParams | null {
   try {
-    const raw = window.sessionStorage.getItem(SESSION_KEY);
+    const raw = readPendingMesocycleRaw();
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingParams;
     if (
@@ -551,11 +551,7 @@ export default function MesocyclePreview() {
   // Effets de bord post-application réussie (réutilisés par onSuccess ET par la
   // récupération onError #5 : apply abouti côté serveur malgré une erreur réseau).
   const finishApplied = (description: string) => {
-    try {
-      window.sessionStorage.removeItem(SESSION_KEY);
-    } catch {
-      // Ignore : sessionStorage peut être bloqué (private mode).
-    }
+    clearPendingMesocycleParams();
     // Includes the exercise/session catalogue, legacy applications, and both
     // hyphen/underscore planning query keys. Inactive plan queries are marked
     // stale and always re-fetch when MyPlanTab mounts after navigation.
@@ -691,11 +687,7 @@ export default function MesocyclePreview() {
   // C2 + C5 — quitter l'aperçu (retour/annuler) : purge le payload (abandon
   // explicite) puis revient à l'écran amont correct (ajustement vs génération).
   const handleLeavePreview = () => {
-    try {
-      window.sessionStorage.removeItem(SESSION_KEY);
-    } catch {
-      // Ignore : sessionStorage peut être bloqué (private mode).
-    }
+    clearPendingMesocycleParams();
     navigate(mesocyclePreviewBackTarget(params));
   };
 

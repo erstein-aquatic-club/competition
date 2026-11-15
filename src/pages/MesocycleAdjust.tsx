@@ -46,6 +46,7 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
+import { savePendingMesocycleParams } from "@/lib/strength/pendingMesocycleHandoff";
 
 // ── Tokens (dupliques de MesocyclePreview pour ne pas exporter depuis une page) ─
 
@@ -300,14 +301,8 @@ export default function MesocycleAdjust() {
       // globale, pose sur le nouveau meso apres l'apply (bannière « Semaine X/Total »).
       weekOffset: phaseInfo.weekIndex,
     };
-    try {
-      window.sessionStorage.setItem(
-        "eac_pending_mesocycle_params",
-        JSON.stringify(payload),
-      );
-    } catch {
-      // sessionStorage peut etre bloque (private mode) : on navigue quand meme.
-    }
+    // Repli mémoire si sessionStorage est indisponible (cf. pendingMesocycleHandoff).
+    savePendingMesocycleParams(payload);
     navigate("/strength/mesocycle-preview");
   };
 
