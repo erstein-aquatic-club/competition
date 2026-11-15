@@ -59,6 +59,8 @@ export interface Exercise {
   folder_id?: number | null;
   /** §369 — Si TRUE, exo au poids de corps : la calibration 1RM l.ignore, runner masque Charge. */
   is_bodyweight?: boolean;
+  /** Explicit opt-in for %1RM calibration; missing/unknown means NEVER prompt. */
+  one_rm_eligible?: boolean;
   /** §298 — Métrique d'intensité. Défaut 'weight_kg'. Pilote runner UI + gating 1RM. */
   intensity_metric?: IntensityMetric;
   /**
