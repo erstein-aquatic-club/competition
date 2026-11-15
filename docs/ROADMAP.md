@@ -2,7 +2,9 @@
 
 *Dernière mise à jour : 2026-11-15*
 
-*Dernière : 2026-11-15 — **§395 — Muscu : échecs de mutation affichés, plus de succès fantôme, retrait de plan confirmé** (audit robustesse 2ᵉ passe, lot 6) : `mutationErrorToast` sur 12 mutations coach + garde-fou de test (toute mutation muscu doit avoir un `onError`) ; `RETURNING id` (§113) sur modifier exercice / renommer / déplacer / supprimer séance en cours ; retrait d'une application de plan visible et confirmé. Restent lots 7-8.*
+*Dernière : 2026-11-15 — **§396 — Muscu : plus de liste vide muette quand un chargement échoue** (audit robustesse 2ᵉ passe, lot 7) : historique, ajustement mid-cycle, listes coach (mésos, assiduité, plans), panneau méso et accueil séances nageur affichent « … indisponible » + Réessayer au lieu d'un état vide trompeur ; panneau méso vide → bouton « Générer un mésocycle ». Reste lot 8 (🟡).*
+
+*§395 — Muscu : échecs de mutation affichés, plus de succès fantôme, retrait de plan confirmé** (audit robustesse 2ᵉ passe, lot 6) : `mutationErrorToast` sur 12 mutations coach + garde-fou de test (toute mutation muscu doit avoir un `onError`) ; `RETURNING id` (§113) sur modifier exercice / renommer / déplacer / supprimer séance en cours ; retrait d'une application de plan visible et confirmé. Restent lots 7-8.*
 
 *§394 — Muscu : plus de suppression destructrice ni de doublon de bilan** (audit robustesse 2ᵉ passe, lot 5) : exercice utilisé = archivé au lieu de supprimé (mig 00231 : `archived_at` + FK RESTRICT, fini la cascade sur séries/1RM) ; suppression de séance annonce les créneaux vidés ; routines d'échauffement non éditables sur échec de chargement ; tuile « Démarrer mon bilan » masquée tant que l'état est inconnu. mig 00231 appliquée en prod. Restent lots 6-8.*
 

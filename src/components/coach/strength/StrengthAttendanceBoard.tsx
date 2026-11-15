@@ -16,6 +16,7 @@
  * Mobile-first (le coach consulte au bord du bassin) : cartes empilées,
  * pastilles qui passent à la ligne, aucun débordement horizontal.
  */
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
@@ -33,6 +34,7 @@ import {
 } from '@/lib/strength/attendance';
 import { addDaysIso, getMonday, toISODate } from '@/lib/date';
 import { cn } from '@/lib/utils';
+import { summarizeLoadFailures } from '@/lib/queryLoadFailures';
 import {
   Tooltip,
   TooltipContent,
@@ -125,11 +127,12 @@ export default function StrengthAttendanceBoard() {
   const fromISO = periodWeekStarts[0];
   const toISO = days[days.length - 1];
 
-  const { data: mesoItems = [], isLoading: mesoLoading } = useQuery({
+  const mesoQ = useQuery({
     queryKey: ['active-mesocycles-coach'],
     queryFn: () => listActiveMesocyclesWithAthletes(),
     staleTime: 60_000,
   });
+  const { data: mesoItems = [], isLoading: mesoLoading } = mesoQ;
 
   const athleteIds = useMemo(
     () => mesoItems.map((m) => m.athlete_id),
@@ -141,12 +144,18 @@ export default function StrengthAttendanceBoard() {
     return map;
   }, [mesoItems]);
 
-  const { data: attendanceData } = useQuery({
+  const attendanceQ = useQuery({
     queryKey: ['strength-attendance', athleteIds, periodWeekStarts],
     queryFn: () =>
       getStrengthAttendanceData(athleteIds, periodWeekStarts, fromISO, toISO),
     enabled: athleteIds.length > 0,
   });
+  const { data: attendanceData } = attendanceQ;
+  // §396 (O7) — échec réseau ≠ « Aucun mésocycle actif » / tableau vide.
+  const loadFailures = summarizeLoadFailures([
+    ['les mésocycles actifs', mesoQ],
+    ["l'assiduité", attendanceQ],
+  ]);
 
   const rows = useMemo(() => {
     if (!attendanceData) return [];
@@ -249,6 +258,14 @@ export default function StrengthAttendanceBoard() {
               />
             ))}
           </div>
+        ) : loadFailures.hasFailure ? (
+          <QueryErrorState
+            compact
+            title="Assiduité indisponible"
+            description={`Chargement impossible : ${loadFailures.failedText}. Vérifie ta connexion, puis réessaie.`}
+            onRetry={loadFailures.retry}
+            isRetrying={loadFailures.isRetrying}
+          />
         ) : athleteIds.length === 0 ? (
           <div className="rounded-2xl border bg-card p-4 text-center">
             <p className="text-sm font-semibold">Aucun mésocycle actif</p>

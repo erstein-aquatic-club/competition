@@ -8,6 +8,7 @@
  *
  * Applications UI (apply a plan to a user/group) is delivered in §275.5.
  */
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -192,11 +193,12 @@ function TrainingPlansList({
   onSelect: (planId: number) => void;
   onCreate: () => void;
 }) {
-  const { data: plans = [], isLoading } = useQuery({
+  const plansQ = useQuery({
     queryKey: ["training_plans", "by-owner", ownerId],
     queryFn: () => getTrainingPlans(ownerId != null ? { ownerId } : {}),
     enabled: ownerId != null,
   });
+  const { data: plans = [], isLoading } = plansQ;
 
   // Per-plan session count (single round-trip via separate query)
   const { data: allSessions = [] } = useQuery({
@@ -242,6 +244,14 @@ function TrainingPlansList({
             />
           ))}
         </div>
+      ) : plansQ.isLoadingError ? (
+        // §396 (O7) — échec réseau ≠ « Aucun plan d'entraînement ».
+        <QueryErrorState
+          title="Plans indisponibles"
+          description="Tes plans d'entraînement n'ont pas pu être chargés. Ils ne sont pas perdus : vérifie ta connexion, puis réessaie."
+          onRetry={() => void plansQ.refetch()}
+          isRetrying={plansQ.isFetching}
+        />
       ) : plans.length === 0 ? (
         <EmptyState
           icon={<Dumbbell />}

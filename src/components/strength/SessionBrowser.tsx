@@ -22,6 +22,8 @@ import { FolderCard } from "@/components/shared/FolderCard";
 import { SessionRow } from "@/components/shared/SessionRow";
 import { TeamPlansSection } from "@/components/strength/TeamPlansSection";
 import { SaveState } from "@/components/shared/BottomActionBar";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -72,16 +74,18 @@ export function SessionBrowser({
   onResumeInProgress,
 }: SessionBrowserProps) {
   // ── Queries ──────────────────────────────────────────────────────────
-  const { data: assignments } = useQuery({
+  const assignmentsQuery = useQuery({
     queryKey: ["assignments", user, "strength"],
     queryFn: () => getAssignments(user!, userId, { assignmentType: "strength" }),
     enabled: !!user,
   });
+  const assignments = assignmentsQuery.data;
 
-  const { data: strengthCatalog } = useQuery({
+  const strengthCatalogQuery = useQuery({
     queryKey: ["strength_catalog"],
     queryFn: () => getStrengthSessions(),
   });
+  const strengthCatalog = strengthCatalogQuery.data;
 
   const { data: exercises } = useQuery({
     queryKey: ["exercises"],
@@ -102,6 +106,14 @@ export function SessionBrowser({
   });
 
   const inProgressRun = inProgressRunQuery.data?.runs?.[0] ?? null;
+
+  // §396 (O8) — un échec donnait une liste vide muette (et masquait la carte
+  // « Reprendre » d'une séance commencée). Calculé avant l'early return.
+  const loadFailures = summarizeLoadFailures([
+    ["séances assignées", assignmentsQuery],
+    ["catalogue", strengthCatalogQuery],
+    ["séance en cours", inProgressRunQuery],
+  ]);
 
   // Global folders (athlete_id IS NULL) — fetch all then filter client-side
   const { data: allGlobalFolders = [] } = useQuery({
@@ -242,6 +254,16 @@ export function SessionBrowser({
     <div className="space-y-3 animate-in fade-in motion-reduce:animate-none">
       {/* ── Cycle selector ── */}
       <CycleSelector cycleType={cycleType} onCycleChange={onCycleChange} />
+
+      {loadFailures.hasFailure && (
+        <QueryErrorState
+          compact
+          title="Séances indisponibles"
+          description={`Chargement impossible : ${loadFailures.failedText}. La liste peut être incomplète.`}
+          onRetry={loadFailures.retry}
+          isRetrying={loadFailures.isRetrying}
+        />
+      )}
 
       {/* ── In-progress session ── */}
       {inProgressRun && (

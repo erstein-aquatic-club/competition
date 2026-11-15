@@ -11,6 +11,7 @@
  * · N sem · N/sem · généré le dd mois" (l'ancienne section du hub coach a été
  * retirée au profit de cet écran — §364).
  */
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, ChevronDown, Dumbbell } from 'lucide-react';
@@ -27,11 +28,12 @@ const FR_DATE = new Intl.DateTimeFormat('fr-FR', {
 });
 
 export default function CoachMesocyclesAccordion() {
-  const { data: items = [], isLoading } = useQuery({
+  const itemsQ = useQuery({
     queryKey: ['active-mesocycles-coach'],
     queryFn: () => listActiveMesocyclesWithAthletes(),
     staleTime: 60_000,
   });
+  const { data: items = [], isLoading } = itemsQ;
 
   // single-open : id de l'item ouvert (string, clé par m.id) ou null.
   const [openId, setOpenId] = useState<string | null>(null);
@@ -70,6 +72,15 @@ export default function CoachMesocyclesAccordion() {
             </li>
           ))}
         </ul>
+      ) : itemsQ.isLoadingError ? (
+        // §396 (O7) — un échec réseau ne se lit plus « Aucun mésocycle actif ».
+        <QueryErrorState
+          compact
+          title="Mésocycles indisponibles"
+          description="La liste des mésocycles actifs n'a pas pu être chargée. Vérifie ta connexion, puis réessaie."
+          onRetry={() => void itemsQ.refetch()}
+          isRetrying={itemsQ.isFetching}
+        />
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-3.5 py-5 text-center">
           <Activity className="mx-auto mb-2 h-5 w-5 text-muted-foreground/40" />

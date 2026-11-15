@@ -2,6 +2,8 @@ import { memo, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { getStrengthHistory, getExercises } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -123,7 +125,21 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
       </div>
 
       {/* ── Runs list ── */}
-      {historyRuns.length > 0 ? (
+      {/* §396 (O5) — chargement et échec réseau ne s'affichent plus « Aucun historique ». */}
+      {strengthHistoryQuery.isLoading ? (
+        <div className="space-y-1.5" aria-busy="true" aria-label="Chargement de l'historique">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : strengthHistoryQuery.isLoadingError ? (
+        <QueryErrorState
+          title="Historique indisponible"
+          description="Tes séances n'ont pas pu être chargées. Elles ne sont pas perdues : vérifie ta connexion, puis réessaie."
+          onRetry={() => void strengthHistoryQuery.refetch()}
+          isRetrying={strengthHistoryQuery.isFetching}
+        />
+      ) : historyRuns.length > 0 ? (
         <motion.div
           className="space-y-1.5"
           variants={listVariants}

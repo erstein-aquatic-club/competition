@@ -15,6 +15,7 @@
  */
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { invalidateStrengthPlanningQueries } from "@/lib/queryClient";
 import { toast } from "sonner";
@@ -169,10 +170,11 @@ export default function CoachMesocyclePanel({
   const [, navigate] = useLocation();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { data: active, isLoading: activeLoading } = useQuery({
+  const activeQ = useQuery({
     queryKey: ["strength-mesocycle-active", athleteId],
     queryFn: () => getActiveMesocycle(athleteId),
   });
+  const { data: active, isLoading: activeLoading } = activeQ;
 
   const { data: history = [] } = useQuery({
     queryKey: ["strength-mesocycle-history", athleteId],
@@ -202,8 +204,28 @@ export default function CoachMesocyclePanel({
     );
   }
 
+  // §396 (O7) — échec réseau ≠ « Aucun mésocycle actif ».
+  if (activeQ.isLoadingError) {
+    return (
+      <div className="rounded-2xl border bg-card">
+        <QueryErrorState
+          compact
+          title="Mésocycle indisponible"
+          description={`Le mésocycle de ${athleteName} n'a pas pu être chargé. Vérifie ta connexion, puis réessaie.`}
+          onRetry={() => void activeQ.refetch()}
+          isRetrying={activeQ.isFetching}
+        />
+      </div>
+    );
+  }
+
   if (!active) {
-    return <EmptyState history={history} />;
+    return (
+      <EmptyState
+        history={history}
+        onGenerate={() => navigate(`/coach/mesocycle-generate/${athleteId}`)}
+      />
+    );
   }
 
   // Les imports PDF historiques n'ont pas tous de snapshot ni de tags
@@ -836,7 +858,13 @@ function HistoryStrip({ history }: { history: StrengthMesocycle[] }) {
   );
 }
 
-function EmptyState({ history }: { history: StrengthMesocycle[] }) {
+function EmptyState({
+  history,
+  onGenerate,
+}: {
+  history: StrengthMesocycle[];
+  onGenerate: () => void;
+}) {
   return (
     <Card className="rounded-2xl border-dashed bg-muted/20 p-5 text-center">
       <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
@@ -844,10 +872,13 @@ function EmptyState({ history }: { history: StrengthMesocycle[] }) {
       </div>
       <p className="text-sm font-semibold">Aucun mésocycle actif</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-        Le nageur n'a pas encore généré de mésocycle muscu, ou l'a rejeté.
-        Il peut en générer un depuis son écran muscu, une fois son bilan
-        complété.
+        Aucun plan muscu en cours, ou le dernier a été rejeté. Génère-en un à
+        partir de son bilan, ou laisse le nageur le faire depuis son écran muscu.
       </p>
+      {/* §396 (🟡5) — l'état vide propose enfin l'action côté coach. */}
+      <Button type="button" size="sm" className="mt-3 rounded-xl" onClick={onGenerate}>
+        Générer un mésocycle
+      </Button>
       {history.length > 0 && (
         <p className="mt-2 text-[10px] font-mono tabular-nums text-muted-foreground">
           {history.length} mésocycle{history.length > 1 ? "s" : ""} dans l'historique
