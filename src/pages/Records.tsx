@@ -43,6 +43,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { staggerChildren, listItem, successBounce } from "@/lib/animations";
 import { compareSwimEvents } from "@/lib/swim-sort";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { isOneRmEligible } from "@/lib/strength/oneRmCalibration";
 import { eventCodeFromFfnName, ffnNamesFromEventCode, eventLabel } from "@/lib/objectiveHelpers";
 import { useLocation } from "wouter";
 
@@ -1309,7 +1310,7 @@ export default function Records() {
                       animate={prefersReducedMotion ? false : "visible"}
                     >
                       {(exercises as Exercise[])
-                        ?.filter((e) => e.exercise_type !== "warmup")
+                        ?.filter(isOneRmEligible)
                         .map((ex) => {
                           const record = oneRMs?.find((r) => r.exercise_id === ex.id);
                           const recordWeight = Number(record?.weight ?? 0);
