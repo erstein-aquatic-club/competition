@@ -2,7 +2,9 @@
 
 *Dernière mise à jour : 2026-11-15*
 
-*Dernière : 2026-11-15 — **§391 — Suite `npm test` verte de bout en bout** : 6 tests `strength.test.ts` alignés sur le contrat durci de `bd903bede` (RETURNING id, réconciliation par identité) + test de la garde ; 5 tests pour `getMissingStrengthLogs` (non couvert) ; fixture `useStrengthWrapped` en dates relatives. vitest de nouveau exécuté par `npm test`.*
+*Dernière : 2026-11-15 — **§392 — Muscu : état vide actionnable, onglet conservé, indicateur d'envoi** (audit robustesse lot 3) : « Mon plan » vide propose « Générer mon plan » / « Faire mon bilan » ; onglet Muscu conservé après une séance ; bandeau « N séance(s) en attente d'envoi » alimenté par `QUEUE_CHANGED_EVENT` (distinct de l'événement de vidange). +7 tests.*
+
+*§391 — **Suite `npm test` verte de bout en bout** : 6 tests `strength.test.ts` alignés sur le contrat durci de `bd903bede` (RETURNING id, réconciliation par identité) + test de la garde ; 5 tests pour `getMissingStrengthLogs` (non couvert) ; fixture `useStrengthWrapped` en dates relatives. vitest de nouveau exécuté par `npm test`.*
 
 *§390 — **Muscu : confirmation de suppression cycle/dossier + anti double-tap** (audit robustesse lot 2) : `ConfirmFolderDeleteDialog` (annonce les séances/exercices concernés) sur plans nageur + catalogue, `deleteStrengthFolder` détecte le no-op RLS (§113), `onError` toasté ; `WorkoutRunner` ignore un 2ᵉ « Valider série » < 700 ms (plus de série fantôme). +9 tests.*
 

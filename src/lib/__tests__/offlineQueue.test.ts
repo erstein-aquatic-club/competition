@@ -51,6 +51,8 @@ const {
   markRetry,
   MAX_RETRY_ATTEMPTS,
   QUEUE_UPDATED_EVENT,
+  QUEUE_CHANGED_EVENT,
+  removeQueueItem,
 } = await import("@/lib/offlineQueue");
 
 describe("offlineQueue.enqueue", () => {
@@ -181,5 +183,37 @@ describe("critical strength mutations are never silently reaped", () => {
       timestamp: Date.now() - 9 * 24 * 60 * 60 * 1000,
     })));
     assert.equal(getQueue().length, 0);
+  });
+});
+
+// Audit robustesse muscu (lot 3) — QUEUE_CHANGED_EVENT alimente le compteur
+// « en attente de synchro ». Il doit suivre TOUTES les écritures, mais un retrait
+// ne doit JAMAIS émettre QUEUE_UPDATED_EVENT (qui relance la vidange → boucle).
+describe("offlineQueue — QUEUE_CHANGED_EVENT (affichage)", () => {
+  beforeEach(() => {
+    clearQueue();
+  });
+
+  it("est émis à l'ajout, au retrait et au vidage", () => {
+    const changed = mock.fn();
+    window.addEventListener(QUEUE_CHANGED_EVENT, changed);
+    enqueue("strength-run-completed", { run_id: 1 });
+    const id = getQueue()[0].id;
+    removeQueueItem(id);
+    clearQueue();
+    window.removeEventListener(QUEUE_CHANGED_EVENT, changed);
+    assert.equal(changed.mock.callCount(), 3);
+  });
+
+  it("un retrait n'émet PAS QUEUE_UPDATED_EVENT (pas de re-vidange en boucle)", () => {
+    enqueue("strength-run-completed", { run_id: 1 });
+    const id = getQueue()[0].id;
+    const updated = mock.fn();
+    window.addEventListener(QUEUE_UPDATED_EVENT, updated);
+    removeQueueItem(id);
+    markRetry("absent");
+    saveQueue([]);
+    window.removeEventListener(QUEUE_UPDATED_EVENT, updated);
+    assert.equal(updated.mock.callCount(), 0);
   });
 });

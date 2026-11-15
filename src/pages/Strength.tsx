@@ -23,7 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle } from "lucide-react";
+import { Dumbbell, AlertCircle, CloudUpload } from "lucide-react";
 import { toast } from "sonner";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
@@ -41,6 +41,7 @@ import { MyPlanTab } from "@/components/strength/MyPlanTab";
 import { QuestionnairePrompt, KpiWizardEntry, StartBilanEntry } from "@/components/strength/StrengthBilanEntry";
 import { MesocycleEntry } from "@/components/strength/MesocycleEntry";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { usePendingStrengthSync } from "@/hooks/usePendingStrengthSync";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
 import { startStrengthRunLocally, saveStrengthRun, markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { clearDraft } from "@/lib/unsavedDraftStore";
@@ -215,6 +216,12 @@ export default function Strength() {
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
   const isOnline = useOnlineStatus();
+  // Audit robustesse muscu (lot 3) — séances non encore envoyées : indicateur
+  // durable (avant : un toast passager, puis plus rien).
+  const pendingSyncCount = usePendingStrengthSync();
+  // Onglet contrôlé : les Tabs sont démontés pendant la séance (focus/summary) ;
+  // en `defaultValue` le nageur revenait toujours sur « Mon plan ».
+  const [activeTab, setActiveTab] = useState<"planning" | "start" | "history">("planning");
   const wasOfflineRef = useRef(false);
 
   // Show recovery toast when a focus session is restored from localStorage
@@ -1110,7 +1117,37 @@ export default function Strength() {
               <Button size="sm" onClick={() => setScreenMode("focus")}>Reprendre</Button>
             </div>
           )}
-          <Tabs defaultValue="planning" className="w-full">
+          {screenMode === "list" && pendingSyncCount > 0 && (
+            <div role="status" className="flex items-center gap-3 rounded-xl border border-status-warning/20 bg-status-warning-bg p-3">
+              <CloudUpload className="h-5 w-5 shrink-0 text-status-warning" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">
+                  {pendingSyncCount === 1
+                    ? "1 séance en attente d'envoi"
+                    : `${pendingSyncCount} séances en attente d'envoi`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isOnline
+                    ? "Envoi en cours…"
+                    : "Envoi automatique dès le retour du réseau, app ouverte."}
+                </p>
+              </div>
+            </div>
+          )}
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              // L'aperçu de séance est rendu par les deux onglets : changer
+              // d'onglet le referme au lieu de le transporter (et de laisser
+              // changer le cycle d'une séance de plan depuis « S'entraîner »).
+              if (screenMode === "reader") {
+                setScreenMode("list");
+                setIsPlanMode(false);
+              }
+              setActiveTab(value as "planning" | "start" | "history");
+            }}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="planning">Mon plan</TabsTrigger>
               <TabsTrigger value="start">S'entraîner</TabsTrigger>
@@ -1185,6 +1222,7 @@ export default function Strength() {
             <TabsContent value="planning" className="space-y-4 pt-4">
               {screenMode === "list" && userId && (
                 <MyPlanTab
+                  selfService
                   athleteId={userId}
                   onSelectSession={startPlanSession}
                   onLaunchSessionDirect={startPlanSessionDirect}

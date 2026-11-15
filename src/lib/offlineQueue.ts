@@ -23,6 +23,15 @@ export type QueuedMutation = {
 };
 
 export const QUEUE_UPDATED_EVENT = "eac-offline-queue-updated";
+/** Émis à CHAQUE écriture de la file (ajout, retrait, vidage) — pour l'affichage
+ *  seulement (compteur « en attente de synchro »). Volontairement distinct de
+ *  QUEUE_UPDATED_EVENT : OfflineMutationSync relance une vidange sur celui-ci, et
+ *  le déclencher à chaque retrait bouclerait la vidange sur elle-même. */
+export const QUEUE_CHANGED_EVENT = "eac-offline-queue-changed";
+
+function notifyQueueChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(QUEUE_CHANGED_EVENT));
+}
 /** Dispatched when stale (> TTL) or poisoned (>= MAX retries) items are
  *  dropped at read time. `detail.count` carries the number of items
  *  reaped in this pass. Listened to by OfflineMutationSync to surface a
@@ -63,6 +72,7 @@ export function enqueue(type: string, payload: Record<string, unknown>, idempote
     }
   }
   window.dispatchEvent(new CustomEvent(QUEUE_UPDATED_EVENT));
+  notifyQueueChanged();
 }
 
 /**
@@ -109,10 +119,12 @@ export function getQueueSize(): number {
 
 export function saveQueue(queue: QueuedMutation[]) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  notifyQueueChanged();
 }
 
 export function clearQueue() {
   localStorage.removeItem(QUEUE_KEY);
+  notifyQueueChanged();
 }
 
 /** Inspect the queue without consuming items (alias of getQueue). */

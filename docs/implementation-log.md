@@ -4,6 +4,24 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §392 — Muscu : état vide actionnable, onglet conservé, indicateur « en attente d'envoi » (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 3 (constats 5, 6, 7). Branche `fix/muscu-robustesse-lot3` (empilée sur `fix/muscu-robustesse-audit`, PR #92).
+
+**Changements.**
+- **Constat 5 — « Mon plan » vide.** Avant : « Ton coach peut créer un plan… », alors que le nageur peut générer son propre mésocycle (entrée cachée sous « S'entraîner »). `MyPlanTab` reçoit `selfService` (passé seulement par `Strength.tsx`) : état vide `EmptyState` « Aucun plan en cours » + CTA « Générer mon plan » si le bilan le permet (`canGenerateMesocycle`, même clé de cache que `MesocycleEntry`), sinon « Faire mon bilan ». Vues tierces (`TeamPlansSection`, `SuiviPlanification`) : message neutre sans action.
+- **Constat 6 — onglet perdu.** Les `Tabs` de `Strength.tsx` étaient en `defaultValue` et démontés pendant la séance → retour systématique sur « Mon plan ». Désormais contrôlés (`activeTab`) : on revient sur l'onglet de départ. Changer d'onglet pendant l'aperçu d'une séance le referme (l'aperçu était rendu par les deux onglets — une séance de plan devenait éditable en cycle depuis « S'entraîner »).
+- **Constat 7 — séances en attente d'envoi.** `sync_pending` était écrit mais jamais lu ; seul un toast passager signalait la mise en file. Nouveau bandeau (écran Muscu, mode liste) « N séance(s) en attente d'envoi » + état (« Envoi en cours… » / « Envoi automatique dès le retour du réseau, app ouverte »).
+  - `src/lib/strength/pendingStrengthSync.ts` (+) : `countPendingStrengthSessions(queue)` — 1 séance = 1 `run_id` (séries + clôture), types `strength-run-completed`/`strength-set-log`/`updateRun` ; élément sans `run_id` compté à part (sur-signaler plutôt que masquer). 5 tests.
+  - `src/lib/offlineQueue.ts` : nouvel événement **`QUEUE_CHANGED_EVENT`** émis par `enqueue`/`saveQueue`/`clearQueue` (donc aussi `removeQueueItem`/`markRetry`/`dequeue`). **Volontairement distinct de `QUEUE_UPDATED_EVENT`** : `OfflineMutationSync` relance une vidange sur ce dernier → l'émettre à chaque retrait bouclerait. +2 tests (émis aux 3 écritures ; un retrait n'émet jamais `QUEUE_UPDATED_EVENT`).
+  - `src/hooks/usePendingStrengthSync.ts` (+) : compteur en direct (événement + `storage` inter-onglets).
+
+**Fichiers modifiés.** `src/pages/Strength.tsx`, `src/components/strength/MyPlanTab.tsx`, `src/lib/offlineQueue.ts`, `src/lib/__tests__/offlineQueue.test.ts`, `src/lib/strength/pendingStrengthSync.ts` (+), `src/lib/strength/__tests__/pendingStrengthSync.test.ts` (+), `src/hooks/usePendingStrengthSync.ts` (+).
+
+**Tests.** `npm test` exit 0 : node:test 1793/1793, vitest 23/23 fichiers. tsc 0, lint 0 erreur (warnings préexistants). Pas de test UI dédié pour l'onglet contrôlé ni le bandeau (logique couverte par les helpers purs) ; pas de smoke navigateur. RLS non concerné.
+
+**Limites.** Restent de l'audit : 9 (repli `sessionStorage` annoncé mais absent dans `MesocycleGeneration`), 10 (« Réessayer » d'une série peut la dupliquer en local), 11 (29 `as any` dans `strength.ts`).
+
 ## §391 — Tests : suite `npm test` de nouveau verte de bout en bout (2026-11-15)
 
 **Contexte.** Depuis `bd903bede` (2026-11-13), 6 tests `node:test` échouaient ; comme `npm test` enchaîne `node:test && vitest`, **vitest ne tournait plus du tout** via `npm test`. S'y ajoutait 1 test vitest à bombe à retardement (dates figées).
