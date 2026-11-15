@@ -136,7 +136,7 @@ describe("§369 calibration gate (SSR)", () => {
   it("POSITIF : exo %1RM>0, weight_kg, non-PDC, sans 1RM → carte série 1 augmentée affichée", () => {
     const markup = renderRunner(calibSession(), exercises, []);
     assert.ok(HINT.test(markup), "le hint 'reps en réserve' doit apparaître");
-    assert.ok(markup.includes("commence léger"), "le guidage 'commence léger' doit apparaître");
+    assert.ok(markup.includes("Pas d&#x27;échec") || markup.includes("Pas d’échec") || markup.includes("Pas d&#39;échec"), "le guidage sans échec doit apparaître");
     // §371 (F2) — sur la carte de calibration, le sélecteur Difficulté 1-5 est masqué
     // (le RIR est l'unique mesure d'effort) → pas de double contrôle.
     assert.ok(!markup.includes("Difficulté"), "F2 : Difficulté masquée sur la carte de calibration");
