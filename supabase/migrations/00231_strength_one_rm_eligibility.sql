@@ -33,3 +33,31 @@ UPDATE public.dim_exercices SET is_bodyweight = true
 -- was edited before this migration.
 UPDATE public.dim_exercices SET one_rm_eligible = false
  WHERE is_bodyweight OR intensity_metric <> 'weight_kg' OR exercise_type = 'warmup';
+
+-- Server-side safety net for older PWAs and direct RPC/offline replays.
+-- Retain notes/history rows; disallow new positive 1RM values for exercises
+-- without a meaningful reference (jumps, planks, mobility, non-kg metrics).
+CREATE OR REPLACE FUNCTION public.guard_ineligible_one_rm()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.dim_exercices e
+    WHERE e.id = NEW.exercise_id
+      AND e.one_rm_eligible
+      AND NOT e.is_bodyweight
+      AND e.intensity_metric = 'weight_kg'
+      AND e.exercise_type = 'strength'
+  ) THEN
+    NEW.one_rm := 0;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS one_rm_eligibility_guard ON public.one_rm_records;
+CREATE TRIGGER one_rm_eligibility_guard
+BEFORE INSERT OR UPDATE ON public.one_rm_records
+FOR EACH ROW EXECUTE FUNCTION public.guard_ineligible_one_rm();
