@@ -1310,7 +1310,7 @@ export default function Records() {
                       animate={prefersReducedMotion ? false : "visible"}
                     >
                       {(exercises as Exercise[])
-                        ?.filter((e) => isOneRmEligible(e) || oneRMs?.some((r) => r.exercise_id === e.id && Number(r.weight) > 0))
+                        ?.filter(isOneRmEligible)
                         .map((ex) => {
                           const record = oneRMs?.find((r) => r.exercise_id === ex.id);
                           const recordWeight = Number(record?.weight ?? 0);
