@@ -998,6 +998,7 @@ export default function StrengthCatalog() {
                             ...(metric !== "weight_kg"
                               ? {
                                   is_bodyweight: false,
+                                  one_rm_eligible: false,
                                   pct_1rm_endurance: null,
                                   pct_1rm_hypertrophie: null,
                                   pct_1rm_force: null,
@@ -1056,6 +1057,7 @@ export default function StrengthCatalog() {
                   setEditingExercise({
                     ...editingExercise,
                     exercise_type: isWarmup ? "warmup" : "strength",
+                    ...(isWarmup ? { one_rm_eligible: false } : {}),
                     ...(isWarmup
                       ? {}
                       : { warmup_reps: null, warmup_duration: null }),
@@ -1064,6 +1066,17 @@ export default function StrengthCatalog() {
               />
               <Label htmlFor="warmup-flag-edit">Exercice d'échauffement (warmup)</Label>
             </div>
+            {(editingExercise.exercise_type !== "warmup" &&
+              (editingExercise.intensity_metric ?? "weight_kg") === "weight_kg" && !editingExercise.is_bodyweight) && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="one-rm-eligible-edit"
+                  checked={editingExercise.one_rm_eligible === true}
+                  onCheckedChange={(checked) => setEditingExercise((prev) => (prev ? { ...prev, one_rm_eligible: checked === true } : prev))}
+                />
+                <Label htmlFor="one-rm-eligible-edit">Référence 1RM pertinente (test facultatif)</Label>
+              </div>
+            )}
             {(editingExercise.intensity_metric ?? "weight_kg") === "weight_kg" && (
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -1074,6 +1087,7 @@ export default function StrengthCatalog() {
                     setEditingExercise({
                       ...editingExercise,
                       is_bodyweight: isBw,
+                      ...(isBw ? { one_rm_eligible: false } : {}),
                       // Reset les % 1RM si l'exo passe en PDC (cohérence)
                       ...(isBw
                         ? {
@@ -1199,6 +1213,7 @@ export default function StrengthCatalog() {
                     ...(metric !== "weight_kg"
                       ? {
                           is_bodyweight: false,
+                          one_rm_eligible: false,
                           pct_1rm_endurance: null,
                           pct_1rm_hypertrophie: null,
                           pct_1rm_force: null,
@@ -1251,6 +1266,7 @@ export default function StrengthCatalog() {
                 setNewExercise({
                   ...newExercise,
                   exercise_type: isWarmup ? "warmup" : "strength",
+                  ...(isWarmup ? { one_rm_eligible: false } : {}),
                   ...(isWarmup
                     ? {}
                     : { warmup_reps: null, warmup_duration: null }),
@@ -1259,6 +1275,17 @@ export default function StrengthCatalog() {
             />
             <Label htmlFor="warmup-flag">Exercice d'échauffement (warmup)</Label>
           </div>
+          {(newExercise.exercise_type !== "warmup" &&
+            (newExercise.intensity_metric ?? "weight_kg") === "weight_kg" && !newExercise.is_bodyweight) && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="one-rm-eligible-create"
+                checked={newExercise.one_rm_eligible === true}
+                onCheckedChange={(checked) => setNewExercise((prev) => ({ ...prev, one_rm_eligible: checked === true }))}
+              />
+              <Label htmlFor="one-rm-eligible-create">Référence 1RM pertinente (test facultatif)</Label>
+            </div>
+          )}
           {(newExercise.intensity_metric ?? "weight_kg") === "weight_kg" && (
             <div className="flex items-center gap-2">
               <Checkbox
@@ -1269,6 +1296,7 @@ export default function StrengthCatalog() {
                   setNewExercise({
                     ...newExercise,
                     is_bodyweight: isBw,
+                    ...(isBw ? { one_rm_eligible: false } : {}),
                     ...(isBw
                       ? {
                           pct_1rm_endurance: null,
