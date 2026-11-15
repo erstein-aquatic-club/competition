@@ -945,7 +945,7 @@ export async function saveStrengthRun(run: any) {
     // §298 — exclure les exos à métrique non-poids (pas de 1RM sur cm/s).
     const estimatedRecords = collectEstimated1RMs(
       rawLogs,
-      await getNonWeightExerciseIds(rawLogs.map((log) => Number(log.exercise_id))),
+      await getNonWeightExerciseIds(rawLogs.map((log: { exercise_id: number }) => Number(log.exercise_id))),
     );
     const oneRmEstimates = Array.from(estimatedRecords.entries()).map(
       ([exerciseId, weight]) => ({
@@ -1022,7 +1022,7 @@ export async function saveStrengthRun(run: any) {
   }
   const estimatedRecords = collectEstimated1RMs(
     Array.isArray(run.logs) ? run.logs : [],
-    await getNonWeightExerciseIds((Array.isArray(run.logs) ? run.logs : []).map((log) => Number(log.exercise_id))),
+    await getNonWeightExerciseIds((Array.isArray(run.logs) ? run.logs : []).map((log: { exercise_id: number }) => Number(log.exercise_id))),
   );
   if (estimatedRecords.size > 0) {
     const athleteId = run.athlete_id ?? null;
