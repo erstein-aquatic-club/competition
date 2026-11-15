@@ -171,7 +171,7 @@ describe("§369 carte série 1 augmentée (jsdom)", () => {
   });
 
   it("ne suggère jamais une calibration si une 1RM est déjà enregistrée", () => {
-    renderRunner({ oneRMs: [{ exercise_id: 10, weight: 80 }] });
+    renderRunner({ oneRMs: [{ exercise_id: 10, weight: 80 }], onManualOneRm: async () => undefined });
     expect(screen.queryByRole("button", { name: "Reps en réserve : 2" })).toBeNull();
     expect(screen.getByRole("button", { name: "Modifier" })).toBeTruthy();
   });
