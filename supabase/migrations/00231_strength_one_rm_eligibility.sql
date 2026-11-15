@@ -61,3 +61,88 @@ DROP TRIGGER IF EXISTS one_rm_eligibility_guard ON public.one_rm_records;
 CREATE TRIGGER one_rm_eligibility_guard
 BEFORE INSERT OR UPDATE ON public.one_rm_records
 FOR EACH ROW EXECUTE FUNCTION public.guard_ineligible_one_rm();
+
+-- Deliberate athlete references have priority over automatic PR estimates.
+-- Existing rows without a source run may have been manually entered in Records.
+ALTER TABLE public.one_rm_records
+  ADD COLUMN IF NOT EXISTS explicit_reference boolean NOT NULL DEFAULT false;
+
+UPDATE public.one_rm_records r
+   SET explicit_reference = true
+  FROM public.dim_exercices e
+ WHERE r.exercise_id = e.id
+   AND e.one_rm_eligible
+   AND r.source_run_id IS NULL
+   AND r.one_rm > 0;
+
+-- The same trigger protects both catalogue eligibility AND user intent.
+-- Automatic log/set/finalization RPCs cannot overwrite an explicit reference.
+CREATE OR REPLACE FUNCTION public.guard_ineligible_one_rm()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.explicit_reference
+     AND current_setting('eac.explicit_one_rm_write', true) IS DISTINCT FROM 'yes' THEN
+    NEW.one_rm := OLD.one_rm;
+    NEW.recorded_at := OLD.recorded_at;
+    NEW.explicit_reference := true;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.dim_exercices e
+    WHERE e.id = NEW.exercise_id
+      AND e.one_rm_eligible
+      AND NOT e.is_bodyweight
+      AND e.intensity_metric = 'weight_kg'
+      AND e.exercise_type = 'strength'
+  ) THEN
+    NEW.one_rm := 0;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Explicit writes use a separate, authenticated RPC so a journal's automatic
+-- upsert cannot impersonate a user edit. Uses table RLS as security invoker.
+CREATE OR REPLACE FUNCTION public.set_strength_1rm_reference(
+  p_athlete_id integer, p_exercise_id integer, p_one_rm numeric
+)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+BEGIN
+  IF public.app_user_id() IS NULL OR
+     (p_athlete_id <> public.app_user_id()
+      AND coalesce(public.app_user_role(), '') NOT IN ('coach', 'admin')) THEN
+    RAISE EXCEPTION 'forbidden: cannot change this athlete reference'
+      USING ERRCODE = '42501';
+  END IF;
+  IF p_one_rm IS NULL OR p_one_rm <= 0 OR p_one_rm > 1000 THEN
+    RAISE EXCEPTION 'invalid 1RM value' USING ERRCODE = '22023';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.dim_exercices e
+    WHERE e.id = p_exercise_id
+      AND e.one_rm_eligible
+      AND NOT e.is_bodyweight
+      AND e.intensity_metric = 'weight_kg'
+      AND e.exercise_type = 'strength'
+  ) THEN
+    RAISE EXCEPTION 'exercise does not require a 1RM reference'
+      USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM set_config('eac.explicit_one_rm_write', 'yes', true);
+  INSERT INTO public.one_rm_records (
+    athlete_id, exercise_id, one_rm, recorded_at, explicit_reference
+  ) VALUES (
+    p_athlete_id, p_exercise_id, p_one_rm, now(), true
+  )
+  ON CONFLICT (athlete_id, exercise_id) DO UPDATE SET
+    one_rm = EXCLUDED.one_rm,
+    recorded_at = EXCLUDED.recorded_at,
+    explicit_reference = true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.set_strength_1rm_reference(integer, integer, numeric) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.set_strength_1rm_reference(integer, integer, numeric) TO authenticated;
