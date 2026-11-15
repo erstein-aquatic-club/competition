@@ -7,7 +7,7 @@ import {
   updateStrengthRun,
   saveStrengthRun,
   updateProfile,
-  update1RM,
+  setManual1RM,
   upsertSwimRecord,
   setPlannedAbsence,
   removePlannedAbsence,
@@ -71,7 +71,7 @@ function isQueuedStrengthSetLog(
 // after intermittent reconnect produces the same end state.
 
 type QueuedProfileUpdatePayload = Parameters<typeof updateProfile>[0];
-type QueuedRecord1rmPayload = Parameters<typeof update1RM>[0];
+type QueuedRecord1rmPayload = Parameters<typeof setManual1RM>[0];
 type QueuedSwimRecordPayload = Parameters<typeof upsertSwimRecord>[0];
 
 function isQueuedProfileUpdate(
@@ -234,7 +234,7 @@ async function replayStrengthCompletion(payload: QueuedStrengthCompletionPayload
 
   if (remoteLogs !== null) {
     const missingLogs = getMissingStrengthLogs(logs, remoteLogs);
-    const nonWeightIds = missingLogs.length ? await getNonWeightExerciseIds() : new Set<number>();
+    const nonWeightIds = missingLogs.length ? await getNonWeightExerciseIds(missingLogs.map(({ log }) => log.exercise_id)) : new Set<number>();
 
     for (const { log, setIndex } of missingLogs) {
       await logStrengthSet({
@@ -315,7 +315,7 @@ export function OfflineMutationSync() {
             continue;
           }
           if (isQueuedRecord1rm(mutation)) {
-            await update1RM(mutation.payload);
+            await setManual1RM(mutation.payload);
             removeQueueItem(mutation.id);
             syncedCount += 1;
             continue;

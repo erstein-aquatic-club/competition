@@ -78,3 +78,14 @@ describe("exercise mappers — intensity_metric (§298)", () => {
     assert.equal(normalizeExercise({ id: 1, nom_exercice: "Box Jump", intensity_metric: "height_cm" }).intensity_metric, "height_cm");
   });
 });
+
+describe("exercise mappers — one_rm_eligible (fail closed)", () => {
+  it("reads, writes and preserves the explicit calibration opt-in", () => {
+    const row = { id: 13, nom_exercice: "Tractions lestées", one_rm_eligible: true };
+    assert.equal(mapDbExerciseToApi(row).one_rm_eligible, true);
+    assert.equal(normalizeExercise({ ...row }).one_rm_eligible, true);
+    assert.equal(mapApiExerciseToDb(mapDbExerciseToApi(row)).one_rm_eligible, true);
+    assert.equal(mapDbExerciseToApi({ id: 110, nom_exercice: "Depth Jump" }).one_rm_eligible, false);
+    assert.equal(mapApiExerciseToDb({ id: 110, nom_exercice: "Depth Jump" }).one_rm_eligible, false);
+  });
+});

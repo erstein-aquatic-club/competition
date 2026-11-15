@@ -250,6 +250,7 @@ export const mapDbExerciseToApi = (row: Record<string, unknown>): Exercise => ({
   recup_exercices_force: safeOptionalInt(row.recup_exercices_force),
   folder_id: safeOptionalInt(row.folder_id),
   is_bodyweight: row.is_bodyweight === true,
+  one_rm_eligible: row.one_rm_eligible === true,
   intensity_metric: normalizeIntensityMetric(row.intensity_metric),
   // §320 — priorité de sélection coach (défaut 0). Doit être lu ici sinon
   // éditer un exo écraserait la priorité seedée à 0.
@@ -279,6 +280,7 @@ export const mapApiExerciseToDb = (exercise: Partial<Exercise>) => ({
   recup_exercices_force: exercise.recup_exercices_force ?? null,
   folder_id: exercise.folder_id ?? null,
   is_bodyweight: exercise.is_bodyweight === true,
+  one_rm_eligible: exercise.one_rm_eligible === true,
   intensity_metric: normalizeIntensityMetric(exercise.intensity_metric),
   // §320 — persiste la priorité de sélection éditée par le coach (défaut 0).
   selection_priority: exercise.selection_priority ?? 0,

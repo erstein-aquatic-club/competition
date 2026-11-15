@@ -35,6 +35,8 @@ const exercises: Exercise[] = [
     nom_exercice: "Développé couché",
     description: "Contrôle et amplitude",
     exercise_type: "strength",
+    intensity_metric: "weight_kg",
+    one_rm_eligible: true,
   },
 ];
 
@@ -134,7 +136,7 @@ describe("§369 calibration gate (SSR)", () => {
   it("POSITIF : exo %1RM>0, weight_kg, non-PDC, sans 1RM → carte série 1 augmentée affichée", () => {
     const markup = renderRunner(calibSession(), exercises, []);
     assert.ok(HINT.test(markup), "le hint 'reps en réserve' doit apparaître");
-    assert.ok(markup.includes("commence léger"), "le guidage 'commence léger' doit apparaître");
+    assert.ok(markup.includes("Pas d&#x27;échec") || markup.includes("Pas d’échec") || markup.includes("Pas d&#39;échec"), "le guidage sans échec doit apparaître");
     // §371 (F2) — sur la carte de calibration, le sélecteur Difficulté 1-5 est masqué
     // (le RIR est l'unique mesure d'effort) → pas de double contrôle.
     assert.ok(!markup.includes("Difficulté"), "F2 : Difficulté masquée sur la carte de calibration");
@@ -150,7 +152,7 @@ describe("§369 calibration gate (SSR)", () => {
 
   it("NÉGATIF (b) is_bodyweight=true → pas de calibration", () => {
     const pdcExos: Exercise[] = [
-      { id: 10, nom_exercice: "Tractions", exercise_type: "strength", is_bodyweight: true },
+      { id: 10, nom_exercice: "Tractions", exercise_type: "strength", is_bodyweight: true, intensity_metric: "weight_kg", one_rm_eligible: true },
     ];
     const markup = renderRunner(calibSession(), pdcExos, []);
     assert.ok(!HINT.test(markup));
@@ -158,10 +160,20 @@ describe("§369 calibration gate (SSR)", () => {
 
   it("NÉGATIF (c) intensity_metric=height_cm (élastique) → pas de calibration", () => {
     const elasticExos: Exercise[] = [
-      { id: 10, nom_exercice: "Bande élastique", exercise_type: "strength", intensity_metric: "height_cm" },
+      { id: 10, nom_exercice: "Bande élastique", exercise_type: "strength", intensity_metric: "height_cm", one_rm_eligible: true },
     ];
     const markup = renderRunner(calibSession(), elasticExos, []);
     assert.ok(!HINT.test(markup));
+  });
+
+  it("NÉGATIF (d) sauts/plyo sans opt-in, même avec une prescription %1RM", () => {
+    const plyoExos: Exercise[] = [{
+      id: 10, nom_exercice: "Depth Jump", exercise_type: "strength",
+      intensity_metric: "weight_kg", one_rm_eligible: false,
+    }];
+    const markup = renderRunner(calibSession(), plyoExos, []);
+    assert.ok(!HINT.test(markup));
+    assert.ok(!markup.includes("Recalculer ma 1RM"));
   });
 
   it("NÉGATIF (d) exo avec 1RM connu → pas de calibration", () => {

@@ -64,7 +64,7 @@ describe("logStrengthSet — atomic RPC path", () => {
     selectCountHandler = () => ({ count: 0, error: null });
   });
 
-  it("calls log_strength_set_atomic once with expected args", async () => {
+  it("saves the set atomically without auto-calculating a 1RM for an unclassified exercise", async () => {
     const { logStrengthSet } = await import("../api/strength.ts");
     await logStrengthSet({
       run_id: 42,
@@ -83,8 +83,8 @@ describe("logStrengthSet — atomic RPC path", () => {
     assert.equal(call.args.p_weight, 80);
     assert.equal(call.args.p_run_id, 42);
     assert.equal(call.args.p_set_index, 2);
-    // Epley 5 reps at 80kg => 80 * (1 + 5/30) ≈ 93.33 rounded to 93
-    assert.equal(call.args.p_one_rm_estimate, 93);
+    // Sans classification explicite du catalogue, pas de 1RM fantôme.
+    assert.equal(call.args.p_one_rm_estimate, null);
     assert.equal(typeof call.args.p_completed_at, "string");
   });
 
