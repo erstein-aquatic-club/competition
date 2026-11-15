@@ -4,6 +4,22 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §395 — Muscu : les échecs de mutation s'affichent enfin, plus de succès fantôme, retrait de plan confirmé (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu, 2ᵉ passe (2026-11-15), lot 6 (constats O2, O3, O4). Branche `fix/muscu-robustesse-lot6`.
+
+**Changements.**
+- **O2 — mutations sans `onError`.** Aucune gestion d'erreur globale (`queryClient.ts`) : 12 mutations coach échouaient en silence (dialog qui reste ouvert, rien ne se passe). Nouveau `src/lib/mutationErrorToast.ts` (`mutationErrorDescription` pur + `mutationErrorToast(title)`) branché sur : `StrengthCatalog` (créer/modifier exercice, modifier séance, ordre, créer/renommer dossier, déplacer), `AthletePlansTab` (créer/renommer cycle), `TrainingPlansBrowser` (poser/retirer une séance du plan, modifier le plan ; l'`onError` d'appel de `upsertSession` remonte au hook, sans double toast).
+  - **Garde-fou** `src/lib/__tests__/strengthMutationsOnError.test.ts` : parcourt les fichiers du module muscu et échoue sur tout `useMutation({…})` sans `onError` (RED avant fix : 12 occurrences listées `fichier:ligne`).
+- **O3 — no-op RLS §113.** `updateExercise`, `renameStrengthFolder`, `moveToFolder`, `deleteStrengthRun` : `RETURNING id` + helper `assertRowsTouched` (0 ligne → erreur « introuvable ou non autorisé »). 8 tests.
+- **O4 — retrait d'une application de plan.** Un tap retirait le plan d'un nageur/groupe, sans confirmation, bouton invisible au toucher (`opacity-0 group-hover`). Désormais bouton visible (`aria-label` « Retirer le plan de X »), `AlertDialog` « Retirer le plan de X ? » (séances retirées de « Mon plan », historique conservé — aucune FK vers `training_plan_applications`). `PlanApplicationsList` exporté pour test. 3 tests vitest.
+
+**Fichiers modifiés.** `src/lib/mutationErrorToast.ts` (+), `src/lib/api/strength.ts`, `src/pages/coach/StrengthCatalog.tsx`, `src/components/coach/strength/AthletePlansTab.tsx`, `src/components/coach/strength/TrainingPlansBrowser.tsx` ; tests : `strengthMutationsOnError.test.ts` (+), `mutationErrorToast.test.ts` (+), `PlanApplicationsList.vitest.tsx` (+), `strength.test.ts`.
+
+**Tests.** `npm test` exit 0 : node:test 1834/1834, vitest 27/27 fichiers (115 tests). tsc 0, lint 0 erreur (43 warnings préexistants, aucun dans les fichiers touchés). RLS non lancé (aucune policy/helper auth modifié ; `RETURNING` client seulement). Pas de smoke navigateur.
+
+**Limites.** `useStrengthPlanningAthleteMode.ts` (code mort, callers passent leur `onError`) hors garde-fou → lot 8. Restent de l'audit : lots 7 (O5-O8, 🟡5), 8 (🟡).
+
 ## §394 — Muscu : plus de suppression destructrice ni de doublon de bilan (2026-11-15)
 
 **Contexte.** Audit robustesse & UX muscu, 2ᵉ passe (2026-11-15), lot 5 (constats R1, R2, R3, O1 — pertes de données). Branche `fix/muscu-robustesse-lot5`. Décisions : R3 option (a) bloquer + archiver ; R1 correctif client seul.

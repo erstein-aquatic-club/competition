@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mutationErrorToast } from "@/lib/mutationErrorToast";
 
 import {
   applyTrainingPlan,
@@ -46,6 +47,7 @@ import type {
   StrengthFolder,
   StrengthSessionTemplate,
   TrainingPlan,
+  TrainingPlanApplication,
   TrainingPlanSession,
 } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
@@ -53,6 +55,16 @@ import { detectPhase, PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { cn } from "@/lib/utils";
 import { SessionPreviewPopover } from "./SessionPreviewPopover";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -473,6 +485,7 @@ function TrainingPlanEditor({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["training_plan_sessions", planId] });
     },
+    onError: mutationErrorToast("Sauvegarde impossible"),
   });
 
   const deleteSessionMut = useMutation({
@@ -480,6 +493,7 @@ function TrainingPlanEditor({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["training_plan_sessions", planId] });
     },
+    onError: mutationErrorToast("Suppression impossible"),
   });
 
   const updatePlan = useMutation({
@@ -488,6 +502,7 @@ function TrainingPlanEditor({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["training_plans"] });
     },
+    onError: mutationErrorToast("Modification impossible"),
   });
 
   // Append one empty week at the end : increment num_weeks. Sessions remain
@@ -615,14 +630,7 @@ function TrainingPlanEditor({
         day_of_week: picker.dayOfWeek,
         session_template_id: templateId,
       },
-      {
-        onSuccess: () => setPicker(null),
-        onError: (err: unknown) => {
-          toast.error("Erreur", {
-            description: err instanceof Error ? err.message : "Sauvegarde échouée",
-          });
-        },
-      },
+      { onSuccess: () => setPicker(null) },
     );
   };
 
@@ -986,7 +994,7 @@ function TrainingPlanEditor({
    Applications list (per-plan)
    ═══════════════════════════════════════════════════════════════════ */
 
-function PlanApplicationsList({
+export function PlanApplicationsList({
   planId,
   planNumWeeks,
 }: {
@@ -1011,10 +1019,15 @@ function PlanApplicationsList({
     staleTime: 5 * 60_000,
   });
 
+  // §395 (O4) — retrait confirmé : un tap ne retire plus le plan d'un nageur/groupe.
+  const [pendingRemove, setPendingRemove] = useState<TrainingPlanApplication | null>(null);
+
   const athleteName = (id: number | null): string =>
     athletes.find((a) => a.id === id)?.display_name ?? `Nageur #${id}`;
   const groupName = (id: number | null): string =>
     groups.find((g) => g.id === id)?.name ?? `Groupe #${id}`;
+  const targetLabel = (app: TrainingPlanApplication): string =>
+    app.target_user_id != null ? athleteName(app.target_user_id) : groupName(app.target_group_id);
 
   const deleteAppMut = useMutation({
     mutationFn: (id: number) => deleteTrainingPlanApplication(id),
@@ -1088,10 +1101,10 @@ function PlanApplicationsList({
               </div>
               <button
                 type="button"
-                onClick={() => deleteAppMut.mutate(app.id)}
+                onClick={() => setPendingRemove(app)}
                 disabled={deleteAppMut.isPending}
-                className="opacity-0 group-hover:opacity-100 inline-flex h-9 w-9 items-center justify-center rounded-full text-destructive hover:bg-destructive/10 shrink-0"
-                aria-label="Retirer cette application"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive shrink-0"
+                aria-label={`Retirer le plan de ${targetLabel(app)}`}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -1099,6 +1112,38 @@ function PlanApplicationsList({
           ))}
         </ul>
       )}
+
+      <AlertDialog
+        open={pendingRemove != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemove(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Retirer le plan de {pendingRemove ? targetLabel(pendingRemove) : ""} ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Ses séances disparaîtront de « Mon plan »
+              {pendingRemove?.target_group_id != null ? " pour tout le groupe" : ""}. Les séances
+              déjà faites restent dans l'historique. Tu pourras réappliquer le plan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingRemove) deleteAppMut.mutate(pendingRemove.id);
+                setPendingRemove(null);
+              }}
+            >
+              Retirer le plan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

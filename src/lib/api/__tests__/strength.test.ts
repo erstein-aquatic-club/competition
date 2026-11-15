@@ -563,3 +563,35 @@ describe("getStrengthSessionUsage + deleteStrengthSession", () => {
     await assert.rejects(() => deleteStrengthSession(8), /introuvable ou non autorisé/);
   });
 });
+
+// §395 (audit muscu 2ᵉ passe, O3) — UPDATE/DELETE refusés par RLS renvoient
+// 0 ligne sans erreur (§113) : l'UI annonçait « Exercice mis à jour »,
+// « Dossier renommé », « Déplacé », « Séance supprimée » sans effet.
+describe("§113 no-op — mutations catalogue et séance en cours", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+    updatedPayloads.length = 0;
+  });
+
+  const cases: [string, string, (m: typeof import("../strength.ts")) => Promise<unknown>][] = [
+    ["updateExercise", "dim_exercices", (m) => m.updateExercise({ id: 12, nom_exercice: "X" } as never)],
+    ["renameStrengthFolder", "strength_folders", (m) => m.renameStrengthFolder(5, "Cycle B")],
+    ["moveToFolder", "dim_exercices", (m) => m.moveToFolder(12, 3, "dim_exercices")],
+    ["deleteStrengthRun", "strength_session_runs", (m) => m.deleteStrengthRun(77)],
+  ];
+
+  for (const [name, table, call] of cases) {
+    it(`${name} : 0 ligne → rejet`, async () => {
+      scripts.push({ expect: table, result: { data: [], error: null } });
+      const m = await import("../strength.ts");
+      await assert.rejects(() => call(m), /introuvable ou non autoris/);
+    });
+
+    it(`${name} : 1 ligne → ok`, async () => {
+      scripts.push({ expect: table, result: { data: [{ id: 1 }], error: null } });
+      const m = await import("../strength.ts");
+      await call(m);
+    });
+  }
+});
