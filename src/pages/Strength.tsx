@@ -302,10 +302,10 @@ export default function Strength() {
     refetchExercises();
   };
 
-  const { data: oneRMs } = useQuery({
+  const { data: oneRMs, isFetching: oneRmsFetching, isSuccess: oneRmsLoaded } = useQuery({
     queryKey: ["1rm", user, userId],
     queryFn: () => get1RM({ athleteName: user, athleteId: userId }),
-    enabled: !!user,
+    enabled: !!user && !!userId,
   });
 
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
@@ -878,7 +878,7 @@ export default function Strength() {
               session={activeSession}
               exercises={exercises}
               oneRMs={oneRMs || []}
-              oneRmsReady={Array.isArray(oneRMs)}
+              oneRmsReady={isOnline && oneRmsLoaded && !oneRmsFetching && Array.isArray(oneRMs)}
               onManualOneRm={handleManualOneRm}
               exerciseNotes={exerciseNotes}
               onUpdateNote={(exerciseId, note) => updateNote.mutate({ exercise_id: exerciseId, notes: note })}
