@@ -2,7 +2,9 @@
 
 *Dernière mise à jour : 2026-11-15*
 
-*Dernière : 2026-11-15 — **§389 — Muscu : états d'erreur réseau explicites** (audit robustesse lot 1) : aperçu méso, génération, tuile méso et « Mon plan » affichent « chargement impossible + Réessayer » au lieu de « pas de bilan / aucun plan » ; l'aperçu ne calcule plus (ni n'applique) un plan sur KPI/échauffements manquants. Helper pur `summarizeLoadFailures` (6 tests) + `QueryErrorState` partagé. Reste lot 2 (suppression cycle coach sans confirmation, double-tap série).*
+*Dernière : 2026-11-15 — **§390 — Muscu : confirmation de suppression cycle/dossier + anti double-tap** (audit robustesse lot 2) : `ConfirmFolderDeleteDialog` (annonce les séances/exercices concernés) sur plans nageur + catalogue, `deleteStrengthFolder` détecte le no-op RLS (§113), `onError` toasté ; `WorkoutRunner` ignore un 2ᵉ « Valider série » < 700 ms (plus de série fantôme). +9 tests.*
+
+*§389 — **Muscu : états d'erreur réseau explicites** (audit robustesse lot 1) : aperçu méso, génération, tuile méso et « Mon plan » affichent « chargement impossible + Réessayer » au lieu de « pas de bilan / aucun plan » ; l'aperçu ne calcule plus (ni n'applique) un plan sur KPI/échauffements manquants. Helper pur `summarizeLoadFailures` (6 tests) + `QueryErrorState` partagé. Reste lot 2 (suppression cycle coach sans confirmation, double-tap série).*
 
 *§388 — **Stats physiques : fiche détail KPI au clic** : chaque KPI (détail, points forts, axes) devient cliquable et ouvre un bottom sheet — score & comparaison population, dernière mesure + décomposition des essais (`describeAttempts`), historique avec Δ vs mesure comparable précédente (`buildKpiHistoryRows`, `getKpiHistory`), protocole de mesure. Nouveaux `KpiDetailSheet.tsx` + `physicalStatsUi.tsx` (UI partagée). +7 tests purs. tsc 0, lint 0, node:test strength 32/32.*
 

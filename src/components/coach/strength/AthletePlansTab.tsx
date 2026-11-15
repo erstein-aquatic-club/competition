@@ -33,6 +33,7 @@ import {
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CopyToAthleteDialog } from "./CopyToAthleteDialog";
+import { ConfirmFolderDeleteDialog } from "./ConfirmFolderDeleteDialog";
 import { AddSessionSheet } from "./AddSessionSheet";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -330,6 +331,11 @@ function AthletePlanDetail({
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["strength_catalog_paginated"] });
       toast("Cycle supprimé");
+    },
+    onError: (err: unknown) => {
+      toast.error("Suppression impossible", {
+        description: err instanceof Error ? err.message : "Le cycle n'a pas été supprimé. Réessaie.",
+      });
     },
   });
 
@@ -686,6 +692,7 @@ function CycleCard({
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(cycle.name);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -719,6 +726,17 @@ function CycleCard({
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">
+      <ConfirmFolderDeleteDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        noun="cycle"
+        name={cycle.name}
+        itemCount={sessions.length}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          onDelete();
+        }}
+      />
       {/* Cycle header */}
       <div className="flex items-center gap-3 bg-muted/30 px-4 py-3">
         <div className={cn("w-1 h-6 rounded-full", color)} />
@@ -777,7 +795,7 @@ function CycleCard({
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-muted"
               onClick={() => {
                 setMenuOpen(false);
-                onDelete();
+                setConfirmDeleteOpen(true);
               }}
             >
               <Trash2 className="h-4 w-4" />

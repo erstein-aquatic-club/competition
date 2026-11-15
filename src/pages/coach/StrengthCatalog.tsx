@@ -69,6 +69,7 @@ import {
 import { MoveToFolderPopover } from "@/components/coach/strength/MoveToFolderPopover";
 import { ExercisePrioritySelector } from "@/components/coach/strength/ExercisePrioritySelector";
 import { WarmupRoutinesEditor } from "@/components/coach/strength/WarmupRoutinesEditor";
+import { ConfirmFolderDeleteDialog } from "@/components/coach/strength/ConfirmFolderDeleteDialog";
 // Lazy-loaded children : ne sont rendus qu'à l'ouverture de modals/sheets
 // ou via un onglet (TabsContent). Évite ~1100 LOC dans le bundle initial du wrapper.
 const CopyToAthleteDialog = lazyWithRetry(
@@ -328,14 +329,33 @@ const WarmupFields = ({
 
 function FolderDropdown({
   name,
+  itemCount,
+  item,
   onRename,
   onDelete,
 }: {
   name: string;
+  itemCount: number;
+  item: "séance" | "exercice";
   onRename: (newName: string) => void;
   onDelete: () => void;
 }) {
+  // Audit robustesse muscu (lot 2) — confirmation avant suppression (avant : 1 tap).
+  const [confirmOpen, setConfirmOpen] = useState(false);
   return (
+    <>
+    <ConfirmFolderDeleteDialog
+      open={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      noun="dossier"
+      name={name}
+      itemCount={itemCount}
+      item={item}
+      onConfirm={() => {
+        setConfirmOpen(false);
+        onDelete();
+      }}
+    />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -357,12 +377,13 @@ function FolderDropdown({
           Renommer
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+        <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
           <Trash2 className="h-4 w-4" />
           Supprimer
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
 
@@ -698,6 +719,11 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_catalog"] });
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast("Dossier supprimé");
+    },
+    onError: (err: unknown) => {
+      toast.error("Suppression impossible", {
+        description: err instanceof Error ? err.message : "Le dossier n'a pas été supprimé. Réessaie.",
+      });
     },
   });
 
@@ -1668,6 +1694,8 @@ export default function StrengthCatalog() {
                       <FolderDropdown
                         name={folder.name}
                         onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
+                        itemCount={folderSessions.length}
+                        item="séance"
                         onDelete={() => deleteFolderMut.mutate(folder.id)}
                       />
                     }
@@ -1739,6 +1767,8 @@ export default function StrengthCatalog() {
                     <FolderDropdown
                       name={folder.name}
                       onRename={(newName) => renameFolder.mutate({ id: folder.id, name: newName })}
+                      itemCount={folderExercises.length}
+                      item="exercice"
                       onDelete={() => deleteFolderMut.mutate(folder.id)}
                     />
                   }

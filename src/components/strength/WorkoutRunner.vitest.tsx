@@ -5,8 +5,8 @@
 //  - changer la pastille RIR met à jour la sélection ;
 //  - valider la série 1 calcule la 1RM via estimateOneRM(w, r, {rir}) et
 //    appelle onEstimationComplete avec cette valeur.
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 
 import { WorkoutRunner } from "@/components/strength/WorkoutRunner";
 import { estimateOneRM } from "@/lib/prDetection";
@@ -206,5 +206,67 @@ describe("§369 carte série 1 augmentée (jsdom)", () => {
     expect(withDefault).toBeGreaterThan(atFailure);
     // Et l'ancien comportement (effort undefined) équivalait bien à RIR 0.
     expect(estimateOneRM(60, 8, undefined)).toBe(atFailure);
+  });
+});
+
+// Audit robustesse muscu (lot 2, constat 4) — un double-tap sur « Valider
+// série » enregistrait une série FANTÔME : le 2ᵉ tap tombait sur le bouton
+// re-rendu de la série/l'exo suivant (sans repos auto, rien ne le recouvre).
+describe("anti double-tap « Valider série »", () => {
+  const twoExoSession = {
+    id: 77,
+    name: "Séance double-tap",
+    items: [
+      { exercise_id: 21, exercise_name: "Gainage", order_index: 0, sets: 1, reps: 5, rest_seconds: 0, percent_1rm: null, block: "main" },
+      { exercise_id: 22, exercise_name: "Pompes", order_index: 1, sets: 2, reps: 5, rest_seconds: 0, percent_1rm: null, block: "main" },
+    ],
+  } as unknown as StrengthSessionTemplate;
+  const catalog = [
+    { id: 21, nom_exercice: "Gainage", exercise_type: "strength" },
+    { id: 22, nom_exercice: "Pompes", exercise_type: "strength" },
+  ] as unknown as Exercise[];
+
+  function setup() {
+    const logged: Array<{ exercise_id: number; set_number?: number }> = [];
+    render(
+      <WorkoutRunner
+        session={twoExoSession}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={1}
+        userId={1}
+        onLogSets={async (blockLogs) => {
+          logged.push(...(blockLogs as typeof logged));
+        }}
+      />,
+    );
+    const goBtn = screen.queryByRole("button", { name: /On y va/i });
+    if (goBtn) fireEvent.click(goBtn);
+    return logged;
+  }
+
+  it("deux taps rapprochés sur la dernière série n'enregistrent qu'UNE série", async () => {
+    const logged = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Valider série" }));
+    await act(async () => {});
+    // 2ᵉ tap immédiat : le bouton affiché est désormais celui de l'exo suivant.
+    const next = screen.queryByRole("button", { name: "Valider série" });
+    if (next) fireEvent.click(next);
+    await act(async () => {});
+    expect(logged.map((l) => l.exercise_id)).toEqual([21]);
+  });
+
+  it("une validation volontaire après le délai anti-rebond est acceptée", async () => {
+    const logged = setup();
+    const t0 = Date.now();
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(t0);
+    fireEvent.click(screen.getByRole("button", { name: "Valider série" }));
+    await act(async () => {});
+    nowSpy.mockReturnValue(t0 + 5_000);
+    fireEvent.click(screen.getByRole("button", { name: "Valider série" }));
+    await act(async () => {});
+    nowSpy.mockRestore();
+    expect(logged.map((l) => l.exercise_id)).toEqual([21, 22]);
   });
 });

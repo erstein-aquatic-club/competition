@@ -399,3 +399,32 @@ describe("logStrengthSet — branch coverage", () => {
     );
   });
 });
+
+// Audit robustesse muscu (lot 2, constat 2) — §113-style : un DELETE refusé
+// par RLS renvoie { data: [], error: null }. Avant, deleteStrengthFolder
+// résolvait quand même → le coach voyait « Cycle supprimé » sans effet.
+describe("deleteStrengthFolder — détection du no-op silencieux", () => {
+  beforeEach(() => {
+    scripts.length = 0;
+    fromCalls.length = 0;
+  });
+
+  it("résout quand une ligne a bien été supprimée", async () => {
+    scripts.push({ expect: "strength_folders", result: { data: [{ id: 5 }], error: null } });
+    const { deleteStrengthFolder } = await import("../strength.ts");
+    await deleteStrengthFolder(5);
+    assert.deepEqual(fromCalls, ["strength_folders"]);
+  });
+
+  it("rejette quand aucune ligne n'est supprimée (RLS / déjà supprimé)", async () => {
+    scripts.push({ expect: "strength_folders", result: { data: [], error: null } });
+    const { deleteStrengthFolder } = await import("../strength.ts");
+    await assert.rejects(() => deleteStrengthFolder(5), /introuvable ou non autorisé/);
+  });
+
+  it("propage l'erreur Supabase", async () => {
+    scripts.push({ expect: "strength_folders", result: { data: null, error: { message: "Connection reset" } } });
+    const { deleteStrengthFolder } = await import("../strength.ts");
+    await assert.rejects(() => deleteStrengthFolder(5), /Connection reset/);
+  });
+});

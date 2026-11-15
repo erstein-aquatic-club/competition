@@ -4,6 +4,23 @@ Ce document trace l'avancement de **chaque patch** du projet. Il est la source d
 
 **Règle** : chaque lot de modifications (commit ou groupe de commits liés) doit avoir une entrée ici. Voir `docs/ROADMAP.md` § "Règles de documentation" pour le format détaillé.
 
+## §390 — Muscu : confirmation de suppression de cycle/dossier + anti double-tap « Valider série » (2026-11-15)
+
+**Contexte.** Audit robustesse & UX muscu (2026-11-15), lot 2 (constats 2 et 4).
+
+**Changements.**
+- **Constat 2 — suppression de cycle/dossier.** Avant : un tap dans le menu supprimait immédiatement (plans nageur `AthletePlansTab` ET catalogue `StrengthCatalog`), sans `onError`, et `deleteStrengthFolder` ne détectait pas le no-op RLS (§113) → « Cycle supprimé » affiché sans effet. Désormais :
+  - **`deleteStrengthFolder`** (`src/lib/api/strength.ts`) : `DELETE … RETURNING id` ; 0 ligne → erreur « Cycle introuvable ou non autorisé ». +3 tests (`src/lib/api/__tests__/strength.test.ts`).
+  - **`src/components/coach/strength/ConfirmFolderDeleteDialog.tsx` (79 l, +)** : AlertDialog « Supprimer « nom » ? » qui annonce le nombre de séances/exercices concernés (ils ne sont pas supprimés — FK `ON DELETE SET NULL` — mais sortent du cycle/dossier) ; helper pur `folderDeleteDescription` (accords singulier/pluriel, masculin/féminin), 4 tests.
+  - Branché sur `CycleCard` (`AthletePlansTab`) et `FolderDropdown` (`StrengthCatalog`, dossiers de séances et d'exercices) ; `onError` → toast « Suppression impossible » sur les deux mutations.
+- **Constat 4 — série fantôme au double-tap.** `isLoggingRef` ne couvrait que `onLogSets` (fire-and-forget, rend la main quasi immédiatement) → un 2ᵉ tap ~100 ms après tombait sur le bouton re-rendu de la série/exo suivant (sans repos auto rien ne le recouvre) et loggait une série jamais faite. Ajout d'un anti-rebond `VALIDATE_DEBOUNCE_MS = 700` (`lastValidateAtRef`) en tête de `handleValidateSet` (`WorkoutRunner.tsx`). +2 tests vitest jsdom (`WorkoutRunner.vitest.tsx`) : double-tap → 1 seule série (RED avant fix : série fantôme de l'exo 2) ; validation après le délai → acceptée.
+
+**Fichiers modifiés.** `src/lib/api/strength.ts`, `src/lib/api/__tests__/strength.test.ts`, `src/components/coach/strength/ConfirmFolderDeleteDialog.tsx` (+), `src/components/coach/strength/__tests__/ConfirmFolderDeleteDialog.test.tsx` (+), `src/components/coach/strength/AthletePlansTab.tsx`, `src/pages/coach/StrengthCatalog.tsx`, `src/components/strength/WorkoutRunner.tsx`, `src/components/strength/WorkoutRunner.vitest.tsx`.
+
+**Tests.** node:test 1779/1785 — 6 échecs **préexistants** inchangés (`strength.test.ts` `updateStrengthRun`/`reconcileStrengthRunLogs`, cf. §389). vitest 98/99 — 1 échec **préexistant hors périmètre** : `useStrengthWrapped.vitest.tsx` (fixtures datées mai 2026 → dépend de la date courante). NB : `npm test` enchaîne `node:test && vitest` → tant que les 6 échecs node:test persistent, vitest ne tourne pas via `npm test`. tsc 0, lint 0 erreur (warnings préexistants). RLS : non lancé — le changement n'ajoute qu'un `RETURNING` client, aucune policy modifiée, et le harness RLS ne couvre pas `strength_folders` ; le no-op RLS est couvert par test unitaire mocké. Pas de smoke navigateur.
+
+**Limites.** Constats restants de l'audit : 5 (texte écran vide « Mon plan »), 6 (onglet actif perdu après séance), 7 (indicateur « en attente de synchro »), 9-11.
+
 ## §389 — Muscu : les échecs réseau ne se déguisent plus en « pas de plan / pas de bilan » (2026-11-15)
 
 **Contexte.** Audit robustesse & UX du module muscu (2026-11-15), lot 1 (constats 1, 3, 8). Plusieurs écrans lisaient `data` avec une valeur par défaut (`= []`, `?? null`) sans regarder l'erreur React Query (les wrappers API lèvent bien via `assertSupabase`) : un échec réseau devenait un état métier trompeur — voire un plan calculé sur des données partielles.
