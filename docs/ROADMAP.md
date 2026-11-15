@@ -2,7 +2,9 @@
 
 *Dernière mise à jour : 2026-11-15*
 
-*Dernière : 2026-11-15 — **§394 — Muscu : plus de suppression destructrice ni de doublon de bilan** (audit robustesse 2ᵉ passe, lot 5) : exercice utilisé = archivé au lieu de supprimé (mig 00231 : `archived_at` + FK RESTRICT, fini la cascade sur séries/1RM) ; suppression de séance annonce les créneaux vidés ; routines d'échauffement non éditables sur échec de chargement ; tuile « Démarrer mon bilan » masquée tant que l'état est inconnu. mig 00231 appliquée en prod. Restent lots 6-8.*
+*Dernière : 2026-11-15 — **§395 — Muscu : échecs de mutation affichés, plus de succès fantôme, retrait de plan confirmé** (audit robustesse 2ᵉ passe, lot 6) : `mutationErrorToast` sur 12 mutations coach + garde-fou de test (toute mutation muscu doit avoir un `onError`) ; `RETURNING id` (§113) sur modifier exercice / renommer / déplacer / supprimer séance en cours ; retrait d'une application de plan visible et confirmé. Restent lots 7-8.*
+
+*§394 — Muscu : plus de suppression destructrice ni de doublon de bilan** (audit robustesse 2ᵉ passe, lot 5) : exercice utilisé = archivé au lieu de supprimé (mig 00231 : `archived_at` + FK RESTRICT, fini la cascade sur séries/1RM) ; suppression de séance annonce les créneaux vidés ; routines d'échauffement non éditables sur échec de chargement ; tuile « Démarrer mon bilan » masquée tant que l'état est inconnu. mig 00231 appliquée en prod. Restent lots 6-8.*
 
 *§393 — Muscu : passage de paramètres méso fiable, séries sans doublon, `strength.ts` sans `as any`** (audit robustesse lot 4, fin de l'audit) : `pendingMesocycleHandoff` (repli mémoire, fin de la boucle génération ↔ aperçu) ; `mergeRunLogs` idempotent (« Réessayer » ne duplique plus une série) ; 29 → 0 `as any` via `readLocalList<T>` (cache corrompu → `[]`), bug 1RM hors-ligne (`weight` undefined) corrigé au passage. +16 tests.*
 

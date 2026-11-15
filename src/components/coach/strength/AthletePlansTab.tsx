@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mutationErrorToast } from "@/lib/mutationErrorToast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CopyToAthleteDialog } from "./CopyToAthleteDialog";
 import { ConfirmFolderDeleteDialog } from "./ConfirmFolderDeleteDialog";
@@ -313,6 +314,7 @@ function AthletePlanDetail({
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast("Cycle créé");
     },
+    onError: mutationErrorToast("Création impossible"),
   });
 
   const renameFolder = useMutation({
@@ -322,6 +324,7 @@ function AthletePlanDetail({
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast("Renommé");
     },
+    onError: mutationErrorToast("Renommage impossible"),
   });
 
   const deleteFolderMut = useMutation({

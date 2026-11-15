@@ -158,17 +158,29 @@ export async function createExercise(exercise: Omit<Exercise, "id">) {
   return { status: "created" };
 }
 
+/**
+ * §395 — un UPDATE/DELETE refusé par RLS renvoie 0 ligne SANS erreur (§113) :
+ * à utiliser avec `.select("id")` pour ne jamais annoncer un succès fantôme.
+ */
+function assertRowsTouched(data: unknown, what: string): void {
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(`${what} introuvable ou non autorisé : rien n'a été modifié.`);
+  }
+}
+
 export async function updateExercise(exercise: Exercise) {
   const exercise_type = normalizeExerciseType(exercise.exercise_type);
 
   if (canUseSupabase()) {
     const dbRow = mapApiExerciseToDb({ ...exercise, exercise_type });
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("dim_exercices")
         .update(dbRow)
         .eq("id", exercise.id)
+        .select("id"),
     );
+    assertRowsTouched(data, "Exercice");
     return { status: "updated" };
   }
 
@@ -1027,12 +1039,14 @@ export async function updateStrengthRun(update: {
 
 export async function deleteStrengthRun(runId: number) {
   if (canUseSupabase()) {
-    assertSupabase(
+    const data = assertSupabase(
       await supabase
         .from("strength_session_runs")
         .delete()
         .eq("id", runId)
+        .select("id"),
     );
+    assertRowsTouched(data, "Séance");
     return { status: "deleted", source: "remote" as const };
   }
 
@@ -1766,7 +1780,10 @@ export async function createStrengthFolder(
 
 export async function renameStrengthFolder(id: number, name: string): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  assertSupabase(await supabase.from("strength_folders").update({ name }).eq("id", id));
+  const data = assertSupabase(
+    await supabase.from("strength_folders").update({ name }).eq("id", id).select("id"),
+  );
+  assertRowsTouched(data, "Dossier");
 }
 
 export async function deleteStrengthFolder(id: number): Promise<void> {
@@ -1787,7 +1804,10 @@ export async function moveToFolder(
   table: 'strength_sessions' | 'dim_exercices',
 ): Promise<void> {
   if (!canUseSupabase()) throw new Error("Supabase requis");
-  assertSupabase(await supabase.from(table).update({ folder_id: folderId }).eq("id", itemId));
+  const data = assertSupabase(
+    await supabase.from(table).update({ folder_id: folderId }).eq("id", itemId).select("id"),
+  );
+  assertRowsTouched(data, table === "dim_exercices" ? "Exercice" : "Séance");
 }
 
 // --- Duplication helpers ---

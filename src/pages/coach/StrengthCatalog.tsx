@@ -42,6 +42,7 @@ import { INTENSITY_METRICS, type IntensityMetric } from "@/lib/strength/intensit
 import { AlertCircle, Archive, ArchiveRestore, Plus, Edit2, Search, Dumbbell, Camera, Loader2, Trash2, FolderPlus, Copy, MoreHorizontal, Pencil, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { mutationErrorToast } from "@/lib/mutationErrorToast";
 import { invalidateStrengthPlanningQueries } from "@/lib/queryClient";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -603,6 +604,7 @@ export default function StrengthCatalog() {
       setExerciseDialogOpen(false);
       toast("Exercice ajouté");
     },
+    onError: mutationErrorToast("Création impossible"),
   });
 
   const createSession = useMutation({
@@ -648,6 +650,7 @@ export default function StrengthCatalog() {
       setEditingExercise(null);
       toast("Exercice mis à jour");
     },
+    onError: mutationErrorToast("Modification impossible"),
   });
 
   const invalidateExerciseLists = () => {
@@ -722,11 +725,13 @@ export default function StrengthCatalog() {
       setEditingSessionId(null);
       setNewSession({ title: "", description: "", cycle: "endurance", items: [], folder_id: null });
       toast("Séance mise à jour");
-    }
+    },
+    onError: mutationErrorToast("Modification impossible"),
   });
 
   const persistOrder = useMutation({
     mutationFn: (session: StrengthSessionTemplate) => persistStrengthSessionOrder(session),
+    onError: mutationErrorToast("Ordre non enregistré"),
   });
 
   const createFolder = useMutation({
@@ -739,6 +744,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast("Dossier créé");
     },
+    onError: mutationErrorToast("Création impossible"),
   });
 
   const renameFolder = useMutation({
@@ -748,6 +754,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["strength_folders"] });
       toast("Dossier renommé");
     },
+    onError: mutationErrorToast("Renommage impossible"),
   });
 
   const deleteFolderMut = useMutation({
@@ -775,6 +782,7 @@ export default function StrengthCatalog() {
       queryClient.invalidateQueries({ queryKey: ["exercises"] });
       toast("Déplacé");
     },
+    onError: mutationErrorToast("Déplacement impossible"),
   });
 
   const copyMutation = useMutation({
