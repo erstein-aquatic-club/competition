@@ -254,6 +254,9 @@ export const mapDbExerciseToApi = (row: Record<string, unknown>): Exercise => ({
   // §320 — priorité de sélection coach (défaut 0). Doit être lu ici sinon
   // éditer un exo écraserait la priorité seedée à 0.
   selection_priority: typeof row.selection_priority === "number" ? row.selection_priority : 0,
+  // §394 — archivage (mig 00231). Lu ici ; JAMAIS écrit par mapApiExerciseToDb
+  // (une édition ne doit pas désarchiver / archiver).
+  archived_at: typeof row.archived_at === "string" ? row.archived_at : null,
 });
 
 export const mapApiExerciseToDb = (exercise: Partial<Exercise>) => ({

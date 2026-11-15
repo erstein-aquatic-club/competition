@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { QueryErrorState } from "@/components/shared/QueryErrorState";
+import { summarizeLoadFailures } from "@/lib/queryLoadFailures";
 
 const ACTIVATION_BUCKETS: { key: string; label: string }[] = [
   { key: "upper_strength", label: "Force haut du corps" },
@@ -175,21 +177,32 @@ function RoutineListEditor({
 export function WarmupRoutinesEditor() {
   const queryClient = useQueryClient();
 
-  const { data: common = [], isLoading: commonLoading } = useQuery({
+  const commonQ = useQuery({
     queryKey: ["strength-warmup-common"],
     queryFn: () => getCommonWarmupRoutine(),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: activation = {}, isLoading: activationLoading } = useQuery({
+  const activationQ = useQuery({
     queryKey: ["strength-warmup-activation"],
     queryFn: () => getActivationRoutine(),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: catalog = [], isLoading: catalogLoading } = useQuery({
+  const catalogQ = useQuery({
     queryKey: ["strength-catalog-tagged"],
     queryFn: () => listCatalogExercisesTagged(),
     staleTime: 5 * 60 * 1000,
   });
+  const { data: common = [], isLoading: commonLoading } = commonQ;
+  const { data: activation = {}, isLoading: activationLoading } = activationQ;
+  const { data: catalog = [], isLoading: catalogLoading } = catalogQ;
+  // §394 (R2) — les « Enregistrer » REMPLACENT la liste serveur (RPC
+  // delete+insert) : on ne laisse jamais éditer une liste vide par défaut issue
+  // d'un échec de chargement (sinon routine du club écrasée en 1 tap).
+  const loadFailures = summarizeLoadFailures([
+    ["la routine articulaire", commonQ],
+    ["l'activation musculaire", activationQ],
+    ["le catalogue d'exercices", catalogQ],
+  ]);
 
   const commonMutation = useMutation({
     mutationFn: (ids: number[]) => setCommonWarmupRoutine(ids),
@@ -216,6 +229,16 @@ export function WarmupRoutinesEditor() {
   const loading = commonLoading || activationLoading || catalogLoading;
   if (loading) {
     return <p className="py-8 text-center text-sm text-muted-foreground">Chargement des routines…</p>;
+  }
+  if (loadFailures.hasFailure) {
+    return (
+      <QueryErrorState
+        title="Routines indisponibles"
+        description={`Chargement impossible : ${loadFailures.failedText}. Les routines enregistrées ne sont pas modifiées. Vérifie ta connexion, puis réessaie.`}
+        onRetry={loadFailures.retry}
+        isRetrying={loadFailures.isRetrying}
+      />
+    );
   }
 
   return (

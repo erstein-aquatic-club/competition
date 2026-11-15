@@ -84,7 +84,8 @@ function mapRow(row: DbRow): CatalogExercise {
  * contraindication_zones / is_core), prêt à être consommé par le moteur.
  *
  * Filtre serveur : `bucket IS NOT NULL` — les exercices non taggés sont
- * exclus (ils sont muets pour le moteur de toute façon).
+ * exclus (ils sont muets pour le moteur de toute façon) — et `archived_at IS
+ * NULL` (§394 : exercices archivés).
  */
 export async function listCatalogExercisesTagged(): Promise<CatalogExercise[]> {
   if (!canUseSupabase()) return [];
@@ -96,7 +97,9 @@ export async function listCatalogExercisesTagged(): Promise<CatalogExercise[]> {
           ' nb_series_endurance, nb_reps_endurance, pourcentage_charge_1rm_endurance, recup_series_endurance,' +
           ' nb_series_force, nb_reps_force, pourcentage_charge_1rm_force, recup_series_force',
       )
-      .not('bucket', 'is', null),
+      .not('bucket', 'is', null)
+      // §394 (R3) — un exo archivé n'est plus pioché par le moteur (historique conservé).
+      .is('archived_at', null),
   );
   // Cast via `unknown` : les types Supabase générés ne reflètent pas encore les
   // colonnes ajoutées par mig 00164 (bucket / level / contraindication_zones /

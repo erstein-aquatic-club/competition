@@ -70,7 +70,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/components/coach/CompetitionStartlist.tsx` | UI coach liste de départ liveffn — exporte `CompetitionStartlistPanel` (panneau Jour J embarquable sans Sheet, monté dans l'onglet Jour J de `CompetitionDetail` §362) : auto-match + dropdowns de correction persistés en map fusionnée, bascule 2 vues nageur/chrono, lignes enrichies perf+objectif, états loading/erreur+retry/vide ; l'URL liveffn est déplacée dans l'onglet Paramètres (source unique) ; lignes Jour J tactiles (§363) → `SwimmerRaceSheet`, `userId` exposé sur `StartlistRow` — §361, refactor §362, §363 | 616 lignes |
 | `src/components/coach/CoachMesocyclePanel.tsx` | **Panneau coach** dans l'onglet Planning de `CoachSwimmerFullView` — visibilité du mésocycle actif + raisonnement parsé du `bucket_priorities` jsonb (6 score bars + top 3 priorités + flags) + bouton Rejeter avec `AlertDialog` → `revertMesocycle` + historique compact — §293 Phase 6 | 538 lignes |
 | `src/lib/api/training-plans.ts` | CRUD training_plans + sessions + applications (§275.2) — 14 fonctions + helper `getActiveTrainingPlanApplicationsForUser` pour timeline derivation | 357 lignes |
-| `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM | ~1399 lignes |
+| `src/lib/api/strength.ts` | Exercices, sessions, runs, logs, 1RM ; usages/archivage exo (§394) | 1920 lignes |
 | `src/lib/api/records.ts` | Hall of fame, records club, perfs, FFN | ~631 lignes |
 | `src/lib/api/users.ts` | Profil, athlètes, approbation | ~450 lignes |
 | `src/lib/api/assignments.ts` | Assignments CRUD (sessions, slots, tracking) | ~1015 lignes |
@@ -126,7 +126,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/pages/StrengthQuestionnaire.tsx` | Questionnaire bilan muscu (§286, routes `/strength/questionnaire` nageur + `/coach/questionnaire/:athleteId` §299 coach) — `getLatestAssessment` → 3 cas ; 4 sections (douleurs, historique, mobilité, psychologie) ; submit `updateAssessmentQuestionnaire` + `upsertPainReports` ; done-state coach → « Noter le bilan physique » / KPIs (§302) | 560 lignes |
 | `src/pages/coach/StrengthAssessmentScreen.tsx` | Bilan physique coach (§287, routes `/coach/strength-assessment` + `/coach/strength-assessment/:athleteId` §302 cible persistante, coach/admin) — sélection nageur, `getLatestAssessment` → 4 cas, rubrique 0-3 G/D par axe via `AssessmentBilateralField` (§346) + note précédente (§301), **fil conducteur `BilanProgress`** + `BilanHistorySection` (§347) ; **édition d'un ancien bilan** (§348 : `editingAssessmentId`, bandeau « Édition du bilan du {date} » + Annuler, save vise l'ancien id) ; done-state → "Générer le mésocycle" + bannière profil incomplet ; submit `updateAssessmentPhysicalTests` | 1054 lignes |
 | `src/pages/coach/SwimCatalog.tsx` | Catalogue séances nage (coach) | ~1003 lignes |
-| `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) | ~1463 lignes |
+| `src/pages/coach/StrengthCatalog.tsx` | Builder muscu (coach) ; section « Archivés » (§394) | 1917 lignes |
 | `src/pages/Records.tsx` | Records personnels + FFN sync + virtualisation @tanstack/react-virtual grille natation (§270 R5 sub-§C) | 1517 lignes |
 | `src/components/records/RecordCard.tsx` | Card record de natation memoïsée — utilisée dans Records.tsx filteredSwimRecords.map (§267 R2 sub-§C) | 56 lignes |
 | `src/pages/RecordsClub.tsx` | Records club (sections nage, drill-down progressif) | ~840 lignes |
@@ -255,6 +255,7 @@ Convention colonnes : chemin, rôle (1 phrase), taille (mesurée via `wc -l`, ja
 | `src/hooks/__tests__/useDebouncedValue.test.ts` | 3 tests TDD (valeur initiale, délai respecté, debounce reset) (§270 R5 sub-§A) | 56 lignes |
 | `src/components/coach/strength/CopyToAthleteDialog.tsx` | Dialog copie séance/dossier vers autre nageur (§90) | |
 | `src/components/coach/strength/WarmupRoutinesEditor.tsx` | Éditeur coach des routines d'échauffement (§354) — onglet « Échauffement » de `StrengthCatalog`. Sous-composant `RoutineListEditor` (liste ↑↓/×/ajouter + Enregistrer dirty-aware) ; section Bloc 1 (routine commune) + 4 sous-sections d'activation par seau. Lit `getCommonWarmupRoutine`/`getActivationRoutine`/`listCatalogExercisesTagged`, sauve via `setCommonWarmupRoutine`/`setActivationRoutine`. | 263 lignes |
+| `src/components/coach/strength/ConfirmCatalogDeleteDialogs.tsx` | Confirmations de suppression du catalogue muscu (§394) : exercice (usages → archivage, sinon suppression) et séance (annonce créneaux/plans vidés) ; aucune action destructrice si usages inconnus | 187 lignes |
 | `src/components/strength/SessionBrowser.tsx` | Orchestrateur bibliothèque muscu nageur (§93) | |
 | `src/components/strength/TeamPlansSection.tsx` | Plans d'équipe visibles entre nageurs (§93) | |
 | `src/lib/strengthHistoryUtils.ts` | Helpers calcul historique muscu (tonnage, sRPE, groupByExercise) | ~80 lignes |

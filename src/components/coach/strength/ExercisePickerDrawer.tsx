@@ -4,6 +4,7 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 import { Check, ChevronDown, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Exercise } from "@/lib/api";
+import { selectableExercises } from "@/lib/strength/exerciseArchive";
 
 interface ExercisePickerDrawerProps {
   exercises: Exercise[];
@@ -15,8 +16,10 @@ export function ExercisePickerDrawer({ exercises, selectedId, onSelect }: Exerci
   const [open, setOpen] = useState(false);
 
   const current = exercises.find((ex) => ex.id === selectedId);
-  const strengthExercises = exercises.filter((ex) => ex.exercise_type !== "warmup");
-  const warmupExercises = exercises.filter((ex) => ex.exercise_type === "warmup");
+  // §394 — archivés masqués, sauf l'exercice déjà choisi (séance existante lisible).
+  const selectable = selectableExercises(exercises, selectedId);
+  const strengthExercises = selectable.filter((ex) => ex.exercise_type !== "warmup");
+  const warmupExercises = selectable.filter((ex) => ex.exercise_type === "warmup");
 
   const handleSelect = (exerciseId: number) => {
     onSelect(exerciseId);

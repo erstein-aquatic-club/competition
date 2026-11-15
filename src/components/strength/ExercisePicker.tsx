@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react";
 import { stripAccents } from "@/lib/utils";
 import { ExerciseGif } from "./ExerciseGif";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { selectableExercises } from "@/lib/strength/exerciseArchive";
 import type { Exercise } from "@/lib/api";
 
 interface ExercisePickerProps {
@@ -31,7 +32,8 @@ export function ExercisePicker({
 
   const filtered = useMemo(() => {
     const q = stripAccents(debouncedSearch.trim().toLowerCase());
-    let list = exercises.filter((e) => e.exercise_type === "strength");
+    // §394 — les exercices archivés ne sont plus proposés.
+    let list = selectableExercises(exercises).filter((e) => e.exercise_type === "strength");
     if (q) {
       list = list.filter((e) =>
         stripAccents((e.nom_exercice ?? "").toLowerCase()).includes(q)

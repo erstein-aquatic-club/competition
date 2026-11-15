@@ -95,6 +95,9 @@ export const normalizeExercise = (exercise: Record<string, unknown>): Exercise =
   // §320 — priorité de sélection coach (défaut 0). Lu ici pour ne pas l'écraser
   // au round-trip d'édition (le catalogue liste via normalizeExercise).
   selection_priority: typeof exercise.selection_priority === "number" ? exercise.selection_priority : 0,
+  // §394 — archivage (mig 00231). Lu ici ; JAMAIS écrit par mapApiExerciseToDb
+  // (une édition ne doit pas désarchiver / archiver).
+  archived_at: typeof exercise.archived_at === "string" ? exercise.archived_at : null,
 });
 
 // --- Session Mapping ---
