@@ -47,6 +47,7 @@ import {
 import { localStorageGet, localStorageSave } from './localStorage';
 import { reconcileMesocyclePayloads } from '../strength/mesocycleItemPayload';
 import { getMissingStrengthLogs } from '../strength/reconcileStrengthLogs';
+import { getQueue } from '../offlineQueue';
 import { isOneRmEligible } from '../strength/oneRmCalibration';
 
 /** §298 — true si l'estimation 1RM doit être ignorée : poids de corps (sentinel)
@@ -1300,6 +1301,31 @@ export async function getStrengthHistoryAggregate(
 
 // --- 1RM ---
 
+// Apply unsynchronized manual/calculated 1RM writes to the read model.
+// A PWA reload while offline must never treat a successfully queued manual
+// value as missing and ask the swimmer to test again.
+function includePendingOneRmUpdates(
+  rows: Array<{ exercise_id: number; weight: number; [key: string]: any }>,
+  athleteId: number | string | null,
+): typeof rows {
+  if (typeof window === "undefined" || athleteId == null) return rows;
+  const byExercise = new Map(rows.map((row) => [row.exercise_id, row]));
+  const updates = getQueue()
+    .filter((m) =>
+      m.type === "record-1rm-update" &&
+      Number(m.payload.athlete_id) === Number(athleteId)
+    )
+    .sort((a, b) => a.timestamp - b.timestamp);
+  for (const item of updates) {
+    const id = Number(item.payload.exercise_id);
+    const weight = Number(item.payload.one_rm);
+    if (!Number.isSafeInteger(id) || !Number.isFinite(weight) || weight <= 0) continue;
+    byExercise.set(id, { ...(byExercise.get(id) ?? {}), exercise_id: id, weight });
+  }
+  return [...byExercise.values()];
+}
+
+
 export async function get1RM(
   athlete:
     | string
@@ -1319,17 +1345,17 @@ export async function get1RM(
       query = query.eq("athlete_id", Number(athleteId));
     }
     const data = assertSupabase(await query);
-    return (data ?? []).map((record: any) => ({
+    return includePendingOneRmUpdates((data ?? []).map((record: any) => ({
       id: safeOptionalInt(record.id),
       athlete_id: safeOptionalInt(record.athlete_id),
       exercise_id: safeInt(record.exercise_id),
       weight: Number(record.one_rm ?? 0),
       recorded_at: record.recorded_at ?? null,
       notes: (record.notes as string) ?? null,
-    }));
+    })), athleteId);
   }
   const records = (localStorageGet(STORAGE_KEYS.ONE_RM) || []) as any[];
-  return records.filter((r: any) => r.athlete_name === athleteName);
+  return includePendingOneRmUpdates(records.filter((r: any) => r.athlete_name === athleteName), athleteId);
 }
 
 export async function update1RM(record: {
