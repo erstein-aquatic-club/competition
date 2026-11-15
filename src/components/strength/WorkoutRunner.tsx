@@ -433,7 +433,7 @@ export function WorkoutRunner({
   const firstMainStep = useMemo(() => findFirstMainStep(workoutPlan), [workoutPlan]);
 
   const percentValue = Number(currentBlock?.percent_1rm);
-  const hasPercent = Number.isFinite(percentValue) && percentValue > 0;
+  const hasPercent = canUseOneRm && Number.isFinite(percentValue) && percentValue > 0;
   const rm = hasPercent
     ? (runOneRms.get(currentBlock?.exercise_id ?? -1)
         ?? oneRMs.find((r) => r.exercise_id === currentBlock?.exercise_id)?.weight
@@ -1447,7 +1447,7 @@ export function WorkoutRunner({
         </div>
       )}
 
-      {canUseOneRm && currentBlock && (hasPercent || hasOneRmForCurrent) && (
+      {canUseOneRm && currentBlock && (oneRmsReady || hasOneRmForCurrent) && (hasPercent || hasOneRmForCurrent) && (
         <div className="rounded-xl border bg-muted/10 px-3 py-2 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">
@@ -1509,7 +1509,7 @@ export function WorkoutRunner({
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
-            Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {currentBlock ? formatSetTarget(currentBlock) : ""}
+            Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {currentBlock ? formatSetTarget(canUseOneRm ? currentBlock : { ...currentBlock, percent_1rm: 0 }) : ""}
             {currentSetKey && prSets.has(currentSetKey) && (
               <Trophy className="h-4 w-4 text-amber-500" aria-label="Record personnel" />
             )}
