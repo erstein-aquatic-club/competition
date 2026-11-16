@@ -53,6 +53,7 @@ jobs:
           src/lib/strength/__tests__/coachMesocycleAudit.test.ts
           src/lib/strength/__tests__/strengthPhaseStyles.test.ts
           src/lib/strength/__tests__/formatStrengthSessionTitle.test.ts
+          src/lib/strength/__tests__/unquantifiedPerformedExercises.test.ts
           src/lib/strength/__tests__/reconcileStrengthLogs.test.ts
           src/lib/__tests__/strengthAtomicSet.test.ts
           src/lib/__tests__/offlineQueue.test.ts
