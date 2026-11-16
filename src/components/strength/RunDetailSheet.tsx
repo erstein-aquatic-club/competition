@@ -23,6 +23,7 @@ import {
 } from "@/lib/strengthHistoryUtils";
 import { supabase } from "@/lib/supabase";
 import { canUseSupabase } from "@/lib/api/client";
+import { getUnquantifiedPerformedExercises } from "@/lib/strength/unquantifiedPerformedExercises";
 
 const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
   completed: { bg: "bg-status-success-bg", text: "text-status-success", label: "Terminée" },
@@ -100,6 +101,7 @@ export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDe
   const listVariants = reduce ? {} : staggerChildren;
   const itemVariants = reduce ? {} : listItem;
   const logs = run.logs ?? run.strength_set_logs ?? [];
+  const unquantifiedExercises = getUnquantifiedPerformedExercises(run, logs);
   const status = run.status ?? "completed";
   const style = statusStyle[status] ?? statusStyle.completed;
   const dateStr = run.started_at || run.date || run.created_at;
@@ -175,7 +177,7 @@ export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDe
         </div>
 
         {/* Exercises */}
-        {exerciseGroups.length > 0 && (
+        {(exerciseGroups.length > 0 || unquantifiedExercises.length > 0) && (
           <div className="mt-4 space-y-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Exercices</h3>
             <motion.div className="space-y-2" variants={listVariants} initial="hidden" animate="visible">
@@ -215,6 +217,16 @@ export function RunDetailSheet({ run, exerciseNames, open, onOpenChange }: RunDe
                       );
                     })}
                   </div>
+                </motion.div>
+              ))}
+              {unquantifiedExercises.map((ex) => (
+                <motion.div key={`reported-${ex.exerciseId}`} variants={itemVariants}
+                  className="rounded-xl border border-dashed bg-card p-2.5 space-y-1">
+                  <p className="text-[12px] font-semibold">{ex.name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Effectué · séries, répétitions et charge non renseignées
+                  </p>
+                  {ex.notes && <p className="text-[11px] text-muted-foreground">{ex.notes}</p>}
                 </motion.div>
               ))}
             </motion.div>
