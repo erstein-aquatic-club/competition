@@ -44,7 +44,7 @@ Le mouvement est utile comme **option avancée** pour le contrôle rotationnel, 
 
 Profil utilisé pour réflexion : force haut 3/5, puissance haut 3,5/5, force bas 5/5, puissance bas 3,5/5 ; priorité travail du tirage les mardis, séance sprint eau le lundi.
 
-La programmation actuelle de 32 semaines dans Supabase : lundi `Amorce sprint`, Box Jump (2–3 × 2), lancer latéral médecine-ball (2–3 × 3/côté), gainage frontal (1 court maintien). C'est raisonnablement court.
+La programmation actuelle de 32 semaines dans Supabase : lundi `Amorce sprint`, Box Jump (2–3 × 2), lancer latéral médecine-ball (2–3 × 3/côté), gainage frontal (1 court maintien). C'est raisonnablement court. Les autres séances contiennent déjà un Pallof le mardi, une planche latérale le jeudi et un gainage frontal le vendredi : il serait donc malvenu de lui ajouter systématiquement encore des exercices de tronc.
 
 Proposition (après test avec Manon / coach, pas déployée) :
 - Garder ce lundi très court, **2 exercices de puissance + un gainage facultatif très léger**, au lieu de copier les 4 blocs de François.
