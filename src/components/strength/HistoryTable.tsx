@@ -14,6 +14,7 @@ import type { LocalStrengthRun } from "@/lib/types";
 import { ExerciseProgressChart } from "./ExerciseProgressChart";
 import { RunDetailSheet } from "./RunDetailSheet";
 import { computeRunTonnage, computeRunSRPE, groupLogsByExercise } from "@/lib/strengthHistoryUtils";
+import { getUnquantifiedPerformedExercises } from "@/lib/strength/unquantifiedPerformedExercises";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Tous" },
@@ -212,6 +213,7 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
                   {expandedRunId === run.id && (() => {
                     const logs = run.logs ?? run.strength_set_logs ?? [];
                     const groups = groupLogsByExercise(logs, exerciseNames);
+                    const unquantifiedExercises = getUnquantifiedPerformedExercises(run, logs);
                     const tonnage = computeRunTonnage(logs);
                     const srpe = computeRunSRPE(run.rpe ?? run.feeling ?? null, run.duration ?? null);
                     return (
@@ -224,11 +226,18 @@ function HistoryTableImpl({ athleteName, athleteId, athleteKey }: HistoryTablePr
                       >
                         <div className="px-2.5 pb-2.5 pt-1 space-y-2">
                           {/* Exercise pills */}
-                          {groups.length > 0 && (
+                          {(groups.length > 0 || unquantifiedExercises.length > 0) && (
                             <div className="flex flex-wrap gap-1">
                               {groups.map((g) => (
                                 <span key={g.exerciseId} className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                   {g.exerciseName}
+                                </span>
+                              ))}
+                              {unquantifiedExercises.map((ex) => (
+                                <span key={`reported-${ex.exerciseId}`}
+                                  title={ex.notes ?? undefined}
+                                  className="rounded-full border border-dashed border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                                  {ex.name} · non quantifié
                                 </span>
                               ))}
                             </div>
