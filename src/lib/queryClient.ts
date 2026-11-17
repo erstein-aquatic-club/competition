@@ -38,6 +38,17 @@ for (const prefix of STRENGTH_PLAN_QUERY_PREFIXES) {
   });
 }
 
+// Session histories can be corrected after completion (coach or athlete).
+// Do not keep a ten-minute old result when the history sheet is reopened.
+for (const prefix of ["strength_history", "strength-run-summary"]) {
+  queryClient.setQueryDefaults([prefix], {
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
+  });
+}
+
 /** Refresh all variants of the strength-planning cache after any publication,
  * coach edit, realtime event or foreground resume. Active queries refetch now;
  * inactive ones are marked stale and will refetch on their next mount. */
