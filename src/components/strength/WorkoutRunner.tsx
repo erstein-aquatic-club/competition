@@ -1107,7 +1107,11 @@ export function WorkoutRunner({
     setChapterBlock(null);
     updateStep(workoutPlan.length + 1);
     // Le run reste in_progress : sa progression n'est plus à 100 %.
-    void onProgress?.(Math.round((workoutPlan.length / (workoutPlan.length + 1)) * 100));
+    if (onProgress) {
+      void Promise.resolve()
+        .then(() => onProgress(Math.round((workoutPlan.length / (workoutPlan.length + 1)) * 100)))
+        .catch(() => toast.error("Progression non synchronisée", { description: "La séance reste enregistrée localement." }));
+    }
     toast("Exercice ajouté", { description: exercise.nom_exercice });
   };
 
