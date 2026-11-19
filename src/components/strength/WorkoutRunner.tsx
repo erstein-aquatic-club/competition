@@ -648,6 +648,9 @@ export function WorkoutRunner({
     // UX4 (§343) — respecte `prefers-reduced-motion` (les autres animations le
     // font déjà via framer-motion ; les confettis sont en `element.animate()`).
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    // Web Animations API non disponible (WebView ancien / environnements de test).
+    // Une animation décorative ne doit jamais bloquer le bilan de séance.
+    if (typeof document.createElement("div").animate !== "function") return;
     const confettiColors = [
       colors.status.success,
       colors.chart[2],
