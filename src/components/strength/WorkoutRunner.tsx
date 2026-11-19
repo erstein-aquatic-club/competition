@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
+  ArrowUp,
   Check,
   CheckCircle2,
   Flame,
@@ -48,6 +49,7 @@ import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { formatPrep, formatWork, formatSetTarget, formatRest, itemPrescription } from "@/lib/strength/prescriptionDisplay";
+import { canMoveWorkoutItemUp, loadWorkoutOrder, moveWorkoutItemUp, normalizeWorkoutOrder, workoutOrderStorageKey } from "@/lib/strength/workoutOrder";
 
 /** Emit a short beep + vibration when the rest timer ends */
 /**
@@ -239,6 +241,26 @@ export function WorkoutRunner({
   const isOnline = useOnlineStatus();
 
   const [currentStep, setCurrentStep] = useState(initialStep ?? 1);
+  // L'ordre d'exécution est local à ce run ; le plan du coach est inchangé.
+  // Chargement synchrone pour reprendre le même ordre après un kill PWA.
+  const exerciseOrderKey = workoutOrderStorageKey(userId, runId);
+  const [itemOrder, setItemOrder] = useState<number[]>(() =>
+    loadWorkoutOrder(userId, runId, session.items?.length ?? 0),
+  );
+  const orderedItemIndices = useMemo(
+    () => normalizeWorkoutOrder(itemOrder, session.items?.length ?? 0),
+    [itemOrder, session.items?.length],
+  );
+  const workoutPlan = useMemo(
+    () => orderedItemIndices.map((index) => (session.items ?? [])[index]),
+    [orderedItemIndices, session.items],
+  );
+  useEffect(() => {
+    if (!exerciseOrderKey) return;
+    try {
+      window.localStorage.setItem(exerciseOrderKey, JSON.stringify(orderedItemIndices));
+    } catch { /* La séance reste utilisable si le stockage est saturé. */ }
+  }, [exerciseOrderKey, orderedItemIndices]);
   // §376 — latest-ref du step pour le clamp anti-retour de la réconciliation,
   // sans mettre currentStep dans les deps de l'effet (qui écraserait les
   // inputs à chaque avancement).
@@ -371,7 +393,6 @@ export function WorkoutRunner({
     setIsRestPaused(false);
   }, []);
 
-  const workoutPlan = session.items || [];
   const currentExerciseIndex = currentStep - 1;
   const currentBlock =
     currentStep > 0 && currentStep <= workoutPlan.length ? workoutPlan[currentExerciseIndex] : null;
@@ -681,7 +702,7 @@ export function WorkoutRunner({
       setCurrentStep((prev: number) => (prev >= 1 ? prev : 1));
       return;
     }
-    const blocks = session.items || [];
+    const blocks = workoutPlan;
     if (!blocks.length) return;
     const logsByExercise = new Map<number, SetLogEntry[]>();
     initialLogs.forEach((log: SetLogEntry, index: number) => {
@@ -756,6 +777,28 @@ export function WorkoutRunner({
   const updateStep = (nextStep: number) => {
     setCurrentStep(nextStep);
     onStepChange?.(nextStep);
+  };
+
+  const loggedExerciseIds = new Set(logs.map((log) => log.exercise_id));
+  const activeHasDraftInputs = Object.values(currentSetInputs).some((values) =>
+    values != null && Object.values(values).some((value) => value !== null && value !== undefined && value !== ""),
+  );
+
+  const moveExerciseEarlier = (fromIndex: number) => {
+    // Vérification dans l'action aussi, pour éviter une permutation durant
+    // la sauvegarde asynchrone d'une série.
+    if (isLoggingRef.current || !canMoveWorkoutItemUp(
+      workoutPlan, fromIndex, currentExerciseIndex, loggedExerciseIds, activeHasDraftInputs,
+    )) return;
+    setItemOrder((prev) => moveWorkoutItemUp(
+      normalizeWorkoutOrder(prev, session.items?.length ?? 0), fromIndex,
+    ));
+    if (fromIndex - 1 === currentExerciseIndex) {
+      // Les deux exercices sont intacts : ni série enregistrée ni saisie en cours.
+      setCurrentSetIndex(1);
+      setCurrentSetInputs({});
+      setSeriesSheetOpen(false);
+    }
   };
 
   const startRestTimer = (duration: number, type: "set" | "exercise" = "set") => {
@@ -1547,12 +1590,12 @@ export function WorkoutRunner({
       </Card>
 
       {currentBlock && currentBlock.block !== "warmup" && currentSetIndex === 1 && !currentLoggedSet &&
-        !prepsDone[String(currentStep)] && formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise) && (
+        !prepsDone[String((orderedItemIndices[currentExerciseIndex] ?? currentExerciseIndex) + 1)] && formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise) && (
         <div className="rounded-2xl border bg-muted/30 px-4 py-3 space-y-2">
           <p className="text-xs font-semibold">Préparation · {formatPrep(currentBlock, Number(activeWeight) || targetWeight, tracksWeight && !isBodyweightExercise)}</p>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String(currentStep)]: true }))}>Fait</Button>
-            <Button variant="ghost" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String(currentStep)]: true }))}>Passer</Button>
+            <Button variant="secondary" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String((orderedItemIndices[currentExerciseIndex] ?? currentExerciseIndex) + 1)]: true }))}>Fait</Button>
+            <Button variant="ghost" size="sm" onClick={() => setPrepsDone(prev => ({ ...prev, [String((orderedItemIndices[currentExerciseIndex] ?? currentExerciseIndex) + 1)]: true }))}>Passer</Button>
           </div>
         </div>
       )}
@@ -1705,6 +1748,7 @@ export function WorkoutRunner({
         <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl">
           <SheetHeader>
             <SheetTitle>Aperçu séance</SheetTitle>
+            <p className="text-xs text-muted-foreground">Pour changer l’ordre, remonte un exercice avec la flèche.</p>
           </SheetHeader>
           <div
             className="mt-4 space-y-2 overflow-y-auto overscroll-contain pb-8"
@@ -1751,14 +1795,34 @@ export function WorkoutRunner({
                       <div className="h-px flex-1 bg-border" />
                     </div>
                   )}
-                  <SetRow
-                    item={item}
-                    index={index}
-                    exercise={exercise}
-                    loggedSets={loggedSets}
-                    isActive={isActive}
-                    hasPr={hasPr}
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <SetRow
+                        item={item}
+                        index={index}
+                        exercise={exercise}
+                        loggedSets={loggedSets}
+                        isActive={isActive}
+                        hasPr={hasPr}
+                      />
+                    </div>
+                    {index > currentExerciseIndex &&
+                      (workoutPlan[index - 1]?.block ?? "main") === (item.block ?? "main") && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-11 w-11 shrink-0 rounded-xl"
+                        aria-label={`Faire passer ${item.exercise_name ?? exercise?.nom_exercice ?? "l'exercice"} avant ${workoutPlan[index - 1]?.exercise_name ?? "le précédent"}`}
+                        disabled={!canMoveWorkoutItemUp(
+                          workoutPlan, index, currentExerciseIndex, loggedExerciseIds, activeHasDraftInputs,
+                        )}
+                        onClick={() => moveExerciseEarlier(index)}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </React.Fragment>
               );
             })}
@@ -2005,7 +2069,7 @@ export function WorkoutRunner({
           open={substitutePickerOpen}
           onOpenChange={setSubstitutePickerOpen}
           exercises={exercises}
-          onSelect={(exercise) => onSubstitute(currentExerciseIndex, exercise)}
+          onSelect={(exercise) => onSubstitute(orderedItemIndices[currentExerciseIndex] ?? currentExerciseIndex, exercise)}
           title="Remplacer l'exercice"
         />
       )}
