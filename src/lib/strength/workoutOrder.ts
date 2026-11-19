@@ -59,3 +59,10 @@ export function moveWorkoutItemUp(order: number[], from: number): number[] {
   [next[from - 1], next[from]] = [next[from], next[from - 1]];
   return next;
 }
+
+/** À appeler uniquement après la clôture confirmée (ou mise en file offline). */
+export function clearWorkoutOrder(userId: number, runId: string | number | null | undefined): void {
+  const key = workoutOrderStorageKey(userId, runId);
+  if (!key || typeof window === "undefined") return;
+  try { window.localStorage.removeItem(key); } catch { /* Stockage indisponible */ }
+}
