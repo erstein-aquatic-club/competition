@@ -429,7 +429,7 @@ describe("ajouter un exercice depuis le bilan de fin", () => {
     await act(async () => {});
     expect(screen.getByText("Fin de séance")).toBeTruthy();
     expect(screen.getByText("Enregistrer et terminer")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.getByText("Séries").parentElement?.textContent).toContain("3");
   });
 
   it("n'ouvre pas de sélecteur vide quand tous les exercices sont déjà présents", () => {
