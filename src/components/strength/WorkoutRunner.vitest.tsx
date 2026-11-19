@@ -6,6 +6,7 @@
 //  - valider la série 1 calcule la 1RM via estimateOneRM(w, r, {rir}) et
 //    appelle onEstimationComplete avec cette valeur.
 import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 
 import { WorkoutRunner } from "@/components/strength/WorkoutRunner";
@@ -348,5 +349,104 @@ describe("permuter les exercices pendant le focus", () => {
       screen.getByRole("button", { name: "Faire passer Exercice 3 avant Exercice 2" })
         .hasAttribute("disabled"),
     ).toBe(true);
+  });
+});
+
+describe("ajouter un exercice depuis le bilan de fin", () => {
+  const completedSession = {
+    id: 515,
+    name: "Séance complétée",
+    items: [
+      { exercise_id: 71, exercise_name: "Premier", order_index: 0, sets: 1, reps: 5, rest_seconds: 0, percent_1rm: 0, block: "main" },
+      { exercise_id: 72, exercise_name: "Deuxième", order_index: 1, sets: 1, reps: 5, rest_seconds: 0, percent_1rm: 0, block: "main" },
+    ],
+  } as unknown as StrengthSessionTemplate;
+  const catalog = [
+    { id: 71, nom_exercice: "Premier", exercise_type: "strength" },
+    { id: 72, nom_exercice: "Deuxième", exercise_type: "strength" },
+    { id: 73, nom_exercice: "Exercice ajouté", exercise_type: "strength" },
+  ] as unknown as Exercise[];
+  const completedLogs = [
+    { exercise_id: 71, set_number: 1, reps: 5, weight: 20 },
+    { exercise_id: 72, set_number: 1, reps: 5, weight: 25 },
+  ];
+
+  function App({ onAdd }: { onAdd: (exercise: Exercise) => void }) {
+    const [session, setSession] = useState(completedSession);
+    return (
+      <WorkoutRunner
+        session={session}
+        exercises={catalog}
+        oneRMs={[]}
+        initialLogs={completedLogs}
+        initialStep={3}
+        onFinish={() => undefined}
+        onAddExercise={(exercise) => {
+          onAdd(exercise);
+          setSession((prev) => ({
+            ...prev,
+            items: [...(prev.items ?? []), {
+              exercise_id: exercise.id,
+              exercise_name: exercise.nom_exercice,
+              order_index: prev.items?.length ?? 0,
+              sets: 1,
+              reps: 8,
+              rest_seconds: 0,
+              percent_1rm: 0,
+              block: "main",
+            }],
+          }));
+        }}
+        userId={38}
+      />
+    );
+  }
+
+  it("ouvre réellement le sélecteur depuis la fin, puis revient à l'exercice ajouté", async () => {
+    const onAdd = vi.fn();
+    render(<App onAdd={onAdd} />);
+    expect(screen.getByText("Fin de séance")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter un exercice" }));
+    // Avant le correctif, le Sheet était uniquement monté dans la branche
+    // normale du runner, inaccessible dès qu'on atteignait l'écran de fin.
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Ajouter un exercice" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Premier" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Exercice ajouté" }));
+    await act(async () => {});
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd.mock.calls[0][0].id).toBe(73);
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Exercice ajouté");
+    expect(screen.queryByText("Fin de séance")).toBeNull();
+  });
+
+  it("enregistre les séries du nouvel exercice et retourne au bilan", async () => {
+    render(<App onAdd={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter un exercice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Exercice ajouté" }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Valider série" }));
+    await act(async () => {});
+    expect(screen.getByText("Fin de séance")).toBeTruthy();
+    expect(screen.getByText("Enregistrer et terminer")).toBeTruthy();
+    expect(screen.getByText("Séries").parentElement?.textContent).toContain("3");
+  });
+
+  it("n'ouvre pas de sélecteur vide quand tous les exercices sont déjà présents", () => {
+    render(
+      <WorkoutRunner
+        session={completedSession}
+        exercises={catalog.slice(0, 2)}
+        oneRMs={[]}
+        initialLogs={completedLogs}
+        initialStep={3}
+        onFinish={() => undefined}
+        onAddExercise={() => undefined}
+        userId={38}
+      />,
+    );
+    const add = screen.getByRole("button", { name: "Ajouter un exercice" });
+    expect(add.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText("Aucun autre exercice disponible.")).toBeTruthy();
   });
 });
