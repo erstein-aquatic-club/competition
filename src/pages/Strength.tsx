@@ -46,6 +46,7 @@ import { mergeRunLogs } from "@/lib/strength/mergeRunLogs";
 import { enqueue, isTransientError } from "@/lib/offlineQueue";
 import { startStrengthRunLocally, saveStrengthRun, markLocalStrengthRunCompleted } from "@/lib/api/strength";
 import { clearDraft } from "@/lib/unsavedDraftStore";
+import { clearWorkoutOrder, loadWorkoutOrder } from "@/lib/strength/workoutOrder";
 
 const normalizeStrengthCycle = (value?: string | null): StrengthCycleType => {
   if (value === "endurance" || value === "hypertrophie" || value === "force") {
@@ -477,6 +478,7 @@ export default function Strength() {
         return;
       }
       clearDraft(`workout_runner:${variables.run_id}`);
+      clearWorkoutOrder(userId ?? 0, variables.run_id);
       if (historyAthleteKey) {
         queryClient.setQueryData(
           ["strength_run_in_progress", historyAthleteKey],
@@ -1003,6 +1005,7 @@ export default function Strength() {
                     enqueue("strength-run-completed", offlinePayload as Record<string, unknown>, `strength-completed:${activeRunId}`);
                     markLocalStrengthRunCompleted(activeRunId, result.logs, true);
                     clearDraft(`workout_runner:${activeRunId}`);
+                    clearWorkoutOrder(userId ?? 0, activeRunId);
                     toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                     setScreenMode("summary");
                   } catch {
@@ -1018,6 +1021,7 @@ export default function Strength() {
                     await saveStrengthRun(offlinePayload);
                     markLocalStrengthRunCompleted(activeRunId, result.logs, false);
                     clearDraft(`workout_runner:${activeRunId}`);
+                    clearWorkoutOrder(userId ?? 0, activeRunId);
                     queryClient.invalidateQueries({ queryKey: ["strength_history"] });
                     queryClient.invalidateQueries({ queryKey: ["strength_run_in_progress"] });
                     queryClient.invalidateQueries({ queryKey: ["assignments"] });
@@ -1057,6 +1061,7 @@ export default function Strength() {
                       enqueue("strength-run-completed", offlinePayload as Record<string, unknown>, `strength-completed:${activeRunId}`);
                       markLocalStrengthRunCompleted(activeRunId, result.logs, true);
                       clearDraft(`workout_runner:${activeRunId}`);
+                      clearWorkoutOrder(userId ?? 0, activeRunId);
                       toast("Séance sauvegardée hors-ligne", { description: "Sera synchronisée au retour du réseau." });
                       setScreenMode("summary");
                     } catch {
@@ -1196,7 +1201,11 @@ export default function Strength() {
                     setActiveSession(session);
                     setActiveRunId(runId);
                     setActiveRunLogs(logs);
-                    setActiveRunnerStep(resolveNextStep(session?.items ?? [], logs, progressPct));
+                    const resumeItems = session?.items ?? [];
+                    const resumeOrder = loadWorkoutOrder(userId ?? 0, runId, resumeItems.length);
+                    setActiveRunnerStep(resolveNextStep(
+                      resumeOrder.map((index) => resumeItems[index]), logs, progressPct,
+                    ));
                     setScreenMode("focus");
                   }}
                 />
