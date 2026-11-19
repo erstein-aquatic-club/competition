@@ -47,6 +47,7 @@ import { detectPR, estimateOneRM } from "@/lib/prDetection";
 import type { PrDetection } from "@/lib/prDetection";
 import { needsOneRmCalibration } from "@/lib/strength/oneRmCalibration";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/unsavedDraftStore";
+import { selectableExercises } from "@/lib/strength/exerciseArchive";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { formatPrep, formatWork, formatSetTarget, formatRest, itemPrescription } from "@/lib/strength/prescriptionDisplay";
 import { canMoveWorkoutItemUp, loadWorkoutOrder, moveWorkoutItemUp, normalizeWorkoutOrder, workoutOrderStorageKey } from "@/lib/strength/workoutOrder";
@@ -255,6 +256,14 @@ export function WorkoutRunner({
     () => orderedItemIndices.map((index) => (session.items ?? [])[index]),
     [orderedItemIndices, session.items],
   );
+  // Éviter deux occurrences du même ID : le suivi des séries est indexé par
+  // exercise_id et fusionnerait les séries d'un exercice ajouté en doublon.
+  const additionalExercises = useMemo(() => {
+    const plannedIds = new Set(workoutPlan.map((item) => item.exercise_id));
+    return selectableExercises(exercises).filter(
+      (exercise) => exercise.exercise_type === "strength" && !plannedIds.has(exercise.id),
+    );
+  }, [exercises, workoutPlan]);
   useEffect(() => {
     if (!exerciseOrderKey) return;
     try {
@@ -1077,6 +1086,31 @@ export function WorkoutRunner({
     setShouldReplace(Boolean(nextValue));
   };
 
+  const handleContinueWithExercise = (exercise: Exercise) => {
+    if (!onAddExercise || isFinishing) return;
+    if (workoutPlan.some((item) => item.exercise_id === exercise.id)) {
+      toast.error("Exercice déjà présent dans la séance");
+      return;
+    }
+    onAddExercise(exercise);
+    // Revenir dans le runner dès que le parent ajoute l'item. Le pas
+    // « fin » de l'ancien plan est celui du nouvel exercice.
+    setContinuePickerOpen(false);
+    setHasCelebrated(false);
+    setCurrentSetIndex(1);
+    setCurrentSetInputs({});
+    setIsResting(false);
+    setIsRestPaused(false);
+    setRestEndAt(0);
+    setInputSheetOpen(false);
+    setSeriesSheetOpen(false);
+    setChapterBlock(null);
+    updateStep(workoutPlan.length + 1);
+    // Le run reste in_progress : sa progression n'est plus à 100 %.
+    void onProgress?.(Math.round((workoutPlan.length / (workoutPlan.length + 1)) * 100));
+    toast("Exercice ajouté", { description: exercise.nom_exercice });
+  };
+
   if (currentStep > workoutPlan.length) {
     return (
       <div className="space-y-6 animate-in fade-in">
@@ -1085,7 +1119,7 @@ export function WorkoutRunner({
             <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
               <CheckCircle2 className="h-12 w-12 text-primary" />
             </div>
-            <CardTitle className="text-3xl heading-display">Séance Terminée !</CardTitle>
+            <CardTitle className="text-3xl heading-display">Fin de séance</CardTitle>
             <CardDescription className="text-lg">
               Durée totale: {Math.floor(elapsedTime / 60)}m {elapsedTime % 60}s
             </CardDescription>
@@ -1104,15 +1138,23 @@ export function WorkoutRunner({
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <Button
-                variant="outline"
-                className="w-full rounded-2xl h-12"
-                onClick={() => setContinuePickerOpen(true)}
-              >
-                + Continuer — ajouter des exercices
-              </Button>
-            </div>
+            {onAddExercise && (
+              <div className="border-t pt-4 space-y-2">
+                <p className="text-sm font-semibold">Prolonger la séance</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-2xl h-12"
+                  disabled={isFinishing || additionalExercises.length === 0}
+                  onClick={() => setContinuePickerOpen(true)}
+                >
+                  Ajouter un exercice
+                </Button>
+                {additionalExercises.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Aucun autre exercice disponible.</p>
+                )}
+              </div>
+            )}
 
             {session.description?.includes("Eau :") && (
               <div className="rounded-xl bg-muted/40 px-3 py-2">
@@ -1169,10 +1211,19 @@ export function WorkoutRunner({
                 // or a successfully persisted offline queue entry.
               }}
             >
-              {isFinishing ? "Enregistrement…" : "Enregistrer & fermer"}
+              {isFinishing ? "Enregistrement…" : "Enregistrer et terminer"}
             </Button>
           </CardFooter>
         </Card>
+        {onAddExercise && (
+          <ExercisePicker
+            open={continuePickerOpen}
+            onOpenChange={setContinuePickerOpen}
+            exercises={additionalExercises}
+            onSelect={handleContinueWithExercise}
+            title="Ajouter un exercice"
+          />
+        )}
       </div>
     );
   }
@@ -2047,21 +2098,6 @@ export function WorkoutRunner({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Task 13: Continue picker from completion */}
-      {onAddExercise && (
-        <ExercisePicker
-          open={continuePickerOpen}
-          onOpenChange={setContinuePickerOpen}
-          exercises={exercises}
-          onSelect={(exercise) => {
-            onAddExercise(exercise);
-            setHasCelebrated(false);
-            updateStep(workoutPlan.length + 1);
-          }}
-          title="Ajouter un exercice"
-        />
-      )}
 
       {/* Task 14: Substitute picker in focus mode */}
       {onSubstitute && (
