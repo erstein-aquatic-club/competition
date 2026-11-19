@@ -328,9 +328,13 @@ describe("permuter les exercices pendant le focus", () => {
   });
 
   it("interdit la permutation si l'exercice en cours a déjà une série", () => {
+    const startedSession = {
+      ...session,
+      items: session.items?.map((item, index) => index === 1 ? { ...item, sets: 2 } : item),
+    } as StrengthSessionTemplate;
     render(
       <WorkoutRunner
-        session={session}
+        session={startedSession}
         exercises={catalog}
         oneRMs={[]}
         onFinish={() => undefined}
