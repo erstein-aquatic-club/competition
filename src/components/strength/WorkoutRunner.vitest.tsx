@@ -270,3 +270,79 @@ describe("anti double-tap « Valider série »", () => {
     expect(logged.map((l) => l.exercise_id)).toEqual([21, 22]);
   });
 });
+
+describe("permuter les exercices pendant le focus", () => {
+  const session = {
+    id: 91,
+    name: "Séance 3 exercices",
+    items: [
+      { exercise_id: 11, exercise_name: "Exercice 1", order_index: 0, sets: 1, reps: 5, rest_seconds: 0, block: "main" },
+      { exercise_id: 12, exercise_name: "Exercice 2", order_index: 1, sets: 1, reps: 5, rest_seconds: 0, block: "main" },
+      { exercise_id: 13, exercise_name: "Exercice 3", order_index: 2, sets: 1, reps: 5, rest_seconds: 0, block: "main" },
+    ],
+  } as unknown as StrengthSessionTemplate;
+  const catalog = [11, 12, 13].map((id, i) =>
+    ({ id, nom_exercice: `Exercice ${i + 1}`, exercise_type: "strength" } as Exercise),
+  );
+  const firstDone = [{ exercise_id: 11, set_number: 1, reps: 5, weight: 0 }];
+
+  it("remonte le 3e avant le 2e, sans altérer les exercices planifiés", () => {
+    render(
+      <WorkoutRunner
+        session={session}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={2}
+        initialLogs={firstDone}
+        userId={1}
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Exercice 2");
+    fireEvent.click(screen.getByRole("button", { name: "Voir les séries" }));
+    fireEvent.click(screen.getByRole("button", { name: "Faire passer Exercice 3 avant Exercice 2" }));
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Exercice 3");
+    expect(session.items?.[1]?.exercise_id).toBe(12);
+  });
+
+  it("retrouve le nouvel ordre après démontage/reprise PWA du même run", () => {
+    window.localStorage.removeItem("strength-exercise-order:1:910");
+    const props = {
+      session,
+      exercises: catalog,
+      oneRMs: [],
+      onFinish: () => undefined,
+      initialStep: 2,
+      initialLogs: firstDone,
+      runId: 910,
+      userId: 1,
+    };
+    const instance = render(<WorkoutRunner {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Voir les séries" }));
+    fireEvent.click(screen.getByRole("button", { name: "Faire passer Exercice 3 avant Exercice 2" }));
+    expect(JSON.parse(window.localStorage.getItem("strength-exercise-order:1:910") ?? "null")).toEqual([0, 2, 1]);
+    instance.unmount();
+    render(<WorkoutRunner {...props} />);
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Exercice 3");
+    window.localStorage.removeItem("strength-exercise-order:1:910");
+  });
+
+  it("interdit la permutation si l'exercice en cours a déjà une série", () => {
+    render(
+      <WorkoutRunner
+        session={session}
+        exercises={catalog}
+        oneRMs={[]}
+        onFinish={() => undefined}
+        initialStep={2}
+        initialLogs={[...firstDone, { exercise_id: 12, set_number: 1, reps: 5, weight: 0 }]}
+        userId={1}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Voir les séries" }));
+    expect(
+      screen.getByRole("button", { name: "Faire passer Exercice 3 avant Exercice 2" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+});
