@@ -108,7 +108,10 @@ export function getTrainingIntent(item: StrengthSessionItem | null | undefined, 
   if (/activation|mobilit|face pull|rotation externe|coiffe|dead bug|gainage|pallof|planche|ab wheel|étirement|poignet/.test(name)) return null;
   if (/explosif|dynamique|saut|jump|cmj|lancer|médecine.ball|medecine.ball|pliom|plyom|rebond|depth|drop landing/.test(name)) return "puissance";
   if (item.raw_payload?.periodization_cycle === "puissance") return "puissance";
-  if (item.raw_payload?.periodization_cycle === "hypertrophie" || (item.reps >= 6 && item.reps <= 12)) return "hypertrophie";
+  if (item.raw_payload?.periodization_cycle === "hypertrophie") return "hypertrophie";
+  if (item.reps >= 8 && item.reps <= 12) return "hypertrophie";
+  // 6–7 reps ne suffisent pas à qualifier une intention hypertrophie : on évite un faux badge.
+  if (item.reps >= 6 && item.reps <= 7) return null;
   return "force";
 }
 
