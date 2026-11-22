@@ -33,7 +33,7 @@ import { SessionSummary } from "@/components/strength/SessionSummary";
 import { SessionDetailPreview } from "@/components/strength/SessionDetailPreview";
 import { HistoryTable } from "@/components/strength/HistoryTable";
 import { useStrengthState } from "@/hooks/useStrengthState";
-import { orderStrengthItems } from "@/components/strength/utils";
+import { selectSessionItems, isPrescribedPlanSession } from "@/lib/strength/selectSessionItems";
 import { localStorageGet } from "@/lib/api/localStorage";
 import { STORAGE_KEYS } from "@/lib/api/client";
 import type { SetLogEntry, UpdateStrengthRunInput, OneRmEntry } from "@/lib/types";
@@ -115,18 +115,13 @@ const resolveExerciseParams = (
   };
 };
 
-const getCycleItems = (items: StrengthSessionTemplate["items"] = [], cycle: StrengthCycleType) => {
-  const filtered = items.filter((item) => item.cycle_type === cycle);
-  const cycleItems = filtered.length ? filtered : items;
-  return orderStrengthItems(cycleItems);
-};
-
 const resolveStrengthItems = (
   items: StrengthSessionItem[] = [],
   cycle: StrengthCycleType,
   exerciseLookup: Map<number, Exercise>,
+  isPrescribedPlan = false,
 ) =>
-  getCycleItems(items, cycle).map((item) => {
+  selectSessionItems(items, cycle, isPrescribedPlan).map((item) => {
     const params = resolveExerciseParams(exerciseLookup.get(item.exercise_id), cycle);
     return {
       ...item,
@@ -391,7 +386,10 @@ export default function Strength() {
 
   const activeFilteredItems = useMemo(() => {
     if (!activeSession) return [];
-    return resolveStrengthItems(activeSession.items ?? [], cycleType, exerciseLookup);
+    return resolveStrengthItems(
+      activeSession.items ?? [], cycleType, exerciseLookup,
+      isPrescribedPlanSession(activeSession),
+    );
   }, [activeSession, cycleType, exerciseLookup]);
 
   // Mutations
@@ -592,18 +590,21 @@ export default function Strength() {
     setOriginalItemCount(items.length);
   };
 
-  /** Launch from "Mon plan" — uses the session's own cycle, no cycle selector */
+  /** Les séances datées sont des prescriptions multi-intentions : conserver tous
+   * les exercices, quelles que soient leurs anciennes étiquettes cycle_type. */
   const startPlanSession = useCallback((session: StrengthSessionTemplate) => {
     const sessionItems = session.items ?? [];
     const cycle = normalizeStrengthCycle(session.cycle ?? sessionItems.find((item) => item.cycle_type)?.cycle_type);
-    const items = resolveStrengthItems(sessionItems, cycle, exerciseLookup);
+    const items = resolveStrengthItems(sessionItems, cycle, exerciseLookup, true);
     if (items.length === 0) {
       toast("Séance vide", { description: "Aucun exercice n'est disponible pour cette séance." });
       return;
     }
     setIsPlanMode(true);
     setCycleType(cycle);
-    setActiveSession({ ...session, cycle, items });
+    // Ce marqueur accompagne le snapshot local pour préserver la prescription
+    // complète lors de la reprise iOS/PWA et au lancement du Focus.
+    setActiveSession({ ...session, cycle, items, is_prescribed_plan: true });
     setActiveAssignment(null);
     setActiveRunId(null);
     setActiveRunLogs(null);
@@ -1248,7 +1249,7 @@ export default function Strength() {
                   session={activeSession}
                   assignment={activeAssignment}
                   cycleType={cycleType}
-                  cycleOptions={isPlanMode ? [] : cycleOptions}
+                  cycleOptions={isPlanMode || isPrescribedPlanSession(activeSession) ? [] : cycleOptions}
                   exercises={exercises}
                   oneRMs={oneRMs || []}
                   saveState={saveState}
