@@ -64,6 +64,7 @@ jobs:
           src/components/strength/ContrastFocus.vitest.tsx
           src/components/strength/ContrastPairPreviewCard.vitest.tsx
           src/lib/strength/contrast.vitest.ts
+          src/lib/strength/selectSessionItems.vitest.ts
           src/hooks/__tests__/useStrengthStateRestore.vitest.tsx
       - name: Production build (including Workbox)
         run: npm run build

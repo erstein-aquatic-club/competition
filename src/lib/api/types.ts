@@ -80,6 +80,10 @@ export interface StrengthSessionTemplate {
   description: string;
   cycle: StrengthCycleType;
   cycle_type?: StrengthCycleType | null;
+  /** Marqueur client : la séance datée de « Mon plan » contient une prescription
+   * complète et ne doit pas être filtrée par cycle_type. Persisté lors de la
+   * reprise PWA, jamais stocké en table strength_sessions. */
+  is_prescribed_plan?: boolean;
   items?: StrengthSessionItem[];
   folder_id?: number | null;
 }
