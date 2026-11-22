@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StrengthSessionItem } from "@/lib/api/types";
 import {
   expandContrastPlan, getContrastRound, contrastSetNumber, validContrastPair,
-  validateContrastPlan, getTrainingIntent, isContrastRoundLogged,
+  validateContrastPlan, getTrainingIntent, isContrastRoundLogged, countPrimaryExercises, countPowerReminders,
 } from "./contrast";
 
 const make = (exercise_id: number, role?: "force" | "power", sets = 3): StrengthSessionItem => ({
@@ -14,6 +14,17 @@ describe("contrast plan", () => {
   it("keeps ordinary sessions untouched", () => {
     const items = [make(1), make(2)];
     expect(expandContrastPlan(items)).toEqual(items);
+  });
+  it("counts a valid power recall as part of the heavy exercise, never as a second principal movement", () => {
+    const items = [make(1, "force"), make(2, "power"), make(3)];
+    expect(countPrimaryExercises(items)).toBe(2);
+    expect(countPowerReminders(items)).toBe(1);
+    expect(countPrimaryExercises([make(1), make(2)])).toBe(2);
+    const invalid = [make(1, "force"), make(2, "power", 2)];
+    expect(countPrimaryExercises(invalid)).toBe(2);
+    expect(countPowerReminders(invalid)).toBe(0);
+    // Le nombre d'items backend reste inchangé : logs/charges indépendants.
+    expect(items).toHaveLength(3);
   });
   it("interleaves force and plyometric series without rest between A and B", () => {
     const items = [make(1, "force"), make(2, "power"), make(3)];
