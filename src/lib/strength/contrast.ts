@@ -103,7 +103,8 @@ export function getTrainingIntent(item: StrengthSessionItem | null | undefined, 
   if (getContrastPair(item)?.role === "force") return "force";
   if (getContrastPair(item)?.role === "power") return "puissance";
   if (item.block === "warmup" || item.raw_payload?.rest_day === true) return null;
-  const name = (exerciseName ?? item.exercise_name ?? item.raw_payload?.original_exercise_name ?? "").toString().toLowerCase();
+  const rawName = item.raw_payload?.original_exercise_name;
+  const name = (exerciseName ?? item.exercise_name ?? (typeof rawName === "string" ? rawName : "")).toLowerCase();
   if (/activation|mobilit|face pull|rotation externe|coiffe|dead bug|gainage|pallof|planche|ab wheel|étirement|poignet/.test(name)) return null;
   if (/explosif|dynamique|saut|jump|cmj|lancer|médecine.ball|medecine.ball|pliom|plyom|rebond|depth|drop landing/.test(name)) return "puissance";
   if (item.raw_payload?.periodization_cycle === "puissance") return "puissance";
