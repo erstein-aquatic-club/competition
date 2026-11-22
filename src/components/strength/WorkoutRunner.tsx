@@ -645,10 +645,14 @@ export function WorkoutRunner({
     return map;
   }, [logs]);
 
-  const currentSetKey = currentBlock ? `${currentBlock.exercise_id}-${currentSetIndex}` : null;
+  const effectiveSetNumber = contrastSetNumber(currentBlock, currentSetIndex);
+  const currentSetKey = currentBlock ? `${currentBlock.exercise_id}-${effectiveSetNumber}` : null;
   const currentLoggedSet = currentSetKey ? logLookup.get(currentSetKey) : null;
+  const previousContrastWeight = contrastRound && contrastRound.round > 1
+    ? logLookup.get(`${currentBlock?.exercise_id}-${contrastRound.round - 1}`)?.weight
+    : undefined;
   const activeWeight =
-    currentLoggedSet?.weight ?? currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue;
+    currentLoggedSet?.weight ?? currentSetInputs[currentSetIndex - 1]?.weight ?? previousContrastWeight ?? targetValue;
   const activeReps =
     currentLoggedSet?.reps ??
     currentSetInputs[currentSetIndex - 1]?.reps ??
@@ -745,9 +749,11 @@ export function WorkoutRunner({
     const effectiveStep = Math.max(resolvedStep, currentStepRef.current);
     if (effectiveStep > 0 && effectiveStep <= blocks.length) {
       const block = blocks[effectiveStep - 1];
-      const existing = logsByExercise.get(block.exercise_id) ?? [];
+      const round = getContrastRound(block);
+      const allExisting = logsByExercise.get(block.exercise_id) ?? [];
+      const existing = round ? allExisting.filter((log) => resolveSetNumber(log, 1) === round.round) : allExisting;
       const inputs = existing.reduce((acc: Record<number, SetInputValues>, log: SetLogEntry, index: number) => {
-        const setNumber = resolveSetNumber(log, index + 1);
+        const setNumber = round ? 1 : resolveSetNumber(log, index + 1);
         acc[setNumber - 1] = {
           reps: log.reps ?? undefined,
           weight: log.weight ?? undefined,
@@ -764,7 +770,7 @@ export function WorkoutRunner({
         }
         return inputs;
       });
-      const nextSetIndex = Math.min(block.sets ?? 1, existing.length + 1);
+      const nextSetIndex = round ? 1 : Math.min(block.sets ?? 1, existing.length + 1);
       setCurrentSetIndex(nextSetIndex);
     } else {
       setCurrentSetInputs({});
@@ -809,6 +815,7 @@ export function WorkoutRunner({
   );
 
   const moveExerciseEarlier = (fromIndex: number) => {
+    if (hasContrastPairs) return;
     // Vérification dans l'action aussi, pour éviter une permutation durant
     // la sauvegarde asynchrone d'une série.
     if (isLoggingRef.current || !canMoveWorkoutItemUp(
@@ -906,11 +913,11 @@ export function WorkoutRunner({
     const setDifficultyValue = currentSetInputs[currentSetIndex - 1]?.difficulty ?? null;
     const newLog = {
       exercise_id: currentBlock.exercise_id,
-      set_number: currentSetIndex,
+      set_number: effectiveSetNumber,
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
       weight: isBodyweightExercise
         ? BODYWEIGHT_SENTINEL
-        : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue),
+        : (currentSetInputs[currentSetIndex - 1]?.weight ?? previousContrastWeight ?? targetValue),
       difficulty: setDifficultyValue,
       notes: needsAssistanceLog ? currentSetInputs[currentSetIndex - 1]?.notes?.trim() || null : null,
     };
@@ -930,7 +937,7 @@ export function WorkoutRunner({
       const exName = currentExerciseDef?.nom_exercice ?? "Exercice";
       const pr = detectPR({ weight: logWeight, reps: logReps, difficulty: newLog.difficulty }, currentBest1rm, exName);
       if (pr) {
-        const setKey = `${currentBlock.exercise_id}-${currentSetIndex}`;
+        const setKey = `${currentBlock.exercise_id}-${effectiveSetNumber}`;
         setPrSets((prev) => new Set(prev).add(setKey));
         toast("🏆 Nouveau record !", { description: `1RM estimé : ${pr.newValue}kg (+${pr.improvement}%)` });
       }
