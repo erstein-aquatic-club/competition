@@ -7,6 +7,7 @@ import {
   formatApproxMinutes,
 } from "@/lib/strength/sessionDuration";
 import type { StrengthSessionItem } from "@/lib/api/types";
+import { expandContrastPlan } from "@/lib/strength/contrast";
 
 function makeItem(overrides: Partial<StrengthSessionItem> = {}): StrengthSessionItem {
   return {
@@ -74,7 +75,7 @@ describe("estimateStrengthSessionDurationSeconds", () => {
     // Trois tours : 3×(force 60s + rappel 15s + repos 180s) = 765s.
     const total = estimateStrengthSessionDurationSeconds([a,b]);
     assert.equal(total, 765);
-    assert.equal(estimateRemainingStrengthSessionDurationSeconds([a,b],1,1), 765);
+    assert.equal(estimateRemainingStrengthSessionDurationSeconds(expandContrastPlan([a,b]),1,1), 765);
   });
   it("inclut les items d'échauffement/mobilité", () => {
     // warmup 2×(60+30)=180 + main 4×(60+90)=600 → 780
