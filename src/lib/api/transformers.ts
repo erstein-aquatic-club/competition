@@ -26,6 +26,7 @@ export interface DbStrengthItemPayload {
   notes?: string;
   /** §298 — Cible absolue (cm/s) prescrite par le coach. NULL = libre. */
   target_intensity?: number | null;
+  raw_payload?: Record<string, unknown> | null;
 }
 
 export interface PreparedStrengthItems {
@@ -63,6 +64,7 @@ export const prepareStrengthItemsPayload = (session: {
       rest_series_s: item.rest_seconds,
       notes: item.notes,
       target_intensity: item.target_intensity ?? null,
+      raw_payload: item.raw_payload ?? null,
     }));
   return { cycle, normalizedItems, itemsPayload };
 };
@@ -88,6 +90,7 @@ export const mapItemsForDbInsert = (
     rest_series_s: item.rest_series_s,
     notes: item.notes,
     target_intensity: item.target_intensity ?? null,
+    raw_payload: item.raw_payload ?? null,
   }));
 
 // --- Strength Run Transformers ---
