@@ -27,6 +27,7 @@ import { Dumbbell, AlertCircle, CloudUpload } from "lucide-react";
 import { toast } from "sonner";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { WorkoutRunner, resolveNextStep } from "@/components/strength/WorkoutRunner";
+import { expandContrastPlan, getContrastPair } from "@/lib/strength/contrast";
 import { SessionBrowser } from "@/components/strength/SessionBrowser";
 import { SessionSummary } from "@/components/strength/SessionSummary";
 import { SessionDetailPreview } from "@/components/strength/SessionDetailPreview";
@@ -1202,9 +1203,11 @@ export default function Strength() {
                     setActiveRunId(runId);
                     setActiveRunLogs(logs);
                     const resumeItems = session?.items ?? [];
-                    const resumeOrder = loadWorkoutOrder(userId ?? 0, runId, resumeItems.length);
+                    const resumeOrder = resumeItems.some((item) => getContrastPair(item))
+                      ? resumeItems.map((_, index) => index)
+                      : loadWorkoutOrder(userId ?? 0, runId, resumeItems.length);
                     setActiveRunnerStep(resolveNextStep(
-                      resumeOrder.map((index) => resumeItems[index]), logs, progressPct,
+                      expandContrastPlan(resumeOrder.map((index) => resumeItems[index])), logs, progressPct,
                     ));
                     setScreenMode("focus");
                   }}
