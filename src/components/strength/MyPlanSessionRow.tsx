@@ -2,6 +2,7 @@ import { ChevronRight, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WeekSession } from "@/lib/strength/strengthPlanWeeks";
 import { formatStrengthSessionTitle } from "@/lib/strength/formatStrengthSessionTitle";
+import { countPrimaryExercises, countPowerReminders } from "@/lib/strength/contrast";
 
 interface MyPlanSessionRowProps {
   weekSession: WeekSession;
@@ -20,13 +21,16 @@ const DAY_COLORS: Record<string, string> = {
 
 export function MyPlanSessionRow({ weekSession, onSelect }: MyPlanSessionRowProps) {
   const { session, dayLabel, cleanTitle } = weekSession;
-  const itemCount = session.items?.length ?? 0;
+  const itemCount = countPrimaryExercises(session.items ?? []);
+  const reminders = countPowerReminders(session.items ?? []);
+  const title = formatStrengthSessionTitle(cleanTitle);
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      className="w-full min-w-0 flex items-center gap-2 h-10 px-2.5 rounded-lg bg-card border border-border/50 active:scale-[0.99] transition-transform overflow-hidden"
+      className="w-full min-w-0 flex items-center gap-2 min-h-10 px-2.5 py-2 rounded-lg bg-card border border-border/50 active:scale-[0.99] transition-transform overflow-hidden"
+      title={title}
     >
       {dayLabel ? (
         <span
@@ -41,10 +45,10 @@ export function MyPlanSessionRow({ weekSession, onSelect }: MyPlanSessionRowProp
         <Dumbbell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       )}
 
-      <span className="text-[12px] font-medium truncate flex-1 text-left">{formatStrengthSessionTitle(cleanTitle)}</span>
+      <span className="text-[12px] font-medium min-w-0 flex-1 text-left leading-tight line-clamp-2 break-words">{title}</span>
 
       <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-        {itemCount} ex.
+        {itemCount} ex.{reminders > 0 && <span title={`${reminders} rappel(s) de puissance`}> +{reminders}↗</span>}
       </span>
 
       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
