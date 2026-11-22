@@ -62,6 +62,7 @@ jobs:
           npx vitest run --config vitest.config.unit.ts
           src/components/strength/WorkoutRunner.vitest.tsx
           src/components/strength/ContrastFocus.vitest.tsx
+          src/components/strength/ContrastPairPreviewCard.vitest.tsx
           src/lib/strength/contrast.vitest.ts
           src/hooks/__tests__/useStrengthStateRestore.vitest.tsx
       - name: Production build (including Workbox)

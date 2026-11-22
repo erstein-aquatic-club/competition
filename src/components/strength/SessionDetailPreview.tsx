@@ -3,6 +3,7 @@ import { StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment, Str
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
 import { getContrastPair, validContrastPair } from "@/lib/strength/contrast";
+import { ContrastPairPreviewCard } from "./ContrastPairPreviewCard";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { Button } from "@/components/ui/button";
 import {
@@ -177,16 +178,17 @@ export function SessionDetailPreview({
         </div>
       </div>
 
-      {/* Description (if any) — kept minimal */}
       {session.description && (
-        <p className="text-[13px] text-muted-foreground leading-relaxed px-1">
-          {session.description}
-        </p>
+        <details className="px-1">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Objectif de séance</summary>
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{session.description}</p>
+        </details>
       )}
 
       {/* ── Exercise list — inline GIF + expandable details ── */}
       <motion.div className="space-y-1.5" variants={listVariants} initial="hidden" animate="visible">
         {items.map((item, index) => {
+          if (index > 0 && validContrastPair(items[index - 1], item)) return null;
           const exercise = exerciseLookup.get(item.exercise_id);
           const percentValue = Number(item.percent_1rm);
           const hasPercent = Number.isFinite(percentValue) && percentValue > 0;
@@ -253,11 +255,23 @@ export function SessionDetailPreview({
                 </div>
               )}
               {contrastStart && (
-                <div className="rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
-                  Contraste · {item.sets} tours : force → puissance → {getContrastPair(item)!.rest_seconds}s de repos
-                </div>
+                <motion.div variants={itemVariants}>
+                  <ContrastPairPreviewCard first={item} second={items[index + 1]}
+                    firstName={exercise?.nom_exercice ?? item.exercise_name}
+                    secondName={exerciseLookup.get(items[index + 1].exercise_id)?.nom_exercice ?? items[index + 1].exercise_name}
+                    firstImage={exercise?.illustration_gif}
+                    secondImage={exerciseLookup.get(items[index + 1].exercise_id)?.illustration_gif}
+                    detailed
+                    onReplaceFirst={onSubstitute ? () => withDisclaimer(() => {
+                      setPickerTargetIndex(index); setPickerOpen(true);
+                    }) : undefined}
+                    onReplaceSecond={onSubstitute ? () => withDisclaimer(() => {
+                      setPickerTargetIndex(index + 1); setPickerOpen(true);
+                    }) : undefined}
+                  />
+                </motion.div>
               )}
-              <motion.div variants={itemVariants}>
+              {!contrastStart && <motion.div variants={itemVariants}>
                 <Collapsible
                   open={isExpanded}
                   onOpenChange={(open) => setExpandedIndex(open ? index : null)}
@@ -380,11 +394,11 @@ export function SessionDetailPreview({
                         )}
                       </div>
 
-                      {/* Notes coach */}
                       {notes && (
-                        <p className="text-xs text-muted-foreground leading-relaxed italic">
-                          💬 {notes}
-                        </p>
+                        <details>
+                          <summary className="cursor-pointer text-xs font-medium text-primary">Consignes</summary>
+                          <p className="mt-1 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{notes}</p>
+                        </details>
                       )}
 
                       {/* Replace action */}
@@ -407,7 +421,7 @@ export function SessionDetailPreview({
                   </motion.div>
                 </CollapsibleContent>
               </Collapsible>
-            </motion.div>
+            </motion.div>}
             </Fragment>
           );
         })}

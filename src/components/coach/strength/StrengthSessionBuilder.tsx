@@ -7,7 +7,8 @@ import { SessionMetadataForm } from "../shared/SessionMetadataForm";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
+import { getContrastPair, validContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
+import { ContrastPairPreviewCard } from "@/components/strength/ContrastPairPreviewCard";
 import { FormActions } from "../shared/FormActions";
 import { StrengthExerciseCard } from "./StrengthExerciseCard";
 import { cn } from "@/lib/utils";
@@ -105,7 +106,7 @@ export function StrengthSessionBuilder({
     if (existing?.role === "force" && getContrastPair(b)?.id === existing.id) {
       editItems(session.items.map((item, i) => i === index || i === index + 1
         ? { ...item, raw_payload: { ...item.raw_payload, contrast_pair_v1: undefined },
-            rest_seconds: i === index ? existing.rest_seconds : item.rest_seconds }
+            rest_seconds: getContrastPair(item)?.original_rest_seconds ?? (i === index ? existing.rest_seconds : item.rest_seconds) }
         : item));
       return;
     }
@@ -122,7 +123,8 @@ export function StrengthSessionBuilder({
       return {
         ...item, rest_seconds: role === "force" ? 0 : rest,
         raw_payload: { ...item.raw_payload, training_intent: role === "force" ? "force" : "puissance",
-          contrast_pair_v1: { id, role, rest_seconds: rest } },
+          contrast_pair_v1: { id, role, rest_seconds: rest, rest_before_power_seconds: 0,
+            original_rest_seconds: item.rest_seconds } },
       };
     }));
   };
@@ -133,8 +135,24 @@ export function StrengthSessionBuilder({
     if (!pair || pair.role !== "force") return;
     editItems(session.items.map((item, i) => {
       if ((i !== index && i !== index + 1) || getContrastPair(item)?.id !== pair.id) return item;
-      return { ...item, rest_seconds: i === index ? 0 : seconds,
+      return { ...item, rest_seconds: i === index ? pair.rest_before_power_seconds : seconds,
         raw_payload: { ...item.raw_payload, contrast_pair_v1: { ...getContrastPair(item)!, rest_seconds: seconds } } };
+    }));
+  };
+
+  const changeContrastBefore = (index: number, seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 900) return;
+    const pair = getContrastPair(session.items[index]);
+    if (!pair || pair.role !== "force") return;
+    editItems(session.items.map((item, i) => {
+      if ((i !== index && i !== index + 1) || getContrastPair(item)?.id !== pair.id) return item;
+      return {
+        ...item,
+        rest_seconds: i === index ? seconds : pair.rest_seconds,
+        raw_payload: { ...item.raw_payload, contrast_pair_v1: {
+          ...getContrastPair(item)!, rest_before_power_seconds: seconds,
+        } },
+      };
     }));
   };
 
@@ -293,11 +311,19 @@ export function StrengthSessionBuilder({
                 {isPairStart && (
                   <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs space-y-2">
                     <p className="font-semibold text-primary">Contraste · {item.sets} tours · A → B → récupération</p>
-                    <div className="flex items-center gap-2">
-                      <label htmlFor={`contrast-rest-${index}`} className="text-muted-foreground">Repos après B (secondes)</label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label htmlFor={`contrast-before-${index}`} className="text-muted-foreground">Entre A et B</label>
+                      <Input id={`contrast-before-${index}`} type="number" min={0} max={900} step={30}
+                        className="h-9 w-20" value={pair.rest_before_power_seconds}
+                        onChange={(e) => changeContrastBefore(index, Number(e.target.value))} />
+                      <span className="text-muted-foreground">s (0 = immédiat)</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label htmlFor={`contrast-rest-${index}`} className="text-muted-foreground">Après B</label>
                       <Input id={`contrast-rest-${index}`} type="number" min={0} max={900} step={15}
                         className="h-9 w-20" value={pair.rest_seconds}
                         onChange={(e) => changeContrastRest(index, Number(e.target.value))} />
+                      <span className="text-muted-foreground">s</span>
                       <Button size="sm" variant="outline" className="ml-auto"
                         onClick={() => toggleContrast(index)}>Dissocier</Button>
                     </div>
@@ -350,8 +376,20 @@ export function StrengthSessionBuilder({
                 {session.items
                   .slice()
                   .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                  .map((item, index) => {
+                  .map((item, index, sortedItems) => {
+                    if (index > 0 && validContrastPair(sortedItems[index - 1], item)) return null;
                     const exercise = exerciseById.get(item.exercise_id);
+                    const partner = sortedItems[index + 1];
+                    if (partner && validContrastPair(item, partner)) {
+                      return (
+                        <ContrastPairPreviewCard key={item.exercise_id} first={item} second={partner}
+                          firstName={exercise?.nom_exercice ?? item.exercise_name}
+                          secondName={exerciseById.get(partner.exercise_id)?.nom_exercice ?? partner.exercise_name}
+                          firstImage={exercise?.illustration_gif}
+                          secondImage={exerciseById.get(partner.exercise_id)?.illustration_gif}
+                        />
+                      );
+                    }
                     return (
                       <div
                         key={`${item.exercise_id}-${index}`}

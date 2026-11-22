@@ -69,6 +69,39 @@ describe("mode focus — contraste A/B", () => {
     }
   });
 
+  it("lance la récupération intermédiaire prescrite après A, avant d'afficher B", async () => {
+    const before = vi.spyOn(Date, "now");
+    before.mockReturnValue(1_800_000_000_000);
+    try {
+      const delayed = { ...session, items: session.items?.map((i) => ({
+        ...i, raw_payload: {
+          ...i.raw_payload,
+          contrast_pair_v1: {
+            ...(i.raw_payload?.contrast_pair_v1 as Record<string, unknown>),
+            rest_before_power_seconds: 300,
+          },
+        },
+      })) } as StrengthSessionTemplate;
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <WorkoutRunner session={delayed} exercises={exercises} oneRMs={[]} userId={9802}
+            initialStep={1} initialLogs={[]}
+            onFinish={() => undefined}
+            onLogSets={async () => undefined}
+          />
+        </QueryClientProvider>,
+      );
+      const go = screen.queryByRole("button", { name: /On y va/i });
+      if (go) fireEvent.click(go);
+      fireEvent.click(screen.getByRole("button", { name: "Valider série" }));
+      await act(async () => {});
+      expect(screen.getByRole("timer").textContent).toContain("5:00");
+      fireEvent.click(screen.getByRole("button", { name: "Passer le repos" }));
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("CMJ");
+    } finally { before.mockRestore(); }
+  });
+
   it("reprend à A2 et non A1 avec les logs de A1 et B1", () => {
     const items = expandContrastPlan(session.items ?? []);
     expect(resolveNextStep(items, [
