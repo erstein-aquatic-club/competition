@@ -55,10 +55,14 @@ describe("contrast plan", () => {
     } };
     expect(validContrastPair(mismatched[0], mismatched[1])).toBe(false);
   });
-  it("uses intent metadata first and infers useful defaults", () => {
-    expect(getTrainingIntent({ ...make(1), exercise_name: "Bench Pull explosif" })).toBe("puissance");
-    expect(getTrainingIntent({ ...make(1), reps: 8, exercise_name: "Tractions lestées" })).toBe("hypertrophie");
-    expect(getTrainingIntent({ ...make(1), exercise_name: "Trap bar squat" })).toBe("force");
-    expect(getTrainingIntent({ ...make(1), raw_payload: { training_intent: "puissance" }, exercise_name: "Trap bar squat" })).toBe("puissance");
+  it("uses the explicit intent of the session item, not the catalog exercise name or repetition count", () => {
+    expect(getTrainingIntent({ ...make(1), exercise_name: "Bench Pull explosif" })).toBeNull();
+    expect(getTrainingIntent({ ...make(1), reps: 8, exercise_name: "Tractions lestées" })).toBeNull();
+    expect(getTrainingIntent({ ...make(1), exercise_name: "Trap bar squat" })).toBeNull();
+    const benchForce = { ...make(60), raw_payload: { training_intent: "force" } };
+    const benchPower = { ...make(60), raw_payload: { training_intent: "puissance" } };
+    expect(getTrainingIntent(benchForce, "Bench Pull")).toBe("force");
+    expect(getTrainingIntent(benchPower, "Bench Pull")).toBe("puissance");
+    expect(getTrainingIntent({ ...make(109), raw_payload: { training_intent: "puissance", instruction_text: "Intention explosive" } }, "Pull-over poulie haute")).toBe("puissance");
   });
 });
