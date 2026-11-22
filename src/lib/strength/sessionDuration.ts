@@ -1,11 +1,15 @@
 import type { StrengthSessionItem } from "@/lib/api/types";
-import { expandContrastPlan } from "./contrast";
+import { expandContrastPlan, getContrastRound } from "./contrast";
 
 /**
  * Temps d'exécution forfaitaire d'une série (hors repos), en secondes.
  * Choix produit (§331) : 1 min par série, simple et lisible pour le nageur.
  */
 export const EXEC_SECONDS_PER_SET = 60;
+// Quelques sauts ou tractions explosives après la charge : un rappel bref, pas une série de force complète.
+export const REMINDER_SECONDS_PER_SET = 15;
+const executionSeconds = (item: StrengthSessionItem) =>
+  getContrastRound(item)?.role === "power" ? REMINDER_SECONDS_PER_SET : EXEC_SECONDS_PER_SET;
 
 /**
  * Estime la durée totale d'une séance de muscu, en secondes.
@@ -24,7 +28,7 @@ export function estimateStrengthSessionDurationSeconds(items: StrengthSessionIte
     if (!Number.isFinite(sets) || sets <= 0) return total;
     const rest = Number(item.rest_seconds);
     const restSeconds = Number.isFinite(rest) && rest > 0 ? rest : 0;
-    return total + sets * (EXEC_SECONDS_PER_SET + restSeconds);
+    return total + sets * (executionSeconds(item) + restSeconds);
   }, 0);
 }
 
@@ -59,7 +63,7 @@ export function estimateRemainingStrengthSessionDurationSeconds(
     const remainingSets = curSets - done;
     const rest = Number(current.rest_seconds);
     const restSeconds = Number.isFinite(rest) && rest > 0 ? rest : 0;
-    currentRemaining = remainingSets * (EXEC_SECONDS_PER_SET + restSeconds);
+    currentRemaining = remainingSets * (executionSeconds(current) + restSeconds);
   }
 
   // Exercices suivants : intégralité, via le modèle canonique (repos par item).

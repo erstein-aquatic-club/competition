@@ -18,9 +18,10 @@ describe("aperçu d'une paire de contraste", () => {
     expect(screen.getByRole("region", { name: /bloc de contraste/i })).toBeTruthy();
     expect(screen.getByText("Squat arrière")).toBeTruthy();
     expect(screen.getByText("Box Jump")).toBeTruthy();
+    expect(screen.getByText(/rappel explosif/i)).toBeTruthy();
     expect(screen.getByText("3 tours")).toBeTruthy();
     expect(screen.getByText(/enchaîner B sans pause/i)).toBeTruthy();
-    expect(screen.getByText(/après B : 2 min de récupération/i)).toBeTruthy();
+    expect(screen.getByText(/après le rappel : 2 min de récupération/i)).toBeTruthy();
   });
   it("annonce une transition retardée lorsque celle-ci est prescrite", () => {
     render(<ContrastPairPreviewCard first={item(26, "force", 300)} second={item(8, "power", 300)} />);

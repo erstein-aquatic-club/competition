@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState, useEffect } from "react";
 import { StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment, StrengthCycleType } from "@/lib/api";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
-import { getContrastPair, validContrastPair } from "@/lib/strength/contrast";
+import { getContrastPair, validContrastPair, countPrimaryExercises, countPowerReminders } from "@/lib/strength/contrast";
 import { ContrastPairPreviewCard } from "./ContrastPairPreviewCard";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { Button } from "@/components/ui/button";
@@ -155,7 +155,7 @@ export function SessionDetailPreview({
               </span>
             )}
             <span className="text-xs text-muted-foreground tabular-nums">
-              {items.length} exercice{items.length > 1 ? "s" : ""}
+              {countPrimaryExercises(items)} exercice{countPrimaryExercises(items) > 1 ? "s" : ""}{countPowerReminders(items) > 0 ? ` · ${countPowerReminders(items)} rappel${countPowerReminders(items) > 1 ? "s" : ""}` : ""}
             </span>
             {assignment?.assigned_date && (
               <>

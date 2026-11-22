@@ -37,7 +37,7 @@ import { RestScreen } from "./RestScreen";
 import { SetRow } from "./SetRow";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
-import { expandContrastPlan, getContrastPair, getContrastRound, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
+import { expandContrastPlan, getContrastPair, getContrastRound, validContrastPair, countPrimaryExercises, countPowerReminders, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -1364,7 +1364,7 @@ export function WorkoutRunner({
                     <div>
                       <CardTitle className="text-xl">Bloc principal</CardTitle>
                       <CardDescription>
-                        {workoutPlan.filter((i) => (i.block ?? "main") === "main").length} exercices
+                        {countPrimaryExercises(orderedOriginalItems.filter((i) => (i.block ?? "main") === "main"))} exercices{countPowerReminders(orderedOriginalItems.filter((i) => (i.block ?? "main") === "main")) > 0 ? ` · ${countPowerReminders(orderedOriginalItems.filter((i) => (i.block ?? "main") === "main"))} rappel(s) explosifs` : ""}
                       </CardDescription>
                     </div>
                   </div>
@@ -1479,7 +1479,7 @@ export function WorkoutRunner({
         </div>
         {contrastRound && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-            <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "A / Force" : "B / Puissance"}</p>
+            <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "Force" : "Rappel puissance"}</p>
             <p className="text-xs text-muted-foreground">
               {contrastRound.role === "force"
                 ? (restDuration > 0 ? `Récupération ${restDuration}s, puis B.` : "Enchaîner B sans pause.")
@@ -1493,7 +1493,7 @@ export function WorkoutRunner({
             {contrastRound ? `Tour ${contrastRound.round}/${contrastRound.total}` : `Ex ${currentStep}/${workoutPlan.length}`}
           </span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold shrink-0">
-            {contrastRound ? (contrastRound.role === "force" ? "A" : "B") : `S ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`}
+            {contrastRound ? (contrastRound.role === "force" ? "Force" : "Rappel") : `S ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`}
           </span>
           <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
@@ -1847,17 +1847,21 @@ export function WorkoutRunner({
             className="mt-4 space-y-2 overflow-y-auto overscroll-contain pb-8"
             style={{ maxHeight: "calc(80vh - 5rem)", WebkitOverflowScrolling: "touch" }}
           >
-            {workoutPlan.map((item, index) => {
+            {orderedOriginalItems.map((item, index) => {
+              if (index > 0 && validContrastPair(orderedOriginalItems[index - 1], item)) return null;
+              const second = orderedOriginalItems[index + 1];
+              const paired = !!second && validContrastPair(item, second);
               const exercise = exercises.find((ex) => ex.id === item.exercise_id);
               const loggedSets = Array.from({ length: item.sets ?? 0 }).filter((_, setIndex) =>
                 logLookup.get(`${item.exercise_id}-${contrastSetNumber(item, setIndex + 1)}`),
               ).length;
-              const isActive = index === currentExerciseIndex;
+              const isActive = item.exercise_id === currentBlock?.exercise_id ||
+                (paired && second.exercise_id === currentBlock?.exercise_id);
               const hasPr = Array.from({ length: item.sets ?? 0 }).some((_, si) =>
                 prSets.has(`${item.exercise_id}-${contrastSetNumber(item, si + 1)}`),
               );
               // §296 — séparateur visuel entre le dernier warmup et le premier main
-              const prevBlock = index > 0 ? workoutPlan[index - 1]?.block : undefined;
+              const prevBlock = index > 0 ? orderedOriginalItems[index - 1]?.block : undefined;
               const showMainDivider =
                 prevBlock === "warmup" && item.block !== "warmup";
               // Eyebrow "Échauffement" au-dessus du tout premier item warmup
@@ -1898,6 +1902,17 @@ export function WorkoutRunner({
                         isActive={isActive}
                         hasPr={hasPr}
                       />
+                      {paired && (
+                        <div className="ml-4 mt-1 flex flex-wrap items-center gap-2 rounded-lg bg-sky-500/5 px-2.5 py-2 text-xs">
+                          <span className="font-bold text-sky-700 dark:text-sky-300">↳ Rappel puissance</span>
+                          <span className="font-medium">{second.exercise_name ?? exercises.find((ex) => ex.id === second.exercise_id)?.nom_exercice}</span>
+                          <span className="ml-auto tabular-nums text-muted-foreground">
+                            {second.sets}×{second.reps} · {Array.from({ length: second.sets ?? 0 }).filter((_, n) =>
+                              logLookup.has(`${second.exercise_id}-${n + 1}`)
+                            ).length}/{second.sets} faits
+                          </span>
+                        </div>
+                      )}
                     </div>
                     {!hasContrastPairs && index > currentExerciseIndex &&
                       (workoutPlan[index - 1]?.block ?? "main") === (item.block ?? "main") && (

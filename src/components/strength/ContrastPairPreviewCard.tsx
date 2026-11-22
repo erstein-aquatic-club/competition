@@ -90,7 +90,7 @@ export function ContrastPairPreviewCard({
       <div className="flex items-center justify-between gap-2 border-b border-primary/10 bg-primary/5 px-3 py-2 sm:px-4">
         <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-primary">
           <Repeat2 className="h-3.5 w-3.5" />
-          Contraste force / puissance
+          Force + rappel puissance
         </div>
         <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
           {first.sets} tours
@@ -107,13 +107,36 @@ export function ContrastPairPreviewCard({
         </span>
       </div>
 
-      <PairRow letter="B" item={second} name={secondName || second.exercise_name || "Exercice de puissance"}
-        image={secondImage} detailed={detailed} onReplace={onReplaceSecond} />
+      <div className="flex items-start gap-2 px-3 py-2 sm:px-4" aria-label="Rappel de puissance intégré au contraste">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-[10px] font-bold text-sky-700 dark:text-sky-300">B</div>
+        {secondImage && <img src={secondImage} alt="" loading="lazy" decoding="async"
+          className="h-9 w-9 shrink-0 rounded-lg border border-border/60 bg-muted object-cover" />}
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <span className="text-[10px] font-semibold uppercase text-muted-foreground">Rappel explosif</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-semibold">{secondName || second.exercise_name || "Rappel de puissance"}</span>
+            <TrainingIntentBadge item={second} exerciseName={secondName} />
+          </div>
+          <span className="text-[11px] tabular-nums text-muted-foreground">{second.reps} reps / tour</span>
+          {detailed && Boolean(second.notes || second.raw_payload?.source_instructions) && (
+            <details>
+              <summary className="cursor-pointer text-[11px] text-primary">Consigne</summary>
+              <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">{second.notes || String(second.raw_payload?.source_instructions)}</p>
+            </details>
+          )}
+        </div>
+        {onReplaceSecond && (
+          <button type="button" onClick={onReplaceSecond} aria-label={`Remplacer ${secondName || second.exercise_name || "le rappel"}`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       <div className="flex items-center gap-2 border-t border-border/50 bg-muted/50 px-3 py-2 sm:px-4">
         <Timer className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="flex-1 text-xs font-semibold text-foreground">
-          Après B : {formatContrastSeconds(pair.rest_seconds)} de récupération
+          Après le rappel : {formatContrastSeconds(pair.rest_seconds)} de récupération
         </span>
         <span className="text-[10px] text-muted-foreground">puis tour suivant</span>
       </div>

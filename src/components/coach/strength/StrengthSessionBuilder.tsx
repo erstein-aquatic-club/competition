@@ -7,7 +7,7 @@ import { SessionMetadataForm } from "../shared/SessionMetadataForm";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getContrastPair, validContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
+import { getContrastPair, validContrastPair, validateContrastPlan, countPrimaryExercises, countPowerReminders, type TrainingIntent } from "@/lib/strength/contrast";
 import { ContrastPairPreviewCard } from "@/components/strength/ContrastPairPreviewCard";
 import { FormActions } from "../shared/FormActions";
 import { StrengthExerciseCard } from "./StrengthExerciseCard";
@@ -265,7 +265,7 @@ export function StrengthSessionBuilder({
         {/* Exercise list header */}
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">
-            Exercices ({session.items.length})
+            Exercices ({countPrimaryExercises(session.items)}){countPowerReminders(session.items) > 0 && <span className="ml-1.5 text-xs font-normal text-muted-foreground">+ {countPowerReminders(session.items)} rappel{countPowerReminders(session.items) > 1 ? "s" : ""}</span>}
           </div>
           <div className="flex items-center gap-2">
             <Select
@@ -310,7 +310,7 @@ export function StrengthSessionBuilder({
                 />
                 {isPairStart && (
                   <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs space-y-2">
-                    <p className="font-semibold text-primary">Contraste · {item.sets} tours · A → B → récupération</p>
+                    <p className="font-semibold text-primary">Contraste · {item.sets} tours · A → rappel explosif → récupération</p>
                     <div className="flex flex-wrap items-center gap-2">
                       <label htmlFor={`contrast-before-${index}`} className="text-muted-foreground">Entre A et B</label>
                       <Input id={`contrast-before-${index}`} type="number" min={0} max={900} step={30}

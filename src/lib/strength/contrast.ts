@@ -61,6 +61,20 @@ export function validateContrastPlan(items: StrengthSessionItem[]): string[] {
   return issues;
 }
 
+/** Un rappel explosif B fait partie du mouvement de force A : il reste loggé
+ * séparément, mais ne prend pas une place supplémentaire dans la séance.
+ * Les paires incomplètes conservent le décompte normal (pas de masquage silencieux).
+ */
+export function countPrimaryExercises(items: StrengthSessionItem[]): number {
+  return items.reduce((count, item, index) =>
+    count + (index > 0 && validContrastPair(items[index - 1], item) ? 0 : 1), 0);
+}
+
+export function countPowerReminders(items: StrengthSessionItem[]): number {
+  return items.reduce((count, item, index) =>
+    count + (index > 0 && validContrastPair(items[index - 1], item) ? 1 : 0), 0);
+}
+
 export function expandContrastPlan(items: StrengthSessionItem[]): StrengthSessionItem[] {
   const result: StrengthSessionItem[] = [];
   for (let index = 0; index < items.length; index += 1) {
