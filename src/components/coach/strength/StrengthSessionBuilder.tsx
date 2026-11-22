@@ -265,7 +265,7 @@ export function StrengthSessionBuilder({
         {/* Exercise list header */}
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">
-            Exercices ({session.items.length})
+            Exercices ({countPrimaryExercises(session.items)}){countPowerReminders(session.items) > 0 && <span className="ml-1.5 text-xs font-normal text-muted-foreground">+ {countPowerReminders(session.items)} rappel{countPowerReminders(session.items) > 1 ? "s" : ""}</span>}
           </div>
           <div className="flex items-center gap-2">
             <Select
