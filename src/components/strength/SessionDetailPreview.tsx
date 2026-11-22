@@ -183,7 +183,7 @@ export function SessionDetailPreview({
           <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Objectif de séance</summary>
           <p className="mt-1 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{session.description}</p>
         </details>
-      )
+      )}
 
       {/* ── Exercise list — inline GIF + expandable details ── */}
       <motion.div className="space-y-1.5" variants={listVariants} initial="hidden" animate="visible">
