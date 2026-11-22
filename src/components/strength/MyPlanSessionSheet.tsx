@@ -69,7 +69,7 @@ export function MyPlanSessionSheet({
                   <summary className="cursor-pointer text-xs text-muted-foreground">Objectif de séance</summary>
                   <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line leading-relaxed">{session.description}</p>
                 </details>
-              )
+              )}
             </SheetHeader>
 
             {items.length > 0 && (
