@@ -7,7 +7,8 @@ import { SessionMetadataForm } from "../shared/SessionMetadataForm";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
+import { getContrastPair, validContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
+import { ContrastPairPreviewCard } from "@/components/strength/ContrastPairPreviewCard";
 import { FormActions } from "../shared/FormActions";
 import { StrengthExerciseCard } from "./StrengthExerciseCard";
 import { cn } from "@/lib/utils";
@@ -375,8 +376,20 @@ export function StrengthSessionBuilder({
                 {session.items
                   .slice()
                   .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-                  .map((item, index) => {
+                  .map((item, index, sortedItems) => {
+                    if (index > 0 && validContrastPair(sortedItems[index - 1], item)) return null;
                     const exercise = exerciseById.get(item.exercise_id);
+                    const partner = sortedItems[index + 1];
+                    if (partner && validContrastPair(item, partner)) {
+                      return (
+                        <ContrastPairPreviewCard key={item.exercise_id} first={item} second={partner}
+                          firstName={exercise?.nom_exercice ?? item.exercise_name}
+                          secondName={exerciseById.get(partner.exercise_id)?.nom_exercice ?? partner.exercise_name}
+                          firstImage={exercise?.illustration_gif}
+                          secondImage={exerciseById.get(partner.exercise_id)?.illustration_gif}
+                        />
+                      );
+                    }
                     return (
                       <div
                         key={`${item.exercise_id}-${index}`}
