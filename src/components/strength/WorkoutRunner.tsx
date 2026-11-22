@@ -37,7 +37,7 @@ import { RestScreen } from "./RestScreen";
 import { SetRow } from "./SetRow";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
-import { expandContrastPlan, getContrastRound, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
+import { expandContrastPlan, getContrastPair, getContrastRound, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -253,8 +253,11 @@ export function WorkoutRunner({
     loadWorkoutOrder(userId, runId, session.items?.length ?? 0),
   );
   const orderedItemIndices = useMemo(
-    () => normalizeWorkoutOrder(itemOrder, session.items?.length ?? 0),
-    [itemOrder, session.items?.length],
+    // Un ordre local ancien (PWA) ne doit jamais séparer la paire du coach.
+    () => (session.items ?? []).some((item) => getContrastPair(item))
+      ? (session.items ?? []).map((_, index) => index)
+      : normalizeWorkoutOrder(itemOrder, session.items?.length ?? 0),
+    [itemOrder, session.items],
   );
   const orderedOriginalItems = useMemo(
     () => orderedItemIndices.map((index) => (session.items ?? [])[index]),
