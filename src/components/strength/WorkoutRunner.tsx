@@ -36,6 +36,8 @@ import { ExerciseGif } from "@/components/strength/ExerciseGif";
 import { RestScreen } from "./RestScreen";
 import { SetRow } from "./SetRow";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { TrainingIntentBadge } from "./TrainingIntentBadge";
+import { expandContrastPlan, getContrastRound, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -116,7 +118,9 @@ export const resolveNextStep = (
     for (let i = 0; i < items.length; i += 1) {
       const block = items[i];
       const existing = logsByExercise.get(block.exercise_id) ?? [];
-      if (existing.length < (block.sets ?? 0)) {
+      const round = getContrastRound(block);
+      const incomplete = round ? !isContrastRoundLogged(block, existing) : existing.length < (block.sets ?? 0);
+      if (incomplete) {
         nextStep = i + 1;
         break;
       }
@@ -252,10 +256,13 @@ export function WorkoutRunner({
     () => normalizeWorkoutOrder(itemOrder, session.items?.length ?? 0),
     [itemOrder, session.items?.length],
   );
-  const workoutPlan = useMemo(
+  const orderedOriginalItems = useMemo(
     () => orderedItemIndices.map((index) => (session.items ?? [])[index]),
     [orderedItemIndices, session.items],
   );
+  const workoutPlan = useMemo(() => expandContrastPlan(orderedOriginalItems), [orderedOriginalItems]);
+  // Les paires de contraste ne doivent pas être séparées pendant un run.
+  const hasContrastPairs = workoutPlan.length !== orderedOriginalItems.length;
   // Éviter deux occurrences du même ID : le suivi des séries est indexé par
   // exercise_id et fusionnerait les séries d'un exercice ajouté en doublon.
   const additionalExercises = useMemo(() => {
@@ -367,7 +374,7 @@ export function WorkoutRunner({
   // onFinish) : ticker pendant toute la séance re-rendait inutilement les
   // ~1900 lignes du runner chaque seconde. Le tick ne tourne plus que sur
   // l'écran de fin (affichage live conservé, durée enregistrée identique).
-  const isComplete = currentStep > (session.items?.length ?? 0);
+  const isComplete = currentStep > workoutPlan.length;
   useEffect(() => {
     if (!isActive || !isComplete) return;
     const tick = () => {
@@ -447,6 +454,11 @@ export function WorkoutRunner({
     return Array.isArray(raw) ? raw : [];
   })();
   const restDuration = currentBlock?.rest_seconds ?? 0;
+  const contrastRound = getContrastRound(currentBlock);
+  // Après l'avancement vers le prochain exercice, le repos est celui du précédent.
+  const displayedRestDuration = restType === "exercise" && currentExerciseIndex > 0
+    ? workoutPlan[currentExerciseIndex - 1]?.rest_seconds ?? restDuration
+    : restDuration;
 
   // Sync local note when exercise changes
   useEffect(() => {
