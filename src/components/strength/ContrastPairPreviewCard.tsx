@@ -118,7 +118,7 @@ export function ContrastPairPreviewCard({
             <TrainingIntentBadge item={second} exerciseName={secondName} />
           </div>
           <span className="text-[11px] tabular-nums text-muted-foreground">{second.reps} reps / tour</span>
-          {detailed && (second.notes || second.raw_payload?.source_instructions) && (
+          {detailed && Boolean(second.notes || second.raw_payload?.source_instructions) && (
             <details>
               <summary className="cursor-pointer text-[11px] text-primary">Consigne</summary>
               <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">{second.notes || String(second.raw_payload?.source_instructions)}</p>
