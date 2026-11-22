@@ -66,6 +66,16 @@ describe("estimateStrengthSessionDurationSeconds", () => {
     assert.equal(total, 3 * EXEC_SECONDS_PER_SET);
   });
 
+  it("traite le B d'un contraste comme un rappel explosif bref sans supprimer son repos réel", () => {
+    const a = makeItem({ exercise_id: 7, sets: 3, reps: 3, rest_seconds: 0,
+      raw_payload: { contrast_pair_v1: { id: "test-tb-cmj", role: "force", rest_seconds: 180 } } });
+    const b = makeItem({ exercise_id: 123, sets: 3, reps: 2, rest_seconds: 180,
+      raw_payload: { contrast_pair_v1: { id: "test-tb-cmj", role: "power", rest_seconds: 180 } } });
+    // Trois tours : 3×(force 60s + rappel 15s + repos 180s) = 765s.
+    const total = estimateStrengthSessionDurationSeconds([a,b]);
+    assert.equal(total, 765);
+    assert.equal(estimateRemainingStrengthSessionDurationSeconds([a,b],1,1), 765);
+  });
   it("inclut les items d'échauffement/mobilité", () => {
     // warmup 2×(60+30)=180 + main 4×(60+90)=600 → 780
     const total = estimateStrengthSessionDurationSeconds([
