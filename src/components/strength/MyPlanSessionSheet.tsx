@@ -14,7 +14,7 @@ import type { StrengthPhase } from "@/lib/strength/strengthPhaseStyles";
 import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
-import { validContrastPair } from "@/lib/strength/contrast";
+import { validContrastPair, countPrimaryExercises, countPowerReminders } from "@/lib/strength/contrast";
 import { ContrastPairPreviewCard } from "./ContrastPairPreviewCard";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { formatStrengthSessionTitle } from "@/lib/strength/formatStrengthSessionTitle";
@@ -64,6 +64,11 @@ export function MyPlanSessionSheet({
                   </span>
                 )}
               </SheetTitle>
+              {countPowerReminders(items) > 0 && (
+                <p className="mt-1 text-left text-[11px] text-muted-foreground">
+                  {countPrimaryExercises(items)} exercices · {countPowerReminders(items)} rappel{countPowerReminders(items) > 1 ? "s" : ""} de puissance intégré{countPowerReminders(items) > 1 ? "s" : ""}
+                </p>
+              )}
               {session.description && (
                 <details className="mt-1 text-left">
                   <summary className="cursor-pointer text-xs text-muted-foreground">Objectif de séance</summary>
