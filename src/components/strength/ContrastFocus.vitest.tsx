@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WorkoutRunner, resolveNextStep } from "./WorkoutRunner";
 import { expandContrastPlan } from "@/lib/strength/contrast";
 import type { Exercise, StrengthSessionTemplate } from "@/lib/api/types";
@@ -35,12 +36,15 @@ describe("mode focus — contraste A/B", () => {
     const t0 = Date.now();
     now.mockReturnValue(t0);
     try {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(
+        <QueryClientProvider client={client}>
         <WorkoutRunner session={session} exercises={exercises} oneRMs={[]} userId={9801}
           initialStep={1} initialLogs={[]}
           onFinish={() => undefined}
           onLogSets={async (logs) => { saved.push(...logs as typeof saved); }}
-        />,
+        />
+        </QueryClientProvider>,
       );
       const go = screen.queryByRole("button", { name: /On y va/i });
       if (go) fireEvent.click(go);
