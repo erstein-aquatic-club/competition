@@ -50,6 +50,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StrengthSessionBuilder } from "@/components/coach/strength/StrengthSessionBuilder";
+import { validateContrastPlan } from "@/lib/strength/contrast";
 import { SessionListView } from "@/components/coach/shared/SessionListView";
 import { FolderCard } from "@/components/shared/FolderCard";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -881,6 +882,8 @@ export default function StrengthCatalog() {
   };
 
   const handleSaveSession = () => {
+    const issue = validateContrastPlan(newSession.items)[0];
+    if (issue) { toast.error("Contraste incomplet", { description: issue }); return; }
     const sessionPayload = { ...newSession, items: updateOrderIndexes(newSession.items) };
     if (editingSessionId) {
       updateSession.mutate({ ...sessionPayload, id: editingSessionId });
