@@ -4,6 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TrainingIntentBadge } from "@/components/strength/TrainingIntentBadge";
+import type { TrainingIntent } from "@/lib/strength/contrast";
 import { ArrowDown, ArrowUp, ChevronDown, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExercisePickerDrawer } from "./ExercisePickerDrawer";
@@ -20,6 +23,7 @@ interface StrengthExerciseCardProps {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onIntentChange?: (intent: TrainingIntent | null) => void;
 }
 
 export function StrengthExerciseCard({
@@ -32,6 +36,7 @@ export function StrengthExerciseCard({
   onDelete,
   onMoveUp,
   onMoveDown,
+  onIntentChange,
 }: StrengthExerciseCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [gifDialogOpen, setGifDialogOpen] = useState(false);
@@ -83,6 +88,7 @@ export function StrengthExerciseCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-[13px] font-semibold leading-tight">{exerciseName}</span>
+              <TrainingIntentBadge item={exercise} exerciseName={exerciseName} />
               {isWarmup && (
                 <span className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-px text-[9px] font-bold">
                   Échauf.
@@ -112,6 +118,23 @@ export function StrengthExerciseCard({
         {/* Expanded content */}
         {expanded && (
           <div className="border-t border-border px-3 pb-3 pt-3 space-y-3">
+            {onIntentChange && !isWarmup && (
+              <div className="space-y-1">
+                <Label className="text-xs">Intention de l'exercice</Label>
+                <Select
+                  value={typeof exercise.raw_payload?.training_intent === "string" ? String(exercise.raw_payload.training_intent) : "auto"}
+                  onValueChange={(value) => onIntentChange(value === "auto" ? null : value as TrainingIntent)}
+                >
+                  <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Déduction automatique</SelectItem>
+                    <SelectItem value="force">Force · charger et contrôler</SelectItem>
+                    <SelectItem value="puissance">Puissance · vitesse maximale</SelectItem>
+                    <SelectItem value="hypertrophie">Hypertrophie · tension musculaire</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Séries</Label>

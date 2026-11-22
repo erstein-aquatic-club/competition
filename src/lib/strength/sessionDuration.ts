@@ -1,4 +1,5 @@
 import type { StrengthSessionItem } from "@/lib/api/types";
+import { expandContrastPlan } from "./contrast";
 
 /**
  * Temps d'exécution forfaitaire d'une série (hors repos), en secondes.
@@ -18,7 +19,7 @@ export const EXEC_SECONDS_PER_SET = 60;
  * négatif ou non fini est traité comme 0.
  */
 export function estimateStrengthSessionDurationSeconds(items: StrengthSessionItem[]): number {
-  return items.reduce((total, item) => {
+  return expandContrastPlan(items).reduce((total, item) => {
     const sets = Number(item.sets);
     if (!Number.isFinite(sets) || sets <= 0) return total;
     const rest = Number(item.rest_seconds);

@@ -36,6 +36,8 @@ import { ExerciseGif } from "@/components/strength/ExerciseGif";
 import { RestScreen } from "./RestScreen";
 import { SetRow } from "./SetRow";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { TrainingIntentBadge } from "./TrainingIntentBadge";
+import { expandContrastPlan, getContrastPair, getContrastRound, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -116,7 +118,9 @@ export const resolveNextStep = (
     for (let i = 0; i < items.length; i += 1) {
       const block = items[i];
       const existing = logsByExercise.get(block.exercise_id) ?? [];
-      if (existing.length < (block.sets ?? 0)) {
+      const round = getContrastRound(block);
+      const incomplete = round ? !isContrastRoundLogged(block, existing) : existing.length < (block.sets ?? 0);
+      if (incomplete) {
         nextStep = i + 1;
         break;
       }
@@ -249,13 +253,19 @@ export function WorkoutRunner({
     loadWorkoutOrder(userId, runId, session.items?.length ?? 0),
   );
   const orderedItemIndices = useMemo(
-    () => normalizeWorkoutOrder(itemOrder, session.items?.length ?? 0),
-    [itemOrder, session.items?.length],
+    // Un ordre local ancien (PWA) ne doit jamais séparer la paire du coach.
+    () => (session.items ?? []).some((item) => getContrastPair(item))
+      ? (session.items ?? []).map((_, index) => index)
+      : normalizeWorkoutOrder(itemOrder, session.items?.length ?? 0),
+    [itemOrder, session.items],
   );
-  const workoutPlan = useMemo(
+  const orderedOriginalItems = useMemo(
     () => orderedItemIndices.map((index) => (session.items ?? [])[index]),
     [orderedItemIndices, session.items],
   );
+  const workoutPlan = useMemo(() => expandContrastPlan(orderedOriginalItems), [orderedOriginalItems]);
+  // Les paires de contraste ne doivent pas être séparées pendant un run.
+  const hasContrastPairs = workoutPlan.length !== orderedOriginalItems.length;
   // Éviter deux occurrences du même ID : le suivi des séries est indexé par
   // exercise_id et fusionnerait les séries d'un exercice ajouté en doublon.
   const additionalExercises = useMemo(() => {
@@ -367,7 +377,7 @@ export function WorkoutRunner({
   // onFinish) : ticker pendant toute la séance re-rendait inutilement les
   // ~1900 lignes du runner chaque seconde. Le tick ne tourne plus que sur
   // l'écran de fin (affichage live conservé, durée enregistrée identique).
-  const isComplete = currentStep > (session.items?.length ?? 0);
+  const isComplete = currentStep > workoutPlan.length;
   useEffect(() => {
     if (!isActive || !isComplete) return;
     const tick = () => {
@@ -447,6 +457,11 @@ export function WorkoutRunner({
     return Array.isArray(raw) ? raw : [];
   })();
   const restDuration = currentBlock?.rest_seconds ?? 0;
+  const contrastRound = getContrastRound(currentBlock);
+  // Après l'avancement vers le prochain exercice, le repos est celui du précédent.
+  const displayedRestDuration = restType === "exercise" && currentExerciseIndex > 0
+    ? workoutPlan[currentExerciseIndex - 1]?.rest_seconds ?? restDuration
+    : restDuration;
 
   // Sync local note when exercise changes
   useEffect(() => {
@@ -633,10 +648,14 @@ export function WorkoutRunner({
     return map;
   }, [logs]);
 
-  const currentSetKey = currentBlock ? `${currentBlock.exercise_id}-${currentSetIndex}` : null;
+  const effectiveSetNumber = contrastSetNumber(currentBlock, currentSetIndex);
+  const currentSetKey = currentBlock ? `${currentBlock.exercise_id}-${effectiveSetNumber}` : null;
   const currentLoggedSet = currentSetKey ? logLookup.get(currentSetKey) : null;
+  const previousContrastWeight = contrastRound && contrastRound.round > 1
+    ? logLookup.get(`${currentBlock?.exercise_id}-${contrastRound.round - 1}`)?.weight
+    : undefined;
   const activeWeight =
-    currentLoggedSet?.weight ?? currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue;
+    currentLoggedSet?.weight ?? currentSetInputs[currentSetIndex - 1]?.weight ?? previousContrastWeight ?? targetValue;
   const activeReps =
     currentLoggedSet?.reps ??
     currentSetInputs[currentSetIndex - 1]?.reps ??
@@ -733,9 +752,11 @@ export function WorkoutRunner({
     const effectiveStep = Math.max(resolvedStep, currentStepRef.current);
     if (effectiveStep > 0 && effectiveStep <= blocks.length) {
       const block = blocks[effectiveStep - 1];
-      const existing = logsByExercise.get(block.exercise_id) ?? [];
+      const round = getContrastRound(block);
+      const allExisting = logsByExercise.get(block.exercise_id) ?? [];
+      const existing = round ? allExisting.filter((log) => resolveSetNumber(log, 1) === round.round) : allExisting;
       const inputs = existing.reduce((acc: Record<number, SetInputValues>, log: SetLogEntry, index: number) => {
-        const setNumber = resolveSetNumber(log, index + 1);
+        const setNumber = round ? 1 : resolveSetNumber(log, index + 1);
         acc[setNumber - 1] = {
           reps: log.reps ?? undefined,
           weight: log.weight ?? undefined,
@@ -752,7 +773,7 @@ export function WorkoutRunner({
         }
         return inputs;
       });
-      const nextSetIndex = Math.min(block.sets ?? 1, existing.length + 1);
+      const nextSetIndex = round ? 1 : Math.min(block.sets ?? 1, existing.length + 1);
       setCurrentSetIndex(nextSetIndex);
     } else {
       setCurrentSetInputs({});
@@ -797,6 +818,7 @@ export function WorkoutRunner({
   );
 
   const moveExerciseEarlier = (fromIndex: number) => {
+    if (hasContrastPairs) return;
     // Vérification dans l'action aussi, pour éviter une permutation durant
     // la sauvegarde asynchrone d'une série.
     if (isLoggingRef.current || !canMoveWorkoutItemUp(
@@ -894,11 +916,11 @@ export function WorkoutRunner({
     const setDifficultyValue = currentSetInputs[currentSetIndex - 1]?.difficulty ?? null;
     const newLog = {
       exercise_id: currentBlock.exercise_id,
-      set_number: currentSetIndex,
+      set_number: effectiveSetNumber,
       reps: currentSetInputs[currentSetIndex - 1]?.reps || currentBlock.reps,
       weight: isBodyweightExercise
         ? BODYWEIGHT_SENTINEL
-        : (currentSetInputs[currentSetIndex - 1]?.weight ?? targetValue),
+        : (currentSetInputs[currentSetIndex - 1]?.weight ?? previousContrastWeight ?? targetValue),
       difficulty: setDifficultyValue,
       notes: needsAssistanceLog ? currentSetInputs[currentSetIndex - 1]?.notes?.trim() || null : null,
     };
@@ -918,7 +940,7 @@ export function WorkoutRunner({
       const exName = currentExerciseDef?.nom_exercice ?? "Exercice";
       const pr = detectPR({ weight: logWeight, reps: logReps, difficulty: newLog.difficulty }, currentBest1rm, exName);
       if (pr) {
-        const setKey = `${currentBlock.exercise_id}-${currentSetIndex}`;
+        const setKey = `${currentBlock.exercise_id}-${effectiveSetNumber}`;
         setPrSets((prev) => new Set(prev).add(setKey));
         toast("🏆 Nouveau record !", { description: `1RM estimé : ${pr.newValue}kg (+${pr.improvement}%)` });
       }
@@ -1409,7 +1431,7 @@ export function WorkoutRunner({
             "h-2 w-2 shrink-0 rounded-full transition-colors",
             isOnline ? "bg-emerald-500" : "bg-red-500"
           )} aria-label={isOnline ? "En ligne" : "Hors ligne"} />
-          {onSubstitute && (
+          {onSubstitute && !contrastRound && (
             <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0"
               onClick={() => withFocusDisclaimer(() => setSubstitutePickerOpen(true))}
               aria-label="Remplacer l'exercice"
@@ -1452,13 +1474,26 @@ export function WorkoutRunner({
             />
           </div>
         )}
+        <div className="flex flex-wrap items-center gap-2">
+          <TrainingIntentBadge item={currentBlock} exerciseName={currentExerciseDef?.nom_exercice} showCue />
+        </div>
+        {contrastRound && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+            <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "A / Force" : "B / Puissance"}</p>
+            <p className="text-xs text-muted-foreground">
+              {contrastRound.role === "force"
+                ? "Enchaîner l'exercice B sans récupération prolongée."
+                : `Après B : ${restDuration}s de récupération commune avant le prochain tour.`}
+            </p>
+          </div>
+        )}
         {/* Ligne 2 : badges + progress */}
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-bold shrink-0">
-            Ex {currentStep}/{workoutPlan.length}
+            {contrastRound ? `Tour ${contrastRound.round}/${contrastRound.total}` : `Ex ${currentStep}/${workoutPlan.length}`}
           </span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold shrink-0">
-            S {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)}
+            {contrastRound ? (contrastRound.role === "force" ? "A" : "B") : `S ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`}
           </span>
           <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
@@ -1542,7 +1577,7 @@ export function WorkoutRunner({
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
-            Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {currentBlock ? formatSetTarget(currentBlock) : ""}
+{contrastRound ? `Tour ${contrastRound.round}/${contrastRound.total}` : `Série ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`} · {currentBlock ? formatSetTarget(currentBlock) : ""}
             {currentSetKey && prSets.has(currentSetKey) && (
               <Trophy className="h-4 w-4 text-amber-500" aria-label="Record personnel" />
             )}
@@ -1731,7 +1766,7 @@ export function WorkoutRunner({
         <RestScreen
           restEndAt={restEndAt}
           onExpire={handleRestExpire}
-          restDuration={restDuration}
+          restDuration={displayedRestDuration}
           restType={restType}
           exercise={currentExerciseDef ?? null}
           block={currentBlock}
@@ -1806,7 +1841,7 @@ export function WorkoutRunner({
         <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl">
           <SheetHeader>
             <SheetTitle>Aperçu séance</SheetTitle>
-            <p className="text-xs text-muted-foreground">Pour changer l’ordre, remonte un exercice avec la flèche.</p>
+            <p className="text-xs text-muted-foreground">{hasContrastPairs ? "Paire de contraste : ordre A → B verrouillé pendant la séance." : "Pour changer l’ordre, remonte un exercice avec la flèche."}</p>
           </SheetHeader>
           <div
             className="mt-4 space-y-2 overflow-y-auto overscroll-contain pb-8"
@@ -1815,11 +1850,11 @@ export function WorkoutRunner({
             {workoutPlan.map((item, index) => {
               const exercise = exercises.find((ex) => ex.id === item.exercise_id);
               const loggedSets = Array.from({ length: item.sets ?? 0 }).filter((_, setIndex) =>
-                logLookup.get(`${item.exercise_id}-${setIndex + 1}`),
+                logLookup.get(`${item.exercise_id}-${contrastSetNumber(item, setIndex + 1)}`),
               ).length;
               const isActive = index === currentExerciseIndex;
               const hasPr = Array.from({ length: item.sets ?? 0 }).some((_, si) =>
-                prSets.has(`${item.exercise_id}-${si + 1}`),
+                prSets.has(`${item.exercise_id}-${contrastSetNumber(item, si + 1)}`),
               );
               // §296 — séparateur visuel entre le dernier warmup et le premier main
               const prevBlock = index > 0 ? workoutPlan[index - 1]?.block : undefined;
@@ -1864,7 +1899,7 @@ export function WorkoutRunner({
                         hasPr={hasPr}
                       />
                     </div>
-                    {index > currentExerciseIndex &&
+                    {!hasContrastPairs && index > currentExerciseIndex &&
                       (workoutPlan[index - 1]?.block ?? "main") === (item.block ?? "main") && (
                       <Button
                         type="button"
@@ -2112,7 +2147,10 @@ export function WorkoutRunner({
           open={substitutePickerOpen}
           onOpenChange={setSubstitutePickerOpen}
           exercises={exercises}
-          onSelect={(exercise) => onSubstitute(orderedItemIndices[currentExerciseIndex] ?? currentExerciseIndex, exercise)}
+          onSelect={(exercise) => {
+            const originalIndex = (session.items ?? []).findIndex((item) => item.exercise_id === currentBlock?.exercise_id);
+            if (originalIndex >= 0) onSubstitute(originalIndex, exercise);
+          }}
           title="Remplacer l'exercice"
         />
       )}

@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import type { StrengthSessionItem } from "@/lib/api/types";
 import type { Exercise } from "@/lib/api/types";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { TrainingIntentBadge } from "./TrainingIntentBadge";
+import { getContrastRound } from "@/lib/strength/contrast";
 
 const formatStrengthValue = (value?: number | null) => {
   const numeric = Number(value);
@@ -52,13 +54,14 @@ function SetRowImpl({ item, index, exercise, loggedSets, isActive, hasPr }: SetR
         <p className="text-sm font-semibold truncate">
           {exercise?.nom_exercice ?? item.exercise_name}
         </p>
+        <TrainingIntentBadge item={item} exerciseName={exercise?.nom_exercice} />
         <p
           className={cn(
             "text-xs",
             isWarmup ? BLOCK_STYLES.warmup.textMuted : "text-muted-foreground",
           )}
         >
-          {formatStrengthValue(item.sets)}×{formatStrengthValue(item.reps)}
+          {getContrastRound(item) ? `Tour ${getContrastRound(item)!.round}/${getContrastRound(item)!.total} · ${item.reps} reps` : `${formatStrengthValue(item.sets)}×${formatStrengthValue(item.reps)}`}
         </p>
       </div>
       {hasPr && <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
