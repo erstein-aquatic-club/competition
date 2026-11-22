@@ -7,7 +7,7 @@ import { SessionMetadataForm } from "../shared/SessionMetadataForm";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getContrastPair, validContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
+import { getContrastPair, validateContrastPlan, type TrainingIntent } from "@/lib/strength/contrast";
 import { FormActions } from "../shared/FormActions";
 import { StrengthExerciseCard } from "./StrengthExerciseCard";
 import { cn } from "@/lib/utils";
@@ -272,7 +272,7 @@ export function StrengthSessionBuilder({
           {session.items.map((item, index) => {
             const pair = getContrastPair(item);
             const isPairStart = pair?.role === "force" &&
-              session.items[index + 1] && validContrastPair(item, session.items[index + 1]);
+              session.items[index + 1] && getContrastPair(session.items[index + 1])?.id === pair.id;
             return (
               <React.Fragment key={`${item.exercise_id}-${index}`}>
                 <StrengthExerciseCard
