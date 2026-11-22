@@ -1,4 +1,4 @@
-import { ArrowDown, Timer, Repeat2, RefreshCw, Zap, Dumbbell } from "lucide-react";
+import { ArrowDown, Timer, Repeat2, RefreshCw } from "lucide-react";
 import type { StrengthSessionItem } from "@/lib/api/types";
 import { getContrastPair } from "@/lib/strength/contrast";
 import { formatWork } from "@/lib/strength/prescriptionDisplay";
