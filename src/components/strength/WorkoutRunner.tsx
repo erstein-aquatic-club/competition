@@ -37,7 +37,7 @@ import { RestScreen } from "./RestScreen";
 import { SetRow } from "./SetRow";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
-import { expandContrastPlan, getContrastPair, getContrastRound, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
+import { expandContrastPlan, getContrastPair, getContrastRound, countPrimaryExercises, countPowerReminders, contrastSetNumber, isContrastRoundLogged } from "@/lib/strength/contrast";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { colors } from "@/lib/design-tokens";
@@ -1364,7 +1364,7 @@ export function WorkoutRunner({
                     <div>
                       <CardTitle className="text-xl">Bloc principal</CardTitle>
                       <CardDescription>
-                        {workoutPlan.filter((i) => (i.block ?? "main") === "main").length} exercices
+                        {countPrimaryExercises(orderedOriginalItems.filter((i) => (i.block ?? "main") === "main"))} exercices{countPowerReminders(orderedOriginalItems.filter((i) => (i.block ?? "main") === "main")) > 0 ? ` · ${countPowerReminders(orderedOriginalItems.filter((i) => (i.block ?? "main") === "main"))} rappel(s) explosifs` : ""}
                       </CardDescription>
                     </div>
                   </div>
@@ -1479,7 +1479,7 @@ export function WorkoutRunner({
         </div>
         {contrastRound && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-            <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "A / Force" : "B / Puissance"}</p>
+            <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "Force" : "Rappel puissance"}</p>
             <p className="text-xs text-muted-foreground">
               {contrastRound.role === "force"
                 ? (restDuration > 0 ? `Récupération ${restDuration}s, puis B.` : "Enchaîner B sans pause.")
@@ -1493,7 +1493,7 @@ export function WorkoutRunner({
             {contrastRound ? `Tour ${contrastRound.round}/${contrastRound.total}` : `Ex ${currentStep}/${workoutPlan.length}`}
           </span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold shrink-0">
-            {contrastRound ? (contrastRound.role === "force" ? "A" : "B") : `S ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`}
+            {contrastRound ? (contrastRound.role === "force" ? "Force" : "Rappel") : `S ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`}
           </span>
           <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
