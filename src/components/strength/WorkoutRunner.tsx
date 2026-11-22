@@ -1838,7 +1838,7 @@ export function WorkoutRunner({
         <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl">
           <SheetHeader>
             <SheetTitle>Aperçu séance</SheetTitle>
-            <p className="text-xs text-muted-foreground">Pour changer l’ordre, remonte un exercice avec la flèche.</p>
+            <p className="text-xs text-muted-foreground">{hasContrastPairs ? "Paire de contraste : ordre A → B verrouillé pendant la séance." : "Pour changer l’ordre, remonte un exercice avec la flèche."}</p>
           </SheetHeader>
           <div
             className="mt-4 space-y-2 overflow-y-auto overscroll-contain pb-8"
@@ -1847,11 +1847,11 @@ export function WorkoutRunner({
             {workoutPlan.map((item, index) => {
               const exercise = exercises.find((ex) => ex.id === item.exercise_id);
               const loggedSets = Array.from({ length: item.sets ?? 0 }).filter((_, setIndex) =>
-                logLookup.get(`${item.exercise_id}-${setIndex + 1}`),
+                logLookup.get(`${item.exercise_id}-${contrastSetNumber(item, setIndex + 1)}`),
               ).length;
               const isActive = index === currentExerciseIndex;
               const hasPr = Array.from({ length: item.sets ?? 0 }).some((_, si) =>
-                prSets.has(`${item.exercise_id}-${si + 1}`),
+                prSets.has(`${item.exercise_id}-${contrastSetNumber(item, si + 1)}`),
               );
               // §296 — séparateur visuel entre le dernier warmup et le premier main
               const prevBlock = index > 0 ? workoutPlan[index - 1]?.block : undefined;
@@ -1896,7 +1896,7 @@ export function WorkoutRunner({
                         hasPr={hasPr}
                       />
                     </div>
-                    {index > currentExerciseIndex &&
+                    {!hasContrastPairs && index > currentExerciseIndex &&
                       (workoutPlan[index - 1]?.block ?? "main") === (item.block ?? "main") && (
                       <Button
                         type="button"
