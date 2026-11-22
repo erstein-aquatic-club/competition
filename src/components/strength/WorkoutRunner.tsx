@@ -1482,8 +1482,8 @@ export function WorkoutRunner({
             <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "A / Force" : "B / Puissance"}</p>
             <p className="text-xs text-muted-foreground">
               {contrastRound.role === "force"
-                ? "Enchaîner l'exercice B sans récupération prolongée."
-                : `Après B : ${restDuration}s de récupération commune avant le prochain tour.`}
+                ? (restDuration > 0 ? `Récupération ${restDuration}s, puis B.` : "Enchaîner B sans pause.")
+                : `Après B : ${restDuration}s de récupération avant le prochain tour.`}
             </p>
           </div>
         )}
