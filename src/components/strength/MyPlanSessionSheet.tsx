@@ -14,7 +14,8 @@ import type { StrengthPhase } from "@/lib/strength/strengthPhaseStyles";
 import { PHASE_STYLES } from "@/lib/strength/strengthPhaseStyles";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
 import { TrainingIntentBadge } from "./TrainingIntentBadge";
-import { getContrastPair, validContrastPair } from "@/lib/strength/contrast";
+import { validContrastPair } from "@/lib/strength/contrast";
+import { ContrastPairPreviewCard } from "./ContrastPairPreviewCard";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { formatStrengthSessionTitle } from "@/lib/strength/formatStrengthSessionTitle";
 import { formatPrep, formatWork, formatRest } from "@/lib/strength/prescriptionDisplay";
@@ -156,11 +157,7 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
         <p className="text-[12px] font-medium leading-snug">{item.exercise_name ?? `Exercice ${displayIdx + 1}`}</p>
         <TrainingIntentBadge item={item} exerciseName={item.exercise_name} />
         {item.notes && <p className="text-[11px] text-muted-foreground leading-snug">{item.notes}</p>}
-        {getContrastPair(item)?.role === "force" ? (
-          <p className="text-[11px] font-medium text-primary">Enchaîner l’exercice B avant la récupération</p>
-        ) : getContrastPair(item)?.role === "power" ? (
-          <p className="text-[11px] font-medium text-primary">Récupération après B · {getContrastPair(item)!.rest_seconds}s</p>
-        ) : formatRest(item) && <p className="text-[11px] text-muted-foreground leading-snug">Repos · {formatRest(item)}</p>}
+        {formatRest(item) && <p className="text-[11px] text-muted-foreground leading-snug">Repos · {formatRest(item)}</p>}
         {!isWarmup && formatPrep(item, 0, true) && (
           <p className="text-[11px] text-muted-foreground leading-snug">Prépa · {formatPrep(item, 0, true)}</p>
         )}
@@ -244,16 +241,19 @@ function ItemsList({ items }: { items: StrengthSessionItem[] }) {
               <div className="h-px flex-1 bg-border" />
             </div>
           )}
-          {mainShown.map((item, i) => (
-            <Fragment key={`m-${item.exercise_id}-${i}`}>
-              {i < mainShown.length - 1 && validContrastPair(item, mainShown[i + 1]) && (
-                <div className="rounded-md bg-primary/5 px-2 py-1.5 text-xs font-semibold text-primary">
-                  Contraste · {item.sets} tours : A → B → {getContrastPair(item)!.rest_seconds}s de repos
-                </div>
-              )}
-              {renderItem(item, warmupShown.length + i, false)}
-            </Fragment>
-          ))}
+          {mainShown.map((item, i) => {
+            if (i > 0 && validContrastPair(mainShown[i - 1], item)) return null;
+            const second = mainShown[i + 1];
+            const paired = !!second && validContrastPair(item, second);
+            return (
+              <Fragment key={`m-${item.exercise_id}-${i}`}>
+                {paired ? (
+                  <ContrastPairPreviewCard first={item} second={second}
+                    firstName={item.exercise_name} secondName={second.exercise_name} />
+                ) : renderItem(item, warmupShown.length + i, false)}
+              </Fragment>
+            );
+          })}
         </div>
       )}
 
