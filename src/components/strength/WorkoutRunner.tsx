@@ -1428,7 +1428,7 @@ export function WorkoutRunner({
             "h-2 w-2 shrink-0 rounded-full transition-colors",
             isOnline ? "bg-emerald-500" : "bg-red-500"
           )} aria-label={isOnline ? "En ligne" : "Hors ligne"} />
-          {onSubstitute && (
+          {onSubstitute && !contrastRound && (
             <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0"
               onClick={() => withFocusDisclaimer(() => setSubstitutePickerOpen(true))}
               aria-label="Remplacer l'exercice"
@@ -1471,13 +1471,26 @@ export function WorkoutRunner({
             />
           </div>
         )}
+        <div className="flex flex-wrap items-center gap-2">
+          <TrainingIntentBadge item={currentBlock} exerciseName={currentExerciseDef?.nom_exercice} showCue />
+        </div>
+        {contrastRound && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+            <p className="font-semibold">Contraste · tour {contrastRound.round}/{contrastRound.total} · {contrastRound.role === "force" ? "A / Force" : "B / Puissance"}</p>
+            <p className="text-xs text-muted-foreground">
+              {contrastRound.role === "force"
+                ? "Enchaîner l'exercice B sans récupération prolongée."
+                : `Après B : ${restDuration}s de récupération commune avant le prochain tour.`}
+            </p>
+          </div>
+        )}
         {/* Ligne 2 : badges + progress */}
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-bold shrink-0">
-            Ex {currentStep}/{workoutPlan.length}
+            {contrastRound ? `Tour ${contrastRound.round}/${contrastRound.total}` : `Ex ${currentStep}/${workoutPlan.length}`}
           </span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold shrink-0">
-            S {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)}
+            {contrastRound ? (contrastRound.role === "force" ? "A" : "B") : `S ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`}
           </span>
           <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
@@ -1561,7 +1574,7 @@ export function WorkoutRunner({
       <Card className="rounded-3xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
-            Série {currentSetIndex}/{formatStrengthValue(currentBlock?.sets)} · {currentBlock ? formatSetTarget(currentBlock) : ""}
+{contrastRound ? `Tour ${contrastRound.round}/${contrastRound.total}` : `Série ${currentSetIndex}/${formatStrengthValue(currentBlock?.sets)}`} · {currentBlock ? formatSetTarget(currentBlock) : ""}
             {currentSetKey && prSets.has(currentSetKey) && (
               <Trophy className="h-4 w-4 text-amber-500" aria-label="Record personnel" />
             )}
@@ -1750,7 +1763,7 @@ export function WorkoutRunner({
         <RestScreen
           restEndAt={restEndAt}
           onExpire={handleRestExpire}
-          restDuration={restDuration}
+          restDuration={displayedRestDuration}
           restType={restType}
           exercise={currentExerciseDef ?? null}
           block={currentBlock}
@@ -2131,7 +2144,10 @@ export function WorkoutRunner({
           open={substitutePickerOpen}
           onOpenChange={setSubstitutePickerOpen}
           exercises={exercises}
-          onSelect={(exercise) => onSubstitute(orderedItemIndices[currentExerciseIndex] ?? currentExerciseIndex, exercise)}
+          onSelect={(exercise) => {
+            const originalIndex = (session.items ?? []).findIndex((item) => item.exercise_id === currentBlock?.exercise_id);
+            if (originalIndex >= 0) onSubstitute(originalIndex, exercise);
+          }}
           title="Remplacer l'exercice"
         />
       )}
