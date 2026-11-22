@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="330" viewBox="0 0 520 330" role="img" aria-labelledby="t d">
+<title id="t">Pallof Press debout : anti-rotation face à l'observateur</title>
+<desc id="d">Athlète debout face à l'observateur, poulie placée latéralement à gauche. Les mains avancent et reviennent dans l'axe du sternum. Buste et bassin restent fixes.</desc>
+<rect width="520" height="330" rx="12" fill="#f8fafc"/>
+<path d="M16 295H505" stroke="#ced4dc" stroke-width="2"/>
+<text x="26" y="29" font-family="Arial,sans-serif" font-weight="700" font-size="17" fill="#243145">PALLOF PRESS</text>
+<text x="26" y="48" font-family="Arial,sans-serif" font-size="11" fill="#5b6677">Poulie sur le côté · anti-rotation du tronc</text>
+<!-- poulie sur le côté gauche de l'athlète -->
+<rect x="38" y="65" width="12" height="231" rx="5" fill="#68788d"/>
+<rect x="26" y="61" width="35" height="11" rx="3" fill="#475569"/>
+<rect x="26" y="290" width="38" height="9" rx="3" fill="#475569"/>
+<circle cx="44" cy="152" r="12" fill="#e5e9ef" stroke="#526173" stroke-width="3"/>
+<circle cx="44" cy="152" r="4" fill="#64748b"/>
+<rect x="50" y="183" width="25" height="56" rx="4" fill="#394a5f"/>
+<path d="M62 190V234" stroke="#8090a4" stroke-width="3" stroke-dasharray="6 5"/>
+<!-- jambes fixes, chaussures -->
+<path d="M296 205L293 275" stroke="#54657c" stroke-width="25" stroke-linecap="round"/>
+<path d="M346 205L350 275" stroke="#54657c" stroke-width="25" stroke-linecap="round"/>
+<path d="M293 273L275 282" stroke="#263446" stroke-width="16" stroke-linecap="round"/>
+<path d="M350 273L368 282" stroke="#263446" stroke-width="16" stroke-linecap="round"/>
+<!-- torse / bras, bassin immobile -->
+<path d="M288 121Q320 116 355 121L350 203Q320 219 291 203Z" fill="#427c9f" stroke="#2d556f" stroke-width="3"/>
+<path d="M298 198Q321 206 343 198" fill="none" stroke="#dce8ef" stroke-width="3"/>
+<path d="M304 147L337 147M321 149V195" stroke="#80b7d2" stroke-width="2" opacity=".65"/>
+<circle cx="321" cy="95" r="24" fill="#dfb590" stroke="#986a4d" stroke-width="2"/>
+<path d="M299 88Q318 60 344 84" fill="#2d3543"/>
+<path d="M301 98H311M331 98H341" stroke="#6e4a38" stroke-width="2"/>
+<path d="M320 107V112" stroke="#986a4d" stroke-width="2"/>
+<path d="M289 130Q280 141 287 158" stroke="#dfb590" stroke-width="18" stroke-linecap="round" fill="none"/>
+<path d="M354 130Q365 143 355 158" stroke="#dfb590" stroke-width="18" stroke-linecap="round" fill="none"/>
+<!-- avant-bras qui avancent vers l'observateur: effet de perspective -->
+<g fill="none" stroke="#dfb590" stroke-width="14" stroke-linecap="round">
+<path d="M286 158L316 159"><animate attributeName="d" dur="2.4s" repeatCount="indefinite" values="M286 158L316 159;M286 158L318 186;M286 158L318 186;M286 158L316 159;M286 158L316 159" keyTimes="0;.32;.58;.87;1"/></path>
+<path d="M355 158L323 159"><animate attributeName="d" dur="2.4s" repeatCount="indefinite" values="M355 158L323 159;M355 158L322 186;M355 158L322 186;M355 158L323 159;M355 158L323 159" keyTimes="0;.32;.58;.87;1"/></path>
+</g>
+<!-- câble : traction horizontale vers la gauche -->
+<line x1="56" y1="152" x2="320" y2="159" stroke="#3d4551" stroke-width="3">
+<animate attributeName="y2" dur="2.4s" repeatCount="indefinite" values="159;186;186;159;159" keyTimes="0;.32;.58;.87;1"/>
+</line>
+<circle cx="320" cy="159" r="10" fill="#f6e4d5" stroke="#987356" stroke-width="2">
+<animate attributeName="cy" dur="2.4s" repeatCount="indefinite" values="159;186;186;159;159" keyTimes="0;.32;.58;.87;1"/>
+<animate attributeName="r" dur="2.4s" repeatCount="indefinite" values="10;14;14;10;10" keyTimes="0;.32;.58;.87;1"/>
+</circle>
+<!-- repère du maintien de l'axe -->
+<path d="M320 218V257" stroke="#167f6b" stroke-dasharray="4 5" stroke-width="2"/>
+<path d="M312 250L320 259L328 250" stroke="#167f6b" fill="none" stroke-width="2"/>
+<text x="384" y="116" font-size="12" font-family="Arial,sans-serif" fill="#1d6b5e" font-weight="700">TRONC FIXE</text>
+<path d="M382 121Q370 158 357 175" stroke="#1d6b5e" stroke-width="2" fill="none"/>
+<text x="27" y="315" font-family="Arial,sans-serif" font-size="12" fill="#526173">Résister à la rotation · tourner de 180° pour l'autre côté</text>
+</svg>
