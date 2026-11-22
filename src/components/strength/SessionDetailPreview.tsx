@@ -1,6 +1,8 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { StrengthSessionTemplate, StrengthSessionItem, Exercise, Assignment, StrengthCycleType } from "@/lib/api";
 import { BLOCK_STYLES } from "@/lib/strength/blockStyles";
+import { TrainingIntentBadge } from "./TrainingIntentBadge";
+import { getContrastPair, validContrastPair } from "@/lib/strength/contrast";
 import { warmupMetaFromItem, warmupSectionLabel, correctiveChipLabel } from "@/lib/strength/warmupLabels";
 import { Button } from "@/components/ui/button";
 import {
@@ -221,6 +223,7 @@ export function SessionDetailPreview({
               : "Échauffement · Mobilité";
           const showWarmupHeader = isWarmup && sectionLabel !== prevSectionLabel;
           const showMainDivider = prevIsWarmup && !isWarmup;
+          const contrastStart = index + 1 < items.length && validContrastPair(item, items[index + 1]);
           const correctiveChip =
             meta.kind === "corrective"
               ? correctiveChipLabel(meta.correctiveAxis, meta.correctiveSide)
@@ -247,6 +250,11 @@ export function SessionDetailPreview({
                     Bloc principal
                   </span>
                   <div className="h-px flex-1 bg-border" />
+                </div>
+              )}
+              {contrastStart && (
+                <div className="rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+                  Contraste · {item.sets} tours : force → puissance → {getContrastPair(item)!.rest_seconds}s de repos
                 </div>
               )}
               <motion.div variants={itemVariants}>
@@ -312,13 +320,14 @@ export function SessionDetailPreview({
                             {correctiveChip}
                           </span>
                         )}
+                        <TrainingIntentBadge item={item} exerciseName={exercise?.nom_exercice} />
                       </div>
                       <p className="text-[11px] text-muted-foreground font-medium mt-0.5 tabular-nums">
                         {setsVal}×{repsVal}
                         {chargeLabel && <span className="text-muted-foreground/50"> · </span>}
                         {chargeLabel && <span>{chargeLabel}</span>}
                         <span className="text-muted-foreground/50"> · </span>
-                        <span>repos {restVal}</span>
+                        <span>{getContrastPair(item)?.role === "force" ? "enchaîner B" : getContrastPair(item)?.role === "power" ? `repos après B · ${getContrastPair(item)!.rest_seconds}s` : `repos ${restVal}`}</span>
                       </p>
                     </div>
 
